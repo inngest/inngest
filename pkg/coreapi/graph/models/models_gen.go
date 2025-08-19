@@ -97,9 +97,39 @@ type CreateAppInput struct {
 	URL string `json:"url"`
 }
 
+type CreateDebugSessionInput struct {
+	WorkspaceID  string  `json:"workspaceId"`
+	FunctionSlug string  `json:"functionSlug"`
+	RunID        *string `json:"runID,omitempty"`
+}
+
+type CreateDebugSessionResponse struct {
+	DebugSessionID string `json:"debugSessionID"`
+	DebugRunID     string `json:"debugRunID"`
+}
+
 type DebounceConfiguration struct {
 	Period string  `json:"period"`
 	Key    *string `json:"key,omitempty"`
+}
+
+type DebugRun struct {
+	DebugRun *RunTraceSpan `json:"debugRun"`
+	RunSteps []*RunStep    `json:"runSteps,omitempty"`
+}
+
+type DebugRunQuery struct {
+	WorkspaceID  string  `json:"workspaceId"`
+	FunctionSlug string  `json:"functionSlug"`
+	DebugRunID   *string `json:"debugRunID,omitempty"`
+	RunID        *string `json:"runID,omitempty"`
+}
+
+type DebugSessionQuery struct {
+	WorkspaceID    string  `json:"workspaceId"`
+	FunctionSlug   string  `json:"functionSlug"`
+	DebugSessionID *string `json:"debugSessionID,omitempty"`
+	RunID          *string `json:"runID,omitempty"`
 }
 
 type Event struct {
@@ -314,6 +344,12 @@ type RerunFromStepInput struct {
 type RetryConfiguration struct {
 	Value     int   `json:"value"`
 	IsDefault *bool `json:"isDefault,omitempty"`
+}
+
+type RunStep struct {
+	StepID string  `json:"stepID"`
+	Name   string  `json:"name"`
+	StepOp *StepOp `json:"stepOp,omitempty"`
 }
 
 type RunStepInfo struct {

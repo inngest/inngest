@@ -629,6 +629,19 @@ type RunTraceTrigger {
   cron: String # The cron expression if available
 }
 
+# debug types
+
+type DebugRun {
+  debugRun: RunTraceSpan!
+  runSteps: [RunStep!]
+}
+
+type RunStep {
+  stepID: String!
+  name: String!
+  stepOp: StepOp
+}
+
 # connect
 
 enum ConnectV1ConnectionStatus {

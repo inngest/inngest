@@ -582,3 +582,105 @@ export const GET_EVENT_RUNS = gql`
     }
   }
 `;
+
+export const CREATE_DEBUG_SESSION = gql`
+  mutation CreateDebugSession($input: CreateDebugSessionInput!) {
+    createDebugSession(input: $input) {
+      debugSessionID
+      debugRunID
+    }
+  }
+`;
+
+export const DEBUG_RUN = gql`
+  query GetDebugRun($query: DebugRunQuery!) {
+    debugRun(query: $query) {
+      debugRun {
+        runID
+        spanID
+        traceID
+        name
+        status
+        attempts
+        duration
+        queuedAt
+        startedAt
+        endedAt
+        stepID
+        stepOp
+        isRoot
+        parentSpanID
+        isUserland
+        debugRunID
+        debugSessionID
+        childrenSpans {
+          runID
+          spanID
+          traceID
+          name
+          status
+          attempts
+          duration
+          queuedAt
+          startedAt
+          endedAt
+          stepID
+          stepOp
+          isRoot
+          parentSpanID
+          isUserland
+          debugRunID
+          debugSessionID
+        }
+      }
+      runSteps {
+        stepID
+        name
+        stepOp
+      }
+    }
+  }
+`;
+
+export const DEBUG_SESSION = gql`
+  query GetDebugSession($query: DebugSessionQuery!) {
+    debugSession(query: $query) {
+      runID
+      spanID
+      traceID
+      name
+      status
+      attempts
+      duration
+      queuedAt
+      startedAt
+      endedAt
+      stepID
+      stepOp
+      isRoot
+      parentSpanID
+      isUserland
+      debugRunID
+      debugSessionID
+      childrenSpans {
+        runID
+        spanID
+        traceID
+        name
+        status
+        attempts
+        duration
+        queuedAt
+        startedAt
+        endedAt
+        stepID
+        stepOp
+        isRoot
+        parentSpanID
+        isUserland
+        debugRunID
+        debugSessionID
+      }
+    }
+  }
+`;

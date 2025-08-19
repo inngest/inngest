@@ -14,8 +14,8 @@ export type Trace = {
   stepOp?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
-  debugRunID?: string;
-  debugSessionID?: string;
+  debugRunID?: string | null;
+  debugSessionID?: string | null;
 };
 
 export type UserlandSpanType = {

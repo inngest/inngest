@@ -15,7 +15,23 @@ export const pathCreator = {
   runPopout({ runID }: { runID: string }): Route {
     return `/run?runID=${runID}` as Route;
   },
-  debugger({ functionSlug, runID }: { functionSlug: string; runID?: string }): Route {
-    return `/debugger/function?function=${functionSlug}&runID=${runID}` as Route;
+  debugger({
+    functionSlug,
+    runID,
+    debugRunID,
+    debugSessionID,
+  }: {
+    functionSlug: string;
+    runID?: string;
+    debugRunID?: string | null;
+    debugSessionID?: string | null;
+  }): Route {
+    const params = new URLSearchParams();
+    params.set('function', functionSlug);
+    runID && params.set('runID', runID);
+    debugRunID && params.set('debugRunID', debugRunID);
+    debugSessionID && params.set('debugSessionID', debugSessionID);
+
+    return `/debugger/function?${params.toString()}` as Route;
   },
 };

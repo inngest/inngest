@@ -63,7 +63,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: { envSlug: env.slug },
   });
 
-  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);
+  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', true);
 
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
