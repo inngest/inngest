@@ -48,7 +48,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         value={value}
         {...props}
       >
-        {iconBefore && <span className="flex-shrink-0">{iconBefore}</span>}
+        {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
         <span ref={textRef} className="flex-1 truncate text-left">
           {children}
         </span>
