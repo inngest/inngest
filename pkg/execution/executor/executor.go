@@ -84,7 +84,8 @@ var (
 // can be directly executed next and saves a state.Pause for edges that have async conditions.
 func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
-		runtimeDrivers: map[string]driver.DriverV1{},
+		driverv1: map[string]driver.DriverV1{},
+		driverv2: map[string]driver.DriverV2{},
 	}
 
 	for _, o := range opts {
@@ -250,19 +251,33 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 	}
 }
 
-// WithRuntimeDrivers specifies the drivers available to use when executing steps
+// WithDriverV1 specifies the drivers available to use when executing steps
 // of a function.
 //
 // When invoking a step in a function, we find the registered driver with the step's URI
 // and use that driver to execute the step.
-func WithRuntimeDrivers(drivers ...driver.DriverV1) ExecutorOpt {
+func WithDriverV1(drivers ...driver.DriverV1) ExecutorOpt {
 	return func(exec execution.Executor) error {
 		e := exec.(*executor)
 		for _, d := range drivers {
-			if _, ok := e.runtimeDrivers[d.Name()]; ok {
+			if _, ok := e.driverv1[d.Name()]; ok {
 				return ErrRuntimeRegistered
 			}
-			e.runtimeDrivers[d.Name()] = d
+			e.driverv1[d.Name()] = d
+
+		}
+		return nil
+	}
+}
+
+func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
+	return func(exec execution.Executor) error {
+		e := exec.(*executor)
+		for _, d := range drivers {
+			if _, ok := e.driverv2[d.Name()]; ok {
+				return ErrRuntimeRegistered
+			}
+			e.driverv2[d.Name()] = d
 
 		}
 		return nil
@@ -344,12 +359,14 @@ type executor struct {
 	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers      map[string]driver.DriverV1
 	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
 	httpClient          exechttp.RequestExecutor
+
+	driverv1 map[string]driver.DriverV1
+	driverv2 map[string]driver.DriverV2
 
 	lifecycles []execution.LifecycleListener
 
@@ -1495,22 +1512,63 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, url.String())
 	}
 
-	// Execute the actual step.
-	response, err := e.executeDriverForStep(ctx, i)
-
-	if response.Err != nil && err == nil {
-		// This step errored, so always return an error.
-		return response, fmt.Errorf("%s", *response.Err)
+	switch d := e.fnDriver(ctx, i.f).(type) {
+	case driver.DriverV2:
+		return e.executeDriverV2(ctx, i, d)
+	case driver.DriverV1:
+		{
+			// Execute the actual step using V1 drivers.  The V1 driver embeds errors in driver
+			// response and has generally difficult error management.
+			response, err := e.executeDriverV1(ctx, i)
+			if response.Err != nil && err == nil {
+				// This step errored, so always return an error.
+				return response, fmt.Errorf("%s", *response.Err)
+			}
+			return response, err
+		}
+	default:
+		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, inngest.Driver(i.f))
 	}
-	return response, err
 }
 
-// executeDriverForStep runs the enqueued step by invoking the driver.  It also inspects
+func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2) (*state.DriverResponse, error) {
+	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
+		Metadata:   *run.Metadata(),
+		Fn:         run.f,
+		SigningKey: []byte{}, // TODO
+		Attempt:    run.AttemptCount(),
+		Index:      run.stackIndex,
+		StepID:     &run.edge.Outgoing,
+	})
+
+	// TODO: Handle errors appropriately.
+	//
+	// For now, the executor expects V1 style errors directly in state.DriverResponse.
+	// We move all UserErrors into state.DriverResponse, and always return a response...
+	// until we refactor the executor to handle (Option<Response>, UserError, InternalError).
+	if resp == nil {
+		resp = &state.DriverResponse{}
+	}
+
+	if uerr != nil {
+		resp.Output = uerr.Raw()
+		resp.OutputSize = len(resp.Output.([]byte))
+	}
+
+	if ierr != nil {
+		str := ierr.Error()
+		resp.Err = &str
+	}
+
+	return resp, ierr
+}
+
+// executeDriverV1 runs the enqueued step by invoking the driver.  It also inspects
 // and normalizes responses (eg. max retry attempts).
-func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
+func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
 	driverName := inngest.Driver(i.f)
 
-	d, ok := e.runtimeDrivers[driverName]
+	d, ok := e.driverv1[driverName]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, driverName)
 	}
@@ -3718,6 +3776,17 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	}
 
+	return nil
+}
+
+func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {
+	name := inngest.Driver(fn)
+	if d, ok := e.driverv1[name]; ok {
+		return d
+	}
+	if d, ok := e.driverv2[name]; ok {
+		return d
+	}
 	return nil
 }
 

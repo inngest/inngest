@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/driver/httpv2"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
@@ -410,9 +411,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
-		executor.WithRuntimeDrivers(
-			drivers...,
-		),
+		executor.WithDriverV1(drivers...),
+		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
 		executor.WithLogger(l),
