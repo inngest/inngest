@@ -169,6 +169,31 @@ func NewDebounceClient(r rueidis.Client, queueDefaultKey string) *DebounceClient
 	}
 }
 
+type CronClient struct {
+	kg          CronKeyGenerator
+	unshardedRc rueidis.Client
+}
+
+func NewCronClient(r rueidis.Client, queueDefaultKey string) *CronClient {
+	return &CronClient{
+		kg: cronKeyGenerator{
+			queueDefaultKey: queueDefaultKey,
+			queueItemKeyGenerator: queueItemKeyGenerator{
+				queueDefaultKey: queueDefaultKey,
+			},
+		},
+		unshardedRc: r,
+	}
+}
+
+func (c *CronClient) Client() rueidis.Client {
+	return c.unshardedRc
+}
+
+func (c *CronClient) KeuGenerator() CronKeyGenerator {
+	return c.kg
+}
+
 type GlobalClient struct {
 	kg          GlobalKeyGenerator
 	unshardedRc rueidis.Client
