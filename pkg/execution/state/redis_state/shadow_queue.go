@@ -464,8 +464,8 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"backlog_throttle", backlog.Throttle,
 	)
 
-	if len(res.RefilledItems) > 0 {
-		q.log.Debug(
+	if len(res.RefilledItems) > 0 && mrand.Float64() < 0.05 {
+		q.log.Trace(
 			"refilled items to ready queue",
 			"job_id", res.RefilledItems,
 			"backlog", backlog.BacklogID,
