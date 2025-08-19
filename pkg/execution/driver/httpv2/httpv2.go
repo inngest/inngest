@@ -114,16 +114,14 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 		return nil, nil, errs.Wrap(0, true, "nil response from sdk: %w", err)
 	}
 
+	// We must also assert that we had an Inngest-specific response.
+	if !headers.IsSDK(resp.Header) {
+		return nil, errs.WrapResponseAsUser(0, true, resp.Body, "didn't receive SDK response: %w", err), nil
+	}
+
 	// We always expect opcodes from the API endpoint.  Whenever we re-enter a sync function,
 	// the API becomes, to effect, an async function and each HTTP request we make should always
 	// result in well-formed ops.
-	//
-	// TODO: Check that the response header is from Inngest.
-	if !headers.IsSDK(resp.Header) {
-		// TODO: Handle and put entire response in error?
-		return nil, errs.WrapUser(0, true, "didn't receive SDK response: %w", err), nil
-	}
-
 	ops, userErr := parseOpcodes(resp.Body)
 	if userErr != nil {
 		return nil, userErr, nil

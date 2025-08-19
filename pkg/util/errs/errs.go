@@ -34,7 +34,7 @@ type UserError interface {
 
 	// Raw returns the raw data for the error.  This may be the raw HTTP response,
 	// the raw error string, and so on.
-	// Raw() []byte
+	Raw() []byte
 }
 
 // Wrap always wraps an error as an InternalError type.
@@ -55,6 +55,17 @@ func WrapUser(code int, retryable bool, msg string, a ...any) UserError {
 	}
 }
 
+// WrapResponseAsUser wraps a raw HTTP response as a user error, exposing the raw
+// response via the `.Raw()` method.
+func WrapResponseAsUser(code int, retryable bool, raw []byte, msg string, a ...any) UserError {
+	return user{
+		error:     fmt.Errorf(msg, a...),
+		code:      code,
+		retryable: retryable,
+		raw:       raw,
+	}
+}
+
 type internal struct {
 	error
 	retryable bool
@@ -72,6 +83,7 @@ type user struct {
 	error
 	retryable bool
 	code      int
+	raw       []byte
 }
 
 // Unwrap allows us to use errors.Is to determine the proper
@@ -79,4 +91,5 @@ type user struct {
 func (u user) Unwrap() error   { return u.error }
 func (u user) ErrorCode() int  { return u.code }
 func (u user) Retryable() bool { return u.retryable }
+func (u user) Raw() []byte     { return u.raw }
 func (user) UserError()        {}
