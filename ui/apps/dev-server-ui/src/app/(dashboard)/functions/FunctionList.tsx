@@ -2,17 +2,19 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BlankSlate } from '@inngest/components/BlankSlate';
+import { Button } from '@inngest/components/Button/Button';
 import { Search } from '@inngest/components/Forms/Search';
+import TableBlankState from '@inngest/components/Functions/TableBlankState';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { Table } from '@inngest/components/Table';
+import { Table } from '@inngest/components/Table/OldTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { RiExternalLinkLine } from '@remixicon/react';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -245,14 +247,16 @@ export default function FunctionList() {
           customRowProps={customRowProps}
           tableContainerRef={tableContainerRef}
           blankState={
-            <BlankSlate
-              title="Inngest has not detected any functions"
-              subtitle="Read our documentation to learn how to serve your functions"
-              imageUrl="/images/no-results.png"
-              link={{
-                text: 'Serving functions',
-                url: 'https://www.inngest.com/docs/sdk/serve',
-              }}
+            <TableBlankState
+              actions={
+                <Button
+                  label="Go to docs"
+                  href="https://www.inngest.com/docs/sdk/serve"
+                  target="_blank"
+                  icon={<RiExternalLinkLine />}
+                  iconSide="left"
+                />
+              }
             />
           }
         />

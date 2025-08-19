@@ -98,6 +98,12 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+
+	// Driver represents driver parameters for executing the Inngest function.  Typically,
+	// this is an HTTP driver with a URL.
+	//
+	// Sometimes, we may include additional information for eg. sync-based functions.
+	Driver FunctionDriver `json:"driver,omitzero"`
 }
 
 type RateLimit struct {
@@ -140,7 +146,7 @@ func (r RateLimit) IsValid(ctx context.Context) error {
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the function's name.
 func (f *Function) DeterministicUUID() uuid.UUID {
-	return DeterministicSha1UUID(f.Name + f.Steps[0].URI)
+	return DeterministicSha1UUID(f.Name + f.URI().String())
 }
 
 // Throttle represents concurrency over time.
@@ -476,11 +482,18 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 
 // URI returns the function's URI.  It is expected that the function has already been
 // validated.
-func (f Function) URI() (*url.URL, error) {
-	if len(f.Steps) >= 1 {
-		return url.Parse(f.Steps[0].URI)
+func (f Function) URI() *url.URL {
+	if f.Driver.URI == "" {
+		// Backcompat - use the step URI if the function driver doesnt exist.
+		if url, _ := url.Parse(f.Steps[0].URI); url != nil {
+			return url
+		}
 	}
-	return nil, fmt.Errorf("No steps configured")
+
+	if url, _ := url.Parse(f.Driver.URI); url != nil {
+		return url
+	}
+	return &url.URL{}
 }
 
 // DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1

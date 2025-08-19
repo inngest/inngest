@@ -43,7 +43,7 @@ export default function FunctionReplayPage({ params }: FunctionReplayPageProps) 
           <NewReplayButton functionSlug={functionSlug} />
         </div>
       )}
-      <div className="overflow-y-auto">
+      <div className="h-full overflow-y-auto">
         <ReplayList functionSlug={functionSlug} />
       </div>
     </>

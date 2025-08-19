@@ -7,7 +7,7 @@ import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
-import NewTable from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import {
   DEFAULT_TIME,
@@ -348,7 +348,7 @@ export function EventsTable({
       </div>
 
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
-        <NewTable
+        <Table
           columns={columns}
           data={eventsData?.events || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage && !isRefetching)}

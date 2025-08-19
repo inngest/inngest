@@ -1,0 +1,16 @@
+version: v1
+plugins:
+  - plugin: go
+    out: gen
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: gen
+    opt: paths=source_relative
+  - plugin: grpc-gateway
+    out: gen
+    opt: 
+      - paths=source_relative
+      - allow_delete_body=true
+  - plugin: connect-go
+    out: gen
+    opt: paths=source_relative
