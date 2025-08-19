@@ -4,7 +4,9 @@ import "time"
 
 type QueueIterOpt func(o *queueIterOpt)
 
+// queueIterOpt provides options to be used for queue iteration operations
 type queueIterOpt struct {
+	// TODO figure how to embed queueOpOpt into this struct and share the setting overrides
 	batchSize                 int64
 	interval                  time.Duration
 	iterateBacklogs           bool
