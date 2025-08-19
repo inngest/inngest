@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 )
@@ -25,6 +24,6 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (c *redisCronManager) UpsertSchedule(ctx context.Context, fnID uuid.UUID) error {
+func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) error {
 	return fmt.Errorf("not implemented")
 }

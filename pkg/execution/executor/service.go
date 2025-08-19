@@ -872,6 +872,11 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	}
 	l.Info("cron sync", "item", ci) // TODO change to trace
 
+	// Upsert the queue item in the map
+	if err := s.croner.UpdateSchedule(ctx, ci); err != nil {
+		return fmt.Errorf("error upserting cron schedule: %w", err)
+	}
+
 	// TODO
 	// 2. delete and dequeue existing queue item
 	// 3. enqueue item for next schedule
