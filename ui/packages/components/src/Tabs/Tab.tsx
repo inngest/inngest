@@ -3,7 +3,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { RiCloseLine } from '@remixicon/react';
 
-import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { TabsContext } from './TabsContext';
 
 const ACTIVE_BORDER_STYLES =
@@ -31,44 +30,41 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
     const finalIconBefore = iconBefore ?? defaultIconBefore;
 
     return (
-      <OptionalTooltip
-        tooltip={isOverflowing && typeof children === 'string' ? children : undefined}
+      <TabsPrimitive.Trigger
+        className={cn(
+          ACTIVE_BORDER_STYLES,
+          ACTIVE_TEXT_STYLES,
+          APPEARANCE_STYLES,
+          FOCUS_STYLES,
+          HOVER_STYLES,
+          INTERACTION_STYLES,
+          LAYOUT_STYLES,
+          SIZING_STYLES,
+          SPACING_STYLES,
+          className
+        )}
+        ref={ref}
+        title={isOverflowing && typeof children === 'string' ? children : undefined}
+        value={value}
+        {...props}
       >
-        <TabsPrimitive.Trigger
-          className={cn(
-            ACTIVE_BORDER_STYLES,
-            ACTIVE_TEXT_STYLES,
-            APPEARANCE_STYLES,
-            FOCUS_STYLES,
-            HOVER_STYLES,
-            INTERACTION_STYLES,
-            LAYOUT_STYLES,
-            SIZING_STYLES,
-            SPACING_STYLES,
-            className
-          )}
-          ref={ref}
-          value={value}
-          {...props}
-        >
-          {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
-          <span ref={textRef} className="flex-1 truncate text-left">
-            {children}
+        {iconBefore && <span className="flex-shrink-0">{iconBefore}</span>}
+        <span ref={textRef} className="flex-1 truncate text-left">
+          {children}
+        </span>
+        {onClose && (
+          <span
+            className={CLOSE_BUTTON_STYLES}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose(value);
+            }}
+          >
+            <RiCloseLine size={14} />
           </span>
-          {onClose && (
-            <span
-              className={CLOSE_BUTTON_STYLES}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose(value);
-              }}
-            >
-              <RiCloseLine size={14} />
-            </span>
-          )}
-        </TabsPrimitive.Trigger>
-      </OptionalTooltip>
+        )}
+      </TabsPrimitive.Trigger>
     );
   }
 );
