@@ -16,6 +16,7 @@ const (
 	CronOpUpdate
 	CronOpPause
 	CronOpUnpause
+	CronOpProcess
 )
 
 var (
@@ -27,9 +28,10 @@ var (
 )
 
 // Parser returns the global cron parser instance
-func Parser() cron.Parser {
-	return parser
-}
+// NOTE comment this out for now until its needed
+// func Parser() cron.Parser {
+// 	return parser
+// }
 
 // Parse parses a cron expression string and returns a schedule
 func Parse(str string) (cron.Schedule, error) {
@@ -52,7 +54,8 @@ func Validate(str string) error {
 
 // CronManager represents the handling of cron
 type CronManager interface {
-	ScheduleNext(ctx context.Context) error
+	// Next returns the next schedule time based on the cron item attributes with a jitter
+	Next(ctx context.Context, ci CronItem) (time.Time, error)
 	// UpdateSchedule handles the updating of the next scheduled item.
 	//
 	// Scenarios:
