@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { ContextualBanner } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
 
@@ -11,24 +12,24 @@ export function ExecutionOverageBanner() {
   const { isBannerVisible, executionOverageData, dismiss } = useExecutionOverage();
   const trackingUser = useTrackingUser();
 
+  // Track CTA viewed when banner becomes visible
+  useEffect(() => {
+    if (isBannerVisible && executionOverageData && trackingUser) {
+      trackEvent({
+        name: 'app/billing_cta.viewed',
+        data: {
+          cta: 'execution-overage-banner',
+          entitlement: 'executions',
+        },
+        user: trackingUser,
+        v: '2025-01-15.1',
+      });
+    }
+  }, [isBannerVisible, executionOverageData, trackingUser]);
+
   if (!isBannerVisible || !executionOverageData) {
     return null;
   }
-
-  const handleCTAClick = () => {
-    if (trackingUser) {
-      trackEvent({
-        name: 'app/upsell.execution.overage.cta.clicked',
-        data: {
-          variant: 'banner',
-          executionCount: executionOverageData.executionCount,
-          executionLimit: executionOverageData.executionLimit,
-        },
-        user: trackingUser,
-        v: '2025-07-14.1',
-      });
-    }
-  };
 
   return (
     <ContextualBanner
@@ -54,7 +55,6 @@ export function ExecutionOverageBanner() {
           href={pathCreator.billing({ tab: 'plans', ref: 'execution-overage-banner' })}
           kind="secondary"
           label="Upgrade plan"
-          onClick={handleCTAClick}
         />
       }
     >
