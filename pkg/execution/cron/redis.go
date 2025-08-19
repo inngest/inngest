@@ -8,8 +8,14 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-func NewRedisCronManager() CronManager {
-	manager := &redisCronManager{}
+func NewRedisCronManager(
+	q redis_state.QueueManager,
+	log logger.Logger,
+) CronManager {
+	manager := &redisCronManager{
+		q:   q,
+		log: log,
+	}
 
 	return manager
 }
