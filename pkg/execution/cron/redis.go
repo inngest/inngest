@@ -72,6 +72,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 
 		// TODO
 		// - update mapping
+		return c.setFunctionScheduleMap(ctx, ci, jobID)
 
 	case CronOpUpdate:
 		// TODO
@@ -88,4 +89,31 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 	}
 
 	return fmt.Errorf("not implemented")
+}
+
+func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronItem, jobID string) error {
+	// compute the hashID from provided jobID
+	//
+	// NOTE ideally, we should just be able to reference the newly enqueued item but Enqueue doesn't return any objects
+	hashedID := queue.HashID(ctx, jobID)
+
+	rc := c.c.Client()
+	kg := c.c.KeyGenerator()
+
+	cmd := rc.B().
+		Hset().
+		Key(kg.Schedule()).
+		FieldValue().
+		FieldValue(ci.FunctionID.String(), hashedID).
+		Build()
+
+	added, err := rc.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error adding job to schedule map: %w", err)
+	}
+	if added != 1 {
+		return fmt.Errorf("expected 1 change made to schedule map, actual: %d", added)
+	}
+
+	return nil
 }
