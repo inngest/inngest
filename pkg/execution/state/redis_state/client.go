@@ -190,7 +190,7 @@ func (c *CronClient) Client() rueidis.Client {
 	return c.unshardedRc
 }
 
-func (c *CronClient) KeuGenerator() CronKeyGenerator {
+func (c *CronClient) KeyGenerator() CronKeyGenerator {
 	return c.kg
 }
 

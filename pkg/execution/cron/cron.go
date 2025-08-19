@@ -2,9 +2,11 @@ package cron
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
+	cron "github.com/robfig/cron/v3"
 )
 
 type CronOp int
@@ -15,6 +17,38 @@ const (
 	CronOpPause
 	CronOpUnpause
 )
+
+var (
+	// parser is a global cron expression parser that supports minute-level precision
+	// and includes descriptive names (e.g., @hourly, @daily)
+	parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+
+	allowedVariant = 50 * time.Second
+)
+
+// Parser returns the global cron parser instance
+func Parser() cron.Parser {
+	return parser
+}
+
+// Parse parses a cron expression string and returns a schedule
+func Parse(str string) (cron.Schedule, error) {
+	return parser.Parse(str)
+}
+
+// IsAt checks if the given time falls within a window of when the cron schedule
+// should execute. This provides tolerance for timing variations in cron execution.
+func IsAt(cs cron.Schedule, t time.Time) bool {
+	next := cs.Next(t.Add(-50 * time.Second))
+	diff := t.Sub(next).Seconds()
+	return diff >= 0 && diff <= float64(allowedVariant)
+}
+
+// Validate checks if a cron expression string is syntactically valid
+func Validate(str string) error {
+	_, err := parser.Parse(str)
+	return err
+}
 
 // CronManager represents the handling of cron
 type CronManager interface {
