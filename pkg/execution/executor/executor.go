@@ -2518,6 +2518,9 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleGeneratorGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
+	case enums.OpcodeRunComplete:
+		// TODO: Handle finalization
+		return fmt.Errorf("run complete not implemented")
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
