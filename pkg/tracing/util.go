@@ -21,12 +21,8 @@ import (
 func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
-	if url, err := f.URI(); err == nil {
-		urlString := url.String()
-		meta.AddAttr(rawAttrs, meta.Attrs.RequestURL, &urlString)
-	} else {
-		rawAttrs.AddErr(fmt.Errorf("failed to get function URI: %w", err))
-	}
+	urlString := f.URI().String()
+	meta.AddAttr(rawAttrs, meta.Attrs.RequestURL, &urlString)
 
 	return rawAttrs
 }
@@ -216,7 +212,6 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 					meta.AddAttr(rawAttrs, meta.Attrs.StepWaitExpiry, &expiry)
 				} else {
 					rawAttrs.AddErr(fmt.Errorf("failed to get wait for event expiry: %w", err))
-
 				}
 
 				if opts.If != nil && *opts.If != "" {

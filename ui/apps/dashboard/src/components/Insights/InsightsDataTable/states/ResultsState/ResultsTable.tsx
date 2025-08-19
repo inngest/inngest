@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import Table from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type {

@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
@@ -24,8 +25,8 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -579,6 +580,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	// Create the API v2 service handler
+	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, apiv2.HTTPHandlerOptions{
+		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create v2 handler: %w", err)
+	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -589,6 +598,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	mounts := []api.Mount{
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
+		{At: "/api/v2", Handler: apiv2Handler},
 		{At: "/debug", Handler: middleware.Profiler()},
 		{At: "/metrics", Router: metricsAPI.Router},
 	}
@@ -664,7 +674,6 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	}()
 	return rc, r, nil
 }
-
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
