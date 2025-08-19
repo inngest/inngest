@@ -44,10 +44,7 @@ export function InsightsTabsList({
       <Tabs
         onClose={(tabId: string) => {
           const tab = tabs.find((t) => t.id === tabId);
-          if (tab === undefined) {
-            tabManagerActions.closeTab(tabId);
-            return;
-          }
+          if (tab === undefined) return;
 
           if (hasDiffWithSavedQuery(queries, tab)) {
             setPendingCloseTabId(tabId);
