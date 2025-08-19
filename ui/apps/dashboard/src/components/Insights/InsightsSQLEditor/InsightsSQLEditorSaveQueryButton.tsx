@@ -4,25 +4,24 @@ import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 import { toast } from 'sonner';
-import { ulid } from 'ulid';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import { hasSavedQueryWithUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
+import { hasDiffWithSavedQuery } from '../InsightsTabManager/InsightsTabManager';
+import { useTabManagerActions } from '../InsightsTabManager/TabManagerContext';
+import type { Query } from '../types';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
-  tab: TabConfig;
+  tab: Query;
 };
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
+  const { tabManagerActions } = useTabManagerActions();
   const { queries, saveQuery } = useStoredQueries();
-  const { query, queryName } = useInsightsStateMachineContext();
+  const { query, queryName: name } = useInsightsStateMachineContext();
 
-  const isSavedQuery = tab.savedQueryId !== undefined;
-  const disabled =
-    queryName === '' || (isSavedQuery && !hasSavedQueryWithUnsavedChanges(tab, queries));
-  const Icon = tab.savedQueryId ? RiBookmarkFill : RiBookmarkLine;
+  const disabled = name === '' || (tab.saved && !hasDiffWithSavedQuery(queries, tab));
+  const Icon = tab.saved ? RiBookmarkFill : RiBookmarkLine;
 
   return (
     <Button
@@ -33,17 +32,10 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       kind="secondary"
       label="Save"
       onClick={() => {
-        saveQuery(
-          {
-            id: tab.savedQueryId ?? ulid(),
-            name: queryName,
-            query,
-            saved: true,
-          },
-          tab.id
-        );
-
-        toast.success(`Successfully ${isSavedQuery ? 'saved' : 'updated'} query`);
+        const { id, saved: wasSaved } = tab;
+        saveQuery({ id, name, query, saved: true });
+        tabManagerActions.updateTab(id, { saved: true });
+        toast.success(`Successfully ${wasSaved ? 'updated' : 'saved'} query`);
       }}
       size="medium"
     />

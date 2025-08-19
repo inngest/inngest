@@ -8,12 +8,12 @@ import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEd
 import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
-import type { TabConfig } from './InsightsTabManager';
+import type { Query } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
 type InsightsTabPanelProps = {
   isTemplatesTab?: boolean;
-  tab: TabConfig;
+  tab: Query;
 };
 
 export function InsightsTabPanel({ isTemplatesTab, tab }: InsightsTabPanelProps) {

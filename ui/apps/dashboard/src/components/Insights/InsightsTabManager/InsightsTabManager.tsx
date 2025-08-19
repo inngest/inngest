@@ -5,34 +5,26 @@ import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
-import { isQuerySnapshot } from '../queries';
+import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
-export interface TabConfig {
-  id: string;
-  name: string;
-  query: string;
-  savedQueryId?: string;
-}
-
 export interface TabManagerActions {
-  breakQueryAssociation: (savedQueryId: string) => void;
+  breakQueryAssociation: (id: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
-  createTabFromQuery: (query: Query | QuerySnapshot) => void;
-  createTabFromTemplate: (template: QueryTemplate) => void;
+  createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
-  updateTab: (id: string, tab: Partial<Omit<TabConfig, 'id'>>) => void;
+  updateTab: (id: string, patch: Partial<Omit<Query, 'id'>>) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
   actions: TabManagerActions;
   activeTabId: string;
   tabManager: JSX.Element;
-  tabs: TabConfig[];
+  tabs: Query[];
 }
 
 export interface UseInsightsTabManagerProps {
@@ -43,112 +35,70 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps
 ): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<TabConfig[]>([TEMPLATES_TAB]);
+  const [tabs, setTabs] = useState<Query[]>([TEMPLATES_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(TEMPLATES_TAB.id);
 
-  const focusTabBase = useCallback(
-    (tabId: string, updatedTabs?: TabConfig[]) => {
-      const relevantTabs = updatedTabs ?? tabs;
-
-      const tab = relevantTabs.find((tab) => tab.id === tabId);
-      if (tab === undefined) {
-        console.warn('Attempted to focus a tab that does not exist.');
-        return;
-      }
-
-      setActiveTabId(tabId);
-    },
-    [tabs]
-  );
-
   const createTabBase = useCallback(
-    (query: Query): TabConfig[] => {
-      const savedQueryId = query.saved ? query.id : undefined;
-      const tabWithSameSavedQueryId =
-        savedQueryId !== undefined
-          ? tabs.find((tab) => tab.savedQueryId === savedQueryId)
-          : undefined;
-      if (tabWithSameSavedQueryId !== undefined) {
-        focusTabBase(tabWithSameSavedQueryId.id);
-        return tabs;
-      }
-
-      const updatedTabs = [...tabs, { ...query, savedQueryId }];
-      setTabs(updatedTabs);
-      focusTabBase(query.id, updatedTabs);
-
-      return updatedTabs;
+    (query: Query) => {
+      setTabs([...tabs, query]);
+      setActiveTabId(query.id);
     },
-    [focusTabBase, tabs]
+    [setActiveTabId, tabs]
   );
 
   const actions = useMemo(
     () => ({
-      breakQueryAssociation: (savedQueryId: string) => {
+      breakQueryAssociation: (id: string) => {
+        const isOpen = activeTabId === id;
+        const replacementId = ulid();
+
         setTabs((prevTabs) =>
-          prevTabs.map((tab) =>
-            tab.savedQueryId === savedQueryId ? { ...tab, savedQueryId: undefined } : tab
-          )
+          prevTabs.map((tab) => (tab.id === id ? { ...tab, id: replacementId, saved: false } : tab))
         );
+
+        if (isOpen) setActiveTabId(replacementId);
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
-          if (prevTabs.find((tab) => tab.id === id) === undefined) {
-            console.warn('Attempted to close a tab that does not exist.');
-            return prevTabs;
-          }
-
           const newTabs = prevTabs.filter((tab) => tab.id !== id);
 
           const newActiveTabId = getNewActiveTabAfterClose(prevTabs, id, activeTabId);
-          if (newActiveTabId !== undefined) {
-            focusTabBase(newActiveTabId, newTabs);
-          }
+          if (newActiveTabId !== undefined) setActiveTabId(newActiveTabId);
 
           return newTabs;
         });
       },
       createNewTab: () => {
-        createTabBase({
-          id: ulid(),
-          name: UNTITLED_QUERY,
-          query: '',
-          saved: false,
-        });
+        createTabBase(makeEmptyUnsavedQuery());
       },
-      createTabFromQuery: (query: Query | QuerySnapshot) => {
-        if (isQuerySnapshot(query)) {
-          createTabBase({
-            id: ulid(),
-            name: UNTITLED_QUERY,
-            query: query.query,
-            saved: false,
-          });
-
+      createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => {
+        if (isQueryTemplate(query) || isQuerySnapshot(query)) {
+          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query });
           return;
         }
 
-        createTabBase(query);
-      },
-      createTabFromTemplate: (template: QueryTemplate) => {
+        const tabWithSameSavedQueryId = findTabWithId(query.id, tabs);
+        if (tabWithSameSavedQueryId !== undefined) {
+          setActiveTabId(tabWithSameSavedQueryId.id);
+          return;
+        }
+
         createTabBase({
-          id: ulid(),
-          name: UNTITLED_QUERY,
-          query: template.query,
-          saved: false,
+          ...query,
+          id: query.saved ? query.id : ulid(),
+          name: query.saved ? query.name : UNTITLED_QUERY,
         });
       },
-      focusTab: focusTabBase,
+      focusTab: setActiveTabId,
       openTemplatesTab: () => {
-        const existingTab = tabs.find((tab) => tab.id === TEMPLATES_TAB.id);
+        const existingTab = findTabWithId(TEMPLATES_TAB.id, tabs);
         if (existingTab === undefined) {
-          const newTabs = createTabBase({ ...TEMPLATES_TAB, saved: false });
-          focusTabBase(TEMPLATES_TAB.id, newTabs);
+          createTabBase(TEMPLATES_TAB);
         } else {
-          focusTabBase(TEMPLATES_TAB.id);
+          setActiveTabId(TEMPLATES_TAB.id);
         }
       },
-      updateTab: (id: string, tab: Partial<Omit<TabConfig, 'id'>>) => {
+      updateTab: (id: string, tab: Partial<Omit<Query, 'id'>>) => {
         setTabs((prevTabs) => prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)));
       },
     }),
@@ -182,7 +132,7 @@ interface InsightsTabManagerInternalProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  tabs: TabConfig[];
+  tabs: Query[];
 }
 
 function InsightsTabManagerInternal({
@@ -219,7 +169,7 @@ function InsightsTabManagerInternal({
 }
 
 function getNewActiveTabAfterClose(
-  existingTabs: TabConfig[],
+  existingTabs: Query[],
   tabIdToClose: string,
   currentActiveTabId: string
 ): undefined | string {
@@ -236,14 +186,17 @@ function getNewActiveTabAfterClose(
   return newlySelectedTabId;
 }
 
-export function hasSavedQueryWithUnsavedChanges(
-  tab: TabConfig,
-  savedQueries: Record<string, Query>
-): boolean {
-  if (tab.savedQueryId === undefined) return false;
+function findTabWithId(id: string, tabs: Query[]): undefined | Query {
+  return tabs.find((tab) => tab.id === id);
+}
 
-  const savedQuery = savedQueries[tab.savedQueryId];
+export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Query): boolean {
+  const savedQuery = savedQueries[tab.id];
   if (savedQuery === undefined) return false;
 
   return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
+}
+
+function makeEmptyUnsavedQuery(): Query {
+  return { id: ulid(), name: UNTITLED_QUERY, query: '', saved: false };
 }

@@ -1,11 +1,15 @@
 import { ulid } from 'ulid';
 
-import type { Query, QuerySnapshot } from './types';
+import type { Query, QuerySnapshot, QueryTemplate } from './types';
 
 type QueryRecord<T> = Record<string, T>;
 
 export function isQuerySnapshot(q: Query | QuerySnapshot): q is QuerySnapshot {
   return !('saved' in q);
+}
+
+export function isQueryTemplate(q: Query | QuerySnapshot | QueryTemplate): q is QueryTemplate {
+  return 'templateKind' in q;
 }
 
 export function getOrderedQuerySnapshots(

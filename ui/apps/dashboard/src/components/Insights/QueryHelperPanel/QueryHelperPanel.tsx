@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
-import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
@@ -11,10 +10,9 @@ import { useStoredQueries } from './StoredQueriesContext';
 
 interface QueryHelperPanelProps {
   activeTabId: string;
-  tabs: TabConfig[];
 }
 
-export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
+export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
   const { deleteQuery, deleteQuerySnapshot, queries, querySnapshots } = useStoredQueries();
 
@@ -55,7 +53,6 @@ export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={savedQueries}
-          tabs={tabs}
           title="Saved queries"
           sectionType="saved"
         />
@@ -64,7 +61,6 @@ export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
           onQueryDelete={deleteQuerySnapshot}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={orderedQuerySnapshots}
-          tabs={tabs}
           title="Query history"
           sectionType="history"
         />

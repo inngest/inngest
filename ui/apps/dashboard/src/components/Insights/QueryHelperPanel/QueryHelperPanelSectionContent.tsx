@@ -1,6 +1,5 @@
 'use client';
 
-import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot } from '../types';
 import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
@@ -15,7 +14,6 @@ export interface QueryHelperPanelSectionContentProps {
     isLoading: boolean;
   };
   sectionType: 'history' | 'saved';
-  tabs: TabConfig[];
 }
 
 export function QueryHelperPanelSectionContent({
@@ -24,7 +22,6 @@ export function QueryHelperPanelSectionContent({
   onQuerySelect,
   queries,
   sectionType,
-  tabs,
 }: QueryHelperPanelSectionContentProps) {
   const { data, error, isLoading } = queries;
 
@@ -60,7 +57,6 @@ export function QueryHelperPanelSectionContent({
           onQuerySelect={onQuerySelect}
           query={query}
           sectionType={sectionType}
-          tabs={tabs}
         />
       ))}
     </div>

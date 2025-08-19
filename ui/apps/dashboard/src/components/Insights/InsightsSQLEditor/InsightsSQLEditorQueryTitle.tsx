@@ -6,10 +6,10 @@ import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { TabConfig } from '../InsightsTabManager/InsightsTabManager';
+import type { Query } from '@/components/Insights/types';
 
 type InsightsSQLEditorQueryTitleProps = {
-  tab: TabConfig;
+  tab: Query;
 };
 
 export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitleProps) {

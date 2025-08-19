@@ -58,7 +58,7 @@ export function InsightsTabPanelTemplatesTabCard({
     <button
       className={BUTTON_CARD_STYLES}
       onClick={() => {
-        tabManagerActions.createTabFromTemplate(template);
+        tabManagerActions.createTabFromQuery(template);
       }}
     >
       <div

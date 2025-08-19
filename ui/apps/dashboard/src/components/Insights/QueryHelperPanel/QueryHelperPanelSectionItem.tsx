@@ -8,8 +8,7 @@ import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/react';
 
-import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import type { Query, QuerySnapshot } from '../types';
+import type { Query, QuerySnapshot } from '@/components/Insights/types';
 
 interface QueryHelperPanelSectionItemProps {
   activeTabId: string;
@@ -17,7 +16,6 @@ interface QueryHelperPanelSectionItemProps {
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   query: Query | QuerySnapshot;
   sectionType: 'history' | 'saved';
-  tabs: TabConfig[];
 }
 
 export function QueryHelperPanelSectionItem({
@@ -26,7 +24,6 @@ export function QueryHelperPanelSectionItem({
   onQuerySelect,
   query,
   sectionType,
-  tabs,
 }: QueryHelperPanelSectionItemProps) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -36,7 +33,7 @@ export function QueryHelperPanelSectionItem({
   const displayText = query.name;
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
-  const isActiveTab = getIsActiveTab(activeTabId, tabs, query);
+  const isActiveTab = activeTabId === query.id;
 
   useEffect(() => {
     const el = textRef.current;
@@ -110,12 +107,4 @@ export function QueryHelperPanelSectionItem({
       </AlertModal>
     </>
   );
-}
-
-function getIsActiveTab(
-  activeTabId: string,
-  tabs: TabConfig[],
-  query: Query | QuerySnapshot
-): boolean {
-  return tabs.find((tab) => tab.id === activeTabId && tab.savedQueryId === query.id) !== undefined;
 }

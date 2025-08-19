@@ -14,7 +14,8 @@ import {
 } from '@remixicon/react';
 
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import { hasSavedQueryWithUnsavedChanges, type TabConfig } from './InsightsTabManager';
+import type { Query } from '@/components/Insights/types';
+import { hasDiffWithSavedQuery } from './InsightsTabManager';
 import { useTabManagerActions } from './TabManagerContext';
 import { TEMPLATES_TAB } from './constants';
 
@@ -22,7 +23,7 @@ interface InsightsTabsListProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  tabs: TabConfig[];
+  tabs: Query[];
 }
 
 export function InsightsTabsList({
@@ -48,7 +49,7 @@ export function InsightsTabsList({
             return;
           }
 
-          if (hasSavedQueryWithUnsavedChanges(tab, queries)) {
+          if (hasDiffWithSavedQuery(queries, tab)) {
             setPendingCloseTabId(tabId);
             return;
           }
@@ -107,15 +108,14 @@ export function InsightsTabsList({
   );
 }
 
-function IndicatorTabIcon({ tab }: { tab: TabConfig }) {
+function IndicatorTabIcon({ tab }: { tab: Query }) {
   const { queries } = useStoredQueries();
 
-  if (tab.id === TEMPLATES_TAB.id) return <RiBookReadLine size={16} />;
-
-  const savedQuery = tab.savedQueryId ? queries[tab.savedQueryId] : undefined;
-  if (savedQuery === undefined || !hasSavedQueryWithUnsavedChanges(tab, queries)) {
+  if (tab.id === TEMPLATES_TAB.id) {
+    return <RiBookReadLine size={16} />;
+  } else if (hasDiffWithSavedQuery(queries, tab)) {
+    return <RiCircleFill className="fill-amber-500" size={16} />;
+  } else {
     return <RiCodeSSlashLine size={16} />;
   }
-
-  return <RiCircleFill className="fill-amber-500" size={16} />;
 }
