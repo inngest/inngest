@@ -8,7 +8,7 @@ import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/componen
 import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
-import type { MetricsData, ScopedMetric } from '@/gql/graphql';
+import type { MetricsData, MetricsResponse, ScopedMetric } from '@/gql/graphql';
 import tailwindConfig from '../../../tailwind.config';
 import type { EntityLookup, EntityType } from './Dashboard';
 
@@ -164,16 +164,25 @@ export const getLineChartOptions = (
   };
 };
 
-export const getXAxis = (metrics: ScopedMetric[]) => {
+export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) => {
   const dark = isDark();
 
-  const diff = timeDiff(metrics[0]?.data[0]?.bucket, metrics[0]?.data.at(-1)?.bucket);
-  const dataLength = metrics[0]?.data?.length || 30;
+  let series: MetricsData[] | undefined;
+  if (Array.isArray(metrics)) {
+    if (metrics[0]?.data) {
+      series = metrics[0].data;
+    }
+  } else if (metrics) {
+    series = metrics.data;
+  }
+
+  const diff = timeDiff(series?.[0]?.bucket, series?.at(-1)?.bucket);
+  const dataLength = series?.length || 30;
 
   return {
     type: 'category' as const,
     boundaryGap: true,
-    data: metrics[0]?.data.map(({ bucket }) => bucket) || ['No Data Found'],
+    data: series?.map(({ bucket }) => bucket) || ['No Data Found'],
     axisPointer: {
       show: true,
       snap: true,

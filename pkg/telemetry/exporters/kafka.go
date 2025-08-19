@@ -3,8 +3,10 @@ package exporters
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -208,6 +210,10 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 					"run_id", id.RunId,
 				)
 				status = "error"
+
+				if strings.Contains(err.Error(), consts.KafkaMsgTooLargeError) {
+					l.Error("error", err, "span proto size", proto.Size(span), "marhsalled span proto size", len(byt), "span.output size", len(span.Output))
+				}
 			}
 
 			metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{

@@ -1,0 +1,33 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+service V2 {
+  rpc Health(HealthRequest) returns (HealthResponse) {
+    option (google.api.http) = {
+      get: "/health"
+    };
+  }
+}
+
+message HealthRequest {
+  // Empty request message for health check
+}
+
+message HealthResponse {
+  HealthData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message HealthData {
+  string status = 1;
+}
+
+message ResponseMetadata {
+  google.protobuf.Timestamp fetched_at = 1;
+  google.protobuf.Timestamp cached_until = 2;
+}

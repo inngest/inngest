@@ -126,6 +126,24 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 			},
 			expected: errors.New("batch timeout should be more than 1s"),
 		},
+		{
+			name: "should return error if key expression is invalid",
+			config: &EventBatchConfig{
+				Key:     strptr("me-bad"),
+				MaxSize: 10,
+				Timeout: "2s",
+			},
+			expected: errors.New("batch key expression is invalid"),
+		},
+		{
+			name: "should return error if conditional expression is invalid",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "2s",
+				If:      strptr("event.data.num = 5"),
+			},
+			expected: errors.New("conditional batch expression is invalid"),
+		},
 	}
 
 	for _, test := range tests {
