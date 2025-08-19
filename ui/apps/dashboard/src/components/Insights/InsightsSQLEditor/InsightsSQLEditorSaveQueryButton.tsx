@@ -32,10 +32,11 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       kind="secondary"
       label="Save"
       onClick={() => {
-        const { id, saved: wasSaved } = tab;
-        saveQuery({ id, name, query, saved: true });
-        tabManagerActions.updateTab(id, { saved: true });
-        toast.success(`Successfully ${wasSaved ? 'updated' : 'saved'} query`);
+        const newTab: Query = { id: tab.id, name, query, saved: true };
+        saveQuery(newTab, () => {
+          tabManagerActions.updateTab(tab.id, newTab);
+          toast.success(`Successfully ${tab.saved ? 'updated' : 'saved'} query`);
+        });
       }}
       size="medium"
     />

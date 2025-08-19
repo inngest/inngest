@@ -18,7 +18,7 @@ interface StoredQueriesContextValue {
   queries: QueryRecord<Query>;
   querySnapshots: QueryRecord<QuerySnapshot>;
   removeUnsavedQuery: (id: ID) => void;
-  saveQuery: (query: Query) => void;
+  saveQuery: (query: Query, onSuccess: () => void) => void;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
 }
 
@@ -52,9 +52,10 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   }, []);
 
   const saveQuery = useCallback(
-    (query: Query) => {
+    (query: Query, onSuccess: () => void) => {
       setSavedQueries(withId(savedQueries, query.id, { ...query, saved: true } as Query));
       setUnsavedQueries((prev) => withoutId(prev, query.id));
+      onSuccess();
     },
     [setSavedQueries, savedQueries]
   );
