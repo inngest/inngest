@@ -221,6 +221,7 @@ type UnshardedClient struct {
 	queue    *QueueClient
 	debounce *DebounceClient
 	global   *GlobalClient
+	cron     *CronClient
 }
 
 func (u *UnshardedClient) Pauses() *PauseClient {
@@ -239,12 +240,17 @@ func (u *UnshardedClient) Global() *GlobalClient {
 	return u.global
 }
 
+func (u *UnshardedClient) Cron() *CronClient {
+	return u.cron
+}
+
 func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
 	return &UnshardedClient{
 		pauses:        NewPauseClient(r, stateDefaultKey),
 		queue:         NewQueueClient(r, queueDefaultKey),
 		debounce:      NewDebounceClient(r, queueDefaultKey),
 		global:        NewGlobalClient(r, stateDefaultKey),
+		cron:          NewCronClient(r, queueDefaultKey),
 		unshardedConn: r,
 	}
 }
