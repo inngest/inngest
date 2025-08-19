@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
+import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
 import { simulateQuery } from './mocks';
@@ -57,7 +58,7 @@ export function InsightsStateMachineContextProvider({
       const result = await simulateQuery(query, null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
       saveQuerySnapshot(
-        makeQuerySnapshot(query, queryName === 'Untitled query' ? undefined : queryName)
+        makeQuerySnapshot(query, queryName === UNTITLED_QUERY ? undefined : queryName)
       );
     } catch (error) {
       dispatch({

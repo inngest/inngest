@@ -56,7 +56,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
       const savedQuery: Query = { ...query, saved: true };
       setSavedQueries(withId(savedQueries, query.id, savedQuery));
       setUnsavedQueries((prev) => withoutId(prev, query.id));
-      tabManagerActions.updateTabSavedQueryId(tabId, query.id);
+      tabManagerActions.updateTab(tabId, { savedQueryId: query.id });
     },
     [setSavedQueries, savedQueries, tabManagerActions]
   );

@@ -5,3 +5,5 @@ export const TEMPLATES_TAB: TabConfig = {
   name: 'Templates',
   query: '',
 };
+
+export const UNTITLED_QUERY = 'Untitled query';

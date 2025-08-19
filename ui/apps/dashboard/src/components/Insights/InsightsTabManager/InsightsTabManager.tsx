@@ -8,7 +8,7 @@ import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/
 import { isQuerySnapshot } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
-import { TEMPLATES_TAB } from './constants';
+import { TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 export interface TabConfig {
   id: string;
@@ -25,9 +25,7 @@ export interface TabManagerActions {
   createTabFromTemplate: (template: QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
-  updateTabQuery: (id: string, query: string) => void;
-  updateTabName: (id: string, name: string) => void;
-  updateTabSavedQueryId: (id: string, savedQueryId: string) => void;
+  updateTab: (id: string, tab: Partial<Omit<TabConfig, 'id'>>) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -113,7 +111,7 @@ export function useInsightsTabManager(
       createNewTab: () => {
         createTabBase({
           id: ulid(),
-          name: 'Untitled query',
+          name: UNTITLED_QUERY,
           query: '',
           saved: false,
         });
@@ -122,7 +120,7 @@ export function useInsightsTabManager(
         if (isQuerySnapshot(query)) {
           createTabBase({
             id: ulid(),
-            name: 'Untitled query',
+            name: UNTITLED_QUERY,
             query: query.query,
             saved: false,
           });
@@ -135,7 +133,7 @@ export function useInsightsTabManager(
       createTabFromTemplate: (template: QueryTemplate) => {
         createTabBase({
           id: ulid(),
-          name: 'Untitled query',
+          name: UNTITLED_QUERY,
           query: template.query,
           saved: false,
         });
@@ -150,16 +148,8 @@ export function useInsightsTabManager(
           focusTabBase(TEMPLATES_TAB.id);
         }
       },
-      updateTabName: (id: string, name: string) => {
-        setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, name } : tab)));
-      },
-      updateTabQuery: (id: string, query: string) => {
-        setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, query } : tab)));
-      },
-      updateTabSavedQueryId: (id: string, savedQueryId: string) => {
-        setTabs((prevTabs) =>
-          prevTabs.map((tab) => (tab.id === id ? { ...tab, savedQueryId } : tab))
-        );
+      updateTab: (id: string, tab: Partial<Omit<TabConfig, 'id'>>) => {
+        setTabs((prevTabs) => prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)));
       },
     }),
     [activeTabId, tabs]
@@ -214,8 +204,8 @@ function InsightsTabManagerInternal({
         {tabs.map((tab) => (
           <InsightsStateMachineContextProvider
             key={tab.id}
-            onQueryChange={(query) => actions.updateTabQuery(tab.id, query)}
-            onQueryNameChange={(name) => actions.updateTabName(tab.id, name)}
+            onQueryChange={(query) => actions.updateTab(tab.id, { query })}
+            onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
             query={tab.query}
             queryName={tab.name}
             renderChildren={tab.id === activeTabId}
