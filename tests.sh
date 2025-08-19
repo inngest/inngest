@@ -50,7 +50,7 @@ sleep 2
 
 export TEST_MODE=true
 
-go run ./cmd/main.go dev --no-discovery > dev-stdout.txt 2> dev-stderr.txt &
+go run ./cmd dev --no-discovery > dev-stdout.txt 2> dev-stderr.txt &
 pids+=($!)
 
 # Check that dev server started successfully

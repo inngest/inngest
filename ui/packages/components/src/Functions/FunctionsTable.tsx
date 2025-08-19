@@ -7,7 +7,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import TableBlankState from '@inngest/components/Functions/TableBlankState';
-import NewTable from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { type Function, type PageInfo } from '@inngest/components/types/function';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -163,7 +163,7 @@ export function FunctionsTable({
         <FunctionsStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
-        <NewTable
+        <Table
           columns={columns}
           data={mergedData || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage)}

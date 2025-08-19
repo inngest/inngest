@@ -326,6 +326,13 @@ func (r *mutationResolver) Rerun(
 		}
 	}
 
+	//
+	// preserve the original run ID to support n+1 subsequent reruns from step
+	originalRunID := &fnrun.RunID
+	if fnrun.OriginalRunID != nil {
+		originalRunID = fnrun.OriginalRunID
+	}
+
 	identifier, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
 		Function: *fn,
 		AppID:    fnCQRS.AppID,
@@ -335,7 +342,7 @@ func (r *mutationResolver) Rerun(
 			// will result in the creation of a new ID
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
-		OriginalRunID:  &fnrun.RunID,
+		OriginalRunID:  originalRunID,
 		AccountID:      consts.DevServerAccountID,
 		FromStep:       fromStepReq,
 		WorkspaceID:    consts.DevServerEnvID,

@@ -12,6 +12,7 @@ export type App = {
 };
 
 export const methodTypes = {
+  Api: 'API',
   Connect: 'CONNECT',
   Serve: 'SERVE',
 } as const;
