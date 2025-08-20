@@ -479,6 +479,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceCroner(croner),
 		executor.WithServiceLogger(l),
 		executor.WithServiceShardSelector(shardSelector),
+		executor.WithServicePublisher(pb),
 		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
