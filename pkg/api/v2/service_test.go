@@ -78,7 +78,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
 		handler, err := NewHTTPHandler(ctx, opts)
 
@@ -183,13 +183,13 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 
 	t.Run("timestamps are consistent and recent", func(t *testing.T) {
 		start := time.Now()
-		
+
 		resp1, err := service.Health(ctx, req)
 		require.NoError(t, err)
-		
+
 		resp2, err := service.Health(ctx, req)
 		require.NoError(t, err)
-		
+
 		end := time.Now()
 
 		time1 := resp1.Metadata.FetchedAt.AsTime()
@@ -210,10 +210,10 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 		require.NotNil(t, timestamp)
 
 		require.True(t, timestamp.IsValid())
-		
+
 		asTime := timestamp.AsTime()
 		require.False(t, asTime.IsZero())
-		
+
 		fromTime := timestamppb.New(asTime)
 		require.Equal(t, timestamp.Seconds, fromTime.Seconds)
 		require.Equal(t, timestamp.Nanos, fromTime.Nanos)
