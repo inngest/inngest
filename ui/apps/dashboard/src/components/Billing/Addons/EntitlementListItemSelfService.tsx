@@ -12,7 +12,6 @@ import AdvancedObservabilityComponent from '@/components/Billing/Addons/Advanced
 import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
-import SlackChannelComponent from './SlackChannelModal';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -64,8 +63,6 @@ export default function EntitlementListItemSelfService({
   const isAdvancedObservability =
     title === 'Log retention' || title === 'Metrics granularity' || title === 'Metrics freshness';
 
-  const isDedicatedSlackChannel = title === 'Dedicated Slack Channel';
-
   const addonCostStr = addonQtyCostString(addonQty, addon);
 
   const addonConfirmTitle =
@@ -103,18 +100,6 @@ export default function EntitlementListItemSelfService({
     if (isAdvancedObservability) {
       return (
         <AdvancedObservabilityComponent
-          title={title}
-          description={description}
-          tooltip={tooltip}
-          entitlement={entitlement}
-          addon={addon}
-          addonPurchased={addonPurchased}
-          onChange={onChange}
-        />
-      );
-    } else if (isDedicatedSlackChannel) {
-      return (
-        <SlackChannelComponent
           title={title}
           description={description}
           tooltip={tooltip}
