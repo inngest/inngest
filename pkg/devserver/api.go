@@ -323,7 +323,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 		// enqueue cron sync to system queue
 		maxAttempts := consts.MaxRetries + 1
-		queueName := queue.KindCronSync
+		kind := queue.KindCronSync
 		for _, ci := range crons {
 			at := ulid.Time(ci.ID.Time())
 			jobID := ci.ID.String()
@@ -331,7 +331,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				JobID:       &jobID,
 				GroupID:     uuid.New().String(),
 				WorkspaceID: ci.WorkspaceID,
-				Kind:        queue.KindCronSync,
+				Kind:        kind,
 				Identifier: state.Identifier{
 					AccountID:       ci.AccountID,
 					WorkspaceID:     ci.WorkspaceID,
@@ -342,7 +342,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				},
 				MaxAttempts: &maxAttempts,
 				Payload:     ci,
-				QueueName:   &queueName,
+				QueueName:   &kind,
 			}, at, queue.EnqueueOpts{}); err != nil {
 				l.Error("error enqueueing cron sync job", "error", err, "cron_item", ci)
 			}

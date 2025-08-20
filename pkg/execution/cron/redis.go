@@ -126,7 +126,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 
 	// enqueue new schedule
 	jobID := ci.ID.String()
-	queueName := queue.KindCron
+	kind := queue.KindCron
 	maxAttempts := consts.MaxRetries + 1
 
 	err = c.q.Enqueue(ctx, queue.Item{
@@ -140,8 +140,8 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 			WorkflowID:      ci.FunctionID,
 			WorkflowVersion: ci.FunctionVersion,
 		},
-		Kind:        queue.KindCron,
-		QueueName:   &queueName,
+		Kind:        kind,
+		QueueName:   &kind,
 		MaxAttempts: &maxAttempts,
 		Payload:     nextItem,
 	}, next, queue.EnqueueOpts{})
