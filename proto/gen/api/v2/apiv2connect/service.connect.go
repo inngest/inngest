@@ -35,6 +35,8 @@ const (
 const (
 	// V2HealthProcedure is the fully-qualified name of the V2's Health RPC.
 	V2HealthProcedure = "/api.v2.V2/Health"
+	// V2XSchemaOnlyProcedure is the fully-qualified name of the V2's _SchemaOnly RPC.
+	V2XSchemaOnlyProcedure = "/api.v2.V2/_SchemaOnly"
 	// V2CreateAccountProcedure is the fully-qualified name of the V2's CreateAccount RPC.
 	V2CreateAccountProcedure = "/api.v2.V2/CreateAccount"
 )
@@ -42,6 +44,8 @@ const (
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 }
 
@@ -62,6 +66,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("Health")),
 			connect.WithClientOptions(opts...),
 		),
+		xSchemaOnly: connect.NewClient[v2.HealthRequest, v2.ErrorResponse](
+			httpClient,
+			baseURL+V2XSchemaOnlyProcedure,
+			connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
+			connect.WithClientOptions(opts...),
+		),
 		createAccount: connect.NewClient[v2.CreateAccountRequest, v2.CreateAccountResponse](
 			httpClient,
 			baseURL+V2CreateAccountProcedure,
@@ -74,12 +84,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 // v2Client implements V2Client.
 type v2Client struct {
 	health        *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	xSchemaOnly   *connect.Client[v2.HealthRequest, v2.ErrorResponse]
 	createAccount *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
 }
 
 // Health calls api.v2.V2.Health.
 func (c *v2Client) Health(ctx context.Context, req *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error) {
 	return c.health.CallUnary(ctx, req)
+}
+
+// XSchemaOnly calls api.v2.V2._SchemaOnly.
+func (c *v2Client) XSchemaOnly(ctx context.Context, req *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error) {
+	return c.xSchemaOnly.CallUnary(ctx, req)
 }
 
 // CreateAccount calls api.v2.V2.CreateAccount.
@@ -90,6 +106,8 @@ func (c *v2Client) CreateAccount(ctx context.Context, req *connect.Request[v2.Cr
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 }
 
@@ -106,6 +124,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("Health")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2XSchemaOnlyHandler := connect.NewUnaryHandler(
+		V2XSchemaOnlyProcedure,
+		svc.XSchemaOnly,
+		connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2CreateAccountHandler := connect.NewUnaryHandler(
 		V2CreateAccountProcedure,
 		svc.CreateAccount,
@@ -116,6 +140,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		switch r.URL.Path {
 		case V2HealthProcedure:
 			v2HealthHandler.ServeHTTP(w, r)
+		case V2XSchemaOnlyProcedure:
+			v2XSchemaOnlyHandler.ServeHTTP(w, r)
 		case V2CreateAccountProcedure:
 			v2CreateAccountHandler.ServeHTTP(w, r)
 		default:
@@ -129,6 +155,10 @@ type UnimplementedV2Handler struct{}
 
 func (UnimplementedV2Handler) Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.Health is not implemented"))
+}
+
+func (UnimplementedV2Handler) XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2._SchemaOnly is not implemented"))
 }
 
 func (UnimplementedV2Handler) CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {

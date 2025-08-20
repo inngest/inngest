@@ -4,15 +4,63 @@ package api.v2;
 import "google/protobuf/timestamp.proto";
 import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
+import "third_party/protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Bearer token authentication. Format: `Bearer {key}`"
+      }
+    }
+  }
+};
 
 service V2 {
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
       get: "/health"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
   }
+  
+  // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+  rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
   
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
@@ -21,6 +69,80 @@ service V2 {
     };
     option (authz) = {
       require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Account successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateAccountResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - account already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
     };
   }
 }
@@ -36,6 +158,15 @@ message HealthResponse {
 
 message HealthData {
   string status = 1;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message ErrorResponse {
+  repeated Error errors = 1;
 }
 
 message ResponseMetadata {

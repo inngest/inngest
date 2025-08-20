@@ -58,6 +58,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 			return nil
 		}
 
+		// Remove default responses from v2 doc before conversion
+		removeDefaultResponses(&v2Doc)
+
 		// Convert to OpenAPI v3
 		v3Doc, err := openapi2conv.ToV3(&v2Doc)
 		if err != nil {
@@ -90,4 +93,52 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		fmt.Printf("Converted %s -> %s\n", path, outputPath)
 		return nil
 	})
+}
+
+// removeDefaultResponses removes "default" responses from all operations
+func removeDefaultResponses(doc *openapi2.T) {
+	if doc.Paths == nil {
+		return
+	}
+
+	for path, pathItem := range doc.Paths {
+		if pathItem == nil {
+			continue
+		}
+
+		// Check all HTTP methods
+		operations := []*openapi2.Operation{
+			pathItem.Get,
+			pathItem.Post,
+			pathItem.Put,
+			pathItem.Patch,
+			pathItem.Delete,
+			pathItem.Options,
+			pathItem.Head,
+		}
+
+		for _, op := range operations {
+			if op != nil && op.Responses != nil {
+				// Remove the default response
+				delete(op.Responses, "default")
+				// Also remove automatic 200 response if we have custom status codes
+				if hasCustomStatusCodes(op.Responses) {
+					delete(op.Responses, "200")
+				}
+			}
+		}
+
+		// Update the path item back to the map
+		doc.Paths[path] = pathItem
+	}
+}
+
+// hasCustomStatusCodes checks if an operation has custom success status codes (2xx, non-200)
+func hasCustomStatusCodes(responses map[string]*openapi2.Response) bool {
+	for code := range responses {
+		if len(code) == 3 && code[0] == '2' && code != "200" {
+			return true // Has custom 2xx success code (like 201, 204, etc.)
+		}
+	}
+	return false
 }

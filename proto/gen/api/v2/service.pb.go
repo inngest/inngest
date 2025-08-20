@@ -7,6 +7,7 @@
 package apiv2
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -155,6 +156,102 @@ func (x *HealthData) GetStatus() string {
 	return ""
 }
 
+type Error struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Error) Reset() {
+	*x = Error{}
+	mi := &file_api_v2_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Error) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Error) ProtoMessage() {}
+
+func (x *Error) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Error.ProtoReflect.Descriptor instead.
+func (*Error) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Error) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Error) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ErrorResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Errors        []*Error               `protobuf:"bytes,1,rep,name=errors,proto3" json:"errors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ErrorResponse) Reset() {
+	*x = ErrorResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ErrorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ErrorResponse) ProtoMessage() {}
+
+func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ErrorResponse.ProtoReflect.Descriptor instead.
+func (*ErrorResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ErrorResponse) GetErrors() []*Error {
+	if x != nil {
+		return x.Errors
+	}
+	return nil
+}
+
 type ResponseMetadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FetchedAt     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
@@ -165,7 +262,7 @@ type ResponseMetadata struct {
 
 func (x *ResponseMetadata) Reset() {
 	*x = ResponseMetadata{}
-	mi := &file_api_v2_service_proto_msgTypes[3]
+	mi := &file_api_v2_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -177,7 +274,7 @@ func (x *ResponseMetadata) String() string {
 func (*ResponseMetadata) ProtoMessage() {}
 
 func (x *ResponseMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[3]
+	mi := &file_api_v2_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -190,7 +287,7 @@ func (x *ResponseMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResponseMetadata.ProtoReflect.Descriptor instead.
 func (*ResponseMetadata) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ResponseMetadata) GetFetchedAt() *timestamppb.Timestamp {
@@ -217,7 +314,7 @@ type CreateAccountRequest struct {
 
 func (x *CreateAccountRequest) Reset() {
 	*x = CreateAccountRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[4]
+	mi := &file_api_v2_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -229,7 +326,7 @@ func (x *CreateAccountRequest) String() string {
 func (*CreateAccountRequest) ProtoMessage() {}
 
 func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[4]
+	mi := &file_api_v2_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -242,7 +339,7 @@ func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountRequest.ProtoReflect.Descriptor instead.
 func (*CreateAccountRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{4}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateAccountRequest) GetEmail() string {
@@ -269,7 +366,7 @@ type CreateAccountResponse struct {
 
 func (x *CreateAccountResponse) Reset() {
 	*x = CreateAccountResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[5]
+	mi := &file_api_v2_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -281,7 +378,7 @@ func (x *CreateAccountResponse) String() string {
 func (*CreateAccountResponse) ProtoMessage() {}
 
 func (x *CreateAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[5]
+	mi := &file_api_v2_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -294,7 +391,7 @@ func (x *CreateAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountResponse.ProtoReflect.Descriptor instead.
 func (*CreateAccountResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{5}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateAccountResponse) GetData() *CreateAccountData {
@@ -325,7 +422,7 @@ type CreateAccountData struct {
 
 func (x *CreateAccountData) Reset() {
 	*x = CreateAccountData{}
-	mi := &file_api_v2_service_proto_msgTypes[6]
+	mi := &file_api_v2_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -337,7 +434,7 @@ func (x *CreateAccountData) String() string {
 func (*CreateAccountData) ProtoMessage() {}
 
 func (x *CreateAccountData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[6]
+	mi := &file_api_v2_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -350,7 +447,7 @@ func (x *CreateAccountData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountData.ProtoReflect.Descriptor instead.
 func (*CreateAccountData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{6}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateAccountData) GetId() string {
@@ -399,14 +496,19 @@ var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\"\x0f\n" +
+	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
 	"\rHealthRequest\"n\n" +
 	"\x0eHealthResponse\x12&\n" +
 	"\x04data\x18\x01 \x01(\v2\x12.api.v2.HealthDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"$\n" +
 	"\n" +
 	"HealthData\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\x8c\x01\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"5\n" +
+	"\x05Error\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"6\n" +
+	"\rErrorResponse\x12%\n" +
+	"\x06errors\x18\x01 \x03(\v2\r.api.v2.ErrorR\x06errors\"\x8c\x01\n" +
 	"\x10ResponseMetadata\x129\n" +
 	"\n" +
 	"fetched_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12=\n" +
@@ -424,10 +526,44 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x06apiKey\x18\x04 \x01(\tR\x06apiKey\x128\n" +
 	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
-	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xc0\x01\n" +
-	"\x02V2\x12H\n" +
-	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x0f\x82\xd3\xe4\x93\x02\t\x12\a/health\x12p\n" +
-	"\rCreateAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\"\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accountsB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
+	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9c\a\n" +
+	"\x02V2\x12\xf6\x01\n" +
+	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xbc\x01\x92A\xa9\x01JR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\t\x12\a/health\x12;\n" +
+	"\v_SchemaOnly\x12\x15.api.v2.HealthRequest\x1a\x15.api.v2.ErrorResponse\x12\xdf\x04\n" +
+	"\rCreateAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\x90\x04\x92A\xea\x03JP\n" +
+	"\x03201\x12I\n" +
+	"\x1cAccount successfully created\x12)\n" +
+	"'\x1a%#/definitions/v2CreateAccountResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - Insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJM\n" +
+	"\x03409\x12F\n" +
+	"!Conflict - account already exists\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accountsB\x90\x01\x92AZZX\n" +
+	"V\n" +
+	"\n" +
+	"BearerAuth\x12H\b\x02\x123Bearer token authentication. Format: `Bearer {key}`\x1a\rAuthorization \x02Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
 	file_api_v2_service_proto_rawDescOnce sync.Once
@@ -441,35 +577,40 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_api_v2_service_proto_goTypes = []any{
 	(*HealthRequest)(nil),         // 0: api.v2.HealthRequest
 	(*HealthResponse)(nil),        // 1: api.v2.HealthResponse
 	(*HealthData)(nil),            // 2: api.v2.HealthData
-	(*ResponseMetadata)(nil),      // 3: api.v2.ResponseMetadata
-	(*CreateAccountRequest)(nil),  // 4: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil), // 5: api.v2.CreateAccountResponse
-	(*CreateAccountData)(nil),     // 6: api.v2.CreateAccountData
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*Error)(nil),                 // 3: api.v2.Error
+	(*ErrorResponse)(nil),         // 4: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),      // 5: api.v2.ResponseMetadata
+	(*CreateAccountRequest)(nil),  // 6: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil), // 7: api.v2.CreateAccountResponse
+	(*CreateAccountData)(nil),     // 8: api.v2.CreateAccountData
+	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	2,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	3,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	7,  // 2: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	7,  // 3: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	6,  // 4: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	3,  // 5: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	7,  // 6: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	7,  // 7: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	0,  // 8: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	4,  // 9: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
-	1,  // 10: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	5,  // 11: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	5,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	3,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	9,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	9,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	8,  // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	5,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	9,  // 7: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	9,  // 8: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	0,  // 9: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	0,  // 10: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	6,  // 11: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
+	1,  // 12: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	4,  // 13: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	7,  // 14: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -478,14 +619,14 @@ func file_api_v2_service_proto_init() {
 		return
 	}
 	file_api_v2_options_proto_init()
-	file_api_v2_service_proto_msgTypes[4].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
