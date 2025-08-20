@@ -766,9 +766,10 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		At:             &at,
 		IdempotencyKey: &idempotencyKey,
 	}); err != nil {
-		if !errors.Is(err, redis_state.ErrQueueItemExists) {
-			// TODO figure this part out
+		if !errors.Is(err, redis_state.ErrQueueItemExists) &&
+			!errors.Is(err, state.ErrIdentifierExists) {
 			l.ReportError(err, "error scheduling cron function execution")
+			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
 	}
 
