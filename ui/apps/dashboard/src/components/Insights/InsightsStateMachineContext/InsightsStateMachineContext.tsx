@@ -64,6 +64,7 @@ export function InsightsStateMachineContextProvider({
         }
       );
     },
+    refetchOnWindowFocus: false,
     select: selectInsightsData,
   });
 
