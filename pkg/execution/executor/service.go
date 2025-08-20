@@ -658,7 +658,8 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 
 	var ci cron.CronItem
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
-		return fmt.Errorf("error unmarshalling cron item: %w", err)
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
 	l.Info("cron sync", "item", ci) // TODO change to trace
 
@@ -672,15 +673,64 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
+// handleCron schedules the function run for the cron item, and enqueues the next schedule
+//
+// NOTE
+// operations need to be idempotent for this function so it doesn't end up breaking the
+// scheduling loop for random reasons
 func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
-	// TODO
-	// 1. unmarshall payload
-	// 2. check against latest hash mapping
-	// 3. if item is not included, return
-	// 4. schedule cron item to run
-	// 5. enqueue next schedule
-	// 6. update hash with queue item ID
-	return fmt.Errorf("not implemented")
+	l := s.log.With("handler", "cron")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	l = l.With("cron_item", ci)
+
+	if !s.croner.CanRun(ctx, ci) {
+		// no action needed
+		return nil
+	}
+
+	// now actually schedule the cron run
+	at := ci.ID.Timestamp()
+	idempotencyKey := ci.ID.String()
+
+	evt := event.Event{
+		ID:   idempotencyKey,
+		Name: "",
+		Data: map[string]any{},
+		// Timestamp: 0,
+	}
+
+	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
+	if err != nil {
+		return fmt.Errorf("error retrieving function: %w", err)
+	}
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return fmt.Errorf("error converting function to config: %w", err)
+	}
+
+	if _, err := s.Executor().Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      ci.AccountID,
+		WorkspaceID:    ci.WorkspaceID,
+		AppID:          ci.AppID,
+		Function:       *conf,
+		Events:         []event.TrackedEvent{event.NewOSSTrackedEvent(evt, nil)},
+		At:             &at,
+		IdempotencyKey: &idempotencyKey,
+	}); err != nil {
+		if !errors.Is(err, redis_state.ErrQueueItemExists) {
+			// TODO figure this part out
+			l.ReportError(err, "error scheduling cron function execution")
+		}
+	}
+
+	// enqueue the next schedule
+	return s.croner.UpdateSchedule(ctx, ci)
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
