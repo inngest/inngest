@@ -41,7 +41,10 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 	if opts.PostgresURI != "" {
 		if !strings.HasPrefix(opts.PostgresURI, "postgres://") && !strings.HasPrefix(opts.PostgresURI, "postgresql://") {
-			return nil, fmt.Errorf("unsupported database URL: %s", opts.PostgresURI)
+			if u, parseErr := url.Parse(opts.PostgresURI); parseErr == nil {
+				return nil, fmt.Errorf("unsupported database URL: %s", u.Redacted())
+			}
+			return nil, fmt.Errorf("unsupported database URL format")
 		}
 
 		o.Do(func() {
@@ -120,7 +123,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 		dbName = "postgres"
 		parsedURL, err := url.Parse(opts.PostgresURI)
 		if err != nil {
-			return fmt.Errorf("error parsing postgres URI to retrieve DB name: %w", err)
+			return fmt.Errorf("error parsing postgres URI to retrieve DB name: invalid format")
 		}
 
 		if parsedURL.Path != "" && parsedURL.Path != "/" {

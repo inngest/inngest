@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import Table from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 import { type ColumnDef } from '@tanstack/react-table';
 
 type LoadingRowData = {

@@ -1,6 +1,5 @@
 export type InsightsAction =
-  | { type: 'UPDATE_CONTENT'; payload: string }
-  | { type: 'START_QUERY' }
+  | { type: 'START_QUERY'; payload: string }
   | { type: 'QUERY_SUCCESS'; payload: InsightsFetchResult }
   | { type: 'QUERY_ERROR'; payload: string }
   | { type: 'FETCH_MORE' }

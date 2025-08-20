@@ -11,7 +11,6 @@ export type Scalars = {
   Boolean: boolean;
   Int: number;
   Float: number;
-  Any: any;
   Bytes: any;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
@@ -49,6 +48,7 @@ export type App = {
 };
 
 export enum AppMethod {
+  Api = 'API',
   Connect = 'CONNECT',
   Serve = 'SERVE'
 }

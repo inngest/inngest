@@ -6,9 +6,10 @@ import { graphql } from '@/gql';
 import { MetricsScope } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
+import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
-import { AccountConcurrency } from './Concurrency';
+import { Concurrency } from './Concurrency';
 import { type EntityLookup } from './Dashboard';
 import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
@@ -35,6 +36,16 @@ const GetVolumeMetrics = graphql(`
     $until: Time
     $scope: MetricsScope!
   ) {
+    accountConcurrency: metrics(opts: { name: "steps_running", from: $from, to: $until }) {
+      data {
+        bucket
+        value
+      }
+      from
+      to
+      granularity
+    }
+
     workspace(id: $workspaceId) {
       runsThroughput: scopedMetrics(
         filter: {
@@ -195,8 +206,6 @@ const GetVolumeMetrics = graphql(`
           name: "concurrency_limit_reached_total"
           scope: $scope
           from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
           until: $until
         }
       ) {
@@ -269,11 +278,10 @@ export const MetricsVolume = ({
               <Backlog workspace={data?.workspace} entities={entities} />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <AccountConcurrency
-                workspace={data?.workspace}
-                entities={entities}
-                concurrencyLimit={concurrencyLimit}
-              />
+              <Concurrency workspace={data?.workspace} entities={entities} />
+              <AccountConcurrency data={data?.accountConcurrency} limit={concurrencyLimit} />
+            </div>
+            <div className="col-span-2 flex flex-row flex-wrap items-center justify-center gap-2 overflow-hidden md:flex-nowrap">
               <Feedback />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>

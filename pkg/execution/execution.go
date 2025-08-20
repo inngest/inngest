@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -102,6 +103,12 @@ type Executor interface {
 	// HandleInvokeFinish handles the invoke pauses from an incoming event. This delegates to Cancel and
 	// Resume where necessary
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
+
+	// HandleGenerator handles an individual opcode from an executor response.
+	// NOTE: This is used for both async (executor controlled) and sync (externally controlled request)
+	// functions.  This specific codepath always converts from sync -> async.
+	HandleGenerator(ctx context.Context, i RunContext, gen state.GeneratorOpcode) error
+
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
 
@@ -121,6 +128,40 @@ type Executor interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+}
+
+// RunContext provides the context needed for HandleGenerator execution without
+// exposing internal executor state. This allows external packages to implement
+// HandleGenerator calls.
+type RunContext interface {
+	// Metadata access
+	Metadata() *sv2.Metadata
+	Events() []json.RawMessage
+	HTTPClient() exechttp.RequestExecutor
+
+	// Group correlation - for pause operations and history tracking
+	GroupID() string
+
+	// Retry logic - encapsulates the common retry pattern
+	AttemptCount() int
+	MaxAttempts() *int
+	ShouldRetry() bool
+	IncrementAttempt()
+
+	// Queue item creation - provides the "template" data for new items
+	PriorityFactor() *int64
+	ConcurrencyKeys() []state.CustomConcurrency
+	ParallelMode() enums.ParallelMode
+
+	// Lifecycle support - provides queue.Item for lifecycle events
+	// TODO: This could be further abstracted in the future
+	LifecycleItem() queue.Item
+
+	// Response tracking methods
+	SetStatusCode(code int)
+	UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)
+	UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage)
+	SetError(err error)
 }
 
 type ResumeSignalResult struct {

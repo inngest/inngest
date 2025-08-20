@@ -180,6 +180,6 @@ type Response[T any] struct {
 
 // ResponseMetadata represents metadata regarding the response.
 type ResponseMetadata struct {
-	FetchedAt   time.Time  `json:"fetched_at,omitempty"`
+	FetchedAt   time.Time  `json:"fetched_at,omitzero,omitempty"`
 	CachedUntil *time.Time `json:"cached_until,omitempty"`
 }

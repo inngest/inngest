@@ -3,25 +3,20 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import { makeQuerySnapshot } from '../queries';
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
-
-const DEFAULT_QUERY = `SELECT
-  toStartOfHour(toDateTime(event_ts / 1000)) AS hour,
-  event_name,
-  COUNT(*) AS event_count
-FROM events
-WHERE event_ts > 1754609958000
-GROUP BY hour, event_name
-ORDER BY hour DESC, event_name ASC`;
 
 interface InsightsStateMachineContextValue {
   activeQuery: string;
   data: InsightsFetchResult | undefined;
   error: null | Error;
   query: string;
+  queryName: string;
   fetchMore: () => void;
   onChange: (value: string) => void;
+  onNameChange: (name: string) => void;
   retry: () => void;
   runQuery: (query: string) => void;
   status: InsightsStatus;
@@ -31,37 +26,64 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
+  onQueryChange: (query: string) => void;
+  onQueryNameChange: (name: string) => void;
+  query: string;
+  queryName: string;
   renderChildren: boolean;
 };
 
 export function InsightsStateMachineContextProvider({
   children,
+  onQueryChange,
+  onQueryNameChange,
+  query,
+  queryName,
   renderChildren,
 }: InsightsStateMachineContextProviderProps) {
-  const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [activeQuery, setActiveQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState<{ query: string; timestamp: number | null }>({
+    query: '',
+    timestamp: null,
+  });
   const { fetchInsights } = useFetchInsights();
+  const { saveQuerySnapshot } = useStoredQueries();
 
   const { data, error, fetchNextPage, isError, isFetching, isLoading, refetch } = useInfiniteQuery({
-    enabled: hasActiveQuery(activeQuery),
+    enabled: hasActiveQuery(activeQuery.query),
     getNextPageParam,
     initialPageParam: null,
-    queryKey: makeQueryKey(activeQuery),
-    queryFn: ({ pageParam }) => fetchInsights({ after: pageParam, first: 30, query: activeQuery }),
+    queryKey: makeQueryKey(activeQuery.query, activeQuery.timestamp),
+    queryFn: ({ pageParam }) => {
+      return fetchInsights(
+        { after: pageParam, first: 30, query: activeQuery.query, queryName },
+        (query, queryName, after) => {
+          // Don't save the query snapshot if it's just fetching additional data.
+          if (Boolean(after)) return;
+
+          saveQuerySnapshot(makeQuerySnapshot(query, queryName));
+        }
+      );
+    },
     select: selectInsightsData,
   });
+
+  const runQuery = (newQuery: string) => {
+    setActiveQuery({ query: newQuery, timestamp: Date.now() });
+  };
 
   return (
     <InsightsStateMachineContext.Provider
       value={{
-        activeQuery,
+        activeQuery: activeQuery.query,
         data,
         error,
         fetchMore: fetchNextPage,
-        onChange: setQuery,
+        onChange: onQueryChange,
+        onNameChange: onQueryNameChange,
         query,
+        queryName,
         retry: refetch,
-        runQuery: setActiveQuery,
+        runQuery,
         status: getInsightsStatus({ data, isError, isFetching, isLoading }),
       }}
     >
@@ -116,11 +138,11 @@ function hasActiveQuery(activeQuery: string) {
 
 /**
  * `activeQuery` changes only when the user runs a new query.
- * Thus, a new fetch will be triggered when the user clicks the "Run query"
- * button, but not automatically when the user types something else in the editor.
+ * The `timestamp` ensures that each "run" of a query is unique, allowing
+ * users to re-run the same query and get fresh data from the server.
  */
-function makeQueryKey(activeQuery: string) {
-  return ['insights', activeQuery];
+function makeQueryKey(activeQuery: string, timestamp: number | null) {
+  return ['insights', activeQuery, timestamp];
 }
 
 function selectInsightsData(

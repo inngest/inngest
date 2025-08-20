@@ -3,13 +3,21 @@ import { useClient } from 'urql';
 
 import { graphql } from '@/gql';
 import { InsightsColumnType, type InsightsQuery } from '@/gql/graphql';
+import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import type { InsightsFetchResult } from './types';
 
 export interface FetchInsightsParams {
   after?: string | null;
   first: number;
   query: string;
+  queryName: string;
 }
+
+type FetchInsightsCallback = (
+  query: string,
+  queryName: undefined | string,
+  after: undefined | null | string
+) => void;
 
 const insightsQuery = graphql(`
   query Insights($query: String!, $first: Int!, $after: String) {
@@ -38,11 +46,15 @@ export function useFetchInsights() {
   const client = useClient();
 
   const fetchInsights = useCallback(
-    async ({ query, first, after = null }: FetchInsightsParams): Promise<InsightsFetchResult> => {
+    async (
+      { query, first, after = null, queryName }: FetchInsightsParams,
+      cb: FetchInsightsCallback
+    ): Promise<InsightsFetchResult> => {
       const res = await client.query(insightsQuery, { after, first, query }).toPromise();
       if (res.error) throw res.error;
       if (!res.data) throw new Error('No data');
 
+      cb(query, queryName === UNTITLED_QUERY ? undefined : queryName, after);
       return transformInsightsResponse(res.data.insights);
     },
     [client]

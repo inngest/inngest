@@ -1,8 +1,6 @@
 package inngest
 
 import (
-	"net/url"
-
 	"github.com/inngest/inngest/pkg/consts"
 )
 
@@ -18,10 +16,6 @@ type Step struct {
 	// Retries optionally overrides retries for this step, allowing steps to have differing retry
 	// counts to the core function.
 	Retries *int `json:"retries,omitempty"`
-
-	// ConcurrencyKey allows steps to share concurrency slots across multiple functions, eg. for
-	// rate limiting across multiple functions.
-	ConcurrencyKey *string `json:"concurrencyKey,omitempty"`
 }
 
 // RetryCount returns the number of retries for this step.
@@ -32,20 +26,4 @@ func (s Step) RetryCount() int {
 		return min(*s.Retries, consts.MaxRetries)
 	}
 	return consts.DefaultRetryCount
-}
-
-func (s Step) Driver() string {
-	uri, _ := url.Parse(s.URI)
-	return SchemeDriver(uri.Scheme)
-}
-
-func SchemeDriver(scheme string) string {
-	switch scheme {
-	case "http", "https":
-		return "http"
-	case "ws", "wss":
-		return "connect"
-	default:
-		return ""
-	}
 }

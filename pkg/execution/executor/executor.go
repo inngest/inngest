@@ -844,19 +844,6 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 	return nil, ErrFunctionSkipped
 }
 
-type runInstance struct {
-	md         sv2.Metadata
-	f          inngest.Function
-	events     []json.RawMessage
-	item       queue.Item
-	edge       inngest.Edge
-	resp       *state.DriverResponse
-	httpClient exechttp.RequestExecutor
-	stackIndex int
-	// If specified, this is the span reference that represents this execution.
-	execSpan *meta.SpanReference
-}
-
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
@@ -1504,7 +1491,7 @@ func correlationID(event event.Event) *string {
 // A nil response with an error indicates that an internal error occurred and the step
 // did not run.
 func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
-	url, _ := i.f.URI()
+	url := i.f.URI()
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, url.String())
 	}
@@ -1522,9 +1509,7 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 // executeDriverForStep runs the enqueued step by invoking the driver.  It also inspects
 // and normalizes responses (eg. max retry attempts).
 func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
-	url, _ := i.f.URI()
-
-	driverName := inngest.SchemeDriver(url.Scheme)
+	driverName := inngest.Driver(i.f)
 
 	d, ok := e.runtimeDrivers[driverName]
 	if !ok {
@@ -2422,7 +2407,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					)
 				}
 			}()
-			return e.handleGenerator(ctx, i, copied)
+			return e.HandleGenerator(ctx, i, copied)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -2441,11 +2426,12 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 	return nil
 }
 
-func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen state.GeneratorOpcode) error {
+func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
 	// Grab the edge that triggered this step execution.
-	edge, ok := i.item.Payload.(queue.PayloadEdge)
+	lifecycleItem := runCtx.LifecycleItem()
+	edge, ok := lifecycleItem.Payload.(queue.PayloadEdge)
 	if !ok {
-		return fmt.Errorf("unknown queue item type handling generator: %T", i.item.Payload)
+		return fmt.Errorf("unknown queue item type handling generator: %T", lifecycleItem.Payload)
 	}
 
 	switch gen.Op {
@@ -2458,23 +2444,23 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
 		return nil
 	case enums.OpcodeStep, enums.OpcodeStepRun:
-		return e.handleGeneratorStep(ctx, i, gen, edge)
+		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepError:
-		return e.handleStepError(ctx, i, gen, edge)
+		return e.handleStepError(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepPlanned:
-		return e.handleGeneratorStepPlanned(ctx, i, gen, edge)
+		return e.handleGeneratorStepPlanned(ctx, runCtx, gen, edge)
 	case enums.OpcodeSleep:
-		return e.handleGeneratorSleep(ctx, i, gen, edge)
+		return e.handleGeneratorSleep(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForEvent:
-		return e.handleGeneratorWaitForEvent(ctx, i, gen, edge)
+		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge)
 	case enums.OpcodeInvokeFunction:
-		return e.handleGeneratorInvokeFunction(ctx, i, gen, edge)
+		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge)
 	case enums.OpcodeAIGateway:
-		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
+		return e.handleGeneratorAIGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeGateway:
-		return e.handleGeneratorGateway(ctx, i, gen, edge)
+		return e.handleGeneratorGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForSignal:
-		return e.handleGeneratorWaitForSignal(ctx, i, gen, edge)
+		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2482,7 +2468,7 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
 // has finished
-func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
@@ -2494,11 +2480,11 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		return err
 	}
 
-	if err := e.validateStateSize(len(output), i.md); err != nil {
+	if err := e.validateStateSize(len(output), *runCtx.Metadata()); err != nil {
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
 	}
@@ -2509,32 +2495,34 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               groupID,
 		Kind:                  queue.KindEdge,
-		Identifier:            i.item.Identifier, // TODO: Refactor
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
+	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
-				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStep"},
-				Metadata:    &i.md,
-				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
 				QueueItem:   &nextItem,
 			},
 		)
@@ -2564,7 +2552,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		// We can't specify step name here since that will result in the
 		// "followup discovery step" having the same name as its predecessor.
 		var stepName *string = nil
-		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
 	}
 
 	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
@@ -2586,7 +2574,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	return nil
 }
 
-func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// With the introduction of the StepError opcode, step errors are handled gracefully, and we can
 	// finally distinguish between application level errors (this function) and network errors/other
 	// errors (as the SDK didn't return this opcode).
@@ -2617,7 +2605,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		// This is a NonRetryableError thrown in a step.
 		retryable = false
 	}
-	if !queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
+	if !runCtx.ShouldRetry() {
 		// This is the last attempt as per the attempt in the queue, which
 		// means we've failed N times, and so it is not retryable.
 		retryable = false
@@ -2625,9 +2613,10 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 
 	if retryable {
 		// Return an error to trigger standard queue retries.
+		runCtx.IncrementAttempt()
 		for _, l := range e.lifecycles {
-			i.item.Attempt += 1
-			go l.OnStepScheduled(ctx, i.md, i.item, &gen.Name)
+			lifecycleItem := runCtx.LifecycleItem()
+			go l.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name)
 		}
 		return ErrHandledStepError
 	}
@@ -2640,7 +2629,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		return err
 	}
 
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, []byte(output))
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if err != nil {
 		return err
 	}
@@ -2655,33 +2644,35 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// This is the discovery step to find what happens after we error
-	jobID := fmt.Sprintf("%s-%s-failure", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s-failure", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               groupID,
 		Kind:                  queue.KindEdgeError,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
+	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
-				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepError"},
-				Metadata:    &i.md,
+				Metadata:    runCtx.Metadata(),
 				QueueItem:   &nextItem,
-				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
 			},
 		)
 		if err != nil {
@@ -2700,13 +2691,13 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 
 	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, i.md, nextItem, nil)
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil)
 	}
 
 	return nil
 }
 
-func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	nextEdge := inngest.Edge{
 		// Planned generator IDs are the same as the actual OpcodeStep IDs.
 		// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
@@ -2730,18 +2721,18 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID+"-plan")
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID+"-plan")
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		Kind:                  queue.KindEdge,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
@@ -2749,15 +2740,16 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		ParallelMode: gen.ParallelMode(),
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
-			Metadata:    &i.md,
+			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
 			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
@@ -2776,14 +2768,14 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 	_ = span.Send()
 
 	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name)
 	}
 	return err
 }
 
 // handleSleep handles the sleep opcode, ensuring that we enqueue the function to rerun
 // at the correct time.
-func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	dur, err := gen.SleepDuration()
 	if err != nil {
 		return err
@@ -2804,34 +2796,36 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID))
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
-		WorkspaceID: i.md.ID.Tenant.EnvID,
+		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
 		// Sleeps re-enqueue the step so that we can mark the step as completed
 		// in the executor after the sleep is complete.  This will re-call the
 		// generator step, but we need the same group ID for correlation.
 		GroupID:               groupID,
 		Kind:                  queue.KindSleep,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
+	metadata := runCtx.Metadata()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
-			Metadata:    &i.md,
+			Metadata:    metadata,
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(metadata),
 			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
@@ -2852,13 +2846,13 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	_ = span.Send()
 
 	for _, e := range e.lifecycles {
-		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
+		go e.OnSleep(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, until)
 	}
 
 	return err
 }
 
-func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	input, err := gen.GatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing gateway step: %w", err)
@@ -2873,24 +2867,26 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	e.addRequestPublishOpts(ctx, i, &req)
+	lifecycleItem := runCtx.LifecycleItem()
+	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	var output []byte
 
-	resp, err := i.httpClient.DoRequest(ctx, req)
+	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
 	if err != nil {
 		// Request failed entirely. Create an error.
 		userLandErr := state.UserError{
 			Name:    "GatewayError",
 			Message: fmt.Sprintf("Error making gateway request: %s", err),
 		}
-		i.resp.UpdateOpcodeError(&gen, userLandErr)
+		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
-			i.resp.SetError(err)
+		if runCtx.ShouldRetry() {
+			runCtx.SetError(err)
 
+			lifecycleItem := runCtx.LifecycleItem()
 			for _, e := range e.lifecycles {
-				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
 
 			// This will retry, as it hits the queue directly.
@@ -2902,8 +2898,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 			execution.StateErrorKey: userLandErrByt,
 		})
 
+		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 		}
 	} else {
 		headers := make(map[string]string)
@@ -2923,17 +2920,18 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 			return fmt.Errorf("error wrapping gateway result in map: %w", err)
 		}
 
-		i.resp.UpdateOpcodeOutput(&gen, output)
+		runCtx.UpdateOpcodeOutput(&gen, output)
+		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, nil)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
 	}
 
 	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
 	if err != nil {
 		return err
 	}
@@ -2946,18 +2944,18 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               groupID,
 		Kind:                  queue.KindEdge,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		ParallelMode:          gen.ParallelMode(),
 	}
@@ -2973,13 +2971,13 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		// We can't specify step name here since that will result in the
 		// "followup discovery step" having the same name as its predecessor.
 		var stepName *string = nil
-		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
 	}
 
 	return err
 }
 
-func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	input, err := gen.AIGatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
@@ -2998,9 +2996,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	e.addRequestPublishOpts(ctx, i, &req)
+	lifecycleItem := runCtx.LifecycleItem()
+	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
-	resp, err := i.httpClient.DoRequest(ctx, req)
+	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
 	failure := err != nil || (resp != nil && resp.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
@@ -3008,7 +3007,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		resp = &exechttp.Response{}
 	}
 
-	i.resp.StatusCode = resp.StatusCode
+	runCtx.SetStatusCode(resp.StatusCode)
 
 	// Handle errors individually, here.
 	if failure {
@@ -3028,20 +3027,21 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			Data:    resp.Body, // For golang's multiple returns.
 			Stack:   string(resp.Body),
 		}
-		i.resp.UpdateOpcodeError(&gen, userLandErr)
+		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
 		// an error on output.
-		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
+		if runCtx.ShouldRetry() {
 			// Set the response error, ensuring the response is retryable in the queue.
-			i.resp.SetError(err)
+			runCtx.SetError(err)
 
+			lifecycleItem := runCtx.LifecycleItem()
 			for _, e := range e.lifecycles {
 				// OnStepFinished handles step success and step errors/failures.  It is
 				// currently the responsibility of the lifecycle manager to handle the differing
 				// step statuses when a step finishes.
-				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
 
 			// This will retry, as it hits the queue directly.
@@ -3058,11 +3058,12 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			execution.StateErrorKey: userLandErrByt,
 		})
 
+		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 		}
 	} else {
 		// The response output is actually now the result of this AI call. We need
@@ -3078,17 +3079,18 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			return fmt.Errorf("error wrapping ai result in map: %w", err)
 		}
 
-		i.resp.UpdateOpcodeOutput(&gen, resp.Body)
+		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
+		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, nil)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
 	}
 
 	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, resp.Body)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -3106,23 +3108,23 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               groupID,
 		Kind:                  queue.KindEdge,
-		Identifier:            i.item.Identifier, // TODO: Refactor
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Attempt:               0,
-		MaxAttempts:           i.item.MaxAttempts,
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
+	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3133,13 +3135,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// We can't specify step name here since that will result in the
 		// "followup discovery step" having the same name as its predecessor.
 		var stepName *string = nil
-		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
 	}
 
 	return err
 }
 
-func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	opts, err := gen.SignalOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse signal opts: %w", err)
@@ -3152,7 +3154,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		return fmt.Errorf("unable to parse signal expires: %w", err)
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := time.Now()
 
@@ -3171,9 +3173,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 
 	pause := state.Pause{
 		ID:                      pauseID,
-		WorkspaceID:             i.md.ID.Tenant.EnvID,
-		Identifier:              sv2.NewPauseIdentifier(i.md.ID),
-		GroupID:                 i.item.GroupID,
+		WorkspaceID:             runCtx.Metadata().ID.Tenant.EnvID,
+		Identifier:              sv2.NewPauseIdentifier(runCtx.Metadata().ID),
+		GroupID:                 runCtx.GroupID(),
 		Outgoing:                gen.ID,
 		Incoming:                edge.Edge.Incoming,
 		StepName:                gen.UserDefinedName(),
@@ -3182,7 +3184,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		DataKey:                 gen.ID,
 		SignalID:                &opts.Signal,
 		ReplaceSignalOnConflict: shouldReplaceSignalOnConflict,
-		MaxAttempts:             i.item.MaxAttempts,
+		MaxAttempts:             runCtx.MaxAttempts(),
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -3203,16 +3205,16 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	}
 
 	// Enqueue a job that will timeout the pause.
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:                 &jobID,
-		WorkspaceID:           i.md.ID.Tenant.EnvID,
-		GroupID:               i.item.GroupID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
+		GroupID:               runCtx.GroupID(),
 		Kind:                  queue.KindPause,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
-		MaxAttempts:           i.item.MaxAttempts,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload: queue.PayloadPauseTimeout{
 			PauseID: pauseID,
 			Pause:   pause,
@@ -3223,11 +3225,12 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		return nil
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
 			context.WithoutCancel(ctx),
-			i.md,
-			i.item,
+			*runCtx.Metadata(),
+			lifecycleItem,
 			gen,
 			pause,
 		)
@@ -3236,7 +3239,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	return err
 }
 
-func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
@@ -3251,14 +3254,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	}
 
 	eventName := event.FnFinishedName
-	correlationID := i.md.ID.RunID.String() + "." + gen.ID
+	correlationID := runCtx.Metadata().ID.RunID.String() + "." + gen.ID
 	strExpr := fmt.Sprintf("async.data.%s == %s", consts.InvokeCorrelationId, strconv.Quote(correlationID))
 	_, err = e.newExpressionEvaluator(ctx, strExpr)
 	if err != nil {
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := time.Now()
 
@@ -3278,18 +3281,18 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		CorrelationID:   &correlationID,
 		TraceCarrier:    carrier,
 		ExpiresAt:       expires.UnixMilli(),
-		GroupID:         i.item.GroupID,
+		GroupID:         runCtx.GroupID(),
 		DisplayName:     gen.UserDefinedName(),
-		SourceAppID:     i.item.Identifier.AppID.String(),
-		SourceFnID:      i.item.Identifier.WorkflowID.String(),
-		SourceFnVersion: i.item.Identifier.WorkflowVersion,
+		SourceAppID:     runCtx.Metadata().ID.Tenant.AppID.String(),
+		SourceFnID:      runCtx.Metadata().ID.FunctionID.String(),
+		SourceFnVersion: runCtx.Metadata().Config.FunctionVersion,
 	})
 
 	pause := state.Pause{
 		ID:                  pauseID,
-		WorkspaceID:         i.md.ID.Tenant.EnvID,
-		Identifier:          sv2.NewPauseIdentifier(i.md.ID),
-		GroupID:             i.item.GroupID,
+		WorkspaceID:         runCtx.Metadata().ID.Tenant.EnvID,
+		Identifier:          sv2.NewPauseIdentifier(runCtx.Metadata().ID),
+		GroupID:             runCtx.GroupID(),
 		Outgoing:            gen.ID,
 		Incoming:            edge.Edge.Incoming,
 		StepName:            gen.UserDefinedName(),
@@ -3301,7 +3304,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		InvokeCorrelationID: &correlationID,
 		TriggeringEventID:   &evt.ID,
 		InvokeTargetFnID:    &opts.FunctionID,
-		MaxAttempts:         i.item.MaxAttempts,
+		MaxAttempts:         runCtx.MaxAttempts(),
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -3309,7 +3312,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	}
 	_, err = e.pm.Write(
 		ctx,
-		pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: eventName},
+		pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName},
 		&pause,
 	)
 	if err == state.ErrPauseAlreadyExists {
@@ -3320,18 +3323,18 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 	}
 
 	// Enqueue a job that will timeout the pause.
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
-		WorkspaceID: i.md.ID.Tenant.EnvID,
+		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.
-		GroupID:               i.item.GroupID,
+		GroupID:               runCtx.GroupID(),
 		Kind:                  queue.KindPause,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
-		MaxAttempts:           i.item.MaxAttempts,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload: queue.PayloadPauseTimeout{
 			PauseID: pauseID,
 			Pause:   pause,
@@ -3344,26 +3347,27 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		logger.StdlibLogger(ctx).Error(
 			"failed to enqueue invoke function pause timeout",
 			"error", err,
-			"run_id", i.md.ID.RunID,
-			"workspace_id", i.md.ID.Tenant.EnvID,
+			"run_id", runCtx.Metadata().ID.RunID,
+			"workspace_id", runCtx.Metadata().ID.Tenant.EnvID,
 		)
 	}
 
 	// Send the event.
-	err = e.handleSendingEvent(ctx, evt, i.item)
+	lifecycleItem := runCtx.LifecycleItem()
+	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
 	if err != nil {
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
+		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt)
 	}
 
 	return err
 }
 
-func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
@@ -3401,7 +3405,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 
 	expr := opts.If
 	if expr != nil && strings.Contains(*expr, "event.") {
@@ -3411,7 +3415,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		// This improves performance in matching, as we can then use the values within
 		// aggregate trees.
 		evt := event.Event{}
-		if err := json.Unmarshal(i.events[0], &evt); err != nil {
+		if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
 		}
 
@@ -3457,9 +3461,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	// pause is no longer available and return.
 	pause := state.Pause{
 		ID:          pauseID,
-		WorkspaceID: i.md.ID.Tenant.EnvID,
-		Identifier:  sv2.NewPauseIdentifier(i.md.ID),
-		GroupID:     i.item.GroupID,
+		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
+		Identifier:  sv2.NewPauseIdentifier(runCtx.Metadata().ID),
+		GroupID:     runCtx.GroupID(),
 		Outgoing:    gen.ID,
 		Incoming:    edge.Edge.Incoming,
 		StepName:    gen.UserDefinedName(),
@@ -3468,7 +3472,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Event:       &opts.Event,
 		Expression:  expr,
 		DataKey:     gen.ID,
-		MaxAttempts: i.item.MaxAttempts,
+		MaxAttempts: runCtx.MaxAttempts(),
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
@@ -3480,17 +3484,17 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	// the pause so this race will conclude by calling the function once, as only
 	// one thread can lease and consume a pause;  the other will find that the
 	// pause is no longer available and return.
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
 		JobID:       &jobID,
-		WorkspaceID: i.md.ID.Tenant.EnvID,
+		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
 		// Use the same group ID, allowing us to track the cancellation of
 		// the step correctly.
-		GroupID:               i.item.GroupID,
+		GroupID:               runCtx.GroupID(),
 		Kind:                  queue.KindPause,
-		Identifier:            i.item.Identifier,
-		PriorityFactor:        i.item.PriorityFactor,
-		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 		Payload: queue.PayloadPauseTimeout{
 			PauseID: pauseID,
 			Pause:   pause,
@@ -3499,15 +3503,16 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		ParallelMode: gen.ParallelMode(),
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
-			Metadata:    &i.md,
+			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
 			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
@@ -3517,7 +3522,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
 	}
 
-	idx := pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: opts.Event}
+	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: opts.Event}
 	_, err = e.pm.Write(ctx, idx, &pause)
 	if err != nil {
 		if err == state.ErrPauseAlreadyExists {
@@ -3538,7 +3543,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	_ = span.Send()
 
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)
+		go e.OnWaitForEvent(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, pause)
 	}
 
 	return err
@@ -3856,7 +3861,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 }
 
 // addRequestPublishOpts generates a new JWT to publish gateway requests in realtime.
-func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr *exechttp.SerializableRequest) {
+func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, sr *exechttp.SerializableRequest) {
 	if e.rtconfig.PublishURL == "" {
 		return
 	}
@@ -3864,8 +3869,8 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr
 	token, err := realtime.NewPublishJWT(
 		ctx,
 		e.rtconfig.Secret,
-		i.item.Identifier.AccountID,
-		i.item.WorkspaceID,
+		item.Identifier.AccountID,
+		item.WorkspaceID,
 	)
 	if err != nil {
 		// XXX: We should be able to attach warnings to runs;  in this case, we couldn't create

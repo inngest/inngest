@@ -40,8 +40,7 @@ func TestURI(t *testing.T) {
 	expected, err := url.Parse("https://example.com/api/inngest?&fnId=fn-stuff&stepId=step")
 	require.NoError(t, err)
 
-	actual, err := fn.URI()
-	require.NoError(t, err)
+	actual := fn.URI()
 	require.EqualValues(t, *expected, *actual)
 }
 
