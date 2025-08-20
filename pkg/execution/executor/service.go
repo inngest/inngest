@@ -704,14 +704,35 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
-	idempotencyKey := ci.ID.String()
+	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
-	evt := event.Event{
+	evt := event.NewOSSTrackedEvent(event.Event{
 		ID:   idempotencyKey,
 		Name: "",
 		Data: map[string]any{},
 		// Timestamp: 0,
-	}
+	}, nil)
+
+	// publish cron event to pubsub
+	go func(ctx context.Context) {
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			l.Error("error marshalling cron event", "error", err)
+			return
+		}
+
+		if err = s.publisher.Publish(
+			ctx,
+			s.config.EventStream.Service.TopicName(),
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: time.Now(),
+			},
+		); err != nil {
+			l.Error("error publishing cron event", "error", err)
+		}
+	}(ctx)
 
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
@@ -722,12 +743,26 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
 
+	ctx, span := run.NewSpan(ctx,
+		run.WithNewRoot(),
+		run.WithName(consts.OtelSpanCron),
+		run.WithScope(consts.OtelScopeCron),
+		run.WithSpanAttributes(
+			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
+		),
+	)
+	defer span.End()
+
+	// NOTE
+	// should this also handle batching and rate limit like runner.initialize?
+	// seems kinda weird to have those settings with cron tbh
 	if _, err := s.Executor().Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      ci.AccountID,
 		WorkspaceID:    ci.WorkspaceID,
 		AppID:          ci.AppID,
 		Function:       *conf,
-		Events:         []event.TrackedEvent{event.NewOSSTrackedEvent(evt, nil)},
+		Events:         []event.TrackedEvent{evt},
 		At:             &at,
 		IdempotencyKey: &idempotencyKey,
 	}); err != nil {
