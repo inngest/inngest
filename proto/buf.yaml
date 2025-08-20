@@ -1,11 +1,7 @@
-# For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
-version: v2
-modules:
-  - path: .
-  - path: third_party
+version: v1beta1
 lint:
   use:
-    - STANDARD
+    - DEFAULT
 breaking:
   use:
     - FILE

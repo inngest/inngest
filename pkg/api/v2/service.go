@@ -32,7 +32,7 @@ type GRPCServerOptions struct {
 // NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
 func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
 	var serverOpts []grpc.ServerOption
-	
+
 	// Add authentication and authorization interceptors if any middleware is provided
 	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
 		serverOpts = append(serverOpts,
@@ -40,11 +40,11 @@ func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
 			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
 		)
 	}
-	
+
 	server := grpc.NewServer(serverOpts...)
 	service := NewService()
 	apiv2.RegisterV2Server(server, service)
-	
+
 	return server
 }
 
@@ -154,6 +154,40 @@ func (s *Service) CreateAccount(ctx context.Context, req *apiv2.CreateAccountReq
 		Metadata: &apiv2.ResponseMetadata{
 			FetchedAt:   timestamppb.New(now),
 			CachedUntil: nil,
+		},
+	}, nil
+}
+
+func (s *Service) FetchAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
+	now := time.Now()
+
+	// Sample data - replace with actual database query
+	accounts := []*apiv2.Account{
+		{
+			Id:        "550e8400-e29b-41d4-a716-446655440000",
+			Email:     "user@example.com",
+			Name:      "John Doe",
+			CreatedAt: timestamppb.New(now.Add(-24 * time.Hour)),
+			UpdatedAt: timestamppb.New(now.Add(-1 * time.Hour)),
+		},
+		{
+			Id:        "550e8400-e29b-41d4-a716-446655440001",
+			Email:     "jane@example.com",
+			Name:      "Jane Smith",
+			CreatedAt: timestamppb.New(now.Add(-48 * time.Hour)),
+			UpdatedAt: timestamppb.New(now.Add(-2 * time.Hour)),
+		},
+	}
+
+	return &apiv2.FetchAccountsResponse{
+		Data: accounts,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(now),
+			CachedUntil: timestamppb.New(now.Add(5 * time.Minute)),
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+			Limit:   20,
 		},
 	}, nil
 }
