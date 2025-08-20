@@ -17,11 +17,25 @@ import (
 	"github.com/redis/rueidis"
 )
 
+var (
+	defaultScheduleForwardDur = 10 * time.Second
+)
+
 type RedisCronManagerOpt func(c *redisCronManagerOpt)
 
 type redisCronManagerOpt struct {
+	// jitter range provides a min and max duration for the jitter to apply to schedules
+	// which will move the scheduling time a little earlier than the actual cron schedule.
+	//
+	// we do this so we can make the actual run start as close as possible to the actual cron schedule.
 	jitterMin time.Duration
 	jitterMax time.Duration
+
+	// we need to move the time upwards on finding the next time due to how we use jitter
+	// to push the time back a little to coordinate the run start timing.
+	//
+	// considering cron's minimum granularity is a minute, the seconds range should work fine
+	scheduleForwardDur time.Duration
 }
 
 func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
@@ -35,6 +49,14 @@ func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
 	}
 }
 
+func WithScheduleForwardDuration(dur time.Duration) RedisCronManagerOpt {
+	return func(c *redisCronManagerOpt) {
+		if dur > 0 {
+			c.scheduleForwardDur = dur
+		}
+	}
+}
+
 func NewRedisCronManager(
 	c *redis_state.CronClient,
 	q redis_state.QueueManager,
@@ -42,8 +64,9 @@ func NewRedisCronManager(
 	opts ...RedisCronManagerOpt,
 ) CronManager {
 	opt := redisCronManagerOpt{
-		jitterMin: 10 * time.Millisecond,
-		jitterMax: 100 * time.Millisecond,
+		jitterMin:          10 * time.Millisecond,
+		jitterMax:          100 * time.Millisecond,
+		scheduleForwardDur: defaultScheduleForwardDur,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -67,20 +90,65 @@ type redisCronManager struct {
 	opt redisCronManagerOpt
 }
 
-func (c *redisCronManager) Next(ctx context.Context, ci CronItem) (time.Time, error) {
+func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
+	l := c.log.With("action", "redisCronManager.ScheduleNext", "cron_item", ci)
+
 	// Parse the cron expression and get the next execution time
 	schedule, err := Parse(ci.Expression)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
+		// TODO decide on what to do with this because it likely can't be fixed on retries
+		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
-	next := schedule.Next(ci.ID.Timestamp())
+	next := schedule.Next(ci.ID.Timestamp().Add(c.opt.scheduleForwardDur))
 
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time
 	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
 	next = next.Add(-jitter)
 
-	return next, nil
+	nextItem := CronItem{
+		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
+		AccountID:       ci.AccountID,
+		WorkspaceID:     ci.WorkspaceID,
+		AppID:           ci.AppID,
+		FunctionID:      ci.FunctionID,
+		FunctionVersion: ci.FunctionVersion,
+		Expression:      ci.Expression,
+		Op:              CronOpProcess,
+	}
+
+	l = l.With("next_cron_item", nextItem)
+
+	// enqueue new schedule
+	jobID := ci.ID.String()
+	queueName := queue.KindCron
+	maxAttempts := consts.MaxRetries + 1
+
+	err = c.q.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		GroupID:     uuid.New().String(),
+		WorkspaceID: ci.WorkspaceID,
+		Identifier: state.Identifier{
+			AccountID:       ci.AccountID,
+			WorkspaceID:     ci.WorkspaceID,
+			AppID:           ci.AppID,
+			WorkflowID:      ci.FunctionID,
+			WorkflowVersion: ci.FunctionVersion,
+		},
+		Kind:        queue.KindCron,
+		QueueName:   &queueName,
+		MaxAttempts: &maxAttempts,
+		Payload:     nextItem,
+	}, next, queue.EnqueueOpts{})
+	switch err {
+	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		// no-op
+	default:
+		l.ReportError(err, "error enqueueing cron for next schedule")
+		return nil, fmt.Errorf("error enqueueing cron for next schedule: %w", err)
+	}
+
+	return &nextItem, nil
 }
 
 func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
@@ -137,59 +205,21 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 }
 
 func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) error {
-	l := c.log.With("action", "redisCronManager.UpdateSchedule", "cron_item", ci)
+	// l := c.log.With("action", "redisCronManager.UpdateSchedule", "cron_item", ci)
 
 	switch ci.Op {
-	// this is net new, so there should be no existing cron workloads running
-	case CronOpNew, CronOpUnpause:
-		jobID := ci.ID.String()
-		queueName := queue.KindCron
-		maxAttempts := consts.MaxRetries + 1
-
-		next, err := c.Next(ctx, ci)
+	case
+		// these are net new, so there should be no existing cron workloads running
+		CronOpNew, CronOpUnpause,
+		// pure processing
+		CronOpProcess:
+		next, err := c.ScheduleNext(ctx, ci)
 		if err != nil {
-			return queue.NeverRetryError(err)
+			return fmt.Errorf("error scheduling next item for Op: %d", ci.Op)
 		}
 
-		ci := CronItem{
-			ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
-			AccountID:       ci.AccountID,
-			WorkspaceID:     ci.WorkspaceID,
-			AppID:           ci.AppID,
-			FunctionID:      ci.FunctionID,
-			FunctionVersion: ci.FunctionVersion,
-			Expression:      ci.Expression,
-			Op:              CronOpProcess,
-		}
-
-		// enqueue new schedule
-		err = c.q.Enqueue(ctx, queue.Item{
-			JobID:       &jobID,
-			GroupID:     uuid.New().String(),
-			WorkspaceID: ci.WorkspaceID,
-			Identifier: state.Identifier{
-				AccountID:       ci.AccountID,
-				WorkspaceID:     ci.WorkspaceID,
-				AppID:           ci.AppID,
-				WorkflowID:      ci.FunctionID,
-				WorkflowVersion: ci.FunctionVersion,
-			},
-			Kind:        queue.KindCron,
-			QueueName:   &queueName,
-			MaxAttempts: &maxAttempts,
-			Payload:     ci,
-		}, next, queue.EnqueueOpts{})
-		switch err {
-		case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-			// no-op
-		default:
-			l.ReportError(err, "error enqueueing cron for next schedule")
-			return fmt.Errorf("error enqueueing cron for next schedule: %w", err)
-		}
-
-		// TODO
 		// - update mapping
-		return c.setFunctionScheduleMap(ctx, ci)
+		return c.setFunctionScheduleMap(ctx, *next)
 
 	case CronOpUpdate:
 		// TODO
