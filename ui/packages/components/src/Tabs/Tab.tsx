@@ -8,15 +8,11 @@ import { TabsContext } from './TabsContext';
 const ACTIVE_BORDER_STYLES =
   'data-[state=active]:after:absolute data-[state=active]:after:bg-contrast data-[state=active]:after:bottom-0 data-[state=active]:after:h-0.5 data-[state=active]:after:left-0 data-[state=active]:after:right-0';
 const ACTIVE_TEXT_STYLES = 'data-[state=active]:text-basis';
-const APPEARANCE_STYLES = 'bg-canvasBase border-r border-subtle text-muted text-sm';
-const CLOSE_BUTTON_STYLES = 'cursor-pointer flex-shrink-0 hover:bg-muted p-0.5 rounded';
-const FOCUS_STYLES =
-  'focus:outline-none focus-visible:outline-none focus-visible:ring-0 outline-none';
+const APPEARANCE_STYLES = 'border-r border-subtle text-muted text-sm';
 const HOVER_STYLES = 'hover:bg-canvasSubtle';
-const INTERACTION_STYLES = 'group transition-all';
 const LAYOUT_STYLES = 'flex flex-1 h-[40px] items-center relative';
 const SIZING_STYLES = 'max-w-[200px] min-w-[84px]';
-const SPACING_STYLES = 'gap-1.5 px-3 py-2';
+const SPACING_STYLES = 'gap-1.5 px-3';
 
 export interface TabProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
   iconBefore?: React.ReactNode;
@@ -35,9 +31,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
           ACTIVE_BORDER_STYLES,
           ACTIVE_TEXT_STYLES,
           APPEARANCE_STYLES,
-          FOCUS_STYLES,
           HOVER_STYLES,
-          INTERACTION_STYLES,
           LAYOUT_STYLES,
           SIZING_STYLES,
           SPACING_STYLES,
@@ -54,7 +48,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         </span>
         {onClose && (
           <span
-            className={CLOSE_BUTTON_STYLES}
+            className="p-0.5"
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
