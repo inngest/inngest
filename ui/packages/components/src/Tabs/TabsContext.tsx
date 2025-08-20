@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext } from 'react';
 
 // TODO: Add support for 'default' variant

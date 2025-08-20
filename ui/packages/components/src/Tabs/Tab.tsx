@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef, useContext, useEffect, useRef, useState } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
