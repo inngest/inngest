@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
-import { useQuery } from '@tanstack/react-query';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -13,7 +12,8 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
-import { useGetTraceResult, type TraceResult } from '../SharedContext/useGetTraceResult';
+import { useShared } from '../SharedContext/SharedContext';
+import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
@@ -125,7 +125,7 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 
 export const StepInfo = ({
   selectedStep,
-  pollInterval,
+  pollInterval: initialPollInterval,
   tracesPreviewEnabled,
 }: {
   selectedStep: StepInfoType;
@@ -133,26 +133,20 @@ export const StepInfo = ({
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
 }) => {
+  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
-  const { loading, getTraceResult } = useGetTraceResult();
-  const [result, setResult] = useState<TraceResult | undefined>();
-
-  useQuery({
-    //
-    // stop polling when we have data
-    refetchInterval: !result && pollInterval ? pollInterval : false,
-    queryKey: ['step-result', trace.outputID, { preview: tracesPreviewEnabled }],
-    queryFn: useCallback(async () => {
-      if (!trace.outputID) {
-        setResult(undefined);
-        return;
-      }
-
-      setResult(await getTraceResult({ traceID: trace.outputID, preview: tracesPreviewEnabled }));
-    }, [getTraceResult, trace.outputID, tracesPreviewEnabled]),
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
+  const { loading, data: result } = useGetTraceResult({
+    traceID: trace.outputID,
+    refetchInterval: pollInterval ? pollInterval : undefined,
+    preview: tracesPreviewEnabled,
   });
+
+  useEffect(() => {
+    result && setPollInterval(undefined);
+  }, [result]);
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
@@ -199,7 +193,7 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && prettyInput && (
+        {runID && trace.stepID && (!cloud || prettyInput) && (
           <>
             <Button
               kind="primary"
@@ -213,7 +207,7 @@ export const StepInfo = ({
               setOpen={setRerunModalOpen}
               runID={runID}
               stepID={trace.stepID}
-              input={prettyInput}
+              input={prettyInput || result?.input || ''}
             />
           </>
         )}
