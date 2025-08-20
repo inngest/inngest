@@ -99,7 +99,12 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		// TODO decide on what to do with this because it likely can't be fixed on retries
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
-	next := schedule.Next(ci.ID.Timestamp().Add(c.opt.scheduleForwardDur))
+	from := ci.ID.Timestamp()
+	switch ci.Op {
+	case CronOpProcess:
+		from = from.Add(c.opt.scheduleForwardDur)
+	}
+	next := schedule.Next(from)
 
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time
