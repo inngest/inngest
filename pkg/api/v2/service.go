@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -20,6 +21,36 @@ type Service struct {
 
 func NewService() *Service {
 	return &Service{}
+}
+
+// GRPCServerOptions contains options for configuring the gRPC server
+type GRPCServerOptions struct {
+	AuthnMiddleware func(http.Handler) http.Handler
+	AuthzMiddleware func(http.Handler) http.Handler
+}
+
+// NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
+func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
+	var serverOpts []grpc.ServerOption
+	
+	// Add authentication and authorization interceptors if any middleware is provided
+	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
+		serverOpts = append(serverOpts,
+			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
+			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
+		)
+	}
+	
+	server := grpc.NewServer(serverOpts...)
+	service := NewService()
+	apiv2.RegisterV2Server(server, service)
+	
+	return server
+}
+
+// NewGRPCServerFromHTTPOptions creates a gRPC server using HTTP middleware options
+func NewGRPCServerFromHTTPOptions(httpOpts HTTPHandlerOptions) *grpc.Server {
+	return NewGRPCServer(GRPCServerOptions(httpOpts))
 }
 
 type HTTPHandlerOptions struct {
