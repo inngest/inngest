@@ -1,9 +1,10 @@
-package debug
+package queue
 
 import (
 	"context"
 	"fmt"
 
+	debugpkg "github.com/inngest/inngest/pkg/debug"
 	"github.com/inngest/inngest/pkg/cli/output"
 	dbgpb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/urfave/cli/v3"
@@ -11,7 +12,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 )
 
-func partitionCommand() *cli.Command {
+func PartitionCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "partition",
 		Aliases:   []string{"pt"},
@@ -24,7 +25,7 @@ func partitionCommand() *cli.Command {
 
 			partitionID := cmd.Args().Get(0)
 
-			debugCtx, ok := ctx.Value(dbgCtxKey).(*DebugContext)
+			debugCtx, ok := ctx.Value(debugpkg.CtxKey).(*debugpkg.Context)
 			if !ok {
 				return fmt.Errorf("debug context not found")
 			}

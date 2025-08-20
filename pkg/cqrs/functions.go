@@ -16,6 +16,7 @@ type Function struct {
 	Name      string          `json:"name"`
 	Config    json.RawMessage `json:"config"`
 	CreatedAt time.Time       `json:"created_at"`
+	EnvID     uuid.UUID       `json:"env_id"`
 }
 
 func (f Function) InngestFunction() (*inngest.Function, error) {
