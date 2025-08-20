@@ -157,7 +157,7 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 		"cron_item", ci,
 	)
 
-	nextItem, err := c.nextScheduledItemForFunction(ctx, ci)
+	nextItem, err := c.NextScheduledItemForFunction(ctx, ci.FunctionID)
 	switch err {
 	case nil:
 		// no-opt
@@ -239,14 +239,14 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 	return fmt.Errorf("not implemented")
 }
 
-func (c *redisCronManager) nextScheduledItemForFunction(ctx context.Context, ci CronItem) (*CronItem, error) {
+func (c *redisCronManager) NextScheduledItemForFunction(ctx context.Context, fnID uuid.UUID) (*CronItem, error) {
 	rc := c.c.Client()
 	kg := c.c.KeyGenerator()
 
 	cmd := rc.B().
 		Hget().
 		Key(kg.Schedule()).
-		Field(ci.FunctionID.String()).
+		Field(fnID.String()).
 		Build()
 
 	byt, err := rc.Do(ctx, cmd).AsBytes()
