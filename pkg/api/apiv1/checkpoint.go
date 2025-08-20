@@ -207,6 +207,7 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	// at some point in the future.
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
+		tracing.AddMetadataTenantAttrs(attrs, md.ID)
 
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
@@ -230,13 +231,15 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 					Parent:    md.Config.NewFunctionTrace(),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
-					Attributes: attrs.Merge(meta.NewAttrSet(
-						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
-						meta.Attr(meta.Attrs.RunID, &input.RunID),
-						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
-						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
-						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
-					)),
+					Attributes: attrs.Merge(
+						meta.NewAttrSet(
+							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
+							meta.Attr(meta.Attrs.RunID, &input.RunID),
+							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+						),
+					),
 				},
 			)
 			if err != nil {
@@ -245,11 +248,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case enums.OpcodeRunComplete:
-			result := APIResult{}
+			result := struct {
+				Data APIResult `json:"data"`
+			}{}
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
 			}
-			if err := a.finalize(ctx, md, result); err != nil {
+			if err := a.finalize(ctx, md, result.Data); err != nil {
 				l.Error("error finalizing sync run", "error", err)
 			}
 
@@ -321,7 +326,11 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 			AppID:     input.AppID,
 		},
 	})
-	// TODO: Handle run not found with 404
+	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
+		// Handle run not found with 404
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
+		return
+	}
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
 			"error loading state in sync fn finalize",
