@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 )
 
 type RedisCronManagerOpt func(c *redisCronManagerOpt)
@@ -81,10 +83,64 @@ func (c *redisCronManager) Next(ctx context.Context, ci CronItem) (time.Time, er
 	return next, nil
 }
 
+func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
+	l := c.log.With(
+		"action", "redisCronManager.CanRun",
+		"cron_item", ci,
+	)
+
+	nextItem, err := c.nextScheduledItemForFunction(ctx, ci)
+	switch err {
+	case nil:
+		// no-opt
+	case errNextScheduleNotFound:
+		// this likely means that the queue item was already dequeued
+		// if there are no mapping, we also can't tell what the next schedule of the function is,
+		// and we default to nothing if not available.
+		return false
+	}
+
+	// it's the same item, it can proceed
+	if ci.Equal(*nextItem) {
+		return true
+	}
+
+	// we need to do some checks if the cron items are different
+	//
+	// NOTE
+	// the checks are for cases where there could be race conditions (shouldn't happen but never know)
+	// where somehow the next item scheduled item is an updated version of the cron workload, but this
+	// outdated one somehow didn't get dequeued in time.
+	// cases where this can happen are on schedule updates
+	//
+	// generally speaking we shouldn't reach this section of the code, but if we do, make sure to make
+	// it known.
+	//
+	// TODO add metrics
+	l.Warn("running checks on cron item to make sure it can be ran", "next_item", nextItem)
+
+	switch nextItem.Op {
+	case CronOpProcess:
+		// no-op: proceed
+	default:
+		// wrong types, not used for processing purposes
+		return false
+	}
+
+	// this means the item in the mapping has an updated version of the cron, so this one should be discarded
+	if nextItem.FunctionVersion > ci.FunctionVersion {
+		return false
+	}
+
+	// all checks has passed so this means it's okay to run
+	return true
+}
+
 func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) error {
 	l := c.log.With("action", "redisCronManager.UpdateSchedule", "cron_item", ci)
 
 	switch ci.Op {
+	// this is net new, so there should be no existing cron workloads running
 	case CronOpNew, CronOpUnpause:
 		jobID := ci.ID.String()
 		queueName := queue.KindCron
@@ -93,6 +149,17 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		next, err := c.Next(ctx, ci)
 		if err != nil {
 			return queue.NeverRetryError(err)
+		}
+
+		ci := CronItem{
+			ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
+			AccountID:       ci.AccountID,
+			WorkspaceID:     ci.WorkspaceID,
+			AppID:           ci.AppID,
+			FunctionID:      ci.FunctionID,
+			FunctionVersion: ci.FunctionVersion,
+			Expression:      ci.Expression,
+			Op:              CronOpProcess,
 		}
 
 		// enqueue new schedule
@@ -110,16 +177,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 			Kind:        queue.KindCron,
 			QueueName:   &queueName,
 			MaxAttempts: &maxAttempts,
-			Payload: CronItem{
-				ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
-				AccountID:       ci.AccountID,
-				WorkspaceID:     ci.WorkspaceID,
-				AppID:           ci.AppID,
-				FunctionID:      ci.FunctionID,
-				FunctionVersion: ci.FunctionVersion,
-				Expression:      ci.Expression,
-				Op:              CronOpProcess,
-			},
+			Payload:     ci,
 		}, next, queue.EnqueueOpts{})
 		switch err {
 		case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
@@ -131,7 +189,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 
 		// TODO
 		// - update mapping
-		return c.setFunctionScheduleMap(ctx, ci, jobID)
+		return c.setFunctionScheduleMap(ctx, ci)
 
 	case CronOpUpdate:
 		// TODO
@@ -150,11 +208,37 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 	return fmt.Errorf("not implemented")
 }
 
-func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronItem, jobID string) error {
-	// compute the hashID from provided jobID
-	//
-	// NOTE ideally, we should just be able to reference the newly enqueued item but Enqueue doesn't return any objects
-	hashedID := queue.HashID(ctx, jobID)
+func (c *redisCronManager) nextScheduledItemForFunction(ctx context.Context, ci CronItem) (*CronItem, error) {
+	rc := c.c.Client()
+	kg := c.c.KeyGenerator()
+
+	cmd := rc.B().
+		Hget().
+		Key(kg.Schedule()).
+		Field(ci.FunctionID.String()).
+		Build()
+
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, errNextScheduleNotFound
+		}
+		return nil, fmt.Errorf("error retrieving cron item: %w", err)
+	}
+
+	var res CronItem
+	if err := json.Unmarshal(byt, &res); err != nil {
+		return nil, fmt.Errorf("error unmarshalling cron item for function: %w", err)
+	}
+
+	return &res, nil
+}
+
+func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronItem) error {
+	byt, err := json.Marshal(ci)
+	if err != nil {
+		return fmt.Errorf("error marshalling cron item: %w", err)
+	}
 
 	rc := c.c.Client()
 	kg := c.c.KeyGenerator()
@@ -163,7 +247,7 @@ func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronIt
 		Hset().
 		Key(kg.Schedule()).
 		FieldValue().
-		FieldValue(ci.FunctionID.String(), hashedID).
+		FieldValue(ci.FunctionID.String(), string(byt)).
 		Build()
 
 	added, err := rc.Do(ctx, cmd).AsInt64()

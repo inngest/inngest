@@ -2,9 +2,11 @@ package cron
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	cron "github.com/robfig/cron/v3"
 )
@@ -25,6 +27,10 @@ var (
 	parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 
 	allowedVariant = 50 * time.Second
+)
+
+var (
+	errNextScheduleNotFound = fmt.Errorf("next schedule not found")
 )
 
 // Parser returns the global cron parser instance
@@ -56,6 +62,8 @@ func Validate(str string) error {
 type CronManager interface {
 	// Next returns the next schedule time based on the cron item attributes with a jitter
 	Next(ctx context.Context, ci CronItem) (time.Time, error)
+	// CanRun checks if the cron item can be scheduled for execution
+	CanRun(ctx context.Context, ci CronItem) bool
 	// UpdateSchedule handles the updating of the next scheduled item.
 	//
 	// Scenarios:
@@ -87,4 +95,26 @@ type CronItem struct {
 	FunctionVersion int       `json:"fnV"`
 	Expression      string    `jaon:"expr"`
 	Op              CronOp    `json:"op"`
+}
+
+// Equal checks if the cron item is identical
+// NOTE this just do a dump field check right now, there might be better ways of handling equation checks
+func (i CronItem) Equal(ci CronItem) bool {
+	return i.ID == ci.ID &&
+		i.AccountID == ci.AccountID &&
+		i.WorkspaceID == ci.WorkspaceID &&
+		i.AppID == ci.AppID &&
+		i.FunctionID == ci.FunctionID &&
+		i.FunctionVersion == ci.FunctionVersion &&
+		i.Expression == ci.Expression &&
+		i.Op == ci.Op
+}
+
+// JobID returns the hash of the queue item ID that's supposed to be handling this cron item
+//
+// NOTE
+// This is based on the assumption that the ID field is always used for JobID assignments when enqueueing.
+// So if that changes, some stuff will break.
+func (i CronItem) JobID() string {
+	return queue.HashID(context.TODO(), i.ID.String())
 }
