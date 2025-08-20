@@ -39,7 +39,7 @@ type UserError interface {
 
 // Wrap always wraps an error as an InternalError type.
 func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
-	return internal{
+	return &internal{
 		error:     fmt.Errorf(msg, a...),
 		code:      code,
 		retryable: retryable,
@@ -48,7 +48,7 @@ func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
 
 // WrapUser always wraps an error as an InternalError type.
 func WrapUser(code int, retryable bool, msg string, a ...any) UserError {
-	return user{
+	return &user{
 		error:     fmt.Errorf(msg, a...),
 		code:      code,
 		retryable: retryable,
@@ -58,7 +58,7 @@ func WrapUser(code int, retryable bool, msg string, a ...any) UserError {
 // WrapResponseAsUser wraps a raw HTTP response as a user error, exposing the raw
 // response via the `.Raw()` method.
 func WrapResponseAsUser(code int, retryable bool, raw []byte, msg string, a ...any) UserError {
-	return user{
+	return &user{
 		error:     fmt.Errorf(msg, a...),
 		code:      code,
 		retryable: retryable,
@@ -74,10 +74,10 @@ type internal struct {
 
 // Unwrap allows us to use errors.Is to determine the proper
 // cause of errors.
-func (i internal) Unwrap() error   { return i.error }
-func (i internal) ErrorCode() int  { return i.code }
-func (i internal) Retryable() bool { return i.retryable }
-func (internal) InternalError()    {}
+func (i *internal) Unwrap() error   { return i.error }
+func (i *internal) ErrorCode() int  { return i.code }
+func (i *internal) Retryable() bool { return i.retryable }
+func (*internal) InternalError()    {}
 
 type user struct {
 	error
@@ -88,8 +88,8 @@ type user struct {
 
 // Unwrap allows us to use errors.Is to determine the proper
 // cause of errors.
-func (u user) Unwrap() error   { return u.error }
-func (u user) ErrorCode() int  { return u.code }
-func (u user) Retryable() bool { return u.retryable }
-func (u user) Raw() []byte     { return u.raw }
-func (user) UserError()        {}
+func (u *user) Unwrap() error   { return u.error }
+func (u *user) ErrorCode() int  { return u.code }
+func (u *user) Retryable() bool { return u.retryable }
+func (u *user) Raw() []byte     { return u.raw }
+func (*user) UserError()        {}
