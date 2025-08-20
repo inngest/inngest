@@ -35,11 +35,14 @@ const (
 const (
 	// V2HealthProcedure is the fully-qualified name of the V2's Health RPC.
 	V2HealthProcedure = "/api.v2.V2/Health"
+	// V2CreateAccountProcedure is the fully-qualified name of the V2's CreateAccount RPC.
+	V2CreateAccountProcedure = "/api.v2.V2/CreateAccount"
 )
 
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -59,12 +62,19 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("Health")),
 			connect.WithClientOptions(opts...),
 		),
+		createAccount: connect.NewClient[v2.CreateAccountRequest, v2.CreateAccountResponse](
+			httpClient,
+			baseURL+V2CreateAccountProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateAccount")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // v2Client implements V2Client.
 type v2Client struct {
-	health *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	health        *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	createAccount *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -72,9 +82,15 @@ func (c *v2Client) Health(ctx context.Context, req *connect.Request[v2.HealthReq
 	return c.health.CallUnary(ctx, req)
 }
 
+// CreateAccount calls api.v2.V2.CreateAccount.
+func (c *v2Client) CreateAccount(ctx context.Context, req *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
+	return c.createAccount.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -90,10 +106,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("Health")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateAccountHandler := connect.NewUnaryHandler(
+		V2CreateAccountProcedure,
+		svc.CreateAccount,
+		connect.WithSchema(v2Methods.ByName("CreateAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
 			v2HealthHandler.ServeHTTP(w, r)
+		case V2CreateAccountProcedure:
+			v2CreateAccountHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +129,8 @@ type UnimplementedV2Handler struct{}
 
 func (UnimplementedV2Handler) Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.Health is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateAccount is not implemented"))
 }

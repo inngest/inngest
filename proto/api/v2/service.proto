@@ -2,7 +2,7 @@ syntax = "proto3";
 package api.v2;
 
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
+import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
@@ -44,7 +44,8 @@ message ResponseMetadata {
 }
 
 message CreateAccountRequest {
-  // TODO this is a placeholder for authz middleware. Fill this in when create account implemented
+  string email = 1;
+  optional string name = 2;
 }
 
 message CreateAccountResponse {
@@ -53,5 +54,10 @@ message CreateAccountResponse {
 }
 
 message CreateAccountData {
-  string apiKey = 1;
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string apiKey = 4;
+  google.protobuf.Timestamp createdAt = 5;
+  google.protobuf.Timestamp updatedAt = 6;
 }
