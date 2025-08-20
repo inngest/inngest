@@ -905,7 +905,7 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 
 	opt, err := rueidis.ParseURL(redisURI)
 	if err != nil {
-		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: invalid format")
 	}
 
 	// Set default overrides
