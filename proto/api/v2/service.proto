@@ -9,6 +9,14 @@ import "third_party/protoc-gen-openapiv2/options/annotations.proto";
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
 
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Inngest REST API v2"
+    version: "2.0.0"
+    description: "The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality."
+  }
+  host: "api.inngest.com"
+  base_path: "/v2"
+  schemes: HTTPS
   security_definitions: {
     security: {
       key: "BearerAuth"

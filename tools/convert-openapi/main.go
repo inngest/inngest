@@ -11,6 +11,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 func main() {
@@ -66,6 +67,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert %s to OpenAPI v3: %w", path, err)
 		}
+
+		// Handle basePath conversion to servers for OpenAPI v3
+		handleBasePath(&v2Doc, v3Doc)
 
 		// Generate output filename
 		relPath, err := filepath.Rel(inputDir, path)
@@ -141,4 +145,20 @@ func hasCustomStatusCodes(responses map[string]*openapi2.Response) bool {
 		}
 	}
 	return false
+}
+
+// handleBasePath converts OpenAPI v2 basePath to OpenAPI v3 servers with multiple environments
+func handleBasePath(v2Doc *openapi2.T, v3Doc *openapi3.T) {
+	// Define multiple servers for different environments
+	servers := []*openapi3.Server{
+		{
+			URL:         "https://api.inngest.com/v2",
+			Description: "Production server",
+		},
+		{
+			URL:         "http://localhost:8288/api/v2",
+			Description: "Development server",
+		},
+	}
+	v3Doc.Servers = servers
 }
