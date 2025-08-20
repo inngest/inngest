@@ -841,16 +841,14 @@ func (l traceLifecycle) OnStepFinished(
 					span.SetAIRequestMetadata(parsed)
 				}
 			case enums.OpcodeStep, enums.OpcodeStepRun:
-				// NOTE: logic is commented out for now since ParseUnknown don't do anything
-				//
 				// Handle input and attempt to best-effort parse.
-				// input, _ := op.Input()
-				// if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
-				// 	span.SetAIRequestMetadata(parsed)
+				input, _ := op.Input()
+				if parsed, err := aigateway.ParseUnknownInput(ctx, json.RawMessage(input)); err == nil {
+					span.SetAIRequestMetadata(parsed)
 
-				// 	// Now that we know the step run was a wrapped AI call, we can also parse the output
-				// 	// to see if we can store the response metadata correctly.
-				// }
+					// Now that we know the step run was a wrapped AI call, we can also parse the output
+					// to see if we can store the response metadata correctly.
+				}
 			}
 
 		} else if resp.Retryable() { // these are function retries
