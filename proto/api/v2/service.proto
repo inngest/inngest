@@ -153,6 +153,78 @@ service V2 {
       }
     };
   }
+
+  rpc FetchAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
+    option (google.api.http) = {
+      get: "/partner/accounts"
+    };
+    option (authz) = {
+      require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of accounts"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -199,4 +271,38 @@ message CreateAccountData {
   string apiKey = 4;
   google.protobuf.Timestamp createdAt = 5;
   google.protobuf.Timestamp updatedAt = 6;
+}
+
+message FetchAccountsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of accounts to return per page (min: 1, max: 1000)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountsResponse {
+  repeated Account data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Account {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  google.protobuf.Timestamp createdAt = 4;
+  google.protobuf.Timestamp updatedAt = 5;
+}
+
+message Page {
+  optional string cursor = 1;
+  bool hasMore = 2;
+  int32 limit = 3;
 }
