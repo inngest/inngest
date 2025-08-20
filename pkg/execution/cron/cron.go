@@ -60,8 +60,8 @@ func Validate(str string) error {
 
 // CronManager represents the handling of cron
 type CronManager interface {
-	// Next returns the next schedule time based on the cron item attributes with a jitter
-	Next(ctx context.Context, ci CronItem) (time.Time, error)
+	// ScheduleNext handles the scheduling of the next cron job
+	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
 	// CanRun checks if the cron item can be scheduled for execution
 	CanRun(ctx context.Context, ci CronItem) bool
 	// UpdateSchedule handles the updating of the next scheduled item.
