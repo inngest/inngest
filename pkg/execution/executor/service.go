@@ -669,7 +669,7 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 		l.Error("error unmarshalling cron item", "item", item)
 		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
-	l.Info("cron sync", "item", ci) // TODO change to trace
+	l.Trace("cron sync", "item", ci)
 
 	// handle the schedule update
 	err := s.croner.UpdateSchedule(ctx, ci)
@@ -696,6 +696,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 
 	l = l.With("cron_item", ci)
+	l.Trace("handling cron")
 
 	if !s.croner.CanRun(ctx, ci) {
 		// no action needed
