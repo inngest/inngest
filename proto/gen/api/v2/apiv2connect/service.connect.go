@@ -39,6 +39,8 @@ const (
 	V2XSchemaOnlyProcedure = "/api.v2.V2/_SchemaOnly"
 	// V2CreateAccountProcedure is the fully-qualified name of the V2's CreateAccount RPC.
 	V2CreateAccountProcedure = "/api.v2.V2/CreateAccount"
+	// V2FetchAccountsProcedure is the fully-qualified name of the V2's FetchAccounts RPC.
+	V2FetchAccountsProcedure = "/api.v2.V2/FetchAccounts"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -47,6 +49,7 @@ type V2Client interface {
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -78,6 +81,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("CreateAccount")),
 			connect.WithClientOptions(opts...),
 		),
+		fetchAccounts: connect.NewClient[v2.FetchAccountsRequest, v2.FetchAccountsResponse](
+			httpClient,
+			baseURL+V2FetchAccountsProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccounts")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -86,6 +95,7 @@ type v2Client struct {
 	health        *connect.Client[v2.HealthRequest, v2.HealthResponse]
 	xSchemaOnly   *connect.Client[v2.HealthRequest, v2.ErrorResponse]
 	createAccount *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
+	fetchAccounts *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -103,12 +113,18 @@ func (c *v2Client) CreateAccount(ctx context.Context, req *connect.Request[v2.Cr
 	return c.createAccount.CallUnary(ctx, req)
 }
 
+// FetchAccounts calls api.v2.V2.FetchAccounts.
+func (c *v2Client) FetchAccounts(ctx context.Context, req *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
+	return c.fetchAccounts.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -136,6 +152,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("CreateAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2FetchAccountsHandler := connect.NewUnaryHandler(
+		V2FetchAccountsProcedure,
+		svc.FetchAccounts,
+		connect.WithSchema(v2Methods.ByName("FetchAccounts")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -144,6 +166,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2XSchemaOnlyHandler.ServeHTTP(w, r)
 		case V2CreateAccountProcedure:
 			v2CreateAccountHandler.ServeHTTP(w, r)
+		case V2FetchAccountsProcedure:
+			v2FetchAccountsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -163,4 +187,8 @@ func (UnimplementedV2Handler) XSchemaOnly(context.Context, *connect.Request[v2.H
 
 func (UnimplementedV2Handler) CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccounts is not implemented"))
 }

@@ -492,6 +492,254 @@ func (x *CreateAccountData) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type FetchAccountsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchAccountsRequest) Reset() {
+	*x = FetchAccountsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchAccountsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchAccountsRequest) ProtoMessage() {}
+
+func (x *FetchAccountsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchAccountsRequest.ProtoReflect.Descriptor instead.
+func (*FetchAccountsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *FetchAccountsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *FetchAccountsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type FetchAccountsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Account             `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchAccountsResponse) Reset() {
+	*x = FetchAccountsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchAccountsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchAccountsResponse) ProtoMessage() {}
+
+func (x *FetchAccountsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchAccountsResponse.ProtoReflect.Descriptor instead.
+func (*FetchAccountsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FetchAccountsResponse) GetData() []*Account {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *FetchAccountsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *FetchAccountsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type Account struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Account) Reset() {
+	*x = Account{}
+	mi := &file_api_v2_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Account) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Account) ProtoMessage() {}
+
+func (x *Account) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Account.ProtoReflect.Descriptor instead.
+func (*Account) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Account) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Account) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *Account) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Account) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Account) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type Page struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	HasMore       bool                   `protobuf:"varint,2,opt,name=hasMore,proto3" json:"hasMore,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Page) Reset() {
+	*x = Page{}
+	mi := &file_api_v2_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Page) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Page) ProtoMessage() {}
+
+func (x *Page) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Page.ProtoReflect.Descriptor instead.
+func (*Page) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *Page) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *Page) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+func (x *Page) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -526,7 +774,27 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x06apiKey\x18\x04 \x01(\tR\x06apiKey\x128\n" +
 	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
-	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9c\a\n" +
+	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"c\n" +
+	"\x14FetchAccountsRequest\x12\x1b\n" +
+	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
+	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x94\x01\n" +
+	"\x15FetchAccountsResponse\x12#\n" +
+	"\x04data\x18\x01 \x03(\v2\x0f.api.v2.AccountR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xb7\x01\n" +
+	"\aAccount\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x128\n" +
+	"\tcreatedAt\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
+	"\tupdatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"^\n" +
+	"\x04Page\x12\x1b\n" +
+	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x18\n" +
+	"\ahasMore\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
+	"\a_cursor2\xa6\v\n" +
 	"\x02V2\x12\xf6\x01\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xbc\x01\x92A\xa9\x01JR\n" +
 	"\x03401\x12K\n" +
@@ -560,7 +828,27 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accountsB\x90\x01\x92AZZX\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\x87\x04\n" +
+	"\rFetchAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\xb8\x03\x92A\x95\x03JD\n" +
+	"\x03200\x12=\n" +
+	"\x10List of accounts\x12)\n" +
+	"'\x1a%#/definitions/v2FetchAccountsResponseJR\n" +
+	"\x03400\x12K\n" +
+	"&Bad Request - invalid query parameters\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accountsB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
 	"BearerAuth\x12H\b\x02\x123Bearer token authentication. Format: `Bearer {key}`\x1a\rAuthorization \x02Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
@@ -577,7 +865,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_api_v2_service_proto_goTypes = []any{
 	(*HealthRequest)(nil),         // 0: api.v2.HealthRequest
 	(*HealthResponse)(nil),        // 1: api.v2.HealthResponse
@@ -588,29 +876,40 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*CreateAccountRequest)(nil),  // 6: api.v2.CreateAccountRequest
 	(*CreateAccountResponse)(nil), // 7: api.v2.CreateAccountResponse
 	(*CreateAccountData)(nil),     // 8: api.v2.CreateAccountData
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*FetchAccountsRequest)(nil),  // 9: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil), // 10: api.v2.FetchAccountsResponse
+	(*Account)(nil),               // 11: api.v2.Account
+	(*Page)(nil),                  // 12: api.v2.Page
+	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	2,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	5,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	3,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	9,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	13, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	13, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	8,  // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
 	5,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	9,  // 7: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	9,  // 8: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	0,  // 9: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	0,  // 10: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	6,  // 11: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
-	1,  // 12: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	4,  // 13: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	7,  // 14: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	13, // 7: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	13, // 8: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	11, // 9: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	5,  // 10: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	12, // 11: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	13, // 12: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	13, // 13: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	0,  // 14: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	0,  // 15: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	6,  // 16: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
+	9,  // 17: api.v2.V2.FetchAccounts:input_type -> api.v2.FetchAccountsRequest
+	1,  // 18: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	4,  // 19: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	7,  // 20: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
+	10, // 21: api.v2.V2.FetchAccounts:output_type -> api.v2.FetchAccountsResponse
+	18, // [18:22] is the sub-list for method output_type
+	14, // [14:18] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -620,13 +919,15 @@ func file_api_v2_service_proto_init() {
 	}
 	file_api_v2_options_proto_init()
 	file_api_v2_service_proto_msgTypes[6].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[9].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

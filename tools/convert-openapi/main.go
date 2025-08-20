@@ -70,6 +70,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 
 		// Handle basePath conversion to servers for OpenAPI v3
 		handleBasePath(&v2Doc, v3Doc)
+		
+		// Add parameter constraints for OpenAPI v3
+		addParameterConstraints(v3Doc)
 
 		// Generate output filename
 		relPath, err := filepath.Rel(inputDir, path)
@@ -161,4 +164,27 @@ func handleBasePath(v2Doc *openapi2.T, v3Doc *openapi3.T) {
 		},
 	}
 	v3Doc.Servers = servers
+}
+
+// addParameterConstraints adds validation constraints to specific parameters
+func addParameterConstraints(v3Doc *openapi3.T) {
+	if v3Doc.Paths == nil {
+		return
+	}
+
+	// Target the specific /partner/accounts endpoint
+	accountsPath := v3Doc.Paths.Find("/partner/accounts")
+	if accountsPath != nil && accountsPath.Get != nil {
+		for _, param := range accountsPath.Get.Parameters {
+			if param.Value != nil && param.Value.Name == "limit" {
+				// Add min/max constraints for limit parameter
+				if param.Value.Schema != nil && param.Value.Schema.Value != nil {
+					min := float64(1)
+					max := float64(1000)
+					param.Value.Schema.Value.Min = &min
+					param.Value.Schema.Value.Max = &max
+				}
+			}
+		}
+	}
 }
