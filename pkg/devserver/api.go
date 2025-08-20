@@ -221,11 +221,11 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Re-initialize our cron manager.
-	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
-		l.Warn("error initializing crons", "error", err)
-		a.err(ctx, w, 400, err)
-		return
-	}
+	// if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
+	// 	l.Warn("error initializing crons", "error", err)
+	// 	a.err(ctx, w, 400, err)
+	// 	return
+	// }
 
 	resp, err := json.Marshal(reply)
 	if err != nil {

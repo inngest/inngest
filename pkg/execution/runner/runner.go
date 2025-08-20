@@ -194,9 +194,9 @@ func (s *svc) Run(ctx context.Context) error {
 	// to rely on a single executor to 'claim' ownership:  we'd have to implement
 	// more complex logic to check for the last heartbeat and valid cron scheduled,
 	// then backtrack to re-execute in the case of node downtime.  This is simple.
-	if err := s.InitializeCrons(ctx); err != nil {
-		return err
-	}
+	// if err := s.InitializeCrons(ctx); err != nil {
+	// 	return err
+	// }
 
 	s.log.Info("subscribing to events", "topic", s.config.EventStream.Service.TopicName())
 	err := s.pubsub.Subscribe(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage)
