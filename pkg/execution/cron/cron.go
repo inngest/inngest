@@ -83,6 +83,8 @@ type CronManager interface {
 	// Creates a schedule, pretty much similar to new
 	//
 	UpdateSchedule(ctx context.Context, ci CronItem) error
+	// NextScheduledItemForFunction retrieves the next cron item for the function
+	NextScheduledItemForFunction(ctx context.Context, fnID uuid.UUID) (*CronItem, error)
 }
 
 // CronItem represent an item that can be scheduled via the cron expression

@@ -41,6 +41,25 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Queue Shard", shard,
 			),
 			"Triggers", fn.Triggers,
+		),
+			WithTextOptLeadSpace(true),
+		); err != nil {
+			return err
+		}
+
+		if pt.GetCron() != nil {
+			c := pt.GetCron()
+			if err := w.WriteOrdered(OrderedData(
+				"CronSchedule", OrderedData(
+					"Next", c.Next.AsTime().Format(time.RFC3339),
+					"JobID", c.JobId,
+				),
+			)); err != nil {
+				return err
+			}
+		}
+
+		if err := w.WriteOrdered(OrderedData(
 			"Concurrency", OrderedData(
 				"Account", 0,
 				"Function", 0,
@@ -59,9 +78,7 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Singleton", fn.Singleton,
 				"URI", fn.Steps,
 			),
-		),
-			WithTextOptLeadSpace(true),
-		); err != nil {
+		)); err != nil {
 			return err
 		}
 	}
