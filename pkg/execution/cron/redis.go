@@ -205,7 +205,7 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 }
 
 func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) error {
-	// l := c.log.With("action", "redisCronManager.UpdateSchedule", "cron_item", ci)
+	l := c.log.With("action", "redisCronManager.UpdateSchedule", "cron_item", ci)
 
 	switch ci.Op {
 	case
@@ -217,6 +217,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		if err != nil {
 			return fmt.Errorf("error scheduling next item for Op: %d", ci.Op)
 		}
+		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", next.JobID())
 
 		// - update mapping
 		return c.setFunctionScheduleMap(ctx, *next)
