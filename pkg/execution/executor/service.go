@@ -103,6 +103,12 @@ func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) b
 	}
 }
 
+func WithServicePublisher(p pubsub.Publisher) func(*svc) {
+	return func(s *svc) {
+		s.publisher = p
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{
 		config: c,
@@ -142,6 +148,8 @@ type svc struct {
 
 	opts      []ExecutorOpt
 	findShard redis_state.ShardSelector
+
+	publisher pubsub.Publisher
 
 	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
