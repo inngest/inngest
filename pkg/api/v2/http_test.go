@@ -89,7 +89,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
 		handler, err := NewHTTPHandler(ctx, opts)
 		require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
 		handler, err := NewHTTPHandler(ctx, opts)
 		require.NoError(t, err)
@@ -124,6 +124,98 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 
 		require.Equal(t, http.StatusUnauthorized, rec.Code)
 		require.Equal(t, "Unauthorized", rec.Body.String())
+	})
+
+	t.Run("authorization middleware blocks protected endpoints", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, opts)
+		require.NoError(t, err)
+
+		// Test protected endpoint (CreateAccount)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.True(t, authzCalled)
+		require.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("authorization middleware not applied to health endpoint", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, opts)
+		require.NoError(t, err)
+
+		// Test health endpoint (should not trigger authz middleware)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.False(t, authzCalled)
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("both authentication and authorization middleware work together", func(t *testing.T) {
+		authnCalled := false
+		authzCalled := false
+
+		authnMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authnCalled = true
+				r.Header.Set("X-Authn-Called", "true")
+				next.ServeHTTP(w, r)
+			})
+		}
+
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthnMiddleware: authnMiddleware,
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, opts)
+		require.NoError(t, err)
+
+		// Test protected endpoint (CreateAccount) - should hit both middlewares
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.True(t, authnCalled, "Authentication middleware should be called")
+		require.True(t, authzCalled, "Authorization middleware should be called for protected endpoint")
+		require.Equal(t, http.StatusForbidden, rec.Code)
 	})
 }
 
@@ -311,7 +403,7 @@ func BenchmarkHTTPGateway_Health(b *testing.B) {
 		for pb.Next() {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
-			
+
 			if rec.Code != http.StatusOK {
 				b.Fatalf("Expected status 200, got %d", rec.Code)
 			}

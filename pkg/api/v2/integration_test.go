@@ -32,9 +32,8 @@ func setupGRPCTestServer(t testing.TB) (apiv2.V2Client, func()) {
 		return lis.Dial()
 	}
 
-	conn, err := grpc.DialContext(
-		context.Background(),
-		"bufnet",
+	conn, err := grpc.NewClient(
+		"passthrough://bufnet",
 		grpc.WithContextDialer(bufDialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)

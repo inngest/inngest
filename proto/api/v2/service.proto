@@ -3,6 +3,7 @@ package api.v2;
 
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
+import "api/v2/options.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
 
@@ -10,6 +11,16 @@ service V2 {
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
       get: "/health"
+    };
+  }
+  
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
+    option (google.api.http) = {
+      post: "/partner/accounts",
+      body : "*"
+    };
+    option (authz) = {
+      require_authz: true
     };
   }
 }
@@ -30,4 +41,17 @@ message HealthData {
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
+}
+
+message CreateAccountRequest {
+  // TODO this is a placeholder for authz middleware. Fill this in when create account implemented
+}
+
+message CreateAccountResponse {
+  CreateAccountData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message CreateAccountData {
+  string apiKey = 1;
 }

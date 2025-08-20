@@ -1,0 +1,16 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+// Extension for method-level authorization options
+extend google.protobuf.MethodOptions {
+  AuthzOptions authz = 50001;
+}
+
+message AuthzOptions {
+  // Whether this endpoint requires authorization middleware
+  bool require_authz = 1;
+}
