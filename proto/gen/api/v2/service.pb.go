@@ -774,10 +774,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x06apiKey\x18\x04 \x01(\tR\x06apiKey\x128\n" +
 	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
-	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"c\n" +
-	"\x14FetchAccountsRequest\x12\x1b\n" +
-	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
-	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd6\x01\n" +
+	"\x14FetchAccountsRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12]\n" +
+	"\x05limit\x18\x02 \x01(\x05BB\x92A?29Number of accounts to return per page (min: 1, max: 1000):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x94\x01\n" +
 	"\x15FetchAccountsResponse\x12#\n" +
