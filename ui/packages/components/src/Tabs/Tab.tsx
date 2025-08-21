@@ -31,40 +31,40 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
     const finalIconBefore = iconBefore ?? defaultIconBefore;
 
     return (
-      <OptionalTooltip side="bottom" tooltip={isOverflowing ? title : ''}>
-        <TabsPrimitive.Trigger
-          className={cn(
-            ACTIVE_BORDER_STYLES,
-            ACTIVE_TEXT_STYLES,
-            APPEARANCE_STYLES,
-            HOVER_STYLES,
-            LAYOUT_STYLES,
-            SIZING_STYLES,
-            SPACING_STYLES,
-            className
-          )}
-          ref={ref}
-          value={value}
-          {...props}
-        >
-          {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
+      <TabsPrimitive.Trigger
+        className={cn(
+          ACTIVE_BORDER_STYLES,
+          ACTIVE_TEXT_STYLES,
+          APPEARANCE_STYLES,
+          HOVER_STYLES,
+          LAYOUT_STYLES,
+          SIZING_STYLES,
+          SPACING_STYLES,
+          className
+        )}
+        ref={ref}
+        value={value}
+        {...props}
+      >
+        {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
+        <OptionalTooltip side="bottom" tooltip={isOverflowing ? title : ''}>
           <span ref={textRef} className="flex-1 truncate text-left">
             {title}
           </span>
-          {onClose && (
-            <span
-              className="p-0.5"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose(value);
-              }}
-            >
-              <RiCloseLine size={14} />
-            </span>
-          )}
-        </TabsPrimitive.Trigger>
-      </OptionalTooltip>
+        </OptionalTooltip>
+        {onClose && (
+          <span
+            className="p-0.5"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose(value);
+            }}
+          >
+            <RiCloseLine size={14} />
+          </span>
+        )}
+      </TabsPrimitive.Trigger>
     );
   }
 );
