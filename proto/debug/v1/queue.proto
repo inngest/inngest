@@ -56,6 +56,7 @@ message CronSchedule {
 message QueueItemRequest {
   string item_id = 1;
   string run_id = 2;
+  string queue_shard = 3;
 }
 
 message QueueItemResponse { bytes data = 1; }
