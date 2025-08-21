@@ -1,9 +1,6 @@
 package debug
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/inngest/inngest/cmd/debug/queue"
 	"github.com/urfave/cli/v3"
 )
@@ -16,9 +13,6 @@ func queueCommand() *cli.Command {
 		Commands: []*cli.Command{
 			queue.PartitionCommand(),
 			queue.ItemCommand(),
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			return fmt.Errorf("queue commands not yet implemented - use subcommands")
 		},
 	}
 }
