@@ -672,8 +672,7 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	l.Trace("cron sync", "item", ci)
 
 	// handle the schedule update
-	err := s.croner.UpdateSchedule(ctx, ci)
-	if err != nil {
+	if err := s.croner.UpdateSchedule(ctx, ci); err != nil {
 		// TODO does this need special error handling?
 		return fmt.Errorf("error upserting cron schedule: %w", err)
 	}
@@ -757,7 +756,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	// NOTE
 	// should this also handle batching and rate limit like runner.initialize?
-	// seems kinda weird to have those settings with cron tbh
+	// seems kinda weird to have those settisngs with cron tbh
 	if _, err := s.Executor().Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      ci.AccountID,
 		WorkspaceID:    ci.WorkspaceID,
@@ -768,7 +767,8 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		IdempotencyKey: &idempotencyKey,
 	}); err != nil {
 		if !errors.Is(err, redis_state.ErrQueueItemExists) &&
-			!errors.Is(err, state.ErrIdentifierExists) {
+			!errors.Is(err, state.ErrIdentifierExists) &&
+			!errors.Is(err, ErrFunctionSkippedIdempotency) {
 			l.ReportError(err, "error scheduling cron function execution")
 			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
