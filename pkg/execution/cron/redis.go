@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -223,28 +224,77 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 
 		next, err := c.ScheduleNext(ctx, ci)
 		if err != nil {
-			return fmt.Errorf("error scheduling next item for Op: %d", ci.Op)
+			return fmt.Errorf("error scheduling next item for Op: %s", ci.Op)
 		}
-		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", ci.JobID)
+		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", next.JobID)
 
 		// - update mapping
 		return c.setFunctionScheduleMap(ctx, *next)
 
 	case enums.CronOpUpdate:
-		// TODO
-		// - delete and dequeue existing queue item
-		// - enqueue new schedule
+		// NOTE
+		// This logic will have race conditions where retrieving of the item and dequeue happens
+		// separately.
+		// For the sake of simplicity, we will not be dealing with it in this logic, and it's up
+		// to the caller to handle things accordingly with the provided interfaces available (e.g. CanRun)
+		// and additional context on the caller side that's out of scope for this module
+		existing, err := c.NextScheduledItemForFunction(ctx, ci.FunctionID)
+		switch err {
+		case nil, errNextScheduleNotFound:
+			// no-op
+		default:
+			return fmt.Errorf("error finding existing cron item for function: %w", err)
+		}
+
+		// no action should be taken if the existing one has a higher function version
+		// this means there's a race condition and we don't want to update the schedule to
+		// an older version
+		if existing.FunctionVersion > ci.FunctionVersion {
+			return nil
+		}
+
+		// dequeue the item
+		if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
+			if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+				return fmt.Errorf("error dequeueing item: %w", err)
+			}
+		}
+
+		next, err := c.ScheduleNext(ctx, ci)
+		if err != nil {
+			return fmt.Errorf("error scheduling next item for Op: %s", ci.Op)
+		}
+		l.Trace("scheduled next cron job after update", "next", next, "op", ci.Op, "job_id", next.JobID)
+
 		// - update mapping
+		return c.setFunctionScheduleMap(ctx, *next)
 
 	case enums.CronOpPause:
-		// TODO
-		// - delete and dequeue existing queue item
+		// NOTE
+		// This logic will have race conditions where retrieving of the item and dequeue happens
+		// separately.
+		// For the sake of simplicity, we will not be dealing with it in this logic, and it's up
+		// to the caller to handle things accordingly with the provided interfaces available (e.g. CanRun)
+		// and additional context on the caller side that's out of scope for this module
+		existing, err := c.NextScheduledItemForFunction(ctx, ci.FunctionID)
+		switch err {
+		case nil, errNextScheduleNotFound:
+			// no-op
+		default:
+			return fmt.Errorf("error finding existing cron item for function: %w", err)
+		}
+
+		// dequeue the item
+		if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
+			if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+				return fmt.Errorf("error dequeueing item: %w", err)
+			}
+		}
+		return nil
 
 	default:
-		return fmt.Errorf("unknow cron operation: %d", ci.Op)
+		return fmt.Errorf("unknown cron operation provided: %s", ci.Op)
 	}
-
-	return fmt.Errorf("not implemented")
 }
 
 func (c *redisCronManager) NextScheduledItemForFunction(ctx context.Context, fnID uuid.UUID) (*CronItem, error) {
