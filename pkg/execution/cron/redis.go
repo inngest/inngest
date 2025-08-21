@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -101,7 +102,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	}
 	from := ci.ID.Timestamp()
 	switch ci.Op {
-	case CronOpProcess:
+	case enums.CronOpProcess:
 		from = from.Add(c.opt.scheduleForwardDur)
 	}
 	next := schedule.Next(from)
@@ -119,7 +120,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		FunctionID:      ci.FunctionID,
 		FunctionVersion: ci.FunctionVersion,
 		Expression:      ci.Expression,
-		Op:              CronOpProcess,
+		Op:              enums.CronOpProcess,
 	}
 
 	l = l.With("next_cron_item", nextItem)
@@ -193,7 +194,7 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 	l.Warn("running checks on cron item to make sure it can be ran", "next_item", nextItem)
 
 	switch nextItem.Op {
-	case CronOpProcess:
+	case enums.CronOpProcess:
 		// no-op: proceed
 	default:
 		// wrong types, not used for processing purposes
@@ -215,9 +216,10 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 	switch ci.Op {
 	case
 		// these are net new, so there should be no existing cron workloads running
-		CronOpNew, CronOpUnpause,
+		enums.CronOpNew, enums.CronOpUnpause,
 		// pure processing
-		CronOpProcess:
+		enums.CronOpProcess:
+
 		next, err := c.ScheduleNext(ctx, ci)
 		if err != nil {
 			return fmt.Errorf("error scheduling next item for Op: %d", ci.Op)
@@ -227,13 +229,13 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		// - update mapping
 		return c.setFunctionScheduleMap(ctx, *next)
 
-	case CronOpUpdate:
+	case enums.CronOpUpdate:
 		// TODO
 		// - delete and dequeue existing queue item
 		// - enqueue new schedule
 		// - update mapping
 
-	case CronOpPause:
+	case enums.CronOpPause:
 		// TODO
 		// - delete and dequeue existing queue item
 
