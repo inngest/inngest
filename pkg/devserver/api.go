@@ -393,7 +393,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 					FunctionID:      fn.ID,
 					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
 					Expression:      fn.ScheduleExpression(),
-					Op:              cron.CronOpUpdate,
+					Op:              enums.CronOpUpdate,
 				})
 			}
 			continue
@@ -421,7 +421,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				FunctionID:      fn.ID,
 				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
 				Expression:      fn.ScheduleExpression(),
-				Op:              cron.CronOpNew,
+				Op:              enums.CronOpNew,
 			})
 		}
 	}
