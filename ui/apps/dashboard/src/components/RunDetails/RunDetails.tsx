@@ -24,7 +24,6 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         getTrigger={getTrigger}
         runID={runID}
         tracesPreviewEnabled={tracePreviewEnabled}
-        pollInterval={DEFAULT_POLL_INTERVAL}
       />
     </div>
   );
