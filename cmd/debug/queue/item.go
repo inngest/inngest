@@ -21,14 +21,17 @@ func ItemCommand() *cli.Command {
 		Usage:   "Get queue item data",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "id",
-				Usage:    "queue item ID to reference (does not work with --run-id)",
-				Required: false,
+				Name:  "id",
+				Usage: "queue item ID to reference (does not work with --run-id)",
 			},
 			&cli.StringFlag{
-				Name:     "run-id",
-				Usage:    "run ID to reference (does not work with --id)",
-				Required: false,
+				Name:  "run-id",
+				Usage: "run ID to reference (does not work with --id)",
+			},
+			&cli.StringFlag{
+				Name:    "queue-shard",
+				Aliases: []string{"qs"},
+				Usage:   "The queue shard to specify",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -43,18 +46,22 @@ func ItemCommand() *cli.Command {
 				return fmt.Errorf("--id and --run-id are mutually exclusive")
 			}
 
-			// Use itemID if provided, otherwise use runID
-			queryID := itemID
-			if queryID == "" {
-				queryID = runID
-			}
-
 			dbgCtx, ok := ctx.Value(debugpkg.CtxKey).(*debugpkg.Context)
 			if !ok {
 				return fmt.Errorf("debug context not found")
 			}
 
-			resp, err := dbgCtx.Client.GetQueueItem(ctx, &pb.QueueItemRequest{Id: queryID})
+			// Use itemID if provided, otherwise use runID
+			req := pb.QueueItemRequest{
+				QueueShard: cmd.String("queue-shard"),
+			}
+			if itemID != "" {
+				req.ItemId = itemID
+			} else {
+				req.RunId = runID
+			}
+
+			resp, err := dbgCtx.Client.GetQueueItem(ctx, &req)
 			if err != nil {
 				st, ok := grpcStatus.FromError(err)
 				if !ok {
@@ -63,7 +70,7 @@ func ItemCommand() *cli.Command {
 
 				switch st.Code() {
 				case codes.NotFound:
-					fmt.Println("no queue item", queryID)
+					fmt.Println("no queue item found")
 					return nil
 				}
 
