@@ -61,7 +61,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
     <OptionalTooltip side="bottom" tooltip={isTruncated ? queryName : ''}>
       <div
         className={cn(
-          'text-basis mr-2 flex h-8 w-[314px] cursor-pointer items-center rounded px-2 py-2 text-sm normal-case leading-none transition-all duration-150',
+          'text-basis mr-2 flex h-8 w-[314px] cursor-pointer items-center rounded px-2 py-2 text-sm normal-case leading-normal transition-all duration-150',
           isHovered
             ? 'bg-canvasSubtle border-muted border'
             : 'border border-transparent bg-transparent'
