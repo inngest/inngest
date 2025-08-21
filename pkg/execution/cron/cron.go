@@ -103,11 +103,19 @@ func (i CronItem) Equal(ci CronItem) bool {
 		i.Op == ci.Op
 }
 
-// JobID returns the hash of the queue item ID that's supposed to be handling this cron item
+func (i CronItem) SyncID() string {
+	return fmt.Sprintf("%s-sync", i.ID)
+}
+
+func (i CronItem) ProcessID() string {
+	return fmt.Sprintf("%s-process", i.ID)
+}
+
+// QueueItemID returns the hash of the queue item ID that's supposed to be handling this cron item
 //
 // NOTE
 // This is based on the assumption that the ID field is always used for JobID assignments when enqueueing.
 // So if that changes, some stuff will break.
 func (i CronItem) JobID() string {
-	return queue.HashID(context.TODO(), i.ID.String())
+	return queue.HashID(context.TODO(), i.ProcessID())
 }

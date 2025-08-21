@@ -65,8 +65,8 @@ func NewRedisCronManager(
 	opts ...RedisCronManagerOpt,
 ) CronManager {
 	opt := redisCronManagerOpt{
-		jitterMin:          10 * time.Millisecond,
-		jitterMax:          100 * time.Millisecond,
+		jitterMin:          0 * time.Millisecond,
+		jitterMax:          20 * time.Millisecond,
 		scheduleForwardDur: defaultScheduleForwardDur,
 	}
 	for _, apply := range opts {
@@ -126,7 +126,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	l = l.With("next_cron_item", nextItem)
 
 	// enqueue new schedule
-	jobID := ci.ID.String()
+	jobID := ci.ProcessID()
 	kind := queue.KindCron
 	maxAttempts := consts.MaxRetries + 1
 
