@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	debugpkg "github.com/inngest/inngest/pkg/debug"
 	"github.com/inngest/inngest/pkg/cli/output"
+	debugpkg "github.com/inngest/inngest/pkg/debug"
 	dbgpb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc/codes"
@@ -54,7 +54,7 @@ func PartitionCommand() *cli.Command {
 				}
 			}
 
-			return output.Partition(partition, status)
+			return output.TextPartition(partition, status)
 		},
 	}
 }
