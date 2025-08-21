@@ -288,12 +288,9 @@ func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronIt
 		FieldValue(ci.FunctionID.String(), string(byt)).
 		Build()
 
-	added, err := rc.Do(ctx, cmd).AsInt64()
+	_, err = rc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error adding job to schedule map: %w", err)
-	}
-	if added != 1 {
-		return fmt.Errorf("expected 1 change made to schedule map, actual: %d", added)
 	}
 
 	return nil
