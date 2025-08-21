@@ -1,21 +1,21 @@
 version: v1
 plugins:
   - plugin: go
-    out: gen
+    out: proto/gen
     opt: paths=source_relative
   - plugin: go-grpc
-    out: gen
+    out: proto/gen
     opt: paths=source_relative
   - plugin: grpc-gateway
-    out: gen
-    opt: 
+    out: proto/gen
+    opt:
       - paths=source_relative
       - allow_delete_body=true
   - plugin: openapiv2
-    out: ../../docs/openapi/v2
+    out: docs/openapi/v2
     opt:
       - allow_delete_body=true
       - json_names_for_fields=false
   - plugin: connect-go
-    out: gen
+    out: proto/gen
     opt: paths=source_relative
