@@ -63,9 +63,12 @@ export function InsightsTabsList({
             title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
           />
           {tabs.map((tab) => (
-            <Tabs.Tab iconBefore={<IndicatorTabIcon tab={tab} />} key={tab.id} value={tab.id}>
-              {tab.name}
-            </Tabs.Tab>
+            <Tabs.Tab
+              iconBefore={<IndicatorTabIcon tab={tab} />}
+              key={tab.id}
+              title={tab.name}
+              value={tab.id}
+            />
           ))}
           <Tabs.IconTab
             icon={<RiAddLine size={16} />}
