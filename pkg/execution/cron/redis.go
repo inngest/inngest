@@ -121,8 +121,10 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		FunctionID:      ci.FunctionID,
 		FunctionVersion: ci.FunctionVersion,
 		Expression:      ci.Expression,
-		JobID:           queue.HashID(ctx, ci.ProcessID()),
-		Op:              enums.CronOpProcess,
+		// NOTE this simulates how queue item hashes its ID, not a nice implementation detail leak
+		// meaning debug tooling will break if that changes somehow even though its unlikely
+		JobID: queue.HashID(ctx, ci.ProcessID()),
+		Op:    enums.CronOpProcess,
 	}
 
 	l = l.With("next_cron_item", nextItem)
@@ -224,7 +226,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 
 		next, err := c.ScheduleNext(ctx, ci)
 		if err != nil {
-			return fmt.Errorf("error scheduling next item for Op: %s", ci.Op)
+			return fmt.Errorf("error scheduling next item for Op: %s: %w", ci.Op, err)
 		}
 		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", next.JobID)
 
@@ -249,20 +251,22 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		// no action should be taken if the existing one has a higher function version
 		// this means there's a race condition and we don't want to update the schedule to
 		// an older version
-		if existing.FunctionVersion > ci.FunctionVersion {
-			return nil
-		}
+		if existing != nil {
+			if existing.FunctionVersion > ci.FunctionVersion {
+				return nil
+			}
 
-		// dequeue the item
-		if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
-			if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				return fmt.Errorf("error dequeueing item: %w", err)
+			// dequeue the item
+			if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
+				if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+					return fmt.Errorf("error dequeueing item: %w", err)
+				}
 			}
 		}
 
 		next, err := c.ScheduleNext(ctx, ci)
 		if err != nil {
-			return fmt.Errorf("error scheduling next item for Op: %s", ci.Op)
+			return fmt.Errorf("error scheduling next item for Op: %s: %w", ci.Op, err)
 		}
 		l.Trace("scheduled next cron job after update", "next", next, "op", ci.Op, "job_id", next.JobID)
 
@@ -284,13 +288,16 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 			return fmt.Errorf("error finding existing cron item for function: %w", err)
 		}
 
-		// dequeue the item
-		if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
-			if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				return fmt.Errorf("error dequeueing item: %w", err)
+		// dequeue the item if it exists
+		if existing != nil {
+			if err := c.q.DequeueByJobID(ctx, existing.JobID); err != nil {
+				if !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+					return fmt.Errorf("error dequeueing item: %w", err)
+				}
 			}
 		}
-		return nil
+
+		return c.removeScheduleMap(ctx, ci.FunctionID)
 
 	default:
 		return fmt.Errorf("unknown cron operation provided: %s", ci.Op)
@@ -342,6 +349,25 @@ func (c *redisCronManager) setFunctionScheduleMap(ctx context.Context, ci CronIt
 	_, err = rc.Do(ctx, cmd).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error adding job to schedule map: %w", err)
+	}
+
+	return nil
+}
+
+func (c *redisCronManager) removeScheduleMap(ctx context.Context, fnID uuid.UUID) error {
+	rc := c.c.Client()
+	kg := c.c.KeyGenerator()
+
+	err := rc.Do(
+		ctx,
+		rc.B().
+			Hdel().
+			Key(kg.Schedule()).
+			Field(fnID.String()).
+			Build(),
+	).Error()
+	if err != nil {
+		return fmt.Errorf("error clearing out schedule map: %w", err)
 	}
 
 	return nil
