@@ -53,7 +53,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		if ci, err := d.croner.NextScheduledItemForFunction(ctx, fn.ID); err == nil {
 			cronSchedule = &pb.CronSchedule{
 				Next:  timestamppb.New(ci.ID.Timestamp()),
-				JobId: ci.JobID(),
+				JobId: ci.JobID,
 			}
 		}
 	}
