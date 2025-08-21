@@ -68,6 +68,9 @@ type CheckpointNewRunRequest struct {
 	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
 
 	// XXX: SDK Version and language??
+
+	// TODO: Track opcodes.
+	// Steps []state.GeneratorOpcode `json:"steps"`
 }
 
 func (r CheckpointNewRunRequest) AppSlug() string {

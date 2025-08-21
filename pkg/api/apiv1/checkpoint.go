@@ -62,6 +62,8 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		Opts:     o,
 		upserted: ccache.New(ccache.Configure().MaxSize(10_000)),
 	}
+
+	// TODO: Also allow steps to be sent in CheckpointNewRun.
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
 	api.Post("/{runID}/response", api.CheckpointResponse)
@@ -191,7 +193,7 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn("error loading state for background checkpoint steps", "error", err)
+		logger.StdlibLogger(ctx).Error("error loading state for background checkpoint steps", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
 		return
 	}
@@ -312,40 +314,6 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	l.Info("handled sync checkpoint", "ops", len(input.Steps), "complete", complete)
-}
-
-func (a checkpointAPI) runContext(ctx context.Context, md sv2.Metadata, fn *inngest.Function) execution.RunContext {
-	// Create a run context specifically for each op;  we need this for any
-	// async op, such as the step error and what not.
-	client := exechttp.Client(exechttp.SecureDialerOpts{})
-	httpClient := &client
-
-	// Create the run context with simplified data
-	return &checkpointRunContext{
-		md:         md,
-		httpClient: httpClient,
-		events:     []json.RawMessage{}, // Empty for checkpoint context
-		groupID:    uuid.New().String(),
-
-		// Sync checkpoints always have a 0 attempt index, as this API
-		// endpoint is only for sync functions that have not yet re-entered,
-		// ie. first attempts at teps.
-		attemptCount: 0,
-
-		maxAttempts:     fn.MaxAttempts(),
-		priorityFactor:  nil,                         // Use default priority
-		concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
-		parallelMode:    enums.ParallelModeWait,      // Default to serial
-	}
-}
-
-func (a checkpointAPI) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
-	// Load the function config.
-	cfn, err := a.Opts.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function: %w", err)
-	}
-	return cfn.InngestFunction()
 }
 
 // CheckpointResponse is called from the SDK when the API responds to the user. This indicates
@@ -531,4 +499,38 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
 		"app_id", app.ID,
 	)
+}
+
+func (a checkpointAPI) runContext(ctx context.Context, md sv2.Metadata, fn *inngest.Function) execution.RunContext {
+	// Create a run context specifically for each op;  we need this for any
+	// async op, such as the step error and what not.
+	client := exechttp.Client(exechttp.SecureDialerOpts{})
+	httpClient := &client
+
+	// Create the run context with simplified data
+	return &checkpointRunContext{
+		md:         md,
+		httpClient: httpClient,
+		events:     []json.RawMessage{}, // Empty for checkpoint context
+		groupID:    uuid.New().String(),
+
+		// Sync checkpoints always have a 0 attempt index, as this API
+		// endpoint is only for sync functions that have not yet re-entered,
+		// ie. first attempts at teps.
+		attemptCount: 0,
+
+		maxAttempts:     fn.MaxAttempts(),
+		priorityFactor:  nil,                         // Use default priority
+		concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
+		parallelMode:    enums.ParallelModeWait,      // Default to serial
+	}
+}
+
+func (a checkpointAPI) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+	// Load the function config.
+	cfn, err := a.Opts.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function: %w", err)
+	}
+	return cfn.InngestFunction()
 }
