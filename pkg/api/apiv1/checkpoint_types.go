@@ -223,7 +223,7 @@ func (c *checkpointRunContext) MaxAttempts() *int {
 }
 
 func (c *checkpointRunContext) ShouldRetry() bool {
-	return c.attemptCount < c.maxAttempts
+	return c.attemptCount < (c.maxAttempts - 1)
 }
 
 func (c *checkpointRunContext) IncrementAttempt() {

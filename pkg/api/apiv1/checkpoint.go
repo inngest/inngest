@@ -20,8 +20,11 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -195,6 +198,16 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 
 	l := logger.StdlibLogger(ctx).With("run_id", md.ID.RunID)
 
+	// Load the function config.
+	fn, err := a.fn(ctx, md.ID.FunctionID)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("error loading fn for background checkpoint steps", "error", err)
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading function config"))
+		return
+	}
+
+	runCtx := a.runContext(ctx, md, fn)
+
 	// If the opcodes contain a function finished op, we don't need to bother serializing
 	// to the state store.  We only care about serializing state if we switch from sync -> async,
 	// as the state will be used for resuming functions.
@@ -211,6 +224,9 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
+			// Steps are checkpointed after they execute.  We only need to store traces here, then
+			// continune; we do not need to handle anything within the executor.
+
 			output, err := op.Output()
 			if err != nil {
 				l.Error("error fetching checkpoint step output", "error", err)
@@ -247,6 +263,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
+		case enums.OpcodeStepError:
+			// StepErrors are unique.  Firstly, we must always store traces.  However, if
+			// we retry the step, we move from sync -> async, requiring jobs to be scheduled.
+			//
+			// If steps only have one attempt, however, we can assume that the SDK handles
+			// step errors and continues
+
 		case enums.OpcodeRunComplete:
 			result := struct {
 				Data APIResult `json:"data"`
@@ -259,30 +282,70 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			}
 
 		default:
-			// Create HTTP client using exechttp.Client
-			client := exechttp.Client(exechttp.SecureDialerOpts{})
-			httpClient := &client
+			err := a.Executor.HandleGenerator(ctx, runCtx, op)
+			if errors.Is(err, executor.ErrHandledStepError) {
+				// In the executor, returning an error bubbles up to the queue to requeue.
+				jobID := fmt.Sprintf("%s-%s-sync-retry", runCtx.Metadata().IdempotencyKey(), op.ID)
+				now := time.Now()
+				nextItem := queue.Item{
+					JobID:                 &jobID,
+					WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
+					Kind:                  queue.KindEdge,
+					Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
+					PriorityFactor:        runCtx.PriorityFactor(),
+					CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+					Attempt:               1, // This is now the next attempt.
+					MaxAttempts:           runCtx.MaxAttempts(),
+					Payload:               queue.PayloadEdge{Edge: inngest.SourceEdge}, // doesn't matter for sync functions.
+					Metadata:              make(map[string]any),
+					ParallelMode:          enums.ParallelModeWait,
+				}
 
-			// Create the run context with simplified data
-			runCtx := &checkpointRunContext{
-				md:              md,
-				httpClient:      httpClient,
-				events:          []json.RawMessage{}, // Empty for checkpoint context
-				groupID:         uuid.New().String(),
-				attemptCount:    0,
-				maxAttempts:     3,                           // Default retry count
-				priorityFactor:  nil,                         // Use default priority
-				concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
-				parallelMode:    enums.ParallelModeWait,      // Default to serial
+				// Continue checking this particular error.
+				err = a.Opts.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 			}
 
-			if err := a.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
+			if err != nil {
 				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
 		}
 	}
 
 	l.Info("handled sync checkpoint", "ops", len(input.Steps), "complete", complete)
+}
+
+func (a checkpointAPI) runContext(ctx context.Context, md sv2.Metadata, fn *inngest.Function) execution.RunContext {
+	// Create a run context specifically for each op;  we need this for any
+	// async op, such as the step error and what not.
+	client := exechttp.Client(exechttp.SecureDialerOpts{})
+	httpClient := &client
+
+	// Create the run context with simplified data
+	return &checkpointRunContext{
+		md:         md,
+		httpClient: httpClient,
+		events:     []json.RawMessage{}, // Empty for checkpoint context
+		groupID:    uuid.New().String(),
+
+		// Sync checkpoints always have a 0 attempt index, as this API
+		// endpoint is only for sync functions that have not yet re-entered,
+		// ie. first attempts at teps.
+		attemptCount: 0,
+
+		maxAttempts:     fn.MaxAttempts(),
+		priorityFactor:  nil,                         // Use default priority
+		concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
+		parallelMode:    enums.ParallelModeWait,      // Default to serial
+	}
+}
+
+func (a checkpointAPI) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+	// Load the function config.
+	cfn, err := a.Opts.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading function: %w", err)
+	}
+	return cfn.InngestFunction()
 }
 
 // CheckpointResponse is called from the SDK when the API responds to the user. This indicates

@@ -517,6 +517,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
+			Queue:              rq,
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
