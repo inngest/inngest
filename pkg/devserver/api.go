@@ -326,7 +326,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		kind := queue.KindCronSync
 		for _, ci := range crons {
 			at := ulid.Time(ci.ID.Time())
-			jobID := ci.ID.String()
+			jobID := ci.SyncID()
 			if err := a.devserver.Queue.Enqueue(ctx, queue.Item{
 				JobID:       &jobID,
 				GroupID:     uuid.New().String(),
@@ -338,7 +338,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 					AppID:           ci.AppID,
 					WorkflowID:      ci.FunctionID,
 					WorkflowVersion: ci.FunctionVersion,
-					Key:             ci.ID.String(),
 				},
 				MaxAttempts: &maxAttempts,
 				Payload:     ci,
