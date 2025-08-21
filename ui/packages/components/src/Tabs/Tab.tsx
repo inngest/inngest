@@ -5,6 +5,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { RiCloseLine } from '@remixicon/react';
 
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { TabsContext } from './TabsContext';
 
 const ACTIVE_BORDER_STYLES =
@@ -16,56 +17,59 @@ const LAYOUT_STYLES = 'flex flex-1 h-[40px] items-center relative';
 const SIZING_STYLES = 'max-w-[200px] min-w-[84px]';
 const SPACING_STYLES = 'gap-1.5 px-3';
 
-export interface TabProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
+export interface TabProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>, 'children'> {
   iconBefore?: React.ReactNode;
+  title: string;
 }
 
 export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, TabProps>(
-  ({ children, className, iconBefore, value, ...props }, ref) => {
+  ({ className, iconBefore, title, value, ...props }, ref) => {
     const { defaultIconBefore, onClose } = useContext(TabsContext);
-    const { isOverflowing, textRef } = useOverflowTooltip(children);
+    const { isOverflowing, textRef } = useOverflowTooltip(title);
 
     const finalIconBefore = iconBefore ?? defaultIconBefore;
 
     return (
-      <TabsPrimitive.Trigger
-        className={cn(
-          ACTIVE_BORDER_STYLES,
-          ACTIVE_TEXT_STYLES,
-          APPEARANCE_STYLES,
-          HOVER_STYLES,
-          LAYOUT_STYLES,
-          SIZING_STYLES,
-          SPACING_STYLES,
-          className
-        )}
-        ref={ref}
-        title={isOverflowing && typeof children === 'string' ? children : undefined}
-        value={value}
-        {...props}
-      >
-        {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
-        <span ref={textRef} className="flex-1 truncate text-left">
-          {children}
-        </span>
-        {onClose && (
-          <span
-            className="p-0.5"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose(value);
-            }}
-          >
-            <RiCloseLine size={14} />
+      <OptionalTooltip side="bottom" tooltip={isOverflowing ? title : ''}>
+        <TabsPrimitive.Trigger
+          className={cn(
+            ACTIVE_BORDER_STYLES,
+            ACTIVE_TEXT_STYLES,
+            APPEARANCE_STYLES,
+            HOVER_STYLES,
+            LAYOUT_STYLES,
+            SIZING_STYLES,
+            SPACING_STYLES,
+            className
+          )}
+          ref={ref}
+          value={value}
+          {...props}
+        >
+          {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
+          <span ref={textRef} className="flex-1 truncate text-left">
+            {title}
           </span>
-        )}
-      </TabsPrimitive.Trigger>
+          {onClose && (
+            <span
+              className="p-0.5"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose(value);
+              }}
+            >
+              <RiCloseLine size={14} />
+            </span>
+          )}
+        </TabsPrimitive.Trigger>
+      </OptionalTooltip>
     );
   }
 );
 
-function useOverflowTooltip(content: React.ReactNode) {
+function useOverflowTooltip(title: string) {
   const [isOverflowing, setIsOverflowing] = useState(false);
   const textRef = useRef<HTMLSpanElement>(null);
 
@@ -73,18 +77,8 @@ function useOverflowTooltip(content: React.ReactNode) {
     const element = textRef.current;
     if (!element) return;
 
-    const checkOverflow = () => {
-      setIsOverflowing(element.scrollWidth > element.clientWidth);
-    };
-
-    checkOverflow();
-    const resizeObserver = new ResizeObserver(checkOverflow);
-    resizeObserver.observe(element);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [content]);
+    setIsOverflowing(element.scrollWidth > element.clientWidth);
+  }, [title]);
 
   return { isOverflowing, textRef };
 }
