@@ -22,12 +22,12 @@ func ItemCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "id",
-				Usage:    "queue item ID to reference",
+				Usage:    "queue item ID to reference (does not work with --run-id)",
 				Required: false,
 			},
 			&cli.StringFlag{
 				Name:     "run-id",
-				Usage:    "run ID to reference",
+				Usage:    "run ID to reference (does not work with --id)",
 				Required: false,
 			},
 		},
@@ -37,6 +37,10 @@ func ItemCommand() *cli.Command {
 
 			if itemID == "" && runID == "" {
 				return fmt.Errorf("either --id or --run-id is required")
+			}
+
+			if itemID != "" && runID != "" {
+				return fmt.Errorf("--id and --run-id are mutually exclusive")
 			}
 
 			// Use itemID if provided, otherwise use runID
