@@ -6,19 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	cron "github.com/robfig/cron/v3"
-)
-
-type CronOp int
-
-const (
-	CronOpNew CronOp = iota
-	CronOpUpdate
-	CronOpPause
-	CronOpUnpause
-	CronOpProcess
 )
 
 var (
@@ -89,14 +80,14 @@ type CronManager interface {
 
 // CronItem represent an item that can be scheduled via the cron expression
 type CronItem struct {
-	ID              ulid.ULID `json:"id"`
-	AccountID       uuid.UUID `json:"acctID"`
-	WorkspaceID     uuid.UUID `json:"wsID"`
-	AppID           uuid.UUID `json:"appID"`
-	FunctionID      uuid.UUID `json:"fnID"`
-	FunctionVersion int       `json:"fnV"`
-	Expression      string    `jaon:"expr"`
-	Op              CronOp    `json:"op"`
+	ID              ulid.ULID    `json:"id"`
+	AccountID       uuid.UUID    `json:"acctID"`
+	WorkspaceID     uuid.UUID    `json:"wsID"`
+	AppID           uuid.UUID    `json:"appID"`
+	FunctionID      uuid.UUID    `json:"fnID"`
+	FunctionVersion int          `json:"fnV"`
+	Expression      string       `jaon:"expr"`
+	Op              enums.CronOp `json:"op"`
 }
 
 // Equal checks if the cron item is identical
