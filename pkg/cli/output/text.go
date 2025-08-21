@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"text/tabwriter"
 )
@@ -179,6 +180,16 @@ func (tw *TextWriter) valueToString(value any) string {
 	case bool:
 		return fmt.Sprintf("%t", v)
 	case fmt.Stringer:
+		// Check for nil pointers that implement Stringer
+		if v == nil {
+			return "<nil>"
+		}
+		// Use reflection to check if it's a nil pointer
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			return "<nil>"
+		}
+
 		return v.String()
 	case error:
 		return v.Error()
@@ -197,7 +208,7 @@ func (tw *TextWriter) formatAsJSON(value any) string {
 	if err != nil {
 		return ""
 	}
-	
+
 	jsonStr := string(jsonBytes)
 	// For multi-line JSON, indent continuation lines to align with value column
 	lines := strings.Split(jsonStr, "\n")
@@ -288,6 +299,15 @@ func (r *Row) ToString() string {
 	case bool:
 		return fmt.Sprintf("%t", v)
 	case fmt.Stringer:
+		// Check for nil pointers that implement Stringer
+		if v == nil {
+			return "<nil>"
+		}
+		// Use reflection to check if it's a nil pointer
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			return "<nil>"
+		}
 		return v.String()
 	case error:
 		return v.Error()
