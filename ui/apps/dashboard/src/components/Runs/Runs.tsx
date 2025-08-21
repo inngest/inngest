@@ -225,7 +225,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
-      pollInterval={DEFAULT_POLL_INTERVAL}
     />
   );
 });

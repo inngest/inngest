@@ -1105,7 +1105,6 @@ export enum MetricsScope {
 
 export type Mutation = {
   __typename?: 'Mutation';
-  addSlackChannel: Scalars['Boolean'];
   archiveApp: App;
   archiveEnvironment: Workspace;
   archiveEvent: Maybe<Event>;
