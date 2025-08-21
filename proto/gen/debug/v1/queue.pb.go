@@ -434,7 +434,8 @@ func (x *CronSchedule) GetJobId() string {
 // Item
 type QueueItemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	RunId         string                 `protobuf:"bytes,2,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -469,9 +470,16 @@ func (*QueueItemRequest) Descriptor() ([]byte, []int) {
 	return file_debug_v1_queue_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *QueueItemRequest) GetId() string {
+func (x *QueueItemRequest) GetItemId() string {
 	if x != nil {
-		return x.Id
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *QueueItemRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
 	}
 	return ""
 }
@@ -559,9 +567,10 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\"U\n" +
 	"\fCronSchedule\x12.\n" +
 	"\x04next\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04next\x12\x15\n" +
-	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"\"\n" +
-	"\x10QueueItemRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"'\n" +
+	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"B\n" +
+	"\x10QueueItemRequest\x12\x17\n" +
+	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x15\n" +
+	"\x06run_id\x18\x02 \x01(\tR\x05runId\"'\n" +
 	"\x11QueueItemResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04dataB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 

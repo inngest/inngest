@@ -53,6 +53,9 @@ message CronSchedule {
 //
 // Item
 //
-message QueueItemRequest { string id = 1; }
+message QueueItemRequest {
+  string item_id = 1;
+  string run_id = 2;
+}
 
 message QueueItemResponse { bytes data = 1; }
