@@ -16,23 +16,41 @@ import (
 
 func ItemCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "item",
-		Aliases:   []string{"i"},
-		Usage:     "Get queue item data",
-		ArgsUsage: "<item-id>",
+		Name:    "item",
+		Aliases: []string{"i"},
+		Usage:   "Get queue item data",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "id",
+				Usage:    "queue item ID to reference",
+				Required: false,
+			},
+			&cli.StringFlag{
+				Name:     "run-id",
+				Usage:    "run ID to reference",
+				Required: false,
+			},
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.NArg() == 0 {
-				return fmt.Errorf("item ID is required")
+			itemID := cmd.String("id")
+			runID := cmd.String("run-id")
+
+			if itemID == "" && runID == "" {
+				return fmt.Errorf("either --id or --run-id is required")
 			}
 
-			itemID := cmd.Args().Get(0)
+			// Use itemID if provided, otherwise use runID
+			queryID := itemID
+			if queryID == "" {
+				queryID = runID
+			}
 
 			dbgCtx, ok := ctx.Value(debugpkg.CtxKey).(*debugpkg.Context)
 			if !ok {
 				return fmt.Errorf("debug context not found")
 			}
 
-			resp, err := dbgCtx.Client.GetQueueItem(ctx, &pb.QueueItemRequest{Id: itemID})
+			resp, err := dbgCtx.Client.GetQueueItem(ctx, &pb.QueueItemRequest{Id: queryID})
 			if err != nil {
 				st, ok := grpcStatus.FromError(err)
 				if !ok {
@@ -41,7 +59,7 @@ func ItemCommand() *cli.Command {
 
 				switch st.Code() {
 				case codes.NotFound:
-					fmt.Println("no queue item", itemID)
+					fmt.Println("no queue item", queryID)
 					return nil
 				}
 
