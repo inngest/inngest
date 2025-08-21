@@ -534,6 +534,9 @@ func (x *CreateStateRequest) GetEvents() [][]byte {
 
 type CreateStateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *Metadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Events        [][]byte               `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	Steps         map[string][]byte      `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -566,6 +569,27 @@ func (x *CreateStateResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateStateResponse.ProtoReflect.Descriptor instead.
 func (*CreateStateResponse) Descriptor() ([]byte, []int) {
 	return file_state_v2_state_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CreateStateResponse) GetMetadata() *Metadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateStateResponse) GetEvents() [][]byte {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *CreateStateResponse) GetSteps() map[string][]byte {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
 }
 
 type DeleteStateRequest struct {
@@ -1463,8 +1487,15 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"account_id\x18\x03 \x01(\tR\taccountId\"\\\n" +
 	"\x12CreateStateRequest\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
-	"\x06events\x18\x02 \x03(\fR\x06events\"\x15\n" +
-	"\x13CreateStateResponse\"2\n" +
+	"\x06events\x18\x02 \x03(\fR\x06events\"\xd7\x01\n" +
+	"\x13CreateStateResponse\x12.\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
+	"\x06events\x18\x02 \x03(\fR\x06events\x12>\n" +
+	"\x05steps\x18\x03 \x03(\v2(.state.v2.CreateStateResponse.StepsEntryR\x05steps\x1a8\n" +
+	"\n" +
+	"StepsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"2\n" +
 	"\x12DeleteStateRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"/\n" +
 	"\x13DeleteStateResponse\x12\x18\n" +
@@ -1542,7 +1573,7 @@ func file_state_v2_state_proto_rawDescGZIP() []byte {
 	return file_state_v2_state_proto_rawDescData
 }
 
-var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_state_v2_state_proto_goTypes = []any{
 	(*Metadata)(nil),               // 0: state.v2.Metadata
 	(*ID)(nil),                     // 1: state.v2.ID
@@ -1570,59 +1601,62 @@ var file_state_v2_state_proto_goTypes = []any{
 	(*LoadStepsResponse)(nil),      // 23: state.v2.LoadStepsResponse
 	(*LoadStateRequest)(nil),       // 24: state.v2.LoadStateRequest
 	(*LoadStateResponse)(nil),      // 25: state.v2.LoadStateResponse
-	nil,                            // 26: state.v2.LoadStepsResponse.StepsEntry
-	nil,                            // 27: state.v2.LoadStateResponse.StepsEntry
-	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),        // 29: google.protobuf.Struct
+	nil,                            // 26: state.v2.CreateStateResponse.StepsEntry
+	nil,                            // 27: state.v2.LoadStepsResponse.StepsEntry
+	nil,                            // 28: state.v2.LoadStateResponse.StepsEntry
+	(*timestamppb.Timestamp)(nil),  // 29: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),        // 30: google.protobuf.Struct
 }
 var file_state_v2_state_proto_depIdxs = []int32{
 	1,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
 	2,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
 	4,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
 	5,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
-	28, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
+	29, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
 	3,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
-	29, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
+	30, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
 	0,  // 7: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
-	1,  // 8: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
-	1,  // 9: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
-	0,  // 10: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
-	1,  // 11: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	28, // 12: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
-	1,  // 13: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
-	1,  // 14: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
-	1,  // 15: state.v2.ExistsRequest.id:type_name -> state.v2.ID
-	1,  // 16: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
-	1,  // 17: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	26, // 18: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
-	1,  // 19: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
-	0,  // 20: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	27, // 21: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
-	6,  // 22: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	8,  // 23: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	18, // 24: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	12, // 25: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	14, // 26: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	16, // 27: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	10, // 28: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	20, // 29: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	22, // 30: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	24, // 31: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	7,  // 32: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	9,  // 33: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	19, // 34: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	13, // 35: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	15, // 36: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	17, // 37: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	11, // 38: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	21, // 39: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	23, // 40: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	25, // 41: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	32, // [32:42] is the sub-list for method output_type
-	22, // [22:32] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	0,  // 8: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
+	26, // 9: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	1,  // 10: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
+	1,  // 11: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
+	0,  // 12: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
+	1,  // 13: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
+	29, // 14: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	1,  // 15: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
+	1,  // 16: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
+	1,  // 17: state.v2.ExistsRequest.id:type_name -> state.v2.ID
+	1,  // 18: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
+	1,  // 19: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
+	27, // 20: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	1,  // 21: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
+	0,  // 22: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
+	28, // 23: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	6,  // 24: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	8,  // 25: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	18, // 26: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	12, // 27: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	14, // 28: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	16, // 29: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	10, // 30: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	20, // 31: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	22, // 32: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	24, // 33: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	7,  // 34: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	9,  // 35: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	19, // 36: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	13, // 37: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	15, // 38: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	17, // 39: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	11, // 40: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	21, // 41: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	23, // 42: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	25, // 43: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	34, // [34:44] is the sub-list for method output_type
+	24, // [24:34] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }
@@ -1637,7 +1671,7 @@ func file_state_v2_state_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_v2_state_proto_rawDesc), len(file_state_v2_state_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

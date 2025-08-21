@@ -60,7 +60,11 @@ message CreateStateRequest {
   repeated bytes events   = 2;
 }
 
-message CreateStateResponse {}
+message CreateStateResponse {
+  Metadata           metadata = 1;
+  repeated bytes     events   = 2;
+  map<string, bytes> steps    = 3;
+}
 
 message DeleteStateRequest {
   ID id = 1;
