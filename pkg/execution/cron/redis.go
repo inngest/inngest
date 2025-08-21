@@ -35,7 +35,7 @@ type redisCronManagerOpt struct {
 	// we need to move the time upwards on finding the next time due to how we use jitter
 	// to push the time back a little to coordinate the run start timing.
 	//
-	// considering cron's minimum granularity is a minute, the seconds range should work fine
+	// considering cron's minimum granularity is a minute, the seconds range should work fine. defaults to 10s
 	scheduleForwardDur time.Duration
 }
 
@@ -120,6 +120,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		FunctionID:      ci.FunctionID,
 		FunctionVersion: ci.FunctionVersion,
 		Expression:      ci.Expression,
+		JobID:           queue.HashID(ctx, ci.ProcessID()),
 		Op:              enums.CronOpProcess,
 	}
 
@@ -224,7 +225,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		if err != nil {
 			return fmt.Errorf("error scheduling next item for Op: %d", ci.Op)
 		}
-		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", next.JobID())
+		l.Trace("scheduled next cron job", "next", next, "op", ci.Op, "job_id", ci.JobID)
 
 		// - update mapping
 		return c.setFunctionScheduleMap(ctx, *next)
