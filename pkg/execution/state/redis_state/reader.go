@@ -620,3 +620,8 @@ func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) 
 
 	return &item, nil
 }
+
+func (q *queue) Shard(ctx context.Context, shardName string) (QueueShard, bool) {
+	shard, ok := q.queueShardClients[shardName]
+	return shard, ok
+}

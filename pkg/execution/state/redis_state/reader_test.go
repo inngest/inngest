@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"crypto/rand"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -424,4 +425,61 @@ func TestItemByID(t *testing.T) {
 		require.ErrorIs(t, err, ErrQueueItemNotFound)
 		require.Nil(t, res)
 	})
+}
+
+func TestShard(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	shard1 := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, QueueDefaultKey),
+		Name:        consts.DefaultQueueShardName,
+	}
+	shard2 := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, QueueDefaultKey),
+		Name:        "yolo",
+	}
+
+	q := NewQueue(
+		shard1,
+		WithClock(clock),
+		WithQueueShardClients(map[string]QueueShard{
+			consts.DefaultQueueShardName: shard1,
+			"yolo":                       shard2,
+		}),
+	)
+
+	testcases := []struct {
+		name            string
+		shardName       string
+		expectAvailable bool
+	}{
+		{
+			name:            "default shard",
+			shardName:       consts.DefaultQueueShardName,
+			expectAvailable: true,
+		},
+		{
+			name:            "other available shard",
+			shardName:       "yolo",
+			expectAvailable: true,
+		},
+		{
+			name:            "non existent shard",
+			shardName:       "amazing",
+			expectAvailable: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ok := q.Shard(ctx, tc.shardName)
+			require.Equal(t, tc.expectAvailable, ok)
+		})
+	}
 }

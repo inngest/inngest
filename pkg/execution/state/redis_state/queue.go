@@ -182,6 +182,8 @@ type QueueManager interface {
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
+	// ItemsByRunID retrieves all queue items via runID
+	ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error)
 
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
@@ -189,6 +191,9 @@ type QueueManager interface {
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
+
+	// Shard returns the shard with the provided name if available
+	Shard(ctx context.Context, shardName string) (QueueShard, bool)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
