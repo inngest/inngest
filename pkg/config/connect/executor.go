@@ -15,17 +15,18 @@ type ConnectExecutor struct {
 }
 
 var (
-	executorConfig ConnectExecutor
-	executorConfigOnce    sync.Once
+	executorConfig     ConnectExecutor
+	executorConfigOnce sync.Once
 )
+
+const ExecutorIPKey = "connect.executor.grpc.ip"
+const ExecutorPortKey = "connect.executor.grpc.port"
 
 func Executor(ctx context.Context) ConnectExecutor {
 	executorConfigOnce.Do(func() {
-		ipKey := "connect.executor.grpc.ip"
-		portKey := "connect.executor.grpc.port"
 
-		ipStr := getWithDefault(ipKey, getOutboundIP(), viper.GetString)
-		port := getWithDefault(portKey, uint32(50053), viper.GetUint32)
+		ipStr := getWithDefault(ExecutorIPKey, "127.0.0.1", viper.GetString)
+		port := getWithDefault(ExecutorPortKey, uint32(50053), viper.GetUint32)
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
@@ -39,4 +40,3 @@ func Executor(ctx context.Context) ConnectExecutor {
 	})
 	return executorConfig
 }
-
