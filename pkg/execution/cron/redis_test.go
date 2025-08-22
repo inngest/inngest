@@ -398,14 +398,16 @@ func TestRedisCronManager(t *testing.T) {
 			err := cm.UpdateSchedule(ctx, cronItem)
 			require.NoError(t, err)
 
-			canRun := cm.CanRun(ctx, cronItem)
+			canRun, err := cm.CanRun(ctx, cronItem)
+			require.NoError(t, err)
 			assert.True(t, canRun)
 		})
 
 		t.Run("no scheduled item should return false", func(t *testing.T) {
 			cronItem := createCronItem(enums.CronOpProcess)
 
-			canRun := cm.CanRun(ctx, cronItem)
+			canRun, err := cm.CanRun(ctx, cronItem)
+			require.NoError(t, err)
 			assert.False(t, canRun)
 		})
 
@@ -420,7 +422,8 @@ func TestRedisCronManager(t *testing.T) {
 			testItem.FunctionID = scheduledItem.FunctionID
 			testItem.FunctionVersion = 2
 
-			canRun := cm.CanRun(ctx, testItem)
+			canRun, err := cm.CanRun(ctx, testItem)
+			require.NoError(t, err)
 			assert.False(t, canRun)
 		})
 
@@ -436,7 +439,8 @@ func TestRedisCronManager(t *testing.T) {
 			testItem.FunctionVersion = 2
 			testItem.ID = ulid.MustNew(ulid.Timestamp(clock.Now().Add(time.Second)), ulid.DefaultEntropy())
 
-			canRun := cm.CanRun(ctx, testItem)
+			canRun, err := cm.CanRun(ctx, testItem)
+			require.NoError(t, err)
 			assert.True(t, canRun)
 		})
 
@@ -452,7 +456,8 @@ func TestRedisCronManager(t *testing.T) {
 			testItem.FunctionVersion = 3
 			testItem.ID = ulid.MustNew(ulid.Timestamp(clock.Now().Add(time.Second)), ulid.DefaultEntropy())
 
-			canRun := cm.CanRun(ctx, testItem)
+			canRun, err := cm.CanRun(ctx, testItem)
+			require.NoError(t, err)
 			assert.True(t, canRun)
 		})
 	})
