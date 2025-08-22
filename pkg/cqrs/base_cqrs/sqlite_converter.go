@@ -56,6 +56,10 @@ func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
 }
 
 func convertSQLiteEventToCQRS(obj *sqlc.Event) *cqrs.Event {
+	if obj == nil {
+		return nil
+	}
+
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
 		ReceivedAt:   obj.ReceivedAt,
