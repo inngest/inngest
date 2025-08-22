@@ -342,7 +342,7 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		// Test CreateAccount method (should use POST based on annotation)
 		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
-		require.NoError(t, err)
+		require.Error(t, err) // Now expects error since it's not implemented
 		require.Equal(t, http.MethodPost, receivedMethod, "CreateAccount method should use POST")
 	})
 }

@@ -159,8 +159,8 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 		require.NotNil(t, resp1)
 
 		resp2, err := client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
-		require.NoError(t, err)
-		require.NotNil(t, resp2)
+		require.Error(t, err)
+		require.Nil(t, resp2)
 	})
 }
 
