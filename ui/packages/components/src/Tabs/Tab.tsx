@@ -1,11 +1,10 @@
 'use client';
 
-import { forwardRef, useContext, useEffect, useRef, useState } from 'react';
+import { forwardRef, useContext } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { RiCloseLine } from '@remixicon/react';
 
-import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { TabsContext } from './TabsContext';
 
 const ACTIVE_BORDER_STYLES =
@@ -17,6 +16,8 @@ const LAYOUT_STYLES = 'flex flex-1 h-[40px] items-center relative';
 const SIZING_STYLES = 'max-w-[200px] min-w-[84px]';
 const SPACING_STYLES = 'gap-1.5 px-3';
 
+// TODO: Add overflow tooltip functionality similar to approach from Pill component.
+
 export interface TabProps
   extends Omit<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>, 'children'> {
   iconBefore?: React.ReactNode;
@@ -26,7 +27,6 @@ export interface TabProps
 export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, TabProps>(
   ({ className, iconBefore, title, value, ...props }, ref) => {
     const { defaultIconBefore, onClose } = useContext(TabsContext);
-    const { isOverflowing, textRef } = useOverflowTooltip(title);
 
     const finalIconBefore = iconBefore ?? defaultIconBefore;
 
@@ -47,11 +47,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         {...props}
       >
         {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
-        <OptionalTooltip side="bottom" tooltip={isOverflowing ? title : ''}>
-          <span ref={textRef} className="flex-1 truncate text-left">
-            {title}
-          </span>
-        </OptionalTooltip>
+        <span className="flex-1 truncate text-left">{title}</span>
         {onClose && (
           <span
             className="p-0.5"
@@ -68,17 +64,3 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
     );
   }
 );
-
-function useOverflowTooltip(title: string) {
-  const [isOverflowing, setIsOverflowing] = useState(false);
-  const textRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const element = textRef.current;
-    if (!element) return;
-
-    setIsOverflowing(element.scrollWidth > element.clientWidth);
-  }, [title]);
-
-  return { isOverflowing, textRef };
-}
