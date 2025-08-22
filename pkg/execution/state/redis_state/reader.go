@@ -648,6 +648,10 @@ func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...Queue
 		return nil, fmt.Errorf("error retrieving queue item IDs: %w", err)
 	}
 
+	if len(itemIDs.Elements) == 0 {
+		return []*osqueue.QueueItem{}, nil
+	}
+
 	items, err := rc.Do(
 		ctx,
 		rc.B().
