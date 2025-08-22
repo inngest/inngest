@@ -53,7 +53,7 @@ type CronManager interface {
 	// ScheduleNext handles the scheduling of the next cron job
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
 	// CanRun checks if the cron item can be scheduled for execution
-	CanRun(ctx context.Context, ci CronItem) bool
+	CanRun(ctx context.Context, ci CronItem) (bool, error)
 	// UpdateSchedule handles the updating of the next scheduled item.
 	//
 	// Scenarios:
