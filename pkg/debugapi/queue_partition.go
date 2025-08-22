@@ -2,7 +2,6 @@ package debugapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -108,21 +107,4 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		Future:            int64(pt.Future),
 		Backlogs:          int64(pt.Backlogs),
 	}, nil
-}
-
-func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (*pb.QueueItemResponse, error) {
-	queueItem, err := d.queue.ItemByID(ctx, req.GetId())
-	if err != nil {
-		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
-			return nil, status.Error(codes.NotFound, "not found")
-		}
-		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving queue item: %w", err).Error())
-	}
-
-	byt, err := json.Marshal(queueItem)
-	if err != nil {
-		return nil, status.Error(codes.Internal, fmt.Errorf("error marshalling queue item: %w", err).Error())
-	}
-
-	return &pb.QueueItemResponse{Data: byt}, nil
 }
