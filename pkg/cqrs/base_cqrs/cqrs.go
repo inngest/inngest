@@ -601,8 +601,7 @@ func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.
 
 	res := make([]*cqrs.Function, len(fns))
 	for i, fn := range fns {
-		converted := SQLiteToCQRSFunction(*fn)
-		res[i] = &converted
+		res[i] = SQLiteToCQRSFunction(fn)
 	}
 	return res, nil
 }
@@ -613,8 +612,7 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 		return nil, err
 	}
 
-	res := SQLiteToCQRSFunction(*fn)
-	return &res, nil
+	return SQLiteToCQRSFunction(fn), nil
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
@@ -623,8 +621,7 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 		return nil, err
 	}
 
-	res := SQLiteToCQRSFunction(*fn)
-	return &res, nil
+	return SQLiteToCQRSFunction(fn), nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -633,12 +630,7 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 		return nil, err
 	}
 
-	res := make([]*cqrs.Function, len(fns))
-	for i, fn := range fns {
-		converted := SQLiteToCQRSFunction(*fn)
-		res[i] = &converted
-	}
-	return res, nil
+	return SQLiteToCQRSFunctionList(fns), nil
 }
 
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
@@ -647,12 +639,7 @@ func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUI
 		return nil, err
 	}
 
-	res := make([]*cqrs.Function, len(fns))
-	for i, fn := range fns {
-		converted := SQLiteToCQRSFunction(*fn)
-		res[i] = &converted
-	}
-	return res, nil
+	return SQLiteToCQRSFunctionList(fns), nil
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
@@ -662,12 +649,7 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 		return nil, err
 	}
 
-	res := make([]*cqrs.Function, len(fns))
-	for i, fn := range fns {
-		converted := SQLiteToCQRSFunction(*fn)
-		res[i] = &converted
-	}
-	return res, nil
+	return SQLiteToCQRSFunctionList(fns), nil
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
