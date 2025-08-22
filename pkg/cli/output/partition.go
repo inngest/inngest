@@ -3,12 +3,14 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/inngest"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
-func Partition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error {
+func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error {
 	w := NewTextWriter()
 
 	if pt != nil {
@@ -69,12 +71,10 @@ func Partition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error 
 		if err := w.WriteOrdered(OrderedData(
 			"Paused", pts.Paused,
 			"Migrate", pts.Migrate,
-			"PauseEnqueue", pts.PauseEnqueue,
 		)); err != nil {
 			return err
 		}
 		if err := w.WriteOrdered(OrderedData(
-			"PauseRefill", pts.PauseRefill,
 			"Account Active", pts.AccountActive,
 			"Account In-progress", pts.AccountInProgress,
 			"Ready", pts.Ready,
@@ -85,6 +85,59 @@ func Partition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error 
 		)); err != nil {
 			return err
 		}
+	}
+
+	return w.Flush()
+}
+
+func TextQueueItem(item *queue.QueueItem) error {
+	if item == nil {
+		fmt.Println("no item found")
+		return nil
+	}
+
+	w := NewTextWriter()
+
+	data := item.Data
+
+	if err := w.WriteOrdered(OrderedData(
+		"ID", item.ID,
+		"EarliestPeekTime", item.EarliestPeekTime,
+		"At", time.UnixMilli(item.AtMS).Format(time.RFC3339),
+		"WallTime", time.Duration(item.WallTimeMS)*time.Millisecond,
+		"WorkspaceID", item.WorkspaceID,
+		"FunctionID", item.FunctionID,
+		"LeaseID", item.LeaseID,
+		"QueueName", item.QueueName,
+		"IdempotencyPeriod", item.IdempotencyPeriod,
+		"RefilledFrom", item.RefilledFrom,
+		"RefilledAt", time.UnixMilli(item.RefilledAt).Format(time.RFC3339),
+		"EnqueuedAt", time.UnixMilli(item.EnqueuedAt).Format(time.RFC3339),
+		"Data", OrderedData(
+			"JobID", data.JobID,
+			"GroupID", data.GroupID,
+			"Kind", data.Kind,
+			"Identifier", OrderedData(
+				"AccountID", data.Identifier.AccountID,
+				"WorkspaceID", data.Identifier.WorkspaceID,
+				"AppID", data.Identifier.AppID,
+				"FunctionID", data.Identifier.WorkflowID,
+				"FunctionVersion", data.Identifier.WorkflowVersion,
+				"EventIDs", data.Identifier.EventIDs,
+				"RunID", data.Identifier.RunID,
+				"Key", data.Identifier.Key,
+				"ReplayID", data.Identifier.ReplayID,
+				"OriginalRunID", data.Identifier.OriginalRunID,
+				"PriorityFactor", data.Identifier.PriorityFactor,
+			),
+			"Attempt", data.Attempt,
+			"MaxAttempts", data.GetMaxAttempts(),
+			"Payload", data.Payload,
+			"Metadata", data.Metadata,
+			"ParallelMode", data.ParallelMode,
+		),
+	), WithTextOptLeadSpace(true)); err != nil {
+		return err
 	}
 
 	return w.Flush()

@@ -31,25 +31,25 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		}, nil
 	}
 
-	wf, err := d.db.GetFunctionByInternalUUID(ctx, id)
+	fn, err := d.db.GetFunctionByInternalUUID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving function: %w", err)
+		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving function: %w", err).Error())
 	}
 
 	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error finding shard: %w", err)
+		return nil, status.Error(codes.Unknown, fmt.Errorf("error finding shard: %w", err).Error())
 	}
 
 	return &pb.PartitionResponse{
 		Id:   req.GetId(),
-		Slug: wf.Slug,
+		Slug: fn.Slug,
 		Tenant: &pb.PartitionTenant{
 			AccountId: consts.DevServerAccountID.String(),
 			EnvId:     consts.DevServerEnvID.String(),
-			AppId:     wf.AppID.String(),
+			AppId:     fn.AppID.String(),
 		},
-		Config: wf.Config,
+		Config: fn.Config,
 		QueueShard: &pb.QueueShard{
 			Name: shard.Name,
 			Kind: shard.Kind,
