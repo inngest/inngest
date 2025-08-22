@@ -34,14 +34,33 @@ type GRPCServerOptions struct {
 
 // NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
 func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
-	var serverOpts []grpc.ServerOption
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	// Always add validation interceptors first
+	unaryInterceptors = append(unaryInterceptors, NewValidationUnaryInterceptor())
+	streamInterceptors = append(streamInterceptors, NewValidationStreamInterceptor())
 
 	// Add authentication and authorization interceptors if any middleware is provided
 	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
-		serverOpts = append(serverOpts,
-			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
-			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
-		)
+		unaryInterceptors = append(unaryInterceptors, NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware))
+		streamInterceptors = append(streamInterceptors, NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware))
+	}
+
+	var serverOpts []grpc.ServerOption
+	if len(unaryInterceptors) > 0 {
+		if len(unaryInterceptors) == 1 {
+			serverOpts = append(serverOpts, grpc.UnaryInterceptor(unaryInterceptors[0]))
+		} else {
+			serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
+		}
+	}
+	if len(streamInterceptors) > 0 {
+		if len(streamInterceptors) == 1 {
+			serverOpts = append(serverOpts, grpc.StreamInterceptor(streamInterceptors[0]))
+		} else {
+			serverOpts = append(serverOpts, grpc.ChainStreamInterceptor(streamInterceptors...))
+		}
 	}
 
 	server := grpc.NewServer(serverOpts...)
@@ -137,8 +156,8 @@ func grpcToHTTPStatus(code codes.Code) int {
 }
 
 func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler, error) {
-	// Create the service
-	service := NewService()
+	// Create the service with validation wrapper
+	service := NewValidatingService()
 
 	// Create grpc-gateway mux for HTTP REST endpoints with custom error handler
 	gwmux := runtime.NewServeMux(
