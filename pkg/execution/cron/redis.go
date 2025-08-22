@@ -176,6 +176,8 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 		// if there are no mapping, we also can't tell what the next schedule of the function is,
 		// and we default to nothing if not available.
 		return false
+	default:
+		return false
 	}
 
 	// it's the same item, it can proceed
