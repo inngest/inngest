@@ -51,7 +51,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         {onClose && (
           <span
             className="p-0.5"
-            onMouseDown={(e) => {
+            onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               onClose(value);
