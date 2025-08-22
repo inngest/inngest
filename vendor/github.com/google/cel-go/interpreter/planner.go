@@ -25,6 +25,12 @@ import (
 	"github.com/google/cel-go/common/types"
 )
 
+// interpretablePlanner creates an Interpretable evaluation plan from a proto Expr value.
+type interpretablePlanner interface {
+	// Plan generates an Interpretable value (or error) from the input proto Expr.
+	Plan(expr ast.Expr) (Interpretable, error)
+}
+
 // newPlanner creates an interpretablePlanner which references a Dispatcher, TypeProvider,
 // TypeAdapter, Container, and CheckedExpr value. These pieces of data are used to resolve
 // functions, types, and namespaced identifiers at plan time rather than at runtime since
@@ -34,7 +40,8 @@ func newPlanner(disp Dispatcher,
 	adapter types.Adapter,
 	attrFactory AttributeFactory,
 	cont *containers.Container,
-	exprAST *ast.AST) *planner {
+	exprAST *ast.AST,
+	decorators ...InterpretableDecorator) interpretablePlanner {
 	return &planner{
 		disp:        disp,
 		provider:    provider,
@@ -43,8 +50,7 @@ func newPlanner(disp Dispatcher,
 		container:   cont,
 		refMap:      exprAST.ReferenceMap(),
 		typeMap:     exprAST.TypeMap(),
-		decorators:  make([]InterpretableDecorator, 0),
-		observers:   make([]StatefulObserver, 0),
+		decorators:  decorators,
 	}
 }
 
@@ -58,7 +64,6 @@ type planner struct {
 	refMap      map[int64]*ast.ReferenceInfo
 	typeMap     map[int64]*types.Type
 	decorators  []InterpretableDecorator
-	observers   []StatefulObserver
 }
 
 // Plan implements the interpretablePlanner interface. This implementation of the Plan method also
@@ -67,17 +72,6 @@ type planner struct {
 // such as state-tracking, expression re-write, and possibly efficient thread-safe memoization of
 // repeated expressions.
 func (p *planner) Plan(expr ast.Expr) (Interpretable, error) {
-	i, err := p.plan(expr)
-	if err != nil {
-		return nil, err
-	}
-	if len(p.observers) == 0 {
-		return i, nil
-	}
-	return &ObservableInterpretable{Interpretable: i, observers: p.observers}, nil
-}
-
-func (p *planner) plan(expr ast.Expr) (Interpretable, error) {
 	switch expr.Kind() {
 	case ast.CallKind:
 		return p.decorate(p.planCall(expr))
@@ -167,7 +161,7 @@ func (p *planner) planSelect(expr ast.Expr) (Interpretable, error) {
 
 	sel := expr.AsSelect()
 	// Plan the operand evaluation.
-	op, err := p.plan(sel.Operand())
+	op, err := p.Plan(sel.Operand())
 	if err != nil {
 		return nil, err
 	}
@@ -226,14 +220,14 @@ func (p *planner) planCall(expr ast.Expr) (Interpretable, error) {
 
 	args := make([]Interpretable, argCount)
 	if target != nil {
-		arg, err := p.plan(target)
+		arg, err := p.Plan(target)
 		if err != nil {
 			return nil, err
 		}
 		args[0] = arg
 	}
 	for i, argExpr := range call.Args() {
-		arg, err := p.plan(argExpr)
+		arg, err := p.Plan(argExpr)
 		if err != nil {
 			return nil, err
 		}
@@ -502,7 +496,7 @@ func (p *planner) planCreateList(expr ast.Expr) (Interpretable, error) {
 	}
 	elems := make([]Interpretable, len(elements))
 	for i, elem := range elements {
-		elemVal, err := p.plan(elem)
+		elemVal, err := p.Plan(elem)
 		if err != nil {
 			return nil, err
 		}
@@ -512,7 +506,7 @@ func (p *planner) planCreateList(expr ast.Expr) (Interpretable, error) {
 		id:           expr.ID(),
 		elems:        elems,
 		optionals:    optionals,
-		hasOptionals: len(optionalIndices) != 0,
+		hasOptionals: len(optionals) != 0,
 		adapter:      p.adapter,
 	}, nil
 }
@@ -524,29 +518,27 @@ func (p *planner) planCreateMap(expr ast.Expr) (Interpretable, error) {
 	optionals := make([]bool, len(entries))
 	keys := make([]Interpretable, len(entries))
 	vals := make([]Interpretable, len(entries))
-	hasOptionals := false
 	for i, e := range entries {
 		entry := e.AsMapEntry()
-		keyVal, err := p.plan(entry.Key())
+		keyVal, err := p.Plan(entry.Key())
 		if err != nil {
 			return nil, err
 		}
 		keys[i] = keyVal
 
-		valVal, err := p.plan(entry.Value())
+		valVal, err := p.Plan(entry.Value())
 		if err != nil {
 			return nil, err
 		}
 		vals[i] = valVal
 		optionals[i] = entry.IsOptional()
-		hasOptionals = hasOptionals || entry.IsOptional()
 	}
 	return &evalMap{
 		id:           expr.ID(),
 		keys:         keys,
 		vals:         vals,
 		optionals:    optionals,
-		hasOptionals: hasOptionals,
+		hasOptionals: len(optionals) != 0,
 		adapter:      p.adapter,
 	}, nil
 }
@@ -562,17 +554,15 @@ func (p *planner) planCreateStruct(expr ast.Expr) (Interpretable, error) {
 	optionals := make([]bool, len(objFields))
 	fields := make([]string, len(objFields))
 	vals := make([]Interpretable, len(objFields))
-	hasOptionals := false
 	for i, f := range objFields {
 		field := f.AsStructField()
 		fields[i] = field.Name()
-		val, err := p.plan(field.Value())
+		val, err := p.Plan(field.Value())
 		if err != nil {
 			return nil, err
 		}
 		vals[i] = val
 		optionals[i] = field.IsOptional()
-		hasOptionals = hasOptionals || field.IsOptional()
 	}
 	return &evalObj{
 		id:           expr.ID(),
@@ -580,7 +570,7 @@ func (p *planner) planCreateStruct(expr ast.Expr) (Interpretable, error) {
 		fields:       fields,
 		vals:         vals,
 		optionals:    optionals,
-		hasOptionals: hasOptionals,
+		hasOptionals: len(optionals) != 0,
 		provider:     p.provider,
 	}, nil
 }
@@ -588,23 +578,23 @@ func (p *planner) planCreateStruct(expr ast.Expr) (Interpretable, error) {
 // planComprehension generates an Interpretable fold operation.
 func (p *planner) planComprehension(expr ast.Expr) (Interpretable, error) {
 	fold := expr.AsComprehension()
-	accu, err := p.plan(fold.AccuInit())
+	accu, err := p.Plan(fold.AccuInit())
 	if err != nil {
 		return nil, err
 	}
-	iterRange, err := p.plan(fold.IterRange())
+	iterRange, err := p.Plan(fold.IterRange())
 	if err != nil {
 		return nil, err
 	}
-	cond, err := p.plan(fold.LoopCondition())
+	cond, err := p.Plan(fold.LoopCondition())
 	if err != nil {
 		return nil, err
 	}
-	step, err := p.plan(fold.LoopStep())
+	step, err := p.Plan(fold.LoopStep())
 	if err != nil {
 		return nil, err
 	}
-	result, err := p.plan(fold.Result())
+	result, err := p.Plan(fold.Result())
 	if err != nil {
 		return nil, err
 	}
@@ -613,7 +603,6 @@ func (p *planner) planComprehension(expr ast.Expr) (Interpretable, error) {
 		accuVar:   fold.AccuVar(),
 		accu:      accu,
 		iterVar:   fold.IterVar(),
-		iterVar2:  fold.IterVar2(),
 		iterRange: iterRange,
 		cond:      cond,
 		step:      step,
