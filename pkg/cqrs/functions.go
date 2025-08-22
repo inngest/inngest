@@ -17,7 +17,7 @@ type Function struct {
 	Name       string          `json:"name"`
 	Config     json.RawMessage `json:"config"`
 	CreatedAt  time.Time       `json:"created_at"`
-	ArchivedAt *time.Time      `json:"archived_at,omitempty"`
+	ArchivedAt time.Time       `json:"archived_at"`
 }
 
 func (f Function) InngestFunction() (*inngest.Function, error) {
@@ -30,10 +30,8 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 }
 
 func (f Function) IsArchived() bool {
-	if f.ArchivedAt != nil {
-		if !f.ArchivedAt.IsZero() && !f.ArchivedAt.Before(time.Time{}) && time.Now().After(*f.ArchivedAt) {
-			return true
-		}
+	if !f.ArchivedAt.IsZero() && !f.ArchivedAt.Before(time.Time{}) && time.Now().After(f.ArchivedAt) {
+		return true
 	}
 	return false
 }

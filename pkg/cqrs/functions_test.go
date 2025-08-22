@@ -73,45 +73,37 @@ func TestFunction_InngestFunction(t *testing.T) {
 
 func TestFunction_IsArchived(t *testing.T) {
 	now := time.Now()
-	pastTime := now.Add(-time.Hour)
-	futureTime := now.Add(time.Hour)
-	zeroTime := time.Time{}
 	weirdTime, err := time.Parse("0001-01-01T00:00:00Z", "0001-01-01T00:00:00Z")
 	require.NoError(t, err)
 
 	tests := []struct {
 		name       string
-		archivedAt *time.Time
+		archivedAt time.Time
 		want       bool
 	}{
 		{
-			name:       "nil archived_at",
-			archivedAt: nil,
-			want:       false,
-		},
-		{
 			name:       "zero time archived_at",
-			archivedAt: &zeroTime,
+			archivedAt: time.Time{},
 			want:       false,
 		},
 		{
 			name:       "beginning of time archived_at",
-			archivedAt: &weirdTime,
+			archivedAt: weirdTime,
 			want:       false,
 		},
 		{
 			name:       "past time archived_at",
-			archivedAt: &pastTime,
+			archivedAt: now.Add(-time.Hour),
 			want:       true,
 		},
 		{
 			name:       "current time archived_at",
-			archivedAt: &now,
+			archivedAt: now,
 			want:       true,
 		},
 		{
 			name:       "future time archived_at",
-			archivedAt: &futureTime,
+			archivedAt: now.Add(time.Hour),
 			want:       false,
 		},
 	}
