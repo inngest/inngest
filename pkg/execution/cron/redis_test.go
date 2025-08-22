@@ -65,7 +65,7 @@ func TestGenerateJitter(t *testing.T) {
 			}
 
 			// Run multiple times to test range
-			for i := 0; i < 50; i++ {
+			for range 50 {
 				jitter := generateJitter(tc.min, tc.max)
 
 				require.GreaterOrEqual(t, jitter, tc.expectMin, "jitter should be >= min")
@@ -75,7 +75,7 @@ func TestGenerateJitter(t *testing.T) {
 			// Test for some variation (unless min == max)
 			if tc.min != tc.max {
 				values := make(map[time.Duration]bool)
-				for i := 0; i < 20; i++ {
+				for range 20 {
 					jitter := generateJitter(tc.min, tc.max)
 					values[jitter] = true
 				}
@@ -127,7 +127,7 @@ func TestJitterEdgeCases(t *testing.T) {
 		min := 1 * time.Nanosecond
 		max := 2 * time.Nanosecond
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			jitter := generateJitter(min, max)
 			assert.True(t, jitter >= min && jitter <= max,
 				"jitter %v should be between %v and %v", jitter, min, max)
@@ -138,7 +138,7 @@ func TestJitterEdgeCases(t *testing.T) {
 		min := 1 * time.Second
 		max := 1 * time.Hour
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			jitter := generateJitter(min, max)
 			assert.True(t, jitter >= min && jitter <= max,
 				"jitter %v should be between %v and %v", jitter, min, max)
