@@ -8,11 +8,32 @@ import (
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 )
 
-func SQLiteToCQRSFunction(fn *sqlc.Function) *cqrs.Function {
-	if fn == nil {
+// SQLiteToCQRS accepts an input and converter, and convert the type to another
+func SQLiteToCQRS[T, R any](input *T, converter func(*T) *R) *R {
+	if input == nil {
 		return nil
 	}
+	return converter(input)
+}
 
+func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
+	if len(inputs) == 0 {
+		return []*R{}
+	}
+
+	results := make([]*R, len(inputs))
+	for i, input := range inputs {
+		results[i] = SQLiteToCQRS(input, converter)
+	}
+	return results
+}
+
+//
+// Converters
+//
+
+// convertSQLiteFunctionToCQRS converts sqlc function to cqrs function
+func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
 	var archivedAt time.Time
 	if fn.ArchivedAt.Valid {
 		archivedAt = fn.ArchivedAt.Time
@@ -27,16 +48,4 @@ func SQLiteToCQRSFunction(fn *sqlc.Function) *cqrs.Function {
 		CreatedAt:  fn.CreatedAt,
 		ArchivedAt: archivedAt,
 	}
-}
-
-func SQLiteToCQRSFunctionList(fns []*sqlc.Function) []*cqrs.Function {
-	if len(fns) == 0 {
-		return []*cqrs.Function{}
-	}
-
-	res := make([]*cqrs.Function, len(fns))
-	for i, fn := range fns {
-		res[i] = SQLiteToCQRSFunction(fn)
-	}
-	return res
 }
