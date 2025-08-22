@@ -142,38 +142,24 @@ type MacroExprHelper interface {
 	NewError(exprID int64, message string) *Error
 }
 
-// MacroOpt defines a functional option for configuring macro behavior.
-type MacroOpt = parser.MacroOpt
-
-// MacroDocs configures a list of strings into a multiline description for the macro.
-func MacroDocs(docs ...string) MacroOpt {
-	return parser.MacroDocs(docs...)
-}
-
-// MacroExamples configures a list of examples, either as a string or common.MultilineString,
-// into an example set to be provided with the macro Documentation() call.
-func MacroExamples(examples ...string) MacroOpt {
-	return parser.MacroExamples(examples...)
-}
-
 // GlobalMacro creates a Macro for a global function with the specified arg count.
-func GlobalMacro(function string, argCount int, factory MacroFactory, opts ...MacroOpt) Macro {
-	return parser.NewGlobalMacro(function, argCount, factory, opts...)
+func GlobalMacro(function string, argCount int, factory MacroFactory) Macro {
+	return parser.NewGlobalMacro(function, argCount, factory)
 }
 
 // ReceiverMacro creates a Macro for a receiver function matching the specified arg count.
-func ReceiverMacro(function string, argCount int, factory MacroFactory, opts ...MacroOpt) Macro {
-	return parser.NewReceiverMacro(function, argCount, factory, opts...)
+func ReceiverMacro(function string, argCount int, factory MacroFactory) Macro {
+	return parser.NewReceiverMacro(function, argCount, factory)
 }
 
 // GlobalVarArgMacro creates a Macro for a global function with a variable arg count.
-func GlobalVarArgMacro(function string, factory MacroFactory, opts ...MacroOpt) Macro {
-	return parser.NewGlobalVarArgMacro(function, factory, opts...)
+func GlobalVarArgMacro(function string, factory MacroFactory) Macro {
+	return parser.NewGlobalVarArgMacro(function, factory)
 }
 
 // ReceiverVarArgMacro creates a Macro for a receiver function matching a variable arg count.
-func ReceiverVarArgMacro(function string, factory MacroFactory, opts ...MacroOpt) Macro {
-	return parser.NewReceiverVarArgMacro(function, factory, opts...)
+func ReceiverVarArgMacro(function string, factory MacroFactory) Macro {
+	return parser.NewReceiverVarArgMacro(function, factory)
 }
 
 // NewGlobalMacro creates a Macro for a global function with the specified arg count.

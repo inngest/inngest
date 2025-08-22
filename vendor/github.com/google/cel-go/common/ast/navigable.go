@@ -237,13 +237,8 @@ func visit(expr Expr, visitor Visitor, order visitOrder, depth, maxDepth int) {
 	case StructKind:
 		s := expr.AsStruct()
 		for _, f := range s.Fields() {
-			if order == preOrder {
-				visitor.VisitEntryExpr(f)
-			}
+			visitor.VisitEntryExpr(f)
 			visit(f.AsStructField().Value(), visitor, order, depth+1, maxDepth)
-			if order == postOrder {
-				visitor.VisitEntryExpr(f)
-			}
 		}
 	}
 	if order == postOrder {
@@ -393,14 +388,6 @@ func (comp navigableComprehensionImpl) IterRange() Expr {
 
 func (comp navigableComprehensionImpl) IterVar() string {
 	return comp.Expr.AsComprehension().IterVar()
-}
-
-func (comp navigableComprehensionImpl) IterVar2() string {
-	return comp.Expr.AsComprehension().IterVar2()
-}
-
-func (comp navigableComprehensionImpl) HasIterVar2() bool {
-	return comp.Expr.AsComprehension().HasIterVar2()
 }
 
 func (comp navigableComprehensionImpl) AccuVar() string {

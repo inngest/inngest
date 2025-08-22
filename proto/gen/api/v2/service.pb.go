@@ -7,7 +7,6 @@
 package apiv2
 
 import (
-	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -745,7 +744,7 @@ var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\x1a\x1bbuf/validate/validate.proto\"\x0f\n" +
+	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
 	"\rHealthRequest\"n\n" +
 	"\x0eHealthResponse\x12&\n" +
 	"\x04data\x18\x01 \x01(\v2\x12.api.v2.HealthDataR\x04data\x124\n" +
@@ -761,9 +760,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x10ResponseMetadata\x129\n" +
 	"\n" +
 	"fetched_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12=\n" +
-	"\fcached_until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vcachedUntil\"W\n" +
-	"\x14CreateAccountRequest\x12\x1d\n" +
-	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12\x17\n" +
+	"\fcached_until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vcachedUntil\"N\n" +
+	"\x14CreateAccountRequest\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
 	"\x05_name\"|\n" +
 	"\x15CreateAccountResponse\x12-\n" +
@@ -775,10 +774,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x16\n" +
 	"\x06apiKey\x18\x04 \x01(\tR\x06apiKey\x128\n" +
 	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
-	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xe0\x01\n" +
+	"\tupdatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd6\x01\n" +
 	"\x14FetchAccountsRequest\x12J\n" +
-	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12g\n" +
-	"\x05limit\x18\x02 \x01(\x05BL\x92A?29Number of accounts to return per page (min: 1, max: 1000):\x0220\xbaH\a\x1a\x05\x18\xe8\a(\x01H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12]\n" +
+	"\x05limit\x18\x02 \x01(\x05BB\x92A?29Number of accounts to return per page (min: 1, max: 1000):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x94\x01\n" +
 	"\x15FetchAccountsResponse\x12#\n" +
