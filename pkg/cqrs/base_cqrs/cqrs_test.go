@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -15,24 +16,17 @@ import (
 )
 
 func TestCQRSWrapper(t *testing.T) {
-	cm, cleanup := initSQLiteCQRS(t)
-	defer cleanup()
-
 	t.Run("GetFunctionByInternalUUID", func(t *testing.T) {
-		ctx := context.Background()
-
 		// Generate test IDs
 		accountID := uuid.New()
 		envID := uuid.New()
 		appID := uuid.New()
 		fnID := uuid.New()
 
-		// Upsert the app first
-		_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
-			ID:   appID,
-			Name: "test-app",
-		})
-		require.NoError(t, err)
+		cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+		defer cleanup()
+
+		ctx := context.Background()
 
 		// Create function config
 		fnConfig := map[string]any{
@@ -84,7 +78,30 @@ func TestCQRSWrapper(t *testing.T) {
 	})
 }
 
-func initSQLiteCQRS(t *testing.T) (cqrs.Manager, func()) {
+//
+// Helpers
+//
+
+type withInitCQRSOpt func(*initCQRSOpt)
+
+type initCQRSOpt struct {
+	appID uuid.UUID
+}
+
+func withInitCQRSOptApp(id uuid.UUID) withInitCQRSOpt {
+	return func(o *initCQRSOpt) {
+		o.appID = id
+	}
+}
+
+func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
+	ctx := context.Background()
+
+	opt := initCQRSOpt{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
 	db, err := New(BaseCQRSOptions{InMemory: true})
 	require.NoError(t, err)
 
@@ -92,6 +109,15 @@ func initSQLiteCQRS(t *testing.T) (cqrs.Manager, func()) {
 
 	cleanup := func() {
 		db.Close()
+	}
+
+	if opt.appID != uuid.Nil {
+		// Upsert the app
+		_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:   opt.appID,
+			Name: fmt.Sprintf("app:%s", opt.appID),
+		})
+		require.NoError(t, err)
 	}
 
 	return cm, cleanup
