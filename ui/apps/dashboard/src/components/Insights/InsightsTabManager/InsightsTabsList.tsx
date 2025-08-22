@@ -1,48 +1,121 @@
 'use client';
 
-import TabCards from '@inngest/components/TabCards/TabCards';
-import { ulid } from 'ulid';
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import Tabs from '@inngest/components/Tabs/Tabs';
+import {
+  RiAddLine,
+  RiBookReadLine,
+  RiCircleFill,
+  RiCodeSSlashLine,
+  RiContractLeftLine,
+  RiExpandRightLine,
+} from '@remixicon/react';
 
-import type { TabConfig, TabManagerActions } from './InsightsTabManager';
-
-// TODO: Complete implementation and remove "hide" prop.
+import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import type { Query } from '@/components/Insights/types';
+import { hasDiffWithSavedQuery } from './InsightsTabManager';
+import { useTabManagerActions } from './TabManagerContext';
+import { TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
-  actions: TabManagerActions;
   activeTabId: string;
-  hide?: boolean;
-  tabs: TabConfig[];
+  isQueryHelperPanelVisible: boolean;
+  onToggleQueryHelperPanelVisibility: () => void;
+  tabs: Query[];
 }
 
-export function InsightsTabsList({ actions, activeTabId, hide, tabs }: InsightsTabsListProps) {
-  if (hide) return null;
+export function InsightsTabsList({
+  activeTabId,
+  isQueryHelperPanelVisible,
+  onToggleQueryHelperPanelVisibility,
+  tabs,
+}: InsightsTabsListProps) {
+  const { tabManagerActions } = useTabManagerActions();
+  const { queries } = useStoredQueries();
+  const [pendingCloseTabId, setPendingCloseTabId] = useState<string | null>(null);
 
-  const handleTabChange = (value: string) => {
-    // Don't change the active tab, just create a new one
-    if (value === '__plus') return;
-
-    actions.focusTab(value);
-  };
-
-  const handlePlusClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    actions.createTab(ulid());
-  };
+  const ActionTabIcon = isQueryHelperPanelVisible ? RiContractLeftLine : RiExpandRightLine;
+  const pendingCloseTab = pendingCloseTabId ? tabs.find((t) => t.id === pendingCloseTabId) : null;
 
   return (
-    <TabCards value={activeTabId} onValueChange={handleTabChange}>
-      <TabCards.ButtonList>
-        {tabs.map((tab) => (
-          <TabCards.Button key={tab.id} value={tab.id}>
-            {tab.name}
-          </TabCards.Button>
-        ))}
-        <TabCards.Button key="__plus" value="__plus" onClick={handlePlusClick}>
-          +
-        </TabCards.Button>
-      </TabCards.ButtonList>
-    </TabCards>
+    <>
+      <Tabs
+        onClose={(tabId: string) => {
+          const tab = tabs.find((t) => t.id === tabId);
+          if (tab === undefined) return;
+
+          if (hasDiffWithSavedQuery(queries, tab)) {
+            setPendingCloseTabId(tabId);
+            return;
+          }
+
+          tabManagerActions.closeTab(tabId);
+        }}
+        onValueChange={tabManagerActions.focusTab}
+        value={activeTabId}
+      >
+        <Tabs.List>
+          <Tabs.IconTab
+            icon={<ActionTabIcon size={16} />}
+            onClick={onToggleQueryHelperPanelVisibility}
+            title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
+          />
+          {tabs.map((tab) => (
+            <Tabs.Tab
+              iconBefore={<IndicatorTabIcon tab={tab} />}
+              key={tab.id}
+              title={tab.name}
+              value={tab.id}
+            />
+          ))}
+          <Tabs.IconTab
+            icon={<RiAddLine size={16} />}
+            onClick={tabManagerActions.createNewTab}
+            title="Add new tab"
+          />
+        </Tabs.List>
+      </Tabs>
+
+      <AlertModal
+        cancelButtonLabel="Cancel"
+        className="w-[656px]"
+        confirmButtonLabel="Confirm"
+        isOpen={Boolean(pendingCloseTab)}
+        onClose={() => {
+          setPendingCloseTabId(null);
+        }}
+        onSubmit={() => {
+          if (pendingCloseTabId) {
+            tabManagerActions.closeTab(pendingCloseTabId);
+            setPendingCloseTabId(null);
+          }
+        }}
+        title="Unsaved changes"
+      >
+        <div className="p-6">
+          <p className="text-subtle text-sm">
+            Are you sure you want to close <strong>{pendingCloseTab?.name}</strong> without saving
+            your changes?
+          </p>
+          <Alert className="mt-4 text-sm" severity="warning">
+            Your changes will be lost if you close this tab without saving it.
+          </Alert>
+        </div>
+      </AlertModal>
+    </>
   );
+}
+
+function IndicatorTabIcon({ tab }: { tab: Query }) {
+  const { queries } = useStoredQueries();
+
+  if (tab.id === TEMPLATES_TAB.id) {
+    return <RiBookReadLine size={16} />;
+  } else if (hasDiffWithSavedQuery(queries, tab)) {
+    return <RiCircleFill className="fill-amber-500" size={16} />;
+  } else {
+    return <RiCodeSSlashLine size={16} />;
+  }
 }

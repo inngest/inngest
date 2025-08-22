@@ -50,11 +50,6 @@ export async function simulateQuery(
   _query: string,
   cursor: string | null
 ): Promise<InsightsFetchResult> {
-  await new Promise((resolve) => setTimeout(resolve, 3000 + Math.random() * 1000));
-
-  if (Math.random() <= 0.3) {
-    throw new Error('Query timeout - please try a more specific query');
-  }
-
+  await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
   return getMockPage(cursor);
 }

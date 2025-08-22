@@ -1,19 +1,34 @@
 'use client';
 
-import { Header } from '@inngest/components/Header/Header';
+import { useState } from 'react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
+import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
+import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 
 function InsightsContent() {
-  const { tabManager } = useInsightsTabManager();
+  const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] = useState(true);
+
+  const { actions, activeTabId, tabManager } = useInsightsTabManager({
+    isQueryHelperPanelVisible,
+    onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
+  });
 
   return (
-    <>
-      <Header breadcrumb={[{ text: 'Insights' }]} />
-      {/* TODO: Add templates, recent queries, saved queries sidepanel */}
-      {tabManager}
-    </>
+    <StoredQueriesProvider tabManagerActions={actions}>
+      <TabManagerProvider actions={actions}>
+        <div className="flex h-full w-full flex-1 overflow-hidden">
+          {isQueryHelperPanelVisible && (
+            <div className="w-[240px] flex-shrink-0">
+              <QueryHelperPanel activeTabId={activeTabId} />
+            </div>
+          )}
+          <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+        </div>
+      </TabManagerProvider>
+    </StoredQueriesProvider>
   );
 }
 
