@@ -30,14 +30,12 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 }
 
 func (f Function) IsArchived() bool {
-	if f.ArchivedAt == nil {
-		return false
+	if f.ArchivedAt != nil {
+		if !f.ArchivedAt.IsZero() && !f.ArchivedAt.Before(time.Time{}) && time.Now().After(*f.ArchivedAt) {
+			return true
+		}
 	}
-	if f.ArchivedAt.IsZero() || f.ArchivedAt.Before(time.Time{}) || f.ArchivedAt.After(time.Now()) {
-		return false
-	}
-
-	return true
+	return false
 }
 
 // FunctionReader finds functions for use across the API and dev server.
