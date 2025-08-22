@@ -3,9 +3,10 @@
 import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { SQL_COMPLETION_CONFIG } from './constants';
 
 export function InsightsSQLEditor() {
   const { onChange, query } = useInsightsStateMachineContext();
 
-  return <SQLEditor content={query} onChange={onChange} />;
+  return <SQLEditor completionConfig={SQL_COMPLETION_CONFIG} content={query} onChange={onChange} />;
 }
