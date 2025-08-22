@@ -273,7 +273,12 @@ func encodeSpanOutputID(spanID string) (*string, error) {
 
 func sorter(span *cqrs.OtelSpan) {
 	sort.Slice(span.Children, func(i, j int) bool {
-		return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+		if !span.Children[i].StartTime.Equal(span.Children[j].StartTime) {
+			return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+		}
+
+		// sort based on SpanID if two spans have equal timestamps
+		return span.Children[i].SpanID < span.Children[j].SpanID
 	})
 
 	for _, child := range span.Children {
