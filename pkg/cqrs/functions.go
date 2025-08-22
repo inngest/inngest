@@ -30,7 +30,7 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 }
 
 func (f Function) IsArchived() bool {
-	if !f.ArchivedAt.IsZero() && !f.ArchivedAt.Before(time.Time{}) && time.Now().After(f.ArchivedAt) {
+	if f.ArchivedAt.After(time.Time{}) && time.Now().After(f.ArchivedAt) {
 		return true
 	}
 	return false

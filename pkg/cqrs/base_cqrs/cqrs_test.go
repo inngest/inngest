@@ -15,18 +15,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCQRSWrapper(t *testing.T) {
-	t.Run("GetFunctionByInternalUUID", func(t *testing.T) {
-		// Generate test IDs
-		accountID := uuid.New()
-		envID := uuid.New()
-		appID := uuid.New()
+func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
+	ctx := context.Background()
+
+	// Generate test IDs
+	accountID := uuid.New()
+	envID := uuid.New()
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	t.Run("when function is active", func(t *testing.T) {
 		fnID := uuid.New()
-
-		cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
-		defer cleanup()
-
-		ctx := context.Background()
 
 		// Create function config
 		fnConfig := map[string]any{
@@ -63,7 +64,6 @@ func TestCQRSWrapper(t *testing.T) {
 		assert.Equal(t, "test-function", function.Slug)
 		assert.NotEmpty(t, function.Config)
 		assert.False(t, function.CreatedAt.IsZero())
-		assert.Nil(t, function.ArchivedAt)
 
 		// Verify function config can be unmarshaled
 		var config map[string]any
@@ -75,6 +75,63 @@ func TestCQRSWrapper(t *testing.T) {
 		nonExistentID := uuid.New()
 		_, err = cm.GetFunctionByInternalUUID(ctx, nonExistentID)
 		assert.ErrorIs(t, err, sql.ErrNoRows)
+
+		// Function should be considered active (not archived)
+		assert.False(t, function.IsArchived())
+
+		// Verify that ArchivedAt is zero time
+		assert.True(t, function.ArchivedAt.IsZero())
+
+		// Function should be retrievable and have valid properties
+		retrievedFn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+		require.NoError(t, err)
+		assert.Equal(t, function.ID, retrievedFn.ID)
+		assert.Equal(t, function.Name, retrievedFn.Name)
+		assert.Equal(t, function.Slug, retrievedFn.Slug)
+	})
+
+	t.Run("when function is deleted/archived", func(t *testing.T) {
+		// Create another function to archive
+		fnID := uuid.New()
+		archivedFnConfig := map[string]any{
+			"triggers": []map[string]any{
+				{"event": "archived.event"},
+			},
+		}
+		archivedConfigJSON, err := json.Marshal(archivedFnConfig)
+		require.NoError(t, err)
+
+		// Insert the function to be archived
+		_, err = cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			AccountID: accountID,
+			EnvID:     envID,
+			AppID:     appID,
+			ID:        fnID,
+			Name:      "Archived Function",
+			Slug:      "archived-function",
+			Config:    string(archivedConfigJSON),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+
+		// Archive the function by setting archived_at
+		err = cm.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnID})
+		require.NoError(t, err)
+
+		// Retrieve the archived function - should still be retrievable
+		archivedFunction, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+		require.NoError(t, err)
+		require.NotNil(t, archivedFunction)
+
+		// Verify function is marked as archived
+		// fmt.Println("ARCHIVE_TIME:", archivedFunction.ArchivedAt)
+		assert.True(t, archivedFunction.IsArchived())
+		assert.False(t, archivedFunction.ArchivedAt.IsZero())
+
+		// Verify other properties are still correct
+		assert.Equal(t, fnID, archivedFunction.ID)
+		assert.Equal(t, "Archived Function", archivedFunction.Name)
+		assert.Equal(t, "archived-function", archivedFunction.Slug)
 	})
 }
 

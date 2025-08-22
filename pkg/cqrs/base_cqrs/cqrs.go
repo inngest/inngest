@@ -608,10 +608,25 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
-	f := func(ctx context.Context) (*sqlc.Function, error) {
-		return w.q.GetFunctionByID(ctx, fnID)
+	fn, err := w.q.GetFunctionByID(ctx, fnID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.Function{})
+
+	var archivedAt time.Time
+	if fn.ArchivedAt.Valid {
+		archivedAt = fn.ArchivedAt.Time
+	}
+
+	return &cqrs.Function{
+		ID:         fn.ID,
+		AppID:      fn.AppID,
+		Name:       fn.Name,
+		Slug:       fn.Slug,
+		Config:     json.RawMessage(fn.Config),
+		CreatedAt:  fn.CreatedAt,
+		ArchivedAt: archivedAt,
+	}, nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
