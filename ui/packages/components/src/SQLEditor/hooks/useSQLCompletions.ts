@@ -19,6 +19,8 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
       createSQLCompletionProvider(config)
     );
 
-    return disposable.dispose;
+    return () => {
+      disposable.dispose();
+    };
   }, [monaco, config]);
 }
