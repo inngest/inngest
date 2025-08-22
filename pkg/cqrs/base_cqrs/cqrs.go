@@ -731,8 +731,8 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	if err != nil {
 		return nil, err
 	}
-	evt := convertEvent(obj)
-	return &evt, nil
+
+	return SQLiteToCQRS(obj, convertSQLiteEventToCQRS), nil
 }
 
 func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*cqrs.EventBatch, error) {
@@ -741,22 +741,16 @@ func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID
 		return nil, err
 	}
 
-	var out = make([]*cqrs.EventBatch, len(batches))
-	for n, i := range batches {
-		eb := convertEventBatch(i)
-		out[n] = &eb
-	}
-
-	return out, nil
+	return SQLiteToCQRSList(batches, convertSQLiteEventBatchToCQRS), nil
 }
+
 func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
 	obj, err := w.q.GetEventBatchByRunID(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
 
-	eb := convertEventBatch(obj)
-	return &eb, nil
+	return SQLiteToCQRS(obj, convertSQLiteEventBatchToCQRS), nil
 }
 
 func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
@@ -765,13 +759,7 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 		return nil, err
 	}
 
-	evts := make([]*cqrs.Event, len(objs))
-	for i, o := range objs {
-		evt := convertEvent(o)
-		evts[i] = &evt
-	}
-
-	return evts, nil
+	return SQLiteToCQRSList(objs, convertSQLiteEventToCQRS), nil
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
@@ -917,8 +905,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		); err != nil {
 			return nil, err
 		}
-		val := convertEvent(&data)
-		out = append(out, &val)
+		out = append(out, SQLiteToCQRS(&data, convertSQLiteEventToCQRS))
 	}
 
 	return out, nil
@@ -1008,47 +995,7 @@ func (w wrapper) GetEventsIDbound(
 		return []*cqrs.Event{}, err
 	}
 
-	var res = make([]*cqrs.Event, len(evts))
-	for n, i := range evts {
-		e := convertEvent(i)
-		res[n] = &e
-	}
-	return res, nil
-}
-
-func convertEvent(obj *sqlc.Event) cqrs.Event {
-	evt := &cqrs.Event{
-		ID:           obj.InternalID,
-		ReceivedAt:   obj.ReceivedAt,
-		EventID:      obj.EventID,
-		EventName:    obj.EventName,
-		EventVersion: obj.EventV.String,
-		EventTS:      obj.EventTs.UnixMilli(),
-		EventData:    map[string]any{},
-		EventUser:    map[string]any{},
-	}
-	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
-	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
-	return *evt
-}
-
-func convertEventBatch(obj *sqlc.EventBatch) cqrs.EventBatch {
-	var evtIDs []ulid.ULID
-	if ids, err := obj.EventIDs(); err == nil {
-		evtIDs = ids
-	}
-
-	eb := cqrs.NewEventBatch(
-		cqrs.WithEventBatchID(obj.ID),
-		cqrs.WithEventBatchAccountID(obj.AccountID),
-		cqrs.WithEventBatchWorkspaceID(obj.WorkspaceID),
-		cqrs.WithEventBatchAppID(obj.AppID),
-		cqrs.WithEventBatchRunID(obj.RunID),
-		cqrs.WithEventBatchEventIDs(evtIDs),
-		cqrs.WithEventBatchExecutedTime(obj.ExecutedAt),
-	)
-
-	return *eb
+	return SQLiteToCQRSList(evts, convertSQLiteEventToCQRS), nil
 }
 
 //

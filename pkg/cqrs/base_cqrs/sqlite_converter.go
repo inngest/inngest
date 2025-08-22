@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/oklog/ulid/v2"
 )
 
 // SQLiteToCQRS accepts an input and converter, and convert the type to another
@@ -34,6 +35,10 @@ func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
 
 // convertSQLiteFunctionToCQRS converts sqlc function to cqrs function
 func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
+	if fn == nil {
+		return nil
+	}
+
 	var archivedAt time.Time
 	if fn.ArchivedAt.Valid {
 		archivedAt = fn.ArchivedAt.Time
@@ -48,4 +53,43 @@ func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
 		CreatedAt:  fn.CreatedAt,
 		ArchivedAt: archivedAt,
 	}
+}
+
+func convertSQLiteEventToCQRS(obj *sqlc.Event) *cqrs.Event {
+	evt := &cqrs.Event{
+		ID:           obj.InternalID,
+		ReceivedAt:   obj.ReceivedAt,
+		EventID:      obj.EventID,
+		EventName:    obj.EventName,
+		EventVersion: obj.EventV.String,
+		EventTS:      obj.EventTs.UnixMilli(),
+		EventData:    map[string]any{},
+		EventUser:    map[string]any{},
+	}
+	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
+	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
+	return evt
+}
+
+func convertSQLiteEventBatchToCQRS(obj *sqlc.EventBatch) *cqrs.EventBatch {
+	if obj == nil {
+		return nil
+	}
+
+	var evtIDs []ulid.ULID
+	if ids, err := obj.EventIDs(); err == nil {
+		evtIDs = ids
+	}
+
+	eb := cqrs.NewEventBatch(
+		cqrs.WithEventBatchID(obj.ID),
+		cqrs.WithEventBatchAccountID(obj.AccountID),
+		cqrs.WithEventBatchWorkspaceID(obj.WorkspaceID),
+		cqrs.WithEventBatchAppID(obj.AppID),
+		cqrs.WithEventBatchRunID(obj.RunID),
+		cqrs.WithEventBatchEventIDs(evtIDs),
+		cqrs.WithEventBatchExecutedTime(obj.ExecutedAt),
+	)
+
+	return eb
 }
