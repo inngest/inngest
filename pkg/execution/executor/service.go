@@ -706,15 +706,26 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
+	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
+	if err != nil {
+		return fmt.Errorf("error retrieving function: %w", err)
+	}
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return fmt.Errorf("error converting function to config: %w", err)
+	}
+
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
 	evt := event.NewOSSTrackedEvent(event.Event{
 		ID:   idempotencyKey,
-		Name: "",
-		Data: map[string]any{},
-		// Timestamp: 0,
+		Name: consts.FnCronName,
+		Data: map[string]any{
+			"cron": conf.ScheduleExpression(),
+		},
+		Timestamp: time.Now().UnixMilli(),
 	}, nil)
 
 	// publish cron event to pubsub
@@ -738,15 +749,6 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		}
 	}(ctx)
 
-	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
-	if err != nil {
-		return fmt.Errorf("error retrieving function: %w", err)
-	}
-	conf, err := fn.InngestFunction()
-	if err != nil {
-		return fmt.Errorf("error converting function to config: %w", err)
-	}
-
 	ctx, span := run.NewSpan(ctx,
 		run.WithNewRoot(),
 		run.WithName(consts.OtelSpanCron),
@@ -754,6 +756,9 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		run.WithSpanAttributes(
 			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
 			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
+			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
+			attribute.String(consts.OtelSysCronExpr, conf.ScheduleExpression()),
+			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
 		),
 	)
 	defer span.End()
