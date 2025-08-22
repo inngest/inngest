@@ -72,7 +72,7 @@ func customErrorHandler(ctx context.Context, mux *runtime.ServeMux, marshaler ru
 	if !ok {
 		// Not a gRPC error, return 500
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fallback))
+		_, _ = w.Write([]byte(fallback))
 		return
 	}
 
@@ -85,7 +85,7 @@ func customErrorHandler(ctx context.Context, mux *runtime.ServeMux, marshaler ru
 	// If the message looks like our JSON format, use it directly
 	if strings.HasPrefix(message, `{"errors":`) {
 		w.WriteHeader(httpCode)
-		w.Write([]byte(message))
+		_, _ = w.Write([]byte(message))
 		return
 	}
 
@@ -102,12 +102,12 @@ func customErrorHandler(ctx context.Context, mux *runtime.ServeMux, marshaler ru
 	jsonData, jsonErr := json.Marshal(errorResponse)
 	if jsonErr != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fallback))
+		_, _ = w.Write([]byte(fallback))
 		return
 	}
 
 	w.WriteHeader(httpCode)
-	w.Write(jsonData)
+	_, _ = w.Write(jsonData)
 }
 
 // grpcToHTTPStatus maps gRPC codes back to HTTP status codes
