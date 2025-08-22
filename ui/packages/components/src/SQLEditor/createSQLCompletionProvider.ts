@@ -37,6 +37,7 @@ export function createSQLCompletionProvider(
         suggestions.push({
           kind: languages.CompletionItemKind.Function,
           insertText: func.signature,
+          insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
           label: func.name,
           range,
         });
