@@ -308,6 +308,11 @@ func (f Function) IsScheduled() bool {
 	return false
 }
 
+// ScheduleExpression returns the cron expression string for the function
+//
+// NOTE
+// the code technically allow multiple triggers, should this also return a
+// list of string instead?
 func (f Function) ScheduleExpression() string {
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
