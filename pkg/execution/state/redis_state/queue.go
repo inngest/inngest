@@ -183,6 +183,9 @@ type QueueManager interface {
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
 	// ItemsByRunID retrieves all queue items via runID
+	//
+	// NOTE
+	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
 	ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error)
 
 	// PartitionBacklogSize returns the point in time backlog size of the partition.

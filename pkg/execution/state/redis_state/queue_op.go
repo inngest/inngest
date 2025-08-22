@@ -25,6 +25,15 @@ func newQueueOpOpt() queueOpOpt {
 	return queueOpOpt{}
 }
 
+func newQueueOpOptWithOpts(opts ...QueueOpOpt) queueOpOpt {
+	opt := newQueueOpOpt()
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	return opt
+}
+
 func WithQueueOpShard(shard QueueShard) QueueOpOpt {
 	return func(o *queueOpOpt) {
 		o.shard = &shard

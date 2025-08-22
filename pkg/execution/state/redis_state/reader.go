@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -592,10 +593,7 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 }
 
 func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error) {
-	opt := newQueueOpOpt()
-	for _, apply := range opts {
-		apply(&opt)
-	}
+	opt := newQueueOpOptWithOpts(opts...)
 
 	shard := q.primaryQueueShard
 	if opt.shard != nil {
@@ -624,4 +622,52 @@ func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) 
 func (q *queue) Shard(ctx context.Context, shardName string) (QueueShard, bool) {
 	shard, ok := q.queueShardClients[shardName]
 	return shard, ok
+}
+
+func (q *queue) ItemsByRunID(ctx context.Context, runID ulid.ULID, opts ...QueueOpOpt) ([]*osqueue.QueueItem, error) {
+	opt := newQueueOpOptWithOpts(opts...)
+
+	shard := q.primaryQueueShard
+	if opt.shard != nil {
+		shard = *opt.shard
+	}
+
+	rc := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
+
+	itemIDs, err := rc.Do(
+		ctx,
+		rc.B().
+			Zscan().
+			Key(kg.RunIndex(runID)).
+			Cursor(uint64(0)).
+			Count(consts.DefaultMaxStepLimit). // use the default step limit for this
+			Build(),
+	).AsScanEntry()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving queue item IDs: %w", err)
+	}
+
+	items, err := rc.Do(
+		ctx,
+		rc.B().
+			Hmget().
+			Key(kg.QueueItem()).
+			Field(itemIDs.Elements...).
+			Build(),
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving queue items: %w", err)
+	}
+
+	var res []*osqueue.QueueItem
+	for _, str := range items {
+		var qi osqueue.QueueItem
+
+		if err := json.Unmarshal([]byte(str), &qi); err == nil {
+			res = append(res, &qi)
+		}
+	}
+
+	return res, nil
 }
