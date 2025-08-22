@@ -907,7 +907,11 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	l = l.With("cron_item", ci)
 	l.Trace("handling cron")
 
-	if !s.croner.CanRun(ctx, ci) {
+	ok, err := s.croner.CanRun(ctx, ci)
+	if err != nil {
+		return err
+	}
+	if !ok {
 		// no action needed
 		return nil
 	}

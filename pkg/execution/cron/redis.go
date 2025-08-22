@@ -161,7 +161,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	return &nextItem, nil
 }
 
-func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
+func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) (bool, error) {
 	l := c.log.With(
 		"action", "redisCronManager.CanRun",
 		"cron_item", ci,
@@ -175,14 +175,14 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 		// this likely means that the queue item was already dequeued
 		// if there are no mapping, we also can't tell what the next schedule of the function is,
 		// and we default to nothing if not available.
-		return false
+		return false, nil
 	default:
-		return false
+		return false, err
 	}
 
 	// it's the same item, it can proceed
 	if ci.Equal(*nextItem) {
-		return true
+		return true, nil
 	}
 
 	// we need to do some checks if the cron items are different
@@ -204,16 +204,16 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) bool {
 		// no-op: proceed
 	default:
 		// wrong types, not used for processing purposes
-		return false
+		return false, nil
 	}
 
 	// this means the item in the mapping has an updated version of the cron, so this one should be discarded
 	if nextItem.FunctionVersion > ci.FunctionVersion {
-		return false
+		return false, nil
 	}
 
 	// all checks has passed so this means it's okay to run
-	return true
+	return true, nil
 }
 
 func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) error {
