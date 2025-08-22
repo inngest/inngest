@@ -594,17 +594,27 @@ func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
 //
 
 func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		return w.q.GetAppFunctions(ctx, appID)
+	fns, err := w.q.GetAppFunctions(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	res := make([]*cqrs.Function, len(fns))
+	for i, fn := range fns {
+		converted := SQLiteToCQRSFunction(*fn)
+		res[i] = &converted
+	}
+	return res, nil
 }
 
 func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID, fnSlug string) (*cqrs.Function, error) {
-	f := func(ctx context.Context) (*sqlc.Function, error) {
-		return w.q.GetFunctionBySlug(ctx, fnSlug)
+	fn, err := w.q.GetFunctionBySlug(ctx, fnSlug)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.Function{})
+
+	res := SQLiteToCQRSFunction(*fn)
+	return &res, nil
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
@@ -618,22 +628,46 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
-	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
+	fns, err := w.q.GetFunctions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*cqrs.Function, len(fns))
+	for i, fn := range fns {
+		converted := SQLiteToCQRSFunction(*fn)
+		res[i] = &converted
+	}
+	return res, nil
 }
 
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		return w.q.GetAppFunctions(ctx, appID)
+	fns, err := w.q.GetAppFunctions(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	res := make([]*cqrs.Function, len(fns))
+	for i, fn := range fns {
+		converted := SQLiteToCQRSFunction(*fn)
+		res[i] = &converted
+	}
+	return res, nil
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
-	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		// Ingore the workspace ID for now.
-		return w.q.GetAppFunctionsBySlug(ctx, appID)
+	// Ingore the workspace ID for now.
+	fns, err := w.q.GetAppFunctionsBySlug(ctx, appID)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, []*cqrs.Function{})
+
+	res := make([]*cqrs.Function, len(fns))
+	for i, fn := range fns {
+		converted := SQLiteToCQRSFunction(*fn)
+		res[i] = &converted
+	}
+	return res, nil
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
