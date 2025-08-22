@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
-	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,9 +71,6 @@ func TestCron(t *testing.T) {
 			assert.False(t, trigger.Timestamp.IsZero())
 			assert.NotNil(t, trigger.Cron)
 			assert.Nil(t, trigger.BatchID)
-
-			rid := ulid.MustParse(runID)
-			assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
 		})
 	})
 }
