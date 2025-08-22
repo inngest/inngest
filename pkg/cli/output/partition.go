@@ -30,6 +30,14 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 			)
 		}
 
+		var cronSchedule *OrderedMap
+		if c := pt.GetCron(); c != nil {
+			cronSchedule = OrderedData(
+				"Next", c.Next.AsTime().Format(time.RFC3339),
+				"JobID", c.JobId,
+			)
+		}
+
 		if err := w.WriteOrdered(OrderedData(
 			"Type", "Partition",
 			"ID", pt.Id,
@@ -41,25 +49,7 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Queue Shard", shard,
 			),
 			"Triggers", fn.Triggers,
-		),
-			WithTextOptLeadSpace(true),
-		); err != nil {
-			return err
-		}
-
-		if pt.GetCron() != nil {
-			c := pt.GetCron()
-			if err := w.WriteOrdered(OrderedData(
-				"CronSchedule", OrderedData(
-					"Next", c.Next.AsTime().Format(time.RFC3339),
-					"JobID", c.JobId,
-				),
-			)); err != nil {
-				return err
-			}
-		}
-
-		if err := w.WriteOrdered(OrderedData(
+			"CronSchedule", cronSchedule,
 			"Concurrency", OrderedData(
 				"Account", 0,
 				"Function", 0,
@@ -78,7 +68,9 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Singleton", fn.Singleton,
 				"URI", fn.Steps,
 			),
-		)); err != nil {
+		),
+			WithTextOptLeadSpace(true),
+		); err != nil {
 			return err
 		}
 	}
