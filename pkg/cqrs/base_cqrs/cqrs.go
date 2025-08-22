@@ -613,20 +613,8 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 		return nil, err
 	}
 
-	var archivedAt time.Time
-	if fn.ArchivedAt.Valid {
-		archivedAt = fn.ArchivedAt.Time
-	}
-
-	return &cqrs.Function{
-		ID:         fn.ID,
-		AppID:      fn.AppID,
-		Name:       fn.Name,
-		Slug:       fn.Slug,
-		Config:     json.RawMessage(fn.Config),
-		CreatedAt:  fn.CreatedAt,
-		ArchivedAt: archivedAt,
-	}, nil
+	res := SQLiteToCQRSFunction(*fn)
+	return &res, nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
