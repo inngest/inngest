@@ -124,7 +124,6 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 		require.NotNil(t, archivedFunction)
 
 		// Verify function is marked as archived
-		// fmt.Println("ARCHIVE_TIME:", archivedFunction.ArchivedAt)
 		assert.True(t, archivedFunction.IsArchived())
 		assert.False(t, archivedFunction.ArchivedAt.IsZero())
 
