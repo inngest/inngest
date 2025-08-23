@@ -275,7 +275,7 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 		// - update mapping
 		return c.setFunctionScheduleMap(ctx, *next)
 
-	case enums.CronOpPause:
+	case enums.CronOpArchive, enums.CronOpPause:
 		// NOTE
 		// This logic will have race conditions where retrieving of the item and dequeue happens
 		// separately.
