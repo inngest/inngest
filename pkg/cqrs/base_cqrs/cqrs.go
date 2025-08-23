@@ -31,7 +31,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
-	"github.com/jinzhu/copier"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -547,11 +546,6 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
-	// https://duckdb.org/docs/sql/indexes.html
-	//
-	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
-	// we run a series of transactions to get, delete, then re-insert the app.  This
-	// will be fixed in a near version of DuckDB.
 	app, err := w.q.GetApp(ctx, arg.ID)
 	if err != nil {
 		return nil, err
@@ -561,17 +555,27 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 	}
 
 	app.Error = arg.Error
-	params := sqlc.UpsertAppParams{}
-	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
+	params := sqlc.UpsertAppParams{
+		ID:          app.ID,
+		Name:        app.Name,
+		SdkLanguage: app.SdkLanguage,
+		SdkVersion:  app.SdkVersion,
+		Framework:   app.Framework,
+		Metadata:    app.Metadata,
+		Status:      app.Status,
+		Error:       app.Error,
+		Checksum:    app.Checksum,
+		Url:         app.Url,
+		Method:      app.Method,
+		AppVersion:  app.AppVersion,
+	}
 
 	// Recreate the app.
 	app, err = w.q.UpsertApp(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	out := &cqrs.App{}
-	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
-	return out, err
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
@@ -591,16 +595,26 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 		return nil, err
 	}
 	app.Url = arg.Url
-	params := sqlc.UpsertAppParams{}
-	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
+	params := sqlc.UpsertAppParams{
+		ID:          app.ID,
+		Name:        app.Name,
+		SdkLanguage: app.SdkLanguage,
+		SdkVersion:  app.SdkVersion,
+		Framework:   app.Framework,
+		Metadata:    app.Metadata,
+		Status:      app.Status,
+		Error:       app.Error,
+		Checksum:    app.Checksum,
+		Url:         app.Url,
+		Method:      app.Method,
+		AppVersion:  app.AppVersion,
+	}
 	// Recreate the app.
 	app, err = w.q.UpsertApp(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	out := &cqrs.App{}
-	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
-	return out, err
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 // DeleteApp deletes an app
@@ -1030,12 +1044,23 @@ func (w wrapper) GetEventsIDbound(
 //
 
 func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) error {
-	run := sqlc.InsertFunctionRunParams{}
-	if err := copier.CopyWithOption(&run, e, copier.Option{DeepCopy: true}); err != nil {
-		return err
+	run := sqlc.InsertFunctionRunParams{
+		RunID:           e.RunID,
+		RunStartedAt:    e.RunStartedAt,
+		FunctionID:      e.FunctionID,
+		FunctionVersion: e.FunctionVersion,
+		TriggerType:     "event",
+		EventID:         e.EventID,
+		WorkspaceID:     e.WorkspaceID,
 	}
 
-	// Need to manually set the cron field since `copier` won't do it.
+	// Handle nullable fields
+	if e.BatchID != nil {
+		run.BatchID = *e.BatchID
+	}
+	if e.OriginalRunID != nil {
+		run.OriginalRunID = *e.OriginalRunID
+	}
 	if e.Cron != nil {
 		run.Cron = sql.NullString{
 			Valid:  true,
