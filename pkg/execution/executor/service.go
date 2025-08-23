@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -907,6 +908,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	l = l.With("cron_item", ci)
 	l.Trace("handling cron")
 
+	// Check if the function can be ran
 	ok, err := s.croner.CanRun(ctx, ci)
 	if err != nil {
 		return err
@@ -918,8 +920,17 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// function doesn't exist, no action needed
+			return nil
+		}
 		return fmt.Errorf("error retrieving function: %w", err)
 	}
+	// function is archived/deleted, so don't do anything
+	if fn.IsArchived() {
+		return nil
+	}
+
 	conf, err := fn.InngestFunction()
 	if err != nil {
 		return fmt.Errorf("error converting function to config: %w", err)
