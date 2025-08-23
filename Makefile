@@ -72,13 +72,8 @@ build-ui:
 .PHONY: docs
 docs:
 	@echo "Generating protobuf files..."
-	@# Generate OpenAPI v2 directly using protoc due to buf configuration issues
 	@mkdir -p docs/openapi/v2
-	cd proto && protoc --proto_path=. --proto_path=third_party \
-		--openapiv2_out=../docs/openapi/v2 \
-		--openapiv2_opt=allow_delete_body=true \
-		--openapiv2_opt=json_names_for_fields=false \
-		api/v2/service.proto
+	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
 	@echo "Converting OpenAPI v2 to v3..."
 	go run ./tools/convert-openapi docs/openapi/v2 docs/openapi/v3
 

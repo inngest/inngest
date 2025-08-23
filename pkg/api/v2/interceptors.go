@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	protovalidate "buf.build/go/protovalidate"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // applyAuth applies authentication and authorization middleware to a gRPC method
@@ -163,4 +165,41 @@ func getHTTPMethodForGRPCMethod(fullMethod string) string {
 	}
 
 	return http.MethodPost // Default fallback
+}
+
+// validateRequest validates a protobuf message using protovalidate
+func validateRequest(req proto.Message) error {
+	validator, err := protovalidate.New()
+	if err != nil {
+		return status.Error(codes.Internal, "validation configuration error")
+	}
+
+	if err := validator.Validate(req); err != nil {
+		// Use the error helper to clean the validation message
+		return NewError(400, "api_error", err.Error())
+	}
+
+	return nil
+}
+
+// NewValidationUnaryInterceptor creates a unary gRPC interceptor that validates request messages
+func NewValidationUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Validate the request if it's a proto message
+		if protoReq, ok := req.(proto.Message); ok {
+			if err := validateRequest(protoReq); err != nil {
+				return nil, err
+			}
+		}
+		return handler(ctx, req)
+	}
+}
+
+// NewValidationStreamInterceptor creates a streaming gRPC interceptor that validates request messages
+func NewValidationStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// Note: Stream validation would need to be implemented in the stream wrapper
+		// For now, we'll just pass through as streaming validation is more complex
+		return handler(srv, ss)
+	}
 }
