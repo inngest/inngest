@@ -2412,19 +2412,3 @@ func copyWriter[
 	err = copier.CopyWithOption(&out, in, copier.Option{DeepCopy: true})
 	return out, err
 }
-
-func copyInto[
-	IN any,
-	OUT any,
-](
-	ctx context.Context,
-	f func(context.Context) (IN, error),
-	out OUT,
-) (OUT, error) {
-	in, err := f(ctx)
-	if err != nil {
-		return out, err
-	}
-	err = copier.CopyWithOption(&out, in, copier.Option{DeepCopy: true})
-	return out, err
-}
