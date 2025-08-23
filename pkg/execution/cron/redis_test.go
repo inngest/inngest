@@ -345,6 +345,7 @@ func TestRedisCronManager(t *testing.T) {
 			testOps := []enums.CronOp{
 				enums.CronOpNew,
 				enums.CronOpUpdate,
+				enums.CronOpArchive,
 				enums.CronOpPause,
 				enums.CronOpUnpause,
 				enums.CronOpProcess,
@@ -574,6 +575,32 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Contains(t, err.Error(), "next schedule not found")
 		})
 
+		t.Run("CronOpArchive should remove schedule", func(t *testing.T) {
+			// Create initial schedule
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.Expression = "0 * * * *"
+
+			err := cm.UpdateSchedule(ctx, cronItem)
+			require.NoError(t, err)
+
+			// Verify schedule exists
+			_, err = cm.NextScheduledItemForFunction(ctx, cronItem.FunctionID)
+			require.NoError(t, err)
+
+			// Archive the function
+			archiveItem := createCronItem(enums.CronOpArchive)
+			archiveItem.FunctionID = cronItem.FunctionID
+			archiveItem.ID = ulid.MustNew(ulid.Timestamp(clock.Now().Add(time.Minute)), ulid.DefaultEntropy())
+
+			err = cm.UpdateSchedule(ctx, archiveItem)
+			require.NoError(t, err)
+
+			// Verify schedule is removed
+			_, err = cm.NextScheduledItemForFunction(ctx, cronItem.FunctionID)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "next schedule not found")
+		})
+
 		t.Run("CronOpUnpause should restore schedule", func(t *testing.T) {
 			// Create and then pause a schedule
 			cronItem := createCronItem(enums.CronOpNew)
@@ -711,6 +738,18 @@ func TestRedisCronManager(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, unpauseItem.Expression, retrievedItem.Expression)
 			assert.Equal(t, 3, retrievedItem.FunctionVersion)
+
+			// Archive the function
+			archiveItem := createCronItem(enums.CronOpArchive)
+			archiveItem.FunctionID = functionID
+
+			err = cm.UpdateSchedule(ctx, archiveItem)
+			require.NoError(t, err)
+
+			// Verify schedule is removed after archive
+			archivedItem, err := cm.NextScheduledItemForFunction(ctx, functionID)
+			assert.ErrorIs(t, err, errNextScheduleNotFound)
+			assert.Nil(t, archivedItem)
 		})
 
 		t.Run("unknown operation type should return error", func(t *testing.T) {
@@ -942,6 +981,27 @@ func TestRedisCronManager(t *testing.T) {
 					assert.Equal(t, enums.CronOpProcess, retrievedItem.Op)
 				})
 			}
+
+			// Test CronOpArchive separately since it removes schedule (like CronOpPause)
+			t.Run("CronOpArchive", func(t *testing.T) {
+				// Create initial schedule first
+				cronItem := createCronItem(enums.CronOpNew)
+				err := cm.UpdateSchedule(ctx, cronItem)
+				require.NoError(t, err)
+
+				// Archive the function
+				archiveItem := createCronItem(enums.CronOpArchive)
+				archiveItem.FunctionID = cronItem.FunctionID
+
+				err = cm.UpdateSchedule(ctx, archiveItem)
+				require.NoError(t, err)
+
+				// Should not be retrievable after archiving
+				retrievedItem, err := cm.NextScheduledItemForFunction(ctx, cronItem.FunctionID)
+				assert.Error(t, err)
+				assert.Nil(t, retrievedItem)
+				assert.Contains(t, err.Error(), "next schedule not found")
+			})
 		})
 
 		t.Run("should preserve all cron item fields", func(t *testing.T) {
