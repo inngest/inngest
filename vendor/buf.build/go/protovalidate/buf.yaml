@@ -1,0 +1,17 @@
+version: v2
+modules:
+  - path: proto
+deps:
+  - buf.build/bufbuild/protovalidate:v0.14.0
+  - buf.build/bufbuild/protovalidate-testing:v0.14.0
+lint:
+  use:
+    - STANDARD
+  ignore_only:
+    PROTOVALIDATE:
+      - proto/tests/example/v1/validations.proto
+      - proto/tests/example/v1/filter.proto
+      - proto/tests/example/v1/compile.proto
+breaking:
+  use:
+    - FILE
