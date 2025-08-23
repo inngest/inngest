@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -185,6 +186,14 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) (bool, error
 		return true, nil
 	}
 
+	switch nextItem.Op {
+	case enums.CronOpProcess:
+		// no-op: proceed
+	default:
+		// wrong types, not used for processing purposes
+		return false, nil
+	}
+
 	// we need to do some checks if the cron items are different
 	//
 	// NOTE
@@ -195,17 +204,8 @@ func (c *redisCronManager) CanRun(ctx context.Context, ci CronItem) (bool, error
 	//
 	// generally speaking we shouldn't reach this section of the code, but if we do, make sure to make
 	// it known.
-	//
-	// TODO add metrics
 	l.Warn("running checks on cron item to make sure it can be ran", "next_item", nextItem)
-
-	switch nextItem.Op {
-	case enums.CronOpProcess:
-		// no-op: proceed
-	default:
-		// wrong types, not used for processing purposes
-		return false, nil
-	}
+	metrics.IncrCronProcessingDiffCheck(ctx, metrics.CounterOpt{PkgName: pkgName})
 
 	// this means the item in the mapping has an updated version of the cron, so this one should be discarded
 	if nextItem.FunctionVersion > ci.FunctionVersion {
@@ -297,6 +297,8 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 					return fmt.Errorf("error dequeueing item: %w", err)
 				}
 			}
+
+			l.Trace("deleted schedule")
 		}
 
 		return c.removeScheduleMap(ctx, ci.FunctionID)
