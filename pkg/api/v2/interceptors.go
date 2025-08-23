@@ -169,12 +169,9 @@ func getHTTPMethodForGRPCMethod(fullMethod string) string {
 
 // validateRequest validates a protobuf message using protovalidate
 func validateRequest(req proto.Message) error {
-	validator, err := protovalidate.New()
-	if err != nil {
-		return status.Error(codes.Internal, "validation configuration error")
-	}
-
-	if err := validator.Validate(req); err != nil {
+	// Use the global validator singleton to avoid creating new CEL environments
+	// on each request, which can cause conflicts with Inngest's CEL usage
+	if err := protovalidate.Validate(req); err != nil {
 		// Use the error helper to clean the validation message
 		return NewError(400, "api_error", err.Error())
 	}
