@@ -453,60 +453,67 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 
 // GetApps returns apps that have not been deleted.
 func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
-	f := func(ctx context.Context) ([]*sqlc.App, error) {
-		return w.q.GetApps(ctx)
-	}
-
-	apps, err := copyInto(ctx, f, []*cqrs.App{})
+	data, err := w.q.GetApps(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get apps: %w", err)
 	}
+	if filter == nil {
+		return SQLiteToCQRSList(data, sqliteApp), nil
+	}
 
-	filtered := make([]*cqrs.App, 0, len(apps))
-	for _, app := range apps {
-		if filter != nil && filter.Method != nil && filter.Method.String() != app.Method {
+	filtered := []*cqrs.App{}
+	for _, app := range data {
+		if filter.Method != nil && filter.Method.String() != app.Method {
 			continue
 		}
-		filtered = append(filtered, app)
+		filtered = append(filtered, SQLiteToCQRS(app, sqliteApp))
 	}
 
 	return filtered, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByChecksum(ctx, checksum)
+	app, err := w.q.GetAppByChecksum(ctx, checksum)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByID(ctx, id)
+	app, err := w.q.GetAppByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url, forceHTTPS)
 
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByURL(ctx, url)
+	app, err := w.q.GetAppByURL(ctx, url)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error) {
-	f := func(ctx context.Context) (*sqlc.App, error) {
-		return w.q.GetAppByName(ctx, name)
+	app, err := w.q.GetAppByName(ctx, name)
+	if err != nil {
+		return nil, err
 	}
-	return copyInto(ctx, f, &cqrs.App{})
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 // GetAllApps returns all apps.
 func (w wrapper) GetAllApps(ctx context.Context, envID uuid.UUID) ([]*cqrs.App, error) {
-	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})
+	apps, err := w.q.GetAllApps(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return SQLiteToCQRSList(apps, sqliteApp), nil
 }
 
 // InsertApp creates a new app.
@@ -1080,9 +1087,11 @@ func (w wrapper) GetFunctionRunFinishesByRunIDs(
 	workspaceID uuid.UUID,
 	runIDs []ulid.ULID,
 ) ([]*cqrs.FunctionRunFinish, error) {
-	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionFinish, error) {
-		return w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
-	}, []*cqrs.FunctionRunFinish{})
+	finish, err := w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+	return SQLiteToCQRSList(finish, sqliteFunctionFinish), nil
 }
 
 //
