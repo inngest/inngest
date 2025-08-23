@@ -7,6 +7,7 @@ type CronOp int
 const (
 	CronOpNew CronOp = iota
 	CronOpUpdate
+	CronOpArchive
 	CronOpPause
 	CronOpUnpause
 	CronOpProcess
