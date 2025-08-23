@@ -11,6 +11,10 @@ import (
 	cron "github.com/robfig/cron/v3"
 )
 
+const (
+	pkgName = "cron.execution.inngest"
+)
+
 var (
 	// parser is a global cron expression parser that supports minute-level precision
 	// and includes descriptive names (e.g., @hourly, @daily)
