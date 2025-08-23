@@ -550,9 +550,6 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 	if err != nil {
 		return nil, err
 	}
-	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
-		return nil, err
-	}
 
 	app.Error = arg.Error
 	params := sqlc.UpsertAppParams{

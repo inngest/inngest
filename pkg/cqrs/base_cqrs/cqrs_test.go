@@ -15,6 +15,108 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//
+// App
+//
+
+// func TestSQLiteCQRSGetApps(t *testing.T) {}
+// func TestSQLiteCQRSGetAppByChecksum(t *testing.T) {}
+// func TestSQLiteCQRSGetAppByID(t *testing.T) {}
+// func TestSQLiteCQRSGetAppByURL(t *testing.T) {}
+// func TestSQLiteCQRSGetAppByName(t *testing.T) {}
+// func TestSQLiteCQRSGetAllApps(t *testing.T) {}
+// func TestSQLiteCQRSUpsertApp(t *testing.T) {}
+
+func TestSQLiteCQRSUpdateAppError(t *testing.T) {
+	ctx := context.Background()
+
+	// Generate test IDs
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	t.Run("set app error", func(t *testing.T) {
+		// Get the original app
+		originalApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		require.NotNil(t, originalApp)
+
+		// Verify initially no error
+		assert.False(t, originalApp.Error.Valid)
+		assert.Empty(t, originalApp.Error.String)
+
+		// Update app with an error
+		errorMessage := "Test error message"
+		updatedApp, err := cm.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+			ID:    appID,
+			Error: sql.NullString{Valid: true, String: errorMessage},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedApp)
+
+		// Verify error was set
+		assert.True(t, updatedApp.Error.Valid)
+		assert.Equal(t, errorMessage, updatedApp.Error.String)
+		assert.Equal(t, appID, updatedApp.ID)
+
+		// Verify other fields remain unchanged
+		assert.Equal(t, originalApp.ID, updatedApp.ID)
+		assert.Equal(t, originalApp.Name, updatedApp.Name)
+		assert.Equal(t, originalApp.Checksum, updatedApp.Checksum)
+
+		// Verify the change persisted by getting the app again
+		retrievedApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		assert.True(t, retrievedApp.Error.Valid)
+		assert.Equal(t, errorMessage, retrievedApp.Error.String)
+	})
+
+	t.Run("clear app error", func(t *testing.T) {
+		// First set an error
+		errorMessage := "Initial error"
+		_, err := cm.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+			ID:    appID,
+			Error: sql.NullString{Valid: true, String: errorMessage},
+		})
+		require.NoError(t, err)
+
+		// Now clear the error
+		updatedApp, err := cm.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+			ID:    appID,
+			Error: sql.NullString{Valid: false, String: ""},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedApp)
+
+		// Verify error was cleared
+		assert.False(t, updatedApp.Error.Valid)
+		assert.Empty(t, updatedApp.Error.String)
+
+		// Verify the change persisted
+		retrievedApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		assert.False(t, retrievedApp.Error.Valid)
+		assert.Empty(t, retrievedApp.Error.String)
+	})
+
+	t.Run("update non-existent app", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		_, err := cm.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+			ID:    nonExistentID,
+			Error: sql.NullString{Valid: true, String: "error"},
+		})
+		assert.Error(t, err)
+	})
+}
+
+// func TestSQLiteCQRSUpdateAppURL(t *testing.T) {}
+// func TestSQLiteCQRSDeleteApp(t *testing.T) {}
+
+//
+// Function
+//
+
 func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	ctx := context.Background()
 
