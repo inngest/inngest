@@ -443,7 +443,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				WorkspaceID: consts.DevServerEnvID,
 				AppID:       appID,
 				FunctionID:  fn.ID,
-				Op:          enums.CronOpNew,
+				Op:          enums.CronOpArchive,
 			})
 		}
 	}
