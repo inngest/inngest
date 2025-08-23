@@ -243,7 +243,7 @@ func (l *baseList) Equal(other ref.Val) ref.Val {
 func (l *baseList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, "%v", err)
+		return ValOrErr(index, err.Error())
 	}
 	if ind < 0 || ind >= l.size {
 		return NewErr("index '%d' out of range in list size '%d'", ind, l.Size())
@@ -254,15 +254,6 @@ func (l *baseList) Get(index ref.Val) ref.Val {
 // IsZeroValue returns true if the list is empty.
 func (l *baseList) IsZeroValue() bool {
 	return l.size == 0
-}
-
-// Fold calls the FoldEntry method for each (index, value) pair in the list.
-func (l *baseList) Fold(f traits.Folder) {
-	for i := 0; i < l.size; i++ {
-		if !f.FoldEntry(i, l.get(i)) {
-			break
-		}
-	}
 }
 
 // Iterator implements the traits.Iterable interface method.
@@ -297,22 +288,6 @@ func (l *baseList) String() string {
 	}
 	sb.WriteString("]")
 	return sb.String()
-}
-
-func formatList(l traits.Lister, sb *strings.Builder) {
-	sb.WriteString("[")
-	n, _ := l.Size().(Int)
-	for i := 0; i < int(n); i++ {
-		formatTo(sb, l.Get(Int(i)))
-		if i != int(n)-1 {
-			sb.WriteString(", ")
-		}
-	}
-	sb.WriteString("]")
-}
-
-func (l *baseList) format(sb *strings.Builder) {
-	formatList(l, sb)
 }
 
 // mutableList aggregates values into its internal storage. For use with internal CEL variables only.
@@ -443,7 +418,7 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 func (l *concatList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, "%v", err)
+		return ValOrErr(index, err.Error())
 	}
 	i := Int(ind)
 	if i < l.prevList.Size().(Int) {
@@ -456,15 +431,6 @@ func (l *concatList) Get(index ref.Val) ref.Val {
 // IsZeroValue returns true if the list is empty.
 func (l *concatList) IsZeroValue() bool {
 	return l.Size().(Int) == 0
-}
-
-// Fold calls the FoldEntry method for each (index, value) pair in the list.
-func (l *concatList) Fold(f traits.Folder) {
-	for i := Int(0); i < l.Size().(Int); i++ {
-		if !f.FoldEntry(i, l.Get(i)) {
-			break
-		}
-	}
 }
 
 // Iterator implements the traits.Iterable interface method.
@@ -559,32 +525,5 @@ func IndexOrError(index ref.Val) (int, error) {
 		return -1, fmt.Errorf("unsupported index value %v in list", index)
 	default:
 		return -1, fmt.Errorf("unsupported index type '%s' in list", index.Type())
-	}
-}
-
-// ToFoldableList will create a Foldable version of a list suitable for key-value pair iteration.
-//
-// For values which are already Foldable, this call is a no-op. For all other values, the fold is
-// driven via the Size() and Get() calls which means that the folding will function, but take a
-// performance hit.
-func ToFoldableList(l traits.Lister) traits.Foldable {
-	if f, ok := l.(traits.Foldable); ok {
-		return f
-	}
-	return interopFoldableList{Lister: l}
-}
-
-type interopFoldableList struct {
-	traits.Lister
-}
-
-// Fold implements the traits.Foldable interface method and performs an iteration over the
-// range of elements of the list.
-func (l interopFoldableList) Fold(f traits.Folder) {
-	sz := l.Size().(Int)
-	for i := Int(0); i < sz; i++ {
-		if !f.FoldEntry(i, l.Get(i)) {
-			break
-		}
 	}
 }

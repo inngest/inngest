@@ -27,5 +27,3 @@ __debug_bin*
 # Generated OpenAPI documentation
 docs/openapi/v2/
 docs/openapi/v3/
-
-/bin/

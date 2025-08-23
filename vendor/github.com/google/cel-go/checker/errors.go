@@ -45,10 +45,6 @@ func (e *typeErrors) notAComprehensionRange(id int64, l common.Location, t *type
 		FormatCELType(t))
 }
 
-func (e *typeErrors) notAnOptionalFieldSelectionCall(id int64, l common.Location, err string) {
-	e.errs.ReportErrorAtID(id, l, "unsupported optional field selection: %s", err)
-}
-
 func (e *typeErrors) notAnOptionalFieldSelection(id int64, l common.Location, field ast.Expr) {
 	e.errs.ReportErrorAtID(id, l, "unsupported optional field selection: %v", field)
 }

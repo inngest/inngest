@@ -19,13 +19,10 @@ import (
 	"reflect"
 	"strings"
 
-	"google.golang.org/protobuf/proto"
-
 	chkdecls "github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
-	celpb "cel.dev/expr"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -164,9 +161,9 @@ var (
 			traits.SubtractorType,
 	}
 	// ListType represents the runtime list type.
-	ListType = NewListType(DynType)
+	ListType = NewListType(nil)
 	// MapType represents the runtime map type.
-	MapType = NewMapType(DynType, DynType)
+	MapType = NewMapType(nil, nil)
 	// NullType represents the type of a null value.
 	NullType = &Type{
 		kind:            NullTypeKind,
@@ -376,10 +373,6 @@ func (t *Type) TypeName() string {
 	return t.runtimeTypeName
 }
 
-func (t *Type) format(sb *strings.Builder) {
-	sb.WriteString(t.TypeName())
-}
-
 // WithTraits creates a copy of the current Type and sets the trait mask to the traits parameter.
 //
 // This method should be used with Opaque types where the type acts like a container, e.g. vector.
@@ -399,9 +392,6 @@ func (t *Type) WithTraits(traits int) *Type {
 
 // String returns a human-readable definition of the type name.
 func (t *Type) String() string {
-	if t.Kind() == TypeParamKind {
-		return fmt.Sprintf("<%s>", t.DeclaredTypeName())
-	}
 	if len(t.Parameters()) == 0 {
 		return t.DeclaredTypeName()
 	}
@@ -676,116 +666,89 @@ func TypeToExprType(t *Type) (*exprpb.Type, error) {
 
 // ExprTypeToType converts a protobuf CEL type representation to a CEL-native type representation.
 func ExprTypeToType(t *exprpb.Type) (*Type, error) {
-	return AlphaProtoAsType(t)
-}
-
-// AlphaProtoAsType converts a CEL v1alpha1.Type protobuf type to a CEL-native type representation.
-func AlphaProtoAsType(t *exprpb.Type) (*Type, error) {
-	canonical := &celpb.Type{}
-	if err := convertProto(t, canonical); err != nil {
-		return nil, err
-	}
-	return ProtoAsType(canonical)
-}
-
-// ProtoAsType converts a canonical CEL celpb.Type protobuf type to a CEL-native type representation.
-func ProtoAsType(t *celpb.Type) (*Type, error) {
 	switch t.GetTypeKind().(type) {
-	case *celpb.Type_Dyn:
+	case *exprpb.Type_Dyn:
 		return DynType, nil
-	case *celpb.Type_AbstractType_:
+	case *exprpb.Type_AbstractType_:
 		paramTypes := make([]*Type, len(t.GetAbstractType().GetParameterTypes()))
 		for i, p := range t.GetAbstractType().GetParameterTypes() {
-			pt, err := ProtoAsType(p)
+			pt, err := ExprTypeToType(p)
 			if err != nil {
 				return nil, err
 			}
 			paramTypes[i] = pt
 		}
 		return NewOpaqueType(t.GetAbstractType().GetName(), paramTypes...), nil
-	case *celpb.Type_ListType_:
-		et, err := ProtoAsType(t.GetListType().GetElemType())
+	case *exprpb.Type_ListType_:
+		et, err := ExprTypeToType(t.GetListType().GetElemType())
 		if err != nil {
 			return nil, err
 		}
 		return NewListType(et), nil
-	case *celpb.Type_MapType_:
-		kt, err := ProtoAsType(t.GetMapType().GetKeyType())
+	case *exprpb.Type_MapType_:
+		kt, err := ExprTypeToType(t.GetMapType().GetKeyType())
 		if err != nil {
 			return nil, err
 		}
-		vt, err := ProtoAsType(t.GetMapType().GetValueType())
+		vt, err := ExprTypeToType(t.GetMapType().GetValueType())
 		if err != nil {
 			return nil, err
 		}
 		return NewMapType(kt, vt), nil
-	case *celpb.Type_MessageType:
+	case *exprpb.Type_MessageType:
 		return NewObjectType(t.GetMessageType()), nil
-	case *celpb.Type_Null:
+	case *exprpb.Type_Null:
 		return NullType, nil
-	case *celpb.Type_Primitive:
+	case *exprpb.Type_Primitive:
 		switch t.GetPrimitive() {
-		case celpb.Type_BOOL:
+		case exprpb.Type_BOOL:
 			return BoolType, nil
-		case celpb.Type_BYTES:
+		case exprpb.Type_BYTES:
 			return BytesType, nil
-		case celpb.Type_DOUBLE:
+		case exprpb.Type_DOUBLE:
 			return DoubleType, nil
-		case celpb.Type_INT64:
+		case exprpb.Type_INT64:
 			return IntType, nil
-		case celpb.Type_STRING:
+		case exprpb.Type_STRING:
 			return StringType, nil
-		case celpb.Type_UINT64:
+		case exprpb.Type_UINT64:
 			return UintType, nil
 		default:
 			return nil, fmt.Errorf("unsupported primitive type: %v", t)
 		}
-	case *celpb.Type_TypeParam:
+	case *exprpb.Type_TypeParam:
 		return NewTypeParamType(t.GetTypeParam()), nil
-	case *celpb.Type_Type:
+	case *exprpb.Type_Type:
 		if t.GetType().GetTypeKind() != nil {
-			p, err := ProtoAsType(t.GetType())
+			p, err := ExprTypeToType(t.GetType())
 			if err != nil {
 				return nil, err
 			}
 			return NewTypeTypeWithParam(p), nil
 		}
 		return TypeType, nil
-	case *celpb.Type_WellKnown:
+	case *exprpb.Type_WellKnown:
 		switch t.GetWellKnown() {
-		case celpb.Type_ANY:
+		case exprpb.Type_ANY:
 			return AnyType, nil
-		case celpb.Type_DURATION:
+		case exprpb.Type_DURATION:
 			return DurationType, nil
-		case celpb.Type_TIMESTAMP:
+		case exprpb.Type_TIMESTAMP:
 			return TimestampType, nil
 		default:
 			return nil, fmt.Errorf("unsupported well-known type: %v", t)
 		}
-	case *celpb.Type_Wrapper:
-		t, err := ProtoAsType(&celpb.Type{TypeKind: &celpb.Type_Primitive{Primitive: t.GetWrapper()}})
+	case *exprpb.Type_Wrapper:
+		t, err := ExprTypeToType(&exprpb.Type{TypeKind: &exprpb.Type_Primitive{Primitive: t.GetWrapper()}})
 		if err != nil {
 			return nil, err
 		}
 		return NewNullableType(t), nil
-	case *celpb.Type_Error:
+	case *exprpb.Type_Error:
 		return ErrorType, nil
 	default:
 		return nil, fmt.Errorf("unsupported type: %v", t)
 	}
-}
-
-// TypeToProto converts from a CEL-native type representation to canonical CEL celpb.Type protobuf type.
-func TypeToProto(t *Type) (*celpb.Type, error) {
-	exprType, err := TypeToExprType(t)
-	if err != nil {
-		return nil, err
-	}
-	var pbtype celpb.Type
-	if err = convertProto(exprType, &pbtype); err != nil {
-		return nil, err
-	}
-	return &pbtype, nil
 }
 
 func maybeWrapper(t *Type, pbType *exprpb.Type) *exprpb.Type {
@@ -811,23 +774,6 @@ func maybeForeignType(t ref.Type) *Type {
 	// Treat the value like a struct. If it has no fields, this is harmless to denote the type
 	// as such since it basically becomes an opaque type by convention.
 	return NewObjectType(t.TypeName(), traitMask)
-}
-
-func convertProto(src, dst proto.Message) error {
-	pb, err := proto.Marshal(src)
-	if err != nil {
-		return err
-	}
-	err = proto.Unmarshal(pb, dst)
-	return err
-}
-
-func primitiveType(primitive celpb.Type_PrimitiveType) *celpb.Type {
-	return &celpb.Type{
-		TypeKind: &celpb.Type_Primitive{
-			Primitive: primitive,
-		},
-	}
 }
 
 var (
@@ -874,11 +820,4 @@ var (
 	}
 
 	structTypeTraitMask = traits.FieldTesterType | traits.IndexerType
-
-	boolType   = primitiveType(celpb.Type_BOOL)
-	bytesType  = primitiveType(celpb.Type_BYTES)
-	doubleType = primitiveType(celpb.Type_DOUBLE)
-	intType    = primitiveType(celpb.Type_INT64)
-	stringType = primitiveType(celpb.Type_STRING)
-	uintType   = primitiveType(celpb.Type_UINT64)
 )

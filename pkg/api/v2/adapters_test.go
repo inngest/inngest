@@ -115,11 +115,8 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount) - should be blocked by authorization
-		// Use valid request to pass validation but fail authorization
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{
-			Email: "test@example.com",
-		})
+		// Test protected method (CreateAccount) - should be blocked
+		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		
 		st, ok := status.FromError(err)

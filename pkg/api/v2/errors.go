@@ -3,7 +3,6 @@ package apiv2
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,21 +43,6 @@ type ErrorResponse struct {
 	Errors []ErrorItem `json:"errors"`
 }
 
-// cleanMessage removes line breaks and extra whitespace from error messages
-func cleanMessage(message string) string {
-	// Replace all line breaks with spaces
-	cleaned := strings.ReplaceAll(message, "\n", " ")
-	cleaned = strings.ReplaceAll(cleaned, "\r", " ")
-	
-	// Replace multiple consecutive spaces with single space
-	for strings.Contains(cleaned, "  ") {
-		cleaned = strings.ReplaceAll(cleaned, "  ", " ")
-	}
-	
-	// Trim leading and trailing whitespace
-	return strings.TrimSpace(cleaned)
-}
-
 // NewErrors creates a gRPC error that will be properly formatted by grpc-gateway
 // Takes one or more ErrorItem and returns a gRPC error
 func NewErrors(httpCode int, errors ...ErrorItem) error {
@@ -66,17 +50,8 @@ func NewErrors(httpCode int, errors ...ErrorItem) error {
 		errors = []ErrorItem{{Code: ErrorInvalidRequest, Message: "No error details provided"}}
 	}
 
-	// Clean messages in all error items
-	cleanedErrors := make([]ErrorItem, len(errors))
-	for i, err := range errors {
-		cleanedErrors[i] = ErrorItem{
-			Code:    err.Code,
-			Message: cleanMessage(err.Message),
-		}
-	}
-
 	response := ErrorResponse{
-		Errors: cleanedErrors,
+		Errors: errors,
 	}
 
 	jsonData, err := json.Marshal(response)
@@ -92,9 +67,9 @@ func NewErrors(httpCode int, errors ...ErrorItem) error {
 	return status.Error(grpcCode, string(jsonData))
 }
 
-// NewError creates a gRPC error for a single error condition
+// NewSingleError creates a gRPC error for a single error condition
 func NewError(httpCode int, errorCode, message string) error {
-	return NewErrors(httpCode, ErrorItem{Code: errorCode, Message: cleanMessage(message)})
+	return NewErrors(httpCode, ErrorItem{Code: errorCode, Message: message})
 }
 
 // httpToGRPCStatus maps HTTP status codes to gRPC status codes
