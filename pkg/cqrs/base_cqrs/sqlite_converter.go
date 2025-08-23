@@ -17,6 +17,7 @@ func SQLiteToCQRS[T, R any](input *T, converter func(*T) *R) *R {
 	return converter(input)
 }
 
+// SQLiteToCQRSList converts a slice of inputs using the provided converter function
 func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
 	if len(inputs) == 0 {
 		return []*R{}
@@ -33,8 +34,8 @@ func SQLiteToCQRSList[T, R any](inputs []*T, converter func(*T) *R) []*R {
 // Converters
 //
 
-// convertSQLiteFunctionToCQRS converts sqlc function to cqrs function
-func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
+// sqliteFunction converts sqlc function to cqrs function
+func sqliteFunction(fn *sqlc.Function) *cqrs.Function {
 	if fn == nil {
 		return nil
 	}
@@ -55,7 +56,8 @@ func convertSQLiteFunctionToCQRS(fn *sqlc.Function) *cqrs.Function {
 	}
 }
 
-func convertSQLiteEventToCQRS(obj *sqlc.Event) *cqrs.Event {
+// sqliteEvent converts sqlc event to cqrs event
+func sqliteEvent(obj *sqlc.Event) *cqrs.Event {
 	if obj == nil {
 		return nil
 	}
@@ -75,7 +77,8 @@ func convertSQLiteEventToCQRS(obj *sqlc.Event) *cqrs.Event {
 	return evt
 }
 
-func convertSQLiteEventBatchToCQRS(obj *sqlc.EventBatch) *cqrs.EventBatch {
+// sqliteEventBatch converts sqlc event batch to cqrs event batch
+func sqliteEventBatch(obj *sqlc.EventBatch) *cqrs.EventBatch {
 	if obj == nil {
 		return nil
 	}

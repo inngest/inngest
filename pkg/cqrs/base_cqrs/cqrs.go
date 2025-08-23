@@ -599,7 +599,7 @@ func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID, fnSlug string) (*cqrs.Function, error) {
@@ -608,7 +608,7 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
@@ -617,7 +617,7 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 		return nil, err
 	}
 
-	return SQLiteToCQRS(fn, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -626,7 +626,7 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
@@ -635,7 +635,7 @@ func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUI
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
@@ -645,7 +645,7 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(fns, convertSQLiteFunctionToCQRS), nil
+	return SQLiteToCQRSList(fns, sqliteFunction), nil
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
@@ -732,7 +732,7 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 		return nil, err
 	}
 
-	return SQLiteToCQRS(obj, convertSQLiteEventToCQRS), nil
+	return SQLiteToCQRS(obj, sqliteEvent), nil
 }
 
 func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID) ([]*cqrs.EventBatch, error) {
@@ -741,7 +741,7 @@ func (w wrapper) GetEventBatchesByEventID(ctx context.Context, eventID ulid.ULID
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(batches, convertSQLiteEventBatchToCQRS), nil
+	return SQLiteToCQRSList(batches, sqliteEventBatch), nil
 }
 
 func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.EventBatch, error) {
@@ -750,7 +750,7 @@ func (w wrapper) GetEventBatchByRunID(ctx context.Context, runID ulid.ULID) (*cq
 		return nil, err
 	}
 
-	return SQLiteToCQRS(obj, convertSQLiteEventBatchToCQRS), nil
+	return SQLiteToCQRS(obj, sqliteEventBatch), nil
 }
 
 func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*cqrs.Event, error) {
@@ -759,7 +759,7 @@ func (w wrapper) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([
 		return nil, err
 	}
 
-	return SQLiteToCQRSList(objs, convertSQLiteEventToCQRS), nil
+	return SQLiteToCQRSList(objs, sqliteEvent), nil
 }
 
 func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
@@ -905,7 +905,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		); err != nil {
 			return nil, err
 		}
-		out = append(out, SQLiteToCQRS(&data, convertSQLiteEventToCQRS))
+		out = append(out, SQLiteToCQRS(&data, sqliteEvent))
 	}
 
 	return out, nil
@@ -995,7 +995,7 @@ func (w wrapper) GetEventsIDbound(
 		return []*cqrs.Event{}, err
 	}
 
-	return SQLiteToCQRSList(evts, convertSQLiteEventToCQRS), nil
+	return SQLiteToCQRSList(evts, sqliteEvent), nil
 }
 
 //
