@@ -1,3 +1,9 @@
+# buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.3-20241127180247-a33202765966.1
+## explicit; go 1.21
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate
+# cel.dev/expr v0.23.0
+## explicit; go 1.22.0
+cel.dev/expr
 # cloud.google.com/go/auth v0.8.1
 ## explicit; go 1.20
 cloud.google.com/go/auth
@@ -324,6 +330,16 @@ github.com/aws/smithy-go/transport/http/internal/io
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/bufbuild/protovalidate-go v0.8.0
+## explicit; go 1.21.1
+github.com/bufbuild/protovalidate-go
+github.com/bufbuild/protovalidate-go/celext
+github.com/bufbuild/protovalidate-go/internal/constraints
+github.com/bufbuild/protovalidate-go/internal/errors
+github.com/bufbuild/protovalidate-go/internal/evaluator
+github.com/bufbuild/protovalidate-go/internal/expression
+github.com/bufbuild/protovalidate-go/internal/extensions
+github.com/bufbuild/protovalidate-go/resolver
 # github.com/cenkalti/backoff/v5 v5.0.2
 ## explicit; go 1.23
 github.com/cenkalti/backoff/v5
@@ -551,8 +567,8 @@ github.com/golang/mock/gomock
 # github.com/golang/snappy v0.0.4
 ## explicit
 github.com/golang/snappy
-# github.com/google/cel-go v0.21.0
-## explicit; go 1.18
+# github.com/google/cel-go v0.22.1
+## explicit; go 1.21.1
 github.com/google/cel-go/cel
 github.com/google/cel-go/checker
 github.com/google/cel-go/checker/decls
@@ -570,6 +586,7 @@ github.com/google/cel-go/common/types
 github.com/google/cel-go/common/types/pb
 github.com/google/cel-go/common/types/ref
 github.com/google/cel-go/common/types/traits
+github.com/google/cel-go/ext
 github.com/google/cel-go/interpreter
 github.com/google/cel-go/parser
 github.com/google/cel-go/parser/gen
@@ -1296,12 +1313,19 @@ golang.org/x/text/encoding
 golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/unicode
+golang.org/x/text/feature/plural
 golang.org/x/text/internal
+golang.org/x/text/internal/catmsg
+golang.org/x/text/internal/format
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/number
+golang.org/x/text/internal/stringset
 golang.org/x/text/internal/tag
 golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
+golang.org/x/text/message
+golang.org/x/text/message/catalog
 golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/secure/precis

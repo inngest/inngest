@@ -34,14 +34,25 @@ type GRPCServerOptions struct {
 
 // NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
 func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
-	var serverOpts []grpc.ServerOption
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+
+	// Add validation interceptor first (runs last due to stack order)
+	unaryInterceptors = append(unaryInterceptors, NewValidationUnaryInterceptor())
 
 	// Add authentication and authorization interceptors if any middleware is provided
 	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
-		serverOpts = append(serverOpts,
-			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
-			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
-		)
+		unaryInterceptors = append(unaryInterceptors, NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware))
+	}
+
+	var serverOpts []grpc.ServerOption
+	if len(unaryInterceptors) > 0 {
+		// Chain interceptors - validation runs first, then auth
+		serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
+	}
+
+	// Add stream interceptor for auth if needed
+	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
+		serverOpts = append(serverOpts, grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)))
 	}
 
 	server := grpc.NewServer(serverOpts...)

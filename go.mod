@@ -7,6 +7,7 @@ toolchain go1.24.1
 replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
 
 require (
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.3-20241127180247-a33202765966.1
 	connectrpc.com/connect v1.16.1
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.27
@@ -15,6 +16,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.34.0
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/smithy-go v1.20.3
+	github.com/bufbuild/protovalidate-go v0.8.0
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/coder/websocket v1.8.12
@@ -34,7 +36,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/google/cel-go v0.21.0
+	github.com/google/cel-go v0.22.1
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.12.0
 	github.com/gowebpki/jcs v1.0.0
@@ -110,6 +112,7 @@ require (
 )
 
 require (
+	cel.dev/expr v0.23.0 // indirect
 	cloud.google.com/go/auth v0.8.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect

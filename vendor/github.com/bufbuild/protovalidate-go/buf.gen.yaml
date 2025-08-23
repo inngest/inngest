@@ -1,0 +1,15 @@
+version: v2
+managed:
+  enabled: true
+  disable:
+    - file_option: go_package
+      module: buf.build/envoyproxy/protoc-gen-validate
+    - file_option: go_package
+      module: buf.build/bufbuild/protovalidate
+  override:
+    - file_option: go_package_prefix
+      value: github.com/bufbuild/protovalidate-go/internal/gen
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.35.2
+    out: internal/gen
+    opt: paths=source_relative

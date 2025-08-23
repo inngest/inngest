@@ -1,6 +1,7 @@
 syntax = "proto3";
 package api.v2;
 
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
@@ -255,8 +256,8 @@ message ResponseMetadata {
 }
 
 message CreateAccountRequest {
-  string email = 1;
-  optional string name = 2;
+  string email = 1 [(buf.validate.field).string.email = true];
+  optional string name = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 message CreateAccountResponse {
@@ -280,6 +281,7 @@ message FetchAccountsRequest {
     }
   ];
   optional int32 limit = 2 [
+    (buf.validate.field).int32 = {gte: 1, lte: 1000},
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Number of accounts to return per page (min: 1, max: 1000)"
       default: "20"

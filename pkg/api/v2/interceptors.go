@@ -2,14 +2,18 @@ package apiv2
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
+	"github.com/bufbuild/protovalidate-go"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // applyAuth applies authentication and authorization middleware to a gRPC method
@@ -163,4 +167,52 @@ func getHTTPMethodForGRPCMethod(fullMethod string) string {
 	}
 
 	return http.MethodPost // Default fallback
+}
+
+// v2Validator is a singleton instance of protovalidate validator scoped to v2 API
+// This uses an isolated CEL environment to avoid conflicts with Inngest's CEL evaluation
+var (
+	v2Validator     *protovalidate.Validator
+	v2ValidatorOnce sync.Once
+)
+
+// GetV2Validator returns a singleton protovalidate validator instance with isolated CEL environment
+func GetV2Validator() (*protovalidate.Validator, error) {
+	var err error
+	v2ValidatorOnce.Do(func() {
+		// Use strict mode to ensure validation failures return errors
+		v2Validator, err = protovalidate.New(
+			protovalidate.WithFailFast(false), // Get all validation errors
+			protovalidate.WithDisableLazy(true), // Disable lazy evaluation for consistency
+		)
+	})
+	return v2Validator, err
+}
+
+// NewValidationUnaryInterceptor creates a unary gRPC interceptor that validates protobuf messages
+// using an isolated protovalidate instance that won't interfere with Inngest's CEL evaluation
+func NewValidationUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Only validate requests for methods that require validation
+		if protoReq, ok := req.(proto.Message); ok {
+			if err := validateRequest(protoReq); err != nil {
+				return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("validation failed: %v", err))
+			}
+		}
+		return handler(ctx, req)
+	}
+}
+
+// validateRequest validates a protobuf message using isolated protovalidate
+func validateRequest(req proto.Message) error {
+	validator, err := GetV2Validator()
+	if err != nil {
+		return fmt.Errorf("failed to create validator: %w", err)
+	}
+
+	if err := validator.Validate(req); err != nil {
+		return fmt.Errorf("message validation failed: %w", err)
+	}
+
+	return nil
 }

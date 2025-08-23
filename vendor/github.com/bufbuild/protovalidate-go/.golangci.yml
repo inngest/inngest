@@ -1,0 +1,85 @@
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  forbidigo:
+    forbid:
+      - '^fmt\.Print'
+      - '^log\.'
+      - '^print$'
+      - '^println$'
+      - '^panic$'
+  godox:
+    # TODO, OPT, etc. comments are fine to commit. Use FIXME comments for
+    # temporary hacks, and use godox to prevent committing them.
+    keywords: [FIXME]
+  varnamelen:
+    ignore-decls:
+      - T any
+      - i int
+      - wg sync.WaitGroup
+      - ok bool
+      - w io.Writer
+linters:
+  enable-all: true
+  disable:
+    - copyloopvar       # enable once go 1.22 is baseline
+    - cyclop            # covered by gocyclo
+    - depguard          # we can manage dependencies strictly if the need arises in the future
+    - err113            # internal error causes may be dynamic
+    - execinquery       # deprecated by author
+    - exhaustruct       # don't _always_ need to exhaustively create struct
+    - funlen            # rely on code review to limit function length
+    - gocognit          # dubious "cognitive overhead" quantification
+    - gofumpt           # prefer standard gofmt
+    - goimports         # rely on gci instead
+    - gomnd             # some unnamed constants are okay
+    - gomoddirectives   # we use go modules replacements intentionally
+    - gomodguard        # not compatible with go workspaces
+    - intrange          # enable once go 1.22 is baseline
+    - ireturn           # "accept interfaces, return structs" isn't ironclad
+    - lll               # don't want hard limits for line length
+    - maintidx          # covered by gocyclo
+    - mnd               # some unnamed constants are okay
+    - nlreturn          # generous whitespace violates house style
+    - nonamedreturns    # usage of named returns should be selective
+    - testpackage       # internal tests are fine
+    - wrapcheck         # don't _always_ need to wrap errors
+    - wsl               # over-generous whitespace violates house style
+issues:
+  exclude-use-default: true
+  exclude:
+    # we will continue to support the deprecated field until it's removed
+    - "IgnoreEmpty is deprecated"
+    - "Skipped is deprecated"
+  exclude-rules:
+    # Loosen requirements on conformance executor
+    - path: internal/cmd/
+      linters:
+        - forbidigo
+        - errorlint
+    # Loosen requirements on tests
+    - path: _test.go
+      linters:
+        - funlen
+        - varnamelen
+        - unparam
+        - gosec
+    - path: celext/lib.go
+      linters:
+        # setting up custom functions/overloads appears duplicative (false positive)
+        - dupl
+        # Types are checked internally within CEL. There are bigger issues if its
+        # type analysis is wrong
+        - forcetypeassert
+    # static unexported lookup tables
+    - path: internal/constraints/lookups.go
+      linters:
+        - gochecknoglobals
+    - path: resolver/resolver.go
+      linters:
+        # uses deprecated fields on protoimpl.ExtensionInfo but its the only way
+        - staticcheck
+    # We allow a global validator.
+    - path: validator.go
+      linters:
+        - gochecknoglobals
