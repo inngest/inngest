@@ -437,12 +437,19 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	for _, fn := range existing {
 		if _, ok := seen[fn.ID]; !ok {
 			deletes = append(deletes, fn.ID)
+			crons = append(crons, cron.CronItem{
+				ID:          ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:   consts.DevServerAccountID,
+				WorkspaceID: consts.DevServerEnvID,
+				AppID:       appID,
+				FunctionID:  fn.ID,
+				Op:          enums.CronOpNew,
+			})
 		}
 	}
 	if len(deletes) == 0 {
 		return reply, nil
 	}
-
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
