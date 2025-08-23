@@ -525,13 +525,25 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 		arg.Method = enums.AppMethodServe.String()
 	}
 
-	return copyWriter(
-		ctx,
-		w.q.UpsertApp,
-		arg,
-		sqlc.UpsertAppParams{},
-		&cqrs.App{},
-	)
+	app, err := w.q.UpsertApp(ctx, sqlc.UpsertAppParams{
+		ID:          arg.ID,
+		Name:        arg.Name,
+		SdkLanguage: arg.SdkLanguage,
+		SdkVersion:  arg.SdkVersion,
+		Framework:   arg.Framework,
+		Metadata:    arg.Metadata,
+		Status:      arg.Status,
+		Error:       arg.Error,
+		Checksum:    arg.Checksum,
+		Url:         arg.Url,
+		Method:      arg.Method,
+		AppVersion:  sql.NullString{String: arg.AppVersion, Valid: arg.AppVersion != ""},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(app, sqliteApp), nil
 }
 
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
@@ -656,13 +668,19 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 }
 
 func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionParams) (*cqrs.Function, error) {
-	return copyWriter(
-		ctx,
-		w.q.InsertFunction,
-		params,
-		sqlc.InsertFunctionParams{},
-		&cqrs.Function{},
-	)
+	fn, err := w.q.InsertFunction(ctx, sqlc.InsertFunctionParams{
+		ID:        params.ID,
+		AppID:     params.AppID,
+		Name:      params.Name,
+		Slug:      params.Slug,
+		Config:    params.Config,
+		CreatedAt: params.CreatedAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
@@ -674,13 +692,15 @@ func (w wrapper) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) erro
 }
 
 func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFunctionConfigParams) (*cqrs.Function, error) {
-	return copyWriter(
-		ctx,
-		w.q.UpdateFunctionConfig,
-		arg,
-		sqlc.UpdateFunctionConfigParams{},
-		&cqrs.Function{},
-	)
+	fn, err := w.q.UpdateFunctionConfig(ctx, sqlc.UpdateFunctionConfigParams{
+		ID:     arg.ID,
+		Config: arg.Config,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return SQLiteToCQRS(fn, sqliteFunction), nil
 }
 
 //
@@ -2383,32 +2403,4 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	}
 
 	return res, nil
-}
-
-// copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
-// automatically.
-func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
-](
-	ctx context.Context,
-	f func(context.Context, INTERNAL_PARAMS) (IN, error),
-	pin PARAMS_IN,
-	pout INTERNAL_PARAMS,
-	out OUT,
-) (OUT, error) {
-	err := copier.Copy(&pout, &pin)
-	if err != nil {
-		return out, err
-	}
-
-	in, err := f(ctx, pout)
-	if err != nil {
-		return out, err
-	}
-
-	err = copier.CopyWithOption(&out, in, copier.Option{DeepCopy: true})
-	return out, err
 }
