@@ -576,38 +576,14 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 }
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
-	// Normalize the URL before inserting into the DB.
+	// Normalize the URL before updating in the DB.
 	arg.Url = util.NormalizeAppURL(arg.Url, forceHTTPS)
 
-	// https://duckdb.org/docs/sql/indexes.html
-	//
-	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
-	// we run a series of transactions to get, delete, then re-insert the app.  This
-	// will be fixed in a near version of DuckDB.
-	app, err := w.q.GetApp(ctx, arg.ID)
-	if err != nil {
-		return nil, err
-	}
-	if err := w.q.DeleteApp(ctx, arg.ID); err != nil {
-		return nil, err
-	}
-	app.Url = arg.Url
-	params := sqlc.UpsertAppParams{
-		ID:          app.ID,
-		Name:        app.Name,
-		SdkLanguage: app.SdkLanguage,
-		SdkVersion:  app.SdkVersion,
-		Framework:   app.Framework,
-		Metadata:    app.Metadata,
-		Status:      app.Status,
-		Error:       app.Error,
-		Checksum:    app.Checksum,
-		Url:         app.Url,
-		Method:      app.Method,
-		AppVersion:  app.AppVersion,
-	}
-	// Recreate the app.
-	app, err = w.q.UpsertApp(ctx, params)
+	// Use the direct SQL UPDATE query instead of delete-and-reinsert
+	app, err := w.q.UpdateAppURL(ctx, sqlc.UpdateAppURLParams{
+		ID:  arg.ID,
+		Url: arg.Url,
+	})
 	if err != nil {
 		return nil, err
 	}

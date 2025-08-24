@@ -469,8 +469,163 @@ func TestSQLiteCQRSUpdateAppError(t *testing.T) {
 	})
 }
 
-// func TestSQLiteCQRSUpdateAppURL(t *testing.T) {}
-// func TestSQLiteCQRSDeleteApp(t *testing.T) {}
+func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
+	ctx := context.Background()
+
+	cm, cleanup := initSQLiteCQRS(t)
+	defer cleanup()
+
+	// Create test app
+	appID := uuid.New()
+	originalURL := "http://original.example.com/webhook"
+	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:       appID,
+		Name:     "Test App for URL Update",
+		Checksum: "url-update-checksum",
+		Url:      originalURL,
+	})
+	require.NoError(t, err)
+
+	t.Run("update app URL successfully", func(t *testing.T) {
+		newURL := "http://updated.example.com/webhook"
+		updatedApp, err := cm.UpdateAppURL(ctx, cqrs.UpdateAppURLParams{
+			ID:  appID,
+			Url: newURL,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedApp)
+
+		// Verify URL was updated (URL normalization doesn't change this simple URL)
+		assert.Equal(t, appID, updatedApp.ID)
+		assert.Equal(t, newURL, updatedApp.Url)
+
+		// Verify other fields remain unchanged
+		assert.Equal(t, "Test App for URL Update", updatedApp.Name)
+		assert.Equal(t, "url-update-checksum", updatedApp.Checksum)
+
+		// Verify the change persisted
+		retrievedApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		assert.Equal(t, newURL, retrievedApp.Url)
+	})
+
+	t.Run("update app URL with empty string", func(t *testing.T) {
+		updatedApp, err := cm.UpdateAppURL(ctx, cqrs.UpdateAppURLParams{
+			ID:  appID,
+			Url: "",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedApp)
+
+		// Verify URL was set to empty string
+		assert.Equal(t, "", updatedApp.Url)
+
+		// Verify the change persisted
+		retrievedApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		assert.Equal(t, "", retrievedApp.Url)
+	})
+
+	t.Run("update non-existent app URL", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		_, err := cm.UpdateAppURL(ctx, cqrs.UpdateAppURLParams{
+			ID:  nonExistentID,
+			Url: "http://new.example.com",
+		})
+		assert.Error(t, err)
+	})
+}
+
+func TestSQLiteCQRSDeleteApp(t *testing.T) {
+	ctx := context.Background()
+
+	cm, cleanup := initSQLiteCQRS(t)
+	defer cleanup()
+
+	// Create test app
+	appID := uuid.New()
+	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:       appID,
+		Name:     "Test App for Deletion",
+		Checksum: "delete-checksum",
+		Url:      "http://delete.example.com",
+	})
+	require.NoError(t, err)
+
+	t.Run("delete existing app", func(t *testing.T) {
+		// Verify app exists before deletion
+		app, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		require.NotNil(t, app)
+		assert.True(t, app.DeletedAt.IsZero()) // Should not be deleted initially
+
+		// Delete the app
+		err = cm.DeleteApp(ctx, appID)
+		require.NoError(t, err)
+
+		// Verify app can still be retrieved (soft delete - archived_at is set)
+		deletedApp, err := cm.GetAppByID(ctx, appID)
+		require.NoError(t, err)
+		require.NotNil(t, deletedApp)
+
+		// Verify the archived_at timestamp was set (DeletedAt field maps to archived_at)
+		assert.False(t, deletedApp.DeletedAt.IsZero(), "App should have DeletedAt timestamp set after deletion")
+	})
+
+	t.Run("delete non-existent app", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		err := cm.DeleteApp(ctx, nonExistentID)
+		// DeleteApp should not return an error for non-existent IDs
+		// This behavior may vary depending on implementation
+		require.NoError(t, err)
+	})
+
+	t.Run("verify app is excluded from GetApps after deletion", func(t *testing.T) {
+		envID := uuid.New()
+
+		// Create a new app to test deletion filtering
+		testAppID := uuid.New()
+		_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:       testAppID,
+			Name:     "Test App for GetApps",
+			Checksum: "getapps-checksum",
+			Url:      "http://getapps.example.com",
+		})
+		require.NoError(t, err)
+
+		// Verify app is returned by GetApps before deletion
+		apps, err := cm.GetApps(ctx, envID, nil)
+		require.NoError(t, err)
+
+		// Find our test app in the results
+		var foundApp bool
+		for _, app := range apps {
+			if app.ID == testAppID {
+				foundApp = true
+				break
+			}
+		}
+		assert.True(t, foundApp, "App should be found before deletion")
+
+		// Delete the app
+		err = cm.DeleteApp(ctx, testAppID)
+		require.NoError(t, err)
+
+		// Verify app is no longer returned by GetApps
+		appsAfterDelete, err := cm.GetApps(ctx, envID, nil)
+		require.NoError(t, err)
+
+		// Verify our test app is not in the results
+		foundAppAfterDelete := false
+		for _, app := range appsAfterDelete {
+			if app.ID == testAppID {
+				foundAppAfterDelete = true
+				break
+			}
+		}
+		assert.False(t, foundAppAfterDelete, "App should not be found after deletion")
+	})
+}
 
 //
 // Function
