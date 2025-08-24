@@ -1376,8 +1376,6 @@ func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
 	})
 }
 
-// TODO: Add event tests - requires understanding Event struct field mapping
-
 //
 // Event Tests (TODO)
 //
