@@ -546,29 +546,11 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
-	app, err := w.q.GetApp(ctx, arg.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	app.Error = arg.Error
-	params := sqlc.UpsertAppParams{
-		ID:          app.ID,
-		Name:        app.Name,
-		SdkLanguage: app.SdkLanguage,
-		SdkVersion:  app.SdkVersion,
-		Framework:   app.Framework,
-		Metadata:    app.Metadata,
-		Status:      app.Status,
-		Error:       app.Error,
-		Checksum:    app.Checksum,
-		Url:         app.Url,
-		Method:      app.Method,
-		AppVersion:  app.AppVersion,
-	}
-
-	// Recreate the app.
-	app, err = w.q.UpsertApp(ctx, params)
+	// Use the direct SQL UPDATE query instead of load-then-upsert
+	app, err := w.q.UpdateAppError(ctx, sqlc.UpdateAppErrorParams{
+		ID:    arg.ID,
+		Error: arg.Error,
+	})
 	if err != nil {
 		return nil, err
 	}

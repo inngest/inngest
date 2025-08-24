@@ -422,7 +422,10 @@ func TestSQLiteCQRSUpdateAppError(t *testing.T) {
 		// Verify other fields remain unchanged
 		assert.Equal(t, originalApp.ID, updatedApp.ID)
 		assert.Equal(t, originalApp.Name, updatedApp.Name)
+		assert.Equal(t, originalApp.AppVersion, updatedApp.AppVersion)
 		assert.Equal(t, originalApp.Checksum, updatedApp.Checksum)
+		assert.Equal(t, originalApp.Metadata, updatedApp.Metadata)
+		assert.Equal(t, originalApp.SdkLanguage, updatedApp.SdkLanguage)
 
 		// Verify the change persisted by getting the app again
 		retrievedApp, err := cm.GetAppByID(ctx, appID)
@@ -821,8 +824,13 @@ func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()
 	if opt.appID != uuid.Nil {
 		// Upsert the app
 		_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
-			ID:   opt.appID,
-			Name: fmt.Sprintf("app:%s", opt.appID),
+			ID:          opt.appID,
+			Name:        fmt.Sprintf("app:%s", opt.appID),
+			SdkLanguage: "go",
+			SdkVersion:  "1.2.3",
+			Framework:   sql.NullString{Valid: true, String: "gin"},
+			Metadata:    `{"environment": "test", "version": "1.0"}`,
+			AppVersion:  "v2.1.0",
 		})
 		require.NoError(t, err)
 	}
