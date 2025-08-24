@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/inngest/inngest/pkg/consts"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/oklog/ulid/v2"
 	_ "modernc.org/sqlite"
 )
 
@@ -28,8 +30,16 @@ var (
 )
 
 type BaseCQRSOptions struct {
+	// InMemory indicates that the sqlite should run in memory only and not persist data to disk.
+	// This is expected to be used for the Dev server and testing.
 	InMemory bool
+	// ForTest indicates that the database handler is created for testing purposes.
+	// By default database handlers are all singletons, but when this flag is enabled, they will create temporary handlers.
+	//
+	// Only supports with in-memory with sqlite for the moment.
+	ForTest bool
 
+	// PostgresURI declares the postgres connection to connect to a postgres database
 	PostgresURI string
 
 	// The path at which the SQLite database should be stored.
@@ -51,9 +61,16 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 			db, err = sql.Open("pgx", opts.PostgresURI)
 		})
 	} else if opts.InMemory {
-		o.Do(func() {
-			db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
-		})
+		if opts.ForTest {
+			// initializes a temporary database every time for test purposes
+			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
+		} else {
+			// initialize the db once
+			o.Do(func() {
+				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+			})
+		}
 	} else {
 		o.Do(func() {
 			// make the dir if it doesn't exist
