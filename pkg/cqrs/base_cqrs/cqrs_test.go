@@ -788,6 +788,600 @@ func TestSQLiteCQRSGetFunctionByInternalUUID(t *testing.T) {
 	})
 }
 
+func TestSQLiteCQRSGetFunctionsByAppInternalID(t *testing.T) {
+	ctx := context.Background()
+
+	// Create two different apps
+	targetAppID := uuid.New()
+	otherAppID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	defer cleanup()
+
+	// Create the other app manually
+	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          otherAppID,
+		Name:        fmt.Sprintf("other-app:%s", otherAppID),
+		SdkLanguage: "go",
+		SdkVersion:  "1.2.3",
+	})
+	require.NoError(t, err)
+
+	// Create test functions for the TARGET app
+	targetFn1ID := uuid.New()
+	targetFn2ID := uuid.New()
+
+	targetFunctions := []cqrs.InsertFunctionParams{
+		{
+			ID:        targetFn1ID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     targetAppID,
+			Name:      "Target App Function 1",
+			Slug:      "target-app-function-1",
+			Config:    `{"triggers": [{"event": "target.event1"}]}`,
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:        targetFn2ID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     targetAppID,
+			Name:      "Target App Function 2",
+			Slug:      "target-app-function-2",
+			Config:    `{"triggers": [{"event": "target.event2"}]}`,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	// Create functions for the OTHER app (should NOT be returned)
+	otherFn1ID := uuid.New()
+	otherFn2ID := uuid.New()
+
+	otherFunctions := []cqrs.InsertFunctionParams{
+		{
+			ID:        otherFn1ID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     otherAppID,
+			Name:      "Other App Function 1",
+			Slug:      "other-app-function-1",
+			Config:    `{"triggers": [{"event": "other.event1"}]}`,
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:        otherFn2ID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     otherAppID,
+			Name:      "Other App Function 2",
+			Slug:      "other-app-function-2",
+			Config:    `{"triggers": [{"event": "other.event2"}]}`,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	// Insert ALL functions (target + other)
+	allFunctions := append(targetFunctions, otherFunctions...)
+	for _, fn := range allFunctions {
+		_, err := cm.InsertFunction(ctx, fn)
+		require.NoError(t, err)
+	}
+
+	t.Run("get functions for target app only", func(t *testing.T) {
+		result, err := cm.GetFunctionsByAppInternalID(ctx, targetAppID)
+		require.NoError(t, err)
+
+		// Should return exactly 2 functions (only target app functions)
+		assert.Len(t, result, 2, "Should return exactly 2 functions for target app")
+
+		// Verify ONLY target app functions are returned
+		returnedFnIDs := make([]uuid.UUID, len(result))
+		for i, fn := range result {
+			returnedFnIDs[i] = fn.ID
+			// Verify all returned functions belong to target app
+			assert.Equal(t, targetAppID, fn.AppID, "Function %s should belong to target app", fn.ID)
+		}
+
+		// Verify target app functions are included
+		assert.Contains(t, returnedFnIDs, targetFn1ID)
+		assert.Contains(t, returnedFnIDs, targetFn2ID)
+
+		// Verify other app functions are NOT included
+		assert.NotContains(t, returnedFnIDs, otherFn1ID, "Other app function should not be returned")
+		assert.NotContains(t, returnedFnIDs, otherFn2ID, "Other app function should not be returned")
+	})
+
+	t.Run("get functions for other app only", func(t *testing.T) {
+		result, err := cm.GetFunctionsByAppInternalID(ctx, otherAppID)
+		require.NoError(t, err)
+
+		// Should return exactly 2 functions (only other app functions)
+		assert.Len(t, result, 2, "Should return exactly 2 functions for other app")
+
+		// Verify ONLY other app functions are returned
+		returnedFnIDs := make([]uuid.UUID, len(result))
+		for i, fn := range result {
+			returnedFnIDs[i] = fn.ID
+			// Verify all returned functions belong to other app
+			assert.Equal(t, otherAppID, fn.AppID, "Function %s should belong to other app", fn.ID)
+		}
+
+		// Verify other app functions are included
+		assert.Contains(t, returnedFnIDs, otherFn1ID)
+		assert.Contains(t, returnedFnIDs, otherFn2ID)
+
+		// Verify target app functions are NOT included
+		assert.NotContains(t, returnedFnIDs, targetFn1ID, "Target app function should not be returned")
+		assert.NotContains(t, returnedFnIDs, targetFn2ID, "Target app function should not be returned")
+	})
+
+	t.Run("get functions for non-existent app", func(t *testing.T) {
+		nonExistentAppID := uuid.New()
+		result, err := cm.GetFunctionsByAppInternalID(ctx, nonExistentAppID)
+		require.NoError(t, err)
+		assert.Len(t, result, 0)
+	})
+}
+
+func TestSQLiteCQRSInsertFunction(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	t.Run("insert new function", func(t *testing.T) {
+		fnID := uuid.New()
+		accountID := uuid.New()
+		envID := uuid.New()
+
+		params := cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: accountID,
+			EnvID:     envID,
+			AppID:     appID,
+			Name:      "New Test Function",
+			Slug:      "new-test-function",
+			Config:    `{"triggers": [{"event": "new.test.event"}]}`,
+			CreatedAt: time.Now(),
+		}
+
+		fn, err := cm.InsertFunction(ctx, params)
+		require.NoError(t, err)
+		require.NotNil(t, fn)
+
+		// Verify function properties
+		assert.Equal(t, fnID, fn.ID)
+		assert.Equal(t, appID, fn.AppID)
+		assert.Equal(t, "New Test Function", fn.Name)
+		assert.Equal(t, "new-test-function", fn.Slug)
+		assert.NotEmpty(t, fn.Config)
+		assert.False(t, fn.CreatedAt.IsZero())
+		assert.False(t, fn.IsArchived())
+
+		// Verify function can be retrieved
+		retrievedFn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+		require.NoError(t, err)
+		assert.Equal(t, fn.ID, retrievedFn.ID)
+		assert.Equal(t, fn.Name, retrievedFn.Name)
+		assert.Equal(t, fn.Slug, retrievedFn.Slug)
+	})
+
+	t.Run("insert function with minimal fields", func(t *testing.T) {
+		fnID := uuid.New()
+		accountID := uuid.New()
+		envID := uuid.New()
+
+		params := cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: accountID,
+			EnvID:     envID,
+			AppID:     appID,
+			Name:      "Minimal Function",
+			Slug:      "minimal-function",
+			Config:    `{}`,
+			CreatedAt: time.Now(),
+		}
+
+		fn, err := cm.InsertFunction(ctx, params)
+		require.NoError(t, err)
+		require.NotNil(t, fn)
+
+		assert.Equal(t, fnID, fn.ID)
+		assert.Equal(t, "Minimal Function", fn.Name)
+		assert.Equal(t, "minimal-function", fn.Slug)
+	})
+}
+
+func TestSQLiteCQRSGetFunctions(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	// Create test functions
+	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+
+	for i, fnID := range fnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     appID,
+			Name:      fmt.Sprintf("Test Function %d", i+1),
+			Slug:      fmt.Sprintf("test-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "test.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("get all functions", func(t *testing.T) {
+		functions, err := cm.GetFunctions(ctx)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(functions), 3)
+
+		// Verify our test functions are included
+		foundFnIDs := make(map[uuid.UUID]bool)
+		for _, fn := range functions {
+			foundFnIDs[fn.ID] = true
+		}
+
+		for _, expectedID := range fnIDs {
+			assert.True(t, foundFnIDs[expectedID], "Expected function ID %s to be found", expectedID)
+		}
+	})
+}
+
+func TestSQLiteCQRSGetFunctionsByAppExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	// Create two different apps with external IDs
+	targetAppID := uuid.New()
+	otherAppID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t)
+	defer cleanup()
+
+	workspaceID := uuid.New()
+	accountID := uuid.New()
+	targetAppExternalID := "target-app-external"
+	otherAppExternalID := "other-app-external"
+
+	// Create target app with external ID
+	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          targetAppID,
+		Name:        targetAppExternalID,
+		SdkLanguage: "go",
+		SdkVersion:  "1.2.3",
+		Checksum:    "target-checksum",
+	})
+	require.NoError(t, err)
+
+	// Create other app with different external ID
+	_, err = cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          otherAppID,
+		Name:        otherAppExternalID,
+		SdkLanguage: "go",
+		SdkVersion:  "1.2.3",
+		Checksum:    "other-checksum",
+	})
+	require.NoError(t, err)
+
+	// Create functions for TARGET app
+	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	for i, fnID := range targetFnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: accountID,
+			EnvID:     workspaceID,
+			AppID:     targetAppID,
+			Name:      fmt.Sprintf("Target External Function %d", i+1),
+			Slug:      fmt.Sprintf("target-external-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "target.external.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	// Create functions for OTHER app (should NOT be returned)
+	otherFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	for i, fnID := range otherFnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: accountID,
+			EnvID:     workspaceID,
+			AppID:     otherAppID,
+			Name:      fmt.Sprintf("Other External Function %d", i+1),
+			Slug:      fmt.Sprintf("other-external-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "other.external.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("get functions for target app only", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByAppExternalID(ctx, workspaceID, targetAppExternalID)
+		require.NoError(t, err)
+
+		// Should return exactly the target app functions
+		assert.Len(t, functions, 2, "Should return exactly 2 functions for target app")
+
+		// Verify all returned functions belong to target app
+		returnedFnIDs := make(map[uuid.UUID]bool)
+		for _, fn := range functions {
+			assert.Equal(t, targetAppID, fn.AppID, "Function %s should belong to target app", fn.ID)
+			returnedFnIDs[fn.ID] = true
+		}
+
+		// Verify target app functions are included
+		for _, expectedID := range targetFnIDs {
+			assert.True(t, returnedFnIDs[expectedID], "Target function %s should be returned", expectedID)
+		}
+
+		// Verify other app functions are NOT included
+		for _, otherFnID := range otherFnIDs {
+			assert.False(t, returnedFnIDs[otherFnID], "Other app function %s should not be returned", otherFnID)
+		}
+	})
+
+	t.Run("get functions for other app only", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByAppExternalID(ctx, workspaceID, otherAppExternalID)
+		require.NoError(t, err)
+
+		// Should return exactly the other app functions
+		assert.Len(t, functions, 2, "Should return exactly 2 functions for other app")
+
+		// Verify all returned functions belong to other app
+		for _, fn := range functions {
+			assert.Equal(t, otherAppID, fn.AppID, "Function %s should belong to other app", fn.ID)
+		}
+	})
+
+	t.Run("get functions for non-existent app", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByAppExternalID(ctx, workspaceID, "non-existent-app")
+		require.NoError(t, err)
+		assert.Empty(t, functions, "Should return empty result for non-existent app")
+	})
+}
+
+func TestSQLiteCQRSDeleteFunctionsByAppID(t *testing.T) {
+	ctx := context.Background()
+
+	// Create two different apps
+	targetAppID := uuid.New()
+	preserveAppID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(targetAppID))
+	defer cleanup()
+
+	// Create the preserve app manually
+	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          preserveAppID,
+		Name:        fmt.Sprintf("preserve-app:%s", preserveAppID),
+		SdkLanguage: "go",
+		SdkVersion:  "1.2.3",
+	})
+	require.NoError(t, err)
+
+	// Create functions for the TARGET app (to be deleted)
+	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	for i, fnID := range targetFnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     targetAppID,
+			Name:      fmt.Sprintf("Target Delete Function %d", i+1),
+			Slug:      fmt.Sprintf("target-delete-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "target.delete.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	// Create functions for the PRESERVE app (should NOT be deleted)
+	preserveFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	for i, fnID := range preserveFnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     preserveAppID,
+			Name:      fmt.Sprintf("Preserve Function %d", i+1),
+			Slug:      fmt.Sprintf("preserve-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "preserve.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("delete functions by app ID only affects target app", func(t *testing.T) {
+		// Verify both apps have functions before deletion
+		targetFunctions, err := cm.GetFunctionsByAppInternalID(ctx, targetAppID)
+		require.NoError(t, err)
+		assert.Len(t, targetFunctions, 2, "Target app should have 2 functions before deletion")
+
+		preserveFunctions, err := cm.GetFunctionsByAppInternalID(ctx, preserveAppID)
+		require.NoError(t, err)
+		assert.Len(t, preserveFunctions, 2, "Preserve app should have 2 functions before deletion")
+
+		// Delete functions by target app ID only
+		err = cm.DeleteFunctionsByAppID(ctx, targetAppID)
+		require.NoError(t, err)
+
+		// Verify target app functions are marked as archived
+		for _, fnID := range targetFnIDs {
+			fn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+			require.NoError(t, err)
+			assert.True(t, fn.IsArchived(), "Target app function %s should be archived", fnID)
+		}
+
+		// Verify preserve app functions are still active
+		for _, fnID := range preserveFnIDs {
+			fn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+			require.NoError(t, err)
+			assert.False(t, fn.IsArchived(), "Preserve app function %s should still be active", fnID)
+		}
+
+		// Verify GetFunctionsByAppInternalID reflects the deletion properly
+		targetFunctionsAfter, err := cm.GetFunctionsByAppInternalID(ctx, targetAppID)
+		require.NoError(t, err)
+		// Should return empty or only non-archived functions (depends on implementation)
+		for _, fn := range targetFunctionsAfter {
+			assert.False(t, fn.IsArchived(), "GetFunctionsByAppInternalID should not return archived functions")
+		}
+
+		preserveFunctionsAfter, err := cm.GetFunctionsByAppInternalID(ctx, preserveAppID)
+		require.NoError(t, err)
+		assert.Len(t, preserveFunctionsAfter, 2, "Preserve app should still have 2 active functions")
+	})
+
+	t.Run("delete functions for non-existent app", func(t *testing.T) {
+		nonExistentAppID := uuid.New()
+		err := cm.DeleteFunctionsByAppID(ctx, nonExistentAppID)
+		// Should not error for non-existent app
+		require.NoError(t, err)
+	})
+}
+
+func TestSQLiteCQRSDeleteFunctionsByIDs(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	// Create test functions
+	fnIDs := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+
+	for i, fnID := range fnIDs {
+		_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fnID,
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     appID,
+			Name:      fmt.Sprintf("Delete by ID Function %d", i+1),
+			Slug:      fmt.Sprintf("delete-by-id-function-%d", i+1),
+			Config:    fmt.Sprintf(`{"triggers": [{"event": "delete.id.event%d"}]}`, i+1),
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("delete specific functions by IDs", func(t *testing.T) {
+		// Delete first two functions
+		deleteIDs := fnIDs[:2]
+		err := cm.DeleteFunctionsByIDs(ctx, deleteIDs)
+		require.NoError(t, err)
+
+		// Verify deleted functions are archived
+		for _, fnID := range deleteIDs {
+			fn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+			require.NoError(t, err)
+			assert.True(t, fn.IsArchived())
+		}
+
+		// Verify third function is still active
+		fn3, err := cm.GetFunctionByInternalUUID(ctx, fnIDs[2])
+		require.NoError(t, err)
+		assert.False(t, fn3.IsArchived())
+	})
+
+	t.Run("delete non-existent function IDs", func(t *testing.T) {
+		nonExistentIDs := []uuid.UUID{uuid.New(), uuid.New()}
+		err := cm.DeleteFunctionsByIDs(ctx, nonExistentIDs)
+		// Should not error for non-existent IDs
+		require.NoError(t, err)
+	})
+
+	t.Run("delete empty ID list", func(t *testing.T) {
+		err := cm.DeleteFunctionsByIDs(ctx, []uuid.UUID{})
+		require.NoError(t, err)
+	})
+}
+
+func TestSQLiteCQRSUpdateFunctionConfig(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initSQLiteCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	// Create test function
+	fnID := uuid.New()
+	originalConfig := `{"triggers": [{"event": "original.event"}], "concurrency": 1}`
+	_, err := cm.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:        fnID,
+		AccountID: uuid.New(),
+		EnvID:     uuid.New(),
+		AppID:     appID,
+		Name:      "Config Update Function",
+		Slug:      "config-update-function",
+		Config:    originalConfig,
+		CreatedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	t.Run("update function config", func(t *testing.T) {
+		newConfig := `{"triggers": [{"event": "updated.event"}], "concurrency": 5, "timeout": "30s"}`
+		updatedFn, err := cm.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+			ID:     fnID,
+			Config: newConfig,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedFn)
+
+		// Verify config was updated
+		assert.Equal(t, fnID, updatedFn.ID)
+		assert.JSONEq(t, newConfig, string(updatedFn.Config))
+
+		// Verify other fields remain unchanged
+		assert.Equal(t, "Config Update Function", updatedFn.Name)
+		assert.Equal(t, "config-update-function", updatedFn.Slug)
+		assert.Equal(t, appID, updatedFn.AppID)
+
+		// Verify change persisted
+		retrievedFn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+		require.NoError(t, err)
+		assert.JSONEq(t, newConfig, string(retrievedFn.Config))
+	})
+
+	t.Run("update config with empty JSON", func(t *testing.T) {
+		emptyConfig := `{}`
+		updatedFn, err := cm.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+			ID:     fnID,
+			Config: emptyConfig,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updatedFn)
+
+		assert.JSONEq(t, emptyConfig, string(updatedFn.Config))
+
+		// Verify change persisted
+		retrievedFn, err := cm.GetFunctionByInternalUUID(ctx, fnID)
+		require.NoError(t, err)
+		assert.JSONEq(t, emptyConfig, string(retrievedFn.Config))
+	})
+
+	t.Run("update non-existent function", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		_, err := cm.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+			ID:     nonExistentID,
+			Config: `{"test": true}`,
+		})
+		assert.Error(t, err)
+	})
+}
+
+// TODO: Add event tests - requires understanding Event struct field mapping
+
+//
+// Event Tests (TODO)
+//
+
 //
 // Helpers
 //
