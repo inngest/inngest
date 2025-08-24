@@ -475,14 +475,21 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 	cm, cleanup := initSQLiteCQRS(t)
 	defer cleanup()
 
-	// Create test app
+	// Create test app with comprehensive field data
 	appID := uuid.New()
 	originalURL := "http://original.example.com/webhook"
-	_, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
-		ID:       appID,
-		Name:     "Test App for URL Update",
-		Checksum: "url-update-checksum",
-		Url:      originalURL,
+	originalApp, err := cm.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          appID,
+		Name:        "Test App for URL Update",
+		SdkLanguage: "go",
+		SdkVersion:  "1.2.3",
+		Framework:   sql.NullString{Valid: true, String: "gin"},
+		Metadata:    `{"environment": "test", "version": "1.0"}`,
+		Status:      "active",
+		Checksum:    "url-update-checksum",
+		Url:         originalURL,
+		Method:      "POST",
+		AppVersion:  "v2.1.0",
 	})
 	require.NoError(t, err)
 
@@ -499,14 +506,32 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 		assert.Equal(t, appID, updatedApp.ID)
 		assert.Equal(t, newURL, updatedApp.Url)
 
-		// Verify other fields remain unchanged
-		assert.Equal(t, "Test App for URL Update", updatedApp.Name)
-		assert.Equal(t, "url-update-checksum", updatedApp.Checksum)
+		// Verify ALL other fields remain unchanged after URL update
+		assert.Equal(t, originalApp.Name, updatedApp.Name)
+		assert.Equal(t, originalApp.SdkLanguage, updatedApp.SdkLanguage)
+		assert.Equal(t, originalApp.SdkVersion, updatedApp.SdkVersion)
+		assert.Equal(t, originalApp.Framework, updatedApp.Framework)
+		assert.Equal(t, originalApp.Metadata, updatedApp.Metadata)
+		assert.Equal(t, originalApp.Status, updatedApp.Status)
+		assert.Equal(t, originalApp.Error, updatedApp.Error)
+		assert.Equal(t, originalApp.Checksum, updatedApp.Checksum)
+		assert.Equal(t, originalApp.Method, updatedApp.Method)
+		assert.Equal(t, originalApp.AppVersion, updatedApp.AppVersion)
+		assert.Equal(t, originalApp.CreatedAt, updatedApp.CreatedAt)
+		assert.Equal(t, originalApp.DeletedAt, updatedApp.DeletedAt)
 
-		// Verify the change persisted
+		// Verify the change persisted in the database
 		retrievedApp, err := cm.GetAppByID(ctx, appID)
 		require.NoError(t, err)
 		assert.Equal(t, newURL, retrievedApp.Url)
+
+		// Verify other fields also persisted correctly
+		assert.Equal(t, originalApp.Name, retrievedApp.Name)
+		assert.Equal(t, originalApp.SdkLanguage, retrievedApp.SdkLanguage)
+		assert.Equal(t, originalApp.SdkVersion, retrievedApp.SdkVersion)
+		assert.Equal(t, originalApp.Checksum, retrievedApp.Checksum)
+		assert.Equal(t, originalApp.Method, retrievedApp.Method)
+		assert.Equal(t, originalApp.AppVersion, retrievedApp.AppVersion)
 	})
 
 	t.Run("update app URL with empty string", func(t *testing.T) {
@@ -520,10 +545,20 @@ func TestSQLiteCQRSUpdateAppURL(t *testing.T) {
 		// Verify URL was set to empty string
 		assert.Equal(t, "", updatedApp.Url)
 
+		// Verify other fields still remain unchanged
+		assert.Equal(t, originalApp.Name, updatedApp.Name)
+		assert.Equal(t, originalApp.SdkLanguage, updatedApp.SdkLanguage)
+		assert.Equal(t, originalApp.SdkVersion, updatedApp.SdkVersion)
+		assert.Equal(t, originalApp.Checksum, updatedApp.Checksum)
+		assert.Equal(t, originalApp.Method, updatedApp.Method)
+		assert.Equal(t, originalApp.AppVersion, updatedApp.AppVersion)
+
 		// Verify the change persisted
 		retrievedApp, err := cm.GetAppByID(ctx, appID)
 		require.NoError(t, err)
 		assert.Equal(t, "", retrievedApp.Url)
+		assert.Equal(t, originalApp.Name, retrievedApp.Name)
+		assert.Equal(t, originalApp.Checksum, retrievedApp.Checksum)
 	})
 
 	t.Run("update non-existent app URL", func(t *testing.T) {
