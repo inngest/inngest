@@ -1,0 +1,5 @@
+.*
+!.gitignore
+!.github
+!.tagpr
+dist
