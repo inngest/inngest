@@ -225,10 +225,83 @@ service V2 {
       }
     };
   }
+
+  rpc FetchAccount(FetchAccountRequest) returns (FetchAccountResponse) {
+    option (google.api.http) = {
+      get: "/accounts/{accountId}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Account"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
   // Empty request message for health check
+}
+
+message FetchAccountRequest {
+  string accountId = 1;
 }
 
 message HealthResponse {
@@ -291,6 +364,11 @@ message FetchAccountsResponse {
   repeated Account data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message FetchAccountResponse {
+  Account data = 1;
+  ResponseMetadata metadata = 2;
 }
 
 message Account {
