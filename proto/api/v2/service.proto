@@ -375,6 +375,86 @@ service V2 {
       }
     };
   }
+
+  rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
+    option (google.api.http) = {
+      get: "/accounts/{accountId}/envs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of account environments"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountEnvsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - account not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -483,4 +563,25 @@ message Page {
   optional string cursor = 1;
   bool hasMore = 2;
   int32 limit = 3;
+}
+
+message FetchAccountEnvsRequest {
+  string accountId = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of environments to return per page (min: 1, max: 250)"
+      default: "50"
+    }
+  ];
+}
+
+message FetchAccountEnvsResponse {
+  repeated Env data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
 }

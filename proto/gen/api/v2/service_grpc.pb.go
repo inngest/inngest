@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	V2_Health_FullMethodName        = "/api.v2.V2/Health"
-	V2_XSchemaOnly_FullMethodName   = "/api.v2.V2/_SchemaOnly"
-	V2_CreateAccount_FullMethodName = "/api.v2.V2/CreateAccount"
-	V2_CreateEnv_FullMethodName     = "/api.v2.V2/CreateEnv"
-	V2_FetchAccounts_FullMethodName = "/api.v2.V2/FetchAccounts"
-	V2_FetchAccount_FullMethodName  = "/api.v2.V2/FetchAccount"
+	V2_Health_FullMethodName           = "/api.v2.V2/Health"
+	V2_XSchemaOnly_FullMethodName      = "/api.v2.V2/_SchemaOnly"
+	V2_CreateAccount_FullMethodName    = "/api.v2.V2/CreateAccount"
+	V2_CreateEnv_FullMethodName        = "/api.v2.V2/CreateEnv"
+	V2_FetchAccounts_FullMethodName    = "/api.v2.V2/FetchAccounts"
+	V2_FetchAccount_FullMethodName     = "/api.v2.V2/FetchAccount"
+	V2_FetchAccountEnvs_FullMethodName = "/api.v2.V2/FetchAccountEnvs"
 )
 
 // V2Client is the client API for V2 service.
@@ -38,6 +39,7 @@ type V2Client interface {
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
 	FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
+	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
 }
 
 type v2Client struct {
@@ -108,6 +110,16 @@ func (c *v2Client) FetchAccount(ctx context.Context, in *FetchAccountRequest, op
 	return out, nil
 }
 
+func (c *v2Client) FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchAccountEnvsResponse)
+	err := c.cc.Invoke(ctx, V2_FetchAccountEnvs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -119,6 +131,7 @@ type V2Server interface {
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
 	FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
+	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -146,6 +159,9 @@ func (UnimplementedV2Server) FetchAccounts(context.Context, *FetchAccountsReques
 }
 func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccount not implemented")
+}
+func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEnvs not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -276,6 +292,24 @@ func _V2_FetchAccount_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_FetchAccountEnvs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchAccountEnvsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).FetchAccountEnvs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_FetchAccountEnvs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).FetchAccountEnvs(ctx, req.(*FetchAccountEnvsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -306,6 +340,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchAccount",
 			Handler:    _V2_FetchAccount_Handler,
+		},
+		{
+			MethodName: "FetchAccountEnvs",
+			Handler:    _V2_FetchAccountEnvs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
