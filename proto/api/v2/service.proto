@@ -156,7 +156,7 @@ service V2 {
 
   rpc CreateEnv(CreateEnvRequest) returns (CreateEnvResponse) {
     option (google.api.http) = {
-      post: "/accounts/{accountId}/env",
+      post: "/accounts/{accountId}/envs",
       body : "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
