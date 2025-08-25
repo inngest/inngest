@@ -8,4 +8,9 @@ export type Replay = {
   endedAt?: Date;
   duration?: number;
   runsCount: number;
+  runsSkippedCount?: number;
 };
+
+export function isReplayStatus(s: string): s is ReplayStatus {
+  return replayStatuses.includes(s as ReplayStatus);
+}
