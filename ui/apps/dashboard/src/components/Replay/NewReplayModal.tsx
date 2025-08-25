@@ -169,7 +169,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       success: () => {
         onClose();
         router.push(
-          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replay`
+          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replays`
         );
         return 'Replay created!';
       },
