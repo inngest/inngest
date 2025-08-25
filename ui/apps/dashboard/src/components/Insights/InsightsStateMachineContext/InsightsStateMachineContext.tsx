@@ -29,6 +29,7 @@ type InsightsStateMachineContextProviderProps = {
   query: string;
   queryName: string;
   renderChildren: boolean;
+  tabId: string;
 };
 
 export function InsightsStateMachineContextProvider({
@@ -38,13 +39,14 @@ export function InsightsStateMachineContextProvider({
   query,
   queryName,
   renderChildren,
+  tabId,
 }: InsightsStateMachineContextProviderProps) {
   const { fetchInsights } = useFetchInsights();
   const { saveQuerySnapshot } = useStoredQueries();
 
   const { data, error, isError, isFetching, refetch } = useQuery({
     enabled: false,
-    queryKey: ['insights', query],
+    queryKey: ['insights', tabId, query],
     queryFn: () => {
       return fetchInsights({ query, queryName }, (query, queryName) => {
         saveQuerySnapshot(makeQuerySnapshot(query, queryName));
