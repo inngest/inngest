@@ -35,6 +35,7 @@ message Config {
   repeated ConcurrencyKey           concurrency_keys = 13;
   bool                              force_step_plan  = 14;
   google.protobuf.Struct            context          = 15;
+  bool                              has_ai           = 16;
 }
 
 message ConcurrencyKey {
@@ -56,8 +57,10 @@ message Tenant {
 }
 
 message CreateStateRequest {
-  Metadata       metadata = 1;
-  repeated bytes events   = 2;
+  Metadata metadata                  = 1;
+  repeated bytes events              = 2;
+  repeated bytes steps               = 3;
+  repeated bytes steps_inputs        = 4;
 }
 
 message CreateStateResponse {

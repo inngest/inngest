@@ -112,11 +112,6 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		return state.State{}, fmt.Errorf("error storing run state in redis when marshalling batchData: %w", err)
 	}
 
-	eventsSize := 0
-	for _, evt := range s.Events {
-		eventsSize += len(evt)
-	}
-
 	metadata := s.Metadata
 	metadata.ID = state.ID{
 		// Set the returned run ID from the state manager
@@ -364,6 +359,8 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 // determine what errors are retriable
 func (v v2) retryableError(err error) bool {
 	switch {
+	case errors.Is(err, statev1.ErrIdempotentResponse):
+		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
 	}
