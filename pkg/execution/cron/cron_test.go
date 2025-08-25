@@ -144,7 +144,7 @@ func TestCronItem(t *testing.T) {
 	})
 }
 
-func TestParse(t *testing.T) {
+func TestNext(t *testing.T) {
 	tests := []struct {
 		name        string
 		cronExpr    string
@@ -232,161 +232,84 @@ func TestParse(t *testing.T) {
 		},
 	}
 
+	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			schedule, err := Parse(tt.cronExpr)
+			next, err := Next(tt.cronExpr, from)
 			if tt.expectError {
 				assert.Error(t, err)
-				assert.Nil(t, schedule)
+				assert.True(t, next.IsZero())
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, schedule)
+				assert.False(t, next.IsZero())
+				assert.True(t, next.After(from))
 			}
 		})
 	}
 }
 
-func TestValidate(t *testing.T) {
-	tests := []struct {
-		name        string
-		cronExpr    string
-		expectError bool
-	}{
-		{
-			name:        "valid expression",
-			cronExpr:    "0 0 * * *",
-			expectError: false,
-		},
-		{
-			name:        "valid descriptor",
-			cronExpr:    "@hourly",
-			expectError: false,
-		},
-		{
-			name:        "invalid expression",
-			cronExpr:    "0 0 32 * *",
-			expectError: true,
-		},
-		{
-			name:        "empty expression",
-			cronExpr:    "",
-			expectError: true,
-		},
-		{
-			name:        "invalid descriptor",
-			cronExpr:    "@invalid",
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := Validate(tt.cronExpr)
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestIsAt(t *testing.T) {
-	schedule, err := Parse("0 12 * * *")
-	assert.NoError(t, err)
-	assert.NotNil(t, schedule)
-
+func TestNextScheduleCalculation(t *testing.T) {
 	tests := []struct {
 		name     string
-		time     time.Time
-		expected bool
+		cronExpr string
+		from     time.Time
+		expected time.Time
 	}{
 		{
-			name:     "exact time match",
-			time:     time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
-			expected: true,
+			name:     "daily at noon from morning",
+			cronExpr: "0 12 * * *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "within allowed variance - 10 seconds after",
-			time:     time.Date(2023, 1, 1, 12, 0, 10, 0, time.UTC),
-			expected: true,
+			name:     "daily at noon from afternoon",
+			cronExpr: "0 12 * * *",
+			from:     time.Date(2023, 1, 1, 14, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "within allowed variance - 30 seconds after",
-			time:     time.Date(2023, 1, 1, 12, 0, 30, 0, time.UTC),
-			expected: true,
+			name:     "hourly from minute 30",
+			cronExpr: "@hourly",
+			from:     time.Date(2023, 1, 1, 10, 30, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "within allowed variance - 49 seconds after",
-			time:     time.Date(2023, 1, 1, 12, 0, 49, 0, time.UTC),
-			expected: true,
+			name:     "every 5 minutes",
+			cronExpr: "*/5 * * * *",
+			from:     time.Date(2023, 1, 1, 10, 2, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 1, 10, 5, 0, 0, time.UTC),
 		},
 		{
-			name:     "outside allowed variance - 51 seconds after",
-			time:     time.Date(2023, 1, 1, 12, 0, 51, 0, time.UTC),
-			expected: false,
-		},
-		{
-			name:     "outside allowed variance - 1 minute after",
-			time:     time.Date(2023, 1, 1, 12, 1, 0, 0, time.UTC),
-			expected: false,
-		},
-		{
-			name:     "before scheduled time",
-			time:     time.Date(2023, 1, 1, 11, 59, 59, 0, time.UTC),
-			expected: false,
-		},
-		{
-			name:     "different day, same time",
-			time:     time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
-			expected: true,
+			name:     "weekly on monday",
+			cronExpr: "0 0 * * 1",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC), // Sunday
+			expected: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC),  // Monday
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsAt(schedule, tt.time)
-			assert.Equal(t, tt.expected, result)
+			next, err := Next(tt.cronExpr, tt.from)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, next)
 		})
 	}
 }
 
-func TestIsAtWithHourlySchedule(t *testing.T) {
-	schedule, err := Parse("@hourly")
-	assert.NoError(t, err)
-	assert.NotNil(t, schedule)
+func TestNextErrorHandling(t *testing.T) {
+	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
+	
+	t.Run("invalid cron expression", func(t *testing.T) {
+		next, err := Next("invalid", from)
+		assert.Error(t, err)
+		assert.True(t, next.IsZero())
+		assert.Contains(t, err.Error(), "error parsing cron expression")
+	})
 
-	tests := []struct {
-		name     string
-		time     time.Time
-		expected bool
-	}{
-		{
-			name:     "exact hour start",
-			time:     time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
-			expected: true,
-		},
-		{
-			name:     "within variance",
-			time:     time.Date(2023, 1, 1, 12, 0, 30, 0, time.UTC),
-			expected: true,
-		},
-		{
-			name:     "outside variance",
-			time:     time.Date(2023, 1, 1, 12, 1, 0, 0, time.UTC),
-			expected: false,
-		},
-		{
-			name:     "different hour",
-			time:     time.Date(2023, 1, 1, 13, 0, 0, 0, time.UTC),
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := IsAt(schedule, tt.time)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	t.Run("empty cron expression", func(t *testing.T) {
+		next, err := Next("", from)
+		assert.Error(t, err)
+		assert.True(t, next.IsZero())
+	})
 }
+
