@@ -220,13 +220,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-initialize our cron manager.
-	// if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
-	// 	l.Warn("error initializing crons", "error", err)
-	// 	a.err(ctx, w, 400, err)
-	// 	return
-	// }
-
 	resp, err := json.Marshal(reply)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
