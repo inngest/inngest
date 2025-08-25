@@ -39,6 +39,8 @@ const (
 	V2XSchemaOnlyProcedure = "/api.v2.V2/_SchemaOnly"
 	// V2CreateAccountProcedure is the fully-qualified name of the V2's CreateAccount RPC.
 	V2CreateAccountProcedure = "/api.v2.V2/CreateAccount"
+	// V2CreateEnvProcedure is the fully-qualified name of the V2's CreateEnv RPC.
+	V2CreateEnvProcedure = "/api.v2.V2/CreateEnv"
 	// V2FetchAccountsProcedure is the fully-qualified name of the V2's FetchAccounts RPC.
 	V2FetchAccountsProcedure = "/api.v2.V2/FetchAccounts"
 	// V2FetchAccountProcedure is the fully-qualified name of the V2's FetchAccount RPC.
@@ -51,6 +53,7 @@ type V2Client interface {
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 }
@@ -84,6 +87,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("CreateAccount")),
 			connect.WithClientOptions(opts...),
 		),
+		createEnv: connect.NewClient[v2.CreateEnvRequest, v2.CreateEnvResponse](
+			httpClient,
+			baseURL+V2CreateEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateEnv")),
+			connect.WithClientOptions(opts...),
+		),
 		fetchAccounts: connect.NewClient[v2.FetchAccountsRequest, v2.FetchAccountsResponse](
 			httpClient,
 			baseURL+V2FetchAccountsProcedure,
@@ -104,6 +113,7 @@ type v2Client struct {
 	health        *connect.Client[v2.HealthRequest, v2.HealthResponse]
 	xSchemaOnly   *connect.Client[v2.HealthRequest, v2.ErrorResponse]
 	createAccount *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
+	createEnv     *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
 	fetchAccounts *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
 	fetchAccount  *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
 }
@@ -123,6 +133,11 @@ func (c *v2Client) CreateAccount(ctx context.Context, req *connect.Request[v2.Cr
 	return c.createAccount.CallUnary(ctx, req)
 }
 
+// CreateEnv calls api.v2.V2.CreateEnv.
+func (c *v2Client) CreateEnv(ctx context.Context, req *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return c.createEnv.CallUnary(ctx, req)
+}
+
 // FetchAccounts calls api.v2.V2.FetchAccounts.
 func (c *v2Client) FetchAccounts(ctx context.Context, req *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
 	return c.fetchAccounts.CallUnary(ctx, req)
@@ -139,6 +154,7 @@ type V2Handler interface {
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 }
@@ -168,6 +184,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("CreateAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateEnvHandler := connect.NewUnaryHandler(
+		V2CreateEnvProcedure,
+		svc.CreateEnv,
+		connect.WithSchema(v2Methods.ByName("CreateEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2FetchAccountsHandler := connect.NewUnaryHandler(
 		V2FetchAccountsProcedure,
 		svc.FetchAccounts,
@@ -188,6 +210,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2XSchemaOnlyHandler.ServeHTTP(w, r)
 		case V2CreateAccountProcedure:
 			v2CreateAccountHandler.ServeHTTP(w, r)
+		case V2CreateEnvProcedure:
+			v2CreateEnvHandler.ServeHTTP(w, r)
 		case V2FetchAccountsProcedure:
 			v2FetchAccountsHandler.ServeHTTP(w, r)
 		case V2FetchAccountProcedure:
@@ -211,6 +235,10 @@ func (UnimplementedV2Handler) XSchemaOnly(context.Context, *connect.Request[v2.H
 
 func (UnimplementedV2Handler) CreateAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateEnv is not implemented"))
 }
 
 func (UnimplementedV2Handler) FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {

@@ -22,6 +22,7 @@ const (
 	V2_Health_FullMethodName        = "/api.v2.V2/Health"
 	V2_XSchemaOnly_FullMethodName   = "/api.v2.V2/_SchemaOnly"
 	V2_CreateAccount_FullMethodName = "/api.v2.V2/CreateAccount"
+	V2_CreateEnv_FullMethodName     = "/api.v2.V2/CreateEnv"
 	V2_FetchAccounts_FullMethodName = "/api.v2.V2/FetchAccounts"
 	V2_FetchAccount_FullMethodName  = "/api.v2.V2/FetchAccount"
 )
@@ -34,6 +35,7 @@ type V2Client interface {
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
 	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
+	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
 	FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
 }
@@ -76,6 +78,16 @@ func (c *v2Client) CreateAccount(ctx context.Context, in *CreateAccountRequest, 
 	return out, nil
 }
 
+func (c *v2Client) CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateEnvResponse)
+	err := c.cc.Invoke(ctx, V2_CreateEnv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchAccountsResponse)
@@ -104,6 +116,7 @@ type V2Server interface {
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error)
 	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
+	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
 	FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
 	mustEmbedUnimplementedV2Server()
@@ -124,6 +137,9 @@ func (UnimplementedV2Server) XSchemaOnly(context.Context, *HealthRequest) (*Erro
 }
 func (UnimplementedV2Server) CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAccount not implemented")
+}
+func (UnimplementedV2Server) CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateEnv not implemented")
 }
 func (UnimplementedV2Server) FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccounts not implemented")
@@ -206,6 +222,24 @@ func _V2_CreateAccount_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_CreateEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateEnv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateEnv(ctx, req.(*CreateEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_FetchAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchAccountsRequest)
 	if err := dec(in); err != nil {
@@ -260,6 +294,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateAccount",
 			Handler:    _V2_CreateAccount_Handler,
+		},
+		{
+			MethodName: "CreateEnv",
+			Handler:    _V2_CreateEnv_Handler,
 		},
 		{
 			MethodName: "FetchAccounts",

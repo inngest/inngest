@@ -232,6 +232,10 @@ func (s *Service) CreateAccount(ctx context.Context, req *apiv2.CreateAccountReq
 	)
 }
 
+func (s *Service) CreateEnv(ctx context.Context, req *apiv2.CreateEnvRequest) (*apiv2.CreateEnvResponse, error) {
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Environments not implemented in OSS")
+}
+
 func (s *Service) FetchAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
 }
