@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
