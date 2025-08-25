@@ -110,9 +110,14 @@ func DriverResponseAttrs(
 		}
 	}
 
+	size := resp.OutputSize
+	if size == 0 && fnOutput != nil {
+		size = len(*fnOutput)
+	}
+
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &resp.OutputSize)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
 
 	// If we have a single op to process, also add any generator data to the
 	// span and overwrite any clashes
