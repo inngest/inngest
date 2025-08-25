@@ -47,6 +47,9 @@ const (
 	V2FetchAccountProcedure = "/api.v2.V2/FetchAccount"
 	// V2FetchAccountEnvsProcedure is the fully-qualified name of the V2's FetchAccountEnvs RPC.
 	V2FetchAccountEnvsProcedure = "/api.v2.V2/FetchAccountEnvs"
+	// V2FetchAccountEventKeysProcedure is the fully-qualified name of the V2's FetchAccountEventKeys
+	// RPC.
+	V2FetchAccountEventKeysProcedure = "/api.v2.V2/FetchAccountEventKeys"
 	// V2FetchAccountSigningKeysProcedure is the fully-qualified name of the V2's
 	// FetchAccountSigningKeys RPC.
 	V2FetchAccountSigningKeysProcedure = "/api.v2.V2/FetchAccountSigningKeys"
@@ -62,6 +65,7 @@ type V2Client interface {
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
+	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 }
 
@@ -118,6 +122,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
 			connect.WithClientOptions(opts...),
 		),
+		fetchAccountEventKeys: connect.NewClient[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse](
+			httpClient,
+			baseURL+V2FetchAccountEventKeysProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
+			connect.WithClientOptions(opts...),
+		),
 		fetchAccountSigningKeys: connect.NewClient[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse](
 			httpClient,
 			baseURL+V2FetchAccountSigningKeysProcedure,
@@ -136,6 +146,7 @@ type v2Client struct {
 	fetchAccounts           *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
 	fetchAccount            *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
 	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
+	fetchAccountEventKeys   *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
 	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
 }
 
@@ -174,6 +185,11 @@ func (c *v2Client) FetchAccountEnvs(ctx context.Context, req *connect.Request[v2
 	return c.fetchAccountEnvs.CallUnary(ctx, req)
 }
 
+// FetchAccountEventKeys calls api.v2.V2.FetchAccountEventKeys.
+func (c *v2Client) FetchAccountEventKeys(ctx context.Context, req *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error) {
+	return c.fetchAccountEventKeys.CallUnary(ctx, req)
+}
+
 // FetchAccountSigningKeys calls api.v2.V2.FetchAccountSigningKeys.
 func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, req *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
 	return c.fetchAccountSigningKeys.CallUnary(ctx, req)
@@ -189,6 +205,7 @@ type V2Handler interface {
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
+	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 }
 
@@ -241,6 +258,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2FetchAccountEventKeysHandler := connect.NewUnaryHandler(
+		V2FetchAccountEventKeysProcedure,
+		svc.FetchAccountEventKeys,
+		connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2FetchAccountSigningKeysHandler := connect.NewUnaryHandler(
 		V2FetchAccountSigningKeysProcedure,
 		svc.FetchAccountSigningKeys,
@@ -263,6 +286,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2FetchAccountHandler.ServeHTTP(w, r)
 		case V2FetchAccountEnvsProcedure:
 			v2FetchAccountEnvsHandler.ServeHTTP(w, r)
+		case V2FetchAccountEventKeysProcedure:
+			v2FetchAccountEventKeysHandler.ServeHTTP(w, r)
 		case V2FetchAccountSigningKeysProcedure:
 			v2FetchAccountSigningKeysHandler.ServeHTTP(w, r)
 		default:
@@ -300,6 +325,10 @@ func (UnimplementedV2Handler) FetchAccount(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountEnvs is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountEventKeys is not implemented"))
 }
 
 func (UnimplementedV2Handler) FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
