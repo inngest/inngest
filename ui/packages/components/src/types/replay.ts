@@ -9,3 +9,7 @@ export type Replay = {
   duration?: number;
   runsCount: number;
 };
+
+export function isReplayStatus(s: string): s is ReplayStatus {
+  return replayStatuses.includes(s as ReplayStatus);
+}

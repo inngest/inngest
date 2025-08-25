@@ -55,13 +55,18 @@ export function TimeCell({ date, format }: { date: Date | string; format?: 'rela
   );
 }
 
-export function StatusCell({ status }: React.PropsWithChildren<{ status: string }>) {
+export function StatusCell({
+  status,
+  label,
+}: React.PropsWithChildren<{ status: string; label?: string }>) {
   const colorClass = getStatusTextClass(status);
 
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
       <StatusDot status={status} />
-      <p className={cn(colorClass, 'lowercase first-letter:capitalize')}>{status}</p>
+      <p className={cn(colorClass, 'text-nowrap lowercase first-letter:capitalize')}>
+        {label || status}
+      </p>
     </div>
   );
 }

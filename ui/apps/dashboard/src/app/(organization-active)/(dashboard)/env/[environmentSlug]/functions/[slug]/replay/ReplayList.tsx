@@ -4,8 +4,14 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
-import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
-import { NumberCell, Table, TableBlankState, TextCell, TimeCell } from '@inngest/components/Table';
+import {
+  NumberCell,
+  StatusCell,
+  Table,
+  TableBlankState,
+  TextCell,
+  TimeCell,
+} from '@inngest/components/Table';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import type { Replay } from '@inngest/components/types/replay';
 import { differenceInMilliseconds, formatMilliseconds } from '@inngest/components/utils/date';
@@ -29,6 +35,8 @@ const GetReplaysDocument = graphql(`
           createdAt
           endedAt
           functionRunsScheduledCount
+          functionRunsProcessedCount
+          filters
         }
       }
     }
@@ -38,18 +46,23 @@ const GetReplaysDocument = graphql(`
 const columnHelper = createColumnHelper<Replay>();
 
 const columns = [
+  columnHelper.accessor('status', {
+    header: () => 'Status',
+    cell: (props) => {
+      const status = props.getValue();
+      return (
+        <StatusCell
+          status={status}
+          label={status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'}
+        />
+      );
+    },
+    enableSorting: false,
+  }),
   columnHelper.accessor('name', {
     header: () => <span>Replay name</span>,
     cell: (props) => {
-      const name = props.row.original.name;
-      const status = props.row.original.status;
-
-      return (
-        <div className="flex items-center gap-2">
-          <ReplayStatusIcon status={status} className="h-5 w-5" />
-          <TextCell>{name}</TextCell>
-        </div>
-      );
+      return <TextCell>{props.getValue()}</TextCell>;
     },
     enableSorting: false,
   }),
