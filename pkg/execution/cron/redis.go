@@ -96,18 +96,18 @@ type redisCronManager struct {
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "cron_item", ci)
 
-	// Parse the cron expression and get the next execution time
-	schedule, err := Parse(ci.Expression)
-	if err != nil {
-		// TODO decide on what to do with this because it likely can't be fixed on retries
-		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
-	}
 	from := ci.ID.Timestamp()
 	switch ci.Op {
 	case enums.CronOpProcess:
 		from = from.Add(c.opt.scheduleForwardDur)
 	}
-	next := schedule.Next(from)
+
+	// Parse the cron expression and get the next execution time
+	next, err := Next(ci.Expression, from)
+	if err != nil {
+		// TODO decide on what to do with this because it likely can't be fixed on retries
+		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
+	}
 
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time

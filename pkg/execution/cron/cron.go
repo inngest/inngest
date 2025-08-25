@@ -19,37 +19,19 @@ var (
 	// parser is a global cron expression parser that supports minute-level precision
 	// and includes descriptive names (e.g., @hourly, @daily)
 	parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-
-	allowedVariant = 50 * time.Second
 )
 
 var (
 	errNextScheduleNotFound = fmt.Errorf("next schedule not found")
 )
 
-// Parser returns the global cron parser instance
-// NOTE comment this out for now until its needed
-// func Parser() cron.Parser {
-// 	return parser
-// }
-
-// Parse parses a cron expression string and returns a schedule
-func Parse(str string) (cron.Schedule, error) {
-	return parser.Parse(str)
-}
-
-// IsAt checks if the given time falls within a window of when the cron schedule
-// should execute. This provides tolerance for timing variations in cron execution.
-func IsAt(cs cron.Schedule, t time.Time) bool {
-	next := cs.Next(t.Add(-50 * time.Second))
-	diff := t.Sub(next).Seconds()
-	return diff >= 0 && diff <= float64(allowedVariant)
-}
-
-// Validate checks if a cron expression string is syntactically valid
-func Validate(str string) error {
-	_, err := parser.Parse(str)
-	return err
+// Next returns the next scheduled time for the cron expression based on the time providedk
+func Next(expr string, from time.Time) (time.Time, error) {
+	schedule, err := parser.Parse(expr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("error parsing cron expression: %w", err)
+	}
+	return schedule.Next(from), nil
 }
 
 // CronManager represents the handling of cron
