@@ -94,8 +94,11 @@ jobs:
         with:
           go-version: "1.24"
       - name: Build dev server
-        run: |
-          go build -cover -o ./inngest-bin ./cmd
+        run: go build -cover -o ./inngest-bin ./cmd
+
+      - name: Install tools
+        run: go install tool
+
       - name: Run E2E tests
         run: |
           echo "Running dev server"
@@ -105,8 +108,7 @@ jobs:
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
 
-          curl -sfL https://raw.githubusercontent.com/Songmu/gotesplit/main/install.sh | sh -s
-          bin/gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} ./tests/golang -- -v -count=1
+          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} ./tests/golang -- -v -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
