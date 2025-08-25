@@ -46,7 +46,8 @@ export function InsightsStateMachineContextProvider({
 
   const { data, error, isError, isFetching, refetch } = useQuery({
     enabled: false,
-    queryKey: ['insights', tabId, query],
+    gcTime: 0,
+    queryKey: ['insights', tabId],
     queryFn: () => {
       return fetchInsights({ query, queryName }, (query, queryName) => {
         saveQuerySnapshot(makeQuerySnapshot(query, queryName));
