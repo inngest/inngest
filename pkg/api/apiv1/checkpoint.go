@@ -381,30 +381,26 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
 // work has finished, and eg. step.Defer items are not running.
 func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
-	err := a.TracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-		Metadata:   &md,
-		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
-		EndTime:    md.ID.RunID.Timestamp().Add(result.Duration),
-		Status:     enums.StepStatusCompleted, // Optionally set a status for the span
-		Attributes: meta.NewAttrSet(),
+	// The async execution flow has a single, last "execution" step:  the request which
+	// results in the function response.  Whilst this isn't technically a "step", from our
+	// point of view we have no idea whether an SDK request will result in a step or the fn
+	// completing.
+	//
+	// The sync request flow, however, always results in a single slice of opcodes and we
+	// have zero extraneous requests to finalize a function.
+	//
+	// To unify both codepaths, we actually create a new span which represents the step output.
+
+	return a.Executor.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: md,
+		RunMode:  enums.RunModeSync,
+		Response: state.DriverResponse{
+			Output:     result,
+			OutputSize: 0, // TODO
+			// TODO: Other fields...
+		},
+		Optional: execution.FinalizeOptional{},
 	})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"error finalizing sync api span",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-		)
-		return fmt.Errorf("error updating span: %w", err)
-	}
-	_, err = a.State.Delete(ctx, md.ID)
-	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"error deleting state in finalize",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-		)
-	}
-	return nil
 }
 
 // upsertSyncData adds apps and functions to the backing datastore the first time

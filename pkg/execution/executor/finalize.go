@@ -246,8 +246,5 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 }
 
 func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
-	if f.Optional.OutputSpanRef == nil {
-		return meta.NewAttrSet()
-	}
 	return tracing.DriverResponseAttrs(&f.Response, f.Optional.OutputSpanRef)
 }
