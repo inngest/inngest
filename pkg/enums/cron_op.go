@@ -11,4 +11,5 @@ const (
 	CronOpPause
 	CronOpUnpause
 	CronOpProcess
+	CronInit
 )
