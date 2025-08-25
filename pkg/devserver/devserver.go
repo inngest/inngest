@@ -495,6 +495,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRunnerQueue(rq),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
+		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
 	)
