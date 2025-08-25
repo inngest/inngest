@@ -53,16 +53,10 @@ export function InsightsStateMachineContextProvider({
     getNextPageParam,
     initialPageParam: null,
     queryKey: makeQueryKey(activeQuery.query, activeQuery.timestamp),
-    queryFn: ({ pageParam }) => {
-      return fetchInsights(
-        { after: pageParam, first: 30, query: activeQuery.query, queryName },
-        (query, queryName, after) => {
-          // Don't save the query snapshot if it's just fetching additional data.
-          if (Boolean(after)) return;
-
-          saveQuerySnapshot(makeQuerySnapshot(query, queryName));
-        }
-      );
+    queryFn: () => {
+      return fetchInsights({ query: activeQuery.query, queryName }, (query, queryName) => {
+        saveQuerySnapshot(makeQuerySnapshot(query, queryName));
+      });
     },
     refetchOnWindowFocus: false,
     select: selectInsightsData,
@@ -126,7 +120,7 @@ export function getInsightsStatus({
 }
 
 function getNextPageParam(lastPage: InsightsFetchResult) {
-  return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : null;
+  return null; // No pagination support
 }
 
 /**
@@ -152,15 +146,12 @@ function selectInsightsData(
   if (infiniteData.pages.length === 0) return undefined;
 
   const firstPage = infiniteData.pages[0];
-  const lastPage = infiniteData.pages[infiniteData.pages.length - 1];
-  if (firstPage === undefined || lastPage === undefined) {
+  if (firstPage === undefined) {
     return undefined;
   }
 
   return {
     columns: firstPage.columns,
-    entries: infiniteData.pages.flatMap((page) => page.entries),
-    pageInfo: lastPage.pageInfo,
-    totalCount: firstPage.totalCount,
+    rows: infiniteData.pages.flatMap((page) => page.rows),
   };
 }

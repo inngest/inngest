@@ -26,7 +26,7 @@ export function ResultsTable() {
       <div className="flex-1 overflow-auto" id="insights-table-container" onScroll={onScroll}>
         <Table
           columns={columns}
-          data={data.entries}
+          data={data.rows}
           isLoading={false}
           cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
         />
@@ -54,6 +54,6 @@ function withLoadingMoreRow(
 
   return {
     ...data,
-    entries: [...data.entries, loadingRow],
+    rows: [...data.rows, loadingRow],
   };
 }

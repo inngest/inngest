@@ -7,7 +7,7 @@ import { ResultsTable } from './ResultsTable';
 export function ResultsState() {
   const { data } = useInsightsStateMachineContext();
 
-  if (!data?.entries.length) return <NoResults />;
+  if (!data?.rows.length) return <NoResults />;
 
   return <ResultsTable />;
 }

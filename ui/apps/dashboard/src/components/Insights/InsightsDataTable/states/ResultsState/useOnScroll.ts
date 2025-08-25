@@ -20,12 +20,12 @@ export function useOnScroll(
     (event) => {
       handleScroll(event, {
         fetchMore,
-        hasEntries: Boolean(data?.entries.length),
-        hasNextPage: Boolean(data?.pageInfo.hasNextPage),
+        hasEntries: Boolean(data?.rows.length),
+        hasNextPage: false, // No pagination support
         status,
       });
     },
-    [fetchMore, data?.pageInfo.hasNextPage, data?.entries.length, status]
+    [fetchMore, data?.rows.length, status]
   );
 
   return { onScroll };

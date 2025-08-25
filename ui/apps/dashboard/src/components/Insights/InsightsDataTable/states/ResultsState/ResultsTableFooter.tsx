@@ -36,7 +36,7 @@ export function ResultsTableFooter() {
 
       {(status === 'success' || status === 'fetchingMore') && (
         <div className="text-muted pl-3 text-sm">
-          {`${data.totalCount} ${data.totalCount === 1 ? 'row' : 'rows'}`}
+          {`${data.rows.length} ${data.rows.length === 1 ? 'row' : 'rows'}`}
         </div>
       )}
     </div>
@@ -44,6 +44,6 @@ export function ResultsTableFooter() {
 }
 
 export function assertData(data: undefined | InsightsFetchResult): data is InsightsFetchResult {
-  if (!data?.entries.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
+  if (!data?.rows.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
   return true;
 }
