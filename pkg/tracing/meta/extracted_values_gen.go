@@ -32,6 +32,7 @@ type ExtractedValues struct {
 	DynamicStatus *enums.StepStatus
 	InternalLocation *string
 	internalError *string
+	IsFunctionOutput *bool
 	StepID *string
 	StepName *string
 	StepOp *enums.Opcode

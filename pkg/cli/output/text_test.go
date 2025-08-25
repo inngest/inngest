@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"text/tabwriter"
+	"time"
 )
 
 // testTextWriter creates a TextWriter that writes to a shared buffer
@@ -235,7 +236,7 @@ func TestTextWriter_valueToString(t *testing.T) {
 		input    any
 		expected string
 	}{
-		{nil, ""},
+		{nil, "<nil>"},
 		{"hello", "hello"},
 		{42, "42"},
 		{3.14, "3.14"},
@@ -496,9 +497,9 @@ func TestTextWriter_formatAsJSON(t *testing.T) {
 			expected: "{\n  \t  \"name\": \"test\",\n  \t  \"nested\": {\n  \t    \"count\": 42\n  \t  }\n  \t}",
 		},
 		{
-			name:   "array multi-line",
-			indent: 0,
-			input:  []string{"first", "second", "third"},
+			name:     "array multi-line",
+			indent:   0,
+			input:    []string{"first", "second", "third"},
 			expected: "[\n\t  \"first\",\n\t  \"second\",\n\t  \"third\"\n\t]",
 		},
 		{
@@ -566,6 +567,51 @@ func TestTextWriter_valueToString_WithJSONSerialization(t *testing.T) {
 				if result != test.expected {
 					t.Errorf("valueToString() = %q, expected %q", result, test.expected)
 				}
+			}
+		})
+	}
+}
+
+// TestTextWriter_valueToString_NilPointerStringer tests the new nil pointer handling for fmt.Stringer
+func TestTextWriter_valueToString_NilPointerStringer(t *testing.T) {
+	tw := &TextWriter{}
+
+	// Create a nil pointer that implements fmt.Stringer
+	var nilTime *time.Time
+	var nilError error
+
+	tests := []struct {
+		name     string
+		input    any
+		expected string
+	}{
+		{
+			name:     "nil time.Time pointer",
+			input:    nilTime,
+			expected: "<nil>",
+		},
+		{
+			name:     "nil error",
+			input:    nilError,
+			expected: "<nil>",
+		},
+		{
+			name:     "valid time.Time pointer",
+			input:    &time.Time{},
+			expected: "0001-01-01 00:00:00 +0000 UTC",
+		},
+		{
+			name:     "nil interface{}",
+			input:    (*fmt.Stringer)(nil),
+			expected: "<nil>",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := tw.valueToString(test.input)
+			if result != test.expected {
+				t.Errorf("valueToString(%T) = %q, expected %q", test.input, result, test.expected)
 			}
 		})
 	}

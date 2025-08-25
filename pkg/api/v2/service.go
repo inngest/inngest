@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -32,7 +35,7 @@ type GRPCServerOptions struct {
 // NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
 func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
 	var serverOpts []grpc.ServerOption
-	
+
 	// Add authentication and authorization interceptors if any middleware is provided
 	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
 		serverOpts = append(serverOpts,
@@ -40,11 +43,11 @@ func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
 			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
 		)
 	}
-	
+
 	server := grpc.NewServer(serverOpts...)
 	service := NewService()
 	apiv2.RegisterV2Server(server, service)
-	
+
 	return server
 }
 
@@ -58,12 +61,89 @@ type HTTPHandlerOptions struct {
 	AuthzMiddleware func(http.Handler) http.Handler
 }
 
+// customErrorHandler converts gRPC errors to our API error format
+func customErrorHandler(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
+	const fallback = `{"errors":[{"code":"internal_server_error","message":"An unexpected error occurred"}]}`
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract gRPC status from error
+	st, ok := status.FromError(err)
+	if !ok {
+		// Not a gRPC error, return 500
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(fallback))
+		return
+	}
+
+	// Map gRPC codes to HTTP status codes
+	httpCode := grpcToHTTPStatus(st.Code())
+
+	// Try to parse the error message as our error format
+	message := st.Message()
+
+	// If the message looks like our JSON format, use it directly
+	if strings.HasPrefix(message, `{"errors":`) {
+		w.WriteHeader(httpCode)
+		_, _ = w.Write([]byte(message))
+		return
+	}
+
+	// Otherwise, create a single error response
+	errorResponse := ErrorResponse{
+		Errors: []ErrorItem{
+			{
+				Code:    "api_error", // Generic code for non-structured errors
+				Message: message,
+			},
+		},
+	}
+
+	jsonData, jsonErr := json.Marshal(errorResponse)
+	if jsonErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(fallback))
+		return
+	}
+
+	w.WriteHeader(httpCode)
+	_, _ = w.Write(jsonData)
+}
+
+// grpcToHTTPStatus maps gRPC codes back to HTTP status codes
+func grpcToHTTPStatus(code codes.Code) int {
+	switch code {
+	case codes.InvalidArgument:
+		return http.StatusBadRequest
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized
+	case codes.PermissionDenied:
+		return http.StatusForbidden
+	case codes.NotFound:
+		return http.StatusNotFound
+	case codes.AlreadyExists:
+		return http.StatusConflict
+	case codes.ResourceExhausted:
+		return http.StatusTooManyRequests
+	case codes.Unimplemented:
+		return http.StatusNotImplemented
+	case codes.Unavailable:
+		return http.StatusServiceUnavailable
+	case codes.Internal:
+		return http.StatusInternalServerError
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler, error) {
 	// Create the service
 	service := NewService()
 
-	// Create grpc-gateway mux for HTTP REST endpoints
-	gwmux := runtime.NewServeMux()
+	// Create grpc-gateway mux for HTTP REST endpoints with custom error handler
+	gwmux := runtime.NewServeMux(
+		runtime.WithErrorHandler(customErrorHandler),
+	)
 	if err := apiv2.RegisterV2HandlerServer(ctx, gwmux, service); err != nil {
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
 	}
@@ -145,15 +225,13 @@ func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.
 
 // CreateAccount implements a protected endpoint that requires authorization
 func (s *Service) CreateAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
-	now := time.Now()
+	// Return multiple errors for the not implemented functionality
+	return nil, NewErrors(http.StatusNotImplemented,
+		ErrorItem{Code: ErrorNotImplemented, Message: "Accounts not implemented in OSS"},
+		ErrorItem{Code: ErrorNotImplemented, Message: "Partners not implemented in OSS"},
+	)
+}
 
-	return &apiv2.CreateAccountResponse{
-		Data: &apiv2.CreateAccountData{
-			ApiKey: "IllBeARealKeySomeday",
-		},
-		Metadata: &apiv2.ResponseMetadata{
-			FetchedAt:   timestamppb.New(now),
-			CachedUntil: nil,
-		},
-	}, nil
+func (s *Service) FetchAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
 }

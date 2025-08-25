@@ -96,6 +96,9 @@ func DriverResponseAttrs(
 	if err != nil {
 		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
 	} else if fnOutput != nil {
+		isFunctionOutput := true
+		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
+
 		if outputSpanRef != nil {
 			if outputSpanRef.DynamicSpanID == "" {
 				rawAttrs.AddErr(fmt.Errorf("output span reference is missing dynamic span ID"))

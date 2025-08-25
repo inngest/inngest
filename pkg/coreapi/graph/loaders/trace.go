@@ -18,6 +18,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	RunSpanName              = "Run"
+	UnknownStepSpanName      = "Unknown step"
+	DiscoveryStepSpanName    = "Discovery step"
+	GenericExecutionSpanName = "Execution"
+	FinalizationSpanName     = "Finalization"
+)
+
 var (
 	ErrSkipSuccess = fmt.Errorf("skip success span")
 )
@@ -265,6 +273,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 	}
 
+	hasFinalizationChild := false
+
 	if len(span.Children) > 0 {
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
 		lastStepQueueTime := &gqlSpan.QueuedAt
@@ -288,6 +298,18 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 			// Decide on changes to this parent span based on the children.
 			switch span.Name {
+			case meta.SpanNameRun:
+				{
+					// Only one step-level finalization span is shown.
+					if child.Name == FinalizationSpanName {
+						if hasFinalizationChild {
+							continue
+						}
+
+						hasFinalizationChild = true
+
+					}
+				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
 					gqlSpan.Status = child.Status
@@ -302,7 +324,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					}
 
 					gqlSpan.EndedAt = child.EndedAt
-					if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
+
+					if cs.Attributes.IsFunctionOutput != nil && *cs.Attributes.IsFunctionOutput {
+						gqlSpan.Name = FinalizationSpanName
+					} else if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
 						gqlSpan.Name = child.Name
 					}
 					child.Name = fmt.Sprintf("Attempt %d", i)
@@ -357,19 +382,19 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		switch gqlSpan.Name {
 		case meta.SpanNameRun:
 			{
-				gqlSpan.Name = "Run"
+				gqlSpan.Name = RunSpanName
 			}
 		case meta.SpanNameStep:
 			{
-				gqlSpan.Name = "Unknown step"
+				gqlSpan.Name = UnknownStepSpanName
 			}
 		case meta.SpanNameStepDiscovery:
 			{
-				gqlSpan.Name = "Discovery step"
+				gqlSpan.Name = DiscoveryStepSpanName
 			}
 		case meta.SpanNameExecution:
 			{
-				gqlSpan.Name = "Execution"
+				gqlSpan.Name = GenericExecutionSpanName
 			}
 		}
 	}

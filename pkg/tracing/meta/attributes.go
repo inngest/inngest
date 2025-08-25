@@ -37,6 +37,9 @@ var Attrs = struct {
 	// Internal as we want this only to be set by internal logic.
 	internalError attr[*string]
 
+	// Function attributes
+	IsFunctionOutput attr[*bool]
+
 	// Step attributes
 	StepID           attr[*string]
 	StepName         attr[*string]
@@ -108,6 +111,7 @@ var Attrs = struct {
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
+	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    HttpHeaderAttr("response.headers"),

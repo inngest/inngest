@@ -4,7 +4,7 @@ import React, { createContext, useContext } from 'react';
 
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
-import type { GetRunPayload, GetRunResult } from './useGetRun';
+import type { GetRunData, GetRunPayload, GetRunResult } from './useGetRun';
 import type { GetTraceResultPayload, TraceResult } from './useGetTraceResult';
 import type { InngestStatus } from './useInngestStatus';
 import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
