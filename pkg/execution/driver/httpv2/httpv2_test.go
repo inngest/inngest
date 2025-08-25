@@ -61,7 +61,7 @@ func TestSyncMethod(t *testing.T) {
 				w.Header().Set(headers.HeaderKeySDK, "test-sdk")
 				opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
 				w.WriteHeader(200)
-				json.NewEncoder(w).Encode(opcodes)
+				_ = json.NewEncoder(w).Encode(opcodes)
 			}))
 			defer ts.Close()
 
@@ -108,7 +108,7 @@ func TestSyncHeaders(t *testing.T) {
 		w.Header().Set(headers.HeaderKeySDK, "test-sdk")
 		opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
 		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(opcodes)
+		_ = json.NewEncoder(w).Encode(opcodes)
 	}))
 	defer ts.Close()
 
@@ -150,7 +150,7 @@ func TestSyncHeaders(t *testing.T) {
 func TestSyncNonSDKResponse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte("not an SDK response"))
+		_, _ = w.Write([]byte("not an SDK response"))
 	}))
 	defer ts.Close()
 
@@ -197,7 +197,7 @@ func TestSyncRequestErrors(t *testing.T) {
 				w.Header().Set(headers.HeaderKeySDK, "test-sdk")
 				data := strings.Repeat("a", 10*1024*1024) // Large response
 				w.WriteHeader(200)
-				w.Write([]byte(data))
+				_, _ = w.Write([]byte(data))
 			},
 			expectedError: "SDK response too large",
 			isUserError:   true,
@@ -395,7 +395,7 @@ func TestSyncResponseParsing(t *testing.T) {
 			{Op: enums.OpcodeStep, ID: "test-step", Name: "Test Step"},
 		}
 		w.WriteHeader(201)
-		json.NewEncoder(w).Encode(opcodes)
+		_ = json.NewEncoder(w).Encode(opcodes)
 	}))
 	defer ts.Close()
 
