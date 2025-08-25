@@ -208,6 +208,24 @@ export default async function Page() {
               onChange={refetch}
             />
           </ServerFeatureFlag>
+          <ServerFeatureFlag flag="dedicated-slack-channel" defaultValue={false}>
+            <EntitlementListItem
+              increaseInHigherPlan={false}
+              planName={currentPlan.name}
+              title="Dedicated Slack Channel"
+              description="Dedicated Slack channel for support"
+              entitlement={{
+                currentValue: entitlements.slackChannel.enabled,
+                displayValue: entitlements.slackChannel.enabled ? 'Enabled' : 'Not enabled',
+              }}
+              addon={{
+                ...addons.slackChannel,
+                baseValue: 0,
+                purchased: addons.slackChannel.purchaseCount > 0,
+              }}
+              onChange={refetch}
+            />
+          </ServerFeatureFlag>
           <EntitlementListItem
             increaseInHigherPlan={false}
             planName={currentPlan.name}

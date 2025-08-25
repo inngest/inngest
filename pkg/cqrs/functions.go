@@ -10,12 +10,14 @@ import (
 )
 
 type Function struct {
-	ID        uuid.UUID       `json:"internal_id"`
-	AppID     uuid.UUID       `json:"app_id"`
-	Slug      string          `json:"id"`
-	Name      string          `json:"name"`
-	Config    json.RawMessage `json:"config"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID         uuid.UUID       `json:"internal_id"`
+	EnvID      uuid.UUID       `json:"env_id"`
+	AppID      uuid.UUID       `json:"app_id"`
+	Slug       string          `json:"id"`
+	Name       string          `json:"name"`
+	Config     json.RawMessage `json:"config"`
+	CreatedAt  time.Time       `json:"created_at"`
+	ArchivedAt time.Time       `json:"archived_at"`
 }
 
 func (f Function) InngestFunction() (*inngest.Function, error) {
@@ -25,6 +27,13 @@ func (f Function) InngestFunction() (*inngest.Function, error) {
 		return nil, err
 	}
 	return &fn, nil
+}
+
+func (f Function) IsArchived() bool {
+	if f.ArchivedAt.After(time.Time{}) && time.Now().After(f.ArchivedAt) {
+		return true
+	}
+	return false
 }
 
 // FunctionReader finds functions for use across the API and dev server.

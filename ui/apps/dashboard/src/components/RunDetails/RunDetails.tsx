@@ -11,6 +11,8 @@ type Props = {
   standalone?: boolean;
 };
 
+export const DEFAULT_POLL_INTERVAL = 1000;
+
 export function DashboardRunDetails({ runID, standalone = true }: Props) {
   const getTrigger = useGetTrigger();
   const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);

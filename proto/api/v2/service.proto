@@ -2,17 +2,73 @@ syntax = "proto3";
 package api.v2;
 
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
+import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
+import "third_party/protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Inngest REST API v2"
+    version: "2.0.0"
+    description: "The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality."
+  }
+  host: "api.inngest.com"
+  base_path: "/v2"
+  schemes: HTTPS
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Bearer token authentication. Format: `Bearer {key}`"
+      }
+    }
+  }
+};
 
 service V2 {
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
       get: "/health"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
   }
+  
+  // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+  rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
   
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
@@ -21,6 +77,152 @@ service V2 {
     };
     option (authz) = {
       require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Account successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateAccountResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - account already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
+    option (google.api.http) = {
+      get: "/partner/accounts"
+    };
+    option (authz) = {
+      require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of accounts"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
     };
   }
 }
@@ -38,13 +240,23 @@ message HealthData {
   string status = 1;
 }
 
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message ErrorResponse {
+  repeated Error errors = 1;
+}
+
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
 }
 
 message CreateAccountRequest {
-  // TODO this is a placeholder for authz middleware. Fill this in when create account implemented
+  string email = 1;
+  optional string name = 2;
 }
 
 message CreateAccountResponse {
@@ -53,5 +265,44 @@ message CreateAccountResponse {
 }
 
 message CreateAccountData {
-  string apiKey = 1;
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string apiKey = 4;
+  google.protobuf.Timestamp createdAt = 5;
+  google.protobuf.Timestamp updatedAt = 6;
+}
+
+message FetchAccountsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of accounts to return per page (min: 1, max: 1000)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountsResponse {
+  repeated Account data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Account {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  google.protobuf.Timestamp createdAt = 4;
+  google.protobuf.Timestamp updatedAt = 5;
+}
+
+message Page {
+  optional string cursor = 1;
+  bool hasMore = 2;
+  int32 limit = 3;
 }

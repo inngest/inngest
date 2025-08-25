@@ -18,6 +18,8 @@ import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
 import { parseRunsData, toRunStatuses, toTimeField } from './utils';
 
+export const DEFAULT_POLL_INTERVAL = 1000;
+
 export type RefreshRunsRef = {
   refresh: () => void;
 };
