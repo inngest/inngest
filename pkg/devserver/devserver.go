@@ -908,6 +908,15 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: invalid format")
 	}
 
+	// Fix for Redis Sentinel authentication: rueidis.ParseURL correctly identifies
+	// Sentinel configurations but fails to populate Sentinel credentials.
+	// When a master_set is configured but Sentinel credentials are empty,
+	// copy the main credentials to Sentinel authentication.
+	if opt.Sentinel.MasterSet != "" && opt.Sentinel.Username == "" && opt.Username != "" {
+		opt.Sentinel.Username = opt.Username
+		opt.Sentinel.Password = opt.Password
+	}
+
 	// Set default overrides
 	opt.DisableCache = true
 	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
