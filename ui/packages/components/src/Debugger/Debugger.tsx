@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
-import { RiGitForkLine, RiPauseLine, RiPlayLine, RiStopLine } from '@remixicon/react';
+import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Timeline } from '../RunDetailsV3/Timeline';
@@ -18,26 +18,15 @@ import { Play } from './Play';
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
-  const { getRun, loading } = useGetRun();
-  const [run, setRun] = useState<any | null>(null);
+  const { data: runData, loading: runLoading } = useGetRun({
+    runID,
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50);
   const [running, setRunning] = useState(false);
-
-  const fetchRun = async (runID: string) => {
-    if (runID) {
-      const run = await getRun({ runID });
-      setRun(run);
-    }
-  };
-
-  useEffect(() => {
-    if (runID) {
-      fetchRun(runID);
-    }
-  }, [runID]);
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -87,7 +76,9 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           <div className="flex flex-row items-center gap-x-2 text-sm">
             <RiGitForkLine className="text-muted h-6 w-6" />
             <div>Forked from:</div>
-            <StatusDot status={run?.data?.trace?.status} className="h-3 w-3" />
+            {runData?.trace?.status && (
+              <StatusDot status={runData?.trace?.status} className="h-3 w-3" />
+            )}
             <div>{runID && <Link href={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
           </div>
         </div>
@@ -130,10 +121,10 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               </div>
             </div>
             <div>
-              {loading ? (
+              {runLoading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : runID && run?.data ? (
-                <Timeline runID={runID} trace={run?.data?.trace} />
+              ) : runID && runData ? (
+                <Timeline runID={runID} trace={runData?.trace} />
               ) : null}
             </div>
           </div>

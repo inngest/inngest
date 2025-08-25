@@ -346,11 +346,16 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			),
 			nil
 	case 1: // already exists
-		st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
-		if err != nil {
-			return nil, err
-		}
-		return st, state.ErrIdentifierExists
+		// XXX: Returns a shell of a state with mutated identifier to the existing runID
+		// It does not load the existing run state anymore.
+		return state.NewStateInstance(
+			input.Identifier,
+			metadata.Metadata(),
+			make([]map[string]any, 0),
+			make([]state.MemoizedStep, 0),
+			make([]string, 0),
+		), state.ErrIdentifierExists
+
 	default:
 		return nil, fmt.Errorf("unknown status %d when attempting to create function state", status)
 	}

@@ -36,17 +36,17 @@ type v2 struct {
 }
 
 // Create creates new state in the store for the given run ID.
-func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
+func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return nil, err
+			return state.State{}, err
 		}
 		batchData[n] = data
 
 	}
-	state, err := v.mgr.New(ctx, statev1.Input{
+	st, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -69,15 +69,74 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
-	if err == nil {
-		metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
-			PkgName: "redis_state",
-			Tags: map[string]any{
-				"account_id": s.Metadata.ID.Tenant.AccountID,
-			},
-		})
+	switch err {
+	case nil:
+		// no-op continue
+	case statev1.ErrIdentifierExists:
+		s.Metadata.ID.RunID = st.RunID()
+		st, err := v.LoadState(ctx, s.Metadata.ID)
+		if err != nil {
+			return state.State{}, err
+		}
+		return st, statev1.ErrIdentifierExists
+	default:
+		return state.State{}, err
 	}
-	return state, err
+
+	metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": s.Metadata.ID.Tenant.AccountID,
+		},
+	})
+
+	// XXX: We do the exact same size calculations done in `mgr.New` to return a v2 state without changing the v1 interface.
+	var stepsByt []byte
+	if len(s.Steps) > 0 {
+		stepsByt, err = json.Marshal(s.Steps)
+		if err != nil {
+			return state.State{}, fmt.Errorf("error storing run state in redis when marshalling steps: %w", err)
+		}
+	}
+
+	var stepInputsByt []byte
+	if len(s.StepInputs) > 0 {
+		stepInputsByt, err = json.Marshal(s.StepInputs)
+		if err != nil {
+			return state.State{}, fmt.Errorf("error storing run state in redis when marshalling step inputs: %w", err)
+		}
+	}
+
+	events, err := json.Marshal(batchData)
+	if err != nil {
+		return state.State{}, fmt.Errorf("error storing run state in redis when marshalling batchData: %w", err)
+	}
+
+	metadata := s.Metadata
+	metadata.ID = state.ID{
+		// Set the returned run ID from the state manager
+		RunID:      st.RunID(),
+		FunctionID: s.Metadata.ID.FunctionID,
+		Tenant: state.Tenant{
+			AppID:     s.Metadata.ID.Tenant.AppID,
+			EnvID:     s.Metadata.ID.Tenant.EnvID,
+			AccountID: s.Metadata.ID.Tenant.AccountID,
+		},
+	}
+	metadata.Metrics = state.RunMetrics{
+		EventSize: len(events),
+		StateSize: len(events) + len(stepsByt) + len(stepInputsByt),
+		StepCount: len(s.Steps),
+	}
+
+	steps := make(map[string]json.RawMessage)
+	for _, step := range s.Steps {
+		if data, err := json.Marshal(step.Data); err == nil {
+			steps[step.ID] = json.RawMessage(data)
+		}
+	}
+
+	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
@@ -300,6 +359,8 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 // determine what errors are retriable
 func (v v2) retryableError(err error) bool {
 	switch {
+	case errors.Is(err, statev1.ErrIdempotentResponse):
+		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
 	}

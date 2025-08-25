@@ -1,47 +1,16 @@
 syntax = "proto3";
 package debug.v1;
 
+import "debug/v1/queue.proto";
+
 option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 
 service Debug {
+  // GetPartition retrieves the partition data from the database
   rpc GetPartition(PartitionRequest) returns (PartitionResponse) {}
+  // GetPartition retrieves additional status of the partition from the queue
+  // directly
   rpc GetPartitionStatus(PartitionRequest) returns (PartitionStatusResponse) {}
-}
-
-message PartitionRequest { string id = 1; }
-
-message PartitionResponse {
-  string id = 1;
-  string slug = 2;
-  PartitionTenant tenant = 3;
-  bytes config = 4;
-  QueueShard queue_shard = 5;
-}
-
-message PartitionStatusResponse {
-  string id = 1;
-
-  bool paused = 2;
-  bool migrate = 3;
-  bool pause_refill = 4;
-  bool pause_enqueue = 5;
-
-  int64 account_active = 6;
-  int64 account_in_progress = 7;
-  int64 ready = 8;
-  int64 in_progress = 9;
-  int64 active = 10;
-  int64 future = 11;
-  int64 backlogs = 12;
-}
-
-message PartitionTenant {
-  string account_id = 1;
-  string env_id = 2;
-  string app_id = 3;
-}
-
-message QueueShard {
-  string name = 1;
-  string kind = 2;
+  // GetQueueItem retrieves the queue item object from the queue
+  rpc GetQueueItem(QueueItemRequest) returns (QueueItemResponse) {}
 }

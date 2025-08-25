@@ -23,3 +23,9 @@ Thumbs.db
 
 __debug_bin*
 .claude/
+
+# Generated OpenAPI documentation
+docs/openapi/v2/
+docs/openapi/v3/
+
+/bin/

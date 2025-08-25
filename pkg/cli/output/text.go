@@ -4,9 +4,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"text/tabwriter"
 )
+
+const nilString = "<nil>"
+
+// valueToStringImpl provides the core logic for converting any value to a string representation
+// with consistent nil handling. The jsonFallback parameter controls whether complex types
+// should be JSON-formatted or use simple fmt.Sprintf.
+func valueToStringImpl(value any, jsonFallback bool, indent int) string {
+	if value == nil {
+		return nilString
+	}
+
+	// Check for nil interfaces and pointers before type switching
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		if rv.IsNil() {
+			return nilString
+		}
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%.2f", v)
+	case bool:
+		return fmt.Sprintf("%t", v)
+	case fmt.Stringer:
+		return v.String()
+	case error:
+		if v == nil {
+			return nilString
+		}
+		return v.Error()
+	default:
+		if jsonFallback {
+			// Try JSON serialization for complex types
+			if jsonStr := formatAsJSON(value, indent); jsonStr != "" {
+				return jsonStr
+			}
+		}
+		return fmt.Sprintf("%v", value)
+	}
+}
 
 func NewTextWriter() *TextWriter {
 	return &TextWriter{
@@ -163,52 +212,32 @@ func (tw *TextWriter) convertToOrderedMap(value any) *OrderedMap {
 }
 
 func (tw *TextWriter) valueToString(value any) string {
-	if value == nil {
-		return ""
-	}
-
-	switch v := value.(type) {
-	case string:
-		return v
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v)
-	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v)
-	case float32, float64:
-		return fmt.Sprintf("%.2f", v)
-	case bool:
-		return fmt.Sprintf("%t", v)
-	case fmt.Stringer:
-		return v.String()
-	case error:
-		return v.Error()
-	default:
-		// Try JSON serialization for complex types
-		if jsonStr := tw.formatAsJSON(value); jsonStr != "" {
-			return jsonStr
-		}
-		return fmt.Sprintf("%v", value)
-	}
+	return valueToStringImpl(value, true, tw.indent)
 }
 
 // formatAsJSON attempts to format a value as indented JSON with proper alignment
-func (tw *TextWriter) formatAsJSON(value any) string {
+func formatAsJSON(value any, indent int) string {
 	jsonBytes, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return ""
 	}
-	
+
 	jsonStr := string(jsonBytes)
 	// For multi-line JSON, indent continuation lines to align with value column
 	lines := strings.Split(jsonStr, "\n")
 	if len(lines) > 1 {
-		indentStr := strings.Repeat(" ", tw.indent) + "\t"
+		indentStr := strings.Repeat(" ", indent) + "\t"
 		for i := 1; i < len(lines); i++ {
 			lines[i] = indentStr + lines[i]
 		}
 		return strings.Join(lines, "\n")
 	}
 	return jsonStr
+}
+
+// formatAsJSON is a convenience method that calls the package-level function
+func (tw *TextWriter) formatAsJSON(value any) string {
+	return formatAsJSON(value, tw.indent)
 }
 
 type Row struct {
@@ -272,26 +301,5 @@ func OrderedData(pairs ...any) *OrderedMap {
 }
 
 func (r *Row) ToString() string {
-	if r.Value == nil {
-		return ""
-	}
-
-	switch v := r.Value.(type) {
-	case string:
-		return v
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v)
-	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v)
-	case float32, float64:
-		return fmt.Sprintf("%.2f", v)
-	case bool:
-		return fmt.Sprintf("%t", v)
-	case fmt.Stringer:
-		return v.String()
-	case error:
-		return v.Error()
-	default:
-		return fmt.Sprintf("%v", r.Value)
-	}
+	return valueToStringImpl(r.Value, false, 0)
 }

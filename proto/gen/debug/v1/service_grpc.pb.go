@@ -21,14 +21,20 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Debug_GetPartition_FullMethodName       = "/debug.v1.Debug/GetPartition"
 	Debug_GetPartitionStatus_FullMethodName = "/debug.v1.Debug/GetPartitionStatus"
+	Debug_GetQueueItem_FullMethodName       = "/debug.v1.Debug/GetQueueItem"
 )
 
 // DebugClient is the client API for Debug service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DebugClient interface {
+	// GetPartition retrieves the partition data from the database
 	GetPartition(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionResponse, error)
+	// GetPartition retrieves additional status of the partition from the queue
+	// directly
 	GetPartitionStatus(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionStatusResponse, error)
+	// GetQueueItem retrieves the queue item object from the queue
+	GetQueueItem(ctx context.Context, in *QueueItemRequest, opts ...grpc.CallOption) (*QueueItemResponse, error)
 }
 
 type debugClient struct {
@@ -59,12 +65,27 @@ func (c *debugClient) GetPartitionStatus(ctx context.Context, in *PartitionReque
 	return out, nil
 }
 
+func (c *debugClient) GetQueueItem(ctx context.Context, in *QueueItemRequest, opts ...grpc.CallOption) (*QueueItemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueueItemResponse)
+	err := c.cc.Invoke(ctx, Debug_GetQueueItem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
 type DebugServer interface {
+	// GetPartition retrieves the partition data from the database
 	GetPartition(context.Context, *PartitionRequest) (*PartitionResponse, error)
+	// GetPartition retrieves additional status of the partition from the queue
+	// directly
 	GetPartitionStatus(context.Context, *PartitionRequest) (*PartitionStatusResponse, error)
+	// GetQueueItem retrieves the queue item object from the queue
+	GetQueueItem(context.Context, *QueueItemRequest) (*QueueItemResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -80,6 +101,9 @@ func (UnimplementedDebugServer) GetPartition(context.Context, *PartitionRequest)
 }
 func (UnimplementedDebugServer) GetPartitionStatus(context.Context, *PartitionRequest) (*PartitionStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPartitionStatus not implemented")
+}
+func (UnimplementedDebugServer) GetQueueItem(context.Context, *QueueItemRequest) (*QueueItemResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetQueueItem not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -138,6 +162,24 @@ func _Debug_GetPartitionStatus_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetQueueItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueueItemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetQueueItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetQueueItem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetQueueItem(ctx, req.(*QueueItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +194,10 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPartitionStatus",
 			Handler:    _Debug_GetPartitionStatus_Handler,
+		},
+		{
+			MethodName: "GetQueueItem",
+			Handler:    _Debug_GetQueueItem_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

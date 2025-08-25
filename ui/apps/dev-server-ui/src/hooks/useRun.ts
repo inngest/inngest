@@ -8,10 +8,10 @@ export function useRun() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error>();
 
-  return useCallback(async ({ runID }: GetRunPayload) => {
+  return useCallback(async ({ runID, preview }: GetRunPayload) => {
     setLoading(true);
     setError(undefined);
-    const data: GetRunQuery = await client.request(GetRunDocument, { runID });
+    const data: GetRunQuery = await client.request(GetRunDocument, { runID, preview });
     const run = data.run;
 
     if (!run) {
