@@ -45,6 +45,8 @@ const (
 	V2FetchAccountsProcedure = "/api.v2.V2/FetchAccounts"
 	// V2FetchAccountProcedure is the fully-qualified name of the V2's FetchAccount RPC.
 	V2FetchAccountProcedure = "/api.v2.V2/FetchAccount"
+	// V2FetchAccountEnvsProcedure is the fully-qualified name of the V2's FetchAccountEnvs RPC.
+	V2FetchAccountEnvsProcedure = "/api.v2.V2/FetchAccountEnvs"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -56,6 +58,7 @@ type V2Client interface {
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -105,17 +108,24 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("FetchAccount")),
 			connect.WithClientOptions(opts...),
 		),
+		fetchAccountEnvs: connect.NewClient[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse](
+			httpClient,
+			baseURL+V2FetchAccountEnvsProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // v2Client implements V2Client.
 type v2Client struct {
-	health        *connect.Client[v2.HealthRequest, v2.HealthResponse]
-	xSchemaOnly   *connect.Client[v2.HealthRequest, v2.ErrorResponse]
-	createAccount *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
-	createEnv     *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
-	fetchAccounts *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
-	fetchAccount  *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
+	health           *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	xSchemaOnly      *connect.Client[v2.HealthRequest, v2.ErrorResponse]
+	createAccount    *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
+	createEnv        *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
+	fetchAccounts    *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
+	fetchAccount     *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
+	fetchAccountEnvs *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -148,6 +158,11 @@ func (c *v2Client) FetchAccount(ctx context.Context, req *connect.Request[v2.Fet
 	return c.fetchAccount.CallUnary(ctx, req)
 }
 
+// FetchAccountEnvs calls api.v2.V2.FetchAccountEnvs.
+func (c *v2Client) FetchAccountEnvs(ctx context.Context, req *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
+	return c.fetchAccountEnvs.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -157,6 +172,7 @@ type V2Handler interface {
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -202,6 +218,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("FetchAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2FetchAccountEnvsHandler := connect.NewUnaryHandler(
+		V2FetchAccountEnvsProcedure,
+		svc.FetchAccountEnvs,
+		connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -216,6 +238,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2FetchAccountsHandler.ServeHTTP(w, r)
 		case V2FetchAccountProcedure:
 			v2FetchAccountHandler.ServeHTTP(w, r)
+		case V2FetchAccountEnvsProcedure:
+			v2FetchAccountEnvsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -247,4 +271,8 @@ func (UnimplementedV2Handler) FetchAccounts(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountEnvs is not implemented"))
 }
