@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@clerk/tanstack-react-start';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
 import SideBar from '@/components/Layout/SideBar';
 import { useEnvironmentContext } from '../contexts/EnvironmentContext';
@@ -11,6 +11,7 @@ type TanStackLayoutProps = {
 
 export default function TanStackLayout({ children }: TanStackLayoutProps) {
   const { user } = useUser();
+  const { organization } = useOrganization();
 
   let activeEnv: any = undefined;
 
@@ -21,15 +22,13 @@ export default function TanStackLayout({ children }: TanStackLayoutProps) {
     // This is normal for non-environment routes (home, about, etc.)
   }
 
+  // Create profile object matching ProfileDisplayType from profile.ts
   const profile = user
     ? {
-        id: user.id,
-        name: user.fullName || user.firstName || 'User',
-        email: user.primaryEmailAddress?.emailAddress || '',
-        imageURL: user.imageUrl || '',
-        isMarketplace: false,
-        displayName: user.fullName || user.firstName || 'User',
-        orgProfilePic: user.imageUrl || '',
+        isMarketplace: false, // TanStack Router users are not marketplace users
+        orgName: organization?.name,
+        displayName: user.fullName || user.firstName || user.username || 'User',
+        orgProfilePic: organization?.hasImage ? organization.imageUrl : null,
       }
     : null;
 
