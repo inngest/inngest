@@ -36,6 +36,8 @@ service V2 {
       get: "/health"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Health check"
+      description: "Returns the health status of the API service"
       security: {
         security_requirement: {
           key: "BearerAuth"
