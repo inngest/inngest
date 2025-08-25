@@ -235,3 +235,7 @@ func (s *Service) CreateAccount(ctx context.Context, req *apiv2.CreateAccountReq
 func (s *Service) FetchAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
 }
+
+func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountRequest) (*apiv2.FetchAccountResponse, error) {
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
+}
