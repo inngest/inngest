@@ -60,19 +60,19 @@ const columns = [
     enableSorting: false,
   }),
   columnHelper.accessor('name', {
-    header: () => <span>Replay name</span>,
+    header: () => 'Replay name',
     cell: (props) => {
       return <TextCell>{props.getValue()}</TextCell>;
     },
     enableSorting: false,
   }),
   columnHelper.accessor('createdAt', {
-    header: () => <span>Created at</span>,
+    header: () => 'Started queuing',
     cell: (props) => <TimeCell date={props.getValue()} />,
     enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
-    header: () => <span>Ended at</span>,
+    header: () => 'Completed queuing',
     cell: (props) => {
       const replayEndedAt = props.getValue();
       if (!replayEndedAt) {
@@ -82,8 +82,26 @@ const columns = [
     },
     enableSorting: false,
   }),
+  columnHelper.accessor('runsCount', {
+    header: () => 'Queued runs',
+    cell: (props) => (
+      <NumberCell term={props.getValue() === 1 ? 'run' : 'runs'} value={props.getValue()} />
+    ),
+    enableSorting: false,
+  }),
+  columnHelper.accessor('runsSkippedCount', {
+    header: () => 'Skipped runs',
+    cell: (props) => {
+      const count = props.getValue();
+      if (!count) {
+        return <TextCell>-</TextCell>;
+      }
+      return <NumberCell term={count === 1 ? 'run' : 'runs'} value={count} />;
+    },
+    enableSorting: false,
+  }),
   columnHelper.accessor('duration', {
-    header: () => <span>Duration</span>,
+    header: () => 'Duration',
     cell: (props) => {
       const replayDuration = props.getValue();
       if (!replayDuration) {
@@ -91,13 +109,6 @@ const columns = [
       }
       return <TextCell>{formatMilliseconds(replayDuration)}</TextCell>;
     },
-    enableSorting: false,
-  }),
-  columnHelper.accessor('runsCount', {
-    header: () => <span>Runs queued</span>,
-    cell: (props) => (
-      <NumberCell term={props.getValue() === 1 ? 'run' : 'runs'} value={props.getValue()} />
-    ),
     enableSorting: false,
   }),
 ];
@@ -133,6 +144,7 @@ export function ReplayList({ functionSlug }: Props) {
             ...replay,
             createdAt: new Date(replay.createdAt),
             runsCount: replay.functionRunsScheduledCount,
+            runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
           };
 
           if (replay.endedAt) {
