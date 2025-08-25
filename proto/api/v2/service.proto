@@ -154,6 +154,87 @@ service V2 {
     };
   }
 
+  rpc CreateEnv(CreateEnvRequest) returns (CreateEnvResponse) {
+    option (google.api.http) = {
+      post: "/accounts/{accountId}/env",
+      body : "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Env successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateEnvResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - account already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc FetchAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
     option (google.api.http) = {
       get: "/partner/accounts"
@@ -335,6 +416,20 @@ message CreateAccountRequest {
 message CreateAccountResponse {
   CreateAccountData data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message CreateEnvRequest {
+  string accountId = 1;
+  string name = 2;
+}
+
+message CreateEnvResponse {
+  string id = 1;
+  string name = 2;
+  string eventKey = 3;
+  string signingKey = 4;
+  google.protobuf.Timestamp createdAt = 5;
+  google.protobuf.Timestamp updatedAt = 6;
 }
 
 message CreateAccountData {
