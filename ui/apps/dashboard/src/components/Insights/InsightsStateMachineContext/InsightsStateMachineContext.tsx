@@ -15,7 +15,6 @@ interface InsightsStateMachineContextValue {
   queryName: string;
   onChange: (value: string) => void;
   onNameChange: (name: string) => void;
-  retry: () => void;
   runQuery: () => void;
   status: InsightsStatus;
 }
@@ -69,7 +68,6 @@ export function InsightsStateMachineContextProvider({
         onNameChange: onQueryNameChange,
         query,
         queryName,
-        retry: refetch,
         runQuery,
         status: getInsightsStatus({ data, isError, isLoading: isFetching }),
       }}

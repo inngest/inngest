@@ -8,7 +8,7 @@ import { useInsightsStateMachineContext } from '../../InsightsStateMachineContex
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, retry } = useInsightsStateMachineContext();
+  const { error, runQuery } = useInsightsStateMachineContext();
 
   return (
     <Banner
@@ -18,7 +18,7 @@ export function ErrorState() {
           kind="danger"
           label="Retry"
           onClick={() => {
-            retry();
+            runQuery();
           }}
         />
       }

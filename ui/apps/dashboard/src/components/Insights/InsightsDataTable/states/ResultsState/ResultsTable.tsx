@@ -19,7 +19,6 @@ export function ResultsTable() {
         <Table
           columns={columns}
           data={data.rows}
-          isLoading={false}
           cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
         />
       </div>
