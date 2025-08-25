@@ -271,19 +271,30 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			//
 			// If steps only have one attempt, however, we can assume that the SDK handles
 			// step errors and continues
-
-		case enums.OpcodeRunComplete:
-			result := struct {
-				Data APIResult `json:"data"`
-			}{}
-			if err := json.Unmarshal(op.Data, &result); err != nil {
-				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
+			status := enums.StepStatusErrored
+			_, err = a.TracerProvider.CreateSpan(
+				meta.SpanNameStep,
+				&tracing.CreateSpanOptions{
+					Parent:    md.Config.NewFunctionTrace(),
+					StartTime: op.Timing.Start(),
+					EndTime:   op.Timing.End(),
+					Attributes: attrs.Merge(
+						meta.NewAttrSet(
+							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
+							meta.Attr(meta.Attrs.RunID, &input.RunID),
+							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+							meta.Attr(meta.Attrs.DynamicStatus, &status),
+						),
+					),
+				},
+			)
+			if err != nil {
+				// We should never hit a blocker creating a span.  If so, warn loudly.
+				l.Error("error saving span for checkpoint step error op", "error", err)
 			}
-			if err := a.finalize(ctx, md, result.Data); err != nil {
-				l.Error("error finalizing sync run", "error", err)
-			}
 
-		default:
 			err := a.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
 				// In the executor, returning an error bubbles up to the queue to requeue.
@@ -304,10 +315,29 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Continue checking this particular error.
-				err = a.Opts.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+				if err = a.Opts.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{}); err != nil {
+					l.Error("error enqueueing step error in checkpoint", "error", err, "opcode", op.Op)
+				}
+			}
+			if err != nil {
+				l.Error("error handlign step error in checkpoint", "error", err, "opcode", op.Op)
 			}
 
-			if err != nil {
+		case enums.OpcodeRunComplete:
+			result := struct {
+				Data APIResult `json:"data"`
+			}{}
+			if err := json.Unmarshal(op.Data, &result); err != nil {
+				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
+			}
+
+			// Call finalize and process the entire op.
+			if err := a.finalize(ctx, md, result.Data); err != nil {
+				l.Error("error finalizing sync run", "error", err)
+			}
+
+		default:
+			if err := a.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
 				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
 		}
@@ -381,23 +411,18 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
 // work has finished, and eg. step.Defer items are not running.
 func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
-	// The async execution flow has a single, last "execution" step:  the request which
-	// results in the function response.  Whilst this isn't technically a "step", from our
-	// point of view we have no idea whether an SDK request will result in a step or the fn
-	// completing.
-	//
-	// The sync request flow, however, always results in a single slice of opcodes and we
-	// have zero extraneous requests to finalize a function.
-	//
-	// To unify both codepaths, we actually create a new span which represents the step output.
+	httpHeader := http.Header{}
+	for k, v := range result.Headers {
+		httpHeader[k] = []string{v}
+	}
 
 	return a.Executor.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: md,
 		RunMode:  enums.RunModeSync,
 		Response: state.DriverResponse{
-			Output:     result,
-			OutputSize: 0, // TODO
-			// TODO: Other fields...
+			Output:     result.Body,
+			Header:     httpHeader,
+			StatusCode: result.StatusCode,
 		},
 		Optional: execution.FinalizeOptional{},
 	})
