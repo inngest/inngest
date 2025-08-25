@@ -81,6 +81,8 @@ service V2 {
       require_authz: true
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create partner account"
+      description: "Creates a sub-account (if you have partner access)"
       security: {
         security_requirement: {
           key: "BearerAuth"
