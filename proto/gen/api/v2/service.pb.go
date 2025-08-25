@@ -1098,7 +1098,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x18\n" +
 	"\ahasMore\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor2\xf1\x13\n" +
+	"\a_cursor2\xf2\x13\n" +
 	"\x02V2\x12\xf6\x01\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xbc\x01\x92A\xa9\x01JR\n" +
 	"\x03401\x12K\n" +
@@ -1132,8 +1132,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\xcd\x04\n" +
-	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\x8a\x04\x92A\xe2\x03JH\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\xce\x04\n" +
+	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\x8b\x04\x92A\xe2\x03JH\n" +
 	"\x03201\x12A\n" +
 	"\x18Env successfully created\x12%\n" +
 	"#\x1a!#/definitions/v2CreateEnvResponseJL\n" +
@@ -1154,7 +1154,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/accounts/{accountId}/env\x12\x87\x04\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/accounts/{accountId}/envs\x12\x87\x04\n" +
 	"\rFetchAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\xb8\x03\x92A\x95\x03JD\n" +
 	"\x03200\x12=\n" +
 	"\x10List of accounts\x12)\n" +
