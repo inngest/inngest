@@ -1,9 +1,8 @@
-'use client';
-
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
-import SideBar from '@/components/Layout/SideBar';
+// import SideBar from '@/components/Layout/SideBar';
 import { useEnvironmentContext } from '../contexts/EnvironmentContext';
+import TanStackAwareSideBar from './TanStackAwareSideBar';
 
 type TanStackLayoutProps = {
   children: React.ReactNode;
@@ -42,7 +41,8 @@ export default function TanStackLayout({ children }: TanStackLayoutProps) {
 
   return (
     <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
-      <SideBar activeEnv={activeEnv} collapsed={undefined} profile={profile} />
+      {/* <SideBar activeEnv={activeEnv} collapsed={undefined} profile={profile} /> */}
+      <TanStackAwareSideBar activeEnv={activeEnv} collapsed={undefined} profile={profile} />
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">{children}</div>
     </div>
