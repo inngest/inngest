@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	V2_Health_FullMethodName           = "/api.v2.V2/Health"
-	V2_XSchemaOnly_FullMethodName      = "/api.v2.V2/_SchemaOnly"
-	V2_CreateAccount_FullMethodName    = "/api.v2.V2/CreateAccount"
-	V2_CreateEnv_FullMethodName        = "/api.v2.V2/CreateEnv"
-	V2_FetchAccounts_FullMethodName    = "/api.v2.V2/FetchAccounts"
-	V2_FetchAccount_FullMethodName     = "/api.v2.V2/FetchAccount"
-	V2_FetchAccountEnvs_FullMethodName = "/api.v2.V2/FetchAccountEnvs"
+	V2_Health_FullMethodName                  = "/api.v2.V2/Health"
+	V2_XSchemaOnly_FullMethodName             = "/api.v2.V2/_SchemaOnly"
+	V2_CreateAccount_FullMethodName           = "/api.v2.V2/CreateAccount"
+	V2_CreateEnv_FullMethodName               = "/api.v2.V2/CreateEnv"
+	V2_FetchAccounts_FullMethodName           = "/api.v2.V2/FetchAccounts"
+	V2_FetchAccount_FullMethodName            = "/api.v2.V2/FetchAccount"
+	V2_FetchAccountEnvs_FullMethodName        = "/api.v2.V2/FetchAccountEnvs"
+	V2_FetchAccountSigningKeys_FullMethodName = "/api.v2.V2/FetchAccountSigningKeys"
 )
 
 // V2Client is the client API for V2 service.
@@ -40,6 +41,7 @@ type V2Client interface {
 	FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
+	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 }
 
 type v2Client struct {
@@ -120,6 +122,16 @@ func (c *v2Client) FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsReq
 	return out, nil
 }
 
+func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchAccountSigningKeysResponse)
+	err := c.cc.Invoke(ctx, V2_FetchAccountSigningKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -132,6 +144,7 @@ type V2Server interface {
 	FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
+	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -162,6 +175,9 @@ func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest)
 }
 func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEnvs not implemented")
+}
+func (UnimplementedV2Server) FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountSigningKeys not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -310,6 +326,24 @@ func _V2_FetchAccountEnvs_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_FetchAccountSigningKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchAccountSigningKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).FetchAccountSigningKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_FetchAccountSigningKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).FetchAccountSigningKeys(ctx, req.(*FetchAccountSigningKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -344,6 +378,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchAccountEnvs",
 			Handler:    _V2_FetchAccountEnvs_Handler,
+		},
+		{
+			MethodName: "FetchAccountSigningKeys",
+			Handler:    _V2_FetchAccountSigningKeys_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
