@@ -36,6 +36,8 @@ service V2 {
       get: "/health"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Health check"
+      description: "Returns the health status of the API service"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -79,6 +81,8 @@ service V2 {
       require_authz: true
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create partner account"
+      description: "Creates a sub-account (if you have partner access)"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -243,6 +247,8 @@ service V2 {
       require_authz: true
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List partner accounts"
+      description: "Lists sub-accounts (if you have partner access)"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -455,6 +461,96 @@ service V2 {
       }
     };
   }
+
+  rpc FetchAccountSigningKeys(FetchAccountSigningKeysRequest) returns (FetchAccountSigningKeysResponse) {
+    option (google.api.http) = {
+      get: "/accounts/{accountId}/signing-keys"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List account signing keys"
+      description: "Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys."
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Filter signing keys by environment (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: false
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of account signing keys"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountSigningKeysResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - account not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -584,4 +680,35 @@ message FetchAccountEnvsResponse {
   repeated Env data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message FetchAccountSigningKeysRequest {
+  string accountId = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of signing keys to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountSigningKeysResponse {
+  repeated SigningKey data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SigningKey {
+  string id = 1;
+  string name = 2;
+  string environment = 3;
+  string keyPrefix = 4;
+  bool isActive = 5;
+  google.protobuf.Timestamp createdAt = 6;
+  google.protobuf.Timestamp lastUsedAt = 7;
 }

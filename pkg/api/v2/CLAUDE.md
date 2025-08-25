@@ -115,6 +115,7 @@ GET /v2/functions?cursor=01hp1zx8m3ng9vp6qn0xk7j4cy&limit=50
 - Include in response metadata
 - Make new fields optional to maintain backwards compatibility
 - Follow nullable vs optional field semantics from spec
+- Always include a short description and summary
 
 ### When Modifying Existing Endpoints
 
