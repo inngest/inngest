@@ -35,7 +35,9 @@ export function useFetchInsights() {
       { query, queryName }: FetchInsightsParams,
       cb: FetchInsightsCallback
     ): Promise<InsightsFetchResult> => {
-      const res = await client.query(insightsQuery, { query }).toPromise();
+      const res = await client
+        .query(insightsQuery, { query }, { requestPolicy: 'network-only' })
+        .toPromise();
       if (res.error) throw res.error;
       if (!res.data) throw new Error('No data');
 

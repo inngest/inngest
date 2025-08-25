@@ -18,7 +18,7 @@ export function InsightsSQLEditorQueryButton() {
       label={isRunning ? undefined : 'Run query'}
       loading={isRunning}
       onClick={(e) => {
-        runQuery(query);
+        runQuery();
         e.currentTarget.blur();
       }}
       size="medium"
