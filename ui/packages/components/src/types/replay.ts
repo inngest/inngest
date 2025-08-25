@@ -2,6 +2,7 @@ const replayStatuses = ['CREATED', 'ENDED'] as const;
 export type ReplayStatus = (typeof replayStatuses)[number];
 
 export type Replay = {
+  id: string;
   name: string;
   status: ReplayStatus;
   createdAt: Date;

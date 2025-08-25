@@ -20,6 +20,7 @@ import { useMutation, useQuery } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetAccountEntitlementsDocument = graphql(`
@@ -169,7 +170,10 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       success: () => {
         onClose();
         router.push(
-          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replays`
+          pathCreator.functionReplays({
+            envSlug: environment.slug,
+            functionSlug: functionSlug,
+          })
         );
         return 'Replay created!';
       },

@@ -22,6 +22,7 @@ import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const GetReplaysDocument = graphql(`
   query GetReplays($environmentID: ID!, $functionSlug: String!) {
@@ -180,6 +181,15 @@ export function ReplayList({ functionSlug }: Props) {
       data={replays}
       columns={columns}
       isLoading={isLoading}
+      onRowClick={(row) =>
+        router.push(
+          pathCreator.functionReplay({
+            envSlug: environment.slug,
+            functionSlug,
+            replayID: row.original.id,
+          })
+        )
+      }
       blankState={
         <TableBlankState
           title="No replays found"
