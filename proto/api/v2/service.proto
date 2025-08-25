@@ -424,6 +424,11 @@ message CreateEnvRequest {
 }
 
 message CreateEnvResponse {
+  Env data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Env {
   string id = 1;
   string name = 2;
   string eventKey = 3;
