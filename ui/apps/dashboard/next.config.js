@@ -87,6 +87,14 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/tanstack/:path*',
+        destination: '/tanstack',
+      },
+    ];
+  },
   // Optional build-time configuration for Sentry.
   // See https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#extend-nextjs-configuration
   sentry: {
