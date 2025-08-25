@@ -19,8 +19,6 @@ export function InsightsDataTable() {
             return <EmptyState />;
           case 'loading':
             return <LoadingState />;
-          case 'fetchingMore':
-          case 'fetchMoreError':
           case 'success': {
             return <ResultsState />;
           }
