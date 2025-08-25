@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
@@ -14,7 +14,6 @@ interface InsightsStateMachineContextValue {
   error: null | Error;
   query: string;
   queryName: string;
-  fetchMore: () => void;
   onChange: (value: string) => void;
   onNameChange: (name: string) => void;
   retry: () => void;
@@ -48,10 +47,8 @@ export function InsightsStateMachineContextProvider({
   const { fetchInsights } = useFetchInsights();
   const { saveQuerySnapshot } = useStoredQueries();
 
-  const { data, error, fetchNextPage, isError, isFetching, isLoading, refetch } = useInfiniteQuery({
+  const { data, error, isError, isLoading, refetch } = useQuery({
     enabled: hasActiveQuery(activeQuery.query),
-    getNextPageParam,
-    initialPageParam: null,
     queryKey: makeQueryKey(activeQuery.query, activeQuery.timestamp),
     queryFn: () => {
       return fetchInsights({ query: activeQuery.query, queryName }, (query, queryName) => {
@@ -59,7 +56,6 @@ export function InsightsStateMachineContextProvider({
       });
     },
     refetchOnWindowFocus: false,
-    select: selectInsightsData,
   });
 
   const runQuery = (newQuery: string) => {
@@ -72,14 +68,13 @@ export function InsightsStateMachineContextProvider({
         activeQuery: activeQuery.query,
         data,
         error,
-        fetchMore: fetchNextPage,
         onChange: onQueryChange,
         onNameChange: onQueryNameChange,
         query,
         queryName,
         retry: refetch,
         runQuery,
-        status: getInsightsStatus({ data, isError, isFetching, isLoading }),
+        status: getInsightsStatus({ data, isError, isLoading }),
       }}
     >
       {renderChildren ? children : null}
@@ -101,26 +96,18 @@ export function useInsightsStateMachineContext() {
 interface GetInsightsStatusParams {
   data: undefined | InsightsFetchResult;
   isError: boolean;
-  isFetching: boolean;
   isLoading: boolean;
 }
 
 export function getInsightsStatus({
   data,
   isError,
-  isFetching,
   isLoading,
 }: GetInsightsStatusParams): InsightsStatus {
-  if (isError && data === undefined) return 'error';
-  if (isError && data !== undefined) return 'fetchMoreError';
+  if (isError) return 'error';
   if (isLoading) return 'loading';
-  if (isFetching && data !== undefined) return 'fetchingMore';
   if (data !== undefined) return 'success';
   return 'initial';
-}
-
-function getNextPageParam(lastPage: InsightsFetchResult) {
-  return null; // No pagination support
 }
 
 /**
@@ -138,20 +125,4 @@ function hasActiveQuery(activeQuery: string) {
  */
 function makeQueryKey(activeQuery: string, timestamp: number | null) {
   return ['insights', activeQuery, timestamp];
-}
-
-function selectInsightsData(
-  infiniteData: InfiniteData<InsightsFetchResult, unknown>
-): undefined | InsightsFetchResult {
-  if (infiniteData.pages.length === 0) return undefined;
-
-  const firstPage = infiniteData.pages[0];
-  if (firstPage === undefined) {
-    return undefined;
-  }
-
-  return {
-    columns: firstPage.columns,
-    rows: infiniteData.pages.flatMap((page) => page.rows),
-  };
 }

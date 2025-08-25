@@ -1,10 +1,7 @@
 export type InsightsAction =
   | { type: 'START_QUERY'; payload: string }
   | { type: 'QUERY_SUCCESS'; payload: InsightsFetchResult }
-  | { type: 'QUERY_ERROR'; payload: string }
-  | { type: 'FETCH_MORE' }
-  | { type: 'FETCH_MORE_SUCCESS'; payload: InsightsFetchResult }
-  | { type: 'FETCH_MORE_ERROR'; payload: string };
+  | { type: 'QUERY_ERROR'; payload: string };
 
 export interface InsightsFetchResult {
   columns: Array<{
@@ -13,7 +10,6 @@ export interface InsightsFetchResult {
   }>;
   rows: Array<{
     id: string;
-    isLoadingRow?: boolean;
     values: Record<string, null | Date | string | number>;
   }>;
 }
@@ -26,15 +22,8 @@ export interface InsightsState {
   activeQuery: string;
   data: undefined | InsightsFetchResult;
   error: undefined | string;
-  fetchMoreError: undefined | string;
   query: string;
   status: InsightsStatus;
 }
 
-export type InsightsStatus =
-  | 'error'
-  | 'fetchingMore'
-  | 'fetchMoreError'
-  | 'initial'
-  | 'loading'
-  | 'success';
+export type InsightsStatus = 'error' | 'initial' | 'loading' | 'success';
