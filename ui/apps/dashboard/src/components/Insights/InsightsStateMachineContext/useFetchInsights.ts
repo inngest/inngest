@@ -7,37 +7,22 @@ import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import type { InsightsFetchResult } from './types';
 
 export interface FetchInsightsParams {
-  after?: string | null;
-  first: number;
   query: string;
   queryName: string;
 }
 
-type FetchInsightsCallback = (
-  query: string,
-  queryName: undefined | string,
-  after: undefined | null | string
-) => void;
+type FetchInsightsCallback = (query: string, name: undefined | string) => void;
 
 const insightsQuery = graphql(`
-  query Insights($query: String!, $first: Int!, $after: String) {
-    insights(query: $query, first: $first, after: $after) {
+  query Insights($query: String!) {
+    insights(query: $query) {
       columns {
         name
         columnType
       }
-      edges {
-        cursor
-        node {
-          id
-          values
-        }
+      rows {
+        values
       }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
-      totalCount
     }
   }
 `);
@@ -47,14 +32,14 @@ export function useFetchInsights() {
 
   const fetchInsights = useCallback(
     async (
-      { query, first, after = null, queryName }: FetchInsightsParams,
+      { query, queryName }: FetchInsightsParams,
       cb: FetchInsightsCallback
     ): Promise<InsightsFetchResult> => {
-      const res = await client.query(insightsQuery, { after, first, query }).toPromise();
+      const res = await client.query(insightsQuery, { query }).toPromise();
       if (res.error) throw res.error;
       if (!res.data) throw new Error('No data');
 
-      cb(query, queryName === UNTITLED_QUERY ? undefined : queryName, after);
+      cb(query, queryName === UNTITLED_QUERY ? undefined : queryName);
       return transformInsightsResponse(res.data.insights);
     },
     [client]
@@ -114,15 +99,9 @@ function transformInsightsResponse(insights: InsightsQuery['insights']): Insight
       name: col.name,
       type: mapColumnType(col.columnType),
     })),
-    entries: insights.edges.map((edge) => ({
-      id: edge.node.id,
-      values: transformValuesByColumns(edge.node.values, insights.columns),
-      isLoadingRow: undefined,
+    rows: insights.rows.map((row, index) => ({
+      id: `row-${index}`,
+      values: transformValuesByColumns(row.values, insights.columns),
     })),
-    pageInfo: {
-      endCursor: insights.pageInfo.endCursor,
-      hasNextPage: insights.pageInfo.hasNextPage,
-    },
-    totalCount: insights.totalCount,
   };
 }

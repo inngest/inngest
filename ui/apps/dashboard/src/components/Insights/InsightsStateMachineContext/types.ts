@@ -11,16 +11,11 @@ export interface InsightsFetchResult {
     name: string;
     type: 'date' | 'string' | 'number';
   }>;
-  entries: Array<{
+  rows: Array<{
     id: string;
-    isLoadingRow: boolean | undefined;
+    isLoadingRow?: boolean;
     values: Record<string, null | Date | string | number>;
   }>;
-  pageInfo: {
-    endCursor: string | null;
-    hasNextPage: boolean;
-  };
-  totalCount: number;
 }
 
 export interface InsightsState {
