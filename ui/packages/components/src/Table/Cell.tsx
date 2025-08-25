@@ -64,7 +64,7 @@ export function StatusCell({
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
       <StatusDot status={status} />
-      <p className={cn(colorClass, 'text-nowrap lowercase first-letter:capitalize')}>
+      <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
         {label || status}
       </p>
     </div>
