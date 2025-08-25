@@ -349,6 +349,7 @@ func TestRedisCronManager(t *testing.T) {
 				enums.CronOpPause,
 				enums.CronOpUnpause,
 				enums.CronOpProcess,
+				enums.CronInit,
 			}
 
 			for _, op := range testOps {
@@ -752,6 +753,63 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Nil(t, archivedItem)
 		})
 
+		t.Run("CronInit should initialize schedule when none exists", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronInit)
+			cronItem.Expression = "0 * * * *"
+
+			err := cm.UpdateSchedule(ctx, cronItem)
+			require.NoError(t, err)
+
+			// Verify schedule was created
+			retrievedItem, err := cm.NextScheduledItemForFunction(ctx, cronItem.FunctionID)
+			require.NoError(t, err)
+			require.NotNil(t, retrievedItem)
+
+			assert.Equal(t, cronItem.FunctionID, retrievedItem.FunctionID)
+			assert.Equal(t, cronItem.Expression, retrievedItem.Expression)
+			assert.Equal(t, cronItem.FunctionVersion, retrievedItem.FunctionVersion)
+			assert.Equal(t, enums.CronOpProcess, retrievedItem.Op)
+		})
+
+		t.Run("CronInit should do nothing when schedule already exists", func(t *testing.T) {
+			// Create initial schedule
+			originalItem := createCronItem(enums.CronOpNew)
+			originalItem.Expression = "0 * * * *"
+			originalItem.FunctionVersion = 1
+
+			err := cm.UpdateSchedule(ctx, originalItem)
+			require.NoError(t, err)
+
+			// Get the original scheduled item
+			originalScheduled, err := cm.NextScheduledItemForFunction(ctx, originalItem.FunctionID)
+			require.NoError(t, err)
+
+			// Try to initialize with CronInit (should be no-op)
+			initItem := createCronItem(enums.CronInit)
+			initItem.FunctionID = originalItem.FunctionID
+			initItem.Expression = "0 0 * * *" // Different expression
+			initItem.FunctionVersion = 2       // Different version
+
+			err = cm.UpdateSchedule(ctx, initItem)
+			require.NoError(t, err)
+
+			// Verify original schedule is unchanged
+			retrievedItem, err := cm.NextScheduledItemForFunction(ctx, originalItem.FunctionID)
+			require.NoError(t, err)
+			assert.Equal(t, originalScheduled.ID, retrievedItem.ID)
+			assert.Equal(t, originalScheduled.Expression, retrievedItem.Expression)
+			assert.Equal(t, originalScheduled.FunctionVersion, retrievedItem.FunctionVersion)
+		})
+
+		t.Run("CronInit with invalid cron expression should return error", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronInit)
+			cronItem.Expression = "invalid expression"
+
+			err := cm.UpdateSchedule(ctx, cronItem)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to parse cron expression")
+		})
+
 		t.Run("unknown operation type should return error", func(t *testing.T) {
 			cronItem := createCronItem(enums.CronOpProcess)
 			cronItem.Op = enums.CronOp(999) // Invalid operation type
@@ -956,6 +1014,7 @@ func TestRedisCronManager(t *testing.T) {
 				{"CronOpUpdate", enums.CronOpUpdate, true},
 				{"CronOpUnpause", enums.CronOpUnpause, false},
 				{"CronOpProcess", enums.CronOpProcess, false},
+				{"CronInit", enums.CronInit, false},
 			}
 
 			for _, tc := range testCases {

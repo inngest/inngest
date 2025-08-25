@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CronOpName = "NewUpdateArchivePauseUnpauseProcess"
+const _CronOpName = "NewUpdateArchivePauseUnpauseProcessCronInit"
 
-var _CronOpIndex = [...]uint8{0, 3, 9, 16, 21, 28, 35}
+var _CronOpIndex = [...]uint8{0, 3, 9, 16, 21, 28, 35, 43}
 
-const _CronOpLowerName = "newupdatearchivepauseunpauseprocess"
+const _CronOpLowerName = "newupdatearchivepauseunpauseprocesscroninit"
 
 func (i CronOp) String() string {
 	if i < 0 || i >= CronOp(len(_CronOpIndex)-1) {
@@ -31,9 +31,10 @@ func _CronOpNoOp() {
 	_ = x[CronOpPause-(3)]
 	_ = x[CronOpUnpause-(4)]
 	_ = x[CronOpProcess-(5)]
+	_ = x[CronInit-(6)]
 }
 
-var _CronOpValues = []CronOp{CronOpNew, CronOpUpdate, CronOpArchive, CronOpPause, CronOpUnpause, CronOpProcess}
+var _CronOpValues = []CronOp{CronOpNew, CronOpUpdate, CronOpArchive, CronOpPause, CronOpUnpause, CronOpProcess, CronInit}
 
 var _CronOpNameToValueMap = map[string]CronOp{
 	_CronOpName[0:3]:        CronOpNew,
@@ -48,6 +49,8 @@ var _CronOpNameToValueMap = map[string]CronOp{
 	_CronOpLowerName[21:28]: CronOpUnpause,
 	_CronOpName[28:35]:      CronOpProcess,
 	_CronOpLowerName[28:35]: CronOpProcess,
+	_CronOpName[35:43]:      CronInit,
+	_CronOpLowerName[35:43]: CronInit,
 }
 
 var _CronOpNames = []string{
@@ -57,6 +60,7 @@ var _CronOpNames = []string{
 	_CronOpName[16:21],
 	_CronOpName[21:28],
 	_CronOpName[28:35],
+	_CronOpName[35:43],
 }
 
 // CronOpString retrieves an enum value from the enum constants string name.
