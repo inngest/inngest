@@ -106,6 +106,11 @@ type Function struct {
 	Driver FunctionDriver `json:"driver,omitzero"`
 }
 
+func (f Function) MaxAttempts() int {
+	// TODO: Improve this please...
+	return f.Steps[0].RetryCount() + 1
+}
+
 type RateLimit struct {
 	// Limit is how often the function can be called within the specified period
 	Limit uint `json:"limit"`

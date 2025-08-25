@@ -68,6 +68,9 @@ type CheckpointNewRunRequest struct {
 	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
 
 	// XXX: SDK Version and language??
+
+	// TODO: Track opcodes.
+	// Steps []state.GeneratorOpcode `json:"steps"`
 }
 
 func (r CheckpointNewRunRequest) AppSlug() string {
@@ -98,13 +101,20 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 }
 
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
-	uri := r.Event.Data.Domain + r.Event.Data.Path + "?x-inngest-type=sync&x-inngest-method=" + r.Event.Data.Method
+	uri := r.Event.Data.Domain + r.Event.Data.Path
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
 		FunctionVersion: 1,
 		Name:            r.FnSlug(),
 		Slug:            r.FnSlug(),
+		Driver: inngest.FunctionDriver{
+			URI: uri,
+			Metadata: map[string]any{
+				"type":   "sync", // This is a sync function
+				"method": r.Event.Data.Method,
+			},
+		},
 		Steps: []inngest.Step{
 			{
 				ID:      "step",
@@ -216,7 +226,7 @@ func (c *checkpointRunContext) MaxAttempts() *int {
 }
 
 func (c *checkpointRunContext) ShouldRetry() bool {
-	return c.attemptCount < c.maxAttempts
+	return c.attemptCount < (c.maxAttempts - 1)
 }
 
 func (c *checkpointRunContext) IncrementAttempt() {
