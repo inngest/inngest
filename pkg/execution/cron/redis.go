@@ -303,6 +303,30 @@ func (c *redisCronManager) UpdateSchedule(ctx context.Context, ci CronItem) erro
 
 		return c.removeScheduleMap(ctx, ci.FunctionID)
 
+	case enums.CronInit:
+		// Check if there's already an item scheduled
+		existing, err := c.NextScheduledItemForFunction(ctx, ci.FunctionID)
+		switch err {
+		case nil, errNextScheduleNotFound:
+			// no-op
+		default:
+			return fmt.Errorf("error finding existing cron item for function: %w", err)
+		}
+
+		// if something already exist don't do anything
+		if existing != nil {
+			return nil
+		}
+
+		next, err := c.ScheduleNext(ctx, ci)
+		if err != nil {
+			return fmt.Errorf("error scheduling next item for Op: %s: %w", ci.Op, err)
+		}
+		l.Trace("initialized cron job", "next", next, "op", ci.Op, "job_id", next.JobID)
+
+		// - update mapping
+		return c.setFunctionScheduleMap(ctx, *next)
+
 	default:
 		return fmt.Errorf("unknown cron operation provided: %s", ci.Op)
 	}
