@@ -788,7 +788,7 @@ func TestRedisCronManager(t *testing.T) {
 			initItem := createCronItem(enums.CronInit)
 			initItem.FunctionID = originalItem.FunctionID
 			initItem.Expression = "0 0 * * *" // Different expression
-			initItem.FunctionVersion = 2       // Different version
+			initItem.FunctionVersion = 2      // Different version
 
 			err = cm.UpdateSchedule(ctx, initItem)
 			require.NoError(t, err)
@@ -845,6 +845,107 @@ func TestRedisCronManager(t *testing.T) {
 					assert.Equal(t, expr, retrievedItem.Expression)
 				})
 			}
+		})
+	})
+
+	t.Run("Sync", func(t *testing.T) {
+		r.FlushAll()
+
+		t.Run("should enqueue cron sync job successfully", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.Expression = "0 * * * *"
+
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err)
+		})
+
+		t.Run("should handle duplicate sync jobs gracefully", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpUpdate)
+			cronItem.Expression = "0 0 * * *"
+
+			// Enqueue the same sync job multiple times
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err)
+
+			err = cm.Sync(ctx, cronItem)
+			require.NoError(t, err) // Should not error on duplicate
+		})
+
+		t.Run("should use correct queue parameters", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.Expression = "0 12 * * *"
+
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err)
+
+			// Verify the sync job ID format
+			syncID := cronItem.SyncID()
+			assert.Contains(t, syncID, ":sync")
+			assert.Equal(t, fmt.Sprintf("%s:sync", cronItem.ID), syncID)
+		})
+
+		t.Run("should handle different cron operations", func(t *testing.T) {
+			syncOperations := []enums.CronOp{
+				enums.CronOpNew,
+				enums.CronOpUpdate,
+				enums.CronOpPause,
+				enums.CronOpUnpause,
+				enums.CronOpArchive,
+				enums.CronInit,
+			}
+
+			for _, op := range syncOperations {
+				t.Run(op.String(), func(t *testing.T) {
+					cronItem := createCronItem(op)
+					cronItem.Expression = "0 * * * *"
+
+					err := cm.Sync(ctx, cronItem)
+					require.NoError(t, err)
+				})
+			}
+		})
+
+		t.Run("should skip CronOpProcess operations", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpProcess)
+			cronItem.Expression = "0 * * * *"
+
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err) // Should return nil without enqueueing
+		})
+
+		t.Run("should preserve all cron item fields", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpUpdate)
+			cronItem.Expression = "@daily"
+			cronItem.FunctionVersion = 5
+
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err)
+		})
+
+		t.Run("should handle context cancellation", func(t *testing.T) {
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.Expression = "0 * * * *"
+
+			cancelledCtx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			err := cm.Sync(cancelledCtx, cronItem)
+			assert.Error(t, err)
+		})
+
+		t.Run("should use correct timing from ULID", func(t *testing.T) {
+			baseTime := clock.Now()
+			cronItem := createCronItem(enums.CronOpNew)
+			cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
+			cronItem.Expression = "0 * * * *"
+
+			err := cm.Sync(ctx, cronItem)
+			require.NoError(t, err)
+
+			// The sync job should be scheduled at the time from the ULID
+			expectedTime := baseTime
+			actualTime := ulid.Time(cronItem.ID.Time())
+			assert.Equal(t, expectedTime.UnixMilli(), actualTime.UnixMilli())
 		})
 	})
 

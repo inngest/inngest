@@ -93,6 +93,45 @@ type redisCronManager struct {
 	opt redisCronManagerOpt
 }
 
+func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
+	l := c.log.With("action", "redisCronManager.Sync")
+
+	switch ci.Op {
+	case enums.CronOpProcess:
+		// OpProcess is not meant for syncs
+		return nil
+	}
+
+	maxAttempts := consts.MaxRetries + 1
+	kind := queue.KindCronSync
+	at := ulid.Time(ci.ID.Time())
+	jobID := ci.SyncID()
+
+	err := c.q.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		GroupID:     uuid.New().String(),
+		WorkspaceID: ci.WorkspaceID,
+		Kind:        kind,
+		Identifier: state.Identifier{
+			AccountID:       ci.AccountID,
+			WorkspaceID:     ci.WorkspaceID,
+			AppID:           ci.AppID,
+			WorkflowID:      ci.FunctionID,
+			WorkflowVersion: ci.FunctionVersion,
+		},
+		MaxAttempts: &maxAttempts,
+		Payload:     ci,
+		QueueName:   &kind,
+	}, at, queue.EnqueueOpts{})
+	switch err {
+	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		return nil
+	default:
+		l.ReportError(err, "error enqueueing cron sync job")
+		return fmt.Errorf("error enqueueing cron sync job: %w", err)
+	}
+}
+
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "cron_item", ci)
 
