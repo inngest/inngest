@@ -20,7 +20,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
   useEffect(() => {
     if (isWidgetVisible && seatOverageData && trackingUser) {
       trackEvent({
-        name: 'app/billing_cta.viewed',
+        name: 'app/billing.cta.viewed',
         data: {
           cta: collapsed ? 'seat-overage-widget-collapsed' : 'seat-overage-widget-expanded',
           entitlement: 'user_seats',
