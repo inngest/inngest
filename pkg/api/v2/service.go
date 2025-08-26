@@ -153,9 +153,7 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 
 	r := chi.NewRouter()
 
-	// Add JSON type validation middleware first (before auth)
-	r.Use(JSONTypeValidationMiddleware())
-
+	// Add authentication middleware first
 	if opts.AuthnMiddleware != nil {
 		r.Use(opts.AuthnMiddleware)
 	}
@@ -170,11 +168,19 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 		// Apply authorization middleware if this path requires it
 		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && opts.AuthzMiddleware != nil {
 			authzHandler := opts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
+				// Add JSON validation after authorization for protected paths
+				validationHandler := JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					gwmux.ServeHTTP(w, r)
+				}))
+				validationHandler.ServeHTTP(w, r)
 			}))
 			authzHandler.ServeHTTP(w, req)
 		} else {
-			gwmux.ServeHTTP(w, req)
+			// Add JSON validation for unprotected paths
+			validationHandler := JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gwmux.ServeHTTP(w, r)
+			}))
+			validationHandler.ServeHTTP(w, req)
 		}
 
 		// Restore original path for logging

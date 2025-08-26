@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTPValidation_CreatePartnerAccount(t *testing.T) {
+func TestHTTPValidation_CreateEnv(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("should validate JSON types and required fields", func(t *testing.T) {
@@ -27,44 +27,44 @@ func TestHTTPValidation_CreatePartnerAccount(t *testing.T) {
 			expectedError  string
 		}{
 			{
-				name:           "empty email field",
-				body:           `{"email": ""}`,
+				name:           "empty name field",
+				body:           `{"name": ""}`,
 				expectedStatus: http.StatusBadRequest,
-				expectedError:  "email",
+				expectedError:  "name",
 			},
 			{
-				name:           "missing email field",
+				name:           "missing name field",
 				body:           `{}`,
 				expectedStatus: http.StatusBadRequest,
-				expectedError:  "email",
+				expectedError:  "name",
 			},
 			{
-				name:           "email wrong type - number instead of string",
-				body:           `{"email": 123}`,
+				name:           "name wrong type - number instead of string",
+				body:           `{"name": 123}`,
 				expectedStatus: http.StatusBadRequest,
-				expectedError:  "must be a string",
+				expectedError:  "invalid value for string field name",
 			},
 			{
-				name:           "email wrong type - boolean instead of string",
-				body:           `{"email": true}`,
+				name:           "name wrong type - boolean instead of string",
+				body:           `{"name": true}`,
 				expectedStatus: http.StatusBadRequest,
-				expectedError:  "must be a string",
+				expectedError:  "invalid value for string field name",
 			},
 			{
-				name:           "multiple validation errors",
-				body:           `{"email": 1, "name": true}`,
+				name:           "name wrong type - array instead of string",
+				body:           `{"name": ["test"]}`,
 				expectedStatus: http.StatusBadRequest,
-				expectedError:  "must be a string",
+				expectedError:  "invalid value for string field name",
 			},
 			{
-				name:           "valid request with basic email",
-				body:           `{"email": "not-validated-format"}`,
+				name:           "valid request with name",
+				body:           `{"name": "test-env"}`,
 				expectedStatus: http.StatusNotImplemented, // Service returns not implemented
 				expectedError:  "",
 			},
 			{
-				name:           "valid request with proper email",
-				body:           `{"email": "test@example.com"}`,
+				name:           "valid request with proper name",
+				body:           `{"name": "production"}`,
 				expectedStatus: http.StatusNotImplemented, // Service returns not implemented
 				expectedError:  "",
 			},
@@ -72,7 +72,7 @@ func TestHTTPValidation_CreatePartnerAccount(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", bytes.NewReader([]byte(tc.body)))
+				req := httptest.NewRequest(http.MethodPost, "/api/v2/envs", bytes.NewReader([]byte(tc.body)))
 				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 
@@ -115,42 +115,42 @@ func TestValidateJSONForProto(t *testing.T) {
 		}{
 			{
 				name:        "valid JSON with all required fields",
-				jsonData:    `{"email": "test@example.com"}`,
+				jsonData:    `{"name": "test-env"}`,
 				expectError: false,
 			},
 			{
-				name:        "missing required email field",
+				name:        "missing required name field",
 				jsonData:    `{}`,
 				expectError: true,
-				errorText:   "email' is required",
+				errorText:   "name' is required",
 			},
 			{
-				name:        "empty required email field",
-				jsonData:    `{"email": ""}`,
+				name:        "empty required name field",
+				jsonData:    `{"name": ""}`,
 				expectError: true,
-				errorText:   "email' is required",
+				errorText:   "name' is required",
 			},
 			{
-				name:        "email wrong type - number",
-				jsonData:    `{"email": 123}`,
+				name:        "name wrong type - number",
+				jsonData:    `{"name": 123}`,
 				expectError: true,
-				errorText:   "must be a string",
+				errorText:   "must be a string, got float64",
 			},
 			{
-				name:        "email wrong type - boolean",
-				jsonData:    `{"email": true}`,
+				name:        "name wrong type - boolean",
+				jsonData:    `{"name": true}`,
 				expectError: true,
-				errorText:   "must be a string",
+				errorText:   "must be a string, got bool",
 			},
 			{
-				name:        "email wrong type - array",
-				jsonData:    `{"email": []}`,
+				name:        "name wrong type - array",
+				jsonData:    `{"name": []}`,
 				expectError: true,
-				errorText:   "must be a string",
+				errorText:   "must be a string, got []interface",
 			},
 			{
 				name:        "invalid JSON",
-				jsonData:    `{"email": }`,
+				jsonData:    `{"name": }`,
 				expectError: true,
 				errorText:   "Invalid JSON",
 			},
@@ -162,8 +162,8 @@ func TestValidateJSONForProto(t *testing.T) {
 			},
 		}
 
-		// Use CreateAccountRequest proto message for testing
-		protoMsg := &apiv2.CreateAccountRequest{}
+		// Use CreateEnvRequest proto message for testing
+		protoMsg := &apiv2.CreateEnvRequest{}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -187,23 +187,23 @@ func TestDynamicEndpointDiscovery(t *testing.T) {
 		require.NotNil(t, serviceDesc)
 
 		discoveredEndpoints := []string{}
-		
+
 		// Iterate through all methods in the V2 service
 		methods := serviceDesc.Methods()
 		for i := 0; i < methods.Len(); i++ {
 			methodDesc := methods.Get(i)
-			
+
 			// Get the HTTP method and path from protobuf annotations
 			httpMethod := getHTTPMethod(methodDesc)
 			httpPath := getHTTPPath(methodDesc)
-			
+
 			if httpPath != "" {
 				fullPath := "/api/v2" + httpPath
 				endpoint := httpMethod + " " + fullPath
 				discoveredEndpoints = append(discoveredEndpoints, endpoint)
-				
+
 				t.Logf("Discovered endpoint: %s", endpoint)
-				
+
 				// Test that we can get a protobuf message for this endpoint
 				protoMsg := getProtoMessageForPath(fullPath, httpMethod)
 				if httpMethod != "GET" { // Only validate non-GET requests
@@ -211,10 +211,10 @@ func TestDynamicEndpointDiscovery(t *testing.T) {
 				}
 			}
 		}
-		
+
 		// Verify we found some endpoints
 		require.NotEmpty(t, discoveredEndpoints, "Should discover at least one endpoint")
-		
+
 		// Verify our known endpoint is discovered
 		found := false
 		for _, endpoint := range discoveredEndpoints {
@@ -246,7 +246,7 @@ func TestAdvancedFieldTypeValidation(t *testing.T) {
 			},
 			{
 				name:         "bytes field accepts byte arrays",
-				fieldType:    "bytes", 
+				fieldType:    "bytes",
 				validValues:  []interface{}{[]interface{}{72, 101, 108, 108, 111}},
 				invalidValue: []interface{}{"not", "numbers"},
 				expectError:  "byte array must contain only numbers",
@@ -274,7 +274,7 @@ func TestAdvancedFieldTypeValidation(t *testing.T) {
 				t.Logf("Field type: %s", tc.fieldType)
 				t.Logf("Valid values: %v", tc.validValues)
 				t.Logf("Invalid value: %v (should error: %s)", tc.invalidValue, tc.expectError)
-				
+
 				// The actual validation would happen through validateJSONFieldType
 				// but would require proto message definitions with these field types
 			})
