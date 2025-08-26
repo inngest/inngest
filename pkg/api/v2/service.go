@@ -223,8 +223,8 @@ func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.
 	}, nil
 }
 
-// CreateAccount implements a protected endpoint that requires authorization
-func (s *Service) CreateAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
+// CreatePartnerAccount implements a protected endpoint that requires authorization
+func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
 	// Return multiple errors for the not implemented functionality
 	return nil, NewErrors(http.StatusNotImplemented,
 		ErrorItem{Code: ErrorNotImplemented, Message: "Accounts not implemented in OSS"},
@@ -236,7 +236,7 @@ func (s *Service) CreateEnv(ctx context.Context, req *apiv2.CreateEnvRequest) (*
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Environments not implemented in OSS")
 }
 
-func (s *Service) FetchAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
+func (s *Service) FetchPartnerAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
 }
 

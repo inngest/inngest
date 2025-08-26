@@ -142,7 +142,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		handler, err := NewHTTPHandler(ctx, opts)
 		require.NoError(t, err)
 
-		// Test protected endpoint (CreateAccount)
+		// Test protected endpoint (CreatePartnerAccount)
 		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -206,7 +206,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		handler, err := NewHTTPHandler(ctx, opts)
 		require.NoError(t, err)
 
-		// Test protected endpoint (CreateAccount) - should hit both middlewares
+		// Test protected endpoint (CreatePartnerAccount) - should hit both middlewares
 		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
