@@ -320,10 +320,9 @@ func TestCronSyncerInterface(t *testing.T) {
 		
 		// Also verify through CronManager interface
 		var manager CronManager
-		var syncer CronSyncer
 		
 		// If this compiles, the interface embedding is working correctly
-		syncer = manager
+		syncer := CronSyncer(manager)
 		_ = syncer
 	})
 }
