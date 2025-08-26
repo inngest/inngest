@@ -111,7 +111,6 @@ func (*HealthRequest) Descriptor() ([]byte, []int) {
 
 type FetchAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -144,13 +143,6 @@ func (x *FetchAccountRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use FetchAccountRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *FetchAccountRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
 }
 
 type HealthResponse struct {
@@ -503,8 +495,7 @@ func (x *CreateAccountResponse) GetMetadata() *ResponseMetadata {
 
 type CreateEnvRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -537,13 +528,6 @@ func (x *CreateEnvRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateEnvRequest.ProtoReflect.Descriptor instead.
 func (*CreateEnvRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *CreateEnvRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
 }
 
 func (x *CreateEnvRequest) GetName() string {
@@ -1059,9 +1043,8 @@ func (x *Page) GetLimit() int32 {
 
 type FetchAccountEventKeysRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
-	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
-	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1094,13 +1077,6 @@ func (x *FetchAccountEventKeysRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use FetchAccountEventKeysRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountEventKeysRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *FetchAccountEventKeysRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
 }
 
 func (x *FetchAccountEventKeysRequest) GetCursor() string {
@@ -1255,9 +1231,8 @@ func (x *EventKey) GetCreatedAt() *timestamppb.Timestamp {
 
 type FetchAccountEnvsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
-	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
-	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1290,13 +1265,6 @@ func (x *FetchAccountEnvsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use FetchAccountEnvsRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountEnvsRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *FetchAccountEnvsRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
 }
 
 func (x *FetchAccountEnvsRequest) GetCursor() string {
@@ -1375,9 +1343,8 @@ func (x *FetchAccountEnvsResponse) GetPage() *Page {
 
 type FetchAccountSigningKeysRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
-	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
-	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1410,13 +1377,6 @@ func (x *FetchAccountSigningKeysRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use FetchAccountSigningKeysRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountSigningKeysRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *FetchAccountSigningKeysRequest) GetAccountId() string {
-	if x != nil {
-		return x.AccountId
-	}
-	return ""
 }
 
 func (x *FetchAccountSigningKeysRequest) GetCursor() string {
@@ -1574,9 +1534,8 @@ var File_api_v2_service_proto protoreflect.FileDescriptor
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
-	"\rHealthRequest\"3\n" +
-	"\x13FetchAccountRequest\x12\x1c\n" +
-	"\taccountId\x18\x01 \x01(\tR\taccountId\"n\n" +
+	"\rHealthRequest\"\x15\n" +
+	"\x13FetchAccountRequest\"n\n" +
 	"\x0eHealthResponse\x12&\n" +
 	"\x04data\x18\x01 \x01(\v2\x12.api.v2.HealthDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"$\n" +
@@ -1598,10 +1557,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x05_name\"|\n" +
 	"\x15CreateAccountResponse\x12-\n" +
 	"\x04data\x18\x01 \x01(\v2\x19.api.v2.CreateAccountDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"D\n" +
-	"\x10CreateEnvRequest\x12\x1c\n" +
-	"\taccountId\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"j\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"&\n" +
+	"\x10CreateEnvRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"j\n" +
 	"\x11CreateEnvResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x88\x01\n" +
@@ -1639,11 +1597,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x18\n" +
 	"\ahasMore\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor\"\xfd\x01\n" +
-	"\x1cFetchAccountEventKeysRequest\x12\x1c\n" +
-	"\taccountId\x18\x01 \x01(\tR\taccountId\x12J\n" +
-	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12^\n" +
-	"\x05limit\x18\x03 \x01(\x05BC\x92A@2:Number of event keys to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursor\"\xdf\x01\n" +
+	"\x1cFetchAccountEventKeysRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12^\n" +
+	"\x05limit\x18\x02 \x01(\x05BC\x92A@2:Number of event keys to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x9d\x01\n" +
 	"\x1dFetchAccountEventKeysResponse\x12$\n" +
@@ -1655,21 +1612,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
-	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xfa\x01\n" +
-	"\x17FetchAccountEnvsRequest\x12\x1c\n" +
-	"\taccountId\x18\x01 \x01(\tR\taccountId\x12J\n" +
-	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
-	"\x05limit\x18\x03 \x01(\x05BE\x92AB2<Number of environments to return per page (min: 1, max: 250):\x0250H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xdc\x01\n" +
+	"\x17FetchAccountEnvsRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
+	"\x05limit\x18\x02 \x01(\x05BE\x92AB2<Number of environments to return per page (min: 1, max: 250):\x0250H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x93\x01\n" +
 	"\x18FetchAccountEnvsResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x03(\v2\v.api.v2.EnvR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x81\x02\n" +
-	"\x1eFetchAccountSigningKeysRequest\x12\x1c\n" +
-	"\taccountId\x18\x01 \x01(\tR\taccountId\x12J\n" +
-	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
-	"\x05limit\x18\x03 \x01(\x05BE\x92AB2<Number of signing keys to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xe3\x01\n" +
+	"\x1eFetchAccountSigningKeysRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
+	"\x05limit\x18\x02 \x01(\x05BE\x92AB2<Number of signing keys to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\xa1\x01\n" +
 	"\x1fFetchAccountSigningKeysResponse\x12&\n" +
@@ -1688,7 +1643,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"PRODUCTION\x10\x00\x12\b\n" +
 	"\x04TEST\x10\x01\x12\n" +
 	"\n" +
-	"\x06BRANCH\x10\x022\xc5)\n" +
+	"\x06BRANCH\x10\x022\xe1(\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1722,8 +1677,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\xce\x04\n" +
-	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\x8b\x04\x92A\xe2\x03JH\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\xe8\x04\n" +
+	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\xa5\x04\x92A\x91\x04\x12\x12Create environment\x1a\x19Create custom environmentJH\n" +
 	"\x03201\x12A\n" +
 	"\x18Env successfully created\x12%\n" +
 	"#\x1a!#/definitions/v2CreateEnvResponseJL\n" +
@@ -1744,7 +1699,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/accounts/{accountId}/envs\x12\xd6\x04\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\n" +
+	":\x01*\"\x05/envs\x12\xd6\x04\n" +
 	"\x14FetchPartnerAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\x80\x04\x92A\xdd\x03\x12\x15List partner accounts\x1a/Lists sub-accounts (if you have partner access)JD\n" +
 	"\x03200\x12=\n" +
 	"\x10List of accounts\x12)\n" +
@@ -1763,27 +1719,21 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\xf8\x03\n" +
-	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\xac\x03\x92A\x8b\x03J:\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\x83\x03\n" +
+	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\xb7\x02\x92A\xa2\x02\x12\vGet account\x1a.Returns the account for the authenticated userJ:\n" +
 	"\x03200\x123\n" +
 	"\aAccount\x12(\n" +
 	"&\x1a$#/definitions/v2FetchAccountResponseJR\n" +
-	"\x03400\x12K\n" +
-	"&Bad Request - invalid query parameters\x12!\n" +
-	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
-	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
-	"\x03403\x12I\n" +
-	"$Forbidden - insufficient permissions\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x17\x12\x15/accounts/{accountId}\x12\xed\x04\n" +
-	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\x95\x04\x92A\xef\x03JS\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\v\x12\t/accounts\x12\x8d\x05\n" +
+	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\xb5\x04\x92A\xa4\x04\x12\x11List environments\x1a List of all custom environments.JS\n" +
 	"\x03200\x12L\n" +
 	"\x1cList of account environments\x12,\n" +
 	"*\x1a(#/definitions/v2FetchAccountEnvsResponseJR\n" +
@@ -1804,8 +1754,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1c\x12\x1a/accounts/{accountId}/envs\x12\xb6\a\n" +
-	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xcf\x06\x92A\xa3\x06\x12\x17List account event keys\x1a\xaf\x01Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.JV\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/envs\x12\xa2\a\n" +
+	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xbb\x06\x92A\xa3\x06\x12\x17List account event keys\x1a\xaf\x01Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.JV\n" +
 	"\x03200\x12O\n" +
 	"\x1aList of account event keys\x121\n" +
 	"/\x1a-#/definitions/v2FetchAccountEventKeysResponseJR\n" +
@@ -1828,8 +1778,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rd\n" +
 	"b\n" +
-	"\rX-Inngest-Env\x12OFilter event keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\"\x12 /accounts/{accountId}/event-keys\x12\xc9\a\n" +
-	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xdc\x06\x92A\xae\x06\x12\x19List account signing keys\x1a\xb2\x01Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys.JZ\n" +
+	"\rX-Inngest-Env\x12OFilter event keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/keys/events\x12\xb4\a\n" +
+	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xc7\x06\x92A\xae\x06\x12\x19List account signing keys\x1a\xb2\x01Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys.JZ\n" +
 	"\x03200\x12S\n" +
 	"\x1cList of account signing keys\x123\n" +
 	"1\x1a/#/definitions/v2FetchAccountSigningKeysResponseJR\n" +
@@ -1852,7 +1802,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rf\n" +
 	"d\n" +
-	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02$\x12\"/accounts/{accountId}/signing-keysB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signingB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +

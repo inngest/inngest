@@ -161,10 +161,12 @@ service V2 {
 
   rpc CreateEnv(CreateEnvRequest) returns (CreateEnvResponse) {
     option (google.api.http) = {
-      post: "/accounts/{accountId}/envs",
+      post: "/envs",
       body : "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create environment"
+      description: "Create custom environment"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -316,9 +318,11 @@ service V2 {
 
   rpc FetchAccount(FetchAccountRequest) returns (FetchAccountResponse) {
     option (google.api.http) = {
-      get: "/accounts/{accountId}"
+      get: "/accounts"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get account"
+      description: "Returns the account for the authenticated user"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -337,31 +341,9 @@ service V2 {
         }
       }
       responses: {
-        key: "400"
-        value: {
-          description: "Bad Request - invalid query parameters"
-          schema: {
-            json_schema: {
-              ref: "#/definitions/v2ErrorResponse"
-            }
-          }
-        }
-      }
-      responses: {
         key: "401"
         value: {
           description: "Unauthorized - authentication required"
-          schema: {
-            json_schema: {
-              ref: "#/definitions/v2ErrorResponse"
-            }
-          }
-        }
-      }
-      responses: {
-        key: "403"
-        value: {
-          description: "Forbidden - insufficient permissions"
           schema: {
             json_schema: {
               ref: "#/definitions/v2ErrorResponse"
@@ -385,9 +367,11 @@ service V2 {
 
   rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
     option (google.api.http) = {
-      get: "/accounts/{accountId}/envs"
+      get: "/envs"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List environments"
+      description: "List of all custom environments."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -465,7 +449,7 @@ service V2 {
 
   rpc FetchAccountEventKeys(FetchAccountEventKeysRequest) returns (FetchAccountEventKeysResponse) {
     option (google.api.http) = {
-      get: "/accounts/{accountId}/event-keys"
+      get: "/keys/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account event keys"
@@ -555,7 +539,7 @@ service V2 {
 
   rpc FetchAccountSigningKeys(FetchAccountSigningKeysRequest) returns (FetchAccountSigningKeysResponse) {
     option (google.api.http) = {
-      get: "/accounts/{accountId}/signing-keys"
+      get: "/keys/signing"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account signing keys"
@@ -649,7 +633,7 @@ message HealthRequest {
 }
 
 message FetchAccountRequest {
-  string accountId = 1;
+  // Empty request message for fetching current account
 }
 
 message HealthResponse {
@@ -686,8 +670,7 @@ message CreateAccountResponse {
 }
 
 message CreateEnvRequest {
-  string accountId = 1;
-  string name = 2;
+  string name = 1;
 }
 
 message CreateEnvResponse {
@@ -757,13 +740,12 @@ message Page {
 }
 
 message FetchAccountEventKeysRequest {
-  string accountId = 1;
-  optional string cursor = 2 [
+  optional string cursor = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
     }
   ];
-  optional int32 limit = 3 [
+  optional int32 limit = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Number of event keys to return per page (min: 1, max: 100)"
       default: "20"
@@ -786,13 +768,12 @@ message EventKey {
 }
 
 message FetchAccountEnvsRequest {
-  string accountId = 1;
-  optional string cursor = 2 [
+  optional string cursor = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
     }
   ];
-  optional int32 limit = 3 [
+  optional int32 limit = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Number of environments to return per page (min: 1, max: 250)"
       default: "50"
@@ -807,13 +788,12 @@ message FetchAccountEnvsResponse {
 }
 
 message FetchAccountSigningKeysRequest {
-  string accountId = 1;
-  optional string cursor = 2 [
+  optional string cursor = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
     }
   ];
-  optional int32 limit = 3 [
+  optional int32 limit = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Number of signing keys to return per page (min: 1, max: 100)"
       default: "20"
