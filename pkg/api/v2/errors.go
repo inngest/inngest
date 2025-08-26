@@ -32,6 +32,9 @@ const (
 	// 422 Unprocessable Entity errors
 	ErrorValidationError = "validation_error"
 
+	// 500 Not Implemented errors
+	ErrorInternalError = "internal_error"
+
 	// 501 Not Implemented errors
 	ErrorNotImplemented = "not_implemented"
 )
