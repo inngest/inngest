@@ -34,8 +34,15 @@ func Next(expr string, from time.Time) (time.Time, error) {
 	return schedule.Next(from), nil
 }
 
+type CronSyncer interface {
+	// EnqueueSync handles the enqueueing of cron schedule sync jobs
+	Sync(ctx context.Context, ci CronItem) error
+}
+
 // CronManager represents the handling of cron
 type CronManager interface {
+	CronSyncer
+
 	// ScheduleNext handles the scheduling of the next cron job
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
 	// CanRun checks if the cron item can be scheduled for execution
