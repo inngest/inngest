@@ -695,13 +695,17 @@ message CreateEnvResponse {
   ResponseMetadata metadata = 2;
 }
 
+enum EnvType {
+  PRODUCTION = 0;
+  TEST = 1;
+  BRANCH = 2;
+}
+
 message Env {
   string id = 1;
   string name = 2;
-  string eventKey = 3;
-  string signingKey = 4;
-  google.protobuf.Timestamp createdAt = 5;
-  google.protobuf.Timestamp updatedAt = 6;
+  EnvType type = 3;
+  google.protobuf.Timestamp createdAt = 4;
 }
 
 message CreateAccountData {
