@@ -1024,6 +1024,202 @@ func (x *Page) GetLimit() int32 {
 	return 0
 }
 
+type FetchAccountEventKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
+	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchAccountEventKeysRequest) Reset() {
+	*x = FetchAccountEventKeysRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchAccountEventKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchAccountEventKeysRequest) ProtoMessage() {}
+
+func (x *FetchAccountEventKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchAccountEventKeysRequest.ProtoReflect.Descriptor instead.
+func (*FetchAccountEventKeysRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *FetchAccountEventKeysRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *FetchAccountEventKeysRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *FetchAccountEventKeysRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type FetchAccountEventKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*EventKey            `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchAccountEventKeysResponse) Reset() {
+	*x = FetchAccountEventKeysResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchAccountEventKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchAccountEventKeysResponse) ProtoMessage() {}
+
+func (x *FetchAccountEventKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchAccountEventKeysResponse.ProtoReflect.Descriptor instead.
+func (*FetchAccountEventKeysResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *FetchAccountEventKeysResponse) GetData() []*EventKey {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *FetchAccountEventKeysResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *FetchAccountEventKeysResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type EventKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Environment   string                 `protobuf:"bytes,3,opt,name=environment,proto3" json:"environment,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EventKey) Reset() {
+	*x = EventKey{}
+	mi := &file_api_v2_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EventKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EventKey) ProtoMessage() {}
+
+func (x *EventKey) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EventKey.ProtoReflect.Descriptor instead.
+func (*EventKey) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *EventKey) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EventKey) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EventKey) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *EventKey) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *EventKey) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type FetchAccountEnvsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     string                 `protobuf:"bytes,1,opt,name=accountId,proto3" json:"accountId,omitempty"`
@@ -1035,7 +1231,7 @@ type FetchAccountEnvsRequest struct {
 
 func (x *FetchAccountEnvsRequest) Reset() {
 	*x = FetchAccountEnvsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[18]
+	mi := &file_api_v2_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1047,7 +1243,7 @@ func (x *FetchAccountEnvsRequest) String() string {
 func (*FetchAccountEnvsRequest) ProtoMessage() {}
 
 func (x *FetchAccountEnvsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[18]
+	mi := &file_api_v2_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1060,7 +1256,7 @@ func (x *FetchAccountEnvsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEnvsRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountEnvsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{18}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *FetchAccountEnvsRequest) GetAccountId() string {
@@ -1095,7 +1291,7 @@ type FetchAccountEnvsResponse struct {
 
 func (x *FetchAccountEnvsResponse) Reset() {
 	*x = FetchAccountEnvsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[19]
+	mi := &file_api_v2_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1107,7 +1303,7 @@ func (x *FetchAccountEnvsResponse) String() string {
 func (*FetchAccountEnvsResponse) ProtoMessage() {}
 
 func (x *FetchAccountEnvsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[19]
+	mi := &file_api_v2_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1120,7 +1316,7 @@ func (x *FetchAccountEnvsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEnvsResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountEnvsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{19}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *FetchAccountEnvsResponse) GetData() []*Env {
@@ -1155,7 +1351,7 @@ type FetchAccountSigningKeysRequest struct {
 
 func (x *FetchAccountSigningKeysRequest) Reset() {
 	*x = FetchAccountSigningKeysRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[20]
+	mi := &file_api_v2_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1363,7 @@ func (x *FetchAccountSigningKeysRequest) String() string {
 func (*FetchAccountSigningKeysRequest) ProtoMessage() {}
 
 func (x *FetchAccountSigningKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[20]
+	mi := &file_api_v2_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1376,7 @@ func (x *FetchAccountSigningKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountSigningKeysRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountSigningKeysRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{20}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *FetchAccountSigningKeysRequest) GetAccountId() string {
@@ -1215,7 +1411,7 @@ type FetchAccountSigningKeysResponse struct {
 
 func (x *FetchAccountSigningKeysResponse) Reset() {
 	*x = FetchAccountSigningKeysResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[21]
+	mi := &file_api_v2_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1227,7 +1423,7 @@ func (x *FetchAccountSigningKeysResponse) String() string {
 func (*FetchAccountSigningKeysResponse) ProtoMessage() {}
 
 func (x *FetchAccountSigningKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[21]
+	mi := &file_api_v2_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1240,7 +1436,7 @@ func (x *FetchAccountSigningKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountSigningKeysResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountSigningKeysResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{21}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *FetchAccountSigningKeysResponse) GetData() []*SigningKey {
@@ -1269,17 +1465,15 @@ type SigningKey struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Environment   string                 `protobuf:"bytes,3,opt,name=environment,proto3" json:"environment,omitempty"`
-	KeyPrefix     string                 `protobuf:"bytes,4,opt,name=keyPrefix,proto3" json:"keyPrefix,omitempty"`
-	IsActive      bool                   `protobuf:"varint,5,opt,name=isActive,proto3" json:"isActive,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
-	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=lastUsedAt,proto3" json:"lastUsedAt,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningKey) Reset() {
 	*x = SigningKey{}
-	mi := &file_api_v2_service_proto_msgTypes[22]
+	mi := &file_api_v2_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1291,7 +1485,7 @@ func (x *SigningKey) String() string {
 func (*SigningKey) ProtoMessage() {}
 
 func (x *SigningKey) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[22]
+	mi := &file_api_v2_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1304,7 +1498,7 @@ func (x *SigningKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningKey.ProtoReflect.Descriptor instead.
 func (*SigningKey) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{22}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SigningKey) GetId() string {
@@ -1328,30 +1522,16 @@ func (x *SigningKey) GetEnvironment() string {
 	return ""
 }
 
-func (x *SigningKey) GetKeyPrefix() string {
+func (x *SigningKey) GetKey() string {
 	if x != nil {
-		return x.KeyPrefix
+		return x.Key
 	}
 	return ""
-}
-
-func (x *SigningKey) GetIsActive() bool {
-	if x != nil {
-		return x.IsActive
-	}
-	return false
 }
 
 func (x *SigningKey) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *SigningKey) GetLastUsedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LastUsedAt
 	}
 	return nil
 }
@@ -1430,7 +1610,23 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x18\n" +
 	"\ahasMore\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor\"\xfa\x01\n" +
+	"\a_cursor\"\xfd\x01\n" +
+	"\x1cFetchAccountEventKeysRequest\x12\x1c\n" +
+	"\taccountId\x18\x01 \x01(\tR\taccountId\x12J\n" +
+	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12^\n" +
+	"\x05limit\x18\x03 \x01(\x05BC\x92A@2:Number of event keys to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x9d\x01\n" +
+	"\x1dFetchAccountEventKeysResponse\x12$\n" +
+	"\x04data\x18\x01 \x03(\v2\x10.api.v2.EventKeyR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x9c\x01\n" +
+	"\bEventKey\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xfa\x01\n" +
 	"\x17FetchAccountEnvsRequest\x12\x1c\n" +
 	"\taccountId\x18\x01 \x01(\tR\taccountId\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
@@ -1450,18 +1646,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1fFetchAccountSigningKeysResponse\x12&\n" +
 	"\x04data\x18\x01 \x03(\v2\x12.api.v2.SigningKeyR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x82\x02\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x9e\x01\n" +
 	"\n" +
 	"SigningKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x1c\n" +
-	"\tkeyPrefix\x18\x04 \x01(\tR\tkeyPrefix\x12\x1a\n" +
-	"\bisActive\x18\x05 \x01(\bR\bisActive\x128\n" +
-	"\tcreatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12:\n" +
-	"\n" +
-	"lastUsedAt\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastUsedAt2\x98!\n" +
+	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb7)\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1577,8 +1769,32 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1c\x12\x1a/accounts/{accountId}/envs\x12\xe3\x06\n" +
-	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xf6\x05\x92A\xc8\x05\x12\x19List account signing keys\x1aMLists signing keys for a specific account, optionally filtered by environmentJZ\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1c\x12\x1a/accounts/{accountId}/envs\x12\xb6\a\n" +
+	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xcf\x06\x92A\xa3\x06\x12\x17List account event keys\x1a\xaf\x01Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.JV\n" +
+	"\x03200\x12O\n" +
+	"\x1aList of account event keys\x121\n" +
+	"/\x1a-#/definitions/v2FetchAccountEventKeysResponseJR\n" +
+	"\x03400\x12K\n" +
+	"&Bad Request - invalid query parameters\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJI\n" +
+	"\x03404\x12B\n" +
+	"\x1dNot Found - account not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00rd\n" +
+	"b\n" +
+	"\rX-Inngest-Env\x12OFilter event keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\"\x12 /accounts/{accountId}/event-keys\x12\xc9\a\n" +
+	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xdc\x06\x92A\xae\x06\x12\x19List account signing keys\x1a\xb2\x01Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys.JZ\n" +
 	"\x03200\x12S\n" +
 	"\x1cList of account signing keys\x123\n" +
 	"1\x1a/#/definitions/v2FetchAccountSigningKeysResponseJR\n" +
@@ -1619,7 +1835,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_api_v2_service_proto_goTypes = []any{
 	(*HealthRequest)(nil),                   // 0: api.v2.HealthRequest
 	(*FetchAccountRequest)(nil),             // 1: api.v2.FetchAccountRequest
@@ -1639,63 +1855,71 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*FetchAccountResponse)(nil),            // 15: api.v2.FetchAccountResponse
 	(*Account)(nil),                         // 16: api.v2.Account
 	(*Page)(nil),                            // 17: api.v2.Page
-	(*FetchAccountEnvsRequest)(nil),         // 18: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),        // 19: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),  // 20: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil), // 21: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                      // 22: api.v2.SigningKey
-	(*timestamppb.Timestamp)(nil),           // 23: google.protobuf.Timestamp
+	(*FetchAccountEventKeysRequest)(nil),    // 18: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),   // 19: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                        // 20: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),         // 21: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),        // 22: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),  // 23: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil), // 24: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                      // 25: api.v2.SigningKey
+	(*timestamppb.Timestamp)(nil),           // 26: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	3,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	6,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	4,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	23, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	23, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	26, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	26, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	12, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
 	6,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
 	11, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	6,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
-	23, // 9: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	23, // 10: api.v2.Env.updatedAt:type_name -> google.protobuf.Timestamp
-	23, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	23, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	26, // 9: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	26, // 10: api.v2.Env.updatedAt:type_name -> google.protobuf.Timestamp
+	26, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	26, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	16, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	6,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	17, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	16, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	6,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	23, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	23, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	11, // 20: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	6,  // 21: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	17, // 22: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	22, // 23: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	6,  // 24: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	17, // 25: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	23, // 26: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	23, // 27: api.v2.SigningKey.lastUsedAt:type_name -> google.protobuf.Timestamp
-	0,  // 28: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	0,  // 29: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	7,  // 30: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
-	9,  // 31: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	13, // 32: api.v2.V2.FetchAccounts:input_type -> api.v2.FetchAccountsRequest
-	1,  // 33: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	18, // 34: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	20, // 35: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	2,  // 36: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	5,  // 37: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	8,  // 38: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
-	10, // 39: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	14, // 40: api.v2.V2.FetchAccounts:output_type -> api.v2.FetchAccountsResponse
-	15, // 41: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	19, // 42: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	21, // 43: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	36, // [36:44] is the sub-list for method output_type
-	28, // [28:36] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	26, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	26, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	20, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	6,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	17, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	26, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	11, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	6,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	17, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	25, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	6,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	17, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	26, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	0,  // 31: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	0,  // 32: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	7,  // 33: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
+	9,  // 34: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	13, // 35: api.v2.V2.FetchAccounts:input_type -> api.v2.FetchAccountsRequest
+	1,  // 36: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	21, // 37: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	18, // 38: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	23, // 39: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	2,  // 40: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	5,  // 41: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	8,  // 42: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
+	10, // 43: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	14, // 44: api.v2.V2.FetchAccounts:output_type -> api.v2.FetchAccountsResponse
+	15, // 45: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	22, // 46: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	19, // 47: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	24, // 48: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	40, // [40:49] is the sub-list for method output_type
+	31, // [31:40] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -1708,14 +1932,15 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[13].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[17].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[18].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[20].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[21].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[23].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   23,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

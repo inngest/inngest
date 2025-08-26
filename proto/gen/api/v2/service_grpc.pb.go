@@ -26,6 +26,7 @@ const (
 	V2_FetchAccounts_FullMethodName           = "/api.v2.V2/FetchAccounts"
 	V2_FetchAccount_FullMethodName            = "/api.v2.V2/FetchAccount"
 	V2_FetchAccountEnvs_FullMethodName        = "/api.v2.V2/FetchAccountEnvs"
+	V2_FetchAccountEventKeys_FullMethodName   = "/api.v2.V2/FetchAccountEventKeys"
 	V2_FetchAccountSigningKeys_FullMethodName = "/api.v2.V2/FetchAccountSigningKeys"
 )
 
@@ -41,6 +42,7 @@ type V2Client interface {
 	FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
+	FetchAccountEventKeys(ctx context.Context, in *FetchAccountEventKeysRequest, opts ...grpc.CallOption) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 }
 
@@ -122,6 +124,16 @@ func (c *v2Client) FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsReq
 	return out, nil
 }
 
+func (c *v2Client) FetchAccountEventKeys(ctx context.Context, in *FetchAccountEventKeysRequest, opts ...grpc.CallOption) (*FetchAccountEventKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchAccountEventKeysResponse)
+	err := c.cc.Invoke(ctx, V2_FetchAccountEventKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchAccountSigningKeysResponse)
@@ -144,6 +156,7 @@ type V2Server interface {
 	FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
+	FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
@@ -175,6 +188,9 @@ func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest)
 }
 func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEnvs not implemented")
+}
+func (UnimplementedV2Server) FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEventKeys not implemented")
 }
 func (UnimplementedV2Server) FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountSigningKeys not implemented")
@@ -326,6 +342,24 @@ func _V2_FetchAccountEnvs_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_FetchAccountEventKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchAccountEventKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).FetchAccountEventKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_FetchAccountEventKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).FetchAccountEventKeys(ctx, req.(*FetchAccountEventKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_FetchAccountSigningKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchAccountSigningKeysRequest)
 	if err := dec(in); err != nil {
@@ -378,6 +412,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchAccountEnvs",
 			Handler:    _V2_FetchAccountEnvs_Handler,
+		},
+		{
+			MethodName: "FetchAccountEventKeys",
+			Handler:    _V2_FetchAccountEventKeys_Handler,
 		},
 		{
 			MethodName: "FetchAccountSigningKeys",
