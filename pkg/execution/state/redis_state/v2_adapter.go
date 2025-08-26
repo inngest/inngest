@@ -15,24 +15,44 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-func MustRunServiceV2(m statev1.Manager) state.RunService {
-	v2, err := RunServiceV2(m)
+func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
+	o := &mgrV2Opts{}
+	for _, apply := range opts {
+		apply(o)
+	}
+
+	v2, err := runServiceV2(m, *o)
 	if err != nil {
 		panic(err)
 	}
+
 	return v2
 }
 
-func RunServiceV2(m statev1.Manager) (state.RunService, error) {
+func runServiceV2(m statev1.Manager, opts mgrV2Opts) (state.RunService, error) {
 	mgr, ok := m.(*mgr)
 	if !ok {
 		return nil, fmt.Errorf("cannot convert %T into type redis_state.*mgr", m)
 	}
-	return v2{mgr}, nil
+
+	v2 := v2{mgr: mgr, disabledRetries: opts.disabledRetries}
+	return v2, nil
+}
+
+type MgrV2Opt func(o *mgrV2Opts)
+type mgrV2Opts struct {
+	disabledRetries bool
+}
+
+func WithDisabledRetries() MgrV2Opt {
+	return func(o *mgrV2Opts) {
+		o.disabledRetries = true
+	}
 }
 
 type v2 struct {
-	mgr *mgr
+	mgr             *mgr
+	disabledRetries bool
 }
 
 // Create creates new state in the store for the given run ID.
@@ -267,7 +287,7 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
@@ -289,7 +309,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			attempt++
 			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 		},
-		util.NewRetryConf(
+		v.retryPolicy(
 			util.WithRetryConfRetryableErrors(v.retryableError),
 			util.WithRetryConfMaxBackoff(10*time.Second),
 			util.WithRetryConfMaxAttempts(10),
@@ -350,10 +370,18 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 			err := v.mgr.SavePending(ctx, v1id, pending)
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
+}
+
+func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
+	if v.disabledRetries {
+		return util.NewRetryConf(util.WithRetryConfMaxAttempts(1))
+	}
+	val := util.NewRetryConf(opts...)
+	return val
 }
 
 // determine what errors are retriable
