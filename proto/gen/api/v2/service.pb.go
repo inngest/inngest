@@ -1653,7 +1653,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
-	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb7)\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xc5)\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1665,8 +1665,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\t\x12\a/health\x12;\n" +
-	"\v_SchemaOnly\x12\x15.api.v2.HealthRequest\x1a\x15.api.v2.ErrorResponse\x12\xab\x05\n" +
-	"\rCreateAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\xdc\x04\x92A\xb6\x04\x12\x16Create partner account\x1a2Creates a sub-account (if you have partner access)JP\n" +
+	"\v_SchemaOnly\x12\x15.api.v2.HealthRequest\x1a\x15.api.v2.ErrorResponse\x12\xb2\x05\n" +
+	"\x14CreatePartnerAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\xdc\x04\x92A\xb6\x04\x12\x16Create partner account\x1a2Creates a sub-account (if you have partner access)JP\n" +
 	"\x03201\x12I\n" +
 	"\x1cAccount successfully created\x12)\n" +
 	"'\x1a%#/definitions/v2CreateAccountResponseJL\n" +
@@ -1709,8 +1709,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/accounts/{accountId}/envs\x12\xcf\x04\n" +
-	"\rFetchAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\x80\x04\x92A\xdd\x03\x12\x15List partner accounts\x1a/Lists sub-accounts (if you have partner access)JD\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/accounts/{accountId}/envs\x12\xd6\x04\n" +
+	"\x14FetchPartnerAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\x80\x04\x92A\xdd\x03\x12\x15List partner accounts\x1a/Lists sub-accounts (if you have partner access)JD\n" +
 	"\x03200\x12=\n" +
 	"\x10List of accounts\x12)\n" +
 	"'\x1a%#/definitions/v2FetchAccountsResponseJR\n" +
@@ -1899,18 +1899,18 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	26, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	0,  // 31: api.v2.V2.Health:input_type -> api.v2.HealthRequest
 	0,  // 32: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	7,  // 33: api.v2.V2.CreateAccount:input_type -> api.v2.CreateAccountRequest
+	7,  // 33: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
 	9,  // 34: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	13, // 35: api.v2.V2.FetchAccounts:input_type -> api.v2.FetchAccountsRequest
+	13, // 35: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
 	1,  // 36: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
 	21, // 37: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
 	18, // 38: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
 	23, // 39: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
 	2,  // 40: api.v2.V2.Health:output_type -> api.v2.HealthResponse
 	5,  // 41: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	8,  // 42: api.v2.V2.CreateAccount:output_type -> api.v2.CreateAccountResponse
+	8,  // 42: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
 	10, // 43: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	14, // 44: api.v2.V2.FetchAccounts:output_type -> api.v2.FetchAccountsResponse
+	14, // 44: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
 	15, // 45: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
 	22, // 46: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
 	19, // 47: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse

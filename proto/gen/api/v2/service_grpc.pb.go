@@ -21,9 +21,9 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	V2_Health_FullMethodName                  = "/api.v2.V2/Health"
 	V2_XSchemaOnly_FullMethodName             = "/api.v2.V2/_SchemaOnly"
-	V2_CreateAccount_FullMethodName           = "/api.v2.V2/CreateAccount"
+	V2_CreatePartnerAccount_FullMethodName    = "/api.v2.V2/CreatePartnerAccount"
 	V2_CreateEnv_FullMethodName               = "/api.v2.V2/CreateEnv"
-	V2_FetchAccounts_FullMethodName           = "/api.v2.V2/FetchAccounts"
+	V2_FetchPartnerAccounts_FullMethodName    = "/api.v2.V2/FetchPartnerAccounts"
 	V2_FetchAccount_FullMethodName            = "/api.v2.V2/FetchAccount"
 	V2_FetchAccountEnvs_FullMethodName        = "/api.v2.V2/FetchAccountEnvs"
 	V2_FetchAccountEventKeys_FullMethodName   = "/api.v2.V2/FetchAccountEventKeys"
@@ -37,9 +37,9 @@ type V2Client interface {
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
-	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
+	CreatePartnerAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
-	FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
+	FetchPartnerAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(ctx context.Context, in *FetchAccountEventKeysRequest, opts ...grpc.CallOption) (*FetchAccountEventKeysResponse, error)
@@ -74,10 +74,10 @@ func (c *v2Client) XSchemaOnly(ctx context.Context, in *HealthRequest, opts ...g
 	return out, nil
 }
 
-func (c *v2Client) CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error) {
+func (c *v2Client) CreatePartnerAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateAccountResponse)
-	err := c.cc.Invoke(ctx, V2_CreateAccount_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, V2_CreatePartnerAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +94,10 @@ func (c *v2Client) CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...
 	return out, nil
 }
 
-func (c *v2Client) FetchAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error) {
+func (c *v2Client) FetchPartnerAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchAccountsResponse)
-	err := c.cc.Invoke(ctx, V2_FetchAccounts_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, V2_FetchPartnerAccounts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,9 +151,9 @@ type V2Server interface {
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
 	XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error)
-	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
+	CreatePartnerAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
-	FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
+	FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error)
@@ -174,14 +174,14 @@ func (UnimplementedV2Server) Health(context.Context, *HealthRequest) (*HealthRes
 func (UnimplementedV2Server) XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method XSchemaOnly not implemented")
 }
-func (UnimplementedV2Server) CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateAccount not implemented")
+func (UnimplementedV2Server) CreatePartnerAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePartnerAccount not implemented")
 }
 func (UnimplementedV2Server) CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateEnv not implemented")
 }
-func (UnimplementedV2Server) FetchAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccounts not implemented")
+func (UnimplementedV2Server) FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchPartnerAccounts not implemented")
 }
 func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchAccount not implemented")
@@ -252,20 +252,20 @@ func _V2_XSchemaOnly_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _V2_CreateAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _V2_CreatePartnerAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateAccountRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(V2Server).CreateAccount(ctx, in)
+		return srv.(V2Server).CreatePartnerAccount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: V2_CreateAccount_FullMethodName,
+		FullMethod: V2_CreatePartnerAccount_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(V2Server).CreateAccount(ctx, req.(*CreateAccountRequest))
+		return srv.(V2Server).CreatePartnerAccount(ctx, req.(*CreateAccountRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -288,20 +288,20 @@ func _V2_CreateEnv_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-func _V2_FetchAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _V2_FetchPartnerAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchAccountsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(V2Server).FetchAccounts(ctx, in)
+		return srv.(V2Server).FetchPartnerAccounts(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: V2_FetchAccounts_FullMethodName,
+		FullMethod: V2_FetchPartnerAccounts_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(V2Server).FetchAccounts(ctx, req.(*FetchAccountsRequest))
+		return srv.(V2Server).FetchPartnerAccounts(ctx, req.(*FetchAccountsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -394,16 +394,16 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_XSchemaOnly_Handler,
 		},
 		{
-			MethodName: "CreateAccount",
-			Handler:    _V2_CreateAccount_Handler,
+			MethodName: "CreatePartnerAccount",
+			Handler:    _V2_CreatePartnerAccount_Handler,
 		},
 		{
 			MethodName: "CreateEnv",
 			Handler:    _V2_CreateEnv_Handler,
 		},
 		{
-			MethodName: "FetchAccounts",
-			Handler:    _V2_FetchAccounts_Handler,
+			MethodName: "FetchPartnerAccounts",
+			Handler:    _V2_FetchPartnerAccounts_Handler,
 		},
 		{
 			MethodName: "FetchAccount",

@@ -30,6 +30,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   }
 };
 
+
 service V2 {
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
@@ -72,7 +73,7 @@ service V2 {
   // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
   rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
   
-  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {
+  rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
       post: "/partner/accounts",
       body : "*"
@@ -239,7 +240,7 @@ service V2 {
     };
   }
 
-  rpc FetchAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
+  rpc FetchPartnerAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
     option (google.api.http) = {
       get: "/partner/accounts"
     };

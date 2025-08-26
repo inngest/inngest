@@ -53,8 +53,8 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.True(t, authzCalled)
 		
@@ -133,8 +133,8 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		
 		// Check that it's a permission denied error with specific message
@@ -234,8 +234,8 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount) - should hit both middlewares
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount) - should hit both middlewares
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.True(t, authnCalled, "Authentication middleware should be called")
 		require.True(t, authzCalled, "Authorization middleware should be called")
@@ -340,10 +340,10 @@ func TestGRPCInterceptors(t *testing.T) {
 		// Reset for next test
 		receivedMethod = ""
 
-		// Test CreateAccount method (should use POST based on annotation)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test CreatePartnerAccount method (should use POST based on annotation)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err) // Now expects error since it's not implemented
-		require.Equal(t, http.MethodPost, receivedMethod, "CreateAccount method should use POST")
+		require.Equal(t, http.MethodPost, receivedMethod, "CreatePartnerAccount method should use POST")
 	})
 }
 
@@ -359,9 +359,9 @@ func TestParseMethodName(t *testing.T) {
 			expected:   "Health",
 		},
 		{
-			name:       "create account method",
-			fullMethod: "/api.v2.V2/CreateAccount",
-			expected:   "CreateAccount",
+			name:       "create partner account method",
+			fullMethod: "/api.v2.V2/CreatePartnerAccount",
+			expected:   "CreatePartnerAccount",
 		},
 		{
 			name:       "empty string",
@@ -400,8 +400,8 @@ func TestRequiresAuthorization(t *testing.T) {
 			expected:   false,
 		},
 		{
-			name:       "create account method should require authorization",
-			fullMethod: "/api.v2.V2/CreateAccount",
+			name:       "create partner account method should require authorization",
+			fullMethod: "/api.v2.V2/CreatePartnerAccount",
 			expected:   true,
 		},
 		{
