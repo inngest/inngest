@@ -250,6 +250,9 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Account ID is required")
 	}
 
+	// Extract environment from X-Inngest-Env header
+	envName := GetInngestEnvHeader(ctx)
+
 	// Validate pagination parameters
 	if req.Limit != nil {
 		if *req.Limit < 1 {
@@ -261,6 +264,8 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 	}
 
 	// For now, return not implemented since this is OSS
+	// Note: envName can be used to filter by environment when implemented
+	_ = envName
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account event keys not implemented in OSS")
 }
 
