@@ -318,7 +318,7 @@ service V2 {
 
   rpc FetchAccount(FetchAccountRequest) returns (FetchAccountResponse) {
     option (google.api.http) = {
-      get: "/accounts"
+      get: "/account"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account"
