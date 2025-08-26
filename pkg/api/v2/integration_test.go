@@ -19,7 +19,7 @@ func setupGRPCTestServer(t testing.TB) (apiv2.V2Client, func()) {
 	lis := bufconn.Listen(bufSize)
 
 	server := grpc.NewServer()
-	service := NewService()
+	service := NewService(ServiceOptions{})
 	apiv2.RegisterV2Server(server, service)
 
 	go func() {
@@ -134,13 +134,13 @@ func TestGRPCIntegration_Health(t *testing.T) {
 
 func TestGRPCIntegration_ServiceImplementation(t *testing.T) {
 	t.Run("service implements V2Server interface", func(t *testing.T) {
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		require.Implements(t, (*apiv2.V2Server)(nil), service)
 	})
 
 	t.Run("service registers successfully with gRPC server", func(t *testing.T) {
 		server := grpc.NewServer()
-		service := NewService()
+		service := NewService(ServiceOptions{})
 
 		require.NotPanics(t, func() {
 			apiv2.RegisterV2Server(server, service)
