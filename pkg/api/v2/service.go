@@ -233,6 +233,12 @@ func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAcc
 }
 
 func (s *Service) CreateEnv(ctx context.Context, req *apiv2.CreateEnvRequest) (*apiv2.CreateEnvResponse, error) {
+	// Validate required fields
+	if req.Name == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Environment name is required")
+	}
+
+	// For now, return not implemented since this is OSS
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Environments not implemented in OSS")
 }
 
@@ -241,15 +247,10 @@ func (s *Service) FetchPartnerAccounts(ctx context.Context, req *apiv2.FetchAcco
 }
 
 func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountRequest) (*apiv2.FetchAccountResponse, error) {
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Accounts not implemented in OSS")
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Current account not implemented in OSS")
 }
 
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
-	// Validate required fields
-	if req.AccountId == "" {
-		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Account ID is required")
-	}
-
 	// Extract environment from X-Inngest-Env header
 	envName := GetInngestEnvHeader(ctx)
 
@@ -270,11 +271,6 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 }
 
 func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountEnvsRequest) (*apiv2.FetchAccountEnvsResponse, error) {
-	// Validate required fields
-	if req.AccountId == "" {
-		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Account ID is required")
-	}
-
 	// Validate pagination parameters
 	if req.Limit != nil {
 		if *req.Limit < 1 {
@@ -287,4 +283,24 @@ func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountE
 
 	// For now, return not implemented since this is OSS
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account environments not implemented in OSS")
+}
+
+func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchAccountSigningKeysRequest) (*apiv2.FetchAccountSigningKeysResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := GetInngestEnvHeader(ctx)
+
+	// Validate pagination parameters
+	if req.Limit != nil {
+		if *req.Limit < 1 {
+			return nil, NewError(http.StatusBadRequest, ErrorInvalidFieldFormat, "Limit must be at least 1")
+		}
+		if *req.Limit > 100 {
+			return nil, NewError(http.StatusBadRequest, ErrorInvalidFieldFormat, "Limit cannot exceed 100")
+		}
+	}
+
+	// For now, return not implemented since this is OSS
+	// Note: envName can be used to filter by environment when implemented
+	_ = envName
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account signing keys not implemented in OSS")
 }
