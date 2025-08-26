@@ -16,7 +16,7 @@ export function ExecutionOverageBanner() {
   useEffect(() => {
     if (isBannerVisible && executionOverageData && trackingUser) {
       trackEvent({
-        name: 'app/billing_cta.viewed',
+        name: 'app/billing.cta.viewed',
         data: {
           cta: 'execution-overage-banner',
           entitlement: 'executions',
