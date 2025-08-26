@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
 import {
   NumberCell,
@@ -14,35 +13,13 @@ import {
 } from '@inngest/components/Table';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import type { Replay } from '@inngest/components/types/replay';
-import { differenceInMilliseconds, formatMilliseconds } from '@inngest/components/utils/date';
+import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
-import { useQuery } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
-import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useGetReplays } from '@/components/Replay/useGetReplay';
 import { pathCreator } from '@/utils/urls';
-
-const GetReplaysDocument = graphql(`
-  query GetReplays($environmentID: ID!, $functionSlug: String!) {
-    environment: workspace(id: $environmentID) {
-      id
-      function: workflowBySlug(slug: $functionSlug) {
-        id
-        replays {
-          id
-          name
-          createdAt
-          endedAt
-          functionRunsScheduledCount
-          functionRunsProcessedCount
-          filters
-        }
-      }
-    }
-  }
-`);
 
 const columnHelper = createColumnHelper<Replay>();
 
@@ -121,59 +98,11 @@ type Props = {
 export function ReplayList({ functionSlug }: Props) {
   const environment = useEnvironment();
   const router = useRouter();
-  const client = useClient();
 
-  const {
-    data: replays,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['replays', environment.id],
-    queryFn: async () => {
-      const result = await client
-        .query(GetReplaysDocument, { environmentID: environment.id, functionSlug })
-        .toPromise();
-
-      if (result.error) {
-        throw result.error;
-      }
-
-      // Map and transform into Replay[]
-      const replays: Replay[] =
-        result.data?.environment.function?.replays.map((replay) => {
-          const baseReplay = {
-            ...replay,
-            createdAt: new Date(replay.createdAt),
-            runsCount: replay.functionRunsScheduledCount,
-            runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
-          };
-
-          if (replay.endedAt) {
-            return {
-              ...baseReplay,
-              status: 'ENDED',
-              endedAt: new Date(replay.endedAt),
-              duration: differenceInMilliseconds(
-                new Date(replay.endedAt),
-                new Date(replay.createdAt)
-              ),
-            };
-          }
-
-          return {
-            ...baseReplay,
-            status: 'CREATED',
-            endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
-          };
-        }) ?? [];
-
-      return replays;
-    },
-    refetchInterval: 5000,
-  });
+  const { isLoading, error, data: replays } = useGetReplays(functionSlug);
 
   if (error) {
-    return <Alert severity="error">Could not load replays</Alert>;
+    throw error;
   }
 
   return (
