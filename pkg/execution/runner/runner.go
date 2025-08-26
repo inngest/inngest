@@ -263,10 +263,11 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 		// blocking the startup process. This allows multiple functions to be
 		// initialized concurrently.
 		go func(ctx context.Context, fn inngest.Function) {
-			// Create a CronItem with CronInit operation to initialize the schedule.
-			// The CronInit operation is idempotent - it will only create a schedule
-			// if one doesn't already exist for this function.
-			ci := cron.CronItem{
+			// Configure queue item parameters for the cron sync job
+			//
+			// This will trigger the cron manager's UpdateSchedule method with the
+			// CronInit operation to initialize the schedule if needed.
+			if err := s.croner.Sync(ctx, cron.CronItem{
 				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 				AccountID:       consts.DevServerAccountID,
 				WorkspaceID:     consts.DevServerEnvID,
@@ -274,34 +275,8 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 				FunctionVersion: fn.FunctionVersion,
 				Expression:      fn.ScheduleExpression(),
 				Op:              enums.CronInit, // Initialize operation
-			}
-
-			// Configure queue item parameters for the cron sync job
-			maxAttempts := consts.MaxRetries + 1
-			kind := queue.KindCronSync
-			at := ulid.Time(ci.ID.Time())
-			jobID := ci.SyncID()
-
-			// Enqueue the CronItem as a sync job to be processed by the cron manager.
-			// This will trigger the cron manager's UpdateSchedule method with the
-			// CronInit operation to initialize the schedule if needed.
-			if err := s.queue.Enqueue(ctx, queue.Item{
-				JobID:       &jobID,
-				GroupID:     uuid.NewString(),
-				WorkspaceID: ci.WorkspaceID,
-				Kind:        kind,
-				Identifier: state.Identifier{
-					AccountID:       ci.AccountID,
-					WorkspaceID:     ci.WorkspaceID,
-					AppID:           ci.AppID,
-					WorkflowID:      ci.FunctionID,
-					WorkflowVersion: ci.FunctionVersion,
-				},
-				MaxAttempts: &maxAttempts,
-				Payload:     ci,
-				QueueName:   &kind,
-			}, at, queue.EnqueueOpts{}); err != nil {
-				l.Error("error enqueueing cron sync job", "error", err, "cron_item", ci)
+			}); err != nil {
+				l.Error("error initializing cron sync job", "error", err)
 			}
 		}(ctx, fn)
 	}

@@ -15,17 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/cqrs/sync"
-	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/cron"
-	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/version"
@@ -314,29 +311,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			l.Error("error registering functions", "error", err)
 		}
 
-		// enqueue cron sync to system queue
-		maxAttempts := consts.MaxRetries + 1
-		kind := queue.KindCronSync
+		// handle cron sync to system queue
 		for _, ci := range crons {
-			at := ulid.Time(ci.ID.Time())
-			jobID := ci.SyncID()
-			if err := a.devserver.Queue.Enqueue(ctx, queue.Item{
-				JobID:       &jobID,
-				GroupID:     uuid.New().String(),
-				WorkspaceID: ci.WorkspaceID,
-				Kind:        kind,
-				Identifier: state.Identifier{
-					AccountID:       ci.AccountID,
-					WorkspaceID:     ci.WorkspaceID,
-					AppID:           ci.AppID,
-					WorkflowID:      ci.FunctionID,
-					WorkflowVersion: ci.FunctionVersion,
-				},
-				MaxAttempts: &maxAttempts,
-				Payload:     ci,
-				QueueName:   &kind,
-			}, at, queue.EnqueueOpts{}); err != nil {
-				l.Error("error enqueueing cron sync job", "error", err, "cron_item", ci)
+			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
+				l.Error("error on cron sync", "error", err)
 			}
 		}
 	}()
