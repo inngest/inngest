@@ -153,6 +153,9 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 
 	r := chi.NewRouter()
 
+	// Add JSON type validation middleware first (before auth)
+	r.Use(JSONTypeValidationMiddleware())
+
 	if opts.AuthnMiddleware != nil {
 		r.Use(opts.AuthnMiddleware)
 	}
@@ -225,6 +228,7 @@ func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.
 
 // CreatePartnerAccount implements a protected endpoint that requires authorization
 func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
+
 	// Return multiple errors for the not implemented functionality
 	return nil, NewErrors(http.StatusNotImplemented,
 		ErrorItem{Code: ErrorNotImplemented, Message: "Accounts not implemented in OSS"},
