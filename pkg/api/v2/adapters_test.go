@@ -95,7 +95,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 		}
 
 		server := NewGRPCServerFromHTTPOptions(httpOpts)
-		
+
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
 		go func() {
@@ -118,7 +118,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 		// Test protected method (CreatePartnerAccount) - should be blocked
 		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
-		
+
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.PermissionDenied, st.Code())
@@ -133,7 +133,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 		httpOpts := HTTPHandlerOptions{}
 
 		server := NewGRPCServerFromHTTPOptions(httpOpts)
-		
+
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
 		go func() {

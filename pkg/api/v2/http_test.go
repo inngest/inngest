@@ -149,7 +149,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		require.True(t, authzCalled)
+		require.True(t, authzCalled, "Authorization middleware should be called")
 		require.Equal(t, http.StatusForbidden, rec.Code)
 	})
 

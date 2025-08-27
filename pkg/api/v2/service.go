@@ -153,6 +153,7 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 
 	r := chi.NewRouter()
 
+	// Add authentication middleware first
 	if opts.AuthnMiddleware != nil {
 		r.Use(opts.AuthnMiddleware)
 	}
@@ -167,11 +168,19 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 		// Apply authorization middleware if this path requires it
 		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && opts.AuthzMiddleware != nil {
 			authzHandler := opts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
+				// Add JSON validation after authorization for protected paths
+				validationHandler := JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					gwmux.ServeHTTP(w, r)
+				}))
+				validationHandler.ServeHTTP(w, r)
 			}))
 			authzHandler.ServeHTTP(w, req)
 		} else {
-			gwmux.ServeHTTP(w, req)
+			// Add JSON validation for unprotected paths
+			validationHandler := JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gwmux.ServeHTTP(w, r)
+			}))
+			validationHandler.ServeHTTP(w, req)
 		}
 
 		// Restore original path for logging
@@ -225,6 +234,7 @@ func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.
 
 // CreatePartnerAccount implements a protected endpoint that requires authorization
 func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
+
 	// Return multiple errors for the not implemented functionality
 	return nil, NewErrors(http.StatusNotImplemented,
 		ErrorItem{Code: ErrorNotImplemented, Message: "Accounts not implemented in OSS"},
