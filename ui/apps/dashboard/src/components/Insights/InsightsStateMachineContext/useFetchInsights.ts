@@ -16,8 +16,8 @@ export interface FetchInsightsParams {
 type FetchInsightsCallback = (query: string, name: undefined | string) => void;
 
 const insightsQuery = graphql(`
-  query Insights($query: String!) {
-    insights(query: $query) {
+  query Insights($query: String!, $workspaceID: ID!) {
+    insights(query: $query, workspaceID: $workspaceID) {
       columns {
         name
         columnType
