@@ -1,3 +1,5 @@
+'use client';
+
 import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
