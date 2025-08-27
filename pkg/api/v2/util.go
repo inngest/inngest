@@ -1,10 +1,12 @@
 package apiv2
 
 import (
+	"context"
 	"net/http"
 
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/genproto/googleapis/api/annotations"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -65,4 +67,15 @@ func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
 	
 	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
 	return authzOpts.RequireAuthz
+}
+
+// GetInngestEnvHeader extracts the X-Inngest-Env header value from the gRPC context.
+// Returns an empty string if the header is not present.
+func GetInngestEnvHeader(ctx context.Context) string {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if values := md.Get("x-inngest-env"); len(values) > 0 {
+			return values[0]
+		}
+	}
+	return ""
 }

@@ -37,7 +37,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		md := metadata.Pairs("authorization", "Bearer valid-token")
 		ctx := metadata.NewIncomingContext(ctx, md)
 
-		err := authzFunc(ctx, "/api.v2.V2/CreateAccount")
+		err := authzFunc(ctx, "/api.v2.V2/CreatePartnerAccount")
 		require.NoError(t, err)
 	})
 
@@ -50,7 +50,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 
 		authzFunc := HTTPMiddlewareToGRPCInterceptor(blockMiddleware)
 
-		err := authzFunc(ctx, "/api.v2.V2/CreateAccount")
+		err := authzFunc(ctx, "/api.v2.V2/CreatePartnerAccount")
 		require.Error(t, err)
 
 		st, ok := status.FromError(err)
@@ -75,7 +75,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		md := metadata.Pairs("authorization", "Bearer invalid-token")
 		ctx := metadata.NewIncomingContext(ctx, md)
 
-		err := authzFunc(ctx, "/api.v2.V2/CreateAccount")
+		err := authzFunc(ctx, "/api.v2.V2/CreatePartnerAccount")
 		require.Error(t, err)
 	})
 }
@@ -115,8 +115,8 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount) - should be blocked
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount) - should be blocked
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		
 		st, ok := status.FromError(err)
@@ -158,7 +158,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp1)
 
-		resp2, err := client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		resp2, err := client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.Nil(t, resp2)
 	})
