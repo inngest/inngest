@@ -261,7 +261,10 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 	now := time.Now()
 
 	// First commit date: 2021-05-13 09:30:04 -0700
-	firstCommitTime := time.Date(2021, 5, 13, 16, 30, 4, 0, time.UTC)
+	firstCommitTime, err := time.Parse("2006-01-02 15:04:05", "2021-05-13 09:30:04")
+	if err != nil {
+		return nil, err // NewError something something
+	}
 
 	// Return the default dev server account
 	account := &apiv2.Account{
@@ -315,7 +318,10 @@ func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountE
 	now := time.Now()
 
 	// First commit date: 2021-05-13 09:30:04 -0700
-	firstCommitTime := time.Date(2021, 5, 13, 16, 30, 4, 0, time.UTC)
+	firstCommitTime, err := time.Parse("2006-01-02 15:04:05", "2021-05-13 09:30:04")
+	if err != nil {
+		return nil, err // NewError something something
+	}
 
 	// Return the default dev server environment
 	defaultEnv := &apiv2.Env{
