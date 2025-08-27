@@ -14,8 +14,11 @@ type SigningKeysProvider interface {
 
 type signingKeysProvider string
 
-func NewSigningKeysProvider(signingKey string) SigningKeysProvider {
-	return signingKeysProvider(signingKey)
+func NewSigningKeysProvider(signingKey *string) SigningKeysProvider {
+	if signingKey == nil {
+		return nil
+	}
+	return signingKeysProvider(*signingKey)
 }
 
 func (key signingKeysProvider) GetSigningKeys(ctx context.Context) ([]*apiv2.SigningKey, error) {
