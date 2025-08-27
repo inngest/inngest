@@ -26,6 +26,7 @@ require (
 	github.com/eko/gocache/lib/v4 v4.1.5
 	github.com/eko/gocache/store/freecache/v4 v4.2.1
 	github.com/eko/gocache/store/rueidis/v4 v4.1.5
+	github.com/elliotchance/orderedmap/v3 v3.1.0
 	github.com/fatih/structs v1.1.0
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/getkin/kin-openapi v0.132.0

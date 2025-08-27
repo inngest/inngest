@@ -18,6 +18,7 @@ import (
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
+	"github.com/elliotchance/orderedmap/v3"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -92,7 +93,9 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	spanMap := make(map[string]*cqrs.OtelSpan)
+	// We need an ordered map here because we loop over it later
+	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
+
 	// A map of dynamic span IDs to the specific span ID that contains an
 	// output
 	outputDynamicRefs := make(map[string]string)
@@ -203,10 +206,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		spanMap[span.DynamicSpanID.String] = newSpan
+		spanMap.Set(span.DynamicSpanID.String, newSpan)
 	}
 
-	for _, span := range spanMap {
+	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
 		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
@@ -223,11 +226,11 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		}
 
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
-			root = spanMap[span.SpanID]
+			root, _ = spanMap.Get(span.SpanID)
 			continue
 		}
 
-		if parent, ok := spanMap[*span.ParentSpanID]; ok {
+		if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
 			// This is wrong. Either do it properly in DB or infer it
 			// correctly here. e.g. if child failed but more attempts coming,
 			// still running
@@ -235,7 +238,8 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				parent.Status = span.Status
 			}
 
-			parent.Children = append(parent.Children, spanMap[span.SpanID])
+			item, _ := spanMap.Get(span.SpanID)
+			parent.Children = append(parent.Children, item)
 		} else {
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
