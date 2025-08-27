@@ -2,28 +2,18 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
+import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import { makeQuerySnapshot } from '../queries';
 import { simulateQuery } from './mocks';
 import { insightsStateMachineReducer } from './reducer';
 import type { InsightsState } from './types';
-
-const DEFAULT_QUERY = `SELECT 
-  HOUR(ts) as hour, 
-  COUNT(*) as count 
-WHERE 
-  name = 'cli/dev_ui.loaded' 
-  AND data.os != 'linux'
-  AND ts > 1752845983000 
-GROUP BY
-  hour 
-ORDER BY 
-  hour desc`;
 
 const INITIAL_STATE: InsightsState = {
   data: undefined,
   error: undefined,
   fetchMoreError: undefined,
   lastSentQuery: '',
-  query: DEFAULT_QUERY,
   status: 'initial',
 };
 
@@ -31,6 +21,9 @@ interface InsightsStateMachineContextValue extends InsightsState {
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
+  onNameChange: (name: string) => void;
+  query: string;
+  queryName: string;
   runQuery: () => void;
 }
 
@@ -38,34 +31,42 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
+  onQueryChange: (query: string) => void;
+  onQueryNameChange: (name: string) => void;
+  query: string;
+  queryName: string;
   renderChildren: boolean;
 };
 
 export function InsightsStateMachineContextProvider({
   children,
+  onQueryChange,
+  onQueryNameChange,
+  query,
+  queryName,
   renderChildren,
 }: InsightsStateMachineContextProviderProps) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
+  const { saveQuerySnapshot } = useStoredQueries();
 
   // TODO: Ensure runQuery and fetchMore cannot finish out of order
   // if run in quick succession.
   const runQuery = useCallback(async () => {
-    dispatch({ type: 'START_QUERY' });
+    dispatch({ type: 'START_QUERY', payload: query });
 
     try {
-      const result = await simulateQuery(queryState.query, null);
+      const result = await simulateQuery(query, null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
+      saveQuerySnapshot(
+        makeQuerySnapshot(query, queryName === UNTITLED_QUERY ? undefined : queryName)
+      );
     } catch (error) {
       dispatch({
         type: 'QUERY_ERROR',
         payload: stringifyError(error),
       });
     }
-  }, [queryState.query]);
-
-  const onChange = useCallback((value: string) => {
-    dispatch({ type: 'UPDATE_CONTENT', payload: value });
-  }, []);
+  }, [query, queryName, saveQuerySnapshot]);
 
   const fetchMore = useCallback(async () => {
     dispatch({ type: 'FETCH_MORE' });
@@ -88,9 +89,12 @@ export function InsightsStateMachineContextProvider({
     <InsightsStateMachineContext.Provider
       value={{
         ...queryState,
+        query,
+        queryName,
         fetchMore,
-        isEmpty: queryState.query.trim() === '',
-        onChange,
+        isEmpty: query.trim() === '',
+        onChange: onQueryChange,
+        onNameChange: onQueryNameChange,
         runQuery,
       }}
     >
