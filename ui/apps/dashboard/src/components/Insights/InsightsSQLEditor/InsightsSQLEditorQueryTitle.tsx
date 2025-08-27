@@ -13,7 +13,7 @@ type InsightsSQLEditorQueryTitleProps = {
 };
 
 export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitleProps) {
-  const { queryName, onNameChange } = useInsightsStateMachineContext();
+  const { onNameChange, queryName } = useInsightsStateMachineContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
