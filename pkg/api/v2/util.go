@@ -17,7 +17,7 @@ func getHTTPRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
 	if !proto.HasExtension(opts, annotations.E_Http) {
 		return nil
 	}
-	
+
 	httpRule := proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
 	return httpRule
 }
@@ -28,7 +28,7 @@ func getHTTPMethodAndPath(method protoreflect.MethodDescriptor) (httpMethod, pat
 	if httpRule == nil {
 		return http.MethodPost, "" // Default for gRPC
 	}
-	
+
 	// Extract both method and path from the annotation pattern
 	switch pattern := httpRule.Pattern.(type) {
 	case *annotations.HttpRule_Get:
@@ -64,7 +64,7 @@ func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
 	if !proto.HasExtension(opts, apiv2.E_Authz) {
 		return false
 	}
-	
+
 	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
 	return authzOpts.RequireAuthz
 }

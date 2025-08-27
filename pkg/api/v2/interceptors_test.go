@@ -57,7 +57,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.True(t, authzCalled)
-		
+
 		// Check that it's a permission denied error
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -136,7 +136,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		// Test protected method (CreatePartnerAccount)
 		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
-		
+
 		// Check that it's a permission denied error with specific message
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -183,7 +183,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		_, err = client.Health(ctx, &apiv2.HealthRequest{})
 		require.Error(t, err)
 		require.True(t, authnCalled)
-		
+
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.Unauthenticated, st.Code())
@@ -239,7 +239,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, authnCalled, "Authentication middleware should be called")
 		require.True(t, authzCalled, "Authorization middleware should be called")
-		
+
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.PermissionDenied, st.Code())
