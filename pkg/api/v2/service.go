@@ -22,16 +22,19 @@ import (
 type Service struct {
 	apiv2.UnimplementedV2Server
 	signingKeys SigningKeysProvider
+	eventKeys   EventKeysProvider
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
+	EventKeysProvider   EventKeysProvider
 }
 
 func NewService(opts ServiceOptions) *Service {
 	return &Service{
 		signingKeys: opts.SigningKeysProvider,
+		eventKeys:   opts.EventKeysProvider,
 	}
 }
 
@@ -309,10 +312,48 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		}
 	}
 
-	// For now, return not implemented since this is OSS
-	// Note: envName can be used to filter by environment when implemented
-	_ = envName
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account event keys not implemented in OSS")
+	// If no event keys provider is configured, return empty list
+	// This happens in dev mode where event keys aren't required
+	if s.eventKeys == nil {
+		return &apiv2.FetchAccountEventKeysResponse{
+			Data: []*apiv2.EventKey{},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt:   timestamppb.New(time.Now()),
+				CachedUntil: nil,
+			},
+			Page: &apiv2.Page{
+				HasMore: false,
+			},
+		}, nil
+	}
+
+	// Get event keys from the provider
+	keys, err := s.eventKeys.GetEventKeys(ctx)
+	if err != nil {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Failed to fetch event keys")
+	}
+
+	// Filter by environment if specified
+	var filteredKeys []*apiv2.EventKey
+	for _, key := range keys {
+		if envName == "" || key.Environment == envName {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+
+	// For now, return all keys without pagination
+	// In a real implementation, you'd handle cursor-based pagination here
+
+	return &apiv2.FetchAccountEventKeysResponse{
+		Data: filteredKeys,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+		},
+	}, nil
 }
 
 func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountEnvsRequest) (*apiv2.FetchAccountEnvsResponse, error) {

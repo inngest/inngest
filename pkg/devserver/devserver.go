@@ -583,6 +583,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create the API v2 service handler
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
+		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 	}
 
 	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
