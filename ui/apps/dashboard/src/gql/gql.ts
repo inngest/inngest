@@ -95,6 +95,7 @@ const documents = {
     "\n  query GetEventV2($envID: ID!, $eventID: ULID!) {\n    environment: workspace(id: $envID) {\n      eventV2(id: $eventID) {\n        name\n        id\n        receivedAt\n        idempotencyKey\n        occurredAt\n        version\n        source {\n          name\n        }\n      }\n    }\n  }\n": types.GetEventV2Document,
     "\n  query GetEventPayload($envID: ID!, $eventID: ULID!) {\n    environment: workspace(id: $envID) {\n      eventV2(id: $eventID) {\n        raw\n      }\n    }\n  }\n": types.GetEventPayloadDocument,
     "\n  query GetEventV2Runs($envID: ID!, $eventID: ULID!) {\n    environment: workspace(id: $envID) {\n      eventV2(id: $eventID) {\n        name\n        runs {\n          status\n          id\n          startedAt\n          endedAt\n          function {\n            name\n            slug\n          }\n        }\n      }\n    }\n  }\n": types.GetEventV2RunsDocument,
+    "\n  query ExecutionOverageCheck {\n    account {\n      id\n      entitlements {\n        executions {\n          limit\n        }\n      }\n    }\n  }\n": types.ExecutionOverageCheckDocument,
     "\n  mutation CreateCancellation($input: CreateCancellationInput!) {\n    createCancellation(input: $input) {\n      id\n    }\n  }\n": types.CreateCancellationDocument,
     "\n  query GetCancellationRunCount(\n    $envID: ID!\n    $functionSlug: String!\n    $queuedAtMin: Time\n    $queuedAtMax: Time!\n  ) {\n    environment: workspace(id: $envID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        cancellationRunCount(input: { queuedAtMin: $queuedAtMin, queuedAtMax: $queuedAtMax })\n      }\n    }\n  }\n": types.GetCancellationRunCountDocument,
     "\n  mutation PauseFunction($fnID: ID!, $cancelRunning: Boolean) {\n    pauseFunction(fnID: $fnID, cancelRunning: $cancelRunning) {\n      id\n    }\n  }\n": types.PauseFunctionDocument,
@@ -487,6 +488,10 @@ export function graphql(source: "\n  query GetEventPayload($envID: ID!, $eventID
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetEventV2Runs($envID: ID!, $eventID: ULID!) {\n    environment: workspace(id: $envID) {\n      eventV2(id: $eventID) {\n        name\n        runs {\n          status\n          id\n          startedAt\n          endedAt\n          function {\n            name\n            slug\n          }\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetEventV2Runs($envID: ID!, $eventID: ULID!) {\n    environment: workspace(id: $envID) {\n      eventV2(id: $eventID) {\n        name\n        runs {\n          status\n          id\n          startedAt\n          endedAt\n          function {\n            name\n            slug\n          }\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query ExecutionOverageCheck {\n    account {\n      id\n      entitlements {\n        executions {\n          limit\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query ExecutionOverageCheck {\n    account {\n      id\n      entitlements {\n        executions {\n          limit\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
