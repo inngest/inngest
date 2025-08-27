@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { trackEvent, useTrackingUser } from '@/utils/tracking';
-import { parseExecutionOverageData, useExecutionOverageCheck } from './data';
+import { isFreePlan, parseExecutionOverageData, useExecutionOverageCheck } from './data';
 
 const STORAGE_KEY = 'executionOverageDismissedUntil';
 
@@ -55,7 +55,12 @@ export function useExecutionOverage() {
   );
 
   const isBannerVisible =
-    !error && executionOverageData && executionOverageData.hasExceeded && isReady && shouldShow;
+    !error &&
+    executionOverageData &&
+    executionOverageData.hasExceeded &&
+    isFreePlan(executionOverageData.planSlug) &&
+    isReady &&
+    shouldShow;
 
   return {
     isBannerVisible,

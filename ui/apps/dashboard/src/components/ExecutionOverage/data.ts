@@ -11,6 +11,9 @@ const executionOverageQuery = graphql(`
           limit
         }
       }
+      plan {
+        slug
+      }
     }
   }
 `);
@@ -19,6 +22,7 @@ export type ExecutionOverageData = {
   hasExceeded: boolean;
   executionCount: number;
   executionLimit: number | null;
+  planSlug: string | null;
 };
 
 export function useExecutionOverageCheck() {
@@ -40,16 +44,22 @@ export function useExecutionOverageCheck() {
   };
 }
 
+export function isFreePlan(planSlug: string | null): boolean {
+  if (!planSlug) return false;
+  return planSlug.toLowerCase().includes('free');
+}
+
 export function parseExecutionOverageData(
   data: any,
   usageData: any[]
 ): ExecutionOverageData | null {
   if (!data?.account) return null;
 
-  const { entitlements } = data.account;
+  const { entitlements, plan } = data.account;
   const { executions } = entitlements;
 
   const limit = executions.limit;
+  const planSlug = plan?.slug || null;
 
   // Calculate current usage by summing the time series data
   const usage = usageData.reduce((sum, point) => {
@@ -63,5 +73,6 @@ export function parseExecutionOverageData(
     hasExceeded,
     executionCount: usage,
     executionLimit: limit,
+    planSlug,
   };
 }
