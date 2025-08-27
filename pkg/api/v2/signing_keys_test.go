@@ -27,7 +27,7 @@ func TestFetchAccountSigningKeys_NoProvider(t *testing.T) {
 func TestFetchAccountSigningKeys_WithProvider(t *testing.T) {
 	// Test with signing keys provider (start mode)
 	signingKey := "test-signing-key"
-	provider := NewSigningKeysProvider(signingKey)
+	provider := NewSigningKeysProvider(&signingKey)
 
 	service := NewService(ServiceOptions{
 		SigningKeysProvider: provider,
@@ -57,7 +57,8 @@ func TestFetchAccountSigningKeys_WithProvider(t *testing.T) {
 
 func TestSigningKeysProvider(t *testing.T) {
 	t.Run("returns signing key even when empty", func(t *testing.T) {
-		provider := NewSigningKeysProvider("")
+		emptyKey := ""
+		provider := NewSigningKeysProvider(&emptyKey)
 		keys, err := provider.GetSigningKeys(context.Background())
 		require.NoError(t, err)
 		require.Len(t, keys, 1)
@@ -72,7 +73,7 @@ func TestSigningKeysProvider(t *testing.T) {
 
 	t.Run("returns signing key with value", func(t *testing.T) {
 		signingKey := "test-key-123"
-		provider := NewSigningKeysProvider(signingKey)
+		provider := NewSigningKeysProvider(&signingKey)
 
 		keys, err := provider.GetSigningKeys(context.Background())
 		require.NoError(t, err)
