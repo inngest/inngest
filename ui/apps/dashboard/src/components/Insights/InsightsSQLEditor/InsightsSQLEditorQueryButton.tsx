@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button } from '@inngest/components/Button/Button';
 import { RiCommandLine, RiCornerDownLeftFill } from '@remixicon/react';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { getCanRunQuery } from './utils';
 
 function QueryButtonLabel({ isRunning }: { isRunning: boolean }) {
   if (isRunning) return null;
@@ -22,11 +24,28 @@ function QueryButtonLabel({ isRunning }: { isRunning: boolean }) {
 export function InsightsSQLEditorQueryButton() {
   const { query, runQuery, status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+  const canRunQuery = getCanRunQuery(query, isRunning);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && canRunQuery) {
+        event.preventDefault();
+        event.stopPropagation();
+        runQuery();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canRunQuery, runQuery]);
 
   return (
     <Button
       className="w-[135px] font-medium"
-      disabled={query.trim() === '' || isRunning}
+      disabled={!canRunQuery}
       label={<QueryButtonLabel isRunning={isRunning} />}
       loading={isRunning}
       onClick={(e) => {
