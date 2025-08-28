@@ -73,17 +73,40 @@ type SerializableRequest struct {
 	// If specified, the HTTP response will be tee-read into the specific channel
 	// and topic.
 	Publish RequestPublishOpts `json:"publish,omitzero"`
+
+	// MaxAttempts defines the number of retries for transient errors (i/o timeout).
+	// Defaults to 1.
+	MaxAttempts int
 }
 
-func NewRequest(method string, url string, body json.RawMessage) (SerializableRequest, error) {
+type requestOptions struct {
+	maxAttempts int
+}
+
+type requestOption func(o *requestOptions)
+
+func WithMaxAttempts(attempts int) requestOption {
+	return func(o *requestOptions) {
+		o.maxAttempts = attempts
+	}
+}
+
+func NewRequest(method string, url string, body json.RawMessage, opts ...requestOption) (SerializableRequest, error) {
 	if !validMethod(method) {
 		return SerializableRequest{}, fmt.Errorf("invalid http method: %s", method)
 	}
+
+	o := &requestOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	return SerializableRequest{
-		Method: method,
-		URL:    url,
-		Body:   body,
-		Header: http.Header{},
+		Method:      method,
+		URL:         url,
+		Body:        body,
+		Header:      http.Header{},
+		MaxAttempts: o.maxAttempts,
 	}, nil
 }
 
