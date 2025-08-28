@@ -9,7 +9,7 @@ import { useExecutionOverage } from './useExecutionOverage';
 export function ExecutionOverageBanner() {
   const { isBannerVisible, executionOverageData, dismiss } = useExecutionOverage();
 
-  // Track CTA viewed when banner becomes visible temporarily disabled
+  // Track CTA viewed when banner becomes visible (temporarily disabled).
   // useEffect(() => {
   //   if (isBannerVisible && executionOverageData && trackingUser) {
   //     trackEvent({
