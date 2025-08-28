@@ -68,11 +68,18 @@ func TestExamplesJSONStructure(t *testing.T) {
 					t.Errorf("Path '%s' method '%s' has invalid status code '%s' (should be 1xx-5xx)", path, method, statusCode)
 				}
 				
-				// Validate example is an object (not a primitive)
-				if exampleMap, ok := example.(map[string]interface{}); !ok {
-					t.Errorf("Path '%s' method '%s' status '%s' example should be an object, got %T", path, method, statusCode, example)
-				} else if len(exampleMap) == 0 {
-					t.Errorf("Path '%s' method '%s' status '%s' example is empty - add example data", path, method, statusCode)
+				// Validate example is an object or non-empty string
+				switch v := example.(type) {
+				case map[string]interface{}:
+					if len(v) == 0 {
+						t.Errorf("Path '%s' method '%s' status '%s' example is empty - add example data", path, method, statusCode)
+					}
+				case string:
+					if v == "" {
+						t.Errorf("Path '%s' method '%s' status '%s' example is empty string - add example data", path, method, statusCode)
+					}
+				default:
+					t.Errorf("Path '%s' method '%s' status '%s' example should be an object or string, got %T", path, method, statusCode, example)
 				}
 			}
 			

@@ -5,17 +5,16 @@
         "data": {
           "createdAt": "2024-01-10T09:15:00Z",
           "email": "user@company.com",
-          "id": "acc_current_user",
+          "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
           "name": "Current User",
           "updatedAt": "2024-01-20T12:00:00Z"
         },
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
-      "401": {
-        "// TODO": "Add example data for get /account 401"
-      },
+      "401": "Authentication failed",
       "500": {
         "// TODO": "Add example data for get /account 500"
       }
@@ -27,22 +26,22 @@
         "data": [
           {
             "createdAt": "2024-01-10T09:15:00Z",
-            "id": "env_prod_123",
+            "id": "a1b2c3d4-e5f6-4789-abc1-234567890def",
             "name": "production",
             "type": "PRODUCTION"
           },
           {
             "createdAt": "2024-01-12T11:30:00Z",
-            "id": "env_stage_456",
+            "id": "b2c3d4e5-f6a7-4890-bcd2-34567890abef",
             "name": "staging",
             "type": "TEST"
           }
         ],
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         },
         "page": {
-          "cursor": null,
           "hasMore": false,
           "limit": 50
         }
@@ -50,9 +49,7 @@
       "400": {
         "// TODO": "Add example data for get /envs 400"
       },
-      "401": {
-        "// TODO": "Add example data for get /envs 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "// TODO": "Add example data for get /envs 403"
       },
@@ -67,20 +64,19 @@
       "201": {
         "data": {
           "createdAt": "2024-01-20T14:22:33Z",
-          "id": "env_new_789",
+          "id": "c3d4e5f6-a7b8-4901-cde3-4567890bcfa0",
           "name": "development",
           "type": "BRANCH"
         },
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
       "400": {
         "// TODO": "Add example data for post /envs 400"
       },
-      "401": {
-        "// TODO": "Add example data for post /envs 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "// TODO": "Add example data for post /envs 403"
       },
@@ -99,12 +95,11 @@
           "status": "ok"
         },
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
-      "401": {
-        "// TODO": "Add example data for get /health 401"
-      },
+      "401": "Authentication failed",
       "500": {
         "// TODO": "Add example data for get /health 500"
       }
@@ -117,23 +112,24 @@
           {
             "createdAt": "2024-01-15T10:30:00Z",
             "environment": "production",
-            "id": "ek_12345",
+            "id": "d4e5f6a7-b8c9-4012-def4-567890cdab12",
             "key": "inngest-event-key-prod-abc123",
             "name": "Production Event Key"
           },
           {
             "createdAt": "2024-01-18T14:22:33Z",
             "environment": "staging",
-            "id": "ek_67890",
+            "id": "e5f6a7b8-c9d0-4123-efa5-67890dbc1234",
             "key": "inngest-event-key-stage-def456",
             "name": "Staging Event Key"
           }
         ],
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         },
         "page": {
-          "cursor": "next_page_token_events",
+          "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
           "hasMore": true,
           "limit": 20
         }
@@ -141,9 +137,7 @@
       "400": {
         "// TODO": "Add example data for get /keys/events 400"
       },
-      "401": {
-        "// TODO": "Add example data for get /keys/events 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "// TODO": "Add example data for get /keys/events 403"
       },
@@ -162,12 +156,13 @@
           {
             "createdAt": "2024-01-15T10:30:00Z",
             "environment": "production",
-            "id": "sk_12345",
+            "id": "f6a7b8c9-d0e1-4234-fab6-7890ecd23456",
             "key": "signkey-prod-abc123def456",
-            "name": "Production Signing Key"
+            "name": ""
           }
         ],
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         },
         "page": {
@@ -179,9 +174,7 @@
       "400": {
         "// TODO": "Add example data for get /keys/signing 400"
       },
-      "401": {
-        "// TODO": "Add example data for get /keys/signing 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "// TODO": "Add example data for get /keys/signing 403"
       },
@@ -200,33 +193,32 @@
           {
             "createdAt": "2024-01-15T10:30:00Z",
             "email": "partner1@company.com",
-            "id": "acc_12345",
+            "id": "a7b8c9d0-e1f2-4345-abc7-890fed345678",
             "name": "Partner Account 1",
             "updatedAt": "2024-01-15T10:30:00Z"
           },
           {
             "createdAt": "2024-01-18T14:22:33Z",
             "email": "partner2@company.com",
-            "id": "acc_67890",
+            "id": "b8c9d0e1-f2a3-4456-bcd8-90aef4567890",
             "name": "Partner Account 2",
             "updatedAt": "2024-01-18T14:22:33Z"
           }
         ],
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         },
         "page": {
-          "cursor": "next_page_token_xyz",
+          "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
           "hasMore": true,
-          "limit": 20
+          "limit": 2
         }
       },
       "400": {
         "// TODO": "Add example data for get /partner/accounts 400"
       },
-      "401": {
-        "// TODO": "Add example data for get /partner/accounts 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "errors": [
           {
@@ -242,14 +234,15 @@
     "post": {
       "201": {
         "data": {
-          "apiKey": "inngest-api-key-abc123",
+          "apiKey": "api-abcdef1234567890",
           "createdAt": "2024-01-20T14:22:33Z",
           "email": "user@example.com",
-          "id": "acc_12345",
+          "id": "c9d0e1f2-a3b4-4567-cde9-01bfa5678901",
           "name": "Jane Smith",
           "updatedAt": "2024-01-20T14:22:33Z"
         },
         "metadata": {
+          "cachedUntil": null,
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
@@ -261,9 +254,7 @@
           }
         ]
       },
-      "401": {
-        "// TODO": "Add example data for post /partner/accounts 401"
-      },
+      "401": "Authentication failed",
       "403": {
         "// TODO": "Add example data for post /partner/accounts 403"
       },
