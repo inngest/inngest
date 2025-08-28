@@ -616,3 +616,96 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 
 	r.Equal(1, int(atomic.LoadInt32(&counter)))
 }
+
+func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
+	ctx := context.Background()
+	c := client.New(t)
+
+	testID := fmt.Sprintf("parallel-fail-%d", time.Now().UnixNano())
+	inngestClient, server, registerFuncs := NewSDKHandler(t, testID)
+	defer server.Close()
+
+	failureCount := int32(0)
+	runID := ""
+
+	functionID := fmt.Sprintf("parallel-fail-test-%d", time.Now().UnixNano())
+	eventName := fmt.Sprintf("test/parallel-fail-%d", time.Now().UnixNano())
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      functionID,
+			Retries: inngestgo.Ptr(0),
+		},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
+			res := group.Parallel(ctx,
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "step-a", func(ctx context.Context) (any, error) {
+						return nil, fmt.Errorf("step a failed")
+					})
+				},
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "step-b", func(ctx context.Context) (any, error) {
+						return nil, fmt.Errorf("step b failed")
+					})
+				},
+				)
+
+			// Check if any parallel step failed and propagate error to trigger onFailure
+			if err := res.AnyError(); err != nil {
+				return nil, err
+			}
+
+			return res, nil
+		},
+		)
+	require.NoError(t, err)
+
+	// onFailure equivalent function
+	handlerID := fmt.Sprintf("handle-parallel-failures-%d", time.Now().UnixNano())
+	expectedFunctionID := fmt.Sprintf("%s-%s", testID, functionID)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      handlerID,
+			Retries: inngestgo.Ptr(0),
+		},
+		inngestgo.EventTrigger(
+			"inngest/function.failed",
+			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", expectedFunctionID)),
+			),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&failureCount, 1)
+
+			assert.NotEmpty(t, input.Event.Data["run_id"])
+			assert.Equal(t, expectedFunctionID, input.Event.Data["function_id"])
+
+			return "handled", nil
+		},
+		)
+	require.NoError(t, err)
+
+	registerFuncs()
+
+	_, err = inngestClient.Send(ctx, inngestgo.Event{
+		Name: eventName,
+		Data: map[string]any{"test": true},
+	})
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.Equal(t, 1, int(atomic.LoadInt32(&failureCount)))
+	}, 15*time.Second, 500*time.Millisecond)
+
+	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+		Status:  models.FunctionStatusFailed,
+		Timeout: 10 * time.Second,
+	})
+	require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+}
