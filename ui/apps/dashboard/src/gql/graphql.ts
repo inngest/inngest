@@ -1591,7 +1591,7 @@ export type QueryExecutionTimeSeriesArgs = {
 
 export type QueryInsightsArgs = {
   query: Scalars['String'];
-  workspaceID: Scalars['ID'];
+  workspaceID: InputMaybe<Scalars['ID']>;
 };
 
 
