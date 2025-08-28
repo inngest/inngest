@@ -47,7 +47,7 @@ type debugAPI struct {
 }
 
 func (d *debugAPI) Name() string {
-	return "debug-api"
+	return "debug-api-dev"
 }
 
 func (d *debugAPI) Pre(ctx context.Context) error {

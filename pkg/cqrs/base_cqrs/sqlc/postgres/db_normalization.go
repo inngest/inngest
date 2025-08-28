@@ -762,8 +762,8 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpansByDebugRunID(ctx context.Context, debugRunID string) ([]*sqlc_sqlite.GetSpansByDebugRunIDRow, error) {
-	rows, err := q.db.GetSpansByDebugRunID(ctx, debugRunID)
+func (q NormalizedQueries) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*sqlc_sqlite.GetSpansByDebugRunIDRow, error) {
+	rows, err := q.db.GetSpansByDebugRunID(ctx, debugRunID.String)
 	if err != nil {
 		return nil, err
 	}
@@ -776,8 +776,8 @@ func (q NormalizedQueries) GetSpansByDebugRunID(ctx context.Context, debugRunID 
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSessionID string) ([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, error) {
-	rows, err := q.db.GetSpansByDebugSessionID(ctx, debugSessionID)
+func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, error) {
+	rows, err := q.db.GetSpansByDebugSessionID(ctx, debugSessionID.String)
 	if err != nil {
 		return nil, err
 	}

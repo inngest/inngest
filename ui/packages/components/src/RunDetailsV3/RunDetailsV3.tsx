@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useShared } from '../SharedContext/SharedContext';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { Skeleton } from '../Skeleton';
@@ -53,6 +54,7 @@ export const RunDetailsV3 = ({
   pollInterval: initialPollInterval,
   initialRunData,
 }: Props) => {
+  const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
@@ -136,19 +138,19 @@ export const RunDetailsV3 = ({
 
   const {
     data: runData,
-    loading: runLoading,
     error: runError,
     refetch: refetchRun,
   } = useGetRun({
     runID,
     preview: tracesPreviewEnabled,
-    refetchInterval: pollInterval,
+    //
+    // TODO: enable this for cloud once we're sure we can handle the load
+    refetchInterval: cloud ? 0 : pollInterval,
   });
 
   const outputID = runData?.trace?.outputID;
   const {
     data: resultData,
-    loading: resultLoading,
     error: resultError,
     refetch: refetchResult,
   } = useGetTraceResult({
@@ -180,7 +182,6 @@ export const RunDetailsV3 = ({
 
   return (
     <>
-      {runLoading && <Skeleton className="h-24 w-full" />}
       {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
@@ -257,7 +258,6 @@ export const RunDetailsV3 = ({
               getTrigger={getTrigger}
               runID={runID}
               result={resultData}
-              resultLoading={resultLoading}
             />
           )}
         </div>

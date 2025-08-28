@@ -30,7 +30,7 @@ type responseMetadata struct {
 func TestHTTPGateway_Health(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("GET /api/v2/health returns success", func(t *testing.T) {
@@ -89,9 +89,9 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -112,9 +112,9 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -125,12 +125,104 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		require.Equal(t, http.StatusUnauthorized, rec.Code)
 		require.Equal(t, "Unauthorized", rec.Body.String())
 	})
+
+	t.Run("authorization middleware blocks protected endpoints", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		require.NoError(t, err)
+
+		// Test protected endpoint (CreatePartnerAccount)
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.True(t, authzCalled, "Authorization middleware should be called")
+		require.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("authorization middleware not applied to health endpoint", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		require.NoError(t, err)
+
+		// Test health endpoint (should not trigger authz middleware)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.False(t, authzCalled)
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("both authentication and authorization middleware work together", func(t *testing.T) {
+		authnCalled := false
+		authzCalled := false
+
+		authnMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authnCalled = true
+				r.Header.Set("X-Authn-Called", "true")
+				next.ServeHTTP(w, r)
+			})
+		}
+
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errors":[{"code":"forbidden","message":"Access denied"}]}`))
+			})
+		}
+
+		opts := HTTPHandlerOptions{
+			AuthnMiddleware: authnMiddleware,
+			AuthzMiddleware: authzMiddleware,
+		}
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		require.NoError(t, err)
+
+		// Test protected endpoint (CreatePartnerAccount) - should hit both middlewares
+		req := httptest.NewRequest(http.MethodPost, "/api/v2/partner/accounts", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.True(t, authnCalled, "Authentication middleware should be called")
+		require.True(t, authzCalled, "Authorization middleware should be called for protected endpoint")
+		require.Equal(t, http.StatusForbidden, rec.Code)
+	})
 }
 
 func TestHTTPGateway_Routing(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("routes without /api/v2 prefix return 404", func(t *testing.T) {
@@ -171,7 +263,7 @@ func TestHTTPGateway_Routing(t *testing.T) {
 func TestHTTPGateway_ContentTypes(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("accepts application/json content type for valid methods", func(t *testing.T) {
@@ -211,7 +303,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 		cancel()
 
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(cancelledCtx, opts)
+		handler, err := NewHTTPHandler(cancelledCtx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -221,7 +313,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 func TestHTTPGateway_ResponseFormat(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("response format matches expected schema", func(t *testing.T) {
@@ -270,7 +362,7 @@ func TestHTTPGateway_ResponseFormat(t *testing.T) {
 func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("handles concurrent requests", func(t *testing.T) {
@@ -301,7 +393,7 @@ func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 func BenchmarkHTTPGateway_Health(b *testing.B) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, opts)
+	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(b, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -311,7 +403,7 @@ func BenchmarkHTTPGateway_Health(b *testing.B) {
 		for pb.Next() {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
-			
+
 			if rec.Code != http.StatusOK {
 				b.Fatalf("Expected status 200, got %d", rec.Code)
 			}

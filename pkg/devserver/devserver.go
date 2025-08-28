@@ -581,8 +581,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Create the API v2 service handler
-	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, apiv2.HTTPHandlerOptions{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
+	serviceOpts := apiv2.ServiceOptions{
+		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
+		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
+	}
+
+	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
+		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
@@ -905,7 +910,16 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 
 	opt, err := rueidis.ParseURL(redisURI)
 	if err != nil {
-		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: invalid format")
+	}
+
+	// Fix for Redis Sentinel authentication: rueidis.ParseURL correctly identifies
+	// Sentinel configurations but fails to populate Sentinel credentials.
+	// When a master_set is configured but Sentinel credentials are empty,
+	// copy the main credentials to Sentinel authentication.
+	if opt.Sentinel.MasterSet != "" && opt.Sentinel.Username == "" && opt.Username != "" {
+		opt.Sentinel.Username = opt.Username
+		opt.Sentinel.Password = opt.Password
 	}
 
 	// Set default overrides

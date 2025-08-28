@@ -38,12 +38,19 @@ const (
 	// DebugGetPartitionStatusProcedure is the fully-qualified name of the Debug's GetPartitionStatus
 	// RPC.
 	DebugGetPartitionStatusProcedure = "/debug.v1.Debug/GetPartitionStatus"
+	// DebugGetQueueItemProcedure is the fully-qualified name of the Debug's GetQueueItem RPC.
+	DebugGetQueueItemProcedure = "/debug.v1.Debug/GetQueueItem"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
 type DebugClient interface {
+	// GetPartition retrieves the partition data from the database
 	GetPartition(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionResponse], error)
+	// GetPartition retrieves additional status of the partition from the queue
+	// directly
 	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
+	// GetQueueItem retrieves the queue item object from the queue
+	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -69,6 +76,12 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
 			connect.WithClientOptions(opts...),
 		),
+		getQueueItem: connect.NewClient[v1.QueueItemRequest, v1.QueueItemResponse](
+			httpClient,
+			baseURL+DebugGetQueueItemProcedure,
+			connect.WithSchema(debugMethods.ByName("GetQueueItem")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -76,6 +89,7 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 type debugClient struct {
 	getPartition       *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
 	getPartitionStatus *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
+	getQueueItem       *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -88,10 +102,20 @@ func (c *debugClient) GetPartitionStatus(ctx context.Context, req *connect.Reque
 	return c.getPartitionStatus.CallUnary(ctx, req)
 }
 
+// GetQueueItem calls debug.v1.Debug.GetQueueItem.
+func (c *debugClient) GetQueueItem(ctx context.Context, req *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error) {
+	return c.getQueueItem.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
+	// GetPartition retrieves the partition data from the database
 	GetPartition(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionResponse], error)
+	// GetPartition retrieves additional status of the partition from the queue
+	// directly
 	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
+	// GetQueueItem retrieves the queue item object from the queue
+	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -113,12 +137,20 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetQueueItemHandler := connect.NewUnaryHandler(
+		DebugGetQueueItemProcedure,
+		svc.GetQueueItem,
+		connect.WithSchema(debugMethods.ByName("GetQueueItem")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
 			debugGetPartitionHandler.ServeHTTP(w, r)
 		case DebugGetPartitionStatusProcedure:
 			debugGetPartitionStatusHandler.ServeHTTP(w, r)
+		case DebugGetQueueItemProcedure:
+			debugGetQueueItemHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -134,4 +166,8 @@ func (UnimplementedDebugHandler) GetPartition(context.Context, *connect.Request[
 
 func (UnimplementedDebugHandler) GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetPartitionStatus is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetQueueItem is not implemented"))
 }

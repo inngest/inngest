@@ -16,7 +16,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-
 // globalFlags are the flags that should be available on all commands
 var globalFlags = []cli.Flag{
 	&cli.BoolFlag{
@@ -52,13 +51,15 @@ func execute() {
 				os.Setenv("LOG_HANDLER", "json")
 			}
 
-			// Set LOG_LEVEL environment variable so the logger picks it up
-			if cmd.IsSet("log-level") {
-				os.Setenv("LOG_LEVEL", cmd.String("log-level"))
-			} else if cmd.Bool("verbose") {
-				os.Setenv("LOG_LEVEL", "debug")
-			} else {
-				os.Setenv("LOG_LEVEL", "info")
+			if os.Getenv("LOG_LEVEL") == "" {
+				// Set LOG_LEVEL environment variable so the logger picks it up
+				if cmd.IsSet("log-level") {
+					os.Setenv("LOG_LEVEL", cmd.String("log-level"))
+				} else if cmd.Bool("verbose") {
+					os.Setenv("LOG_LEVEL", "debug")
+				} else {
+					os.Setenv("LOG_LEVEL", "info")
+				}
 			}
 
 			m := tel.NewMetadata(ctx)

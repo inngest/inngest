@@ -13,7 +13,7 @@ import (
 )
 
 func TestService_Health(t *testing.T) {
-	service := NewService()
+	service := NewService(ServiceOptions{})
 
 	t.Run("returns health status with timestamp", func(t *testing.T) {
 		ctx := context.Background()
@@ -51,7 +51,7 @@ func TestService_Health(t *testing.T) {
 
 func TestNewService(t *testing.T) {
 	t.Run("creates new service instance", func(t *testing.T) {
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		require.NotNil(t, service)
 		require.IsType(t, &Service{}, service)
 	})
@@ -62,7 +62,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("creates HTTP handler without auth middleware", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -78,9 +78,9 @@ func TestNewHTTPHandler(t *testing.T) {
 		}
 
 		opts := HTTPHandlerOptions{
-			AuthMiddleware: authMiddleware,
+			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -96,7 +96,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("handles health endpoint correctly", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -114,7 +114,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("strips /api/v2 prefix correctly", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -129,7 +129,7 @@ func TestNewHTTPHandler(t *testing.T) {
 }
 
 func TestService_HealthResponse_Structure(t *testing.T) {
-	service := NewService()
+	service := NewService(ServiceOptions{})
 	ctx := context.Background()
 	req := &apiv2.HealthRequest{}
 
@@ -157,7 +157,7 @@ func TestService_HealthResponse_Structure(t *testing.T) {
 }
 
 func TestService_HealthRequest_Validation(t *testing.T) {
-	service := NewService()
+	service := NewService(ServiceOptions{})
 	ctx := context.Background()
 
 	t.Run("accepts nil request", func(t *testing.T) {
@@ -177,19 +177,19 @@ func TestService_HealthRequest_Validation(t *testing.T) {
 }
 
 func TestService_Metadata_Timestamp(t *testing.T) {
-	service := NewService()
+	service := NewService(ServiceOptions{})
 	ctx := context.Background()
 	req := &apiv2.HealthRequest{}
 
 	t.Run("timestamps are consistent and recent", func(t *testing.T) {
 		start := time.Now()
-		
+
 		resp1, err := service.Health(ctx, req)
 		require.NoError(t, err)
-		
+
 		resp2, err := service.Health(ctx, req)
 		require.NoError(t, err)
-		
+
 		end := time.Now()
 
 		time1 := resp1.Metadata.FetchedAt.AsTime()
@@ -210,10 +210,10 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 		require.NotNil(t, timestamp)
 
 		require.True(t, timestamp.IsValid())
-		
+
 		asTime := timestamp.AsTime()
 		require.False(t, asTime.IsZero())
-		
+
 		fromTime := timestamppb.New(asTime)
 		require.Equal(t, timestamp.Seconds, fromTime.Seconds)
 		require.Equal(t, timestamp.Nanos, fromTime.Nanos)

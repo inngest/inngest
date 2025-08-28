@@ -56,7 +56,6 @@ export const useGetRun = ({
         console.info('no runID provided, skipping getRun');
         return undefined;
       }
-
       const result = await shared.getRun({ runID, preview });
       if (result.error) {
         throw result.error;

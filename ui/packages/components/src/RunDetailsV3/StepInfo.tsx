@@ -12,6 +12,7 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
+import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
@@ -132,6 +133,7 @@ export const StepInfo = ({
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
 }) => {
+  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
@@ -191,7 +193,7 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && (
+        {runID && trace.stepID && (!cloud || prettyInput) && (
           <>
             <Button
               kind="primary"

@@ -35,11 +35,38 @@ const (
 const (
 	// V2HealthProcedure is the fully-qualified name of the V2's Health RPC.
 	V2HealthProcedure = "/api.v2.V2/Health"
+	// V2XSchemaOnlyProcedure is the fully-qualified name of the V2's _SchemaOnly RPC.
+	V2XSchemaOnlyProcedure = "/api.v2.V2/_SchemaOnly"
+	// V2CreatePartnerAccountProcedure is the fully-qualified name of the V2's CreatePartnerAccount RPC.
+	V2CreatePartnerAccountProcedure = "/api.v2.V2/CreatePartnerAccount"
+	// V2CreateEnvProcedure is the fully-qualified name of the V2's CreateEnv RPC.
+	V2CreateEnvProcedure = "/api.v2.V2/CreateEnv"
+	// V2FetchPartnerAccountsProcedure is the fully-qualified name of the V2's FetchPartnerAccounts RPC.
+	V2FetchPartnerAccountsProcedure = "/api.v2.V2/FetchPartnerAccounts"
+	// V2FetchAccountProcedure is the fully-qualified name of the V2's FetchAccount RPC.
+	V2FetchAccountProcedure = "/api.v2.V2/FetchAccount"
+	// V2FetchAccountEnvsProcedure is the fully-qualified name of the V2's FetchAccountEnvs RPC.
+	V2FetchAccountEnvsProcedure = "/api.v2.V2/FetchAccountEnvs"
+	// V2FetchAccountEventKeysProcedure is the fully-qualified name of the V2's FetchAccountEventKeys
+	// RPC.
+	V2FetchAccountEventKeysProcedure = "/api.v2.V2/FetchAccountEventKeys"
+	// V2FetchAccountSigningKeysProcedure is the fully-qualified name of the V2's
+	// FetchAccountSigningKeys RPC.
+	V2FetchAccountSigningKeysProcedure = "/api.v2.V2/FetchAccountSigningKeys"
 )
 
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
+	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
+	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
+	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
+	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -59,12 +86,68 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("Health")),
 			connect.WithClientOptions(opts...),
 		),
+		xSchemaOnly: connect.NewClient[v2.HealthRequest, v2.ErrorResponse](
+			httpClient,
+			baseURL+V2XSchemaOnlyProcedure,
+			connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
+			connect.WithClientOptions(opts...),
+		),
+		createPartnerAccount: connect.NewClient[v2.CreateAccountRequest, v2.CreateAccountResponse](
+			httpClient,
+			baseURL+V2CreatePartnerAccountProcedure,
+			connect.WithSchema(v2Methods.ByName("CreatePartnerAccount")),
+			connect.WithClientOptions(opts...),
+		),
+		createEnv: connect.NewClient[v2.CreateEnvRequest, v2.CreateEnvResponse](
+			httpClient,
+			baseURL+V2CreateEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateEnv")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchPartnerAccounts: connect.NewClient[v2.FetchAccountsRequest, v2.FetchAccountsResponse](
+			httpClient,
+			baseURL+V2FetchPartnerAccountsProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchPartnerAccounts")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchAccount: connect.NewClient[v2.FetchAccountRequest, v2.FetchAccountResponse](
+			httpClient,
+			baseURL+V2FetchAccountProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccount")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchAccountEnvs: connect.NewClient[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse](
+			httpClient,
+			baseURL+V2FetchAccountEnvsProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchAccountEventKeys: connect.NewClient[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse](
+			httpClient,
+			baseURL+V2FetchAccountEventKeysProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchAccountSigningKeys: connect.NewClient[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse](
+			httpClient,
+			baseURL+V2FetchAccountSigningKeysProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // v2Client implements V2Client.
 type v2Client struct {
-	health *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	health                  *connect.Client[v2.HealthRequest, v2.HealthResponse]
+	xSchemaOnly             *connect.Client[v2.HealthRequest, v2.ErrorResponse]
+	createPartnerAccount    *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
+	createEnv               *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
+	fetchPartnerAccounts    *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
+	fetchAccount            *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
+	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
+	fetchAccountEventKeys   *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
+	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -72,9 +155,58 @@ func (c *v2Client) Health(ctx context.Context, req *connect.Request[v2.HealthReq
 	return c.health.CallUnary(ctx, req)
 }
 
+// XSchemaOnly calls api.v2.V2._SchemaOnly.
+func (c *v2Client) XSchemaOnly(ctx context.Context, req *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error) {
+	return c.xSchemaOnly.CallUnary(ctx, req)
+}
+
+// CreatePartnerAccount calls api.v2.V2.CreatePartnerAccount.
+func (c *v2Client) CreatePartnerAccount(ctx context.Context, req *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
+	return c.createPartnerAccount.CallUnary(ctx, req)
+}
+
+// CreateEnv calls api.v2.V2.CreateEnv.
+func (c *v2Client) CreateEnv(ctx context.Context, req *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return c.createEnv.CallUnary(ctx, req)
+}
+
+// FetchPartnerAccounts calls api.v2.V2.FetchPartnerAccounts.
+func (c *v2Client) FetchPartnerAccounts(ctx context.Context, req *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
+	return c.fetchPartnerAccounts.CallUnary(ctx, req)
+}
+
+// FetchAccount calls api.v2.V2.FetchAccount.
+func (c *v2Client) FetchAccount(ctx context.Context, req *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error) {
+	return c.fetchAccount.CallUnary(ctx, req)
+}
+
+// FetchAccountEnvs calls api.v2.V2.FetchAccountEnvs.
+func (c *v2Client) FetchAccountEnvs(ctx context.Context, req *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
+	return c.fetchAccountEnvs.CallUnary(ctx, req)
+}
+
+// FetchAccountEventKeys calls api.v2.V2.FetchAccountEventKeys.
+func (c *v2Client) FetchAccountEventKeys(ctx context.Context, req *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error) {
+	return c.fetchAccountEventKeys.CallUnary(ctx, req)
+}
+
+// FetchAccountSigningKeys calls api.v2.V2.FetchAccountSigningKeys.
+func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, req *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
+	return c.fetchAccountSigningKeys.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
+	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
+	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
+	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
+	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
+	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
+	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -90,10 +222,74 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("Health")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2XSchemaOnlyHandler := connect.NewUnaryHandler(
+		V2XSchemaOnlyProcedure,
+		svc.XSchemaOnly,
+		connect.WithSchema(v2Methods.ByName("_SchemaOnly")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreatePartnerAccountHandler := connect.NewUnaryHandler(
+		V2CreatePartnerAccountProcedure,
+		svc.CreatePartnerAccount,
+		connect.WithSchema(v2Methods.ByName("CreatePartnerAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreateEnvHandler := connect.NewUnaryHandler(
+		V2CreateEnvProcedure,
+		svc.CreateEnv,
+		connect.WithSchema(v2Methods.ByName("CreateEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchPartnerAccountsHandler := connect.NewUnaryHandler(
+		V2FetchPartnerAccountsProcedure,
+		svc.FetchPartnerAccounts,
+		connect.WithSchema(v2Methods.ByName("FetchPartnerAccounts")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchAccountHandler := connect.NewUnaryHandler(
+		V2FetchAccountProcedure,
+		svc.FetchAccount,
+		connect.WithSchema(v2Methods.ByName("FetchAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchAccountEnvsHandler := connect.NewUnaryHandler(
+		V2FetchAccountEnvsProcedure,
+		svc.FetchAccountEnvs,
+		connect.WithSchema(v2Methods.ByName("FetchAccountEnvs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchAccountEventKeysHandler := connect.NewUnaryHandler(
+		V2FetchAccountEventKeysProcedure,
+		svc.FetchAccountEventKeys,
+		connect.WithSchema(v2Methods.ByName("FetchAccountEventKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchAccountSigningKeysHandler := connect.NewUnaryHandler(
+		V2FetchAccountSigningKeysProcedure,
+		svc.FetchAccountSigningKeys,
+		connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
 			v2HealthHandler.ServeHTTP(w, r)
+		case V2XSchemaOnlyProcedure:
+			v2XSchemaOnlyHandler.ServeHTTP(w, r)
+		case V2CreatePartnerAccountProcedure:
+			v2CreatePartnerAccountHandler.ServeHTTP(w, r)
+		case V2CreateEnvProcedure:
+			v2CreateEnvHandler.ServeHTTP(w, r)
+		case V2FetchPartnerAccountsProcedure:
+			v2FetchPartnerAccountsHandler.ServeHTTP(w, r)
+		case V2FetchAccountProcedure:
+			v2FetchAccountHandler.ServeHTTP(w, r)
+		case V2FetchAccountEnvsProcedure:
+			v2FetchAccountEnvsHandler.ServeHTTP(w, r)
+		case V2FetchAccountEventKeysProcedure:
+			v2FetchAccountEventKeysHandler.ServeHTTP(w, r)
+		case V2FetchAccountSigningKeysProcedure:
+			v2FetchAccountSigningKeysHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +301,36 @@ type UnimplementedV2Handler struct{}
 
 func (UnimplementedV2Handler) Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.Health is not implemented"))
+}
+
+func (UnimplementedV2Handler) XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2._SchemaOnly is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreatePartnerAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchPartnerAccounts is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountEnvs is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountEventKeys is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountSigningKeys is not implemented"))
 }

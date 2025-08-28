@@ -2,20 +2,638 @@ syntax = "proto3";
 package api.v2;
 
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
+import "third_party/google/api/annotations.proto";
+import "api/v2/options.proto";
+import "third_party/protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Inngest REST API v2"
+    version: "2.0.0"
+    description: "The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality."
+  }
+  host: "api.inngest.com"
+  base_path: "/v2"
+  schemes: HTTPS
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Bearer token authentication. Format: `Bearer {key}`"
+      }
+    }
+  }
+};
+
 
 service V2 {
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
       get: "/health"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Health check"
+      description: "Returns the health status of the API service"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+  
+  // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
+  rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
+  
+  rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
+    option (google.api.http) = {
+      post: "/partner/accounts",
+      body : "*"
+    };
+    option (authz) = {
+      require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create partner account"
+      description: "Creates a sub-account (if you have partner access)"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Account successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateAccountResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - account already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc CreateEnv(CreateEnvRequest) returns (CreateEnvResponse) {
+    option (google.api.http) = {
+      post: "/envs",
+      body : "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create environment"
+      description: "Create custom environment"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Env successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateEnvResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - account already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchPartnerAccounts(FetchAccountsRequest) returns (FetchAccountsResponse) {
+    option (google.api.http) = {
+      get: "/partner/accounts"
+    };
+    option (authz) = {
+      require_authz: true
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List partner accounts"
+      description: "Lists sub-accounts (if you have partner access)"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of accounts"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchAccount(FetchAccountRequest) returns (FetchAccountResponse) {
+    option (google.api.http) = {
+      get: "/account"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get account"
+      description: "Returns the account for the authenticated user"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Account"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
+    option (google.api.http) = {
+      get: "/envs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List environments"
+      description: "List of all custom environments."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of account environments"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountEnvsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - account not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchAccountEventKeys(FetchAccountEventKeysRequest) returns (FetchAccountEventKeysResponse) {
+    option (google.api.http) = {
+      get: "/keys/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List account event keys"
+      description: "Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys."
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Filter event keys by environment (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: false
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of account event keys"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountEventKeysResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - account not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchAccountSigningKeys(FetchAccountSigningKeysRequest) returns (FetchAccountSigningKeysResponse) {
+    option (google.api.http) = {
+      get: "/keys/signing"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List account signing keys"
+      description: "Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys."
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Filter signing keys by environment (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: false
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of account signing keys"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchAccountSigningKeysResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - account not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
   }
 }
 
 message HealthRequest {
   // Empty request message for health check
+}
+
+message FetchAccountRequest {
+  // Empty request message for fetching current account
 }
 
 message HealthResponse {
@@ -27,7 +645,172 @@ message HealthData {
   string status = 1;
 }
 
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message ErrorResponse {
+  repeated Error errors = 1;
+}
+
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
+}
+
+message CreateAccountRequest {
+  string email = 1;
+  optional string name = 2;
+}
+
+message CreateAccountResponse {
+  CreateAccountData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message CreateEnvRequest {
+  string name = 1;
+}
+
+message CreateEnvResponse {
+  Env data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+enum EnvType {
+  PRODUCTION = 0;
+  TEST = 1;
+  BRANCH = 2;
+}
+
+message Env {
+  string id = 1;
+  string name = 2;
+  EnvType type = 3;
+  google.protobuf.Timestamp createdAt = 4;
+}
+
+message CreateAccountData {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string apiKey = 4;
+  google.protobuf.Timestamp createdAt = 5;
+  google.protobuf.Timestamp updatedAt = 6;
+}
+
+message FetchAccountsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of accounts to return per page (min: 1, max: 1000)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountsResponse {
+  repeated Account data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message FetchAccountResponse {
+  Account data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Account {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  google.protobuf.Timestamp createdAt = 4;
+  google.protobuf.Timestamp updatedAt = 5;
+}
+
+message Page {
+  optional string cursor = 1;
+  bool hasMore = 2;
+  int32 limit = 3;
+}
+
+message FetchAccountEventKeysRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of event keys to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountEventKeysResponse {
+  repeated EventKey data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message EventKey {
+  string id = 1;
+  string name = 2;
+  string environment = 3;
+  string key = 4;
+  google.protobuf.Timestamp createdAt = 5;
+}
+
+message FetchAccountEnvsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of environments to return per page (min: 1, max: 250)"
+      default: "50"
+    }
+  ];
+}
+
+message FetchAccountEnvsResponse {
+  repeated Env data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message FetchAccountSigningKeysRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of signing keys to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message FetchAccountSigningKeysResponse {
+  repeated SigningKey data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SigningKey {
+  string id = 1;
+  string name = 2;
+  string environment = 3;
+  string key = 4;
+  google.protobuf.Timestamp createdAt = 5;
 }

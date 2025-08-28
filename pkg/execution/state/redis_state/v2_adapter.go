@@ -15,38 +15,58 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-func MustRunServiceV2(m statev1.Manager) state.RunService {
-	v2, err := RunServiceV2(m)
+func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
+	o := &mgrV2Opts{}
+	for _, apply := range opts {
+		apply(o)
+	}
+
+	v2, err := runServiceV2(m, *o)
 	if err != nil {
 		panic(err)
 	}
+
 	return v2
 }
 
-func RunServiceV2(m statev1.Manager) (state.RunService, error) {
+func runServiceV2(m statev1.Manager, opts mgrV2Opts) (state.RunService, error) {
 	mgr, ok := m.(*mgr)
 	if !ok {
 		return nil, fmt.Errorf("cannot convert %T into type redis_state.*mgr", m)
 	}
-	return v2{mgr}, nil
+
+	v2 := v2{mgr: mgr, disabledRetries: opts.disabledRetries}
+	return v2, nil
+}
+
+type MgrV2Opt func(o *mgrV2Opts)
+type mgrV2Opts struct {
+	disabledRetries bool
+}
+
+func WithDisabledRetries() MgrV2Opt {
+	return func(o *mgrV2Opts) {
+		o.disabledRetries = true
+	}
 }
 
 type v2 struct {
-	mgr *mgr
+	mgr             *mgr
+	disabledRetries bool
 }
 
 // Create creates new state in the store for the given run ID.
-func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
+func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return nil, err
+			return state.State{}, err
 		}
 		batchData[n] = data
 
 	}
-	state, err := v.mgr.New(ctx, statev1.Input{
+	st, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -69,15 +89,74 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
-	if err == nil {
-		metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
-			PkgName: "redis_state",
-			Tags: map[string]any{
-				"account_id": s.Metadata.ID.Tenant.AccountID,
-			},
-		})
+	switch err {
+	case nil:
+		// no-op continue
+	case statev1.ErrIdentifierExists:
+		s.Metadata.ID.RunID = st.RunID()
+		st, err := v.LoadState(ctx, s.Metadata.ID)
+		if err != nil {
+			return state.State{}, err
+		}
+		return st, statev1.ErrIdentifierExists
+	default:
+		return state.State{}, err
 	}
-	return state, err
+
+	metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": s.Metadata.ID.Tenant.AccountID,
+		},
+	})
+
+	// XXX: We do the exact same size calculations done in `mgr.New` to return a v2 state without changing the v1 interface.
+	var stepsByt []byte
+	if len(s.Steps) > 0 {
+		stepsByt, err = json.Marshal(s.Steps)
+		if err != nil {
+			return state.State{}, fmt.Errorf("error storing run state in redis when marshalling steps: %w", err)
+		}
+	}
+
+	var stepInputsByt []byte
+	if len(s.StepInputs) > 0 {
+		stepInputsByt, err = json.Marshal(s.StepInputs)
+		if err != nil {
+			return state.State{}, fmt.Errorf("error storing run state in redis when marshalling step inputs: %w", err)
+		}
+	}
+
+	events, err := json.Marshal(batchData)
+	if err != nil {
+		return state.State{}, fmt.Errorf("error storing run state in redis when marshalling batchData: %w", err)
+	}
+
+	metadata := s.Metadata
+	metadata.ID = state.ID{
+		// Set the returned run ID from the state manager
+		RunID:      st.RunID(),
+		FunctionID: s.Metadata.ID.FunctionID,
+		Tenant: state.Tenant{
+			AppID:     s.Metadata.ID.Tenant.AppID,
+			EnvID:     s.Metadata.ID.Tenant.EnvID,
+			AccountID: s.Metadata.ID.Tenant.AccountID,
+		},
+	}
+	metadata.Metrics = state.RunMetrics{
+		EventSize: len(events),
+		StateSize: len(events) + len(stepsByt) + len(stepInputsByt),
+		StepCount: len(s.Steps),
+	}
+
+	steps := make(map[string]json.RawMessage)
+	for _, step := range s.Steps {
+		if data, err := json.Marshal(step.Data); err == nil {
+			steps[step.ID] = json.RawMessage(data)
+		}
+	}
+
+	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
@@ -208,7 +287,7 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
@@ -230,7 +309,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			attempt++
 			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 		},
-		util.NewRetryConf(
+		v.retryPolicy(
 			util.WithRetryConfRetryableErrors(v.retryableError),
 			util.WithRetryConfMaxBackoff(10*time.Second),
 			util.WithRetryConfMaxAttempts(10),
@@ -291,15 +370,25 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 			err := v.mgr.SavePending(ctx, v1id, pending)
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
 }
 
+func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
+	if v.disabledRetries {
+		return util.NewRetryConf(util.WithRetryConfMaxAttempts(1))
+	}
+	val := util.NewRetryConf(opts...)
+	return val
+}
+
 // determine what errors are retriable
 func (v v2) retryableError(err error) bool {
 	switch {
+	case errors.Is(err, statev1.ErrIdempotentResponse):
+		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
 	}
