@@ -73,6 +73,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		
 		// Add parameter constraints for OpenAPI v3
 		addParameterConstraints(v3Doc)
+		
+		// Apply examples from external JSON file
+		applyExamples(v3Doc, inputDir)
 
 		// Generate output filename
 		relPath, err := filepath.Rel(inputDir, path)
@@ -183,6 +186,156 @@ func addParameterConstraints(v3Doc *openapi3.T) {
 					max := float64(1000)
 					param.Value.Schema.Value.Min = &min
 					param.Value.Schema.Value.Max = &max
+				}
+			}
+		}
+	}
+}
+
+// applyExamples reads examples from external JSON file and applies them to OpenAPI v3 responses
+func applyExamples(v3Doc *openapi3.T, inputDir string) {
+	// Construct path to examples file (go up from docs/openapi/v2 to docs/)
+	examplesPath := filepath.Join(filepath.Dir(filepath.Dir(inputDir)), "api_v2_examples.json")
+	
+	// Read examples file
+	examplesData, err := os.ReadFile(examplesPath)
+	if err != nil {
+		fmt.Printf("Warning: Could not read examples file %s: %v\n", examplesPath, err)
+		return
+	}
+	
+	// Parse examples JSON with new structure: path -> method -> statusCode -> example
+	var examples map[string]map[string]map[string]interface{}
+	if err := json.Unmarshal(examplesData, &examples); err != nil {
+		fmt.Printf("Warning: Could not parse examples file: %v\n", err)
+		return
+	}
+	
+	// Generate missing entries in examples structure
+	generateMissingExamples(v3Doc, &examples)
+	
+	// Write updated examples back to file
+	updatedExamplesData, err := json.MarshalIndent(examples, "", "  ")
+	if err != nil {
+		fmt.Printf("Warning: Could not marshal updated examples: %v\n", err)
+	} else if err := os.WriteFile(examplesPath, updatedExamplesData, 0644); err != nil {
+		fmt.Printf("Warning: Could not write updated examples file: %v\n", err)
+	} else {
+		fmt.Printf("Updated examples file with missing entries: %s\n", examplesPath)
+	}
+	
+	if v3Doc.Paths == nil {
+		return
+	}
+	
+	// Apply examples to each path and operation
+	for pathKey, pathItem := range v3Doc.Paths.Map() {
+		if pathItem == nil {
+			continue
+		}
+		
+		// Find examples for this path
+		pathExamples, pathExists := examples[pathKey]
+		if !pathExists {
+			continue
+		}
+		
+		// Check each HTTP method
+		operations := map[string]*openapi3.Operation{
+			"get":    pathItem.Get,
+			"post":   pathItem.Post,
+			"put":    pathItem.Put,
+			"patch":  pathItem.Patch,
+			"delete": pathItem.Delete,
+		}
+		
+		for method, operation := range operations {
+			if operation == nil || operation.Responses == nil {
+				continue
+			}
+			
+			// Find examples for this method
+			methodExamples, methodExists := pathExamples[method]
+			if !methodExists {
+				continue
+			}
+			
+			// Apply examples to each response status code
+			for statusCode, exampleData := range methodExamples {
+				responseRef, exists := operation.Responses.Map()[statusCode]
+				if !exists || responseRef == nil || responseRef.Value == nil || responseRef.Value.Content == nil {
+					continue
+				}
+				
+				// Add example to each content type
+				for _, mediaType := range responseRef.Value.Content {
+					if mediaType == nil {
+						continue
+					}
+					
+					// Add the example
+					if mediaType.Examples == nil {
+						mediaType.Examples = make(map[string]*openapi3.ExampleRef)
+					}
+					
+					mediaType.Examples["default"] = &openapi3.ExampleRef{
+						Value: &openapi3.Example{
+							Value: exampleData,
+						},
+					}
+				}
+			}
+		}
+	}
+}
+
+// generateMissingExamples creates empty example entries for any missing path/method/statusCode combinations
+func generateMissingExamples(v3Doc *openapi3.T, examples *map[string]map[string]map[string]interface{}) {
+	if v3Doc.Paths == nil {
+		return
+	}
+	
+	// Initialize examples map if nil
+	if *examples == nil {
+		*examples = make(map[string]map[string]map[string]interface{})
+	}
+	
+	// Scan all paths and operations in the OpenAPI spec
+	for pathKey, pathItem := range v3Doc.Paths.Map() {
+		if pathItem == nil {
+			continue
+		}
+		
+		// Initialize path entry if missing
+		if (*examples)[pathKey] == nil {
+			(*examples)[pathKey] = make(map[string]map[string]interface{})
+		}
+		
+		// Check each HTTP method
+		operations := map[string]*openapi3.Operation{
+			"get":    pathItem.Get,
+			"post":   pathItem.Post,
+			"put":    pathItem.Put,
+			"patch":  pathItem.Patch,
+			"delete": pathItem.Delete,
+		}
+		
+		for method, operation := range operations {
+			if operation == nil || operation.Responses == nil {
+				continue
+			}
+			
+			// Initialize method entry if missing
+			if (*examples)[pathKey][method] == nil {
+				(*examples)[pathKey][method] = make(map[string]interface{})
+			}
+			
+			// Add missing status codes with empty objects
+			for statusCode := range operation.Responses.Map() {
+				if (*examples)[pathKey][method][statusCode] == nil {
+					(*examples)[pathKey][method][statusCode] = map[string]interface{}{
+						"// TODO": "Add example data for " + method + " " + pathKey + " " + statusCode,
+					}
 				}
 			}
 		}
