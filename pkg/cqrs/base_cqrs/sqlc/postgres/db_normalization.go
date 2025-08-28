@@ -762,6 +762,34 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([
 	return sqliteRows, nil
 }
 
+func (q NormalizedQueries) GetSpansByDebugRunID(ctx context.Context, debugRunID string) ([]*sqlc_sqlite.GetSpansByDebugRunIDRow, error) {
+	rows, err := q.db.GetSpansByDebugRunID(ctx, debugRunID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByDebugRunIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSessionID string) ([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, error) {
+	rows, err := q.db.GetSpansByDebugSessionID(ctx, debugSessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByDebugSessionIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
 func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
 	// TODO
 	return nil, nil

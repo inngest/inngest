@@ -20,7 +20,6 @@ func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuer
 	var runSteps []*models.RunStep
 	var err error
 
-	// If debugRunID is provided, we need to find the span with that debug run ID
 	if query.DebugRunID != nil {
 		debugRunSpan, err = qr.getSpanByDebugRunID(ctx, query.FunctionSlug, *query.DebugRunID)
 		if err != nil {
@@ -28,19 +27,16 @@ func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuer
 		}
 		runSteps = qr.extractRunSteps(debugRunSpan)
 	} else if query.RunID != nil {
-		// If runID is provided, get the trace for that specific run
 		runID, err := ulid.Parse(*query.RunID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid runID: %w", err)
 		}
 
-		// Get the function to get its ID
 		function, err := qr.getFunctionBySlug(ctx, query.FunctionSlug)
 		if err != nil {
 			return nil, fmt.Errorf("function not found: %w", err)
 		}
 
-		// Use the trace loader to get the trace span
 		debugRunSpan, err = loader.LoadOne[models.RunTraceSpan](
 			ctx,
 			loader.FromCtx(ctx).RunTraceLoader,
@@ -134,7 +130,7 @@ func (qr *queryResolver) collectChildrenSpans(span *models.RunTraceSpan) []*mode
 	return result
 }
 
-// Helper function to extract run steps from a trace span
+// In the event
 func (qr *queryResolver) extractRunSteps(span *models.RunTraceSpan) []*models.RunStep {
 	if span == nil {
 		return nil
@@ -168,18 +164,20 @@ func (qr *queryResolver) getSpanByDebugRunID(ctx context.Context, functionSlug, 
 		return nil, err
 	}
 
+	//
 	// For now, we'll need to get recent trace runs and search through their spans
-	// This is not optimal but works until we have better queries
+	// This is not optimal but works for now
 	runs, err := qr.Data.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			FunctionID: []uuid.UUID{function.ID},
 		},
-		Items: 100, // Limit to recent runs
+		Items: 100,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error getting trace runs: %w", err)
 	}
 
+	//
 	// Search through runs for spans with the debug run ID
 	for _, run := range runs {
 		runID, err := ulid.Parse(run.RunID)
