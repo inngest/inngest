@@ -2,18 +2,24 @@
 
 import { useEffect } from 'react';
 import { Button } from '@inngest/components/Button/Button';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiCommandLine, RiCornerDownLeftFill } from '@remixicon/react';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { getCanRunQuery } from './utils';
 
-function QueryButtonLabel({ isRunning }: { isRunning: boolean }) {
+function QueryButtonLabel({ disabled, isRunning }: { disabled: boolean; isRunning: boolean }) {
   if (isRunning) return null;
 
   return (
     <div className="flex items-center gap-2">
       <span>Run query</span>
-      <div className="bg-primary-moderate flex shrink-0 gap-0.5 rounded-[4px] px-1 py-0.5">
+      <div
+        className={cn(
+          'flex shrink-0 gap-0.5 rounded-[4px] px-1 py-0.5',
+          disabled ? 'bg-muted' : 'bg-primary-moderate'
+        )}
+      >
         <RiCommandLine className="h-4 w-4" />
         <RiCornerDownLeftFill className="h-4 w-4" />
       </div>
@@ -46,7 +52,7 @@ export function InsightsSQLEditorQueryButton() {
     <Button
       className="w-[135px] font-medium"
       disabled={!canRunQuery}
-      label={<QueryButtonLabel isRunning={isRunning} />}
+      label={<QueryButtonLabel isRunning={isRunning} disabled={!canRunQuery} />}
       loading={isRunning}
       onClick={(e) => {
         runQuery();
