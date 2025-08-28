@@ -71,6 +71,21 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
     }
   }
 
+  // Concurrency warnings temporarily disabled
+  // if (concurrency.usage >= 12) {
+  //   issues.add(
+  //     'concurrency',
+  //     <div className="flex items-center">
+  //       Account concurrency limit reached in {concurrency.usage} of the past 24 hours
+  //       <BillingBannerTooltip>
+  //         Reaching the concurrency limit adds delays between steps, making function runs take longer
+  //         to complete.
+  //       </BillingBannerTooltip>
+  //     </div>,
+  //     IssueSeverity.softLimitReached
+  //   );
+  // }
+
   return {
     bannerMessage: issues.getBannerMessage(),
     bannerSeverity: issues.getBannerSeverity(),
