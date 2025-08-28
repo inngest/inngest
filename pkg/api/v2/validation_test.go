@@ -17,7 +17,7 @@ func TestHTTPValidation_CreateEnv(t *testing.T) {
 
 	t.Run("should validate JSON types and required fields", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, opts)
+		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		testCases := []struct {

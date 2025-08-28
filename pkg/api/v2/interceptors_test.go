@@ -31,7 +31,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -77,7 +77,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -111,7 +111,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, nil)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -157,7 +157,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, nil)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -212,7 +212,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -267,7 +267,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -310,7 +310,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(methodCheckMiddleware, methodCheckMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
