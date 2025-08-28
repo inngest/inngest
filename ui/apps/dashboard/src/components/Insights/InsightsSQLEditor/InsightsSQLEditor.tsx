@@ -14,14 +14,11 @@ export function InsightsSQLEditor() {
   // nevertheless executes with fresh state (query, isRunning, runQuery).
   const handleEditorMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
     const disposable = editor.onKeyDown((e) => {
-      if (
-        e.keyCode === monaco.KeyCode.Enter &&
-        (e.metaKey || e.ctrlKey) &&
-        getCanRunQuery(query, isRunning)
-      ) {
+      if (e.keyCode === monaco.KeyCode.Enter && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         e.stopPropagation();
-        runQuery();
+
+        if (getCanRunQuery(query, isRunning)) runQuery();
       }
     });
 
