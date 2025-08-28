@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useClient } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { InsightsColumnType, type InsightsQuery } from '@/gql/graphql';
 import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
@@ -16,8 +17,8 @@ export interface FetchInsightsParams {
 type FetchInsightsCallback = (query: string, name: undefined | string) => void;
 
 const insightsQuery = graphql(`
-  query Insights($query: String!) {
-    insights(query: $query) {
+  query Insights($query: String!, $workspaceID: ID!) {
+    insights(query: $query, workspaceID: $workspaceID) {
       columns {
         name
         columnType
@@ -31,6 +32,7 @@ const insightsQuery = graphql(`
 
 export function useFetchInsights() {
   const client = useClient();
+  const environment = useEnvironment();
 
   const fetchInsights = useCallback(
     async (
@@ -38,7 +40,11 @@ export function useFetchInsights() {
       cb: FetchInsightsCallback
     ): Promise<InsightsFetchResult> => {
       const res = await client
-        .query(insightsQuery, { query }, { requestPolicy: 'network-only' })
+        .query(
+          insightsQuery,
+          { query, workspaceID: environment.id },
+          { requestPolicy: 'network-only' }
+        )
         .toPromise();
       if (res.error) throw res.error;
       if (!res.data) throw new Error('No data');
@@ -46,7 +52,7 @@ export function useFetchInsights() {
       cb(query, queryName === UNTITLED_QUERY ? undefined : queryName);
       return transformInsightsResponse(res.data.insights);
     },
-    [client]
+    [client, environment.id]
   );
 
   return { fetchInsights };
