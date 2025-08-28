@@ -174,6 +174,7 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 		Proto:      resp.Proto,
 		ProtoMajor: resp.ProtoMajor,
 		ProtoMinor: resp.ProtoMinor,
+		Attempts:   1,
 	}
 
 	if len(byt) > consts.MaxSDKResponseBodySize {
