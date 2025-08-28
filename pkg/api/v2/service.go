@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -257,7 +258,27 @@ func (s *Service) FetchPartnerAccounts(ctx context.Context, req *apiv2.FetchAcco
 }
 
 func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountRequest) (*apiv2.FetchAccountResponse, error) {
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Current account not implemented in OSS")
+	now := time.Now()
+
+	// First commit date: 2021-05-13 09:30:04 -0700
+	firstCommitTime := time.Date(2021, 5, 13, 16, 30, 4, 0, time.UTC)
+
+	// Return the default dev server account
+	account := &apiv2.Account{
+		Id:        consts.DevServerAccountID.String(),
+		Email:     "dev@inngest.local",
+		Name:      "Dev Server",
+		CreatedAt: timestamppb.New(firstCommitTime),
+		UpdatedAt: timestamppb.New(firstCommitTime),
+	}
+
+	return &apiv2.FetchAccountResponse{
+		Data: account,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(now),
+			CachedUntil: nil,
+		},
+	}, nil
 }
 
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
