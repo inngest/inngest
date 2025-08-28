@@ -378,10 +378,9 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 
 func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
 	if v.disabledRetries {
-		return util.NewRetryConf(util.WithRetryConfMaxAttempts(1))
+		opts = append(opts, util.WithRetryConfMaxAttempts(1))
 	}
-	val := util.NewRetryConf(opts...)
-	return val
+	return util.NewRetryConf(opts...)
 }
 
 // determine what errors are retriable

@@ -80,7 +80,7 @@ func TestWithRetry(t *testing.T) {
 
 		require.Error(t, err)
 
-		// It should be exact equality
+		// It should be exactly equal
 		require.Equal(t, idemErr, err)
 	})
 }
