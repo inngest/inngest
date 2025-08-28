@@ -127,6 +127,10 @@ func (d *devserver) PrettyName() string {
 		return ""
 	}
 
+	if d.Opts.Config.ServerKind == "cloud" {
+		return "Server"
+	}
+
 	return "Dev Server"
 }
 
