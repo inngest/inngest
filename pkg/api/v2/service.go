@@ -21,10 +21,21 @@ import (
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
+	signingKeys SigningKeysProvider
+	eventKeys   EventKeysProvider
 }
 
-func NewService() *Service {
-	return &Service{}
+// ServiceOptions contains configuration for the V2 service
+type ServiceOptions struct {
+	SigningKeysProvider SigningKeysProvider
+	EventKeysProvider   EventKeysProvider
+}
+
+func NewService(opts ServiceOptions) *Service {
+	return &Service{
+		signingKeys: opts.SigningKeysProvider,
+		eventKeys:   opts.EventKeysProvider,
+	}
 }
 
 // GRPCServerOptions contains options for configuring the gRPC server
@@ -34,27 +45,27 @@ type GRPCServerOptions struct {
 }
 
 // NewGRPCServer creates a new gRPC server with the V2 service and optional interceptors
-func NewGRPCServer(opts GRPCServerOptions) *grpc.Server {
+func NewGRPCServer(serviceOpts ServiceOptions, grpcOpts GRPCServerOptions) *grpc.Server {
 	var serverOpts []grpc.ServerOption
 
 	// Add authentication and authorization interceptors if any middleware is provided
-	if opts.AuthnMiddleware != nil || opts.AuthzMiddleware != nil {
+	if grpcOpts.AuthnMiddleware != nil || grpcOpts.AuthzMiddleware != nil {
 		serverOpts = append(serverOpts,
-			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
-			grpc.StreamInterceptor(NewAuthStreamInterceptor(opts.AuthnMiddleware, opts.AuthzMiddleware)),
+			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(grpcOpts.AuthnMiddleware, grpcOpts.AuthzMiddleware)),
+			grpc.StreamInterceptor(NewAuthStreamInterceptor(grpcOpts.AuthnMiddleware, grpcOpts.AuthzMiddleware)),
 		)
 	}
 
 	server := grpc.NewServer(serverOpts...)
-	service := NewService()
+	service := NewService(serviceOpts)
 	apiv2.RegisterV2Server(server, service)
 
 	return server
 }
 
 // NewGRPCServerFromHTTPOptions creates a gRPC server using HTTP middleware options
-func NewGRPCServerFromHTTPOptions(httpOpts HTTPHandlerOptions) *grpc.Server {
-	return NewGRPCServer(GRPCServerOptions(httpOpts))
+func NewGRPCServerFromHTTPOptions(serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions) *grpc.Server {
+	return NewGRPCServer(serviceOpts, GRPCServerOptions(httpOpts))
 }
 
 type HTTPHandlerOptions struct {
@@ -137,13 +148,20 @@ func grpcToHTTPStatus(code codes.Code) int {
 	}
 }
 
-func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler, error) {
+func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions) (http.Handler, error) {
 	// Create the service
-	service := NewService()
+	service := NewService(serviceOpts)
 
 	// Create grpc-gateway mux for HTTP REST endpoints with custom error handler
 	gwmux := runtime.NewServeMux(
 		runtime.WithErrorHandler(customErrorHandler),
+		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
+			// forward standard headers
+			if strings.HasPrefix(strings.ToLower(key), "x-") || key == "authorization" {
+				return strings.ToLower(key), true
+			}
+			return "", false
+		}),
 	)
 	if err := apiv2.RegisterV2HandlerServer(ctx, gwmux, service); err != nil {
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
@@ -155,8 +173,8 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 	r := chi.NewRouter()
 
 	// Add authentication middleware first
-	if opts.AuthnMiddleware != nil {
-		r.Use(opts.AuthnMiddleware)
+	if httpOpts.AuthnMiddleware != nil {
+		r.Use(httpOpts.AuthnMiddleware)
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -167,8 +185,8 @@ func NewHTTPHandler(ctx context.Context, opts HTTPHandlerOptions) (http.Handler,
 		}
 
 		// Apply authorization middleware if this path requires it
-		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && opts.AuthzMiddleware != nil {
-			authzHandler := opts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
+			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
 				validationHandler := JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					gwmux.ServeHTTP(w, r)
@@ -220,14 +238,12 @@ func buildAuthzPathMap() map[string]bool {
 
 // Health implements the health check endpoint for gRPC (used by grpc-gateway)
 func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.HealthResponse, error) {
-	now := time.Now()
-
 	return &apiv2.HealthResponse{
 		Data: &apiv2.HealthData{
 			Status: "ok",
 		},
 		Metadata: &apiv2.ResponseMetadata{
-			FetchedAt:   timestamppb.New(now),
+			FetchedAt:   timestamppb.New(time.Now()),
 			CachedUntil: nil, // Health responses are not cached
 		},
 	}, nil
@@ -258,8 +274,6 @@ func (s *Service) FetchPartnerAccounts(ctx context.Context, req *apiv2.FetchAcco
 }
 
 func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountRequest) (*apiv2.FetchAccountResponse, error) {
-	now := time.Now()
-
 	// First commit date: 2021-05-13 09:30:04 -0700
 	firstCommitTime, err := time.Parse("2006-01-02 15:04:05", "2021-05-13 09:30:04")
 	if err != nil {
@@ -278,7 +292,7 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 	return &apiv2.FetchAccountResponse{
 		Data: account,
 		Metadata: &apiv2.ResponseMetadata{
-			FetchedAt:   timestamppb.New(now),
+			FetchedAt:   timestamppb.New(time.Now()),
 			CachedUntil: nil,
 		},
 	}, nil
@@ -298,10 +312,48 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		}
 	}
 
-	// For now, return not implemented since this is OSS
-	// Note: envName can be used to filter by environment when implemented
-	_ = envName
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account event keys not implemented in OSS")
+	// If no event keys provider is configured, return empty list
+	// This happens in dev mode where event keys aren't required
+	if s.eventKeys == nil {
+		return &apiv2.FetchAccountEventKeysResponse{
+			Data: []*apiv2.EventKey{},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt:   timestamppb.New(time.Now()),
+				CachedUntil: nil,
+			},
+			Page: &apiv2.Page{
+				HasMore: false,
+			},
+		}, nil
+	}
+
+	// Get event keys from the provider
+	keys, err := s.eventKeys.GetEventKeys(ctx)
+	if err != nil {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Failed to fetch event keys")
+	}
+
+	// Filter by environment if specified
+	var filteredKeys []*apiv2.EventKey
+	for _, key := range keys {
+		if envName == "" || key.Environment == envName {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+
+	// For now, return all keys without pagination
+	// In a real implementation, you'd handle cursor-based pagination here
+
+	return &apiv2.FetchAccountEventKeysResponse{
+		Data: filteredKeys,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+		},
+	}, nil
 }
 
 func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountEnvsRequest) (*apiv2.FetchAccountEnvsResponse, error) {
@@ -314,8 +366,6 @@ func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountE
 			return nil, NewError(http.StatusBadRequest, ErrorInvalidFieldFormat, "Limit cannot exceed 250")
 		}
 	}
-
-	now := time.Now()
 
 	// First commit date: 2021-05-13 09:30:04 -0700
 	firstCommitTime, err := time.Parse("2006-01-02 15:04:05", "2021-05-13 09:30:04")
@@ -334,7 +384,7 @@ func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountE
 	return &apiv2.FetchAccountEnvsResponse{
 		Data: []*apiv2.Env{defaultEnv},
 		Metadata: &apiv2.ResponseMetadata{
-			FetchedAt:   timestamppb.New(now),
+			FetchedAt:   timestamppb.New(time.Now()),
 			CachedUntil: nil,
 		},
 		Page: &apiv2.Page{
@@ -357,8 +407,46 @@ func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchA
 		}
 	}
 
-	// For now, return not implemented since this is OSS
-	// Note: envName can be used to filter by environment when implemented
-	_ = envName
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Account signing keys not implemented in OSS")
+	// If no signing keys provider is configured, return empty list
+	// This happens in dev mode where signing keys aren't required
+	if s.signingKeys == nil {
+		return &apiv2.FetchAccountSigningKeysResponse{
+			Data: []*apiv2.SigningKey{},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt:   timestamppb.New(time.Now()),
+				CachedUntil: nil,
+			},
+			Page: &apiv2.Page{
+				HasMore: false,
+			},
+		}, nil
+	}
+
+	// Get signing keys from the provider
+	keys, err := s.signingKeys.GetSigningKeys(ctx)
+	if err != nil {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Failed to fetch signing keys")
+	}
+
+	// Filter by environment if specified
+	var filteredKeys []*apiv2.SigningKey
+	for _, key := range keys {
+		if envName == "" || key.Environment == envName {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+
+	// For now, return all keys without pagination
+	// In a real implementation, you'd handle cursor-based pagination here
+
+	return &apiv2.FetchAccountSigningKeysResponse{
+		Data: filteredKeys,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+		},
+	}, nil
 }
