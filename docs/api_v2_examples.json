@@ -1,0 +1,278 @@
+{
+  "/account": {
+    "get": {
+      "200": {
+        "data": {
+          "createdAt": "2024-01-10T09:15:00Z",
+          "email": "user@company.com",
+          "id": "acc_current_user",
+          "name": "Current User",
+          "updatedAt": "2024-01-20T12:00:00Z"
+        },
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "401": {
+        "// TODO": "Add example data for get /account 401"
+      },
+      "500": {
+        "// TODO": "Add example data for get /account 500"
+      }
+    }
+  },
+  "/envs": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-10T09:15:00Z",
+            "id": "env_prod_123",
+            "name": "production",
+            "type": "PRODUCTION"
+          },
+          {
+            "createdAt": "2024-01-12T11:30:00Z",
+            "id": "env_stage_456",
+            "name": "staging",
+            "type": "TEST"
+          }
+        ],
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 50
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for get /envs 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /envs 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /envs 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /envs 404"
+      },
+      "500": {
+        "// TODO": "Add example data for get /envs 500"
+      }
+    },
+    "post": {
+      "201": {
+        "data": {
+          "createdAt": "2024-01-20T14:22:33Z",
+          "id": "env_new_789",
+          "name": "development",
+          "type": "BRANCH"
+        },
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for post /envs 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /envs 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /envs 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /envs 409"
+      },
+      "500": {
+        "// TODO": "Add example data for post /envs 500"
+      }
+    }
+  },
+  "/health": {
+    "get": {
+      "200": {
+        "data": {
+          "status": "ok"
+        },
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "401": {
+        "// TODO": "Add example data for get /health 401"
+      },
+      "500": {
+        "// TODO": "Add example data for get /health 500"
+      }
+    }
+  },
+  "/keys/events": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "environment": "production",
+            "id": "ek_12345",
+            "key": "inngest-event-key-prod-abc123",
+            "name": "Production Event Key"
+          },
+          {
+            "createdAt": "2024-01-18T14:22:33Z",
+            "environment": "staging",
+            "id": "ek_67890",
+            "key": "inngest-event-key-stage-def456",
+            "name": "Staging Event Key"
+          }
+        ],
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": "next_page_token_events",
+          "hasMore": true,
+          "limit": 20
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for get /keys/events 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /keys/events 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /keys/events 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /keys/events 404"
+      },
+      "500": {
+        "// TODO": "Add example data for get /keys/events 500"
+      }
+    }
+  },
+  "/keys/signing": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "environment": "production",
+            "id": "sk_12345",
+            "key": "signkey-prod-abc123def456",
+            "name": "Production Signing Key"
+          }
+        ],
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 20
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for get /keys/signing 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /keys/signing 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /keys/signing 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /keys/signing 404"
+      },
+      "500": {
+        "// TODO": "Add example data for get /keys/signing 500"
+      }
+    }
+  },
+  "/partner/accounts": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "email": "partner1@company.com",
+            "id": "acc_12345",
+            "name": "Partner Account 1",
+            "updatedAt": "2024-01-15T10:30:00Z"
+          },
+          {
+            "createdAt": "2024-01-18T14:22:33Z",
+            "email": "partner2@company.com",
+            "id": "acc_67890",
+            "name": "Partner Account 2",
+            "updatedAt": "2024-01-18T14:22:33Z"
+          }
+        ],
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": "next_page_token_xyz",
+          "hasMore": true,
+          "limit": 20
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for get /partner/accounts 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /partner/accounts 401"
+      },
+      "403": {
+        "errors": [
+          {
+            "code": "insufficient_permissions",
+            "message": "Partner access required"
+          }
+        ]
+      },
+      "500": {
+        "// TODO": "Add example data for get /partner/accounts 500"
+      }
+    },
+    "post": {
+      "201": {
+        "data": {
+          "apiKey": "inngest-api-key-abc123",
+          "createdAt": "2024-01-20T14:22:33Z",
+          "email": "user@example.com",
+          "id": "acc_12345",
+          "name": "Jane Smith",
+          "updatedAt": "2024-01-20T14:22:33Z"
+        },
+        "metadata": {
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "validation_error",
+            "message": "Email is required"
+          }
+        ]
+      },
+      "401": {
+        "// TODO": "Add example data for post /partner/accounts 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /partner/accounts 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /partner/accounts 409"
+      },
+      "500": {
+        "// TODO": "Add example data for post /partner/accounts 500"
+      }
+    }
+  }
+}
