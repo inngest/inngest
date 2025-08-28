@@ -1452,7 +1452,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
 			if !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        md.ID.RunID.String(),
 					Name:      event.FnFailedName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,
@@ -1462,7 +1462,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			// Add function cancelled event
 			if *resp.Err == state.ErrFunctionCancelled.Error() {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        md.ID.RunID.String(),
 					Name:      event.FnCancelledName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,
