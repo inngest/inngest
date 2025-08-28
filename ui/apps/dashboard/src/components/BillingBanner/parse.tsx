@@ -8,7 +8,7 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
   bannerSeverity: Severity;
   items: [string, React.ReactNode][];
 } {
-  const { runCount, concurrency, stepCount } = data;
+  const { runCount, stepCount } = data;
   const issues = new Issues();
 
   // Users who can buy additional runs should not warnings about nearing the run
@@ -69,20 +69,6 @@ export function parseEntitlementUsage(data: EntitlementUsageQuery['account']['en
         IssueSeverity.hardLimitNear
       );
     }
-  }
-
-  if (concurrency.usage >= 12) {
-    issues.add(
-      'concurrency',
-      <div className="flex items-center">
-        Account concurrency limit reached in {concurrency.usage} of the past 24 hours
-        <BillingBannerTooltip>
-          Reaching the concurrency limit adds delays between steps, making function runs take longer
-          to complete.
-        </BillingBannerTooltip>
-      </div>,
-      IssueSeverity.softLimitReached
-    );
   }
 
   return {
