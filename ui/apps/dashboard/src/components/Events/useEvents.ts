@@ -16,7 +16,7 @@ export const eventsQuery = graphql(`
   ) {
     environment: workspace(id: $envID) {
       eventsV2(
-        first: 30
+        first: 50
         after: $cursor
         filter: {
           from: $startTime

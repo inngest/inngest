@@ -11,7 +11,7 @@ const query = graphql(`
     environment: workspace(id: $envID) {
       eventTypesV2(
         after: $cursor
-        first: 30
+        first: 50
         filter: { archived: $archived, nameSearch: $nameSearch }
       ) {
         edges {

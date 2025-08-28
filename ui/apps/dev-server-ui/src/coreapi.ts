@@ -502,7 +502,7 @@ export const GET_EVENTS = gql`
     $includeInternalEvents: Boolean = true
   ) {
     eventsV2(
-      first: 30
+      first: 50
       after: $cursor
       filter: {
         from: $startTime
