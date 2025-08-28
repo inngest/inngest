@@ -8,7 +8,9 @@ import { getCanRunQuery } from './utils';
 
 export function InsightsSQLEditor() {
   const { onChange, query, runQuery, status } = useInsightsStateMachineContext();
-  const isRunning = status === 'loading';
+
+  const latestQueryRef = useLatest(query);
+  const isRunningRef = useLatest(status === 'loading');
 
   // useLatestCallback ensures Monaco's onMount gets a stable reference while the callback
   // nevertheless executes with fresh state (query, isRunning, runQuery).
@@ -18,7 +20,9 @@ export function InsightsSQLEditor() {
         e.preventDefault();
         e.stopPropagation();
 
-        if (getCanRunQuery(query, isRunning)) runQuery();
+        if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) {
+          runQuery();
+        }
       }
     });
 
@@ -30,14 +34,20 @@ export function InsightsSQLEditor() {
   return <SQLEditor content={query} onChange={onChange} onMount={handleEditorMount} />;
 }
 
-function useLatestCallback<A extends any[], R>(callback: (...args: A) => R) {
-  const ref = useRef(callback);
+function useLatest<T>(value: T) {
+  const r = useRef(value);
 
   useLayoutEffect(() => {
-    ref.current = callback;
-  }, [callback]);
+    r.current = value;
+  }, [value]);
+
+  return r;
+}
+
+function useLatestCallback<A extends unknown[], R>(cb: (...args: A) => R) {
+  const latest = useLatest(cb);
 
   return useCallback((...args: A) => {
-    return ref.current(...args);
+    return latest.current(...args);
   }, []);
 }
