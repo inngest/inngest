@@ -12,20 +12,20 @@ export function ExecutionOverageBanner() {
   const { isBannerVisible, executionOverageData, dismiss } = useExecutionOverage();
   const trackingUser = useTrackingUser();
 
-  // Track CTA viewed when banner becomes visible
-  useEffect(() => {
-    if (isBannerVisible && executionOverageData && trackingUser) {
-      trackEvent({
-        name: 'app/billing.cta.viewed',
-        data: {
-          cta: 'execution-overage-banner',
-          entitlement: 'executions',
-        },
-        user: trackingUser,
-        v: '2025-01-15.1',
-      });
-    }
-  }, [isBannerVisible, executionOverageData, trackingUser]);
+  // Track CTA viewed when banner becomes visible temporarily disabled
+  // useEffect(() => {
+  //   if (isBannerVisible && executionOverageData && trackingUser) {
+  //     trackEvent({
+  //       name: 'app/billing.cta.viewed',
+  //       data: {
+  //         cta: 'execution-overage-banner',
+  //         entitlement: 'executions',
+  //       },
+  //       user: trackingUser,
+  //       v: '2025-01-15.1',
+  //     });
+  //   }
+  // }, [isBannerVisible, executionOverageData, trackingUser]);
 
   if (!isBannerVisible || !executionOverageData) {
     return null;

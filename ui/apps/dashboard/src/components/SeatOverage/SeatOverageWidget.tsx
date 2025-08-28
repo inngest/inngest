@@ -16,20 +16,20 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
   const { isWidgetVisible, seatOverageData, dismiss } = useSeatOverage();
   const trackingUser = useTrackingUser();
 
-  // Track CTA viewed when widget becomes visible
-  useEffect(() => {
-    if (isWidgetVisible && seatOverageData && trackingUser) {
-      trackEvent({
-        name: 'app/billing.cta.viewed',
-        data: {
-          cta: collapsed ? 'seat-overage-widget-collapsed' : 'seat-overage-widget-expanded',
-          entitlement: 'user_seats',
-        },
-        user: trackingUser,
-        v: '2025-01-15.1',
-      });
-    }
-  }, [isWidgetVisible, collapsed, seatOverageData, trackingUser]);
+  // Track CTA viewed when widget becomes visible (temporarily disabled)
+  // useEffect(() => {
+  //   if (isWidgetVisible && seatOverageData && trackingUser) {
+  //     trackEvent({
+  //       name: 'app/billing.cta.viewed',
+  //       data: {
+  //         cta: collapsed ? 'seat-overage-widget-collapsed' : 'seat-overage-widget-expanded',
+  //         entitlement: 'user_seats',
+  //       },
+  //       user: trackingUser,
+  //       v: '2025-01-15.1',
+  //     });
+  //   }
+  // }, [isWidgetVisible, collapsed, seatOverageData, trackingUser]);
 
   if (!isWidgetVisible || !seatOverageData) {
     return null;
