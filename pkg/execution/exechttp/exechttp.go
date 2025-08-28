@@ -195,6 +195,14 @@ type Response struct {
 	Proto      string // e.g. "HTTP/1.0"
 	ProtoMajor int    // e.g. 1
 	ProtoMinor int    // e.g. 0
+
+	// Hostname represents the hostname of the machine executing the request.
+	// This is optional and may be unset.
+	Hostname string
+
+	// Attempts returns the number of attempts taken to execute the request.
+	// This is optional and may be unset.
+	Attempts int
 }
 
 // Client returns a new HTTP transport.
