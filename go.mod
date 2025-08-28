@@ -42,7 +42,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20250728175740-617972707fc1
+	github.com/inngest/expr v0.0.0-20250827210420-250dd9c460ad
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 	github.com/inngest/inngestgo v0.13.2-0.20250812183425-c9b78e47b1f9
 	github.com/jackc/pgx/v5 v5.5.4
@@ -117,6 +117,7 @@ require (
 	cloud.google.com/go/iam v1.1.13 // indirect
 	cloud.google.com/go/pubsub v1.41.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/RoaringBitmap/roaring v1.9.4 // indirect
 	github.com/Songmu/gotesplit v0.4.0 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
@@ -138,6 +139,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.30.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.2 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
@@ -195,6 +197,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
