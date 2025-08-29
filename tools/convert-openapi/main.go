@@ -199,18 +199,30 @@ func applyExamples(v3Doc *openapi3.T, inputDir string) {
 	// Construct path to examples file (go up from docs/openapi/v2 to docs/)
 	examplesPath := filepath.Join(filepath.Dir(filepath.Dir(inputDir)), "api_v2_examples.json")
 	
+	// Initialize examples structure
+	var examples map[string]map[string]map[string]interface{}
+	
 	// Read examples file
 	examplesData, err := os.ReadFile(examplesPath)
 	if err != nil {
-		fmt.Printf("Warning: Could not read examples file %s: %v\n", examplesPath, err)
-		return
+		// File doesn't exist or can't be read, start with empty structure
+		fmt.Printf("Examples file %s doesn't exist or can't be read, creating new structure\n", examplesPath)
+		examples = make(map[string]map[string]map[string]interface{})
+	} else if len(examplesData) == 0 {
+		// File exists but is empty, start with empty structure
+		fmt.Printf("Examples file %s is empty, creating new structure\n", examplesPath)
+		examples = make(map[string]map[string]map[string]interface{})
+	} else {
+		// Parse examples JSON with new structure: path -> method -> statusCode -> example
+		if err := json.Unmarshal(examplesData, &examples); err != nil {
+			fmt.Printf("Warning: Could not parse examples file: %v, creating new structure\n", err)
+			examples = make(map[string]map[string]map[string]interface{})
+		}
 	}
 	
-	// Parse examples JSON with new structure: path -> method -> statusCode -> example
-	var examples map[string]map[string]map[string]interface{}
-	if err := json.Unmarshal(examplesData, &examples); err != nil {
-		fmt.Printf("Warning: Could not parse examples file: %v\n", err)
-		return
+	// Ensure examples is not nil
+	if examples == nil {
+		examples = make(map[string]map[string]map[string]interface{})
 	}
 	
 	// Generate missing entries in examples structure

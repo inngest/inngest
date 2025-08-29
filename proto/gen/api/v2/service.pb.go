@@ -1643,7 +1643,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"PRODUCTION\x10\x00\x12\b\n" +
 	"\x04TEST\x10\x01\x12\n" +
 	"\n" +
-	"\x06BRANCH\x10\x022\xb2)\n" +
+	"\x06BRANCH\x10\x022\xba)\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1736,8 +1736,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\n" +
-	"\x12\b/account\x12\x8d\x05\n" +
-	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\xb5\x04\x92A\xa4\x04\x12\x11List environments\x1a List of all custom environments.JS\n" +
+	"\x12\b/account\x12\x95\x05\n" +
+	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\xbd\x04\x92A\xa4\x04\x12\x11List environments\x1a List of all custom environments.JS\n" +
 	"\x03200\x12L\n" +
 	"\x1cList of account environments\x12,\n" +
 	"*\x1a(#/definitions/v2FetchAccountEnvsResponseJR\n" +
@@ -1758,7 +1758,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/envs\x12\xa2\a\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f\x12\r/envs/{limit}\x12\xa2\a\n" +
 	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xbb\x06\x92A\xa3\x06\x12\x17List account event keys\x1a\xaf\x01Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.JV\n" +
 	"\x03200\x12O\n" +
 	"\x1aList of account event keys\x121\n" +
