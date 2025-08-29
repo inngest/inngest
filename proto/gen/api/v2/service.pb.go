@@ -73,6 +73,52 @@ func (EnvType) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{0}
 }
 
+type FilterType int32
+
+const (
+	FilterType_ALLOW FilterType = 0
+	FilterType_DENY  FilterType = 1
+)
+
+// Enum value maps for FilterType.
+var (
+	FilterType_name = map[int32]string{
+		0: "ALLOW",
+		1: "DENY",
+	}
+	FilterType_value = map[string]int32{
+		"ALLOW": 0,
+		"DENY":  1,
+	}
+)
+
+func (x FilterType) Enum() *FilterType {
+	p := new(FilterType)
+	*p = x
+	return p
+}
+
+func (x FilterType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FilterType) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[1].Descriptor()
+}
+
+func (FilterType) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[1]
+}
+
+func (x FilterType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FilterType.Descriptor instead.
+func (FilterType) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{1}
+}
+
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1529,6 +1575,398 @@ func (x *SigningKey) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type CreateWebhookRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Transform     string                 `protobuf:"bytes,2,opt,name=transform,proto3" json:"transform,omitempty"`
+	Response      *string                `protobuf:"bytes,3,opt,name=response,proto3,oneof" json:"response,omitempty"`
+	EventFilter   *EventFilter           `protobuf:"bytes,4,opt,name=event_filter,json=eventFilter,proto3,oneof" json:"event_filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateWebhookRequest) Reset() {
+	*x = CreateWebhookRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateWebhookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateWebhookRequest) ProtoMessage() {}
+
+func (x *CreateWebhookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateWebhookRequest.ProtoReflect.Descriptor instead.
+func (*CreateWebhookRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CreateWebhookRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateWebhookRequest) GetTransform() string {
+	if x != nil {
+		return x.Transform
+	}
+	return ""
+}
+
+func (x *CreateWebhookRequest) GetResponse() string {
+	if x != nil && x.Response != nil {
+		return *x.Response
+	}
+	return ""
+}
+
+func (x *CreateWebhookRequest) GetEventFilter() *EventFilter {
+	if x != nil {
+		return x.EventFilter
+	}
+	return nil
+}
+
+type CreateWebhookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Webhook               `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateWebhookResponse) Reset() {
+	*x = CreateWebhookResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateWebhookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateWebhookResponse) ProtoMessage() {}
+
+func (x *CreateWebhookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateWebhookResponse.ProtoReflect.Descriptor instead.
+func (*CreateWebhookResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *CreateWebhookResponse) GetData() *Webhook {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *CreateWebhookResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type EventFilter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []string               `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	Filter        FilterType             `protobuf:"varint,2,opt,name=filter,proto3,enum=api.v2.FilterType" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EventFilter) Reset() {
+	*x = EventFilter{}
+	mi := &file_api_v2_service_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EventFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EventFilter) ProtoMessage() {}
+
+func (x *EventFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EventFilter.ProtoReflect.Descriptor instead.
+func (*EventFilter) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *EventFilter) GetEvents() []string {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *EventFilter) GetFilter() FilterType {
+	if x != nil {
+		return x.Filter
+	}
+	return FilterType_ALLOW
+}
+
+type ListWebhooksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWebhooksRequest) Reset() {
+	*x = ListWebhooksRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWebhooksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWebhooksRequest) ProtoMessage() {}
+
+func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWebhooksRequest.ProtoReflect.Descriptor instead.
+func (*ListWebhooksRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListWebhooksRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListWebhooksRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type ListWebhooksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Webhook             `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWebhooksResponse) Reset() {
+	*x = ListWebhooksResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWebhooksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWebhooksResponse) ProtoMessage() {}
+
+func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWebhooksResponse.ProtoReflect.Descriptor instead.
+func (*ListWebhooksResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ListWebhooksResponse) GetData() []*Webhook {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListWebhooksResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListWebhooksResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type Webhook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Url           string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	Transform     string                 `protobuf:"bytes,4,opt,name=transform,proto3" json:"transform,omitempty"`
+	Response      *string                `protobuf:"bytes,5,opt,name=response,proto3,oneof" json:"response,omitempty"`
+	EventFilter   *EventFilter           `protobuf:"bytes,6,opt,name=event_filter,json=eventFilter,proto3,oneof" json:"event_filter,omitempty"`
+	Environment   string                 `protobuf:"bytes,7,opt,name=environment,proto3" json:"environment,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Webhook) Reset() {
+	*x = Webhook{}
+	mi := &file_api_v2_service_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Webhook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Webhook) ProtoMessage() {}
+
+func (x *Webhook) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Webhook.ProtoReflect.Descriptor instead.
+func (*Webhook) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *Webhook) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Webhook) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Webhook) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *Webhook) GetTransform() string {
+	if x != nil {
+		return x.Transform
+	}
+	return ""
+}
+
+func (x *Webhook) GetResponse() string {
+	if x != nil && x.Response != nil {
+		return *x.Response
+	}
+	return ""
+}
+
+func (x *Webhook) GetEventFilter() *EventFilter {
+	if x != nil {
+		return x.EventFilter
+	}
+	return nil
+}
+
+func (x *Webhook) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *Webhook) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Webhook) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
@@ -1637,13 +2075,51 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
-	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt*/\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb4\x05\n" +
+	"\x14CreateWebhookRequest\x12W\n" +
+	"\x04name\x18\x01 \x01(\tBC\x92A@2 Descriptive name for the webhookJ\x1c\"Payment Processing Webhook\"R\x04name\x12\xda\x01\n" +
+	"\ttransform\x18\x02 \x01(\tB\xbb\x01\x92A\xb7\x0124The inline JS transform function for incoming eventsJ\x7f\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\"R\ttransform\x12\xdd\x01\n" +
+	"\bresponse\x18\x03 \x01(\tB\xbb\x01\x92A\xb7\x012FOptional inline JS function which is called to respond to GET requestsJm\"function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };\"H\x00R\bresponse\x88\x01\x01\x12h\n" +
+	"\fevent_filter\x18\x04 \x01(\v2\x13.api.v2.EventFilterB+\x92A(2&Optional event filtering configurationH\x01R\veventFilter\x88\x01\x01B\v\n" +
+	"\t_responseB\x0f\n" +
+	"\r_event_filter\"r\n" +
+	"\x15CreateWebhookResponse\x12#\n" +
+	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xeb\x02\n" +
+	"\vEventFilter\x12\xde\x01\n" +
+	"\x06events\x18\x01 \x03(\tB\xc5\x01\x92A\xc1\x012\x96\x01Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.J&[\"orders/payment.created\", \"orders/*\"]R\x06events\x12{\n" +
+	"\x06filter\x18\x02 \x01(\x0e2\x12.api.v2.FilterTypeBO\x92AL2JEither allow only the events requested, or deny the specific events listedR\x06filter\"\xd4\x01\n" +
+	"\x13ListWebhooksRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12\\\n" +
+	"\x05limit\x18\x02 \x01(\x05BA\x92A>28Number of webhooks to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x93\x01\n" +
+	"\x14ListWebhooksResponse\x12#\n" +
+	"\x04data\x18\x01 \x03(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xef\x02\n" +
+	"\aWebhook\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x1c\n" +
+	"\ttransform\x18\x04 \x01(\tR\ttransform\x12\x1f\n" +
+	"\bresponse\x18\x05 \x01(\tH\x00R\bresponse\x88\x01\x01\x12;\n" +
+	"\fevent_filter\x18\x06 \x01(\v2\x13.api.v2.EventFilterH\x01R\veventFilter\x88\x01\x01\x12 \n" +
+	"\venvironment\x18\a \x01(\tR\venvironment\x128\n" +
+	"\tcreatedAt\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
+	"\tupdatedAt\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\v\n" +
+	"\t_responseB\x0f\n" +
+	"\r_event_filter*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
 	"\x04TEST\x10\x01\x12\n" +
 	"\n" +
-	"\x06BRANCH\x10\x022\xe0(\n" +
+	"\x06BRANCH\x10\x02*!\n" +
+	"\n" +
+	"FilterType\x12\t\n" +
+	"\x05ALLOW\x10\x00\x12\b\n" +
+	"\x04DENY\x10\x012\xf84\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1803,7 +2279,55 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rf\n" +
 	"d\n" +
-	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signingB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signing\x12\xee\x06\n" +
+	"\rCreateWebhook\x12\x1c.api.v2.CreateWebhookRequest\x1a\x1d.api.v2.CreateWebhookResponse\"\x9f\x06\x92A\x83\x06\x12\x0eCreate webhook\x1a*Creates a new webhook for receiving eventsJP\n" +
+	"\x03201\x12I\n" +
+	"\x1cWebhook successfully created\x12)\n" +
+	"'\x1a%#/definitions/v2CreateWebhookResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ[\n" +
+	"\x03409\x12T\n" +
+	"/Conflict - webhook with same URL already exists\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJc\n" +
+	"\x03422\x12\\\n" +
+	"7Unprocessable Entity - business logic validation failed\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00rh\n" +
+	"f\n" +
+	"\rX-Inngest-Env\x12QTarget environment for the webhook (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/env/webhooks\x12\xa4\x05\n" +
+	"\fListWebhooks\x12\x1b.api.v2.ListWebhooksRequest\x1a\x1c.api.v2.ListWebhooksResponse\"\xd8\x04\x92A\xbf\x04\x12\rList webhooks\x1a/Lists all webhooks in the specified environmentJC\n" +
+	"\x03200\x12<\n" +
+	"\x10List of webhooks\x12(\n" +
+	"&\x1a$#/definitions/v2ListWebhooksResponseJR\n" +
+	"\x03400\x12K\n" +
+	"&Bad Request - invalid query parameters\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00ri\n" +
+	"g\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooksB\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -1821,93 +2345,114 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_api_v2_service_proto_goTypes = []any{
 	(EnvType)(0),                            // 0: api.v2.EnvType
-	(*HealthRequest)(nil),                   // 1: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),             // 2: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                  // 3: api.v2.HealthResponse
-	(*HealthData)(nil),                      // 4: api.v2.HealthData
-	(*Error)(nil),                           // 5: api.v2.Error
-	(*ErrorResponse)(nil),                   // 6: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                // 7: api.v2.ResponseMetadata
-	(*CreateAccountRequest)(nil),            // 8: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),           // 9: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                // 10: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),               // 11: api.v2.CreateEnvResponse
-	(*Env)(nil),                             // 12: api.v2.Env
-	(*CreateAccountData)(nil),               // 13: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),            // 14: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),           // 15: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),            // 16: api.v2.FetchAccountResponse
-	(*Account)(nil),                         // 17: api.v2.Account
-	(*Page)(nil),                            // 18: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),    // 19: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),   // 20: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                        // 21: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),         // 22: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),        // 23: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),  // 24: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil), // 25: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                      // 26: api.v2.SigningKey
-	(*timestamppb.Timestamp)(nil),           // 27: google.protobuf.Timestamp
+	(FilterType)(0),                         // 1: api.v2.FilterType
+	(*HealthRequest)(nil),                   // 2: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),             // 3: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                  // 4: api.v2.HealthResponse
+	(*HealthData)(nil),                      // 5: api.v2.HealthData
+	(*Error)(nil),                           // 6: api.v2.Error
+	(*ErrorResponse)(nil),                   // 7: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                // 8: api.v2.ResponseMetadata
+	(*CreateAccountRequest)(nil),            // 9: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),           // 10: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                // 11: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),               // 12: api.v2.CreateEnvResponse
+	(*Env)(nil),                             // 13: api.v2.Env
+	(*CreateAccountData)(nil),               // 14: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),            // 15: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),           // 16: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),            // 17: api.v2.FetchAccountResponse
+	(*Account)(nil),                         // 18: api.v2.Account
+	(*Page)(nil),                            // 19: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),    // 20: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),   // 21: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                        // 22: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),         // 23: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),        // 24: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),  // 25: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil), // 26: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                      // 27: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),            // 28: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),           // 29: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                     // 30: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),             // 31: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),            // 32: api.v2.ListWebhooksResponse
+	(*Webhook)(nil),                         // 33: api.v2.Webhook
+	(*timestamppb.Timestamp)(nil),           // 34: google.protobuf.Timestamp
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	4,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	7,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	5,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	27, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	27, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	13, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	7,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	12, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	7,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	5,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	8,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	6,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	34, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	34, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	14, // 5: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	8,  // 6: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	13, // 7: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	8,  // 8: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	0,  // 9: api.v2.Env.type:type_name -> api.v2.EnvType
-	27, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	27, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	27, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	17, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	7,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	18, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	17, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	7,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	27, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	27, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	21, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	7,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	18, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	27, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	12, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	7,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	18, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	26, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	7,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	18, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	27, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	1,  // 31: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	1,  // 32: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	8,  // 33: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	10, // 34: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	14, // 35: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	2,  // 36: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	22, // 37: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	19, // 38: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	24, // 39: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	3,  // 40: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	6,  // 41: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	9,  // 42: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	11, // 43: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	15, // 44: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	16, // 45: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	23, // 46: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	20, // 47: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	25, // 48: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	40, // [40:49] is the sub-list for method output_type
-	31, // [31:40] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	34, // 10: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	34, // 11: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	34, // 12: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	18, // 13: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	8,  // 14: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19, // 15: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	18, // 16: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	8,  // 17: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	34, // 18: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	34, // 19: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	22, // 20: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	8,  // 21: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19, // 22: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	34, // 23: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	13, // 24: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	8,  // 25: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19, // 26: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	27, // 27: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	8,  // 28: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19, // 29: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	34, // 30: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	30, // 31: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	33, // 32: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	8,  // 33: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	1,  // 34: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
+	33, // 35: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	8,  // 36: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19, // 37: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	30, // 38: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	34, // 39: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	34, // 40: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	2,  // 41: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	2,  // 42: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	9,  // 43: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	11, // 44: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	15, // 45: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	3,  // 46: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	23, // 47: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	20, // 48: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	25, // 49: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	28, // 50: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	31, // 51: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	4,  // 52: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	7,  // 53: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	10, // 54: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	12, // 55: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	16, // 56: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	17, // 57: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	24, // 58: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	21, // 59: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	26, // 60: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	29, // 61: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	32, // 62: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	52, // [52:63] is the sub-list for method output_type
+	41, // [41:52] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -1922,13 +2467,16 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[18].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[21].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[23].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[26].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   26,
+			NumEnums:      2,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

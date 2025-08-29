@@ -53,6 +53,10 @@ const (
 	// V2FetchAccountSigningKeysProcedure is the fully-qualified name of the V2's
 	// FetchAccountSigningKeys RPC.
 	V2FetchAccountSigningKeysProcedure = "/api.v2.V2/FetchAccountSigningKeys"
+	// V2CreateWebhookProcedure is the fully-qualified name of the V2's CreateWebhook RPC.
+	V2CreateWebhookProcedure = "/api.v2.V2/CreateWebhook"
+	// V2ListWebhooksProcedure is the fully-qualified name of the V2's ListWebhooks RPC.
+	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -67,6 +71,8 @@ type V2Client interface {
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
+	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
+	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -134,6 +140,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 			connect.WithClientOptions(opts...),
 		),
+		createWebhook: connect.NewClient[v2.CreateWebhookRequest, v2.CreateWebhookResponse](
+			httpClient,
+			baseURL+V2CreateWebhookProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateWebhook")),
+			connect.WithClientOptions(opts...),
+		),
+		listWebhooks: connect.NewClient[v2.ListWebhooksRequest, v2.ListWebhooksResponse](
+			httpClient,
+			baseURL+V2ListWebhooksProcedure,
+			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -148,6 +166,8 @@ type v2Client struct {
 	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
 	fetchAccountEventKeys   *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
 	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
+	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
+	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -195,6 +215,16 @@ func (c *v2Client) FetchAccountSigningKeys(ctx context.Context, req *connect.Req
 	return c.fetchAccountSigningKeys.CallUnary(ctx, req)
 }
 
+// CreateWebhook calls api.v2.V2.CreateWebhook.
+func (c *v2Client) CreateWebhook(ctx context.Context, req *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error) {
+	return c.createWebhook.CallUnary(ctx, req)
+}
+
+// ListWebhooks calls api.v2.V2.ListWebhooks.
+func (c *v2Client) ListWebhooks(ctx context.Context, req *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
+	return c.listWebhooks.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -207,6 +237,8 @@ type V2Handler interface {
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
+	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
+	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -270,6 +302,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("FetchAccountSigningKeys")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateWebhookHandler := connect.NewUnaryHandler(
+		V2CreateWebhookProcedure,
+		svc.CreateWebhook,
+		connect.WithSchema(v2Methods.ByName("CreateWebhook")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListWebhooksHandler := connect.NewUnaryHandler(
+		V2ListWebhooksProcedure,
+		svc.ListWebhooks,
+		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -290,6 +334,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2FetchAccountEventKeysHandler.ServeHTTP(w, r)
 		case V2FetchAccountSigningKeysProcedure:
 			v2FetchAccountSigningKeysHandler.ServeHTTP(w, r)
+		case V2CreateWebhookProcedure:
+			v2CreateWebhookHandler.ServeHTTP(w, r)
+		case V2ListWebhooksProcedure:
+			v2ListWebhooksHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -333,4 +381,12 @@ func (UnimplementedV2Handler) FetchAccountEventKeys(context.Context, *connect.Re
 
 func (UnimplementedV2Handler) FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccountSigningKeys is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateWebhook is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListWebhooks is not implemented"))
 }
