@@ -795,6 +795,30 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
+	// We also create the first discovery step right now, as then every single
+	// queue item has a span to reference.
+	//
+	// Initially, this helps combat a situation whereby erroring calls within
+	// the very first discovery step of a function are difficult to attribute
+	// to the same step span across retries.
+	//
+	// In the future, this also means that we can remove some magic around
+	// where to find the latest span and just always fetch it from the queue
+	// item.
+	_, err = e.tracerProvider.CreateSpan(
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+			Parent:    runSpanRef,
+			Metadata:  &metadata,
+			QueueItem: &item,
+			Carriers:  []map[string]any{item.Metadata},
+		},
+	)
+	if err != nil {
+		l.Debug("error creating initial step span", "error", err)
+	}
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -978,8 +1002,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// trace context set
 	ctx = extractTraceCtx(ctx, md)
 
-	isFirstExecution := edge.Incoming == inngest.TriggerName && item.Attempt == 0
-
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
@@ -1037,26 +1059,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// Set the parent span for this execution.
 	var execParent *meta.SpanReference
-	if isFirstExecution {
-		// If this is the first ever attempt, we haven't created a step yet. If
-		// this is not the first attempt, the step span is created when it is
-		// enqueued, so we don't need to create one here.
-		execParent, err = e.tracerProvider.CreateSpan(
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				Debug:     &tracing.SpanDebugData{Location: "executor.Execute"},
-				Parent:    tracing.RunSpanRefFromMetadata(&md),
-				Metadata:  &md,
-				QueueItem: &item,
-			},
-		)
-		if err != nil {
-			// return nil, fmt.Errorf("error creating initial step span: %w",
-			// err)
-			l.Debug("error creating initial step span", "error", err)
-		}
-
-	} else if isSleepResume {
+	if isSleepResume {
 		// If we're resuming a sleep here, we're also starting a new discovery
 		// step here.
 		execParent, err = e.tracerProvider.CreateSpan(
