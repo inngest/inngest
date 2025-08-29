@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useLayoutEffect, useRef } from 'react';
-import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor.jsx';
+import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { getCanRunQuery } from './utils';
