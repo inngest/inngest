@@ -1643,7 +1643,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"PRODUCTION\x10\x00\x12\b\n" +
 	"\x04TEST\x10\x01\x12\n" +
 	"\n" +
-	"\x06BRANCH\x10\x022\xe0(\n" +
+	"\x06BRANCH\x10\x022\xb2)\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -1719,13 +1719,16 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\x82\x03\n" +
-	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\xb6\x02\x92A\xa2\x02\x12\vGet account\x1a.Returns the account for the authenticated userJ:\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\xd4\x03\n" +
+	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\x88\x03\x92A\xf4\x02\x12\vGet account\x1a.Returns the account for the authenticated userJ:\n" +
 	"\x03200\x123\n" +
 	"\aAccount\x12(\n" +
 	"&\x1a$#/definitions/v2FetchAccountResponseJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - Insufficient permissions\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +
