@@ -257,7 +257,7 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	return rawAttrs
 }
 
-func GatewayResponseAttrs(ctx context.Context, resp *exechttp.Response, userErr *state.UserError, op state.GeneratorOpcode) *meta.SerializableAttrs {
+func GatewayResponseAttrs(resp *exechttp.Response, userErr *state.UserError, op state.GeneratorOpcode) *meta.SerializableAttrs {
 	now := time.Now()
 
 	rawAttrs := meta.NewAttrSet(

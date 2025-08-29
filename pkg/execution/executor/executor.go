@@ -2875,6 +2875,8 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	// Without this, publishing will not work.
 	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
+	metadata := runCtx.Metadata()
+	execSpan := runCtx.ExecutionSpan()
 
 	var output []byte
 
@@ -2886,6 +2888,14 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			Message: fmt.Sprintf("Error making gateway request: %s", err),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		})
 
 		if runCtx.ShouldRetry() {
 			runCtx.SetError(err)
@@ -2928,6 +2938,15 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		})
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
@@ -3069,11 +3088,11 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
 		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			TargetSpan: runCtx.ExecutionSpan(),
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Attributes: tracing.GatewayResponseAttrs(ctx, resp, &userLandErr, gen),
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
 		})
 
 		// And, finally, if this is retryable return an error which will be retried.
@@ -3130,11 +3149,11 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		lifecycleItem := runCtx.LifecycleItem()
 
 		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			TargetSpan: runCtx.ExecutionSpan(),
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Attributes: tracing.GatewayResponseAttrs(ctx, resp, nil, gen),
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
 		})
 
 		for _, e := range e.lifecycles {
