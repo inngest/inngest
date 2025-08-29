@@ -38,11 +38,4 @@ export const TEMPLATES: QueryTemplate[] = [
     explanation: 'Identify unusually large event payloads',
     templateKind: 'warning',
   },
-  {
-    id: 'suspicious-event-patterns',
-    name: 'Suspicious event patterns',
-    query: `<Query text from "Suspicious event patterns">`,
-    explanation: 'Detect abnormally high event rates',
-    templateKind: 'warning',
-  },
 ];

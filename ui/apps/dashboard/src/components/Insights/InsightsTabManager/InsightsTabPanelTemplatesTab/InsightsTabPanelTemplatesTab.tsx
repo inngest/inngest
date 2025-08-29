@@ -22,8 +22,10 @@ export function InsightsTabPanelTemplatesTab() {
     <div className="col-span-1 row-span-2 flex h-full w-full gap-12 overflow-y-auto p-12">
       <div className="flex flex-1 flex-col">
         <div className="mb-10">
-          <h2 className="text-basis mb-1 text-xl">Start with a template</h2>
-          <p className="text-muted text-sm">Choose a template to start exploring your data</p>
+          <h2 className="text-basis mb-1 text-xl">Getting started</h2>
+          <p className="text-muted text-sm">
+            Choose a template to start exploring your data or start from scratch
+          </p>
         </div>
         <InsightsTabPanelTemplatesTabGrid />
       </div>
