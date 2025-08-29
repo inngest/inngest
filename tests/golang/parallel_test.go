@@ -616,3 +616,93 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 
 	r.Equal(1, int(atomic.LoadInt32(&counter)))
 }
+
+  func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
+        ctx := context.Background()
+        c := client.New(t)
+        inngestClient, server, registerFuncs := NewSDKHandler(t, "parallel-fail")
+        defer server.Close()
+
+        var (
+                failureCount int32
+                runID        string
+        )
+
+        _, err := inngestgo.CreateFunction(
+                inngestClient,
+                inngestgo.FunctionOpts{
+                        ID:      "parallel-fail-test",
+                        Retries: inngestgo.Ptr(0),
+                },
+                inngestgo.EventTrigger("test/parallel-fail", nil),
+                func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+                        if runID == "" {
+                                runID = input.InputCtx.RunID
+                        }
+
+                        res := group.Parallel(ctx,
+                                func(ctx context.Context) (any, error) {
+                                        return step.Run(ctx, "step-a", func(ctx context.Context) (any, error) {
+                                                return nil, fmt.Errorf("step a failed")
+                                        })
+                                },
+                                func(ctx context.Context) (any, error) {
+                                        return step.Run(ctx, "step-b", func(ctx context.Context) (any, error) {
+                                                return nil, fmt.Errorf("step b failed")
+                                        })
+                                },
+                        )
+
+                        // Check if any parallel step failed and propagate error to trigger onFailure
+                        if err := res.AnyError(); err != nil {
+                                return nil, err
+                        }
+
+                        return res, nil
+                },
+        )
+        require.NoError(t, err)
+
+        // onFailure equivalent function
+        _, err = inngestgo.CreateFunction(
+                inngestClient,
+                inngestgo.FunctionOpts{
+                        ID:      "handle-parallel-failures",
+                        Retries: inngestgo.Ptr(0),
+                },
+                inngestgo.EventTrigger(
+                        "inngest/function.failed",
+                        inngestgo.StrPtr("event.data.function_id == 'parallel-fail-parallel-fail-test'"),
+                ),
+                func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+                        atomic.AddInt32(&failureCount, 1)
+
+                        // Assert failure data is present
+                        require.NotEmpty(t, input.Event.Data["run_id"])
+                        require.Equal(t, "parallel-fail-parallel-fail-test", input.Event.Data["function_id"])
+
+                        return "handled", nil
+                },
+        )
+        require.NoError(t, err)
+
+        registerFuncs()
+
+        _, err = inngestClient.Send(ctx, inngestgo.Event{
+                Name: "test/parallel-fail",
+                Data: map[string]any{"test": true},
+        })
+        require.NoError(t, err)
+
+        <-time.After(5 * time.Second)
+
+        require.Eventually(t, func() bool {
+                return atomic.LoadInt32(&failureCount) == 1
+        }, 15*time.Second, 500*time.Millisecond)
+
+        run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+                Status:  models.FunctionStatusFailed,
+                Timeout: 10 * time.Second,
+        })
+        require.Equal(t, models.RunTraceSpanStatusFailed.String(), run.Trace.Status)
+  }
