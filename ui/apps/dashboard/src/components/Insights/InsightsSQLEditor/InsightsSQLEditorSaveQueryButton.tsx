@@ -26,11 +26,12 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   return (
     <Button
       appearance="outlined"
+      className="font-medium"
       disabled={disabled}
       icon={<Icon className={cn(disabled ? 'text-disabled' : 'text-muted')} size={16} />}
       iconSide="left"
       kind="secondary"
-      label="Save"
+      label="Save query"
       onClick={() => {
         const newTab: Query = { id: tab.id, name, query, saved: true };
         saveQuery(newTab, () => {
