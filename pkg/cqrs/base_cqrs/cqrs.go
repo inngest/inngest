@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"sort"
@@ -256,6 +257,14 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	sorter(root)
 
 	return root, nil
+}
+
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	return nil, errors.New("not implemented")
 }
 
 func encodeSpanOutputID(spanID string) (*string, error) {

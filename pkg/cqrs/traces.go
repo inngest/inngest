@@ -383,6 +383,10 @@ type TraceReader interface {
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
+	// GetSpansByDebugRunID retrieves all spans related to the specified debug run
+	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*OtelSpan, error)
+	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
+	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud

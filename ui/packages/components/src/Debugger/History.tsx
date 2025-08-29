@@ -1,3 +1,7 @@
+import { useEffect, useState } from 'react';
+
+import { useGetDebugSession } from '../SharedContext/useGetDebugSession';
+import { Skeleton } from '../Skeleton';
 import { StepHistory } from './StepHistory';
 
 const exampleAiOutput = {
@@ -119,10 +123,44 @@ const data = [
   },
 ];
 
-export const History = () => (
-  <div className="flex w-full flex-col gap-2">
-    {data.map((item, i) => (
-      <StepHistory {...item} defaultOpen={i === data.length - 1} key={`step-history-${item.id}`} />
-    ))}
-  </div>
-);
+type HistoryProps = {
+  functionSlug: string;
+  debugSessionID?: string;
+  runID?: string;
+};
+
+export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
+  const {
+    data: newData,
+    loading: newLoading,
+    error,
+  } = useGetDebugSession({
+    functionSlug,
+    debugSessionID,
+    runID,
+  });
+  const [debugSessionData, setDebugSessionData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex w-full flex-col gap-2">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-2">
+      {data.map((item, i) => (
+        <StepHistory
+          {...item}
+          defaultOpen={i === data.length - 1}
+          key={`step-history-${item.id}`}
+        />
+      ))}
+    </div>
+  );
+};

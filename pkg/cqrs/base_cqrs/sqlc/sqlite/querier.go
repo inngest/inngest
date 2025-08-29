@@ -6,6 +6,7 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	ulid "github.com/oklog/ulid/v2"
@@ -46,6 +47,8 @@ type Querier interface {
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
 	GetSpanOutput(ctx context.Context, spanID string) (interface{}, error)
+	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*GetSpansByDebugRunIDRow, error)
+	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*GetSpansByDebugSessionIDRow, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)

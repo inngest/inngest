@@ -5,6 +5,7 @@ import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Timeline } from '../RunDetailsV3/Timeline';
+import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
@@ -18,9 +19,23 @@ import { Play } from './Play';
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
+  const [debugRunID] = useSearchParam('debugRunID');
+  const [debugSessionID] = useSearchParam('debugSessionID');
+
+  const { data: debugRunData } = useGetDebugRun({
+    functionSlug,
+    debugRunID,
+    runID,
+  });
+
+  console.info('debugRunData coming soon', debugRunData);
+
   const { data: runData, loading: runLoading } = useGetRun({
     runID,
   });
+
+  // For now, we'll use the regular run data and add debug fetching later
+  // TODO: Use debug run data when available
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -96,7 +111,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                     {running ? (
                       <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
                     ) : (
-                      <Play runID={runID} />
+                      <Play runID={runID} debugRunID={debugRunID} debugSessionID={debugSessionID} />
                     )}
                   </TooltipTrigger>
                   <TooltipContent className="whitespace-pre-line">
@@ -152,7 +167,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               />
             </div>
 
-            <History />
+            <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
           </div>
         </div>
       </div>

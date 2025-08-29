@@ -31,7 +31,7 @@ func (qr *queryResolver) FunctionRun(ctx context.Context, query models.FunctionR
 
 	runID, err := ulid.Parse(query.FunctionRunID)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid run ID: %w", err)
+		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
 	run, err := qr.HistoryReader.GetRun(

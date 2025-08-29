@@ -33,8 +33,8 @@ import {
 const pollInterval = 400;
 
 export default function Page() {
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
