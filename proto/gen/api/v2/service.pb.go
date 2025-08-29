@@ -2077,9 +2077,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\r_event_filter\"r\n" +
 	"\x15CreateWebhookResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xec\x02\n" +
-	"\vEventFilter\x12\xdf\x01\n" +
-	"\x06events\x18\x01 \x03(\tB\xc6\x01\x92A\xc2\x012\x97\x01Allowlist only specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.J&[\"orders/payment.created\", \"orders/*\"]R\x06events\x12{\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xeb\x02\n" +
+	"\vEventFilter\x12\xde\x01\n" +
+	"\x06events\x18\x01 \x03(\tB\xc5\x01\x92A\xc1\x012\x96\x01Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.J&[\"orders/payment.created\", \"orders/*\"]R\x06events\x12{\n" +
 	"\x06filter\x18\x02 \x01(\x0e2\x12.api.v2.FilterTypeBO\x92AL2JEither allow only the events requested, or deny the specific events listedR\x06filter\"\xd4\x01\n" +
 	"\x13ListWebhooksRequest\x12J\n" +
 	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12\\\n" +

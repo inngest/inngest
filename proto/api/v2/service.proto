@@ -1035,7 +1035,7 @@ enum FilterType {
 message EventFilter {
   repeated string events = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Allowlist only specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied."
+      description: "Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied."
       example: "[\"orders/payment.created\", \"orders/*\"]"
     }
   ];
