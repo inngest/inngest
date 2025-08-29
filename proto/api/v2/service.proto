@@ -1069,10 +1069,11 @@ message ListWebhooksResponse {
 message Webhook {
   string id = 1;
   string name = 2;
-  string transform = 3;
-  string response = 4;
-  EventFilter event_filter = 5;
-  string environment = 6;
-  google.protobuf.Timestamp createdAt = 7;
-  google.protobuf.Timestamp updatedAt = 8;
+  string url = 3;
+  string transform = 4;
+  optional string response = 5;
+  optional EventFilter event_filter = 6;
+  string environment = 7;
+  google.protobuf.Timestamp createdAt = 8;
+  google.protobuf.Timestamp updatedAt = 9;
 }

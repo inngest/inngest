@@ -1863,12 +1863,13 @@ type Webhook struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Transform     string                 `protobuf:"bytes,3,opt,name=transform,proto3" json:"transform,omitempty"`
-	Response      string                 `protobuf:"bytes,4,opt,name=response,proto3" json:"response,omitempty"`
-	EventFilter   *EventFilter           `protobuf:"bytes,5,opt,name=event_filter,json=eventFilter,proto3" json:"event_filter,omitempty"`
-	Environment   string                 `protobuf:"bytes,6,opt,name=environment,proto3" json:"environment,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
+	Url           string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	Transform     string                 `protobuf:"bytes,4,opt,name=transform,proto3" json:"transform,omitempty"`
+	Response      *string                `protobuf:"bytes,5,opt,name=response,proto3,oneof" json:"response,omitempty"`
+	EventFilter   *EventFilter           `protobuf:"bytes,6,opt,name=event_filter,json=eventFilter,proto3,oneof" json:"event_filter,omitempty"`
+	Environment   string                 `protobuf:"bytes,7,opt,name=environment,proto3" json:"environment,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1917,6 +1918,13 @@ func (x *Webhook) GetName() string {
 	return ""
 }
 
+func (x *Webhook) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
 func (x *Webhook) GetTransform() string {
 	if x != nil {
 		return x.Transform
@@ -1925,8 +1933,8 @@ func (x *Webhook) GetTransform() string {
 }
 
 func (x *Webhook) GetResponse() string {
-	if x != nil {
-		return x.Response
+	if x != nil && x.Response != nil {
+		return *x.Response
 	}
 	return ""
 }
@@ -2089,16 +2097,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14ListWebhooksResponse\x12#\n" +
 	"\x04data\x18\x01 \x03(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xb5\x02\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xef\x02\n" +
 	"\aWebhook\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
-	"\ttransform\x18\x03 \x01(\tR\ttransform\x12\x1a\n" +
-	"\bresponse\x18\x04 \x01(\tR\bresponse\x126\n" +
-	"\fevent_filter\x18\x05 \x01(\v2\x13.api.v2.EventFilterR\veventFilter\x12 \n" +
-	"\venvironment\x18\x06 \x01(\tR\venvironment\x128\n" +
-	"\tcreatedAt\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
-	"\tupdatedAt\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*/\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x1c\n" +
+	"\ttransform\x18\x04 \x01(\tR\ttransform\x12\x1f\n" +
+	"\bresponse\x18\x05 \x01(\tH\x00R\bresponse\x88\x01\x01\x12;\n" +
+	"\fevent_filter\x18\x06 \x01(\v2\x13.api.v2.EventFilterH\x01R\veventFilter\x88\x01\x01\x12 \n" +
+	"\venvironment\x18\a \x01(\tR\venvironment\x128\n" +
+	"\tcreatedAt\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x128\n" +
+	"\tupdatedAt\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\v\n" +
+	"\t_responseB\x0f\n" +
+	"\r_event_filter*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -2458,6 +2469,7 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[23].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[26].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

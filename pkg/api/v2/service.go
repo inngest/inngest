@@ -451,6 +451,26 @@ func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchA
 }
 
 func (s *Service) CreateWebhook(ctx context.Context, req *apiv2.CreateWebhookRequest) (*apiv2.CreateWebhookResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Webhook name is required")
+	}
+
+	if req.Transform == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Transform function is required")
+	}
+
+	// For now, return not implemented since this is OSS
+	// In a real implementation, this would:
+	// 1. Generate a unique URL for the webhook
+	// 2. Validate JavaScript syntax for transform and response functions  
+	// 3. Save to database and return the created webhook with generated URL
 	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
 
