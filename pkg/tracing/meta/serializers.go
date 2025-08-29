@@ -388,14 +388,14 @@ func JsonAttr[T any](key string) attr[*T] {
 				return BlankAttr
 			}
 
-			reqByt, _ := json.Marshal(v)
+			byt, _ := json.Marshal(v)
 
-			return attribute.String(withPrefix(key), string(reqByt))
+			return attribute.String(withPrefix(key), string(byt))
 		},
 		deserialize: func(v any) (*T, bool) {
-			if reqStr, ok := v.(string); ok {
+			if str, ok := v.(string); ok {
 				var req T
-				if err := json.Unmarshal([]byte(reqStr), &req); err == nil {
+				if err := json.Unmarshal([]byte(str), &req); err == nil {
 					return &req, true
 				}
 			}
