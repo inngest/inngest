@@ -15,8 +15,16 @@
         }
       },
       "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for get /account 403"
+      },
       "500": {
-        "// TODO": "Add example data for get /account 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
@@ -47,7 +55,12 @@
         }
       },
       "400": {
-        "// TODO": "Add example data for get /envs 400"
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Environment name is required"
+          }
+        ]
       },
       "401": "Authentication failed",
       "403": {
@@ -57,7 +70,12 @@
         "// TODO": "Add example data for get /envs 404"
       },
       "500": {
-        "// TODO": "Add example data for get /envs 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     },
     "post": {
@@ -84,7 +102,12 @@
         "// TODO": "Add example data for post /envs 409"
       },
       "500": {
-        "// TODO": "Add example data for post /envs 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
@@ -101,7 +124,12 @@
       },
       "401": "Authentication failed",
       "500": {
-        "// TODO": "Add example data for get /health 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
@@ -135,7 +163,12 @@
         }
       },
       "400": {
-        "// TODO": "Add example data for get /keys/events 400"
+        "errors": [
+          {
+            "code": "invalid_field_format",
+            "message": "Limit must be at least 1"
+          }
+        ]
       },
       "401": "Authentication failed",
       "403": {
@@ -145,7 +178,12 @@
         "// TODO": "Add example data for get /keys/events 404"
       },
       "500": {
-        "// TODO": "Add example data for get /keys/events 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
@@ -172,7 +210,12 @@
         }
       },
       "400": {
-        "// TODO": "Add example data for get /keys/signing 400"
+        "errors": [
+          {
+            "code": "invalid_field_format",
+            "message": "Limit must be at least 1"
+          }
+        ]
       },
       "401": "Authentication failed",
       "403": {
@@ -182,7 +225,12 @@
         "// TODO": "Add example data for get /keys/signing 404"
       },
       "500": {
-        "// TODO": "Add example data for get /keys/signing 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
@@ -218,17 +266,29 @@
       "400": {
         "// TODO": "Add example data for get /partner/accounts 400"
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
       "403": {
         "errors": [
           {
-            "code": "insufficient_permissions",
-            "message": "Partner access required"
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
           }
         ]
       },
       "500": {
-        "// TODO": "Add example data for get /partner/accounts 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     },
     "post": {
@@ -254,15 +314,32 @@
           }
         ]
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
       "403": {
-        "// TODO": "Add example data for post /partner/accounts 403"
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
       },
       "409": {
         "// TODO": "Add example data for post /partner/accounts 409"
       },
       "500": {
-        "// TODO": "Add example data for post /partner/accounts 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   }

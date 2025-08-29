@@ -136,6 +136,12 @@ message YourData {
 }
 ```
 
+When you are done defining your endpoint, request and response, run:
+
+```sh
+make protobuf
+```
+
 #### Key Conventions
 
 - **Required vs Optional**: Use `optional` for non-required or nullable fields
