@@ -176,17 +176,26 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 
 	carrier := propagation.MapCarrier{}
 	defaultPropagator.Inject(ctx, carrier)
+	refTp := carrier["traceparent"]
+	refTs := carrier["tracestate"]
 
 	spanRef := &meta.SpanReference{
-		TraceParent: carrier["traceparent"],
-		TraceState:  carrier["tracestate"],
+		TraceParent: refTp,
+		TraceState:  refTs,
 	}
 
-	// Only spans with parents can be dynamic? Hm.
 	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
+
 	if opts.Parent != nil {
+		// If the span has a parent, set some attributes so we can extend it later
+		// and pick the same trace and parent span IDs for the extension span.
 		spanRef.DynamicSpanTraceParent = opts.Parent.TraceParent
 		spanRef.DynamicSpanTraceState = opts.Parent.TraceState
+	} else {
+		// If we don't have a parent, this is a top-level span (e.g. the run
+		// span), so we use this span as the dynamic reference instead.
+		spanRef.DynamicSpanTraceParent = refTp
+		spanRef.DynamicSpanTraceState = refTs
 	}
 
 	span.SetAttributes(
