@@ -1548,7 +1548,7 @@ export const CountWorkerConnectionsDocument = `
 export const GetEventsV2Document = `
     query GetEventsV2($cursor: String, $startTime: Time!, $endTime: Time, $celQuery: String = null, $eventNames: [String!] = null, $includeInternalEvents: Boolean = true) {
   eventsV2(
-    first: 30
+    first: 50
     after: $cursor
     filter: {from: $startTime, until: $endTime, query: $celQuery, eventNames: $eventNames, includeInternalEvents: $includeInternalEvents}
   ) {
