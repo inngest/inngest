@@ -152,7 +152,7 @@ func TestItemsByPartition(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			items, err := q.ItemsByPartition(ctx, defaultShard, fnID, tc.from, tc.until,
+			items, err := q.ItemsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
 				WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
