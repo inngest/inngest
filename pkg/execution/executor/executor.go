@@ -3096,6 +3096,8 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			TargetSpan: execSpan,
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Attributes: tracing.GatewayResponseAttrs(ctx, resp, &userLandErr, gen),
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
 		})
 
 		// And, finally, if this is retryable return an error which will be retried.
