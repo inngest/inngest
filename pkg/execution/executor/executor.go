@@ -3022,11 +3022,44 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
+	metadata := runCtx.Metadata()
+
+	var execSpan *meta.SpanReference
+	stepSpan, stepSpanErr := e.tracerProvider.CreateSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:    metadata,
+			QueueItem:   &lifecycleItem,
+			Parent:      tracing.RunSpanRefFromMetadata(metadata),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+		},
+	)
+	if stepSpanErr != nil {
+		e.log.Debug("error creating step span representing AI gateway", "error", err)
+	} else {
+		var execSpanErr error
+		execSpan, execSpanErr = e.tracerProvider.CreateSpan(
+			meta.SpanNameExecution,
+			&tracing.CreateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+				Metadata:   metadata,
+				QueueItem:  &lifecycleItem,
+				Parent:     stepSpan,
+				Attributes: tracing.GeneratorAttrs(&gen),
+			},
+		)
+		if execSpanErr != nil {
+			e.log.Debug("error creating execution span representing AI gateway", "error", execSpanErr)
+		}
+	}
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
@@ -3058,6 +3091,12 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			Stack:   string(resp.Body),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			TargetSpan: execSpan,
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Attributes: tracing.GatewayResponseAttrs(ctx, resp, &userLandErr, gen),
+		})
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
