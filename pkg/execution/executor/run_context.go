@@ -96,3 +96,7 @@ func (r *runInstance) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.
 func (r *runInstance) SetError(err error) {
 	r.resp.SetError(err)
 }
+
+func (r *runInstance) ExecutionSpan() *meta.SpanReference {
+	return r.execSpan
+}

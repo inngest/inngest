@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"reflect"
 	"strconv"
 	"time"
@@ -381,23 +380,23 @@ func StepOpAttr(key string) attr[*enums.Opcode] {
 	}
 }
 
-func HttpHeaderAttr(key string) attr[*http.Header] {
-	return attr[*http.Header]{
+func JsonAttr[T any](key string) attr[*T] {
+	return attr[*T]{
 		key: withPrefix(key),
-		serialize: func(v *http.Header) attribute.KeyValue {
-			if v == nil || len(*v) == 0 {
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
 				return BlankAttr
 			}
 
-			headerByt, _ := json.Marshal(v)
+			byt, _ := json.Marshal(v)
 
-			return attribute.String(withPrefix(key), string(headerByt))
+			return attribute.String(withPrefix(key), string(byt))
 		},
-		deserialize: func(v any) (*http.Header, bool) {
-			if headerStr, ok := v.(string); ok {
-				var headers http.Header
-				if err := json.Unmarshal([]byte(headerStr), &headers); err == nil {
-					return &headers, true
+		deserialize: func(v any) (*T, bool) {
+			if str, ok := v.(string); ok {
+				var req T
+				if err := json.Unmarshal([]byte(str), &req); err == nil {
+					return &req, true
 				}
 			}
 

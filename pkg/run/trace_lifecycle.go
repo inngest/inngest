@@ -710,11 +710,11 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	case enums.OpcodeAIGateway:
 		req, _ := op.AIGatewayOpts()
 		// Parse the request
-		if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+		if parsed, err := aigateway.ParseInput(req); err == nil {
 			span.SetAIRequestMetadata(parsed)
 		}
 		// And parse the response.
-		if parsed, err := aigateway.ParseOutput(ctx, req.Format, op.Data); err == nil {
+		if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
 			span.SetAIResponseMetadata(parsed)
 		}
 	}
@@ -837,7 +837,7 @@ func (l traceLifecycle) OnStepFinished(
 			switch op.Op {
 			case enums.OpcodeAIGateway:
 				req, _ := op.AIGatewayOpts()
-				if parsed, err := aigateway.ParseInput(ctx, req); err == nil {
+				if parsed, err := aigateway.ParseInput(req); err == nil {
 					span.SetAIRequestMetadata(parsed)
 				}
 			case enums.OpcodeStep, enums.OpcodeStepRun:

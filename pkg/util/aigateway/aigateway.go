@@ -79,7 +79,7 @@ func ParseUnknownInput(ctx context.Context, req json.RawMessage) (ParsedInferenc
 // * Mistral
 // * Cohere
 // * Groq (must include URL)
-func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error) {
+func ParseInput(req Request) (ParsedInferenceRequest, error) {
 	switch req.Format {
 	case FormatOpenAIChat:
 		// OpenAI Chat is the default format, so fall through to the default.
@@ -139,7 +139,7 @@ func ParseInput(ctx context.Context, req Request) (ParsedInferenceRequest, error
 
 }
 
-func ParseOutput(ctx context.Context, format string, response []byte) (ParsedInferenceResponse, error) {
+func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error) {
 	switch format {
 	case FormatAnthropic:
 		r := anthropic.MessagesResponse{}

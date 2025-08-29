@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -138,6 +139,8 @@ type RunContext interface {
 	Metadata() *sv2.Metadata
 	Events() []json.RawMessage
 	HTTPClient() exechttp.RequestExecutor
+	// The span that represents this individual execution
+	ExecutionSpan() *meta.SpanReference
 
 	// Group correlation - for pause operations and history tracking
 	GroupID() string

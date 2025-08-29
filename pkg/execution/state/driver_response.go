@@ -324,6 +324,28 @@ func (r *DriverResponse) IsDiscoveryResponse() bool {
 	return false
 }
 
+// IsGatewayRequest returns true if this `DriverResponse` is the SDK reporting that they
+// wish us to make a request via the gateway.
+//
+// Note that, like the gateways, this does not currently support parallelism; we
+// expect there to only be a single reported op for this to resole to `true`.
+func (r *DriverResponse) IsGatewayRequest() bool {
+	if !r.IsDiscoveryResponse() {
+		return false
+	}
+
+	if len(r.Generator) != 1 {
+		return false
+	}
+
+	switch r.Generator[0].Op {
+	case enums.OpcodeAIGateway, enums.OpcodeGateway:
+		return true
+	}
+
+	return false
+}
+
 // GetFunctionOutput returns the serialized output of the function if this
 // response represents a function result. The output could also be an error.
 func (r *DriverResponse) GetFunctionOutput() (*string, error) {

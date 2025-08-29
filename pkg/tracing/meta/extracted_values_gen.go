@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -62,4 +63,6 @@ type ExtractedValues struct {
 	ResponseOutputSize *int
 	DebugSessionID *ulid.ULID
 	DebugRunID *ulid.ULID
+	AIRequestMetadata *aigateway.ParsedInferenceRequest
+	AIResponseMetadata *aigateway.ParsedInferenceResponse
 }
