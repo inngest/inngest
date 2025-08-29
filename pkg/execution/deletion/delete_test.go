@@ -376,4 +376,315 @@ func TestDeleteManager(t *testing.T) {
 		// Note: We can't easily verify debounce deletion without the exact debounce ID
 		// that was created, but the delete manager should handle it properly
 	})
+
+	t.Run("UnknownKind", func(t *testing.T) {
+		// Test deletion of unknown queue item kind
+		// This should test the handler mechanism for unknown kinds
+		var handlerCallCount int
+
+		// Create a DeleteManager with a custom handler for unknown kinds
+		deleteManagerWithHandler, err := NewDeleteManager(
+			WithQueueManager(queueManager),
+			WithPauseManager(pauseManager),
+			WithBatchManager(batchManager),
+			WithDebouncer(debouncer),
+			WithUnknownHandler(func(ctx context.Context, shard redis_state.QueueShard, item *queue.QueueItem) error {
+				handlerCallCount++
+				return nil
+			}),
+		)
+		require.NoError(t, err)
+
+		// Create a queue item with unknown kind "unknownItem"
+		queueItem := &queue.QueueItem{
+			ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+			AtMS:        time.Now().UnixMilli(),
+			WallTimeMS:  time.Now().UnixMilli(),
+			FunctionID:  functionID,
+			WorkspaceID: workspaceID,
+			QueueName:   nil,
+			Data: queue.Item{
+				WorkspaceID: workspaceID,
+				Kind:        "unknownItem",
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					WorkflowID:  functionID,
+					Key:         "test-unknown",
+				},
+			},
+		}
+
+		// Enqueue the item
+		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Delete the queue item (should call our custom handler)
+		err = deleteManagerWithHandler.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+		require.NoError(t, err, "DeleteQueueItem should succeed for unknown kind")
+
+		// Validate that the handler was called at least once
+		require.GreaterOrEqual(t, handlerCallCount, 1, "Handler should be called at least once for unknown kind")
+	})
+
+	t.Run("KindPause Edge Cases", func(t *testing.T) {
+		t.Run("NilPauseManager", func(t *testing.T) {
+			// DeleteManager without pause manager should skip pause deletion
+			deleteManagerNoPause, err := NewDeleteManager(
+				WithQueueManager(queueManager),
+				WithBatchManager(batchManager),
+				WithDebouncer(debouncer),
+			)
+			require.NoError(t, err)
+
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindPause,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-pause-nil-manager",
+					},
+					Payload: queue.PayloadPauseTimeout{
+						PauseID: uuid.New(),
+						Pause:   state.Pause{},
+					},
+				},
+			}
+
+			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManagerNoPause.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with nil pause manager")
+		})
+
+		t.Run("InvalidPayloadType", func(t *testing.T) {
+			// KindPause with wrong payload type should skip pause deletion
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindPause,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-pause-invalid-payload",
+					},
+					Payload: "invalid-payload-type",
+				},
+			}
+
+			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with invalid payload type")
+		})
+
+		t.Run("PauseNotFound", func(t *testing.T) {
+			// KindPause with non-existent pause ID should skip pause deletion
+			nonExistentPauseID := uuid.New()
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindPause,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-pause-not-found",
+					},
+					Payload: queue.PayloadPauseTimeout{
+						PauseID: nonExistentPauseID,
+						Pause: state.Pause{
+							ID:          nonExistentPauseID,
+							WorkspaceID: workspaceID,
+							Event:       nil,
+						},
+					},
+				},
+			}
+
+			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even when pause is not found")
+		})
+	})
+
+	t.Run("KindDebounce Edge Cases", func(t *testing.T) {
+		t.Run("NilDebouncer", func(t *testing.T) {
+			// DeleteManager without debouncer should skip debounce deletion
+			deleteManagerNoDebounce, err := NewDeleteManager(
+				WithQueueManager(queueManager),
+				WithPauseManager(pauseManager),
+				WithBatchManager(batchManager),
+			)
+			require.NoError(t, err)
+
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindDebounce,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-debounce-nil-manager",
+					},
+					Payload: debounce.DebouncePayload{
+						DebounceID:  ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader),
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						FunctionID:  functionID,
+					},
+				},
+			}
+
+			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManagerNoDebounce.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with nil debouncer")
+		})
+
+		t.Run("InvalidPayloadType", func(t *testing.T) {
+			// KindDebounce with wrong payload type should skip debounce deletion
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindDebounce,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-debounce-invalid-payload",
+					},
+					Payload: "invalid-payload-type",
+				},
+			}
+
+			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with invalid payload type")
+		})
+	})
+
+	t.Run("KindScheduleBatch Edge Cases", func(t *testing.T) {
+		t.Run("NilBatchManager", func(t *testing.T) {
+			// DeleteManager without batch manager should skip batch deletion
+			deleteManagerNoBatch, err := NewDeleteManager(
+				WithQueueManager(queueManager),
+				WithPauseManager(pauseManager),
+				WithDebouncer(debouncer),
+			)
+			require.NoError(t, err)
+
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindScheduleBatch,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-batch-nil-manager",
+					},
+					Payload: batch.ScheduleBatchPayload{
+						BatchID:     ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader),
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						FunctionID:  functionID,
+					},
+				},
+			}
+
+			err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManagerNoBatch.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with nil batch manager")
+		})
+
+		t.Run("InvalidPayloadType", func(t *testing.T) {
+			// KindScheduleBatch with wrong payload type should skip batch deletion
+			queueItem := &queue.QueueItem{
+				ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
+				AtMS:        time.Now().UnixMilli(),
+				WallTimeMS:  time.Now().UnixMilli(),
+				FunctionID:  functionID,
+				WorkspaceID: workspaceID,
+				QueueName:   nil,
+				Data: queue.Item{
+					WorkspaceID: workspaceID,
+					Kind:        queue.KindScheduleBatch,
+					Identifier: state.Identifier{
+						AccountID:   accountID,
+						WorkspaceID: workspaceID,
+						AppID:       appID,
+						WorkflowID:  functionID,
+						Key:         "test-batch-invalid-payload",
+					},
+					Payload: "invalid-payload-type",
+				},
+			}
+
+			err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			err = deleteManager.DeleteQueueItem(ctx, defaultQueueShard, queueItem)
+			require.NoError(t, err, "Should succeed even with invalid payload type")
+		})
+	})
 }
