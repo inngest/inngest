@@ -30,6 +30,7 @@ type deleteManager struct {
 // DeleteQueueItem implements DeleteManager.
 func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.QueueShard, item *queue.QueueItem) error {
 	switch item.Data.Kind {
+	// For pause timeouts, delete the associated pause. The pause might otherwise sit in the system for up to a year.
 	case queue.KindPause:
 		if d.pm == nil {
 			break
@@ -53,6 +54,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.Q
 		if err != nil {
 			return fmt.Errorf("could not delete pause for timeout item %q: %w", item.ID, err)
 		}
+	// Delete associated debounce state
 	case queue.KindDebounce:
 		if d.deb == nil {
 			break
@@ -76,6 +78,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.Q
 		if err != nil {
 			return fmt.Errorf("could not delete debounce item: %w", err)
 		}
+	// Delete associated batch data
 	case queue.KindScheduleBatch:
 		if d.batch == nil {
 			break
@@ -90,11 +93,15 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard redis_state.Q
 		if err != nil {
 			return fmt.Errorf("could not delete batch: %w", err)
 		}
+	// Some items do not have any other associated data
+	// TODO: Should we drop state for function runs?
 	case queue.KindEdge, queue.KindEdgeError, queue.KindStart, queue.KindSleep:
 		break
+	// The following system queues do not have associated state we need to clean up
 	case queue.KindQueueMigrate, queue.KindCancel, queue.KindJobPromote, queue.KindPauseBlockFlush:
 		break
 	default:
+		// If the queue item kind is unknown and we have a handler func, execute this to perform external cleanup operations.
 		if d.handleUnknown != nil {
 			err := d.handleUnknown(ctx, shard, item)
 			if err != nil {
