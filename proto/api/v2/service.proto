@@ -626,6 +626,187 @@ service V2 {
       }
     };
   }
+
+  rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse) {
+    option (google.api.http) = {
+      post: "/env/webhooks",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create webhook"
+      description: "Creates a new webhook for receiving events"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Target environment for the webhook (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: true
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Webhook successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateWebhookResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - webhook with same URL already exists"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - business logic validation failed"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse) {
+    option (google.api.http) = {
+      get: "/env/webhooks"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List webhooks"
+      description: "Lists all webhooks in the specified environment"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Target environment for the webhooks (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: true
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of webhooks"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ListWebhooksResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -813,4 +994,85 @@ message SigningKey {
   string environment = 3;
   string key = 4;
   google.protobuf.Timestamp createdAt = 5;
+}
+
+message CreateWebhookRequest {
+  string name = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Descriptive name for the webhook"
+      example: "\"Payment Processing Webhook\""
+    }
+  ];
+  string transform = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The inline JS transform function for incoming events"
+      example: "\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\""
+    }
+  ];
+  optional string response = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional inline JS function which is called to respond to GET requests"
+      example: "\"function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };\""
+    }
+  ];
+  optional EventFilter event_filter = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event filtering configuration"
+    }
+  ];
+}
+
+message CreateWebhookResponse {
+  Webhook data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+enum FilterType {
+  ALLOW = 0;
+  DENY = 1;
+}
+
+message EventFilter {
+  repeated string events = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Allowlist only specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied."
+      example: "[\"orders/payment.created\", \"orders/*\"]"
+    }
+  ];
+  FilterType filter = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Either allow only the events requested, or deny the specific events listed"
+    }
+  ];
+}
+
+message ListWebhooksRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of webhooks to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListWebhooksResponse {
+  repeated Webhook data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Webhook {
+  string id = 1;
+  string name = 2;
+  string transform = 3;
+  string response = 4;
+  EventFilter event_filter = 5;
+  string environment = 6;
+  google.protobuf.Timestamp createdAt = 7;
+  google.protobuf.Timestamp updatedAt = 8;
 }
