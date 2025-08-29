@@ -2,6 +2,11 @@ package headers
 
 import (
 	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/dateutil"
 )
 
 const (
@@ -17,6 +22,10 @@ const (
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
 
 	HeaderKeySignature = "X-Inngest-Signature"
+
+	// HeaderRequestVersion represents the request version header.
+	// XXX: This is exctracted from httpdriver and needs documenting.
+	HeaderKeyRequestVersion = "x-inngest-req-version"
 
 	HeaderAuthorization = "Authorization"
 	HeaderContentType   = "Content-Type"
@@ -58,6 +67,73 @@ func ContentTypeJsonResponse() func(http.Handler) http.Handler {
 	}
 }
 
+// IsSDK returns whether the SDK header is set.  This should always be set in every
+// SDK response, allowing us to check whether the response is controlled by Inngest.
 func IsSDK(headers http.Header) bool {
 	return headers.Get(HeaderKeySDK) != ""
+}
+
+// RequestVersion returns the value of the HeaderKeyRequestVersion header as an int.
+func RequestVersion(headers http.Header) int {
+	rv, _ := strconv.Atoi(headers.Get(HeaderKeyRequestVersion))
+	return rv
+}
+
+// NoRetry indicates whether the custom no-retry haeder is set to true, preventing any
+// future retries of this rqeuest/step.
+func NoRetry(headers http.Header) bool {
+	return headers.Get("x-inngest-no-retry") == "true"
+}
+
+// RetryAfter returns the parsed value of the retry-after header, or nil if the value
+// is empty or unable to be parsed.
+func RetryAfter(headers http.Header) *time.Time {
+	return parseRetry(headers.Get("retry-after"))
+}
+
+// ParseRetry attempts to parse the retry-after header value.  It first checks to see
+// if we have a reasonably sized second value (<= weeks), then parses the value as unix
+// seconds.
+//
+// It falls back to parsing value in multiple formats: RFC3339, RFC1123, etc.
+//
+// This clips time within the minimums and maximums specified within consts.
+func parseRetry(retry string) *time.Time {
+	at := parseRetryTime(retry)
+	if at == nil {
+		return at
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	dur := time.Until(*at)
+	if dur > consts.MaxRetryDuration {
+		// apply max duration
+		next := now.Add(consts.MaxRetryDuration)
+		return &next
+	}
+	if dur < consts.MinRetryDuration {
+		// apply min duration
+		next := now.Add(consts.MinRetryDuration)
+		return &next
+	}
+	return at
+}
+
+func parseRetryTime(retry string) *time.Time {
+	if retry == "" {
+		return nil
+	}
+	if len(retry) <= 7 {
+		// Assume this is an int;  no dates can be <= 7 characters.
+		secs, _ := strconv.Atoi(retry)
+		if secs > 0 {
+			parsed := time.Now().UTC().Truncate(time.Second).Add(time.Second * time.Duration(secs))
+			return &parsed
+		}
+	}
+	if val, err := dateutil.ParseString(retry); err == nil {
+		return &val
+	}
+	return nil
 }

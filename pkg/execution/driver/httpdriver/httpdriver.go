@@ -49,8 +49,8 @@ type executor struct {
 	requireLocalSigningKey bool
 }
 
-// RuntimeType fulfiils the inngest.Runtime interface.
-func (e executor) RuntimeType() string {
+// Name fulfiils the inngest.Runtime interface.
+func (e executor) Name() string {
 	return "http"
 }
 

@@ -11,9 +11,11 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
-const DefaultErrorName = "Error"
-const DefaultErrorMessage = "Function execution error"
-const DefaultStepErrorMessage = "Step execution error"
+const (
+	DefaultErrorName        = "Error"
+	DefaultErrorMessage     = "Function execution error"
+	DefaultStepErrorMessage = "Step execution error"
+)
 
 type Retryable interface {
 	Retryable() bool
@@ -46,7 +48,7 @@ type UserError struct {
 type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
-	// Duration is how long the step took to run, from the driver itsef.
+	// Duration is how long the step took to run, from the driver itself.
 	Duration time.Duration `json:"dur"`
 	// RequestVersion represents the hashing version used within the current SDK request.
 	//

@@ -39,5 +39,9 @@ func (i Interval) Start() time.Time {
 }
 
 func (i Interval) End() time.Time {
-	return i.Start().Add(time.Nanosecond * time.Duration(i.B))
+	dur := time.Nanosecond * time.Duration(i.B)
+	if dur < time.Millisecond {
+		dur = time.Millisecond
+	}
+	return i.Start().Add(dur)
 }
