@@ -71,6 +71,8 @@ build-ui:
 # Generate OpenAPI documentation from protobuf files
 .PHONY: docs
 docs:
+	@echo "Validating examples JSON structure..."
+	@cd tools/convert-openapi && go test -run TestExamplesJSONStructure -v
 	@echo "Generating protobuf files..."
 	@# Generate OpenAPI v2 directly using protoc due to buf configuration issues
 	@mkdir -p docs/openapi/v2
@@ -81,10 +83,6 @@ docs:
 		api/v2/service.proto
 	@echo "Converting OpenAPI v2 to v3..."
 	go run ./tools/convert-openapi docs/openapi/v2 docs/openapi/v3
-
-# Generate documentation only (without building)
-.PHONY: docs-only
-docs-only: docs
 
 .PHONY: build
 build: docs
