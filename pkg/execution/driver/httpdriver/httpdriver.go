@@ -372,6 +372,11 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(resp.Body)
 		if err != nil {
+			l.Error(
+				"error parsing SDK response stream",
+				"error", err,
+				"body", string(resp.Body),
+			)
 			return nil, resp.StatResult, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.

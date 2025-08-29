@@ -144,7 +144,7 @@ func NewAggregateEvaluator[T Evaluable](
 		eval:   opts.Eval,
 		parser: opts.Parser,
 		engines: map[EngineType]MatchingEngine{
-			EngineTypeStringHash: newStringEqualityMatcher(opts.Concurrency),
+			EngineTypeStringHash: newBitmapStringEqualityMatcher(opts.Concurrency),
 			EngineTypeNullMatch:  newNullMatcher(opts.Concurrency),
 			EngineTypeBTree:      newNumberMatcher(opts.Concurrency),
 		},

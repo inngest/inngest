@@ -1,14 +1,17 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import type { GetRunPayload } from '@inngest/components/SharedContext/useGetRun';
 
 import { client } from '@/store/baseApi';
 import { GetRunDocument, type GetRunQuery } from '@/store/generated';
 
 export function useGetRun() {
-  return useCallback(async (runID: string, preview?: boolean) => {
-    const data: GetRunQuery = await client.request(GetRunDocument, {
-      runID,
-      preview,
-    });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error>();
+
+  return useCallback(async ({ runID, preview }: GetRunPayload) => {
+    setLoading(true);
+    setError(undefined);
+    const data: GetRunQuery = await client.request(GetRunDocument, { runID, preview });
     const run = data.run;
 
     if (!run) {
@@ -28,11 +31,15 @@ export function useGetRun() {
     }
 
     return {
-      ...run,
-      app,
-      id: runID,
-      fn,
-      trace,
+      data: {
+        ...run,
+        app,
+        id: runID,
+        fn,
+        trace,
+      },
+      loading,
+      error,
     };
   }, []);
 }

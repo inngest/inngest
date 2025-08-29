@@ -25,8 +25,15 @@ const (
 	// 409 Conflict errors
 	ErrorResourceAlreadyExists = "resource_already_exists"
 
+	// 404 Not Found errors
+	ErrorAccountNotFound = "account_not_found"
+	ErrorEnvNotFound     = "env_not_found"
+
 	// 422 Unprocessable Entity errors
 	ErrorValidationError = "validation_error"
+
+	// 500 Not Implemented errors
+	ErrorInternalError = "internal_error"
 
 	// 501 Not Implemented errors
 	ErrorNotImplemented = "not_implemented"

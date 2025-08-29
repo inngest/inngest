@@ -13,6 +13,21 @@ import { useSeatOverage } from './useSeatOverage';
 export default function SeatOverageWidget({ collapsed }: { collapsed: boolean }) {
   const { isWidgetVisible, seatOverageData, dismiss } = useSeatOverage();
 
+  // Track CTA viewed when widget becomes visible (temporarily disabled)
+  // useEffect(() => {
+  //   if (isWidgetVisible && seatOverageData && trackingUser) {
+  //     trackEvent({
+  //       name: 'app/billing.cta.viewed',
+  //       data: {
+  //         cta: collapsed ? 'seat-overage-widget-collapsed' : 'seat-overage-widget-expanded',
+  //         entitlement: 'user_seats',
+  //       },
+  //       user: trackingUser,
+  //       v: '2025-01-15.1',
+  //     });
+  //   }
+  // }, [isWidgetVisible, collapsed, seatOverageData, trackingUser]);
+
   if (!isWidgetVisible || !seatOverageData) {
     return null;
   }
@@ -23,7 +38,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
         <MenuItem
           href={pathCreator.billing({
             tab: 'plans',
-            ref: 'seat-overage-widget',
+            ref: 'seat-overage-widget-collapsed',
           })}
           className="border border-amber-200 bg-amber-50"
           collapsed={collapsed}
@@ -65,7 +80,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
             </div>
             <Link
               href={pathCreator.billing({
-                ref: 'seat-overage-widget',
+                ref: 'seat-overage-widget-expanded',
               })}
               className="text-sm text-amber-800 hover:text-amber-900 hover:underline"
             >
