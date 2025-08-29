@@ -1,3 +1,4 @@
+import { ReplayStatus } from '@inngest/components/types/replay';
 import { differenceInMilliseconds } from '@inngest/components/utils/date';
 import { useQuery } from '@tanstack/react-query';
 import { decodeTime } from 'ulid';
@@ -56,7 +57,7 @@ export function useGetReplay(replayID: string) {
       if (replay.endedAt) {
         return {
           ...baseReplay,
-          status: 'ENDED',
+          status: ReplayStatus.Ended,
           endedAt: new Date(replay.endedAt),
           duration: differenceInMilliseconds(new Date(replay.endedAt), new Date(replay.createdAt)),
         };
@@ -64,7 +65,7 @@ export function useGetReplay(replayID: string) {
 
       return {
         ...baseReplay,
-        status: 'CREATED',
+        status: ReplayStatus.Created,
         endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
         duration: undefined,
       };
@@ -118,7 +119,7 @@ export function useGetReplays(functionSlug: string) {
           if (replay.endedAt) {
             return {
               ...baseReplay,
-              status: 'ENDED',
+              status: ReplayStatus.Ended,
               endedAt: new Date(replay.endedAt),
               duration: differenceInMilliseconds(
                 new Date(replay.endedAt),
@@ -129,7 +130,7 @@ export function useGetReplays(functionSlug: string) {
 
           return {
             ...baseReplay,
-            status: 'CREATED',
+            status: ReplayStatus.Created,
             endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
           };
         }) ?? [];

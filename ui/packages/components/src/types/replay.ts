@@ -1,7 +1,9 @@
 import { type FunctionRunStatus } from './functionRun';
 
-const replayStatuses = ['CREATED', 'ENDED'] as const;
-export type ReplayStatus = (typeof replayStatuses)[number];
+export enum ReplayStatus {
+  Created = 'CREATED',
+  Ended = 'ENDED',
+}
 
 export type Replay = {
   id: string;
@@ -18,5 +20,5 @@ export type Replay = {
 };
 
 export function isReplayStatus(s: string): s is ReplayStatus {
-  return replayStatuses.includes(s as ReplayStatus);
+  return Object.values(ReplayStatus).includes(s as ReplayStatus);
 }

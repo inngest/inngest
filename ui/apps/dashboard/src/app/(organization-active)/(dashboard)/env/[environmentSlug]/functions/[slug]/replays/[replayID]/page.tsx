@@ -66,7 +66,7 @@ export default function Page({ params }: Props) {
         <AppDetailsCard.Item
           term="Filters"
           detail={
-            replay.filters?.statuses?.length ? (
+            replay.filters?.statuses.length ? (
               <div className="flex flex-wrap gap-2">
                 {replay.filters.statuses.map((status: string) => (
                   <StatusCell key={status} status={status} label={status} size="small" />

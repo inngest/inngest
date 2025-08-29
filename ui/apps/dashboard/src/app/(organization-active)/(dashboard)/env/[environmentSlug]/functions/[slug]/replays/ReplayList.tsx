@@ -12,7 +12,7 @@ import {
   TimeCell,
 } from '@inngest/components/Table';
 import { IconReplay } from '@inngest/components/icons/Replay';
-import type { Replay } from '@inngest/components/types/replay';
+import { ReplayStatus, type Replay } from '@inngest/components/types/replay';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
@@ -31,7 +31,7 @@ const columns = [
       return (
         <StatusCell
           status={status}
-          label={status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'}
+          label={status === ReplayStatus.Ended ? 'Queuing complete' : 'Queuing runs'}
         />
       );
     },
