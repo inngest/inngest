@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"strconv"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -144,7 +146,13 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
-			// TODO
+			if req, err := op.AIGatewayOpts(); err == nil {
+				if parsed, err := aigateway.ParseInput(req); err == nil {
+					meta.AddAttr(rawAttrs, meta.Attrs.AIRequestMetadata, &parsed)
+				} else {
+					rawAttrs.AddErr(fmt.Errorf("failed to parse AI gateway input: %w", err))
+				}
+			}
 		}
 
 	case enums.OpcodeGateway:
@@ -243,14 +251,21 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	return rawAttrs
 }
 
-func GatewayResponseAttrs(resp *http.Response, userErr *state.UserError) trace.SpanStartEventOption {
+func GatewayResponseAttrs(ctx context.Context, resp *exechttp.Response, userErr *state.UserError, op state.GeneratorOpcode) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
 	if resp != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepGatewayResponseStatusCode, &resp.StatusCode)
 
-		contentLength := int(resp.ContentLength)
-		meta.AddAttr(rawAttrs, meta.Attrs.StepGatewayResponseOutputSizeBytes, &contentLength)
+		contentLengthStr := resp.Header.Get("Content-Length")
+		if contentLengthStr != "" {
+			if parsed, err := strconv.ParseInt(contentLengthStr, 10, 64); err == nil {
+				parsedInt := int(parsed)
+				meta.AddAttr(rawAttrs, meta.Attrs.StepGatewayResponseOutputSizeBytes, &parsedInt)
+			} else {
+				rawAttrs.AddErr(fmt.Errorf("failed to parse gateway response content length: %w", err))
+			}
+		}
 	}
 
 	if userErr != nil {
@@ -268,7 +283,19 @@ func GatewayResponseAttrs(resp *http.Response, userErr *state.UserError) trace.S
 		meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 	}
 
-	return trace.WithAttributes(rawAttrs.Serialize()...)
+	if op.Op == enums.OpcodeAIGateway {
+		if req, err := op.AIGatewayOpts(); err == nil {
+			if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
+				meta.AddAttr(rawAttrs, meta.Attrs.AIResponseMetadata, &parsed)
+			} else {
+				rawAttrs.AddErr(fmt.Errorf("failed to parse AI gateway output: %w", err))
+			}
+		} else {
+			rawAttrs.AddErr(fmt.Errorf("failed to get AI gateway opts: %w", err))
+		}
+	}
+
+	return rawAttrs
 }
 
 func SpanRefFromQueueItem(i *queue.Item) *meta.SpanReference {
