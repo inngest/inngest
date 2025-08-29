@@ -219,10 +219,11 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
-		batchSize: 1000,
-		interval:  500 * time.Millisecond,
+		batchSize:       1000,
+		interval:        500 * time.Millisecond,
+		iterateBacklogs: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -230,10 +231,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 	l := q.log.With(
 		"method", "ItemsByPartition",
-		"partitionID", partitionID.String(),
+		"partition_id", partitionID,
 		"from", from,
 		"until", until,
-		"partition_id", partitionID.String(),
 		"queue_shard", shard.Name,
 	)
 
@@ -241,15 +241,15 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	hash := shard.RedisClient.kg.PartitionItem()
 	rc := shard.RedisClient.Client()
 
-	cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
+	cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving partition '%s': %w", partitionID.String(), err)
+		return nil, fmt.Errorf("error retrieving partition '%s': %w", partitionID, err)
 	}
 
 	var pt QueuePartition
 	if err := json.Unmarshal(byt, &pt); err != nil {
-		return nil, fmt.Errorf("error unmarshalling queue partition '%s': %w", partitionID.String(), err)
+		return nil, fmt.Errorf("error unmarshalling queue partition '%s': %w", partitionID, err)
 	}
 
 	l = l.With("account_id", pt.AccountID.String())
@@ -265,7 +265,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				From:         &ptFrom,
 				Until:        until,
 				Limit:        opt.batchSize,
-				PartitionID:  partitionID.String(),
+				PartitionID:  partitionID,
 				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
 			})
 			if err != nil {
@@ -314,11 +314,15 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			<-time.After(opt.interval)
 		}
 
+		if !opt.iterateBacklogs {
+			return
+		}
+
 		// NOTE: iterate through backlogs
 		backlogFrom := from
 
 		hash := shard.RedisClient.kg.ShadowPartitionMeta()
-		cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
+		cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
 			l.Warn("error retrieving shadow partition from queue", "error", err)
