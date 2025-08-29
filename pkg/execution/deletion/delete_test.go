@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -100,16 +99,16 @@ func TestDeleteManager(t *testing.T) {
 	t.Run("KindEdge", func(t *testing.T) {
 		// Test deletion of KindEdge items (no additional cleanup required)
 		// Create a KindEdge queue item
-		queueItem := &osqueue.QueueItem{
+		queueItem := &queue.QueueItem{
 			ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
 			AtMS:        time.Now().UnixMilli(),
 			WallTimeMS:  time.Now().UnixMilli(),
 			FunctionID:  functionID,
 			WorkspaceID: workspaceID,
 			QueueName:   nil,
-			Data: osqueue.Item{
+			Data: queue.Item{
 				WorkspaceID: workspaceID,
-				Kind:        osqueue.KindEdge,
+				Kind:        queue.KindEdge,
 				Identifier: state.Identifier{
 					AccountID:   accountID,
 					WorkspaceID: workspaceID,
@@ -121,7 +120,7 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Enqueue the item
-		err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), osqueue.EnqueueOpts{})
+		err := queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Delete the queue item (this is what we're actually testing)
@@ -164,16 +163,16 @@ func TestDeleteManager(t *testing.T) {
 		require.Equal(t, pauseID, retrievedPause.ID)
 
 		// Create a KindPause queue item with PayloadPauseTimeout
-		queueItem := &osqueue.QueueItem{
+		queueItem := &queue.QueueItem{
 			ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
 			AtMS:        time.Now().UnixMilli(),
 			WallTimeMS:  time.Now().UnixMilli(),
 			FunctionID:  functionID,
 			WorkspaceID: workspaceID,
 			QueueName:   nil,
-			Data: osqueue.Item{
+			Data: queue.Item{
 				WorkspaceID: workspaceID,
-				Kind:        osqueue.KindPause,
+				Kind:        queue.KindPause,
 				Identifier: state.Identifier{
 					AccountID:   accountID,
 					WorkspaceID: workspaceID,
@@ -181,7 +180,7 @@ func TestDeleteManager(t *testing.T) {
 					WorkflowID:  functionID,
 					Key:         "test-pause",
 				},
-				Payload: osqueue.PayloadPauseTimeout{
+				Payload: queue.PayloadPauseTimeout{
 					PauseID: pauseID,
 					Pause:   *pause,
 				},
@@ -189,7 +188,7 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Enqueue the item
-		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), osqueue.EnqueueOpts{})
+		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the pause)
@@ -197,7 +196,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindPause")
 
 		// Verify pause was also deleted
-		retrievedPause, err = pauseManager.PauseByID(ctx, pauseIndex, pauseID)
+		_, err = pauseManager.PauseByID(ctx, pauseIndex, pauseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, state.ErrPauseNotFound)
 	})
@@ -253,16 +252,16 @@ func TestDeleteManager(t *testing.T) {
 		require.Equal(t, eventID, items[0].EventID)
 
 		// Create a KindScheduleBatch queue item with ScheduleBatchPayload
-		queueItem := &osqueue.QueueItem{
+		queueItem := &queue.QueueItem{
 			ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
 			AtMS:        time.Now().UnixMilli(),
 			WallTimeMS:  time.Now().UnixMilli(),
 			FunctionID:  functionID,
 			WorkspaceID: workspaceID,
 			QueueName:   nil,
-			Data: osqueue.Item{
+			Data: queue.Item{
 				WorkspaceID: workspaceID,
-				Kind:        osqueue.KindScheduleBatch,
+				Kind:        queue.KindScheduleBatch,
 				Identifier: state.Identifier{
 					AccountID:   accountID,
 					WorkspaceID: workspaceID,
@@ -283,7 +282,7 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Enqueue the item
-		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), osqueue.EnqueueOpts{})
+		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the batch)
@@ -337,16 +336,16 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a KindDebounce queue item with DebouncePayload
-		queueItem := &osqueue.QueueItem{
+		queueItem := &queue.QueueItem{
 			ID:          ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String(),
 			AtMS:        time.Now().UnixMilli(),
 			WallTimeMS:  time.Now().UnixMilli(),
 			FunctionID:  functionID,
 			WorkspaceID: workspaceID,
 			QueueName:   nil,
-			Data: osqueue.Item{
+			Data: queue.Item{
 				WorkspaceID: workspaceID,
-				Kind:        osqueue.KindDebounce,
+				Kind:        queue.KindDebounce,
 				Identifier: state.Identifier{
 					AccountID:   accountID,
 					WorkspaceID: workspaceID,
@@ -366,7 +365,7 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Enqueue the item
-		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), osqueue.EnqueueOpts{})
+		err = queueManager.Enqueue(ctx, queueItem.Data, time.Now(), queue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		// Delete the queue item (should also delete the debounce)
