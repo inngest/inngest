@@ -1115,7 +1115,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
-			updateOpts.EndTime = st.Add(time.Since(st))
+			updateOpts.EndTime = time.Now()
 
 			status := enums.StepStatusCompleted
 			if err != nil || resp.Err != nil || resp.UserError != nil {
