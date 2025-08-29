@@ -1103,24 +1103,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
-		et := st.Add(time.Since(st))
-
-		status := enums.StepStatusCompleted
-		if err != nil || resp.Err != nil || resp.UserError != nil {
-			status = enums.StepStatusFailed
+		updateOpts := &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Metadata:   &md,
+			QueueItem:  &item,
+			TargetSpan: instance.execSpan,
+			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		_ = e.tracerProvider.UpdateSpan(
-			&tracing.UpdateSpanOptions{
-				EndTime:    et,
-				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
-				Metadata:   &md,
-				QueueItem:  &item,
-				TargetSpan: instance.execSpan,
-				Status:     status,
-				Attributes: tracing.DriverResponseAttrs(resp, nil),
-			},
-		)
+		// For most executions, we now set the status of the execution span.
+		// For some responses, however, the execution as the user sees it is
+		// still ongoing. Account for that here.
+		if !resp.IsGatewayRequest() {
+			updateOpts.EndTime = st.Add(time.Since(st))
+
+			status := enums.StepStatusCompleted
+			if err != nil || resp.Err != nil || resp.UserError != nil {
+				status = enums.StepStatusFailed
+			}
+			updateOpts.Status = status
+		}
+
+		_ = e.tracerProvider.UpdateSpan(updateOpts)
 
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
@@ -3028,37 +3032,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
 
-	var execSpan *meta.SpanReference
-	stepSpan, stepSpanErr := e.tracerProvider.CreateSpan(
-		meta.SpanNameStep,
-		&tracing.CreateSpanOptions{
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Metadata:    metadata,
-			QueueItem:   &lifecycleItem,
-			Parent:      tracing.RunSpanRefFromMetadata(metadata),
-			Attributes:  tracing.GeneratorAttrs(&gen),
-		},
-	)
-	if stepSpanErr != nil {
-		e.log.Debug("error creating step span representing AI gateway", "error", err)
-	} else {
-		var execSpanErr error
-		execSpan, execSpanErr = e.tracerProvider.CreateSpan(
-			meta.SpanNameExecution,
-			&tracing.CreateSpanOptions{
-				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-				Metadata:   metadata,
-				QueueItem:  &lifecycleItem,
-				Parent:     stepSpan,
-				Attributes: tracing.GeneratorAttrs(&gen),
-			},
-		)
-		if execSpanErr != nil {
-			e.log.Debug("error creating execution span representing AI gateway", "error", execSpanErr)
-		}
-	}
-
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
@@ -3096,7 +3069,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
 		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			TargetSpan: execSpan,
+			TargetSpan: runCtx.ExecutionSpan(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Attributes: tracing.GatewayResponseAttrs(ctx, resp, &userLandErr, gen),
 			Metadata:   metadata,
@@ -3155,6 +3128,15 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			TargetSpan: runCtx.ExecutionSpan(),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Attributes: tracing.GatewayResponseAttrs(ctx, resp, nil, gen),
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+		})
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
