@@ -18,7 +18,7 @@ export function InsightsTabPanelTemplatesTabGrid() {
       <button
         className={cn(
           BUTTON_CARD_STYLES,
-          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm shadow-none'
+          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 text-sm'
         )}
         onClick={() => {
           tabManagerActions.createNewTab();
