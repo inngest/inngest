@@ -89,6 +89,22 @@ export const pathCreator = {
   function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
   },
+  functionReplays({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/replays` as Route;
+  },
+  functionReplay({
+    envSlug,
+    functionSlug,
+    replayID,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    replayID: string;
+  }): Route {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug
+    )}/replays/${replayID}` as Route;
+  },
   functionCancellations({
     envSlug,
     functionSlug,
