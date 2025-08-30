@@ -126,6 +126,7 @@ message LoadEventsRequest {
 
 message LoadEventsResponse {
   repeated bytes events = 4;
+  bool cached = 5;
 }
 
 
