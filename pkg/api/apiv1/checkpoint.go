@@ -63,7 +63,6 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		upserted: ccache.New(ccache.Configure().MaxSize(10_000)),
 	}
 
-	// TODO: Also allow steps to be sent in CheckpointNewRun.
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
 	api.Post("/{runID}/response", api.CheckpointResponse)
@@ -134,6 +133,17 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		Events:      []event.TrackedEvent{evt},
 	})
 
+	if len(input.Steps) > 0 {
+		a.checkpoint(ctx, checkpointSteps{
+			RunID:     input.RunID,
+			FnID:      fn.ID,
+			AppID:     appID,
+			AccountID: auth.AccountID(),
+			EnvID:     auth.WorkspaceID(),
+			Steps:     input.Steps,
+		}, w)
+	}
+
 	switch err {
 	case nil:
 		_ = WriteResponse(w, CheckpointNewRunResponse{
@@ -166,24 +176,25 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// checkpoint those steps by writing to state.
-	input := struct {
-		RunID ulid.ULID               `json:"run_id"`
-		FnID  uuid.UUID               `json:"fn_id"`
-		AppID uuid.UUID               `json:"app_id"`
-		Steps []state.GeneratorOpcode `json:"steps"`
-	}{}
+	input := checkpointSteps{}
+	input.AccountID = auth.AccountID()
+	input.EnvID = auth.WorkspaceID()
 
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
 
-	md, err := a.State.LoadMetadata(r.Context(), sv2.ID{
+	a.checkpoint(ctx, input, w)
+}
+
+func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w http.ResponseWriter) {
+	md, err := a.State.LoadMetadata(ctx, sv2.ID{
 		RunID:      input.RunID,
 		FunctionID: input.FnID,
 		Tenant: sv2.Tenant{
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
+			AccountID: input.AccountID,
+			EnvID:     input.EnvID,
 			AppID:     input.AppID,
 		},
 	})

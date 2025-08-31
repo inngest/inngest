@@ -67,10 +67,12 @@ type CheckpointNewRunRequest struct {
 	// event for API-based runs.
 	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
 
-	// XXX: SDK Version and language??
+	// Steps represent optional steps sent when creating the new run.  Sometimes,
+	// the SDK may execute the run entirely and want to create run and accounting
+	// in the same step.
+	Steps []state.GeneratorOpcode `json:"steps"`
 
-	// TODO: Track opcodes.
-	// Steps []state.GeneratorOpcode `json:"steps"`
+	// XXX: SDK Version and language??
 }
 
 func (r CheckpointNewRunRequest) AppSlug() string {
@@ -184,6 +186,17 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	}
 
 	return evt
+}
+
+type checkpointSteps struct {
+	RunID ulid.ULID               `json:"run_id"`
+	FnID  uuid.UUID               `json:"fn_id"`
+	AppID uuid.UUID               `json:"app_id"`
+	Steps []state.GeneratorOpcode `json:"steps"`
+
+	// Plus auth data added from auth.
+	AccountID uuid.UUID `json:"-"`
+	EnvID     uuid.UUID `json:"-"`
 }
 
 // checkpointRunContext implements execution.RunContext for use in checkpoint API calls
