@@ -238,7 +238,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				// Checkpointing happens in this API when either the function finishes or we move to
 				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
 				// as all complete functions will never re-enter.
-				if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
+				_, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
+				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+					// Ignore.
+					l.Warn("duplicate checkpoint step", "id", md.ID)
+					continue
+				}
+				if err != nil {
 					l.Error("error saving checkpointed step state", "error", err)
 				}
 			}
