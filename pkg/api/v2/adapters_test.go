@@ -94,7 +94,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 			AuthzMiddleware: blockMiddleware,
 		}
 
-		server := NewGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
+		server := NewGRPCServerFromHTTPOptions(NewServiceOptions(ServiceConfig{}), httpOpts)
 
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
@@ -132,7 +132,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 	t.Run("works without middleware", func(t *testing.T) {
 		httpOpts := HTTPHandlerOptions{}
 
-		server := NewGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
+		server := NewGRPCServerFromHTTPOptions(NewServiceOptions(ServiceConfig{}), httpOpts)
 
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
@@ -177,7 +177,7 @@ func TestGRPCServerOptions(t *testing.T) {
 			AuthzMiddleware: httpMiddleware,
 		}
 
-		server := NewGRPCServer(ServiceOptions{}, opts)
+		server := NewGRPCServer(NewServiceOptions(ServiceConfig{}), opts)
 		require.NotNil(t, server)
 	})
 }
