@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -176,17 +177,37 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 
 	carrier := propagation.MapCarrier{}
 	defaultPropagator.Inject(ctx, carrier)
+	refTp := carrier["traceparent"]
+	refTs := carrier["tracestate"]
 
 	spanRef := &meta.SpanReference{
-		TraceParent: carrier["traceparent"],
-		TraceState:  carrier["tracestate"],
+		TraceParent: refTp,
+		TraceState:  refTs,
 	}
 
-	// Only spans with parents can be dynamic? Hm.
 	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
+
 	if opts.Parent != nil {
+		// If the span has a parent, set some attributes so we can extend it later
+		// and pick the same trace and parent span IDs for the extension span.
 		spanRef.DynamicSpanTraceParent = opts.Parent.TraceParent
 		spanRef.DynamicSpanTraceState = opts.Parent.TraceState
+	} else {
+		// If we don't have a parent, this is a top-level span (e.g. the run
+		// span), so we use this span as the dynamic reference instead.
+		//
+		// In this case, we forcibly set the span ID part of the traceparent
+		// to the expected zero value, to be the same as the top-level span.
+		// e.g. for "00-c0b6b7b1d103cd383d594e9ffa128965-930c339a6dbccb41-01",
+		// produce "00-c0b6b7b1d103cd383d594e9ffa128965-0000000000000000-01"
+		splitRefTp := strings.Split(refTp, "-")
+		if len(splitRefTp) != 4 {
+			return nil, fmt.Errorf("invalid traceparent format when setting dynamic span data: %q", refTp)
+		}
+		splitRefTp[2] = "0000000000000000"
+
+		spanRef.DynamicSpanTraceParent = strings.Join(splitRefTp, "-")
+		spanRef.DynamicSpanTraceState = refTs
 	}
 
 	span.SetAttributes(
