@@ -42,6 +42,30 @@ func (k *TraceRequestKey) String() string {
 	return fmt.Sprintf("%s:%s", k.TraceID, k.RunID)
 }
 
+type DebugRunRequestKey struct {
+	DebugRunID ulid.ULID
+}
+
+func (k *DebugRunRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugRunRequestKey) String() string {
+	return k.DebugRunID.String()
+}
+
+type DebugSessionRequestKey struct {
+	DebugSessionID ulid.ULID
+}
+
+func (k *DebugSessionRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugSessionRequestKey) String() string {
+	return k.DebugSessionID.String()
+}
+
 type traceReader struct {
 	loaders *loaders
 	reader  cqrs.TraceReader
@@ -761,6 +785,99 @@ func (tr *traceReader) GetLegacySpanRun(ctx context.Context, keys dataloader.Key
 
 			res.Data = findNestedSpan([]*models.RunTraceSpan{rootSpan})
 		}(ctx, results[i])
+	}
+
+	wg.Wait()
+	return results
+}
+
+func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+	results := make([]*dataloader.Result, len(keys))
+	var wg sync.WaitGroup
+
+	for i, key := range keys {
+		results[i] = &dataloader.Result{}
+
+		wg.Add(1)
+		go func(ctx context.Context, res *dataloader.Result, key dataloader.Key) {
+			defer wg.Done()
+
+			req, ok := key.Raw().(*DebugRunRequestKey)
+			if !ok {
+				res.Error = fmt.Errorf("unexpected type %T", key.Raw())
+				return
+			}
+
+			// Get all spans for this debug run ID and merge them into a single trace
+			rootSpans, err := tr.reader.GetSpansByDebugRunID(ctx, req.DebugRunID)
+			if err != nil {
+				res.Error = fmt.Errorf("error retrieving debug run trace: %w", err)
+				return
+			}
+
+			if len(rootSpans) == 0 {
+				return
+			}
+
+			// Merge all roots into a single virtual root
+			virtualRoot := &cqrs.OtelSpan{
+				RawOtelSpan: cqrs.RawOtelSpan{
+					SpanID:  "virtual-debug-root",
+					TraceID: rootSpans[0].TraceID,
+					Name:    "Debug Run",
+				},
+				Children: rootSpans,
+			}
+
+			gqlRoot, err := tr.convertRunSpanToGQL(ctx, virtualRoot)
+			if err != nil {
+				res.Error = fmt.Errorf("error converting debug run root to GQL: %w", err)
+				return
+			}
+
+			res.Data = gqlRoot
+		}(ctx, results[i], key)
+	}
+
+	wg.Wait()
+	return results
+}
+
+func (tr *traceReader) GetDebugSessionTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+	results := make([]*dataloader.Result, len(keys))
+	var wg sync.WaitGroup
+
+	for i, key := range keys {
+		results[i] = &dataloader.Result{}
+
+		wg.Add(1)
+		go func(ctx context.Context, res *dataloader.Result, key dataloader.Key) {
+			defer wg.Done()
+
+			req, ok := key.Raw().(*DebugSessionRequestKey)
+			if !ok {
+				res.Error = fmt.Errorf("unexpected type %T", key.Raw())
+				return
+			}
+
+			rootSpans, err := tr.reader.GetSpansByDebugSessionID(ctx, req.DebugSessionID)
+			if err != nil {
+				res.Error = fmt.Errorf("error retrieving debug session traces: %w", err)
+				return
+			}
+
+			var gqlSpans []*models.RunTraceSpan
+			for _, rootSpan := range rootSpans {
+				gqlSpan, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+				if err != nil {
+					res.Error = fmt.Errorf("error converting debug session span to GQL: %w", err)
+					return
+				}
+				gqlSpans = append(gqlSpans, gqlSpan)
+			}
+
+			res.Data = gqlSpans
+		}(ctx, results[i], key)
 	}
 
 	wg.Wait()

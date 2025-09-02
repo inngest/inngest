@@ -7,7 +7,6 @@ import type { Run as InitialRunData } from '../RunsPage/types';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
-import { Skeleton } from '../Skeleton';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';

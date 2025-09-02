@@ -632,7 +632,7 @@ type RunTraceTrigger {
 # debug types
 
 type DebugRun {
-  debugRun: RunTraceSpan!
+  debugRun: RunTraceSpan
   runSteps: [RunStep!]
 }
 
