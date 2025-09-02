@@ -2889,13 +2889,15 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: execSpan,
-		})
+		}); spanErr != nil {
+			e.log.Debug("error updating span for erroring gateway request during handleGeneratorGateway", "error", spanErr)
+		}
 
 		if runCtx.ShouldRetry() {
 			runCtx.SetError(err)
@@ -2939,13 +2941,15 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: execSpan,
-		})
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorGateway", "error", spanErr)
+		}
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
@@ -3087,13 +3091,15 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: runCtx.ExecutionSpan(),
-		})
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -3148,13 +3154,15 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: runCtx.ExecutionSpan(),
-		})
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
