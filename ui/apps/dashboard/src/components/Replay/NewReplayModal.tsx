@@ -6,9 +6,9 @@ import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { RangePicker } from '@inngest/components/DatePicker';
 import { Input } from '@inngest/components/Forms/Input';
-import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { Link } from '@inngest/components/Link';
 import { Modal } from '@inngest/components/Modal';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import { subtractDuration } from '@inngest/components/utils/date';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -20,6 +20,7 @@ import { useMutation, useQuery } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { ReplayRunStatus } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetAccountEntitlementsDocument = graphql(`
@@ -169,7 +170,10 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
       success: () => {
         onClose();
         router.push(
-          `/env/${environment.slug}/functions/${encodeURIComponent(functionSlug)}/replay`
+          pathCreator.functionReplays({
+            envSlug: environment.slug,
+            functionSlug: functionSlug,
+          })
         );
         return 'Replay created!';
       },
@@ -261,7 +265,7 @@ export default function NewReplayModal({ functionSlug, isOpen, onClose }: NewRep
                   className="focus:ring-primary-moderate data-[state=on]:bg-success text-basis border-subtle hover:bg-canvasSubtle data-[state=on]:border-primary-moderate items-left flex w-full flex-col gap-1 rounded-md border p-3 text-sm"
                   value={value}
                 >
-                  <RunStatusIcon status={value} className="mx-auto h-8" />
+                  <StatusDot status={value} className="mx-auto" />
                   {label}
                   {!timeRange && <p className="text-muted text-sm">-- runs</p>}
                   {timeRange && (

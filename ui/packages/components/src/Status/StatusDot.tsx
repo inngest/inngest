@@ -2,13 +2,13 @@ import { cn } from '../utils/classNames';
 import { getStatusBackgroundClass, getStatusBorderClass } from './statusClasses';
 import { statusTitles } from './statusTitles';
 
-type Props = {
+export type StatusDotProps = {
   status: string;
   className?: string;
   size?: 'small' | 'base';
 };
 
-export function StatusDot({ status, size = 'base', className }: Props) {
+export function StatusDot({ status, size = 'base', className }: StatusDotProps) {
   const backgroundClass = getStatusBackgroundClass(status);
   const borderClass = getStatusBorderClass(status);
 
