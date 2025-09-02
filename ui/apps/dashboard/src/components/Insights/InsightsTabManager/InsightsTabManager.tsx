@@ -72,7 +72,12 @@ export function useInsightsTabManager(
         createTabBase(makeEmptyUnsavedQuery());
       },
       createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => {
-        if (isQueryTemplate(query) || isQuerySnapshot(query)) {
+        if (isQueryTemplate(query)) {
+          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query, name: query.name });
+          return;
+        }
+
+        if (isQuerySnapshot(query)) {
           createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query });
           return;
         }
