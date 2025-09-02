@@ -795,6 +795,30 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
+	// We also create the first discovery step right now, as then every single
+	// queue item has a span to reference.
+	//
+	// Initially, this helps combat a situation whereby erroring calls within
+	// the very first discovery step of a function are difficult to attribute
+	// to the same step span across retries.
+	//
+	// In the future, this also means that we can remove some magic around
+	// where to find the latest span and just always fetch it from the queue
+	// item.
+	_, err = e.tracerProvider.CreateSpan(
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+			Parent:    runSpanRef,
+			Metadata:  &metadata,
+			QueueItem: &item,
+			Carriers:  []map[string]any{item.Metadata},
+		},
+	)
+	if err != nil {
+		l.Debug("error creating initial step span", "error", err)
+	}
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -978,8 +1002,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// trace context set
 	ctx = extractTraceCtx(ctx, md)
 
-	isFirstExecution := edge.Incoming == inngest.TriggerName && item.Attempt == 0
-
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
@@ -1037,26 +1059,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// Set the parent span for this execution.
 	var execParent *meta.SpanReference
-	if isFirstExecution {
-		// If this is the first ever attempt, we haven't created a step yet. If
-		// this is not the first attempt, the step span is created when it is
-		// enqueued, so we don't need to create one here.
-		execParent, err = e.tracerProvider.CreateSpan(
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				Debug:     &tracing.SpanDebugData{Location: "executor.Execute"},
-				Parent:    tracing.RunSpanRefFromMetadata(&md),
-				Metadata:  &md,
-				QueueItem: &item,
-			},
-		)
-		if err != nil {
-			// return nil, fmt.Errorf("error creating initial step span: %w",
-			// err)
-			l.Debug("error creating initial step span", "error", err)
-		}
-
-	} else if isSleepResume {
+	if isSleepResume {
 		// If we're resuming a sleep here, we're also starting a new discovery
 		// step here.
 		execParent, err = e.tracerProvider.CreateSpan(
@@ -1100,24 +1103,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
-		et := st.Add(time.Since(st))
-
-		status := enums.StepStatusCompleted
-		if err != nil || resp.Err != nil || resp.UserError != nil {
-			status = enums.StepStatusFailed
+		updateOpts := &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Metadata:   &md,
+			QueueItem:  &item,
+			TargetSpan: instance.execSpan,
+			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		_ = e.tracerProvider.UpdateSpan(
-			&tracing.UpdateSpanOptions{
-				EndTime:    et,
-				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
-				Metadata:   &md,
-				QueueItem:  &item,
-				TargetSpan: instance.execSpan,
-				Status:     status,
-				Attributes: tracing.DriverResponseAttrs(resp, nil),
-			},
-		)
+		// For most executions, we now set the status of the execution span.
+		// For some responses, however, the execution as the user sees it is
+		// still ongoing. Account for that here.
+		if !resp.IsGatewayRequest() {
+			updateOpts.EndTime = time.Now()
+
+			status := enums.StepStatusCompleted
+			if err != nil || resp.Err != nil || resp.UserError != nil {
+				status = enums.StepStatusFailed
+			}
+			updateOpts.Status = status
+		}
+
+		_ = e.tracerProvider.UpdateSpan(updateOpts)
 
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
@@ -2868,6 +2875,8 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	// Without this, publishing will not work.
 	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
+	metadata := runCtx.Metadata()
+	execSpan := runCtx.ExecutionSpan()
 
 	var output []byte
 
@@ -2879,6 +2888,16 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			Message: fmt.Sprintf("Error making gateway request: %s", err),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		}); spanErr != nil {
+			e.log.Debug("error updating span for erroring gateway request during handleGeneratorGateway", "error", spanErr)
+		}
 
 		if runCtx.ShouldRetry() {
 			runCtx.SetError(err)
@@ -2921,6 +2940,17 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorGateway", "error", spanErr)
+		}
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
@@ -2956,13 +2986,44 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
+		span, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			e.log.Debug("error creating span for next step after Gateway", "error", err)
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			return nil
+		if err != nil {
+			if span != nil {
+				span.Drop()
+			}
+
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling Gateway step queue item", "error", err)
+			return err
+		}
+
+		if span != nil {
+			_ = span.Send()
 		}
 	}
 
@@ -2991,11 +3052,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
+	metadata := runCtx.Metadata()
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
@@ -3027,6 +3090,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			Stack:   string(resp.Body),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -3080,6 +3153,17 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
@@ -3120,13 +3204,44 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
+		span, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			e.log.Debug("error creating span for next step after AI Gateway", "error", err)
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			return nil
+		if err != nil {
+			if span != nil {
+				span.Drop()
+			}
+
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling AI Gateway step queue item", "error", err)
+			return err
+		}
+
+		if span != nil {
+			_ = span.Send()
 		}
 	}
 

@@ -19,6 +19,7 @@ export default function Provider({ children }: React.PropsWithChildren) {
 
   return (
     <ClerkProvider
+      clerkJSVersion="5.88.0"
       appearance={{
         layout: {
           logoPlacement: 'outside' as const,

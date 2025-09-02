@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -276,4 +277,9 @@ func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, out
 
 func (c *checkpointRunContext) SetError(err error) {
 	// TODO
+}
+
+func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
+	// TODO
+	return nil
 }
