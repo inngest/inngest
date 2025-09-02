@@ -6,7 +6,8 @@ import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTab
 
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
 
-// TODO: Update these to point to the correct URLs.
+// TODO: Update these to point to the correct URLs and toggle the visibility.
+const SHOW_DOCS_LINKS: boolean = false;
 const RESOURCES = [
   { href: BASE_DOCS_URL, label: 'How to write your own query', icon: RiQuillPenLine },
   { href: BASE_DOCS_URL, label: 'Insights documentation', icon: RiExternalLinkLine },
@@ -25,26 +26,28 @@ export function InsightsTabPanelTemplatesTab() {
         </div>
         <InsightsTabPanelTemplatesTabGrid />
       </div>
-      <div className="flex w-[360px] flex-shrink-0 flex-col">
-        <div className="flex flex-col gap-4">
-          <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
-          <div className="flex flex-col gap-3">
-            {RESOURCES.map(({ icon: Icon, label, href }) => (
-              <div className="flex items-center gap-2" key={label}>
-                <Icon className="text-muted-foreground h-4 w-4" />
-                <a
-                  className="hover:text-foreground text-muted-foreground text-sm transition-colors hover:underline"
-                  href={href}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {label}
-                </a>
-              </div>
-            ))}
+      {SHOW_DOCS_LINKS && (
+        <div className="flex w-[360px] flex-shrink-0 flex-col">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
+            <div className="flex flex-col gap-3">
+              {RESOURCES.map(({ icon: Icon, label, href }) => (
+                <div className="flex items-center gap-2" key={label}>
+                  <Icon className="text-muted-foreground h-4 w-4" />
+                  <a
+                    className="hover:text-foreground text-muted-foreground text-sm transition-colors hover:underline"
+                    href={href}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {label}
+                  </a>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
