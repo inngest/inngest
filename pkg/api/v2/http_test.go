@@ -260,6 +260,56 @@ func TestHTTPGateway_Routing(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_MountPoint(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("default mount point /api/v2 works", func(t *testing.T) {
+		opts := HTTPHandlerOptions{} // MountPoint not specified, defaults to /api/v2
+		handler, err := NewHTTPHandler(ctx, NewServiceOptions(ServiceConfig{}), opts)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"status":"ok"`)
+	})
+
+	t.Run("custom mount point /v2 works", func(t *testing.T) {
+		opts := HTTPHandlerOptions{
+			MountPoint: "/v2",
+		}
+		handler, err := NewHTTPHandler(ctx, NewServiceOptions(ServiceConfig{}), opts)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"status":"ok"`)
+	})
+
+	t.Run("custom mount point rejects old path", func(t *testing.T) {
+		opts := HTTPHandlerOptions{
+			MountPoint: "/v2",
+		}
+		handler, err := NewHTTPHandler(ctx, NewServiceOptions(ServiceConfig{}), opts)
+		require.NoError(t, err)
+
+		// Try the old /api/v2 path when configured for /v2
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+}
+
 func TestHTTPGateway_ContentTypes(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}

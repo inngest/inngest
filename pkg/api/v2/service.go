@@ -101,6 +101,7 @@ func NewGRPCServerFromHTTPOptions(serviceOpts ServiceOptions, httpOpts HTTPHandl
 type HTTPHandlerOptions struct {
 	AuthnMiddleware func(http.Handler) http.Handler
 	AuthzMiddleware func(http.Handler) http.Handler
+	MountPoint      string // Mount point: "/api/v2" (default) or "/v2"
 }
 
 // customErrorHandler converts gRPC errors to our API error format
@@ -208,9 +209,14 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Strip /api/v2 prefix and forward to gateway
+		// Strip mount point prefix and forward to gateway
+		mountPoint := httpOpts.MountPoint
+		if mountPoint == "" {
+			mountPoint = "/api/v2" // Default to current behavior
+		}
+		
 		originalPath := req.URL.Path
-		if after, ok := strings.CutPrefix(req.URL.Path, "/api/v2"); ok {
+		if after, ok := strings.CutPrefix(req.URL.Path, mountPoint); ok {
 			req.URL.Path = after
 		}
 
