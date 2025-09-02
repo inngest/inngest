@@ -18,16 +18,16 @@ export function InsightsTabPanelTemplatesTabGrid() {
       <button
         className={cn(
           BUTTON_CARD_STYLES,
-          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 text-sm'
+          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm'
         )}
         onClick={() => {
           tabManagerActions.createNewTab();
         }}
       >
-        <div className="border-muted self-center rounded-[4px] border p-1">
+        <div className="border-muted text-basis bg-surfaceSubtle dark:bg-surfaceMuted self-center rounded-[4px] border p-1">
           <RiAddLine className="h-5 w-5" />
         </div>
-        <p className="self-center text-sm">Start from scratch</p>
+        <p className="text-basis self-center text-sm">Start from scratch</p>
       </button>
       {TEMPLATES.map((template) => (
         <InsightsTabPanelTemplatesTabCard key={template.id} template={template} />
