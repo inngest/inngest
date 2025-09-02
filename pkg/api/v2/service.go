@@ -251,7 +251,6 @@ func (s *Service) Health(ctx context.Context, req *apiv2.HealthRequest) (*apiv2.
 
 // CreatePartnerAccount implements a protected endpoint that requires authorization
 func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAccountRequest) (*apiv2.CreateAccountResponse, error) {
-
 	// Return multiple errors for the not implemented functionality
 	return nil, NewErrors(http.StatusNotImplemented,
 		ErrorItem{Code: ErrorNotImplemented, Message: "Accounts not implemented in OSS"},
@@ -449,4 +448,53 @@ func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchA
 			HasMore: false,
 		},
 	}, nil
+}
+
+func (s *Service) CreateWebhook(ctx context.Context, req *apiv2.CreateWebhookRequest) (*apiv2.CreateWebhookResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Webhook name is required")
+	}
+
+	if req.Transform == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "Transform function is required")
+	}
+
+	// For now, return not implemented since this is OSS
+	// In a real implementation, this would:
+	// 1. Generate a unique URL for the webhook
+	// 2. Validate JavaScript syntax for transform and response functions  
+	// 3. Save to database and return the created webhook with generated URL
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Webhooks not implemented in OSS")
+}
+
+func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksRequest) (*apiv2.ListWebhooksResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, NewError(http.StatusBadRequest, ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate pagination parameters
+	if req.Limit != nil {
+		if *req.Limit < 1 {
+			return nil, NewError(http.StatusBadRequest, ErrorInvalidFieldFormat, "Limit must be at least 1")
+		}
+		if *req.Limit > 100 {
+			return nil, NewError(http.StatusBadRequest, ErrorInvalidFieldFormat, "Limit cannot exceed 100")
+		}
+	}
+
+	// For now, return not implemented since this is OSS
+	// In a real implementation, this would:
+	// 1. Query the database for webhooks in the specified environment
+	// 2. Apply cursor-based pagination
+	// 3. Return the list with proper pagination metadata
+	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Webhooks not implemented in OSS")
 }

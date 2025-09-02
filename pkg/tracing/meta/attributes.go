@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -94,9 +95,15 @@ var Attrs = struct {
 	// Debugger attributes
 	DebugSessionID attr[*ulid.ULID]
 	DebugRunID     attr[*ulid.ULID]
+
+	// AI attributes
+	AIRequestMetadata  attr[*aigateway.ParsedInferenceRequest]
+	AIResponseMetadata attr[*aigateway.ParsedInferenceResponse]
 }{
 	internalError: StringAttr("internal.error"),
 
+	AIRequestMetadata:                  JsonAttr[aigateway.ParsedInferenceRequest]("ai.request"),
+	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
 	BatchID:                            ULIDAttr("batch.id"),
@@ -114,7 +121,7 @@ var Attrs = struct {
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),
-	ResponseHeaders:                    HttpHeaderAttr("response.headers"),
+	ResponseHeaders:                    JsonAttr[http.Header]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
 	ResponseStatusCode:                 IntAttr("response.status_code"),
 	RunID:                              ULIDAttr("run.id"),
