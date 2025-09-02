@@ -1,9 +1,7 @@
 'use client';
 
-import { Button } from '@inngest/components/Button/Button';
 import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
 
-import { useTabManagerActions } from '../TabManagerContext';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
@@ -16,8 +14,6 @@ const RESOURCES = [
 ];
 
 export function InsightsTabPanelTemplatesTab() {
-  const { tabManagerActions } = useTabManagerActions();
-
   return (
     <div className="col-span-1 row-span-2 flex h-full w-full gap-12 overflow-y-auto p-12">
       <div className="flex flex-1 flex-col">
