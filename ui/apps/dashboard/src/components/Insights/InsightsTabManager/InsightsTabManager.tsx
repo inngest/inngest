@@ -40,10 +40,10 @@ export function useInsightsTabManager(
 
   const createTabBase = useCallback(
     (query: Query) => {
-      setTabs([...tabs, query]);
+      setTabs((prev) => [...prev, query]);
       setActiveTabId(query.id);
     },
-    [setActiveTabId, tabs]
+    [setActiveTabId]
   );
 
   const actions = useMemo(
@@ -102,7 +102,7 @@ export function useInsightsTabManager(
         setTabs((prevTabs) => prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)));
       },
     }),
-    [activeTabId, tabs]
+    [activeTabId, createTabBase, tabs]
   );
 
   const tabManager = useMemo(
