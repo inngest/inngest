@@ -142,7 +142,7 @@ export async function POST(req: Request) {
   const threadRes = await client.createThread(thread);
 
   if (threadRes.error) {
-    console.error(JSON.stringify(threadRes.error));
+    console.error('error creating ticket via support API', JSON.stringify(threadRes.error));
     return NextResponse.json({ error: threadRes.error.message }, { status: 500 });
   }
 
