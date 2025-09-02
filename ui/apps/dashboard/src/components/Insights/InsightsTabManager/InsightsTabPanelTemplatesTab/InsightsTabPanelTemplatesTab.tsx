@@ -7,8 +7,7 @@ import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTab
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
 
 // TODO: Update these to point to the correct URLs and toggle the visibility.
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-const SHOW_DOCS_LINKS = false;
+const SHOW_DOCS_LINKS: boolean = false;
 const RESOURCES = [
   { href: BASE_DOCS_URL, label: 'How to write your own query', icon: RiQuillPenLine },
   { href: BASE_DOCS_URL, label: 'Insights documentation', icon: RiExternalLinkLine },
