@@ -7,13 +7,14 @@
 package statev2
 
 import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (
@@ -1223,6 +1224,7 @@ func (x *LoadEventsRequest) GetId() *ID {
 type LoadEventsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Events        [][]byte               `protobuf:"bytes,4,rep,name=events,proto3" json:"events,omitempty"`
+	Cached        bool                   `protobuf:"varint,5,opt,name=cached,proto3" json:"cached,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1262,6 +1264,13 @@ func (x *LoadEventsResponse) GetEvents() [][]byte {
 		return x.Events
 	}
 	return nil
+}
+
+func (x *LoadEventsResponse) GetCached() bool {
+	if x != nil {
+		return x.Cached
+	}
+	return false
 }
 
 type LoadStepsRequest struct {
@@ -1553,9 +1562,10 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0eExistsResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\"1\n" +
 	"\x11LoadEventsRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\",\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"D\n" +
 	"\x12LoadEventsResponse\x12\x16\n" +
-	"\x06events\x18\x04 \x03(\fR\x06events\"0\n" +
+	"\x06events\x18\x04 \x03(\fR\x06events\x12\x16\n" +
+	"\x06cached\x18\x05 \x01(\bR\x06cached\"0\n" +
 	"\x10LoadStepsRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"\x8b\x01\n" +
 	"\x11LoadStepsResponse\x12<\n" +
