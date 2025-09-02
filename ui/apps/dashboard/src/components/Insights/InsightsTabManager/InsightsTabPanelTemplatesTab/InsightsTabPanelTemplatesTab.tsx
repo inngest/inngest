@@ -30,17 +30,7 @@ export function InsightsTabPanelTemplatesTab() {
         <InsightsTabPanelTemplatesTabGrid />
       </div>
       <div className="flex w-[360px] flex-shrink-0 flex-col">
-        <div className="border-subtle flex flex-col gap-3 border-b">
-          <p className="text-muted mb-1 text-sm">Prefer to write a query yourself?</p>
-          <Button
-            appearance="outlined"
-            className="mb-6 w-fit font-medium"
-            kind="secondary"
-            label="Start from scratch"
-            onClick={tabManagerActions.createNewTab}
-          />
-        </div>
-        <div className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
           <div className="flex flex-col gap-3">
             {RESOURCES.map(({ icon: Icon, label, href }) => (
