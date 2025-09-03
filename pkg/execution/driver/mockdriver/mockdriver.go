@@ -38,8 +38,8 @@ type Mock struct {
 	lock sync.RWMutex
 }
 
-// RuntimeType fulfiils the inngest.Runtime interface.
-func (m *Mock) RuntimeType() string {
+// Name fulfiils the inngest.Runtime interface.
+func (m *Mock) Name() string {
 	if m.RuntimeName == "" {
 		return RuntimeName
 	}
@@ -81,7 +81,7 @@ type Config struct {
 	// steps to return different data on each execution invocation.
 	DynamicResponses func(context.Context, sv2.Metadata, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
-	driver driver.Driver
+	driver driver.DriverV1
 	Driver string
 }
 
@@ -91,7 +91,7 @@ func (c *Config) RuntimeName() string { return c.Driver }
 // DriverName returns the name of this driver
 func (*Config) DriverName() string { return RuntimeName }
 
-func (c *Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
+func (c *Config) NewDriver(opts ...registration.NewDriverOpts) (driver.DriverV1, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 

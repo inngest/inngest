@@ -113,6 +113,8 @@ type Executor interface {
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
 
+	Finalize(ctx context.Context, opts FinalizeOpts) error
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
@@ -383,4 +385,44 @@ func (h HandlePauseResult) Processed() int32 {
 // and successfully impacted runs (either by cancellation or continuing).
 func (h HandlePauseResult) Handled() int32 {
 	return h[1]
+}
+
+type FinalizeOpts struct {
+	// Metadata is the run metadata.
+	Metadata sv2.Metadata
+	// RunMode indicates whether this was an async or sync function.  The
+	// sync run mode is always determined by calling Finalize via the
+	// checkpoint APIs.
+	RunMode enums.RunMode
+	// Response is the final run output.
+	Response state.DriverResponse
+	// Optional represents optional fields that improve performance of the
+	// finalize call, requiring less data calls to fetch associated information
+	// when finalizing.  Where possible, if already loaded in memory these fields
+	// should be supplied.
+	Optional FinalizeOptional
+}
+
+// FinalizeOptional represents optional fields that improve performance of the
+// finalize call, requiring less data calls to fetch associated information
+// when finalizing.  Where possible, if already loaded in memory these fields
+// should be supplied.
+type FinalizeOptional struct {
+	// FnSlug is the slug of the function, used in the finish event.
+	//
+	// If not present, this will be loaded via the function loader.
+	FnSlug string
+	// InputEvents are the events that triggered the function run.
+	InputEvents []json.RawMessage
+	// TODO: Document
+	OutputSpanRef *meta.SpanReference
+	// Reason is the tag used in finalization counters to track in metrics.
+	Reason string
+}
+
+func (f FinalizeOpts) Status() enums.StepStatus {
+	if f.Response.Error() != "" {
+		return enums.StepStatusFailed
+	}
+	return enums.StepStatusCompleted
 }
