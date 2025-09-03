@@ -12,9 +12,6 @@ import (
 )
 
 func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuery) (*models.DebugRun, error) {
-	fmt.Printf("DebugRun resolver called with: functionSlug=%s, debugRunID=%v, runID=%v\n",
-		query.FunctionSlug, query.DebugRunID, query.RunID)
-
 	var debugRunSpan *models.RunTraceSpan
 	var runSteps []*models.RunStep
 
