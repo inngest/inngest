@@ -166,7 +166,11 @@ function InsightsTabManagerInternal({
             renderChildren={tab.id === activeTabId}
             tabId={tab.id}
           >
-            <InsightsTabPanel isTemplatesTab={tab.id === TEMPLATES_TAB.id} tab={tab} />
+            <InsightsTabPanel
+              isHomeTab={tab.id === HOME_TAB.id}
+              isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+              tab={tab}
+            />
           </InsightsStateMachineContextProvider>
         ))}
       </div>

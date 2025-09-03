@@ -12,13 +12,17 @@ import type { Query } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
 type InsightsTabPanelProps = {
+  isHomeTab?: boolean;
   isTemplatesTab?: boolean;
   tab: Query;
 };
 
-export function InsightsTabPanel({ isTemplatesTab, tab }: InsightsTabPanelProps) {
+export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+
+  // TODO: Adjust home tab to AI panel.
+  if (isHomeTab) return <InsightsTabPanelTemplatesTab />;
 
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
