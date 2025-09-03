@@ -66,7 +66,6 @@ export function InsightsTabsList({
           <Tabs.IconTab
             icon={<RiHome4Line size={16} />}
             onClick={() => tabManagerActions.focusTab(HOME_TAB.id)}
-            title="Home"
             value={HOME_TAB.id}
           />
           {tabs
