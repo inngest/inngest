@@ -3964,7 +3964,7 @@ func TestMigrate(t *testing.T) {
 
 				from := time.Time{}
 				until := q.clock.Now().Add(24 * time.Hour * 365)
-				items, err := q.ItemsByPartition(ctx, shard, partitionID, from, until)
+				items, err := q.ItemsByPartition(ctx, shard, partitionID.String(), from, until)
 				require.NoError(t, err)
 
 				for range items {

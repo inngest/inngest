@@ -26,19 +26,23 @@ func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.S
 	}
 }
 
+// AddMetadataTenantAttrs adds all attrs  from the metadata ID to the trace.
+func AddMetadataTenantAttrs(rawAttrs *meta.SerializableAttrs, id statev2.ID) {
+	meta.AddAttr(rawAttrs, meta.Attrs.RunID, &id.RunID)
+	meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &id.FunctionID)
+	meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &id.Tenant.AccountID)
+	meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &id.Tenant.EnvID)
+	meta.AddAttr(rawAttrs, meta.Attrs.AppID, &id.Tenant.AppID)
+}
+
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
 	rawAttrs := meta.NewAttrSet()
 	now := s.StartTime()
 
 	if p.md != nil {
-		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
-		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
-		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
-		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, p.md.Config.DebugSessionID())
+		AddMetadataTenantAttrs(rawAttrs, p.md.ID)
 		meta.AddAttr(rawAttrs, meta.Attrs.DebugRunID, p.md.Config.DebugRunID())
-
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, p.md.Config.DebugSessionID())
 	} else if p.qi != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
 		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.qi.Identifier.WorkflowID)

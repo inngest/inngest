@@ -4,7 +4,7 @@ import {
   type PillAppearance,
   type PillContentProps,
 } from '@inngest/components/Pill';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { StatusDot, type StatusDotProps } from '@inngest/components/Status/StatusDot';
 import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
@@ -55,13 +55,19 @@ export function TimeCell({ date, format }: { date: Date | string; format?: 'rela
   );
 }
 
-export function StatusCell({ status }: React.PropsWithChildren<{ status: string }>) {
+export function StatusCell({
+  status,
+  label,
+  size,
+}: React.PropsWithChildren<{ status: string; label?: string; size?: StatusDotProps['size'] }>) {
   const colorClass = getStatusTextClass(status);
 
   return (
     <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
-      <StatusDot status={status} />
-      <p className={cn(colorClass, 'lowercase first-letter:capitalize')}>{status}</p>
+      <StatusDot status={status} size={size} />
+      <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
+        {label || status}
+      </p>
     </div>
   );
 }

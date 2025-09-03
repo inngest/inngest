@@ -84,7 +84,8 @@ var (
 // can be directly executed next and saves a state.Pause for edges that have async conditions.
 func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
-		runtimeDrivers: map[string]driver.Driver{},
+		driverv1: map[string]driver.DriverV1{},
+		driverv2: map[string]driver.DriverV2{},
 	}
 
 	for _, o := range opts {
@@ -250,19 +251,33 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 	}
 }
 
-// WithRuntimeDrivers specifies the drivers available to use when executing steps
+// WithDriverV1 specifies the drivers available to use when executing steps
 // of a function.
 //
-// When invoking a step in a function, we find the registered driver with the step's
-// RuntimeType() and use that driver to execute the step.
-func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
+// When invoking a step in a function, we find the registered driver with the step's URI
+// and use that driver to execute the step.
+func WithDriverV1(drivers ...driver.DriverV1) ExecutorOpt {
 	return func(exec execution.Executor) error {
 		e := exec.(*executor)
 		for _, d := range drivers {
-			if _, ok := e.runtimeDrivers[d.RuntimeType()]; ok {
+			if _, ok := e.driverv1[d.Name()]; ok {
 				return ErrRuntimeRegistered
 			}
-			e.runtimeDrivers[d.RuntimeType()] = d
+			e.driverv1[d.Name()] = d
+
+		}
+		return nil
+	}
+}
+
+func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
+	return func(exec execution.Executor) error {
+		e := exec.(*executor)
+		for _, d := range drivers {
+			if _, ok := e.driverv2[d.Name()]; ok {
+				return ErrRuntimeRegistered
+			}
+			e.driverv2[d.Name()] = d
 
 		}
 		return nil
@@ -344,12 +359,14 @@ type executor struct {
 	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers      map[string]driver.Driver
 	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
 	httpClient          exechttp.RequestExecutor
+
+	driverv1 map[string]driver.DriverV1
+	driverv2 map[string]driver.DriverV2
 
 	lifecycles []execution.LifecycleListener
 
@@ -802,6 +819,30 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
+	// We also create the first discovery step right now, as then every single
+	// queue item has a span to reference.
+	//
+	// Initially, this helps combat a situation whereby erroring calls within
+	// the very first discovery step of a function are difficult to attribute
+	// to the same step span across retries.
+	//
+	// In the future, this also means that we can remove some magic around
+	// where to find the latest span and just always fetch it from the queue
+	// item.
+	_, err = e.tracerProvider.CreateSpan(
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+			Parent:    runSpanRef,
+			Metadata:  &metadata,
+			QueueItem: &item,
+			Carriers:  []map[string]any{item.Metadata},
+		},
+	)
+	if err != nil {
+		l.Debug("error creating initial step span", "error", err)
+	}
+
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
@@ -985,8 +1026,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// trace context set
 	ctx = extractTraceCtx(ctx, md)
 
-	isFirstExecution := edge.Incoming == inngest.TriggerName && item.Attempt == 0
-
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
 	//
@@ -1044,26 +1083,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// Set the parent span for this execution.
 	var execParent *meta.SpanReference
-	if isFirstExecution {
-		// If this is the first ever attempt, we haven't created a step yet. If
-		// this is not the first attempt, the step span is created when it is
-		// enqueued, so we don't need to create one here.
-		execParent, err = e.tracerProvider.CreateSpan(
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				Debug:     &tracing.SpanDebugData{Location: "executor.Execute"},
-				Parent:    tracing.RunSpanRefFromMetadata(&md),
-				Metadata:  &md,
-				QueueItem: &item,
-			},
-		)
-		if err != nil {
-			// return nil, fmt.Errorf("error creating initial step span: %w",
-			// err)
-			l.Debug("error creating initial step span", "error", err)
-		}
-
-	} else if isSleepResume {
+	if isSleepResume {
 		// If we're resuming a sleep here, we're also starting a new discovery
 		// step here.
 		execParent, err = e.tracerProvider.CreateSpan(
@@ -1107,24 +1127,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
-		et := st.Add(time.Since(st))
-
-		status := enums.StepStatusCompleted
-		if err != nil || resp.Err != nil || resp.UserError != nil {
-			status = enums.StepStatusFailed
+		updateOpts := &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Metadata:   &md,
+			QueueItem:  &item,
+			TargetSpan: instance.execSpan,
+			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		_ = e.tracerProvider.UpdateSpan(
-			&tracing.UpdateSpanOptions{
-				EndTime:    et,
-				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
-				Metadata:   &md,
-				QueueItem:  &item,
-				TargetSpan: instance.execSpan,
-				Status:     status,
-				Attributes: tracing.DriverResponseAttrs(resp, nil),
-			},
-		)
+		// For most executions, we now set the status of the execution span.
+		// For some responses, however, the execution as the user sees it is
+		// still ongoing. Account for that here.
+		if !resp.IsGatewayRequest() {
+			updateOpts.EndTime = time.Now()
+
+			status := enums.StepStatusCompleted
+			if err != nil || resp.Err != nil || resp.UserError != nil {
+				status = enums.StepStatusFailed
+			}
+			updateOpts.Status = status
+		}
+
+		_ = e.tracerProvider.UpdateSpan(updateOpts)
 
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
@@ -1182,14 +1206,19 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
-				metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"reason": "fail-early",
+				if err := e.Finalize(ctx, execution.FinalizeOpts{
+					Metadata: i.md,
+					// Always, when called from the executor, as this handles async
+					// finalization.
+					RunMode:  enums.RunModeAsync,
+					Response: *i.resp,
+					Optional: execution.FinalizeOptional{
+						FnSlug:        i.f.GetSlug(),
+						InputEvents:   i.events,
+						OutputSpanRef: i.execSpan,
+						Reason:        "fail-early",
 					},
-				})
-
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
+				}); err != nil {
 					l.ReportError(err, "error running finish handler")
 				}
 
@@ -1234,15 +1263,19 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// only OpcodeStepError causes try/catch to be handled and us to continue
 		// on error.
 
-		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"reason": "resp-err",
+		if err := e.Finalize(ctx, execution.FinalizeOpts{
+			Metadata: i.md,
+			// Always, when called from the executor, as this handles async
+			// finalization.
+			RunMode:  enums.RunModeAsync,
+			Response: *i.resp,
+			Optional: execution.FinalizeOptional{
+				FnSlug:        i.f.GetSlug(),
+				InputEvents:   i.events,
+				OutputSpanRef: i.execSpan,
+				Reason:        "resp-err",
 			},
-		})
-
-		// TODO: Refactor state input
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
+		}); err != nil {
 			l.ReportError(err, "error running finish handler")
 		}
 
@@ -1257,15 +1290,20 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// The generator length check is necessary because parallel steps in older
 	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
 	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
-		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"reason": "opcode-none",
-			},
-		})
-
 		// This is the function result.
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
+		if err := e.Finalize(ctx, execution.FinalizeOpts{
+			Metadata: i.md,
+			// Always, when called from the executor, as this handles async
+			// finalization.
+			RunMode:  enums.RunModeAsync,
+			Response: *i.resp,
+			Optional: execution.FinalizeOptional{
+				FnSlug:        i.f.GetSlug(),
+				InputEvents:   i.events,
+				OutputSpanRef: i.execSpan,
+				Reason:        "opcode-none",
+			},
+		}); err != nil {
 			l.ReportError(err, "error running finish handler")
 		}
 
@@ -1306,181 +1344,6 @@ func (f functionFinishedData) Map() map[string]any {
 	return s.Map()
 }
 
-// finalize performs run finalization, which involves sending the function
-// finished/failed event and deleting state.
-//
-// Returns a boolean indicating whether it performed finalization. If the run
-// had parallel steps then it may be false, since parallel steps cause the
-// function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse, outputSpanRef *meta.SpanReference) error {
-	ctx = context.WithoutCancel(ctx)
-
-	l := logger.StdlibLogger(ctx)
-
-	runStatus := enums.StepStatusCompleted
-	if resp.Error() != "" {
-		runStatus = enums.StepStatusFailed
-	}
-
-	targetSpan := tracing.RunSpanRefFromMetadata(&md)
-	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-		EndTime:    time.Now(),
-		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
-		Metadata:   &md,
-		TargetSpan: targetSpan,
-		Status:     runStatus,
-		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
-	})
-	if err != nil {
-		// TODO This should be a warning/error once these spans are critical.
-		l.Debug(
-			"error updating run span end time",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-			"target_span", targetSpan,
-		)
-	}
-
-	// Parse events for the fail handler before deleting state.
-	inputEvents := make([]event.Event, len(evts))
-	for n, e := range evts {
-		evt, err := event.NewEvent(e)
-		if err != nil {
-			return err
-		}
-		inputEvents[n] = *evt
-	}
-
-	if e.preDeleteStateSizeReporter != nil {
-		e.preDeleteStateSizeReporter(ctx, md)
-	}
-
-	// Delete the function state in every case.
-	_, err = e.smv2.Delete(ctx, md.ID)
-	if err != nil {
-		l.Error(
-			"error deleting state in finalize",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-		)
-	}
-
-	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
-	// outstanding jobs from the queue, if possible.
-	//
-	// XXX: Remove this typecast and normalize queue interface to a single package
-	q, ok := e.queue.(redis_state.QueueManager)
-	if ok {
-		// Find all items for the current function run.
-		jobs, err := q.RunJobs(
-			ctx,
-			queueShard.Name,
-			md.ID.Tenant.EnvID,
-			md.ID.FunctionID,
-			md.ID.RunID,
-			1000,
-			0,
-		)
-		if err != nil {
-			l.Error(
-				"error fetching run jobs",
-				"error", err,
-				"run_id", md.ID.RunID.String(),
-			)
-		}
-
-		for _, j := range jobs {
-			qi, _ := j.Raw.(*queue.QueueItem)
-			if qi == nil {
-				continue
-			}
-
-			jobID := queue.JobIDFromContext(ctx)
-			if jobID != "" && qi.ID == jobID {
-				// Do not dequeue the current job that we're working on.
-				continue
-			}
-
-			err := q.Dequeue(ctx, queueShard, *qi)
-			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				l.Error(
-					"error dequeueing run job",
-					"error", err,
-					"run_id", md.ID.RunID.String(),
-				)
-			}
-		}
-	}
-
-	if e.finishHandler == nil {
-		return nil
-	}
-
-	// Prepare events that we must send
-	now := time.Now()
-	base := &functionFinishedData{
-		FunctionID: fnSlug,
-		RunID:      md.ID.RunID,
-		Events:     inputEvents,
-	}
-	base.setResponse(resp)
-
-	// We'll send many events - some for each items in the batch.  This ensures that invoke works
-	// for batched functions.
-	freshEvents := []event.Event{}
-	for n, runEvt := range inputEvents {
-		if runEvt.Name == event.FnFailedName || runEvt.Name == event.FnFinishedName {
-			// Don't recursively trigger internal finish handlers.
-			continue
-		}
-
-		invokeID := correlationID(runEvt)
-		if invokeID == nil && n > 0 {
-			// We only send function finish events for either the first event in a batch or for
-			// all events with a correlation ID.
-			continue
-		}
-
-		// Copy the base data to set the event.
-		copied := *base
-		copied.Event = runEvt.Map()
-		copied.InvokeCorrelationID = invokeID
-		data := copied.Map()
-
-		// Add an `inngest/function.finished` event.
-		freshEvents = append(freshEvents, event.Event{
-			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-			Name:      event.FnFinishedName,
-			Timestamp: now.UnixMilli(),
-			Data:      data,
-		})
-
-		if resp.Err != nil {
-			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
-			if !strings.Contains(*resp.Err, state.ErrFunctionCancelled.Error()) {
-				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-					Name:      event.FnFailedName,
-					Timestamp: now.UnixMilli(),
-					Data:      data,
-				})
-			}
-
-			// Add function cancelled event
-			if *resp.Err == state.ErrFunctionCancelled.Error() {
-				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
-					Name:      event.FnCancelledName,
-					Timestamp: now.UnixMilli(),
-					Data:      data,
-				})
-			}
-		}
-	}
-
-	return e.finishHandler(ctx, md.ID, freshEvents)
-}
-
 func correlationID(event event.Event) *string {
 	container, ok := event.Data[consts.InngestEventDataPrefix].(map[string]any)
 	if !ok {
@@ -1502,22 +1365,63 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, url.String())
 	}
 
-	// Execute the actual step.
-	response, err := e.executeDriverForStep(ctx, i)
-
-	if response.Err != nil && err == nil {
-		// This step errored, so always return an error.
-		return response, fmt.Errorf("%s", *response.Err)
+	switch d := e.fnDriver(ctx, i.f).(type) {
+	case driver.DriverV2:
+		return e.executeDriverV2(ctx, i, d)
+	case driver.DriverV1:
+		{
+			// Execute the actual step using V1 drivers.  The V1 driver embeds errors in driver
+			// response and has generally difficult error management.
+			response, err := e.executeDriverV1(ctx, i)
+			if response.Err != nil && err == nil {
+				// This step errored, so always return an error.
+				return response, fmt.Errorf("%s", *response.Err)
+			}
+			return response, err
+		}
+	default:
+		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, inngest.Driver(i.f))
 	}
-	return response, err
 }
 
-// executeDriverForStep runs the enqueued step by invoking the driver.  It also inspects
+func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2) (*state.DriverResponse, error) {
+	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
+		Metadata:   *run.Metadata(),
+		Fn:         run.f,
+		SigningKey: []byte{}, // TODO
+		Attempt:    run.AttemptCount(),
+		Index:      run.stackIndex,
+		StepID:     &run.edge.Outgoing,
+	})
+
+	// TODO: Handle errors appropriately.
+	//
+	// For now, the executor expects V1 style errors directly in state.DriverResponse.
+	// We move all UserErrors into state.DriverResponse, and always return a response...
+	// until we refactor the executor to handle (Option<Response>, UserError, InternalError).
+	if resp == nil {
+		resp = &state.DriverResponse{}
+	}
+
+	if uerr != nil {
+		resp.Output = uerr.Raw()
+		resp.OutputSize = len(resp.Output.([]byte))
+	}
+
+	if ierr != nil {
+		str := ierr.Error()
+		resp.Err = &str
+	}
+
+	return resp, ierr
+}
+
+// executeDriverV1 runs the enqueued step by invoking the driver.  It also inspects
 // and normalizes responses (eg. max retry attempts).
-func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
+func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
 	driverName := inngest.Driver(i.f)
 
-	d, ok := e.runtimeDrivers[driverName]
+	d, ok := e.driverv1[driverName]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, driverName)
 	}
@@ -1526,12 +1430,12 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 
-	// TODO: Steps.
 	if response == nil {
 		response = &state.DriverResponse{
 			Step: *step,
 		}
 	}
+
 	if err != nil && response.Err == nil {
 		var serr syscode.Error
 		if errors.As(err, &serr) {
@@ -2007,23 +1911,22 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
-	shard, err := e.shardFinder(ctx, md.ID.Tenant.AccountID, nil)
-	if err != nil {
-		return fmt.Errorf("could not find shard for account %q: %w", md.ID.Tenant, err)
-	}
-
-	metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"reason": "cancel",
-		},
-	})
-
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
-	// TODO Is the execspan set here? Does it matter?
-	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{
-		Err: &fnCancelledErr,
-	}, nil); err != nil {
+
+	if err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: md,
+		// Always, when called from the executor, as this handles async
+		// finalization.
+		RunMode: enums.RunModeAsync,
+		Response: state.DriverResponse{
+			Err: &fnCancelledErr,
+		},
+		Optional: execution.FinalizeOptional{
+			FnSlug:      f.Function.GetSlug(),
+			InputEvents: evts,
+			Reason:      "cancel",
+		},
+	}); err != nil {
 		l.Error("error running finish handler", "error", err)
 	}
 	for _, e := range e.lifecycles {
@@ -2467,6 +2370,9 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleGeneratorGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
+	case enums.OpcodeRunComplete:
+		// TODO: Handle finalization
+		return fmt.Errorf("run complete not implemented")
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2875,6 +2781,8 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	// Without this, publishing will not work.
 	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
+	metadata := runCtx.Metadata()
+	execSpan := runCtx.ExecutionSpan()
 
 	var output []byte
 
@@ -2886,6 +2794,16 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			Message: fmt.Sprintf("Error making gateway request: %s", err),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		}); spanErr != nil {
+			e.log.Debug("error updating span for erroring gateway request during handleGeneratorGateway", "error", spanErr)
+		}
 
 		if runCtx.ShouldRetry() {
 			runCtx.SetError(err)
@@ -2928,6 +2846,17 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: execSpan,
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorGateway", "error", spanErr)
+		}
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
@@ -2963,13 +2892,44 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
+		span, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			e.log.Debug("error creating span for next step after Gateway", "error", err)
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			return nil
+		if err != nil {
+			if span != nil {
+				span.Drop()
+			}
+
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling Gateway step queue item", "error", err)
+			return err
+		}
+
+		if span != nil {
+			_ = span.Send()
 		}
 	}
 
@@ -2998,11 +2958,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
+	lifecycleItem := runCtx.LifecycleItem()
+	metadata := runCtx.Metadata()
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
@@ -3034,6 +2996,16 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			Stack:   string(resp.Body),
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -3087,6 +3059,17 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
+
+		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+			Metadata:   metadata,
+			QueueItem:  &lifecycleItem,
+			TargetSpan: runCtx.ExecutionSpan(),
+		}); spanErr != nil {
+			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
+
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
@@ -3127,13 +3110,44 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
+		span, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			e.log.Debug("error creating span for next step after AI Gateway", "error", err)
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			return nil
+		if err != nil {
+			if span != nil {
+				span.Drop()
+			}
+
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling AI Gateway step queue item", "error", err)
+			return err
+		}
+
+		if span != nil {
+			_ = span.Send()
 		}
 	}
 
@@ -3725,6 +3739,17 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 	}
 
+	return nil
+}
+
+func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {
+	name := inngest.Driver(fn)
+	if d, ok := e.driverv1[name]; ok {
+		return d
+	}
+	if d, ok := e.driverv2[name]; ok {
+		return d
+	}
 	return nil
 }
 

@@ -11,9 +11,11 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
-const DefaultErrorName = "Error"
-const DefaultErrorMessage = "Function execution error"
-const DefaultStepErrorMessage = "Step execution error"
+const (
+	DefaultErrorName        = "Error"
+	DefaultErrorMessage     = "Function execution error"
+	DefaultStepErrorMessage = "Step execution error"
+)
 
 type Retryable interface {
 	Retryable() bool
@@ -46,7 +48,7 @@ type UserError struct {
 type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
-	// Duration is how long the step took to run, from the driver itsef.
+	// Duration is how long the step took to run, from the driver itself.
 	Duration time.Duration `json:"dur"`
 	// RequestVersion represents the hashing version used within the current SDK request.
 	//
@@ -321,6 +323,28 @@ func (r *DriverResponse) IsDiscoveryResponse() bool {
 
 	// Response has a single op code which indicates the SDK did idempotent
 	// work during this execution.
+	return false
+}
+
+// IsGatewayRequest returns true if this `DriverResponse` is the SDK reporting that they
+// wish us to make a request via the gateway.
+//
+// Note that, like the gateways, this does not currently support parallelism; we
+// expect there to only be a single reported op for this to resole to `true`.
+func (r *DriverResponse) IsGatewayRequest() bool {
+	if !r.IsDiscoveryResponse() {
+		return false
+	}
+
+	if len(r.Generator) != 1 {
+		return false
+	}
+
+	switch r.Generator[0].Op {
+	case enums.OpcodeAIGateway, enums.OpcodeGateway:
+		return true
+	}
+
 	return false
 }
 
