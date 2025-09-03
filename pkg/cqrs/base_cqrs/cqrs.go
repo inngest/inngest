@@ -93,6 +93,55 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
+	return mapRootSpansFromRows(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
+		return nil, err
+	}
+
+	rootSpan, err := mapRootSpansFromRows(ctx, spans)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*cqrs.OtelSpan{rootSpan}, nil
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
+		return nil, err
+	}
+
+	// Group spans by debug_run_id to build separate trace trees
+	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	for _, span := range spans {
+		if span.DebugRunID.Valid {
+			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+		}
+	}
+
+	var allRoots []*cqrs.OtelSpan
+
+	// Process each debug run separately
+	for _, runSpans := range spansByDebugRun {
+		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+		if err != nil {
+			return nil, err
+		}
+		allRoots = append(allRoots, rootSpan)
+	}
+
+	return allRoots, nil
+}
+
+// map spans from row where rows can be any of the three different span query types
+func mapRootSpansFromRows[T any](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
 	// We need an ordered map here because we loop over it later
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
@@ -100,34 +149,76 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	// output
 	outputDynamicRefs := make(map[string]string)
 	var root *cqrs.OtelSpan
+	var runID ulid.ULID
 
 	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		// Type assert to get the fields directly
+		var traceID, runIDStr string
+		var dynamicSpanID, parentSpanID sql.NullString
+		var startTime, endTime interface{}
+		var spanFragments interface{}
+
+		switch s := any(span).(type) {
+		case *sqlc.GetSpansByRunIDRow:
+			traceID = s.TraceID
+			runIDStr = s.RunID
+			dynamicSpanID = s.DynamicSpanID
+			parentSpanID = s.ParentSpanID
+			startTime = s.StartTime
+			endTime = s.EndTime
+			spanFragments = s.SpanFragments
+		case *sqlc.GetSpansByDebugRunIDRow:
+			traceID = s.TraceID
+			runIDStr = s.RunID
+			dynamicSpanID = s.DynamicSpanID
+			parentSpanID = s.ParentSpanID
+			startTime = s.StartTime
+			endTime = s.EndTime
+			spanFragments = s.SpanFragments
+		case *sqlc.GetSpansByDebugSessionIDRow:
+			traceID = s.TraceID
+			runIDStr = s.RunID
+			dynamicSpanID = s.DynamicSpanID
+			parentSpanID = s.ParentSpanID
+			startTime = s.StartTime
+			endTime = s.EndTime
+			spanFragments = s.SpanFragments
+		default:
+			return nil, fmt.Errorf("unknown span type: %T", span)
+		}
+
+		st := strings.Split(startTime.(string), " m=")[0]
+		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
 			return nil, err
 		}
 
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+		et := strings.Split(endTime.(string), " m=")[0]
+		parsedEndTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
 			return nil, err
 		}
 
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
+		var parentSpanIDPtr *string
+		if parentSpanID.Valid {
+			parentSpanIDPtr = &parentSpanID.String
+		}
+
+		runID, err := ulid.Parse(runIDStr)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing run ID from span", "error", err)
+			return nil, err
 		}
 
 		newSpan := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
+				SpanID:       dynamicSpanID.String,
+				TraceID:      traceID,
+				ParentSpanID: parentSpanIDPtr,
+				StartTime:    parsedStartTime,
+				EndTime:      parsedEndTime,
 				Name:         "",
 				Attributes:   make(map[string]any),
 			},
@@ -139,7 +230,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		var outputSpanID *string
 		var fragments []map[string]interface{}
 		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
@@ -159,7 +250,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
-					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
+					outputDynamicRefs[dynamicSpanID.String] = outputRef
 				}
 			}
 		}
@@ -185,6 +276,14 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			newSpan.RunID = *newSpan.Attributes.RunID
 		}
 
+		if newSpan.Attributes.DebugRunID != nil {
+			newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
+		}
+
+		if newSpan.Attributes.DebugSessionID != nil {
+			newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
+		}
+
 		if newSpan.Attributes.StartedAt != nil {
 			newSpan.StartTime = *newSpan.Attributes.StartedAt
 		}
@@ -206,7 +305,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		spanMap.Set(span.DynamicSpanID.String, newSpan)
+		spanMap.Set(dynamicSpanID.String, newSpan)
 	}
 
 	for _, span := range spanMap.AllFromFront() {
@@ -216,6 +315,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
 				// We've found the span ID that we need to target for
 				// this span. So let's use it!
+				var err error
 				span.OutputID, err = encodeSpanOutputID(targetSpanID)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
@@ -256,366 +356,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	sorter(root)
 
 	return root, nil
-}
-
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
-		return nil, err
-	}
-
-	// We need an ordered map here because we loop over it later
-	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
-
-	// A map of dynamic span IDs to the specific span ID that contains an output
-	outputDynamicRefs := make(map[string]string)
-	var roots []*cqrs.OtelSpan
-
-	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
-			return nil, err
-		}
-
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
-			return nil, err
-		}
-
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
-		}
-
-		// Parse the run ID from the span
-		runID, err := ulid.Parse(span.RunID)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing run ID", "error", err, "runID", span.RunID)
-			return nil, err
-		}
-
-		newSpan := &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
-				Name:         "",
-				Attributes:   make(map[string]any),
-			},
-			Status:          enums.StepStatusRunning,
-			RunID:           runID,
-			MarkedAsDropped: false,
-		}
-
-		var outputSpanID *string
-		var fragments []map[string]interface{}
-		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
-
-		for _, fragment := range fragments {
-			if name, ok := fragment["name"].(string); ok {
-				if strings.HasPrefix(name, "executor.") {
-					newSpan.Name = name
-				}
-			}
-
-			if attrs, ok := fragment["attributes"].(string); ok {
-				fragmentAttr := map[string]any{}
-				if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
-					logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
-					return nil, err
-				}
-
-				maps.Copy(groupedAttrs, fragmentAttr)
-
-				if outputRef, ok := fragment["output_span_id"].(string); ok {
-					outputSpanID = &outputRef
-					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-				}
-			}
-		}
-
-		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
-		if err != nil {
-			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
-		}
-
-		if newSpan.Attributes.DynamicStatus != nil {
-			newSpan.Status = *newSpan.Attributes.DynamicStatus
-		}
-
-		if newSpan.Attributes.AppID != nil {
-			newSpan.AppID = *newSpan.Attributes.AppID
-		}
-
-		if newSpan.Attributes.FunctionID != nil {
-			newSpan.FunctionID = *newSpan.Attributes.FunctionID
-		}
-
-		if newSpan.Attributes.RunID != nil {
-			newSpan.RunID = *newSpan.Attributes.RunID
-		}
-
-		if newSpan.Attributes.StartedAt != nil {
-			newSpan.StartTime = *newSpan.Attributes.StartedAt
-		}
-
-		if newSpan.Attributes.EndedAt != nil {
-			newSpan.EndTime = *newSpan.Attributes.EndedAt
-		}
-
-		if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
-			newSpan.MarkedAsDropped = true
-		}
-
-		// If this span has finished, set a preliminary output ID.
-		if outputSpanID != nil && *outputSpanID != "" {
-			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
-				return nil, err
-			}
-		}
-
-		spanMap.Set(span.DynamicSpanID.String, newSpan)
-	}
-
-	for _, span := range spanMap.AllFromFront() {
-		// If we have an output reference for this span, set the appropriate target span ID here
-		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
-			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
-				// We've found the span ID that we need to target for this span. So let's use it!
-				span.OutputID, err = encodeSpanOutputID(targetSpanID)
-				if err != nil {
-					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-					return nil, err
-				}
-			}
-		}
-
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
-			root, _ := spanMap.Get(span.SpanID)
-			roots = append(roots, root)
-			continue
-		}
-
-		if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
-			// This is wrong. Either do it properly in DB or infer it
-			// correctly here. e.g. if child failed but more attempts coming,
-			// still running
-			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
-				parent.Status = span.Status
-			}
-
-			item, _ := spanMap.Get(span.SpanID)
-			parent.Children = append(parent.Children, item)
-		} else {
-			logger.StdlibLogger(ctx).Warn(
-				"lost lineage detected",
-				"spanID", span.SpanID,
-				"parentSpanID", span.ParentSpanID,
-			)
-		}
-	}
-
-	// Sort each root span
-	for _, root := range roots {
-		sorter(root)
-	}
-
-	return roots, nil
-}
-
-func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
-		return nil, err
-	}
-
-	// Group spans by debug_run_id to build separate trace trees
-	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
-	for _, span := range spans {
-		if span.DebugRunID.Valid {
-			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
-		}
-	}
-
-	var allRoots []*cqrs.OtelSpan
-
-	// Process each debug run separately
-	for debugRunID, runSpans := range spansByDebugRun {
-		spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
-		outputDynamicRefs := make(map[string]string)
-		var root *cqrs.OtelSpan
-
-		for _, span := range runSpans {
-			st := strings.Split(span.StartTime.(string), " m=")[0]
-			startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
-				return nil, err
-			}
-
-			et := strings.Split(span.EndTime.(string), " m=")[0]
-			endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
-				return nil, err
-			}
-
-			var parentSpanID *string
-			if span.ParentSpanID.Valid {
-				parentSpanID = &span.ParentSpanID.String
-			}
-
-			// Parse the run ID from the span
-			runID, err := ulid.Parse(span.RunID)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error parsing run ID", "error", err, "runID", span.RunID)
-				return nil, err
-			}
-
-			newSpan := &cqrs.OtelSpan{
-				RawOtelSpan: cqrs.RawOtelSpan{
-					SpanID:       span.DynamicSpanID.String,
-					TraceID:      span.TraceID,
-					ParentSpanID: parentSpanID,
-					StartTime:    startTime,
-					EndTime:      endTime,
-					Name:         "",
-					Attributes:   make(map[string]any),
-				},
-				Status:          enums.StepStatusRunning,
-				RunID:           runID,
-				MarkedAsDropped: false,
-			}
-
-			var outputSpanID *string
-			var fragments []map[string]interface{}
-			groupedAttrs := make(map[string]any)
-			_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
-
-			for _, fragment := range fragments {
-				if name, ok := fragment["name"].(string); ok {
-					if strings.HasPrefix(name, "executor.") {
-						newSpan.Name = name
-					}
-				}
-
-				if attrs, ok := fragment["attributes"].(string); ok {
-					fragmentAttr := map[string]any{}
-					if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
-						logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
-						return nil, err
-					}
-
-					maps.Copy(groupedAttrs, fragmentAttr)
-
-					if outputRef, ok := fragment["output_span_id"].(string); ok {
-						outputSpanID = &outputRef
-						outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-					}
-				}
-			}
-
-			newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
-			if err != nil {
-				return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
-			}
-
-			if newSpan.Attributes.DynamicStatus != nil {
-				newSpan.Status = *newSpan.Attributes.DynamicStatus
-			}
-
-			if newSpan.Attributes.AppID != nil {
-				newSpan.AppID = *newSpan.Attributes.AppID
-			}
-
-			if newSpan.Attributes.FunctionID != nil {
-				newSpan.FunctionID = *newSpan.Attributes.FunctionID
-			}
-
-			if newSpan.Attributes.RunID != nil {
-				newSpan.RunID = *newSpan.Attributes.RunID
-			}
-
-			if newSpan.Attributes.StartedAt != nil {
-				newSpan.StartTime = *newSpan.Attributes.StartedAt
-			}
-
-			if newSpan.Attributes.EndedAt != nil {
-				newSpan.EndTime = *newSpan.Attributes.EndedAt
-			}
-
-			if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
-				newSpan.MarkedAsDropped = true
-			}
-
-			// If this span has finished, set a preliminary output ID.
-			if outputSpanID != nil && *outputSpanID != "" {
-				newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
-				if err != nil {
-					logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
-					return nil, err
-				}
-			}
-
-			spanMap.Set(span.DynamicSpanID.String, newSpan)
-		}
-
-		for _, span := range spanMap.AllFromFront() {
-			// If we have an output reference for this span, set the appropriate target span ID here
-			if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
-				if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
-					// We've found the span ID that we need to target for this span. So let's use it!
-					span.OutputID, err = encodeSpanOutputID(targetSpanID)
-					if err != nil {
-						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-						return nil, err
-					}
-				}
-			}
-
-			if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
-				root, _ = spanMap.Get(span.SpanID)
-				continue
-			}
-
-			if parent, ok := spanMap.Get(*span.ParentSpanID); ok {
-				// This is wrong. Either do it properly in DB or infer it
-				// correctly here. e.g. if child failed but more attempts coming,
-				// still running
-				if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
-					parent.Status = span.Status
-				}
-
-				item, _ := spanMap.Get(span.SpanID)
-				parent.Children = append(parent.Children, item)
-			} else {
-				logger.StdlibLogger(ctx).Warn(
-					"lost lineage detected",
-					"spanID", span.SpanID,
-					"parentSpanID", span.ParentSpanID,
-					"debugRunID", debugRunID,
-				)
-			}
-		}
-
-		if root != nil {
-			sorter(root)
-			allRoots = append(allRoots, root)
-		}
-	}
-
-	return allRoots, nil
 }
 
 func encodeSpanOutputID(spanID string) (*string, error) {

@@ -3228,7 +3228,9 @@ type Mutation {
     debugRunID: ULID
   ): ULID!
 
-  createDebugSession(input: CreateDebugSessionInput!): CreateDebugSessionResponse!
+  createDebugSession(
+    input: CreateDebugSessionInput!
+  ): CreateDebugSessionResponse!
 }
 
 input CreateAppInput {
@@ -3252,8 +3254,8 @@ input CreateDebugSessionInput {
 }
 
 type CreateDebugSessionResponse {
-  debugSessionID: String!
-  debugRunID: String!
+  debugSessionID: ULID!
+  debugRunID: ULID!
 }
 `, BuiltIn: false},
 	{Name: "../gql.query.graphql", Input: `type Query {
@@ -3968,8 +3970,8 @@ type RunTraceSpan {
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
   userlandSpan: UserlandSpan
-  debugRunID: String
-  debugSessionID: String
+  debugRunID: ULID
+  debugSessionID: ULID
 }
 
 type UserlandSpan {
@@ -4008,7 +4010,7 @@ type RunTraceTrigger {
 # debug types
 
 type DebugRun {
-  debugRun: RunTraceSpan!
+  debugRun: RunTraceSpan
   runSteps: [RunStep!]
 }
 
@@ -7051,9 +7053,9 @@ func (ec *executionContext) _CreateDebugSessionResponse_debugSessionID(ctx conte
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(ulid.ULID)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_CreateDebugSessionResponse_debugSessionID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7063,7 +7065,7 @@ func (ec *executionContext) fieldContext_CreateDebugSessionResponse_debugSession
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ULID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7095,9 +7097,9 @@ func (ec *executionContext) _CreateDebugSessionResponse_debugRunID(ctx context.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(ulid.ULID)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNULID2githubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_CreateDebugSessionResponse_debugRunID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7107,7 +7109,7 @@ func (ec *executionContext) fieldContext_CreateDebugSessionResponse_debugRunID(c
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ULID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7219,14 +7221,11 @@ func (ec *executionContext) _DebugRun_debugRun(ctx context.Context, field graphq
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*models.RunTraceSpan)
 	fc.Result = res
-	return ec.marshalNRunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
+	return ec.marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DebugRun_debugRun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18235,9 +18234,9 @@ func (ec *executionContext) _RunTraceSpan_debugRunID(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(*ulid.ULID)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunTraceSpan_debugRunID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18247,7 +18246,7 @@ func (ec *executionContext) fieldContext_RunTraceSpan_debugRunID(ctx context.Con
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ULID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -18276,9 +18275,9 @@ func (ec *executionContext) _RunTraceSpan_debugSessionID(ctx context.Context, fi
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(*ulid.ULID)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunTraceSpan_debugSessionID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18288,7 +18287,7 @@ func (ec *executionContext) fieldContext_RunTraceSpan_debugSessionID(ctx context
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ULID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -24199,9 +24198,6 @@ func (ec *executionContext) _DebugRun(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = ec._DebugRun_debugRun(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "runSteps":
 
 			out.Values[i] = ec._DebugRun_runSteps(ctx, field, obj)

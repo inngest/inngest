@@ -104,8 +104,8 @@ type CreateDebugSessionInput struct {
 }
 
 type CreateDebugSessionResponse struct {
-	DebugSessionID string `json:"debugSessionID"`
-	DebugRunID     string `json:"debugRunID"`
+	DebugSessionID ulid.ULID `json:"debugSessionID"`
+	DebugRunID     ulid.ULID `json:"debugRunID"`
 }
 
 type DebounceConfiguration struct {
@@ -114,7 +114,7 @@ type DebounceConfiguration struct {
 }
 
 type DebugRun struct {
-	DebugRun *RunTraceSpan `json:"debugRun"`
+	DebugRun *RunTraceSpan `json:"debugRun,omitempty"`
 	RunSteps []*RunStep    `json:"runSteps,omitempty"`
 }
 
@@ -382,8 +382,8 @@ type RunTraceSpan struct {
 	ParentSpan     *RunTraceSpan      `json:"parentSpan,omitempty"`
 	IsUserland     bool               `json:"isUserland"`
 	UserlandSpan   *UserlandSpan      `json:"userlandSpan,omitempty"`
-	DebugRunID     *string            `json:"debugRunID,omitempty"`
-	DebugSessionID *string            `json:"debugSessionID,omitempty"`
+	DebugRunID     *ulid.ULID         `json:"debugRunID,omitempty"`
+	DebugSessionID *ulid.ULID         `json:"debugSessionID,omitempty"`
 }
 
 type RunTraceSpanOutput struct {

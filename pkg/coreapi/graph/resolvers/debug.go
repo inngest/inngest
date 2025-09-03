@@ -138,12 +138,10 @@ func (qr *queryResolver) DebugSession(ctx context.Context, query models.DebugSes
 	return nil, fmt.Errorf("debug session not found")
 }
 
-// Helper function to get function by slug
 func (qr *queryResolver) getFunctionBySlug(ctx context.Context, functionSlug string) (*cqrs.Function, error) {
 	return qr.Data.GetFunctionByExternalID(ctx, consts.DevServerEnvID, "local", functionSlug)
 }
 
-// Helper function to collect children spans recursively
 func (qr *queryResolver) collectChildrenSpans(span *models.RunTraceSpan) []*models.RunTraceSpan {
 	var result []*models.RunTraceSpan
 	for _, child := range span.ChildrenSpans {
@@ -179,12 +177,8 @@ func (qr *queryResolver) collectRunSteps(span *models.RunTraceSpan, steps *[]*mo
 }
 
 func (mr *mutationResolver) CreateDebugSession(ctx context.Context, input models.CreateDebugSessionInput) (*models.CreateDebugSessionResponse, error) {
-	// Generate new ULIDs for debug session and debug run
-	debugSessionID := ulid.Make().String()
-	debugRunID := ulid.Make().String()
-
 	return &models.CreateDebugSessionResponse{
-		DebugSessionID: debugSessionID,
-		DebugRunID:     debugRunID,
+		DebugSessionID: ulid.Make(),
+		DebugRunID:     ulid.Make(),
 	}, nil
 }

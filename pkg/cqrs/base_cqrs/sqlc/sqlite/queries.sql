@@ -347,6 +347,7 @@ INSERT INTO spans (
 
 -- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,

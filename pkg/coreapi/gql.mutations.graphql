@@ -22,7 +22,9 @@ type Mutation {
     debugRunID: ULID
   ): ULID!
 
-  createDebugSession(input: CreateDebugSessionInput!): CreateDebugSessionResponse!
+  createDebugSession(
+    input: CreateDebugSessionInput!
+  ): CreateDebugSessionResponse!
 }
 
 input CreateAppInput {
@@ -46,6 +48,6 @@ input CreateDebugSessionInput {
 }
 
 type CreateDebugSessionResponse {
-  debugSessionID: String!
-  debugRunID: String!
+  debugSessionID: ULID!
+  debugRunID: ULID!
 }

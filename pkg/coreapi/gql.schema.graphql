@@ -592,8 +592,8 @@ type RunTraceSpan {
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
   userlandSpan: UserlandSpan
-  debugRunID: String
-  debugSessionID: String
+  debugRunID: ULID
+  debugSessionID: ULID
 }
 
 type UserlandSpan {

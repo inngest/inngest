@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -188,19 +189,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	}
 
 	attempts := span.GetAttempts()
-
-	var debugRunID *string
-	var debugSessionID *string
-	if span.Attributes != nil {
-		if span.Attributes.DebugRunID != nil {
-			str := span.Attributes.DebugRunID.String()
-			debugRunID = &str
-		}
-		if span.Attributes.DebugSessionID != nil {
-			str := span.Attributes.DebugSessionID.String()
-			debugSessionID = &str
-		}
-	}
+	debugRunID := ulid.MustParse(span.GetDebugRunID().String())
+	debugSessionID := ulid.MustParse(span.GetDebugSessionID().String())
 
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
@@ -218,8 +208,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		StartedAt:      span.GetStartedAtTime(),
 		Status:         status,
 		TraceID:        span.GetTraceID(),
-		DebugRunID:     debugRunID,
-		DebugSessionID: debugSessionID,
+		DebugRunID:     &debugRunID,
+		DebugSessionID: &debugSessionID,
 
 		// IsUserland: , TODO
 		// UserlandSpan: , TODO
@@ -815,6 +805,12 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 				return
 			}
 
+			if debugJSON, err := json.MarshalIndent(rootSpans, "", "  "); err == nil {
+				fmt.Printf("=== DEBUG: rootSpans (%d spans) ===\n%s\n=== END DEBUG ===\n", len(rootSpans), string(debugJSON))
+			} else {
+				fmt.Printf("=== DEBUG: rootSpans (%d spans) - JSON marshal failed: %v ===\n", len(rootSpans), err)
+			}
+
 			if len(rootSpans) == 0 {
 				return
 			}
@@ -826,7 +822,8 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 					TraceID: rootSpans[0].TraceID,
 					Name:    "Debug Run",
 				},
-				Children: rootSpans,
+				Attributes: &meta.ExtractedValues{},
+				Children:   rootSpans,
 			}
 
 			gqlRoot, err := tr.convertRunSpanToGQL(ctx, virtualRoot)
