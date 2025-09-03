@@ -173,7 +173,7 @@ func (qr *queryResolver) collectRunSteps(span *models.RunTraceSpan, steps *[]*mo
 	}
 }
 
-func (mr *mutationResolver) CreateDebugSession(ctx context.Context, input models.CreateDebugSessionInput) (*models.CreateDebugSessionResponse, error) {
+func (r *mutationResolver) CreateDebugSession(ctx context.Context, input models.CreateDebugSessionInput) (*models.CreateDebugSessionResponse, error) {
 	return &models.CreateDebugSessionResponse{
 		DebugSessionID: ulid.Make(),
 		DebugRunID:     ulid.Make(),
