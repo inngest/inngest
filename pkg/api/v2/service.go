@@ -19,37 +19,8 @@ import (
 // This interface uses empty interfaces to be fully portable with zero external dependencies.
 // All methods return 'any' type allowing external applications to provide their own implementations.
 type ServiceOptions interface {
-	GetActionConfig() any
-	GetAuthn() any
-	GetBigQuery() any
-	GetCancellationReadWriter() any
-	GetClerk() any
-	GetConditionalConnectTracer() any
-	GetConnectGatewayRetriever() any
-	GetConnectHistoryRPC() any
-	GetConnectRequestAuther() any
-	GetConnectRequestStateManager() any
-	GetConnectTokenSigner() any
-	GetDB() any
-	GetDBCache() any
+	GetDatabase() any
 	GetEncryptor() any
-	GetEntitlementProvider() any
-	GetEntitlements() any
-	GetEventReader() any
-	GetExecutor() any
-	GetFDB() any
-	GetFnReader() any
-	GetHistoryReader() any
-	GetLog() any
-	GetMetrics() any
-	GetMetricsRPC() any
-	GetPublisher() any
-	GetQueueShards() any
-	GetReadiness() any
-	GetReadOnlyDB() any
-	GetRedis() any
-	GetReplayStore() any
-	GetUnshardedClient() any
 }
 
 // Service implements the V2 API service for gRPC with grpc-gateway
@@ -214,7 +185,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		if mountPoint == "" {
 			mountPoint = "/api/v2" // Default to current behavior
 		}
-		
+
 		originalPath := req.URL.Path
 		if after, ok := strings.CutPrefix(req.URL.Path, mountPoint); ok {
 			req.URL.Path = after
