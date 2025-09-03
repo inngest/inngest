@@ -74,7 +74,7 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
 	// Extract environment from X-Inngest-Env header
-	// envName := GetInngestEnvHeader(ctx)
+	envName := GetInngestEnvHeader(ctx)
 
 	// Validate pagination parameters
 	if req.Limit != nil {
@@ -86,9 +86,57 @@ func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAcc
 		}
 	}
 
-	// For now, return not implemented since this is OSS
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "event keys not implemented")
+	// If no event keys provider is configured, return empty list
+	// This happens in dev mode where event keys aren't required
+	eventKeysProvider := s.opts.GetEventKeys()
+	if eventKeysProvider == nil {
+		return &apiv2.FetchAccountEventKeysResponse{
+			Data: []*apiv2.EventKey{},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt:   timestamppb.New(time.Now()),
+				CachedUntil: nil,
+			},
+			Page: &apiv2.Page{
+				HasMore: false,
+			},
+		}, nil
+	}
 
+	// Type assert to the expected interface
+	eventKeys, ok := eventKeysProvider.(interface {
+		GetEventKeys(context.Context) ([]*apiv2.EventKey, error)
+	})
+	if !ok {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Invalid event keys provider")
+	}
+
+	// Get event keys from the provider
+	keys, err := eventKeys.GetEventKeys(ctx)
+	if err != nil {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Failed to fetch event keys")
+	}
+
+	// Filter by environment if specified
+	var filteredKeys []*apiv2.EventKey
+	for _, key := range keys {
+		if envName == "" || key.Environment == envName {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+
+	// For now, return all keys without pagination
+	// In a real implementation, you'd handle cursor-based pagination here
+
+	return &apiv2.FetchAccountEventKeysResponse{
+		Data: filteredKeys,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+		},
+	}, nil
 }
 
 func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountEnvsRequest) (*apiv2.FetchAccountEnvsResponse, error) {
@@ -130,7 +178,7 @@ func (s *Service) FetchAccountEnvs(ctx context.Context, req *apiv2.FetchAccountE
 
 func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchAccountSigningKeysRequest) (*apiv2.FetchAccountSigningKeysResponse, error) {
 	// Extract environment from X-Inngest-Env header
-	// envName := GetInngestEnvHeader(ctx)
+	envName := GetInngestEnvHeader(ctx)
 
 	// Validate pagination parameters
 	if req.Limit != nil {
@@ -142,6 +190,55 @@ func (s *Service) FetchAccountSigningKeys(ctx context.Context, req *apiv2.FetchA
 		}
 	}
 
-	// For now, return not implemented since this is OSS
-	return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "signing keys not implemented")
+	// If no signing keys provider is configured, return empty list
+	// This happens in dev mode where signing keys aren't required
+	signingKeysProvider := s.opts.GetSigningKeys()
+	if signingKeysProvider == nil {
+		return &apiv2.FetchAccountSigningKeysResponse{
+			Data: []*apiv2.SigningKey{},
+			Metadata: &apiv2.ResponseMetadata{
+				FetchedAt:   timestamppb.New(time.Now()),
+				CachedUntil: nil,
+			},
+			Page: &apiv2.Page{
+				HasMore: false,
+			},
+		}, nil
+	}
+
+	// Type assert to the expected interface
+	signingKeys, ok := signingKeysProvider.(interface {
+		GetSigningKeys(context.Context) ([]*apiv2.SigningKey, error)
+	})
+	if !ok {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Invalid signing keys provider")
+	}
+
+	// Get signing keys from the provider
+	keys, err := signingKeys.GetSigningKeys(ctx)
+	if err != nil {
+		return nil, NewError(http.StatusInternalServerError, ErrorInternalError, "Failed to fetch signing keys")
+	}
+
+	// Filter by environment if specified
+	var filteredKeys []*apiv2.SigningKey
+	for _, key := range keys {
+		if envName == "" || key.Environment == envName {
+			filteredKeys = append(filteredKeys, key)
+		}
+	}
+
+	// For now, return all keys without pagination
+	// In a real implementation, you'd handle cursor-based pagination here
+
+	return &apiv2.FetchAccountSigningKeysResponse{
+		Data: filteredKeys,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+		Page: &apiv2.Page{
+			HasMore: false,
+		},
+	}, nil
 }

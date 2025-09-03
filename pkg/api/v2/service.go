@@ -21,6 +21,8 @@ import (
 type ServiceOptions interface {
 	GetDatabase() any
 	GetEncryptor() any
+	GetEventKeys() any
+	GetSigningKeys() any
 }
 
 // Service implements the V2 API service for gRPC with grpc-gateway
