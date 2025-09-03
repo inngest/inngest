@@ -1,0 +1,3 @@
+npx inngest-cli@latest dev
+# You can specify the URL of your development `serve` API endpoint
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
