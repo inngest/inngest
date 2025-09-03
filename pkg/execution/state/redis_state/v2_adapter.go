@@ -271,6 +271,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	return result, nil
 }
 
+// LoadStack returns the current stack for a run.
+func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
+}
+
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
