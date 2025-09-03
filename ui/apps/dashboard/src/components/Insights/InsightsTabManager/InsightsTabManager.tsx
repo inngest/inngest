@@ -8,7 +8,7 @@ import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
-import { TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
+import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 export interface TabManagerActions {
   breakQueryAssociation: (id: string) => void;
@@ -35,8 +35,8 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps
 ): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<Query[]>([TEMPLATES_TAB]);
-  const [activeTabId, setActiveTabId] = useState<string>(TEMPLATES_TAB.id);
+  const [tabs, setTabs] = useState<Query[]>([HOME_TAB]);
+  const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
 
   const createTabBase = useCallback(
     (query: Query) => {
