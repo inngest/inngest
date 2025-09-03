@@ -37,14 +37,14 @@ export type RunTraceSpan = {
 };
 
 export type DebugRunData = {
-  debugRun: RunTraceSpan;
+  debugRun: RunTraceSpan | null;
   runSteps?: RunStep[] | null;
 };
 
 export type DebugRunResult = {
   error?: Error;
   loading: boolean;
-  data?: DebugRunData;
+  data?: DebugRunData | null;
 };
 
 type UseGetDebugRunOptions = {

@@ -7,8 +7,18 @@ type Props = {
 };
 
 export const DebugRun = ({ debugRun }: Props) => {
-  // const minTime = new Date(debugRun.queuedAt);
-  // const maxTime = toMaybeDate(debugRun.endedAt) ?? new Date();
+  const minTime = new Date(debugRun.queuedAt);
+  const maxTime = toMaybeDate(debugRun.endedAt) ?? new Date();
 
-  return <div className={`w-full pb-4 pr-8`}>coming soon...</div>;
+  return (
+    <div className={`w-full pb-4 pr-8`}>
+      <Trace
+        depth={0}
+        maxTime={maxTime}
+        minTime={minTime}
+        runID={debugRun.runID}
+        trace={{ ...(debugRun as any), name: 'Debug Run' }}
+      />
+    </div>
+  );
 };
