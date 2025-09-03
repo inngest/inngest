@@ -22,7 +22,7 @@ export interface TabProps
   extends Omit<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>, 'children'> {
   disallowClose?: boolean;
   iconBefore?: React.ReactNode;
-  title: string;
+  title?: string;
 }
 
 export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, TabProps>(
@@ -48,7 +48,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         {...props}
       >
         {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
-        {title && <span className="flex-1 truncate text-left">{title}</span>}
+        {title !== undefined && <span className="flex-1 truncate text-left">{title}</span>}
         {onClose && !disallowClose && (
           <span
             className="p-0.5"

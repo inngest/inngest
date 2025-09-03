@@ -25,6 +25,7 @@ interface IconTabButtonProps
 // Tab variant (value required, can be active)
 interface IconTabTabProps extends BaseIconTabProps, Omit<TabProps, 'title' | 'iconBefore'> {
   disallowClose?: boolean;
+  title?: never;
   value: string;
 }
 
@@ -41,14 +42,12 @@ export const IconTab = forwardRef<HTMLButtonElement | React.ElementRef<typeof Ta
       return (
         <Tab
           className={cn(
-            // Override Tab's default styles to look like IconTab
             'w-[44px] min-w-[44px] max-w-[44px] justify-center gap-0 px-0',
             props.className
           )}
           disallowClose={disallowClose}
           iconBefore={icon}
           ref={ref}
-          title=""
           {...tabProps}
         />
       );
