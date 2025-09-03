@@ -114,7 +114,6 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 		return nil, err
 	}
 
-	// Group spans by debug_run_id to build separate trace trees
 	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
 	for _, span := range spans {
 		if span.DebugRunID.Valid {
@@ -124,7 +123,6 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 
 	var allRoots []*cqrs.OtelSpan
 
-	// Process each debug run separately
 	for _, runSpans := range spansByDebugRun {
 		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
 		if err != nil {
@@ -136,7 +134,7 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	return allRoots, nil
 }
 
-// map spans from row where rows can be any of the three different span query types
+// map spans from rows where rows can be any of the three different span query types (run, debug, session)
 func mapRootSpansFromRows[T any](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
