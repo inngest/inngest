@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
-
+import { ErrorCard } from '../Error/ErrorCard';
 import { useGetDebugSession } from '../SharedContext/useGetDebugSession';
 import { Skeleton } from '../Skeleton';
 import { StepHistory } from './StepHistory';
 
-const exampleAiOutput = {
+export const exampleAiOutput = {
   id: 'chatcmpl-BjpG3gipnAUHsi3txqSt5XLp9G76J',
   object: 'chat.completion',
   created: 1750261495,
@@ -130,17 +129,11 @@ type HistoryProps = {
 };
 
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
-  const {
-    data: newData,
-    loading: newLoading,
-    error,
-  } = useGetDebugSession({
+  const { data, loading, error } = useGetDebugSession({
     functionSlug,
     debugSessionID,
     runID,
   });
-  const [debugSessionData, setDebugSessionData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   if (loading) {
     return (
@@ -152,15 +145,22 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     );
   }
 
+  if (error || !data) {
+    return <ErrorCard error={error || new Error('No data found')} />;
+  }
+
   return (
     <div className="flex w-full flex-col gap-2">
-      {data.map((item, i) => (
-        <StepHistory
-          {...item}
-          defaultOpen={i === data.length - 1}
-          key={`step-history-${item.id}`}
-        />
-      ))}
+      {data.map(
+        (run, i) =>
+          run && (
+            <StepHistory
+              debugRun={run}
+              defaultOpen={i === data.length - 1}
+              key={`step-history-${run.spanID}`}
+            />
+          )
+      )}
     </div>
   );
 };

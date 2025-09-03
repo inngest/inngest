@@ -2,7 +2,6 @@ package loader
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -798,35 +797,13 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 				return
 			}
 
-			// Get all spans for this debug run ID and merge them into a single trace
-			rootSpans, err := tr.reader.GetSpansByDebugRunID(ctx, req.DebugRunID)
+			rootSpan, err := tr.reader.GetSpansByDebugRunID(ctx, req.DebugRunID)
 			if err != nil {
 				res.Error = fmt.Errorf("error retrieving debug run trace: %w", err)
 				return
 			}
 
-			if debugJSON, err := json.MarshalIndent(rootSpans, "", "  "); err == nil {
-				fmt.Printf("=== DEBUG: rootSpans (%d spans) ===\n%s\n=== END DEBUG ===\n", len(rootSpans), string(debugJSON))
-			} else {
-				fmt.Printf("=== DEBUG: rootSpans (%d spans) - JSON marshal failed: %v ===\n", len(rootSpans), err)
-			}
-
-			if len(rootSpans) == 0 {
-				return
-			}
-
-			// Merge all roots into a single virtual root
-			virtualRoot := &cqrs.OtelSpan{
-				RawOtelSpan: cqrs.RawOtelSpan{
-					SpanID:  "virtual-debug-root",
-					TraceID: rootSpans[0].TraceID,
-					Name:    "Debug Run",
-				},
-				Attributes: &meta.ExtractedValues{},
-				Children:   rootSpans,
-			}
-
-			gqlRoot, err := tr.convertRunSpanToGQL(ctx, virtualRoot)
+			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
 			if err != nil {
 				res.Error = fmt.Errorf("error converting debug run root to GQL: %w", err)
 				return

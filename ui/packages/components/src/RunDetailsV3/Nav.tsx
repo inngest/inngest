@@ -81,6 +81,7 @@ export const Nav = ({ standalone, functionSlug, runID, debugRunID, debugSessionI
       });
 
       router.push(debuggerPath);
+      return;
     }
 
     e?.preventDefault && e.preventDefault();

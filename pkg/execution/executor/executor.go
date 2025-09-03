@@ -537,6 +537,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
+	if req.DebugSessionID != nil {
+		config.SetDebugSessionID(*req.DebugSessionID)
+	}
+	if req.DebugRunID != nil {
+		config.SetDebugRunID(*req.DebugRunID)
+	}
+
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)

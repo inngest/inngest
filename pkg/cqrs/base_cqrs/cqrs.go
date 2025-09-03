@@ -96,19 +96,15 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
+
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
 		return nil, err
 	}
 
-	rootSpan, err := mapRootSpansFromRows(ctx, spans)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*cqrs.OtelSpan{rootSpan}, nil
+	return mapRootSpansFromRows(ctx, spans)
 }
 
 func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
@@ -142,11 +138,10 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 
 // map spans from row where rows can be any of the three different span query types
 func mapRootSpansFromRows[T any](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
-	// We need an ordered map here because we loop over it later
+	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
-	// A map of dynamic span IDs to the specific span ID that contains an
-	// output
+	// A map of dynamic span IDs to the specific span ID that contains an output
 	outputDynamicRefs := make(map[string]string)
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID

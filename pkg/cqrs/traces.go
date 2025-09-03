@@ -401,7 +401,7 @@ type TraceReader interface {
 	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
 	// GetSpansByDebugRunID retrieves all spans related to the specified debug run
-	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*OtelSpan, error)
+	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*OtelSpan, error)
 	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)

@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { useSearchParam } from '../hooks/useSearchParam';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
+import { DebugRun } from './DebugRun';
 import { History } from './History';
 import { Play } from './Play';
 
@@ -28,14 +29,9 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     runID,
   });
 
-  console.info('debugRunData coming soon', debugRunData);
-
   const { data: runData, loading: runLoading } = useGetRun({
     runID,
   });
-
-  // For now, we'll use the regular run data and add debug fetching later
-  // TODO: Use debug run data when available
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -138,6 +134,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <div>
               {runLoading ? (
                 <Skeleton className="h-24 w-full" />
+              ) : debugRunData?.debugRun ? (
+                <DebugRun debugRun={debugRunData?.debugRun} />
               ) : runID && runData ? (
                 <Timeline runID={runID} trace={runData?.trace} />
               ) : null}

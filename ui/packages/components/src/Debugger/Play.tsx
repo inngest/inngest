@@ -26,7 +26,7 @@ export const Play = ({
         debugRunID,
         debugSessionID,
       });
-      console.log('play result', result);
+      console.debug('play result', result);
     }
   };
 
