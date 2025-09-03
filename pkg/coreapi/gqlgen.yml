@@ -27,8 +27,6 @@ models:
     fields:
       externalID:
         resolver: true
-  Runtime:
-    model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
   FunctionRunFinish:
