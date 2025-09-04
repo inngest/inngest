@@ -179,9 +179,19 @@ func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, err
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
-// LoadEvents returns all events for a run.
+// LoadSteps returns all steps for a run.
 func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
 	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepInputs returns only the step inputs for a run.
+func (v v2) LoadStepInputs(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepInputs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepsWithIDs returns a list of steps with the given IDs for a run.
+func (v v2) LoadStepsWithIDs(ctx context.Context, id state.ID, stepIDs []string) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepsWithIDs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, stepIDs)
 }
 
 // LoadState returns all state for a run.
@@ -269,6 +279,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	_ = result.Config.FunctionTrace()
 
 	return result, nil
+}
+
+// LoadStack returns the current stack for a run.
+func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
 }
 
 // Update updates configuration on the state, eg. setting the execution

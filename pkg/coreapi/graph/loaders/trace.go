@@ -26,9 +26,7 @@ const (
 	FinalizationSpanName     = "Finalization"
 )
 
-var (
-	ErrSkipSuccess = fmt.Errorf("skip success span")
-)
+var ErrSkipSuccess = fmt.Errorf("skip success span")
 
 type TraceRequestKey struct {
 	*cqrs.TraceRunIdentifier
@@ -664,7 +662,6 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 		for _, cp := range pb.Children {
 			cspan, err := convertRunTreeToGQLModel(cp)
-
 			if err != nil {
 				return nil, err
 			}

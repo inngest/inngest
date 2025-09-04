@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -67,6 +68,11 @@ type CheckpointNewRunRequest struct {
 	// event for API-based runs.
 	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
 
+	// Steps represent optional steps sent when creating the new run.  Sometimes,
+	// the SDK may execute the run entirely and want to create run and accounting
+	// in the same step.
+	Steps []state.GeneratorOpcode `json:"steps"`
+
 	// XXX: SDK Version and language??
 }
 
@@ -98,13 +104,20 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 }
 
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
-	uri := r.Event.Data.Domain + r.Event.Data.Path + "?x-inngest-type=sync&x-inngest-method=" + r.Event.Data.Method
+	uri := r.Event.Data.Domain + r.Event.Data.Path
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
 		FunctionVersion: 1,
 		Name:            r.FnSlug(),
 		Slug:            r.FnSlug(),
+		Driver: inngest.FunctionDriver{
+			URI: uri,
+			Metadata: map[string]any{
+				"type":   "sync", // This is a sync function
+				"method": r.Event.Data.Method,
+			},
+		},
 		Steps: []inngest.Step{
 			{
 				ID:      "step",
@@ -176,6 +189,17 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	return evt
 }
 
+type checkpointSteps struct {
+	RunID ulid.ULID               `json:"run_id"`
+	FnID  uuid.UUID               `json:"fn_id"`
+	AppID uuid.UUID               `json:"app_id"`
+	Steps []state.GeneratorOpcode `json:"steps"`
+
+	// Plus auth data added from auth.
+	AccountID uuid.UUID `json:"-"`
+	EnvID     uuid.UUID `json:"-"`
+}
+
 // checkpointRunContext implements execution.RunContext for use in checkpoint API calls
 type checkpointRunContext struct {
 	md         sv2.Metadata
@@ -216,7 +240,7 @@ func (c *checkpointRunContext) MaxAttempts() *int {
 }
 
 func (c *checkpointRunContext) ShouldRetry() bool {
-	return c.attemptCount < c.maxAttempts
+	return c.attemptCount < (c.maxAttempts - 1)
 }
 
 func (c *checkpointRunContext) IncrementAttempt() {
@@ -276,4 +300,9 @@ func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, out
 
 func (c *checkpointRunContext) SetError(err error) {
 	// TODO
+}
+
+func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
+	// TODO
+	return nil
 }

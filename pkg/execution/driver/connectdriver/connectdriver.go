@@ -30,7 +30,7 @@ const (
 	pkgName = "connect.execution.driver"
 )
 
-func NewDriver(ctx context.Context, psf grpc.RequestForwarder, tracer itrace.ConditionalTracer) driver.Driver {
+func NewDriver(ctx context.Context, psf grpc.RequestForwarder, tracer itrace.ConditionalTracer) driver.DriverV1 {
 	return &executor{
 		forwarder: psf,
 		tracer:    tracer,
@@ -42,8 +42,7 @@ type executor struct {
 	tracer    itrace.ConditionalTracer
 }
 
-// RuntimeType fulfills the inngest.Runtime interface.
-func (e executor) RuntimeType() string {
+func (e executor) Name() string {
 	return "connect"
 }
 
@@ -251,5 +250,4 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 		Header:         http.Header{}, // not supported by connect
 		SysErr:         sysErr,
 	}, err
-
 }

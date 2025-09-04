@@ -31,6 +31,8 @@ type Opts struct {
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
+	// Queue allows the checkppinting API to continue by enqueueing new queue items.
+	Queue queue.Queue
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
 	// FunctionRunReader reads function runs, history, etc. from backing storage
