@@ -1,6 +1,27 @@
 import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/createSQLCompletionProvider';
 
-const KEYWORDS = ['FROM', 'GROUP BY', 'LIMIT', 'OFFSET', 'ORDER BY', 'SELECT', 'WHERE'] as const;
+const KEYWORDS = [
+  'AND',
+  'AS',
+  'ASC',
+  'BETWEEN',
+  'DESC',
+  'DISTINCT',
+  'FALSE',
+  'FROM',
+  'GROUP BY',
+  'IS',
+  'LIKE',
+  'LIMIT',
+  'NOT',
+  'NULL',
+  'OFFSET',
+  'OR',
+  'ORDER BY',
+  'SELECT',
+  'TRUE',
+  'WHERE',
+] as const;
 
 const FUNCTIONS = [
   { name: 'AVG', signature: 'AVG(${1:column})' },
