@@ -59,6 +59,12 @@ type StateLoader interface {
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.
 	LoadSteps(ctx context.Context, id ID) (map[string]json.RawMessage, error)
+	// LoadStepInputs returns only the step inputs for a run.
+	LoadStepInputs(ctx context.Context, id ID) (map[string]json.RawMessage, error)
+	// LoadStepsWithIDs returns a list of steps with the given IDs for a run.
+	LoadStepsWithIDs(ctx context.Context, id ID, stepIDs []string) (map[string]json.RawMessage, error)
+	// LoadStack returns the stack for a given run
+	LoadStack(ctx context.Context, id ID) ([]string, error)
 
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
