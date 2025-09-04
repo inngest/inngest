@@ -1591,7 +1591,7 @@ export type QueryExecutionTimeSeriesArgs = {
 
 export type QueryInsightsArgs = {
   query: Scalars['String'];
-  workspaceID: InputMaybe<Scalars['ID']>;
+  workspaceID: Scalars['ID'];
 };
 
 
@@ -2419,7 +2419,7 @@ export type Workspace = {
   lastDeployedAt: Maybe<Scalars['Time']>;
   name: Scalars['String'];
   parentID: Maybe<Scalars['ID']>;
-  replay: Maybe<Replay>;
+  replay: Replay;
   run: Maybe<FunctionRunV2>;
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
@@ -3418,7 +3418,7 @@ export type GetReplayQueryVariables = Exact<{
 }>;
 
 
-export type GetReplayQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', replay: { __typename?: 'Replay', id: string, name: string, createdAt: string, endedAt: string | null, functionRunsScheduledCount: number, fromRange: string, toRange: string, functionRunsProcessedCount: number, filtersV2: { __typename?: 'ReplayFilters', statuses: Array<FunctionRunStatus> } | null } | null } };
+export type GetReplayQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', replay: { __typename?: 'Replay', id: string, name: string, createdAt: string, endedAt: string | null, functionRunsScheduledCount: number, fromRange: string, toRange: string, functionRunsProcessedCount: number, filtersV2: { __typename?: 'ReplayFilters', statuses: Array<FunctionRunStatus> } | null } } };
 
 export type GetReplaysQueryVariables = Exact<{
   environmentID: Scalars['ID'];
