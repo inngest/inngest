@@ -2251,6 +2251,7 @@ export type VercelApp = {
 
 export enum VercelDeploymentProtection {
   All = 'ALL',
+  AllExceptCustomDomains = 'ALL_EXCEPT_CUSTOM_DOMAINS',
   Disabled = 'DISABLED',
   Preview = 'PREVIEW',
   ProdDeploymentUrlsAndAllPreviews = 'PROD_DEPLOYMENT_URLS_AND_ALL_PREVIEWS',
