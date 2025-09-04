@@ -22,7 +22,7 @@ export function useFunctions() {
           {
             environmentID: envID,
             page: cursor ?? 1,
-            pageSize: 30,
+            pageSize: 50,
             archived,
             search: nameSearch,
           },

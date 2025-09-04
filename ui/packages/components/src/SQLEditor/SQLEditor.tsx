@@ -1,19 +1,23 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import { Editor } from '@monaco-editor/react';
+import { Editor, type Monaco } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 
 import { EDITOR_OPTIONS } from './constants';
 import type { SQLCompletionConfig } from './createSQLCompletionProvider';
 import { useMonacoWithTheme, useSQLCompletions } from './hooks';
 
+export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
+
 export type SQLEditorProps = {
   completionConfig: SQLCompletionConfig;
   content: string;
   onChange: (value: string) => void;
+  onMount?: SQLEditorMountCallback;
 };
 
-export function SQLEditor({ completionConfig, content, onChange }: SQLEditorProps) {
+export function SQLEditor({ completionConfig, content, onChange, onMount }: SQLEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useMonacoWithTheme(wrapperRef);
@@ -26,11 +30,19 @@ export function SQLEditor({ completionConfig, content, onChange }: SQLEditorProp
     [onChange]
   );
 
+  const handleEditorMount = useCallback(
+    (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+      onMount?.(editorInstance, monaco);
+    },
+    [onMount]
+  );
+
   return (
     <div ref={wrapperRef} className="bg-codeEditor relative h-full">
       <Editor
         defaultLanguage="sql"
         onChange={handleContentChange}
+        onMount={handleEditorMount}
         options={EDITOR_OPTIONS}
         theme="inngest-theme"
         value={content}

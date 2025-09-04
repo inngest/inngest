@@ -617,6 +617,60 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 	return steps, nil
 }
 
+func (m shardedMgr) LoadStepInputs(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadStepInputs"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+
+	var (
+		steps = map[string]json.RawMessage{}
+		v1id  = state.Identifier{
+			RunID:      runID,
+			WorkflowID: fnID,
+			AccountID:  accountId,
+		}
+	)
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	// Load action inputs only
+	inputMap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.ActionInputs(ctx, isSharded, v1id)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed loading action inputs; %w", err)
+	}
+	for stepID, marshalled := range inputMap {
+		steps[stepID] = json.RawMessage(marshalled)
+	}
+
+	return steps, nil
+}
+
+func (m shardedMgr) LoadStepsWithIDs(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID, stepIDs []string) (map[string]json.RawMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadStepsWithIDs"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+
+	steps := map[string]json.RawMessage{}
+
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+
+	for _, stepID := range stepIDs {
+		result, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Hget().Key(fnRunState.kg.Actions(ctx, isSharded, fnID, runID)).Field(stepID).Build()
+		}).ToString()
+		if err != nil && err != rueidis.Nil {
+			return nil, fmt.Errorf("failed loading action for step %s; %w", stepID, err)
+		}
+		if err != rueidis.Nil {
+			steps[stepID] = json.RawMessage(result)
+		}
+	}
+
+	return steps, nil
+}
+
 func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (state.State, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Load"), redis_telemetry.ScopeFnRunState)
 

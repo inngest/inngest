@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/driver/httpv2"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
@@ -378,7 +379,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
-	drivers := []driver.Driver{}
+	drivers := []driver.DriverV1{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:       executorProxy,
@@ -410,9 +411,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
-		executor.WithRuntimeDrivers(
-			drivers...,
-		),
+		executor.WithDriverV1(drivers...),
+		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
 		executor.WithLogger(l),
@@ -517,6 +517,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
+			Queue:              rq,
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
@@ -581,7 +582,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Create the API v2 service handler
-	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, apiv2.HTTPHandlerOptions{
+	serviceOpts := apiv2.ServiceOptions{
+		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
+		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
+	}
+
+	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
 		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 	})
 	if err != nil {
@@ -906,6 +912,15 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 	opt, err := rueidis.ParseURL(redisURI)
 	if err != nil {
 		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: invalid format")
+	}
+
+	// Fix for Redis Sentinel authentication: rueidis.ParseURL correctly identifies
+	// Sentinel configurations but fails to populate Sentinel credentials.
+	// When a master_set is configured but Sentinel credentials are empty,
+	// copy the main credentials to Sentinel authentication.
+	if opt.Sentinel.MasterSet != "" && opt.Sentinel.Username == "" && opt.Username != "" {
+		opt.Sentinel.Username = opt.Username
+		opt.Sentinel.Password = opt.Password
 	}
 
 	// Set default overrides

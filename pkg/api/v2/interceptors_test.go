@@ -31,7 +31,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -53,11 +53,11 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.True(t, authzCalled)
-		
+
 		// Check that it's a permission denied error
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -77,7 +77,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -111,7 +111,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(nil, nil)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -133,10 +133,10 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
-		
+
 		// Check that it's a permission denied error with specific message
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -157,7 +157,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, nil)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -183,7 +183,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		_, err = client.Health(ctx, &apiv2.HealthRequest{})
 		require.Error(t, err)
 		require.True(t, authnCalled)
-		
+
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.Unauthenticated, st.Code())
@@ -212,7 +212,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -234,12 +234,12 @@ func TestGRPCInterceptors(t *testing.T) {
 
 		client := apiv2.NewV2Client(conn)
 
-		// Test protected method (CreateAccount) - should hit both middlewares
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
+		// Test protected method (CreatePartnerAccount) - should hit both middlewares
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
 		require.Error(t, err)
 		require.True(t, authnCalled, "Authentication middleware should be called")
 		require.True(t, authzCalled, "Authorization middleware should be called")
-		
+
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		require.Equal(t, codes.PermissionDenied, st.Code())
@@ -267,7 +267,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(authnMiddleware, authzMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -310,7 +310,7 @@ func TestGRPCInterceptors(t *testing.T) {
 		server := grpc.NewServer(
 			grpc.UnaryInterceptor(NewAuthUnaryInterceptor(methodCheckMiddleware, methodCheckMiddleware)),
 		)
-		service := NewService()
+		service := NewService(ServiceOptions{})
 		apiv2.RegisterV2Server(server, service)
 
 		// Setup in-memory connection
@@ -340,10 +340,10 @@ func TestGRPCInterceptors(t *testing.T) {
 		// Reset for next test
 		receivedMethod = ""
 
-		// Test CreateAccount method (should use POST based on annotation)
-		_, err = client.CreateAccount(ctx, &apiv2.CreateAccountRequest{})
-		require.NoError(t, err)
-		require.Equal(t, http.MethodPost, receivedMethod, "CreateAccount method should use POST")
+		// Test CreatePartnerAccount method (should use POST based on annotation)
+		_, err = client.CreatePartnerAccount(ctx, &apiv2.CreateAccountRequest{})
+		require.Error(t, err) // Now expects error since it's not implemented
+		require.Equal(t, http.MethodPost, receivedMethod, "CreatePartnerAccount method should use POST")
 	})
 }
 
@@ -359,9 +359,9 @@ func TestParseMethodName(t *testing.T) {
 			expected:   "Health",
 		},
 		{
-			name:       "create account method",
-			fullMethod: "/api.v2.V2/CreateAccount",
-			expected:   "CreateAccount",
+			name:       "create partner account method",
+			fullMethod: "/api.v2.V2/CreatePartnerAccount",
+			expected:   "CreatePartnerAccount",
 		},
 		{
 			name:       "empty string",
@@ -400,8 +400,8 @@ func TestRequiresAuthorization(t *testing.T) {
 			expected:   false,
 		},
 		{
-			name:       "create account method should require authorization",
-			fullMethod: "/api.v2.V2/CreateAccount",
+			name:       "create partner account method should require authorization",
+			fullMethod: "/api.v2.V2/CreatePartnerAccount",
 			expected:   true,
 		},
 		{

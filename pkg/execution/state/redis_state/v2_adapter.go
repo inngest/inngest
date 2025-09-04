@@ -15,24 +15,44 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-func MustRunServiceV2(m statev1.Manager) state.RunService {
-	v2, err := RunServiceV2(m)
+func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
+	o := &mgrV2Opts{}
+	for _, apply := range opts {
+		apply(o)
+	}
+
+	v2, err := runServiceV2(m, *o)
 	if err != nil {
 		panic(err)
 	}
+
 	return v2
 }
 
-func RunServiceV2(m statev1.Manager) (state.RunService, error) {
+func runServiceV2(m statev1.Manager, opts mgrV2Opts) (state.RunService, error) {
 	mgr, ok := m.(*mgr)
 	if !ok {
 		return nil, fmt.Errorf("cannot convert %T into type redis_state.*mgr", m)
 	}
-	return v2{mgr}, nil
+
+	v2 := v2{mgr: mgr, disabledRetries: opts.disabledRetries}
+	return v2, nil
+}
+
+type MgrV2Opt func(o *mgrV2Opts)
+type mgrV2Opts struct {
+	disabledRetries bool
+}
+
+func WithDisabledRetries() MgrV2Opt {
+	return func(o *mgrV2Opts) {
+		o.disabledRetries = true
+	}
 }
 
 type v2 struct {
-	mgr *mgr
+	mgr             *mgr
+	disabledRetries bool
 }
 
 // Create creates new state in the store for the given run ID.
@@ -112,11 +132,6 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		return state.State{}, fmt.Errorf("error storing run state in redis when marshalling batchData: %w", err)
 	}
 
-	eventsSize := 0
-	for _, evt := range s.Events {
-		eventsSize += len(evt)
-	}
-
 	metadata := s.Metadata
 	metadata.ID = state.ID{
 		// Set the returned run ID from the state manager
@@ -164,9 +179,19 @@ func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, err
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
-// LoadEvents returns all events for a run.
+// LoadSteps returns all steps for a run.
 func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
 	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepInputs returns only the step inputs for a run.
+func (v v2) LoadStepInputs(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepInputs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
+}
+
+// LoadStepsWithIDs returns a list of steps with the given IDs for a run.
+func (v v2) LoadStepsWithIDs(ctx context.Context, id state.ID, stepIDs []string) (map[string]json.RawMessage, error) {
+	return v.mgr.LoadStepsWithIDs(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, stepIDs)
 }
 
 // LoadState returns all state for a run.
@@ -256,6 +281,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 	return result, nil
 }
 
+// LoadStack returns the current stack for a run.
+func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
+}
+
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
@@ -272,7 +302,7 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
@@ -294,7 +324,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			attempt++
 			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 		},
-		util.NewRetryConf(
+		v.retryPolicy(
 			util.WithRetryConfRetryableErrors(v.retryableError),
 			util.WithRetryConfMaxBackoff(10*time.Second),
 			util.WithRetryConfMaxAttempts(10),
@@ -355,15 +385,24 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 			err := v.mgr.SavePending(ctx, v1id, pending)
 			return false, err
 		},
-		util.NewRetryConf(),
+		v.retryPolicy(),
 	)
 
 	return err
 }
 
+func (v v2) retryPolicy(opts ...util.RetryConfSetting) util.RetryConf {
+	if v.disabledRetries {
+		opts = append(opts, util.WithRetryConfMaxAttempts(1))
+	}
+	return util.NewRetryConf(opts...)
+}
+
 // determine what errors are retriable
 func (v v2) retryableError(err error) bool {
 	switch {
+	case errors.Is(err, statev1.ErrIdempotentResponse):
+		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
 	}

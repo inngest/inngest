@@ -7,13 +7,14 @@
 package statev2
 
 import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (
@@ -168,6 +169,7 @@ type Config struct {
 	ConcurrencyKeys []*ConcurrencyKey      `protobuf:"bytes,13,rep,name=concurrency_keys,json=concurrencyKeys,proto3" json:"concurrency_keys,omitempty"`
 	ForceStepPlan   bool                   `protobuf:"varint,14,opt,name=force_step_plan,json=forceStepPlan,proto3" json:"force_step_plan,omitempty"`
 	Context         *structpb.Struct       `protobuf:"bytes,15,opt,name=context,proto3" json:"context,omitempty"`
+	HasAi           bool                   `protobuf:"varint,16,opt,name=has_ai,json=hasAi,proto3" json:"has_ai,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -298,6 +300,13 @@ func (x *Config) GetContext() *structpb.Struct {
 		return x.Context
 	}
 	return nil
+}
+
+func (x *Config) GetHasAi() bool {
+	if x != nil {
+		return x.HasAi
+	}
+	return false
 }
 
 type ConcurrencyKey struct {
@@ -484,6 +493,8 @@ type CreateStateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Metadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	Events        [][]byte               `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	Steps         [][]byte               `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty"`
+	StepsInputs   [][]byte               `protobuf:"bytes,4,rep,name=steps_inputs,json=stepsInputs,proto3" json:"steps_inputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -528,6 +539,20 @@ func (x *CreateStateRequest) GetMetadata() *Metadata {
 func (x *CreateStateRequest) GetEvents() [][]byte {
 	if x != nil {
 		return x.Events
+	}
+	return nil
+}
+
+func (x *CreateStateRequest) GetSteps() [][]byte {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+func (x *CreateStateRequest) GetStepsInputs() [][]byte {
+	if x != nil {
+		return x.StepsInputs
 	}
 	return nil
 }
@@ -1199,6 +1224,7 @@ func (x *LoadEventsRequest) GetId() *ID {
 type LoadEventsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Events        [][]byte               `protobuf:"bytes,4,rep,name=events,proto3" json:"events,omitempty"`
+	Cached        bool                   `protobuf:"varint,5,opt,name=cached,proto3" json:"cached,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1238,6 +1264,13 @@ func (x *LoadEventsResponse) GetEvents() [][]byte {
 		return x.Events
 	}
 	return nil
+}
+
+func (x *LoadEventsResponse) GetCached() bool {
+	if x != nil {
+		return x.Cached
+	}
+	return false
 }
 
 type LoadStepsRequest struct {
@@ -1446,7 +1479,7 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
 	"functionId\x12(\n" +
-	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\x82\x05\n" +
+	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\x99\x05\n" +
 	"\x06Config\x12)\n" +
 	"\x10function_version\x18\x02 \x01(\x03R\x0ffunctionVersion\x12#\n" +
 	"\rcron_schedule\x18\x03 \x01(\tR\fcronSchedule\x12\x17\n" +
@@ -1463,7 +1496,8 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0fpriority_factor\x18\f \x01(\x03H\x02R\x0epriorityFactor\x88\x01\x01\x12C\n" +
 	"\x10concurrency_keys\x18\r \x03(\v2\x18.state.v2.ConcurrencyKeyR\x0fconcurrencyKeys\x12&\n" +
 	"\x0fforce_step_plan\x18\x0e \x01(\bR\rforceStepPlan\x121\n" +
-	"\acontext\x18\x0f \x01(\v2\x17.google.protobuf.StructR\acontextB\f\n" +
+	"\acontext\x18\x0f \x01(\v2\x17.google.protobuf.StructR\acontext\x12\x15\n" +
+	"\x06has_ai\x18\x10 \x01(\bR\x05hasAiB\f\n" +
 	"\n" +
 	"_replay_idB\x12\n" +
 	"\x10_original_run_idB\x12\n" +
@@ -1484,10 +1518,12 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x15\n" +
 	"\x06env_id\x18\x02 \x01(\tR\x05envId\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x03 \x01(\tR\taccountId\"\\\n" +
+	"account_id\x18\x03 \x01(\tR\taccountId\"\x95\x01\n" +
 	"\x12CreateStateRequest\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
-	"\x06events\x18\x02 \x03(\fR\x06events\"\xd7\x01\n" +
+	"\x06events\x18\x02 \x03(\fR\x06events\x12\x14\n" +
+	"\x05steps\x18\x03 \x03(\fR\x05steps\x12!\n" +
+	"\fsteps_inputs\x18\x04 \x03(\fR\vstepsInputs\"\xd7\x01\n" +
 	"\x13CreateStateResponse\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\fR\x06events\x12>\n" +
@@ -1526,9 +1562,10 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0eExistsResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\"1\n" +
 	"\x11LoadEventsRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\",\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"D\n" +
 	"\x12LoadEventsResponse\x12\x16\n" +
-	"\x06events\x18\x04 \x03(\fR\x06events\"0\n" +
+	"\x06events\x18\x04 \x03(\fR\x06events\x12\x16\n" +
+	"\x06cached\x18\x05 \x01(\bR\x06cached\"0\n" +
 	"\x10LoadStepsRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"\x8b\x01\n" +
 	"\x11LoadStepsResponse\x12<\n" +

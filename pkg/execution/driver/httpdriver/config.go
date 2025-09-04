@@ -23,7 +23,7 @@ func (Config) RuntimeName() string { return "http" }
 // DriverName returns the name of this driver
 func (Config) DriverName() string { return "http" }
 
-func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
+func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.DriverV1, error) {
 	var skey []byte
 	requireLocalSigningKey := false
 	client := exechttp.RequestExecutor(defaultClient)

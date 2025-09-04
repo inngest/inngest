@@ -169,7 +169,7 @@ type QueueManager interface {
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
 	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
+	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
 	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
@@ -1551,7 +1551,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
 	until := q.clock.Now().Add(24 * time.Hour * 365 * 5)
-	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until,
+	items, err := q.ItemsByPartition(ctx, shard, fnID.String(), from, until,
 		WithQueueItemIterBatchSize(limit),
 	)
 	if err != nil {

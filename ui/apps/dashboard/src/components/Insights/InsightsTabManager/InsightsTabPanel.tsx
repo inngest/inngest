@@ -4,19 +4,39 @@ import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/Insig
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
+import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryTitle';
+import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
+import type { Query } from '@/components/Insights/types';
+import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
-export function InsightsTabPanel() {
+type InsightsTabPanelProps = {
+  isHomeTab?: boolean;
+  isTemplatesTab?: boolean;
+  tab: Query;
+};
+
+export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+
+  // TODO: Adjust home tab to AI panel.
+  if (isHomeTab) return <InsightsTabPanelTemplatesTab />;
+
+  if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
     <>
       <Section
-        actions={<InsightsSQLEditorQueryButton />}
+        actions={
+          <>
+            <InsightsSQLEditorSaveQueryButton tab={tab} />
+            <InsightsSQLEditorQueryButton />
+          </>
+        }
         className="min-h-[255px]"
-        title="Query Editor"
+        title={<InsightsSQLEditorQueryTitle tab={tab} />}
       >
         <InsightsSQLEditor />
       </Section>

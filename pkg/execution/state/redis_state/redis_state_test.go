@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/testharness"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -292,6 +293,160 @@ func TestBufIter(t *testing.T) {
 
 	require.Equal(t, context.Canceled, bi.Error())
 	require.Equal(t, entries, listed)
+}
+
+func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
+	ctx := context.Background()
+
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	sm, err := New(
+		ctx,
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
+	)
+	require.NoError(t, err)
+
+	mgr := sm.(*mgr)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Create a state with steps
+	id := state.Identifier{
+		AccountID:   acctID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		WorkflowID:  fnID,
+		RunID:       runID,
+	}
+
+	steps := []state.MemoizedStep{
+		{
+			ID:   "step-1",
+			Data: map[string]any{"input": "step1_input"},
+		},
+		{
+			ID:   "step-2", 
+			Data: map[string]any{"input": "step2_input"},
+		},
+		{
+			ID:   "step-3",
+			Data: map[string]any{"input": "step3_input"},
+		},
+	}
+
+	stepInputs := []state.MemoizedStep{
+		{
+			ID:   "step-1",
+			Data: map[string]any{"input": "step1_input"},
+		},
+		{
+			ID:   "step-2",
+			Data: map[string]any{"input": "step2_input"},
+		},
+		{
+			ID:   "step-3",
+			Data: map[string]any{"input": "step3_input"},
+		},
+	}
+
+	init := state.Input{
+		Identifier:     id,
+		EventBatchData: []map[string]any{{"test": "event"}},
+		Steps:          steps,
+		StepInputs:     stepInputs,
+	}
+
+	createdState, err := mgr.New(ctx, init)
+	require.NoError(t, err)
+
+	// Save some step results so LoadStepsWithIDs has something to return
+	// Use different step IDs to avoid duplicate response errors
+	_, err = mgr.shardedMgr.SaveResponse(ctx, id, "step-result-1", `{"result": "step1_result"}`)
+	require.NoError(t, err)
+	_, err = mgr.shardedMgr.SaveResponse(ctx, id, "step-result-3", `{"result": "step3_result"}`)
+	require.NoError(t, err)
+
+	t.Run("LoadStack works", func(t *testing.T) {
+		stack, err := mgr.shardedMgr.stack(ctx, acctID, runID)
+		require.NoError(t, err)
+		assert.NotNil(t, stack)
+	})
+
+	t.Run("LoadStepInputs returns only step inputs", func(t *testing.T) {
+		stepInputsResult, err := mgr.shardedMgr.LoadStepInputs(ctx, acctID, fnID, runID)
+		require.NoError(t, err)
+		assert.Equal(t, 3, len(stepInputsResult))
+		assert.Contains(t, stepInputsResult, "step-1")
+		assert.Contains(t, stepInputsResult, "step-2")
+		assert.Contains(t, stepInputsResult, "step-3")
+
+		// Verify that step inputs are returned directly (not wrapped)
+		for stepID, stepData := range stepInputsResult {
+			var data map[string]any
+			err := json.Unmarshal(stepData, &data)
+			require.NoError(t, err)
+			assert.NotNil(t, data, "Step %s should contain data", stepID)
+		}
+	})
+
+	t.Run("LoadStepsWithIDs returns specific steps", func(t *testing.T) {
+		requestedSteps := []string{"step-result-1", "step-result-3"}
+		stepsResult, err := mgr.shardedMgr.LoadStepsWithIDs(ctx, acctID, fnID, runID, requestedSteps)
+		require.NoError(t, err)
+		assert.Equal(t, 2, len(stepsResult))
+		assert.Contains(t, stepsResult, "step-result-1")
+		assert.Contains(t, stepsResult, "step-result-3")
+		assert.NotContains(t, stepsResult, "step-2")
+	})
+
+	t.Run("LoadStepsWithIDs with empty slice returns empty map", func(t *testing.T) {
+		requestedSteps := []string{}
+		stepsResult, err := mgr.shardedMgr.LoadStepsWithIDs(ctx, acctID, fnID, runID, requestedSteps)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(stepsResult))
+	})
+
+	t.Run("LoadStepsWithIDs with non-existent steps returns partial results", func(t *testing.T) {
+		requestedSteps := []string{"step-result-1", "non-existent-step"}
+		stepsResult, err := mgr.shardedMgr.LoadStepsWithIDs(ctx, acctID, fnID, runID, requestedSteps)
+		require.NoError(t, err)
+		assert.Equal(t, 1, len(stepsResult))
+		assert.Contains(t, stepsResult, "step-result-1")
+		assert.NotContains(t, stepsResult, "non-existent-step")
+	})
+
+	// Test non-existent run ID
+	nonExistentRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	t.Run("LoadStepInputs with non-existent run returns empty", func(t *testing.T) {
+		stepInputsResult, err := mgr.shardedMgr.LoadStepInputs(ctx, acctID, fnID, nonExistentRunID)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(stepInputsResult))
+	})
+
+	t.Run("LoadStepsWithIDs with non-existent run returns empty", func(t *testing.T) {
+		requestedSteps := []string{"step-1", "step-2"}
+		stepsResult, err := mgr.shardedMgr.LoadStepsWithIDs(ctx, acctID, fnID, nonExistentRunID, requestedSteps)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(stepsResult))
+	})
+
+	// Clean up
+	_, err = mgr.Delete(ctx, createdState.Identifier())
+	require.NoError(t, err)
 }
 
 func BenchmarkNew(b *testing.B) {

@@ -531,7 +531,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore)
+		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID.String(), from, c.StartedBefore)
 		if err != nil {
 			return fmt.Errorf("error retrieving partition items: %w", err)
 		}
