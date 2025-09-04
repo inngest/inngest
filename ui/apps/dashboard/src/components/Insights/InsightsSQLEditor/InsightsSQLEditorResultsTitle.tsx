@@ -8,12 +8,12 @@ const ROW_LIMIT = 1000;
 export function InsightsSQLEditorResultsTitle() {
   return (
     <div className="mr-1 flex items-center gap-2">
-      <span>Results</span>
+      <span className="uppercase">Results</span>
       <Tooltip>
         <TooltipTrigger asChild>
           <span>
             <Pill appearance="outlined" kind="info">
-              LIMIT {ROW_LIMIT}
+              Row limit : {ROW_LIMIT}
             </Pill>
           </span>
         </TooltipTrigger>
