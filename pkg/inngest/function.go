@@ -298,6 +298,7 @@ func (f Function) GetSlug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+// IsScheduled indicates if the function is a cron function or not
 func (f Function) IsScheduled() bool {
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
@@ -305,6 +306,20 @@ func (f Function) IsScheduled() bool {
 		}
 	}
 	return false
+}
+
+// ScheduleExpression returns the cron expression string for the function
+//
+// NOTE
+// the code technically allow multiple triggers, should this also return a
+// list of string instead?
+func (f Function) ScheduleExpression() string {
+	for _, t := range f.Triggers {
+		if t.CronTrigger != nil {
+			return t.CronTrigger.Cron
+		}
+	}
+	return ""
 }
 
 func (f Function) IsBatchEnabled() bool {

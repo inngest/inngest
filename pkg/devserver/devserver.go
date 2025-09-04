@@ -40,6 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpv2"
@@ -340,6 +341,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+	croner := cron.NewRedisCronManager(unshardedClient.Cron(), rq, l)
 
 	sn := singleton.New(ctx, queueShards, shardSelector)
 
@@ -474,8 +476,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceCroner(croner),
 		executor.WithServiceLogger(l),
 		executor.WithServiceShardSelector(shardSelector),
+		executor.WithServicePublisher(pb),
 		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
@@ -491,6 +495,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRunnerQueue(rq),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
+		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
 	)
@@ -500,6 +505,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
+	ds.CronSyncer = croner
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
@@ -651,6 +657,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			DB:            ds.Data,
 			Queue:         rq,
 			State:         ds.State,
+			Cron:          croner,
 			ShardSelector: shardSelector,
 		}))
 	}
