@@ -121,6 +121,16 @@ func TestV2Adapter(t *testing.T) {
 					Data: stepData2,
 				},
 			},
+			StepInputs: []state.MemoizedStep{
+				{
+					ID:   "step-1",
+					Data: stepData1,
+				},
+				{
+					ID:   "step-2",
+					Data: stepData2,
+				},
+			},
 		}
 
 		createdState, err := v2svc.Create(ctx, v2Input)
@@ -187,6 +197,65 @@ func TestV2Adapter(t *testing.T) {
 			require.NoError(t, err)
 		})
 
+		t.Run("LoadStack returns stack", func(t *testing.T) {
+			stack, err := v2svc.LoadStack(ctx, createdState.Metadata.ID)
+			require.NoError(t, err)
+			assert.NotNil(t, stack)
+		})
+
+		t.Run("LoadSteps returns all steps", func(t *testing.T) {
+			steps, err := v2svc.LoadSteps(ctx, createdState.Metadata.ID)
+			require.NoError(t, err)
+			// Should contain the 2 initial steps plus the "new-step" from SaveStep test
+			assert.Equal(t, 3, len(steps))
+			assert.Contains(t, steps, "step-1")
+			assert.Contains(t, steps, "step-2")
+			assert.Contains(t, steps, "new-step")
+		})
+
+		t.Run("LoadStepInputs returns only step inputs", func(t *testing.T) {
+			stepInputs, err := v2svc.LoadStepInputs(ctx, createdState.Metadata.ID)
+			require.NoError(t, err)
+			// Should have the same step IDs as the full steps
+			assert.Equal(t, 2, len(stepInputs))
+			assert.Contains(t, stepInputs, "step-1")
+			assert.Contains(t, stepInputs, "step-2")
+			
+			// Verify that step inputs are returned directly (not wrapped)
+			for stepID, stepData := range stepInputs {
+				var data map[string]any
+				err := json.Unmarshal(stepData, &data)
+				require.NoError(t, err)
+				assert.NotNil(t, data, "Step %s should contain data", stepID)
+			}
+		})
+
+		t.Run("LoadStepsWithIDs returns specific steps", func(t *testing.T) {
+			// LoadStepsWithIDs only returns steps that have results, not just inputs
+			// The created steps don't have results saved, but "new-step" does from SaveStep test
+			requestedSteps := []string{"new-step"}
+			steps, err := v2svc.LoadStepsWithIDs(ctx, createdState.Metadata.ID, requestedSteps)
+			require.NoError(t, err)
+			assert.Equal(t, 1, len(steps))
+			assert.Contains(t, steps, "new-step")
+		})
+
+		t.Run("LoadStepsWithIDs with empty slice returns empty map", func(t *testing.T) {
+			requestedSteps := []string{}
+			steps, err := v2svc.LoadStepsWithIDs(ctx, createdState.Metadata.ID, requestedSteps)
+			require.NoError(t, err)
+			assert.Equal(t, 0, len(steps))
+		})
+
+		t.Run("LoadStepsWithIDs with non-existent step IDs returns partial results", func(t *testing.T) {
+			requestedSteps := []string{"new-step", "non-existent-step"}
+			steps, err := v2svc.LoadStepsWithIDs(ctx, createdState.Metadata.ID, requestedSteps)
+			require.NoError(t, err)
+			assert.Equal(t, 1, len(steps))
+			assert.Contains(t, steps, "new-step")
+			assert.NotContains(t, steps, "non-existent-step")
+		})
+
 		t.Run("Delete works", func(t *testing.T) {
 			deleted, err := v2svc.Delete(ctx, createdState.Metadata.ID)
 			require.NoError(t, err)
@@ -223,6 +292,31 @@ func TestV2Adapter(t *testing.T) {
 		t.Run("LoadMetadata with non-existent ID returns error", func(t *testing.T) {
 			_, err := v2svc.LoadMetadata(ctx, nonExistentID)
 			assert.Error(t, err)
+		})
+
+		t.Run("LoadStack with non-existent ID returns empty slice", func(t *testing.T) {
+			stack, err := v2svc.LoadStack(ctx, nonExistentID)
+			require.NoError(t, err) // LoadStack typically doesn't error on non-existent runs
+			assert.Equal(t, 0, len(stack))
+		})
+
+		t.Run("LoadSteps with non-existent ID returns empty map", func(t *testing.T) {
+			steps, err := v2svc.LoadSteps(ctx, nonExistentID)
+			require.NoError(t, err) // LoadSteps typically doesn't error on non-existent runs
+			assert.Equal(t, 0, len(steps))
+		})
+
+		t.Run("LoadStepInputs with non-existent ID returns empty map", func(t *testing.T) {
+			stepInputs, err := v2svc.LoadStepInputs(ctx, nonExistentID)
+			require.NoError(t, err) // LoadStepInputs typically doesn't error on non-existent runs
+			assert.Equal(t, 0, len(stepInputs))
+		})
+
+		t.Run("LoadStepsWithIDs with non-existent ID returns empty map", func(t *testing.T) {
+			requestedSteps := []string{"step-1", "step-2"}
+			steps, err := v2svc.LoadStepsWithIDs(ctx, nonExistentID, requestedSteps)
+			require.NoError(t, err) // LoadStepsWithIDs typically doesn't error on non-existent runs
+			assert.Equal(t, 0, len(steps))
 		})
 
 		t.Run("Exists returns false for non-existent ID", func(t *testing.T) {
