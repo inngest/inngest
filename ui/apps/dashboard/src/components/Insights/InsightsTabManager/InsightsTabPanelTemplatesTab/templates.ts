@@ -10,8 +10,7 @@ function makeEventVolumePerHourQuery(event?: string) {
 FROM
     events
 WHERE
-    account_id = '{{ account_id }}'
-    AND event_ts > {{ start_time }}${event ? `\n    AND event_name = '${event}'` : ''}
+    event_ts > {{ start_time }}${event ? `\n    AND event_name = '${event}'` : ''}
 GROUP BY
     hour_bucket,
     event_name
