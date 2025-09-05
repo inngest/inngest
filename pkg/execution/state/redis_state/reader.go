@@ -224,6 +224,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		batchSize:       1000,
 		interval:        500 * time.Millisecond,
 		iterateBacklogs: true,
+		forceNextPage:   true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -305,10 +306,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				break
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
+			if opt.forceNextPage {
+				// shift the starting point 1ms so it doesn't try to grab the same stuff again
+				// NOTE: this could result skipping items if the previous batch of items are all on
+				// the same millisecond
+				ptFrom = ptFrom.Add(time.Millisecond)
+			}
 
 			// wait a little before proceeding
 			<-time.After(opt.interval)
@@ -413,10 +416,13 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 					earliest = t
 				}
 			}
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			backlogFrom = earliest.Add(time.Millisecond)
+
+			if opt.forceNextPage {
+				// shift the starting point 1ms so it doesn't try to grab the same stuff again
+				// NOTE: this could result skipping items if the previous batch of items are all on
+				// the same millisecond
+				backlogFrom = earliest.Add(time.Millisecond)
+			}
 
 			// wait a little before proceeding
 			<-time.After(opt.interval)
