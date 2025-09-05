@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { InlineSpans } from './InlineSpans';
+import { StepTypePill } from './StepTypePill';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
 import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
@@ -82,6 +83,8 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
                 />
               </div>
             )}
+
+            {trace.stepType && trace.stepType !== '' && <StepTypePill stepType={trace.stepType} />}
 
             <div
               className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
