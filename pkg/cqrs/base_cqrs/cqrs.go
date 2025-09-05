@@ -86,6 +86,16 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
+type normalizedSpan interface {
+	GetTraceID() string
+	GetRunID() string
+	GetDynamicSpanID() sql.NullString
+	GetParentSpanID() sql.NullString
+	GetStartTime() interface{}
+	GetEndTime() interface{}
+	GetSpanFragments() any
+}
+
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
 	if err != nil {
@@ -134,8 +144,8 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	return allRoots, nil
 }
 
-// map spans from rows where rows can be any of the three different span query types (run, debug, session)
-func mapRootSpansFromRows[T any](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+// Uses generics to accept slices of any type that implements normalizedSpan interface
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
@@ -145,40 +155,14 @@ func mapRootSpansFromRows[T any](ctx context.Context, spans []T) (*cqrs.OtelSpan
 	var runID ulid.ULID
 
 	for _, span := range spans {
-		// Type assert to get the fields directly
-		var traceID, runIDStr string
-		var dynamicSpanID, parentSpanID sql.NullString
-		var startTime, endTime interface{}
-		var spanFragments interface{}
-
-		switch s := any(span).(type) {
-		case *sqlc.GetSpansByRunIDRow:
-			traceID = s.TraceID
-			runIDStr = s.RunID
-			dynamicSpanID = s.DynamicSpanID
-			parentSpanID = s.ParentSpanID
-			startTime = s.StartTime
-			endTime = s.EndTime
-			spanFragments = s.SpanFragments
-		case *sqlc.GetSpansByDebugRunIDRow:
-			traceID = s.TraceID
-			runIDStr = s.RunID
-			dynamicSpanID = s.DynamicSpanID
-			parentSpanID = s.ParentSpanID
-			startTime = s.StartTime
-			endTime = s.EndTime
-			spanFragments = s.SpanFragments
-		case *sqlc.GetSpansByDebugSessionIDRow:
-			traceID = s.TraceID
-			runIDStr = s.RunID
-			dynamicSpanID = s.DynamicSpanID
-			parentSpanID = s.ParentSpanID
-			startTime = s.StartTime
-			endTime = s.EndTime
-			spanFragments = s.SpanFragments
-		default:
-			return nil, fmt.Errorf("unknown span type: %T", span)
-		}
+		// Use interface methods to get the fields directly
+		traceID := span.GetTraceID()
+		runIDStr := span.GetRunID()
+		dynamicSpanID := span.GetDynamicSpanID()
+		parentSpanID := span.GetParentSpanID()
+		startTime := span.GetStartTime()
+		endTime := span.GetEndTime()
+		spanFragments := span.GetSpanFragments()
 
 		st := strings.Split(startTime.(string), " m=")[0]
 		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
