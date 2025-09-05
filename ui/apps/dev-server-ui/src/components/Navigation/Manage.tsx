@@ -1,15 +1,30 @@
+import { useEffect, useState } from 'react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function Mange({ collapsed }: { collapsed: boolean }) {
+  const [pollingInterval, setPollingInterval] = useState(1500);
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
+
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setPollingInterval(0);
+    }
+  }, [pollingDisabled, pollingFlagReady]);
+
   const { hasSyncingError } = useGetAppsQuery(undefined, {
     selectFromResult: (result) => ({
       hasSyncingError: result?.data?.apps?.some((app) => app.connected === false),
     }),
-    pollingInterval: 1500,
+    pollingInterval: pollingFlagReady && pollingDisabled ? 0 : 1500,
   });
 
   return (

@@ -8,6 +8,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
@@ -22,7 +23,16 @@ import { useInfoQuery } from '@/store/devApi';
 import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
-  const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
+
+  const { data } = useGetAppsQuery(undefined, {
+    pollingInterval: pollingFlagReady && pollingDisabled ? 0 : 1500,
+  });
+
   const getWorkerCount = useGetWorkerCount();
   const apps = data?.apps || [];
 
