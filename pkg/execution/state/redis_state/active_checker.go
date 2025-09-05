@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -569,22 +570,26 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 
 	key := kg.BacklogActiveCheckSet()
 
-	peeker := peeker[QueueBacklog]{
-		q:                      q,
-		max:                    q.activeCheckBacklogConcurrency,
-		opName:                 "peekBacklogActiveCheck",
-		isMillisecondPrecision: true,
-		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
-		maker: func() *QueueBacklog {
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		keyMetadataHash: kg.BacklogMeta(),
-	}
+		peek.WithPeekerClient(client),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(key, client, q.log)),
+		peek.WithPeekerMaxPeekSize(int(q.activeCheckBacklogConcurrency)),
+		peek.WithPeekerMetadataHashKey(kg.BacklogMeta()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("peekBacklogActiveCheck"),
+	)
 
 	// Pick random backlogs within bounds
 	isSequential := false
 
-	res, err := peeker.peek(ctx, key, isSequential, q.clock.Now(), peekSize)
+	res, err := p.Peek(ctx, key,
+		peek.Sequential(isSequential),
+		peek.Until(q.clock.Now()),
+		peek.Limit(int(peekSize)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek active check backlogs: %w", err)
 	}
@@ -599,19 +604,26 @@ func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]u
 
 	key := kg.AccountActiveCheckSet()
 
-	peeker := peeker[QueueBacklog]{
-		q:                      q,
-		max:                    q.activeCheckAccountConcurrency,
-		opName:                 "peekAccountActiveCheck",
-		isMillisecondPrecision: true,
-		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
-		keyMetadataHash:        kg.BacklogMeta(),
-	}
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		peek.WithPeekerClient(client),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(key, client, q.log)),
+		peek.WithPeekerMaxPeekSize(int(q.activeCheckAccountConcurrency)),
+		peek.WithPeekerMetadataHashKey(kg.BacklogMeta()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("peekAccountActiveCheck"),
+	)
 
 	// Pick random account IDs within bounds
 	isSequential := false
 
-	accountIDs, err := peeker.peekUUIDPointer(ctx, key, isSequential, q.clock.Now(), peekSize)
+	accountIDs, err := p.PeekUUIDPointer(ctx, key,
+		peek.Sequential(isSequential),
+		peek.Until(q.clock.Now()),
+		peek.Limit(int(peekSize)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek active check accounts: %w", err)
 	}

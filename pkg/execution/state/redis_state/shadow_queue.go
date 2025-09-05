@@ -252,7 +252,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	// Pick a random backlog offset every time
 	sequential := false
 
-	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, refillUntil, limit)
+	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shard, shadowPart, sequential, refillUntil, limit)
 	if err != nil {
 		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
 	}
@@ -844,38 +844,34 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...peekOpt) ([]*QueueBacklog, int, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
+func (q *queue) ShadowPartitionPeek(ctx context.Context, shard QueueShard, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", shard.Kind)
 	}
 
-	opt := peekOption{}
-	for _, apply := range opts {
-		apply(&opt)
-	}
-
-	rc := q.primaryQueueShard.RedisClient
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient
-	}
+	rc := shard.RedisClient
 
 	shadowPartitionSet := rc.kg.ShadowPartitionSet(sp.PartitionID)
 
-	p := peeker[QueueBacklog]{
-		q:               q,
-		opName:          "ShadowPartitionPeek",
-		keyMetadataHash: rc.kg.BacklogMeta(),
-		max:             ShadowPartitionPeekMaxBacklogs,
-		maker: func() *QueueBacklog {
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems:     CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp)),
-		isMillisecondPrecision: true,
-	}
+		peek.WithPeekerClient(rc.Client()),
+		peek.WithPeekerHandleMissingItems(CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp))),
+		peek.WithPeekerMaxPeekSize(int(ShadowPartitionPeekMaxBacklogs)),
+		peek.WithPeekerMetadataHashKey(rc.kg.BacklogMeta()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("ShadowPartitionPeek"),
+	)
 
-	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit, opts...)
+	res, err := p.Peek(ctx, shadowPartitionSet,
+		peek.Sequential(sequential),
+		peek.Until(until),
+		peek.Limit(int(limit)),
+	)
 	if err != nil {
-		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+		if errors.Is(err, peek.ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits
 		}
 		return nil, 0, fmt.Errorf("could not peek shadow partition backlogs: %w", err)

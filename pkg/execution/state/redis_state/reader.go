@@ -288,9 +288,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			var iterated int
 
 			// TODO: maybe provide a different limit?
-			backlogs, _, err := q.ShadowPartitionPeek(ctx, sp, true, until, ShadowPartitionPeekMaxBacklogs,
-				WithPeekOptQueueShard(&shard),
-			)
+			backlogs, _, err := q.ShadowPartitionPeek(ctx, shard, sp, true, until, ShadowPartitionPeekMaxBacklogs)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error peeking backlogs for partition")
