@@ -1,0 +1,11 @@
+src/app/
+src/components/
+src/queries/
+src/gql/
+src/utils/
+src/icons/
+src/images/
+src/logos/
+src/types/
+*.tsx
+!src/routes/**/*.tsx

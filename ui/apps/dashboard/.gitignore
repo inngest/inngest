@@ -13,3 +13,6 @@ next-env.d.ts
 # Sentry
 .sentryclirc
 .env*.local
+
+# TanStack Router Generated Files
+src/spa/routeTree.gen.ts
