@@ -16,7 +16,7 @@ import (
 	"github.com/redis/rueidis"
 )
 
-type peekOpt func(p *peekOption)
+type PeekOpt func(p *peekOption)
 
 type peekOption struct {
 	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
@@ -24,7 +24,7 @@ type peekOption struct {
 	Shard *QueueShard
 }
 
-func WithPeekOptQueueShard(qs *QueueShard) peekOpt {
+func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
 	return func(p *peekOption) {
 		p.Shard = qs
 	}
@@ -50,6 +50,13 @@ type peeker[T any] struct {
 	fromTime *time.Time
 }
 
+// Peeker defines the interface for peeking operations on queues
+type Peeker[T any] interface {
+	Peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error)
+	PeekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error)
+	PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
+}
+
 var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
 type peekResult[T any] struct {
@@ -62,8 +69,8 @@ type peekResult[T any] struct {
 	Cursor int64
 }
 
-// peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...peekOpt) (*peekResult[T], error) {
+// Peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
+func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
 	opt := peekOption{}
@@ -239,7 +246,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 	}, nil
 }
 
-func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error) {
+func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
 	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -290,8 +297,8 @@ func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string
 	return pointers, nil
 }
 
-func (p *peeker[T]) peekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	pointers, err := p.peekPointer(ctx, keyOrderedPointerSet, sequential, until, limit)
+func (p *peeker[T]) PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	pointers, err := p.PeekPointer(ctx, keyOrderedPointerSet, sequential, until, limit)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek pointers: %w", err)
 	}

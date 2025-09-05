@@ -10,29 +10,29 @@ If sequential is 0, items are returned randomly if more items are available than
 local keyMetadataHash        = KEYS[1]
 local keyOrderedPointerSet   = KEYS[2]
 
-local peekFrom     = ARGV[1]
-local peekUntil    = tonumber(ARGV[2])
-local peekUntilMS  = tonumber(ARGV[3])
-local limit        = tonumber(ARGV[4])
-local sequential   = tonumber(ARGV[5])
+local from       = ARGV[1]
+local to         = ARGV[2]
 
-local count = redis.call("ZCOUNT", keyOrderedPointerSet, peekFrom, peekUntil)
-local offset = 0
+local limit      = tonumber(ARGV[3])
+local offset     = tonumber(ARGV[4])
+
+local untilMS    = tonumber(ARGV[5])
+local sequential = tonumber(ARGV[6])
+
+-- NOTE: ZCOUNT becomes unreliable when combined with the `offset` option
+local count = redis.call("ZCOUNT", keyOrderedPointerSet, from, to)
 
 if count > limit and sequential == 0 then
-	math.randomseed(peekUntilMS);
+	math.randomseed(untilMS);
 	-- We have to +1 then -1 to ensure that we have 0 as a valid random offset.
 	offset = math.random((count-limit)+1) - 1
 end
 
-local pointerIDs = redis.call("ZRANGE", keyOrderedPointerSet, peekFrom, peekUntil, "BYSCORE", "LIMIT", offset, limit)
-if #pointerIDs == 0 then
+local pointers = redis.call("ZRANGE", keyOrderedPointerSet, from, to, "BYSCORE", "LIMIT", offset, limit)
+if #pointers == 0 then
 	return {}
 end
 
-local potentiallyMissingItems = redis.call("HMGET", keyMetadataHash, unpack(pointerIDs))
+local potentiallyMissingItems = redis.call("HMGET", keyMetadataHash, unpack(pointers))
 
-local lastItemID = pointerIDs[#pointerIDs]
-local cursor = tonumber(redis.call("ZSCORE", keyOrderedPointerSet, lastItemID))
-
-return { count, potentiallyMissingItems, pointerIDs, cursor }
+return { count, potentiallyMissingItems, pointers }
