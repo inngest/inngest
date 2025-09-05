@@ -1754,12 +1754,13 @@ func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until
 }
 
 type peekOpts struct {
-	PartitionID  string
-	PartitionKey string
-	Random       bool
-	From         *time.Time
-	Until        time.Time
-	Limit        int64
+	PartitionID   string
+	PartitionKey  string
+	Random        bool
+	From          *time.Time
+	Until         time.Time
+	Limit         int64
+	IncludeLeased bool
 }
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
@@ -1882,7 +1883,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 
 		now := q.clock.Now()
-		if qi.IsLeased(now) {
+		if !opts.IncludeLeased && qi.IsLeased(now) {
 			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{

@@ -224,6 +224,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		batchSize:       1000,
 		interval:        500 * time.Millisecond,
 		iterateBacklogs: true,
+		skipLeased:      true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -262,11 +263,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 			// peek function partition
 			items, err := q.peek(ctx, shard, peekOpts{
-				From:         &ptFrom,
-				Until:        until,
-				Limit:        opt.batchSize,
-				PartitionID:  partitionID,
-				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
+				From:          &ptFrom,
+				Until:         until,
+				Limit:         opt.batchSize,
+				PartitionID:   partitionID,
+				PartitionKey:  pt.zsetKey(shard.RedisClient.kg),
+				IncludeLeased: !opt.skipLeased,
 			})
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {

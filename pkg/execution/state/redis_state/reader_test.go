@@ -37,6 +37,8 @@ func TestItemsByPartition(t *testing.T) {
 		expectedItems    int
 		keyQueuesEnabled bool
 		batchSize        int64
+		leased           bool
+		skipLeased       bool
 	}{
 		{
 			name:          "retrieve items in one fetch",
@@ -69,6 +71,24 @@ func TestItemsByPartition(t *testing.T) {
 			interval:      10 * time.Millisecond,
 			expectedItems: 500,
 			batchSize:     150,
+		},
+		{
+			name:          "include leased items",
+			num:           500,
+			from:          time.Time{},
+			until:         clock.Now().Add(time.Minute),
+			expectedItems: 500,
+			leased:        true,
+			skipLeased:    false,
+		},
+		{
+			name:          "skip leased items",
+			num:           500,
+			from:          time.Time{},
+			until:         clock.Now().Add(time.Minute),
+			expectedItems: 0,
+			leased:        true,
+			skipLeased:    true,
 		},
 		// With key queues
 		{
@@ -147,12 +167,18 @@ func TestItemsByPartition(t *testing.T) {
 					},
 				}
 
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
+
+				if tc.leased {
+					_, err := q.Lease(ctx, qi, 10*time.Second, q.clock.Now(), nil)
+					require.NoError(t, err)
+				}
 			}
 
 			items, err := q.ItemsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
 				WithQueueItemIterBatchSize(tc.batchSize),
+				WithQueueItemIterSkipLeased(tc.skipLeased),
 			)
 			require.NoError(t, err)
 
@@ -193,7 +219,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 	systemQueueName := "a-system-queue"
 
 	for i := range num {
-		at := clock.Now().Add(time.Duration(i)*time.Millisecond)
+		at := clock.Now().Add(time.Duration(i) * time.Millisecond)
 
 		item := osqueue.QueueItem{
 			ID:          fmt.Sprintf("test%d", i),
