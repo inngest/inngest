@@ -5,6 +5,7 @@ import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Timeline } from '../RunDetailsV3/Timeline';
+import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
@@ -12,12 +13,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { useSearchParam } from '../hooks/useSearchParam';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
+import { DebugRun } from './DebugRun';
 import { History } from './History';
 import { Play } from './Play';
 
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
+  const [debugRunID] = useSearchParam('debugRunID');
+  const [debugSessionID] = useSearchParam('debugSessionID');
+
+  const { data: debugRunData } = useGetDebugRun({
+    functionSlug,
+    debugRunID,
+    runID,
+  });
+
   const { data: runData, loading: runLoading } = useGetRun({
     runID,
   });
@@ -96,7 +107,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                     {running ? (
                       <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
                     ) : (
-                      <Play runID={runID} />
+                      <Play runID={runID} debugRunID={debugRunID} debugSessionID={debugSessionID} />
                     )}
                   </TooltipTrigger>
                   <TooltipContent className="whitespace-pre-line">
@@ -123,6 +134,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <div>
               {runLoading ? (
                 <Skeleton className="h-24 w-full" />
+              ) : debugRunData?.debugRun ? (
+                <DebugRun debugRun={debugRunData?.debugRun} />
               ) : runID && runData ? (
                 <Timeline runID={runID} trace={runData?.trace} />
               ) : null}
@@ -152,7 +165,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               />
             </div>
 
-            <History />
+            <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
           </div>
         </div>
       </div>

@@ -1036,8 +1036,139 @@ func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (pqtype.Null
 	return output, err
 }
 
+const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_session_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_run_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetSpansByDebugRunIDRow struct {
+	TraceID        string
+	RunID          string
+	DebugSessionID sql.NullString
+	DynamicSpanID  sql.NullString
+	StartTime      interface{}
+	EndTime        interface{}
+	ParentSpanID   sql.NullString
+	SpanFragments  json.RawMessage
+}
+
+func (q *Queries) GetSpansByDebugRunID(ctx context.Context, dollar_1 string) ([]*GetSpansByDebugRunIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByDebugRunID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByDebugRunIDRow
+	for rows.Next() {
+		var i GetSpansByDebugRunIDRow
+		if err := rows.Scan(
+			&i.TraceID,
+			&i.RunID,
+			&i.DebugSessionID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpansByDebugSessionID = `-- name: GetSpansByDebugSessionID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_run_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_session_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetSpansByDebugSessionIDRow struct {
+	TraceID       string
+	RunID         string
+	DebugRunID    sql.NullString
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetSpansByDebugSessionID(ctx context.Context, dollar_1 string) ([]*GetSpansByDebugSessionIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByDebugSessionID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByDebugSessionIDRow
+	for rows.Next() {
+		var i GetSpansByDebugSessionIDRow
+		if err := rows.Scan(
+			&i.TraceID,
+			&i.RunID,
+			&i.DebugRunID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpansByRunID = `-- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,
@@ -1057,6 +1188,7 @@ ORDER BY start_time
 `
 
 type GetSpansByRunIDRow struct {
+	RunID         string
 	TraceID       string
 	DynamicSpanID sql.NullString
 	StartTime     interface{}
@@ -1075,6 +1207,7 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*GetS
 	for rows.Next() {
 		var i GetSpansByRunIDRow
 		if err := rows.Scan(
+			&i.RunID,
 			&i.TraceID,
 			&i.DynamicSpanID,
 			&i.StartTime,

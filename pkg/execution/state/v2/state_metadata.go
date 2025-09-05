@@ -17,11 +17,13 @@ import (
 )
 
 const (
-	cronScheduleKey = "__cron"
-	fnslugKey       = "__fnslug"
-	traceLinkKey    = "__tracelink"
-	debounceKey     = "__debounce"
-	evtmapKey       = "__evtmap"
+	cronScheduleKey   = "__cron"
+	fnslugKey         = "__fnslug"
+	traceLinkKey      = "__tracelink"
+	debounceKey       = "__debounce"
+	evtmapKey         = "__evtmap"
+	debugSessionIDKey = "__debug_session_id"
+	debugRunIDKey     = "__debug_run_id"
 )
 
 type ID struct {
@@ -414,6 +416,62 @@ func (c *Config) EventIDMapping() map[string]ulid.ULID {
 			var m map[string]ulid.ULID
 			if err := json.Unmarshal([]byte(s), &m); err == nil {
 				return m
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetDebugSessionID(debugSessionID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugSessionIDKey] = debugSessionID.String()
+}
+
+// DebugSessionID retrieves the stored debug session ID if available
+func (c *Config) DebugSessionID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugSessionIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) SetDebugRunID(debugRunID ulid.ULID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[debugRunIDKey] = debugRunID.String()
+}
+
+// DebugRunID retrieves the stored debug run ID if available
+func (c *Config) DebugRunID() *ulid.ULID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if v, ok := c.Context[debugRunIDKey]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := ulid.Parse(s); err == nil {
+				return &id
 			}
 		}
 	}

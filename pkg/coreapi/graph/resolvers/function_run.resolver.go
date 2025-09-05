@@ -266,9 +266,6 @@ func (r *mutationResolver) Rerun(
 	debugSessionID *ulid.ULID,
 	debugRunID *ulid.ULID,
 ) (ulid.ULID, error) {
-	if debugSessionID != nil && debugRunID == nil {
-		debugRunID = &runID
-	}
 
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID

@@ -8,7 +8,12 @@ export type PathCreator = {
   eventType?: (params: { eventName: string }) => Route;
   function: (params: { functionSlug: string }) => Route;
   runPopout: (params: { runID: string }) => Route;
-  debugger: (params: { functionSlug: string; runID?: string }) => Route;
+  debugger: (params: {
+    functionSlug: string;
+    runID?: string;
+    debugRunID?: string | null;
+    debugSessionID?: string | null;
+  }) => Route;
 };
 
 export const usePathCreator = () => {

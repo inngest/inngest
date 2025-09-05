@@ -3,7 +3,15 @@ import { RiPlayLine } from '@remixicon/react';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useRerunFromStep } from '../SharedContext/useRerunFromStep';
 
-export const Play = ({ runID }: { runID?: string }) => {
+export const Play = ({
+  runID,
+  debugRunID,
+  debugSessionID,
+}: {
+  runID?: string;
+  debugRunID?: string;
+  debugSessionID?: string;
+}) => {
   const { selectedStep } = useStepSelection(runID);
   const { rerun } = useRerunFromStep();
 
@@ -15,8 +23,10 @@ export const Play = ({ runID }: { runID?: string }) => {
           stepID: selectedStep.trace.stepID,
           input: '[{}]',
         },
-        debugSessionID: runID,
+        debugRunID,
+        debugSessionID,
       });
+      console.debug('play result', result);
     }
   };
 

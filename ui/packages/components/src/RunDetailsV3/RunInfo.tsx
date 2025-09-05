@@ -49,6 +49,8 @@ type Run = {
     startedAt: string | null;
     status: string;
     stepID?: string | null;
+    debugRunID?: string | null;
+    debugSessionID?: string | null;
   };
   hasAI: boolean;
 };
@@ -80,7 +82,13 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
           </div>
 
           {isLazyDone(run) && (
-            <Nav standalone={standalone} functionSlug={run.fn.name} runID={runID} />
+            <Nav
+              standalone={standalone}
+              functionSlug={run.fn.slug}
+              runID={runID}
+              debugRunID={run.trace.debugRunID}
+              debugSessionID={run.trace.debugSessionID}
+            />
           )}
         </div>
 

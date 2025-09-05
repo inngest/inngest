@@ -29,6 +29,7 @@ type TopInfoProps = {
   getTrigger: (runID: string) => Promise<Trigger>;
   result?: TraceResult;
   runID: string;
+  resultLoading?: boolean;
 };
 
 export type Trigger = {
@@ -79,7 +80,7 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
+export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
@@ -255,7 +256,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title="Function Payload"
                         raw={prettyPayload}
                         actions={codeBlockActions}
-                        loading={isPending}
+                        loading={isPending || resultLoading}
                       />
                     ),
                   },
@@ -266,7 +267,9 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                   {
                     label: 'Output',
                     id: 'output',
-                    node: <IO title="Output" raw={prettyOutput} loading={isPending} />,
+                    node: (
+                      <IO title="Output" raw={prettyOutput} loading={isPending || resultLoading} />
+                    ),
                   },
                 ]
               : []),
@@ -280,7 +283,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title={result.error.message || 'Unknown error'}
                         raw={prettyErrorBody ?? ''}
                         error={true}
-                        loading={isPending}
+                        loading={isPending || resultLoading}
                       />
                     ),
                   },
