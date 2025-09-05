@@ -18,4 +18,7 @@ end
 
 local potentiallyMissingItems = redis.call("HMGET", keyMetadataHash, unpack(pointers))
 
-return { count, potentiallyMissingItems, pointers }
+local lastItemID = pointers[#pointers]
+local cursor = tonumber(redis.call("ZSCORE", keyPointerSet, lastItemID))
+
+return { count, potentiallyMissingItems, pointers, cursor }

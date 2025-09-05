@@ -156,7 +156,7 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, opts 
 		return nil, fmt.Errorf("unknown return type from %s: %T", p.opName, peekRet)
 	}
 
-	var totalCount int64
+	var totalCount, cursor int64
 	var potentiallyMissingItems, allPointerIDs []any
 	if len(returnedSet) == 3 {
 		totalCount, ok = returnedSet[0].(int64)
@@ -174,8 +174,12 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, opts 
 			return nil, fmt.Errorf("unexpected third item in set returned from %s: %T", p.opName, returnedSet[2])
 		}
 
+		cursor, ok = returnedSet[3].(int64)
+		if !ok {
+			return nil, fmt.Errorf("unexpected fourth item in set returned from %s: %T", p.opName, returnedSet[3])
+		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or three items in set returned by %s: %v", p.opName, returnedSet)
+		return nil, fmt.Errorf("expected zero or four items in set returned by %s: %v", p.opName, returnedSet)
 	}
 
 	encoded := make([]any, 0)
@@ -237,6 +241,7 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, opts 
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
+		Cursor:       cursor,
 	}, nil
 }
 
