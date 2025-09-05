@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -178,8 +179,10 @@ type QueueManager interface {
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	// PartitionByID retrieves the partition including counts
+	InspectPartition(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*QueuePartition, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
 	// ItemsByRunID retrieves all queue items via runID
@@ -1754,12 +1757,14 @@ func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until
 }
 
 type peekOpts struct {
-	PartitionID  string
-	PartitionKey string
-	Random       bool
-	From         *time.Time
-	Until        time.Time
-	Limit        int64
+	PartitionID   string
+	PartitionKey  string
+	Random        bool
+	From          *time.Time
+	Until         time.Time
+	Limit         int64
+	Offset        int64
+	IncludeLeased bool
 }
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
@@ -1786,6 +1791,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		from,
 		until,
 		opts.Limit,
+		opts.Offset,
 		randomOffset,
 	})
 	if err != nil {
@@ -1882,7 +1888,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 
 		now := q.clock.Now()
-		if qi.IsLeased(now) {
+		if !opts.IncludeLeased && qi.IsLeased(now) {
 			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
@@ -2300,14 +2306,21 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 
 	rc := q.primaryQueueShard.RedisClient
 
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalNormalizeAccounts",
-		max:                    NormalizeAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		peek.WithPeekerClient(rc.unshardedRc),
+		peek.WithPeekerMaxPeekSize(int(NormalizeAccountPeekMax)),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("peekGlobalNormalizeAccounts"),
+	)
 
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
+	return p.PeekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(),
+		peek.Sequential(true),
+		peek.Until(until),
+		peek.Limit(int(limit)),
+	)
 }
 
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.

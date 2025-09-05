@@ -24,10 +24,9 @@ type PartitionInspectionResult struct {
 	Backlogs          int  `json:"backlogs"`
 }
 
-func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
+func (q *queue) InspectPartition(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
 	var (
 		result PartitionInspectionResult
-		qp     QueuePartition
 		sqp    QueueShadowPartition
 	)
 
@@ -35,21 +34,9 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 	kg := shard.RedisClient.kg
 
 	// load queue partition
-	{
-		cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
-		byt, err := rc.Do(ctx, cmd).AsBytes()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil, ErrPartitionNotFound
-			}
-
-			return nil, fmt.Errorf("error retrieving queue partition: %w", err)
-		}
-
-		if err := json.Unmarshal(byt, &qp); err != nil {
-			return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
-		}
-		result.QueuePartition = &qp
+	qp, err := q.PartitionByID(ctx, shard, partitionID)
+	if err != nil {
+		return nil, fmt.Errorf("could not load partition by ID: %w", err)
 	}
 
 	// load shadow partition

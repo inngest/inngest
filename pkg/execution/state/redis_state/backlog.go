@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -932,13 +933,8 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 }
 
-func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) backlogPeek(ctx context.Context, shard QueueShard, b *QueueBacklog, from time.Time, until time.Time, limit int64) ([]*osqueue.QueueItem, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
-
-	opt := peekOption{}
-	for _, apply := range opts {
-		apply(&opt)
-	}
 
 	if !q.isPermittedQueueKind() {
 		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
@@ -955,11 +951,6 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		limit = q.peekMin
 	}
 
-	var fromTime *time.Time
-	if !from.IsZero() {
-		fromTime = &from
-	}
-
 	l := q.log.With(
 		"method", "backlogPeek",
 		"backlog", b,
@@ -968,36 +959,31 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		"limit", limit,
 	)
 
-	rc := q.primaryQueueShard.RedisClient
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient
-	}
+	rc := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
 
-	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+	backlogSet := kg.BacklogSet(b.BacklogID)
 
-	p := peeker[osqueue.QueueItem]{
-		q:               q,
-		opName:          "backlogPeek",
-		keyMetadataHash: rc.kg.QueueItem(),
-		max:             q.peekMax,
-		maker: func() *osqueue.QueueItem {
+	p := peek.NewPeeker(
+		func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			cmd := rc.Client().B().Zrem().Key(rc.kg.QueueItem()).Member(pointers...).Build()
-			err := rc.Client().Do(ctx, cmd).Error()
-			if err != nil {
-				l.Warn("failed to clean up dangling queue items in the backlog", "missing", pointers)
-			}
-			return nil
-		},
-		isMillisecondPrecision: true,
-		fromTime:               fromTime,
-	}
+		peek.WithPeekerClient(rc),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(backlogSet, rc, l)),
+		peek.WithPeekerMaxPeekSize(int(q.peekMax)),
+		peek.WithPeekerMetadataHashKey(kg.QueueItem()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("backlogPeek"),
+	)
 
-	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
+	res, err := p.Peek(ctx, backlogSet,
+		peek.Sequential(true),
+		peek.From(from),
+		peek.Until(until),
+		peek.Limit(int(limit)),
+	)
 	if err != nil {
-		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+		if errors.Is(err, peek.ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrBacklogPeekMaxExceedsLimits
 		}
 		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
@@ -1024,6 +1010,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 	)
 
 	kg := queueShard.RedisClient.kg
+	rc := queueShard.RedisClient.Client()
 
 	return func(yield func(*QueueBacklog) bool) {
 		hashKey := kg.BacklogMeta()
@@ -1032,25 +1019,29 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 		for {
 			var iterated int
 
-			peeker := peeker[QueueBacklog]{
-				q:                      q,
-				max:                    opt.batchSize,
-				opName:                 "backlogsByPartition",
-				isMillisecondPrecision: true,
-				handleMissingItems: func(pointers []string) error {
-					// don't interfere, clean up will happen in normal processing anyways
-					return nil
-				},
-				maker: func() *QueueBacklog {
+			peeker := peek.NewPeeker(
+				func() *QueueBacklog {
 					return &QueueBacklog{}
 				},
-				keyMetadataHash: hashKey,
-				fromTime:        &ptFrom,
-			}
+
+				peek.WithPeekerClient(rc),
+				peek.WithPeekerHandleMissingItems(
+					func(ctx context.Context, pointers []string) error {
+						// don't interfere, cleanup will happen in normal processing anyways
+						return nil
+					}),
+				peek.WithPeekerMaxPeekSize(int(opt.batchSize)),
+				peek.WithPeekerMetadataHashKey(hashKey),
+				peek.WithPeekerMillisecondPrecision(true),
+				peek.WithPeekerOpName("backlogsByPartition"),
+			)
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
-				WithPeekOptQueueShard(&queueShard),
+			res, err := peeker.Peek(ctx, kg.ShadowPartitionSet(partitionID),
+				peek.Sequential(isSequential),
+				peek.From(ptFrom),
+				peek.Until(until),
+				peek.Limit(int(opt.batchSize)),
 			)
 			if err != nil {
 				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)

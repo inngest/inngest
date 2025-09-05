@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
@@ -472,21 +473,22 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 
 	partitionNormalizeSet := rc.kg.PartitionNormalizeSet(sp.PartitionID)
 
-	p := peeker[QueueBacklog]{
-		q:               q,
-		opName:          "ShadowPartitionPeekNormalizeBacklogs",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
-		max:             NormalizePartitionPeekMax,
-		maker: func() *QueueBacklog {
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems: CleanupMissingPointers(ctx, partitionNormalizeSet, rc.Client(), q.log.With("sp", sp)),
-		// faster option: load items regardless of zscore
-		ignoreUntil:            true,
-		isMillisecondPrecision: true,
-	}
+		peek.WithPeekerClient(rc.Client()),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(partitionNormalizeSet, rc.Client(), q.log.With("sp", sp))),
+		peek.WithPeekerMaxPeekSize(int(NormalizePartitionPeekMax)),
+		peek.WithPeekerMetadataHashKey(q.primaryQueueShard.RedisClient.kg.BacklogMeta()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("ShadowPartitionPeekNormalizeBacklogs"),
+	)
 
-	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
+	res, err := p.Peek(ctx, partitionNormalizeSet,
+		peek.Sequential(false),
+		peek.Limit(int(limit)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlogs for normalization: %w", err)
 	}
@@ -494,7 +496,7 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 	return res.Items, nil
 }
 
-func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peekResult[osqueue.QueueItem], error) {
+func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peek.Result[osqueue.QueueItem], error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for BacklogNormalizePeek: %s", q.primaryQueueShard.Kind)
 	}
@@ -503,24 +505,22 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 
 	backlogSet := rc.kg.BacklogSet(b.BacklogID)
 
-	p := peeker[osqueue.QueueItem]{
-		q:               q,
-		opName:          "BacklogNormalizePeek",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		max:             NormalizeBacklogPeekMax,
-		maker: func() *osqueue.QueueItem {
+	p := peek.NewPeeker(
+		func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: CleanupMissingPointers(ctx, backlogSet, rc.Client(), q.log.With("backlog", b)),
-		// faster option: load items regardless of zscore
-		ignoreUntil:            true,
-		isMillisecondPrecision: true,
-	}
+		peek.WithPeekerClient(rc.Client()),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(backlogSet, rc.Client(), q.log.With("backlog", b))),
+		peek.WithPeekerMaxPeekSize(int(NormalizeBacklogPeekMax)),
+		peek.WithPeekerMetadataHashKey(q.primaryQueueShard.RedisClient.kg.QueueItem()),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("BacklogNormalizePeek"),
+	)
 
-	// this is essentially +inf as no queue items should ever be scheduled >2y out
-	normalizeLookahead := q.clock.Now().Add(time.Hour * 24 * 365 * 2)
-
-	res, err := p.peek(ctx, backlogSet, false, normalizeLookahead, limit)
+	res, err := p.Peek(ctx, backlogSet,
+		peek.Sequential(false),
+		peek.Limit(int(limit)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlog items for normalization: %w", err)
 	}

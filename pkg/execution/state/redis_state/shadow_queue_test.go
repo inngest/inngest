@@ -87,7 +87,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
 	t.Run("should find backlog with peek", func(t *testing.T) {
-		backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, &shadowPartition, true, at.Add(time.Minute), 10)
+		backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, defaultShard, &shadowPartition, true, at.Add(time.Minute), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, totalCount)
 
@@ -2025,7 +2025,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		until := now.Add(PartitionLookahead)
-		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, defaultShard, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, totalUntil)
@@ -2153,14 +2153,14 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		until := now.Add(time.Second)
-		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, defaultShard, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 0, totalUntil)
 		require.Len(t, peeked, 0)
 
 		until = now.Add(2 * time.Second)
-		peeked, totalUntil, err = q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		peeked, totalUntil, err = q.ShadowPartitionPeek(ctx, defaultShard, &shadowPart, false, until, 100)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, totalUntil)
