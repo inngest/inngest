@@ -16,7 +16,7 @@ import (
 	"github.com/redis/rueidis"
 )
 
-type PeekOpt func(p *peekOption)
+type peekOpt func(p *peekOption)
 
 type peekOption struct {
 	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
@@ -24,7 +24,7 @@ type peekOption struct {
 	Shard *QueueShard
 }
 
-func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
+func WithPeekOptQueueShard(qs *QueueShard) peekOpt {
 	return func(p *peekOption) {
 		p.Shard = qs
 	}
@@ -63,7 +63,7 @@ type peekResult[T any] struct {
 }
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
+func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...peekOpt) (*peekResult[T], error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
 	opt := peekOption{}
