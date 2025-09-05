@@ -44,7 +44,7 @@ export const useGetDebugSession = ({
       if (result.error) {
         throw result.error;
       }
-      return result.data;
+      return result.data || [];
     }, [shared.getDebugSession, functionSlug, debugSessionID, runID]),
     refetchInterval,
     enabled: enabled && !!functionSlug,

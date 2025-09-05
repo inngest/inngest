@@ -114,6 +114,10 @@ func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID)
 		return nil, err
 	}
 
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
 	return mapRootSpansFromRows(ctx, spans)
 }
 
@@ -122,6 +126,10 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
 		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
 	}
 
 	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)

@@ -71,12 +71,18 @@ func (s *OtelSpan) GetRunID() ulid.ULID {
 	return s.RunID
 }
 
-func (s *OtelSpan) GetDebugRunID() ulid.ULID {
-	return s.DebugRunID
+func (s *OtelSpan) GetDebugRunID() *ulid.ULID {
+	if s.DebugRunID.IsZero() {
+		return nil
+	}
+	return &s.DebugRunID
 }
 
-func (s *OtelSpan) GetDebugSessionID() ulid.ULID {
-	return s.DebugSessionID
+func (s *OtelSpan) GetDebugSessionID() *ulid.ULID {
+	if s.DebugSessionID.IsZero() {
+		return nil
+	}
+	return &s.DebugSessionID
 }
 
 func (s *OtelSpan) GetSpanID() string {

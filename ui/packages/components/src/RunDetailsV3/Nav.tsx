@@ -61,7 +61,7 @@ export const Nav = ({ standalone, functionSlug, runID, debugRunID, debugSessionI
   const { booleanFlag } = useBooleanFlag();
   const { pathCreator } = usePathCreator();
   const { cloud } = useShared();
-  const { createDebugSession, data, isSuccess, loading, error } = useCreateDebugSession();
+  const { createDebugSession, data, isSuccess, error } = useCreateDebugSession();
   const [showErrorModal, setShowErrorModal] = useState(false);
 
   const { value: debuggerEnabled, isReady: debuggerFlagReady } = booleanFlag(
