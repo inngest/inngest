@@ -11,13 +11,14 @@ import {
   RiCodeSSlashLine,
   RiContractLeftLine,
   RiExpandRightLine,
+  RiHome4Line,
 } from '@remixicon/react';
 
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import type { Query } from '@/components/Insights/types';
 import { hasDiffWithSavedQuery } from './InsightsTabManager';
 import { useTabManagerActions } from './TabManagerContext';
-import { TEMPLATES_TAB } from './constants';
+import { HOME_TAB, TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
   activeTabId: string;
@@ -62,14 +63,21 @@ export function InsightsTabsList({
             onClick={onToggleQueryHelperPanelVisibility}
             title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
           />
-          {tabs.map((tab) => (
-            <Tabs.Tab
-              iconBefore={<IndicatorTabIcon tab={tab} />}
-              key={tab.id}
-              title={tab.name}
-              value={tab.id}
-            />
-          ))}
+          <Tabs.IconTab
+            icon={<RiHome4Line size={16} />}
+            onClick={() => tabManagerActions.focusTab(HOME_TAB.id)}
+            value={HOME_TAB.id}
+          />
+          {tabs
+            .filter((tab) => tab.id !== HOME_TAB.id)
+            .map((tab) => (
+              <Tabs.Tab
+                iconBefore={<IndicatorTabIcon tab={tab} />}
+                key={tab.id}
+                title={tab.name}
+                value={tab.id}
+              />
+            ))}
           <Tabs.IconTab
             icon={<RiAddLine size={16} />}
             onClick={tabManagerActions.createNewTab}
