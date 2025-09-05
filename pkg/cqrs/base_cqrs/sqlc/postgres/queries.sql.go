@@ -1168,6 +1168,7 @@ func (q *Queries) GetSpansByDebugSessionID(ctx context.Context, dollar_1 string)
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,
@@ -1187,6 +1188,7 @@ ORDER BY start_time
 `
 
 type GetSpansByRunIDRow struct {
+	RunID         string
 	TraceID       string
 	DynamicSpanID sql.NullString
 	StartTime     interface{}
@@ -1205,6 +1207,7 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*GetS
 	for rows.Next() {
 		var i GetSpansByRunIDRow
 		if err := rows.Scan(
+			&i.RunID,
 			&i.TraceID,
 			&i.DynamicSpanID,
 			&i.StartTime,
