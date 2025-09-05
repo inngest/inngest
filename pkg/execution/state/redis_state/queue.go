@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -2305,14 +2306,21 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 
 	rc := q.primaryQueueShard.RedisClient
 
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalNormalizeAccounts",
-		max:                    NormalizeAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		peek.WithPeekerClient(rc.unshardedRc),
+		peek.WithPeekerMaxPeekSize(int(NormalizeAccountPeekMax)),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("peekGlobalNormalizeAccounts"),
+	)
 
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
+	return p.PeekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(),
+		peek.Sequential(true),
+		peek.Until(until),
+		peek.Limit(int(limit)),
+	)
 }
 
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.

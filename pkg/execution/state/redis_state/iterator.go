@@ -7,6 +7,8 @@ import (
 	"time"
 
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 type queueSortedSetIterationOptions struct {
@@ -16,7 +18,7 @@ type queueSortedSetIterationOptions struct {
 	until         time.Time
 	pageSize      int
 	includeLeased bool
-	peek          func(ctx context.Context, shard QueueShard, from, until time.Time, limit, offset int) ([]*osqueue.QueueItem, error)
+	peeker        peek.Peeker[osqueue.QueueItem]
 }
 
 // iterateSortedSetQueue returns an iterator over queue items found in a provided sorted set. This has to be millisecond precision, and can be the queue set, an in-progress
@@ -27,7 +29,9 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 		"partition_id", opts.partitionID,
 		"sorted_set_key", opts.keySortedSet,
 		"from", opts.from.UnixMilli(),
+		"from_human", opts.from.Format(time.StampMilli),
 		"until", opts.until.UnixMilli(),
+		"until_human", opts.until.Format(time.StampMilli),
 		"page_size", opts.pageSize,
 	)
 
@@ -48,17 +52,16 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 		// The important edge case of multiple items with the same score is explained above.
 		cursor := opts.from
 		for {
+			l := l.With("cursor", cursor.UnixMilli())
+			l.Trace("fetching sorted set page")
+
 			// Fetch page of queue items
-			items, err := opts.peek(ctx, shard, &cursor, opts.until, int64(limit), 0,
-				peekOpts{
-					PartitionID:   opts.partitionID,
-					PartitionKey:  opts.keySortedSet,
-					IncludeLeased: opts.includeLeased,
-					From:          &cursor,
-					Until:         opts.until,
-					Limit:         int64(limit),
-					Offset:        0,
-				})
+			res, err := opts.peeker.Peek(ctx, opts.keySortedSet,
+				peek.From(cursor),
+				peek.Until(opts.until),
+				peek.Limit(limit),
+				peek.Sequential(true),
+			)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error peeking items for partition iterator")
@@ -66,8 +69,10 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 				return
 			}
 
+			items := res.Items
+
 			if len(items) == 0 {
-				break
+				return
 			}
 
 			// If the set has more items, we have just retrieved one extra item (given the limit is page size + 1)
@@ -75,7 +80,7 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 
 			itemsWithoutExtra := items
 			if hasExtra {
-				itemsWithoutExtra = items[0 : len(items)-2]
+				itemsWithoutExtra = items[0 : len(items)-1]
 			}
 
 			// Yield all items except for the extra item
@@ -85,7 +90,9 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 					continue
 				}
 
-				yield(qi)
+				if !yield(qi) {
+					return
+				}
 				seenBuffer[qi.ID] = struct{}{}
 			}
 
@@ -94,6 +101,7 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 			// offset-based pagination for all items with this score, then continue with the next millisecond.
 			hasDuplicateScores := hasExtra && items[len(items)-1].AtMS == items[len(items)-2].AtMS
 			if hasDuplicateScores {
+				l.Trace("starting offset based iteration")
 				items := q.offsetBasedIteration(ctx, shard, offsetBasedIterationOptions{
 					keySortedSet:  opts.keySortedSet,
 					partitionID:   opts.partitionID,
@@ -106,13 +114,20 @@ func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opt
 						continue
 					}
 
-					yield(qi)
+					if !yield(qi) {
+						return
+					}
 					seenBuffer[qi.ID] = struct{}{}
 				}
 			}
 
 			// Carry on with next page by advancing the cursor by one millisecond (this is equivalent to AtMS + 1)
-			cursor = time.UnixMilli(itemsWithoutExtra[len(items)-1].AtMS).Add(time.Millisecond)
+			nextCursor := time.UnixMilli(itemsWithoutExtra[len(itemsWithoutExtra)-1].AtMS).Add(time.Millisecond)
+			if nextCursor.Equal(cursor) {
+				return
+			}
+			cursor = nextCursor
+			l.Trace("continuing to next cursor", "cursor", cursor.UnixMilli())
 		}
 	}
 }
@@ -165,6 +180,118 @@ func (q *queue) offsetBasedIteration(ctx context.Context, shard QueueShard, opts
 			}
 
 			offset += int64(len(items))
+		}
+	}
+}
+
+type iteratePartitionBacklogsOpt struct {
+	from        time.Time
+	until       time.Time
+	partitionID string
+	interval    time.Duration
+	pageSize    int
+}
+
+func (q *queue) iteratePartitionBacklogs(ctx context.Context, shard QueueShard, opt iteratePartitionBacklogsOpt) iter.Seq[*osqueue.QueueItem] {
+	from := opt.from
+	until := opt.until
+
+	l := logger.StdlibLogger(ctx)
+
+	// NOTE: iterate through backlogs
+	backlogFrom := from
+
+	sp, err := q.ShadowPartitionByID(ctx, shard, opt.partitionID)
+	if err != nil && !errors.Is(err, ErrShadowPartitionNotFound) {
+		l.Warn("error retrieving shadow partition from queue", "error", err)
+	}
+
+	return func(yield func(*osqueue.QueueItem) bool) {
+		if sp == nil {
+			return
+		}
+
+		l = l.With("shadow_partition", sp)
+
+		for {
+			var iterated int
+
+			// TODO: maybe provide a different limit?
+			backlogs, _, err := q.ShadowPartitionPeek(ctx, shard, sp, true, until, ShadowPartitionPeekMaxBacklogs)
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "error peeking backlogs for partition")
+				}
+				return
+			}
+
+			if len(backlogs) == 0 {
+				l.Warn("no more backlogs to iterate")
+				return
+			}
+
+			latestTimes := []time.Time{}
+			for _, backlog := range backlogs {
+				errTags := map[string]string{
+					"backlog_id": backlog.BacklogID,
+				}
+
+				var last time.Time
+				items, _, err := q.backlogPeek(ctx, shard, backlog, backlogFrom, until, int64(opt.pageSize))
+				if err != nil {
+					l.ReportError(err, "error retrieving queue items from backlog",
+						logger.WithErrorReportTags(errTags),
+					)
+					return
+				}
+
+				var start, end time.Time
+				for _, qi := range items {
+					if qi == nil {
+						continue
+					}
+
+					if !yield(qi) {
+						return
+					}
+					iterated++
+
+					at := time.UnixMilli(qi.AtMS)
+					if start.IsZero() {
+						start = at
+					}
+					end = at
+					last = at
+				}
+
+				l.Debug("iterated items in backlog",
+					"count", iterated,
+					"start", start.Format(time.StampMilli),
+					"end", end.Format(time.StampMilli),
+				)
+				latestTimes = append(latestTimes, last)
+
+				// didn't process anything, meaning there's nothing left to do
+				// exit loop
+				if iterated == 0 {
+					return
+				}
+			}
+
+			// find the earliest time within the last item timestamp of the previously processed backlogs
+			var earliest time.Time
+			for _, t := range latestTimes {
+				if earliest.IsZero() || t.Before(earliest) {
+					earliest = t
+				}
+			}
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			backlogFrom = earliest.Add(time.Millisecond)
+
+			// wait a little before proceeding
+			<-time.After(opt.interval)
 		}
 	}
 }

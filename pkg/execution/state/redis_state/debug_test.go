@@ -110,7 +110,7 @@ func TestPartitionByID(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			res, err := q.PartitionByID(ctx, defaultShard, fnID.String())
+			res, err := q.InspectPartition(ctx, defaultShard, fnID.String())
 			require.NoError(t, err)
 
 			// fmt.Printf("RESULT: %#v\n", res)

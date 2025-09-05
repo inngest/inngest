@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state/peek"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
@@ -743,25 +744,28 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
 	}
 
-	p := peeker[QueueShadowPartition]{
-		q:               q,
-		opName:          "peekShadowPartitions",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		max:             ShadowPartitionPeekMax,
-		maker: func() *QueueShadowPartition {
+	p := peek.NewPeeker(
+		func() *QueueShadowPartition {
 			return &QueueShadowPartition{}
 		},
-		handleMissingItems: func(pointers []string) error {
+		peek.WithPeekerClient(q.primaryQueueShard.RedisClient.unshardedRc),
+		peek.WithPeekerMaxPeekSize(int(ShadowPartitionPeekMax)),
+		peek.WithPeekerMetadataHashKey(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()),
+		peek.WithPeekerOpName("peekShadowPartitions"),
+		peek.WithPeekerHandleMissingItems(func(ctx context.Context, pointers []string) error {
 			q.log.Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
-
 			return nil
-		},
-		isMillisecondPrecision: true,
-	}
+		}),
+		peek.WithPeekerMillisecondPrecision(true),
+	)
 
-	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
+	res, err := p.Peek(ctx, partitionIndexKey,
+		peek.Sequential(sequential),
+		peek.Until(until),
+		peek.Limit(int(peekLimit)),
+	)
 	if err != nil {
-		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+		if errors.Is(err, peek.ErrPeekerPeekExceedsMaxLimits) {
 			return nil, ErrShadowPartitionPeekMaxExceedsLimits
 		}
 		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
@@ -858,7 +862,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, shard QueueShard, sp *Q
 			return &QueueBacklog{}
 		},
 		peek.WithPeekerClient(rc.Client()),
-		peek.WithPeekerHandleMissingItems(CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp))),
+		peek.WithPeekerHandleMissingItems(peek.CleanupMissingPointers(shadowPartitionSet, rc.Client(), q.log.With("sp", sp))),
 		peek.WithPeekerMaxPeekSize(int(ShadowPartitionPeekMaxBacklogs)),
 		peek.WithPeekerMetadataHashKey(rc.kg.BacklogMeta()),
 		peek.WithPeekerMillisecondPrecision(true),
@@ -1081,14 +1085,21 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequentia
 
 	rc := q.primaryQueueShard.RedisClient
 
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalShadowPartitionAccounts",
-		max:                    ShadowPartitionAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
+	p := peek.NewPeeker(
+		func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		peek.WithPeekerClient(rc.Client()),
+		peek.WithPeekerMaxPeekSize(int(ShadowPartitionAccountPeekMax)),
+		peek.WithPeekerMillisecondPrecision(true),
+		peek.WithPeekerOpName("peekGlobalShadowPartitionAccounts"),
+	)
 
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
+	return p.PeekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(),
+		peek.Sequential(sequential),
+		peek.Until(until),
+		peek.Limit(int(limit)),
+	)
 }
 
 func (q *queue) ShadowPartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*QueueShadowPartition, error) {

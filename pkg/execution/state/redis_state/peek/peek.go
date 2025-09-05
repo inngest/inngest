@@ -158,7 +158,7 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, opts 
 
 	var totalCount, cursor int64
 	var potentiallyMissingItems, allPointerIDs []any
-	if len(returnedSet) == 3 {
+	if len(returnedSet) == 4 {
 		totalCount, ok = returnedSet[0].(int64)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from %s: %T", p.opName, returnedSet[0])

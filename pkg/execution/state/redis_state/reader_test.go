@@ -76,7 +76,7 @@ func TestItemsByPartition(t *testing.T) {
 			name:          "include leased items",
 			num:           500,
 			from:          time.Time{},
-			until:         clock.Now().Add(time.Minute),
+			until:         clock.Now().Add(time.Hour),
 			expectedItems: 500,
 			leased:        true,
 			skipLeased:    false,
@@ -144,7 +144,6 @@ func TestItemsByPartition(t *testing.T) {
 				WithClock(clock),
 			)
 
-			start := time.Now()
 			for i := range tc.num {
 				at := clock.Now()
 				if !tc.from.IsZero() {
@@ -172,17 +171,8 @@ func TestItemsByPartition(t *testing.T) {
 				require.NoError(t, err)
 
 				if tc.leased {
-					fmt.Printf("leasing item %d\n", i)
 					leaseDur := 10 * time.Second
-					leaseExpiry := time.UnixMilli(qi.AtMS).Add(leaseDur)
 					_, err := q.Lease(ctx, qi, leaseDur, time.UnixMilli(qi.AtMS), nil)
-					require.NoError(t, err)
-
-					fmt.Printf("re-adding item %d\n", i)
-					// Re-add to partition to allow finding leased items
-					kg := defaultShard.RedisClient.kg
-					partitionKey := kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
-					_, err = r.ZAdd(partitionKey, float64(leaseExpiry.UnixMilli()), qi.ID)
 					require.NoError(t, err)
 				}
 			}
@@ -190,6 +180,7 @@ func TestItemsByPartition(t *testing.T) {
 			items, err := q.ItemsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
 				WithQueueItemIterBatchSize(tc.batchSize),
 				WithQueueItemIterSkipLeased(tc.skipLeased),
+				WithQueueItemIterateInProgress(!tc.skipLeased),
 			)
 			require.NoError(t, err)
 
@@ -198,7 +189,7 @@ func TestItemsByPartition(t *testing.T) {
 				count++
 			}
 
-			require.Equal(t, tc.expectedItems, count)
+			require.Equal(t, tc.expectedItems, count, r.Dump())
 		})
 	}
 }
