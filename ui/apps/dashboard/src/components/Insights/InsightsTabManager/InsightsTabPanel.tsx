@@ -44,8 +44,8 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
       <Section
         actions={
           <>
+            <InsightsSQLEditorDownloadCSVButton temporarilyHide />
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-            <InsightsSQLEditorDownloadCSVButton />
           </>
         }
         title={<InsightsSQLEditorResultsTitle />}

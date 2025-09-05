@@ -3,7 +3,27 @@
 import { Button } from '@inngest/components/Button/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 
-export function InsightsSQLEditorDownloadCSVButton() {
+interface InsightsSQLEditorDownloadCSVButtonProps {
+  temporarilyHide?: boolean;
+}
+
+export function InsightsSQLEditorDownloadCSVButton({
+  temporarilyHide = false,
+}: InsightsSQLEditorDownloadCSVButtonProps) {
+  // Maintain layout consistency when the button is temporarily hidden.
+  if (temporarilyHide) {
+    return (
+      <Button
+        appearance="ghost"
+        className="invisible"
+        disabled
+        kind="secondary"
+        label=""
+        size="medium"
+      />
+    );
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
