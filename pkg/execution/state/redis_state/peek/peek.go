@@ -1,4 +1,4 @@
-package redis_state
+package peek
 
 import (
 	"context"
@@ -9,88 +9,85 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
 )
 
-type PeekOpt func(p *peekOption)
+type Option func(p *peekOption)
 
 type peekOption struct {
-	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
-	// The use of this should be rare, and should be limited to system queue operations as much as possible.
-	Shard *QueueShard
-}
-
-func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
-	return func(p *peekOption) {
-		p.Shard = qs
-	}
-}
-
-type peeker[T any] struct {
-	q      *queue
-	max    int64
-	opName string
-
-	// if ignoreUntil is provided, the entire count is returned and items are peeked even
-	// if the score exceeds the until value (usually the current time).
-	ignoreUntil bool
-
-	isMillisecondPrecision bool
-
-	handleMissingItems func(pointers []string) error
-	maker              func() *T
-	keyMetadataHash    string
+	client rueidis.Client
 
 	// fromTime provides an optional start time for peeks
 	// instead of the default -INF
-	fromTime *time.Time
+	from *time.Time
+
+	// fromTime provides an optional end time for peeks
+	// instead of the default +INF
+	until *time.Time
+
+	// limit determines how many items should be peeked
+	limit int
+
+	// sequential determines whether peeks should respect FIFO rules
+	sequential bool
 }
 
-// Peeker defines the interface for peeking operations on queues
-type Peeker[T any] interface {
-	Peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error)
-	PeekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error)
-	PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
+func WithClient(c rueidis.Client) Option {
+	return func(p *peekOption) {
+		p.client = c
+	}
+}
+
+func From(from time.Time) Option {
+	return func(p *peekOption) {
+		p.from = &from
+	}
+}
+
+func Until(until time.Time) Option {
+	return func(p *peekOption) {
+		p.from = &until
+	}
+}
+
+func Limit(limit int) Option {
+	return func(p *peekOption) {
+		p.limit = limit
+	}
+}
+
+func Sequential(sequential bool) Option {
+	return func(p *peekOption) {
+		p.sequential = sequential
+	}
 }
 
 var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
-type peekResult[T any] struct {
-	Items        []*T
-	TotalCount   int
-	RemovedCount int
-
-	// Cursor represents the score of the last item in the peek result.
-	// This can be used for pagination within iterators
-	Cursor int64
-}
-
 // Peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
+func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, opts ...Option) (*Result[T], error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx)
 
 	opt := peekOption{}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
+	client := p.client
+	if opt.client != nil {
+		client = opt.client
+	}
+
 	if p.maker == nil {
 		return nil, fmt.Errorf("missing 'maker' argument")
 	}
 
-	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for %s: %s", p.opName, p.q.primaryQueueShard.Kind)
-	}
-
-	rc := p.q.primaryQueueShard.RedisClient.Client()
-	if opt.Shard != nil {
-		rc = opt.Shard.RedisClient.Client()
-	}
-
+	limit := int64(opt.limit)
 	if limit > p.max {
 		return nil, ErrPeekerPeekExceedsMaxLimits
 	}
@@ -100,7 +97,9 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 
 	var script string
 	var rawArgs []any
-	if p.ignoreUntil {
+
+	until := opt.until
+	if until == nil {
 		script = "peekOrderedSet"
 		rawArgs = []any{
 			limit,
@@ -110,8 +109,8 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 		ms := until.UnixMilli()
 
 		fromTime := "-inf"
-		if p.fromTime != nil && !p.fromTime.IsZero() {
-			fromTime = strconv.Itoa(int(p.fromTime.UnixMilli()))
+		if opt.from != nil && !opt.from.IsZero() {
+			fromTime = strconv.Itoa(int(opt.from.UnixMilli()))
 		}
 
 		untilTime := until.Unix()
@@ -120,7 +119,7 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 
 		isSequential := 0
-		if sequential {
+		if opt.sequential {
 			isSequential = 1
 		}
 
@@ -133,14 +132,14 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 	}
 
-	args, err := StrSlice(rawArgs)
+	args, err := util.StrSlice(rawArgs)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert args: %w", err)
 	}
 
-	peekRet, err := scripts[fmt.Sprintf("queue/%s", script)].Exec(
+	peekRet, err := scripts[script].Exec(
 		redis_telemetry.WithScriptName(ctx, script),
-		rc,
+		client,
 		[]string{
 			p.keyMetadataHash,
 			keyOrderedPointerSet,
@@ -157,9 +156,9 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("unknown return type from %s: %T", p.opName, peekRet)
 	}
 
-	var totalCount, cursor int64
+	var totalCount int64
 	var potentiallyMissingItems, allPointerIDs []any
-	if len(returnedSet) == 4 {
+	if len(returnedSet) == 3 {
 		totalCount, ok = returnedSet[0].(int64)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from %s: %T", p.opName, returnedSet[0])
@@ -175,12 +174,8 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 			return nil, fmt.Errorf("unexpected third item in set returned from %s: %T", p.opName, returnedSet[2])
 		}
 
-		cursor, ok = returnedSet[3].(int64)
-		if !ok {
-			return nil, fmt.Errorf("invalid cursor returned from %s: %T", p.opName, returnedSet[3])
-		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or four items in set returned by %s: %v", p.opName, returnedSet)
+		return nil, fmt.Errorf("expected zero or three items in set returned by %s: %v", p.opName, returnedSet)
 	}
 
 	encoded := make([]any, 0)
@@ -207,7 +202,7 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 	// Use parallel decoding as per Peek
 	items, err := util.ParallelDecode(encoded, func(val any, _ int) (*T, bool, error) {
 		if val == nil {
-			p.q.log.Error("encountered nil item in pointer queue",
+			l.Error("encountered nil item in pointer queue",
 				"encoded", encoded,
 				"missing", missingItems,
 				"key", keyOrderedPointerSet,
@@ -233,31 +228,42 @@ func (p *peeker[T]) Peek(ctx context.Context, keyOrderedPointerSet string, seque
 	}
 
 	if p.handleMissingItems != nil && len(missingItems) > 0 {
-		if err := p.handleMissingItems(missingItems); err != nil {
+		if err := p.handleMissingItems(ctx, missingItems); err != nil {
 			return nil, fmt.Errorf("could not handle missing items: %w", err)
 		}
 	}
 
-	return &peekResult[T]{
+	return &Result[T]{
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
-		Cursor:       cursor,
 	}, nil
 }
 
-func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]string, error) {
+func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string, opts ...Option) ([]string, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
-	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for %s: %s", p.opName, p.q.primaryQueueShard.Kind)
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
 	}
 
+	client := p.client
+	if opt.client != nil {
+		client = opt.client
+	}
+
+	limit := int64(opt.limit)
 	if limit > p.max {
 		return nil, ErrPeekerPeekExceedsMaxLimits
 	}
 	if limit <= 0 {
 		limit = p.max
+	}
+
+	until := opt.until
+	if until == nil {
+		return nil, fmt.Errorf("until is required in peek pointer")
 	}
 
 	ms := until.UnixMilli()
@@ -268,11 +274,11 @@ func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string
 	}
 
 	isSequential := 0
-	if sequential {
+	if opt.sequential {
 		isSequential = 1
 	}
 
-	args, err := StrSlice([]any{
+	args, err := util.StrSlice([]any{
 		untilTime,
 		ms,
 		limit,
@@ -282,9 +288,9 @@ func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string
 		return nil, err
 	}
 
-	pointers, err := scripts["queue/peekPointerUntil"].Exec(
+	pointers, err := scripts["peekPointerUntil"].Exec(
 		redis_telemetry.WithScriptName(ctx, "peekPointerUntil"),
-		p.q.primaryQueueShard.RedisClient.unshardedRc,
+		client,
 		[]string{
 			keyOrderedPointerSet,
 		},
@@ -297,8 +303,8 @@ func (p *peeker[T]) PeekPointer(ctx context.Context, keyOrderedPointerSet string
 	return pointers, nil
 }
 
-func (p *peeker[T]) PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	pointers, err := p.PeekPointer(ctx, keyOrderedPointerSet, sequential, until, limit)
+func (p *peeker[T]) PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet string, opts ...Option) ([]uuid.UUID, error) {
+	pointers, err := p.PeekPointer(ctx, keyOrderedPointerSet, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek pointers: %w", err)
 	}
@@ -316,8 +322,8 @@ func (p *peeker[T]) PeekUUIDPointer(ctx context.Context, keyOrderedPointerSet st
 	return items, nil
 }
 
-func CleanupMissingPointers(ctx context.Context, key string, client rueidis.Client, log logger.Logger) func(pointers []string) error {
-	return func(pointers []string) error {
+func CleanupMissingPointers(key string, client rueidis.Client, log logger.Logger) MissingItemHandler {
+	return func(ctx context.Context, pointers []string) error {
 		cmd := client.B().Zrem().Key(key).Member(pointers...).Build()
 
 		err := client.Do(ctx, cmd).Error()
@@ -327,4 +333,14 @@ func CleanupMissingPointers(ctx context.Context, key string, client rueidis.Clie
 
 		return nil
 	}
+}
+
+func init() {
+	// read the lua scripts
+	entries, err := embedded.ReadDir("lua")
+	if err != nil {
+		panic(fmt.Errorf("error reading redis lua dir: %w", err))
+	}
+
+	readRedisScripts("lua", entries)
 }

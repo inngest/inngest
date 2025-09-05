@@ -844,7 +844,7 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
+func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...peekOpt) ([]*QueueBacklog, int, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
 	}
