@@ -401,6 +401,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		return nil, nil
 	}
 
+	if gqlSpan.StepOp != nil && *gqlSpan.StepOp == models.StepOpRun && span.Attributes.StepRunType != nil {
+		gqlSpan.StepType = *span.Attributes.StepRunType
+	} else if gqlSpan.StepOp != nil {
+		gqlSpan.StepType = gqlSpan.StepOp.String()
+	}
+
 	return gqlSpan, nil
 }
 
