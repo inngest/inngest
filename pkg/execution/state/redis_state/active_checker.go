@@ -4,7 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	mathRand "math/rand"
+	"strconv"
+	"sync/atomic"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -13,10 +19,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
-	mathRand "math/rand"
-	"strconv"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -171,29 +173,13 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 	l := logger.StdlibLogger(ctx)
 	client := shard.RedisClient.Client()
 
-	var sp QueueShadowPartition
-
-	{
-		str, err := client.Do(ctx, client.B().Hget().Key(kg.ShadowPartitionMeta()).Field(b.ShadowPartitionID).Build()).ToString()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				l.Debug("shadow partition meta hash not found, exiting")
-				return true, nil
-			}
-
-			return false, fmt.Errorf("could not get shadow partition: %w", err)
-		}
-
-		// If shadow partition is missing, clean up
-		if str == "" {
-			l.Debug("shadow partition not found for backlog, exiting")
+	sp, err := q.ShadowPartitionByID(ctx, shard, b.ShadowPartitionID)
+	if err != nil {
+		if errors.Is(err, ErrShadowPartitionNotFound) {
+			l.Debug("shadow partition meta hash not found, exiting")
 			return true, nil
 		}
-
-		if err := json.Unmarshal([]byte(str), &sp); err != nil {
-			l.Error("failed to unmarshal shadow partition", "err", err, "str", str)
-			return true, nil
-		}
+		return false, fmt.Errorf("could not get shadow partition: %w", err)
 	}
 
 	if sp.AccountID != nil {
@@ -223,14 +209,14 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 	}
 
 	// Check partition
-	err := q.partitionActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "partition-check")), &sp, accountID, client, kg, readOnly)
+	err = q.partitionActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "partition-check")), sp, accountID, client, kg, readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "backlog-check")), &sp, accountID, key, client, kg, readOnly)
+		err := q.customConcurrencyActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "backlog-check")), sp, accountID, key, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}

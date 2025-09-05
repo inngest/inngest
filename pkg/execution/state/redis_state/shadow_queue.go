@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -1092,4 +1093,27 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequentia
 	}
 
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
+}
+
+func (q *queue) ShadowPartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*QueueShadowPartition, error) {
+	rc := shard.RedisClient.Client()
+	kg := shard.RedisClient.kg
+
+	// load queue partition
+	cmd := rc.B().Hget().Key(kg.ShadowPartitionMeta()).Field(partitionID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, ErrShadowPartitionNotFound
+		}
+
+		return nil, fmt.Errorf("error retrieving queue shadow partition: %w", err)
+	}
+
+	var sp QueueShadowPartition
+	if err := json.Unmarshal(byt, &sp); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue shadow partition: %w", err)
+	}
+
+	return &sp, nil
 }

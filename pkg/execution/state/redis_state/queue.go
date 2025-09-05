@@ -178,8 +178,10 @@ type QueueManager interface {
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+	// PartitionByID retrieves the partition including counts
+	InspectPartition(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*QueuePartition, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
 	// ItemsByRunID retrieves all queue items via runID
@@ -1760,6 +1762,7 @@ type peekOpts struct {
 	From          *time.Time
 	Until         time.Time
 	Limit         int64
+	Offset        int64
 	IncludeLeased bool
 }
 
@@ -1787,6 +1790,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		from,
 		until,
 		opts.Limit,
+		opts.Offset,
 		randomOffset,
 	})
 	if err != nil {

@@ -238,83 +238,33 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		"queue_shard", shard.Name,
 	)
 
-	// retrieve partition by ID
-	hash := shard.RedisClient.kg.PartitionItem()
-	rc := shard.RedisClient.Client()
-
-	cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
-	byt, err := rc.Do(ctx, cmd).AsBytes()
+	pt, err := q.PartitionByID(ctx, shard, partitionID)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving partition '%s': %w", partitionID, err)
-	}
-
-	var pt QueuePartition
-	if err := json.Unmarshal(byt, &pt); err != nil {
-		return nil, fmt.Errorf("error unmarshalling queue partition '%s': %w", partitionID, err)
+		return nil, fmt.Errorf("could not fetch partition: %w", err)
 	}
 
 	l = l.With("account_id", pt.AccountID.String())
 
 	return func(yield func(*osqueue.QueueItem) bool) {
-		ptFrom := from
+		partitionKey := pt.zsetKey(shard.RedisClient.kg)
+		var iterated int
 
-		for {
-			var iterated int
-
-			// peek function partition
-			items, err := q.peek(ctx, shard, peekOpts{
-				From:          &ptFrom,
-				Until:         until,
-				Limit:         opt.batchSize,
-				PartitionID:   partitionID,
-				PartitionKey:  pt.zsetKey(shard.RedisClient.kg),
-				IncludeLeased: !opt.skipLeased,
-			})
-			if err != nil {
-				if !errors.Is(err, context.Canceled) {
-					l.ReportError(err, "error peeking items for partition iterator")
-				}
-				return
-			}
-
-			var start, end time.Time
-			for _, qi := range items {
-				if qi == nil {
-					continue
-				}
-
-				if !yield(qi) {
-					return
-				}
-
-				at := time.UnixMilli(qi.AtMS)
-				if start.IsZero() {
-					start = at
-				}
-				end = at
-				ptFrom = at
-				iterated++
-			}
-
-			l.Debug("iterated items in partition",
-				"count", iterated,
-				"start", start.Format(time.StampMilli),
-				"end", end.Format(time.StampMilli),
-			)
-
-			// didn't process anything, exit loop
-			if iterated == 0 {
-				break
-			}
-
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
-
-			// wait a little before proceeding
-			<-time.After(opt.interval)
+		items := q.iterateSortedSetQueue(ctx, shard, queueSortedSetIterationOptions{
+			keySortedSet:  partitionKey,
+			partitionID:   partitionID,
+			from:          from,
+			until:         until,
+			pageSize:      int(opt.batchSize),
+			includeLeased: !opt.skipLeased,
+		})
+		for item := range items {
+			yield(item)
+			iterated++
 		}
+
+		l.Debug("iterated items in partition",
+			"count", iterated,
+		)
 
 		if !opt.iterateBacklogs {
 			return
@@ -323,27 +273,22 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		// NOTE: iterate through backlogs
 		backlogFrom := from
 
-		hash := shard.RedisClient.kg.ShadowPartitionMeta()
-		cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
-		byt, err := rc.Do(ctx, cmd).AsBytes()
-		if err != nil {
+		sp, err := q.ShadowPartitionByID(ctx, shard, partitionID)
+		if err != nil && !errors.Is(err, ErrShadowPartitionNotFound) {
 			l.Warn("error retrieving shadow partition from queue", "error", err)
+		}
+
+		if sp == nil {
 			return
 		}
 
-		var spt QueueShadowPartition
-		if err := json.Unmarshal(byt, &spt); err != nil {
-			l.ReportError(err, "error unmarshalling shadow partition")
-			return
-		}
-
-		l = l.With("shadow_partition", spt)
+		l = l.With("shadow_partition", sp)
 
 		for {
 			var iterated int
 
 			// TODO: maybe provide a different limit?
-			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs,
+			backlogs, _, err := q.ShadowPartitionPeek(ctx, sp, true, until, ShadowPartitionPeekMaxBacklogs,
 				WithPeekOptQueueShard(&shard),
 			)
 			if err != nil {
@@ -511,6 +456,165 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			<-time.After(opt.interval)
 		}
 	}, nil
+}
+
+type queueSortedSetIterationOptions struct {
+	keySortedSet  string
+	partitionID   string
+	from          time.Time
+	until         time.Time
+	pageSize      int
+	includeLeased bool
+	peek          func(from, until time.Time, limit, offset int) ([]*osqueue.QueueItem, error)
+}
+
+// iterateSortedSetQueue returns an iterator over queue items found in a provided sorted set. This has to be millisecond precision, and can be the queue set, an in-progress
+func (q *queue) iterateSortedSetQueue(ctx context.Context, shard QueueShard, opts queueSortedSetIterationOptions) iter.Seq[*osqueue.QueueItem] {
+	l := q.log.With(
+		"method", "iterateSortedSet",
+		"queue_shard", shard.Name,
+		"partition_id", opts.partitionID,
+		"sorted_set_key", opts.keySortedSet,
+		"from", opts.from.UnixMilli(),
+		"until", opts.until.UnixMilli(),
+		"page_size", opts.pageSize,
+	)
+
+	// TODO: Switch to a circular buffer data structure
+	seenBuffer := map[string]struct{}{}
+
+	// Always look up one more item than the requested page size to check for duplicate scores.
+	// A duplicate score is assumed when the extra item has the same score as the last item of the current page.
+	//
+	// This is relevant to ensure we never miss queue items while iterating. If we simply skip to the next millisecond,
+	// we could miss items on the previous milliseconds outside the current page.
+	limit := opts.pageSize + 1
+
+	return func(yield func(*osqueue.QueueItem) bool) {
+		// Cursor tracks the current position within the sorted set. This advances with each page, based on the last item's score.
+		// Queue sets are assumed to use timestamps as scores with millisecond precision. This means the next item may be as close as the next millisecond.
+		//
+		// The important edge case of multiple items with the same score is explained above.
+		cursor := opts.from
+		for {
+			// Fetch page of queue items
+			items, err := q.peek(ctx, shard, peekOpts{
+				PartitionID:   opts.partitionID,
+				PartitionKey:  opts.keySortedSet,
+				IncludeLeased: opts.includeLeased,
+				From:          &cursor,
+				Until:         opts.until,
+				Limit:         int64(limit),
+				Offset:        0,
+			})
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "error peeking items for partition iterator")
+				}
+				return
+			}
+
+			if len(items) == 0 {
+				break
+			}
+
+			// If the set has more items, we have just retrieved one extra item (given the limit is page size + 1)
+			hasExtra := len(items) == limit
+
+			itemsWithoutExtra := items
+			if hasExtra {
+				itemsWithoutExtra = items[0 : len(items)-2]
+			}
+
+			// Yield all items except for the extra item
+			// If the item was previously returned, ignore it. This is a best-effort deduplication implementation.
+			for _, qi := range itemsWithoutExtra {
+				if _, has := seenBuffer[qi.ID]; has {
+					continue
+				}
+
+				yield(qi)
+				seenBuffer[qi.ID] = struct{}{}
+			}
+
+			// If there's an extra item and it has the same score as the last item on the current page,
+			// this means there is at least one more item with the same score. Temporarily switch to
+			// offset-based pagination for all items with this score, then continue with the next millisecond.
+			hasDuplicateScores := hasExtra && items[len(items)-1].AtMS == items[len(items)-2].AtMS
+			if hasDuplicateScores {
+				items := q.offsetBasedIteration(ctx, shard, offsetBasedIterationOptions{
+					keySortedSet:  opts.keySortedSet,
+					partitionID:   opts.partitionID,
+					score:         time.UnixMilli(items[len(items)-1].AtMS),
+					pageSize:      opts.pageSize,
+					includeLeased: opts.includeLeased,
+				})
+				for qi := range items {
+					if _, has := seenBuffer[qi.ID]; has {
+						continue
+					}
+
+					yield(qi)
+					seenBuffer[qi.ID] = struct{}{}
+				}
+			}
+
+			// Carry on with next page by advancing the cursor by one millisecond (this is equivalent to AtMS + 1)
+			cursor = time.UnixMilli(itemsWithoutExtra[len(items)-1].AtMS).Add(time.Millisecond)
+		}
+	}
+}
+
+type offsetBasedIterationOptions struct {
+	keySortedSet  string
+	partitionID   string
+	score         time.Time
+	pageSize      int
+	includeLeased bool
+}
+
+// offsetBasedIteration performs offset-based pagination over all queue items with the same score.
+func (q *queue) offsetBasedIteration(ctx context.Context, shard QueueShard, opts offsetBasedIterationOptions) iter.Seq[*osqueue.QueueItem] {
+	l := q.log.With(
+		"method", "offsetBasedIteration",
+		"queue_shard", shard.Name,
+		"partition_id", opts.partitionID,
+		"sorted_set_key", opts.keySortedSet,
+		"score", opts.score.UnixMilli(),
+		"page_size", opts.pageSize,
+	)
+
+	return func(yield func(*osqueue.QueueItem) bool) {
+		var offset int64
+		for {
+			// Fetch page of queue items
+			items, err := q.peek(ctx, shard, peekOpts{
+				PartitionID:   opts.partitionID,
+				PartitionKey:  opts.keySortedSet,
+				IncludeLeased: opts.includeLeased,
+				From:          &opts.score,
+				Until:         opts.score,
+				Limit:         int64(opts.pageSize),
+				Offset:        offset,
+			})
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "error peeking items for partition iterator")
+				}
+				return
+			}
+
+			if len(items) == 0 {
+				break
+			}
+
+			for _, qi := range items {
+				yield(qi)
+			}
+
+			offset += int64(len(items))
+		}
+	}
 }
 
 type QueueIteratorOpts struct {
