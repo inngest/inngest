@@ -5,10 +5,10 @@ import "time"
 type QueueIterOpt func(o *queueIterOpt)
 
 type queueIterOpt struct {
-	batchSize       int64
-	interval        time.Duration
-	iterateBacklogs bool
-	forceNextPage   bool
+	batchSize                 int64
+	interval                  time.Duration
+	iterateBacklogs           bool
+	enableMillisecondIncrease bool
 }
 
 func WithQueueItemIterBatchSize(size int64) QueueIterOpt {
@@ -31,8 +31,8 @@ func WithQueueItemIterEnableBacklog(iterateBacklogs bool) QueueIterOpt {
 	}
 }
 
-func WithQueueItemIterForceNextPage(forceNextPage bool) QueueIterOpt {
+func WithQueueItemIterDisableMillisecondIncrease() QueueIterOpt {
 	return func(o *queueIterOpt) {
-		o.forceNextPage = forceNextPage
+		o.enableMillisecondIncrease = false
 	}
 }

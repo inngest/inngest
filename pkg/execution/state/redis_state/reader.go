@@ -221,10 +221,10 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 
 func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
-		batchSize:       1000,
-		interval:        500 * time.Millisecond,
-		iterateBacklogs: true,
-		forceNextPage:   true,
+		batchSize:                 1000,
+		interval:                  500 * time.Millisecond,
+		iterateBacklogs:           true,
+		enableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -306,7 +306,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				break
 			}
 
-			if opt.forceNextPage {
+			if opt.enableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
@@ -417,7 +417,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				}
 			}
 
-			if opt.forceNextPage {
+			if opt.enableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
