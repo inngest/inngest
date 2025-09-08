@@ -28,6 +28,48 @@
       }
     }
   },
+  "/env/webhooks": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /env/webhooks 200"
+      },
+      "400": {
+        "// TODO": "Add example data for get /env/webhooks 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /env/webhooks 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /env/webhooks 403"
+      },
+      "500": {
+        "// TODO": "Add example data for get /env/webhooks 500"
+      }
+    },
+    "post": {
+      "201": {
+        "// TODO": "Add example data for post /env/webhooks 201"
+      },
+      "400": {
+        "// TODO": "Add example data for post /env/webhooks 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /env/webhooks 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /env/webhooks 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /env/webhooks 409"
+      },
+      "422": {
+        "// TODO": "Add example data for post /env/webhooks 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /env/webhooks 500"
+      }
+    }
+  },
   "/envs": {
     "get": {
       "200": {
