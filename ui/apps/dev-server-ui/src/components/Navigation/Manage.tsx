@@ -24,7 +24,7 @@ export default function Mange({ collapsed }: { collapsed: boolean }) {
     selectFromResult: (result) => ({
       hasSyncingError: result?.data?.apps?.some((app) => app.connected === false),
     }),
-    pollingInterval: pollingFlagReady && pollingDisabled ? 0 : 1500,
+    pollingInterval: pollingFlagReady && pollingDisabled ? 0 : pollingInterval,
   });
 
   return (
