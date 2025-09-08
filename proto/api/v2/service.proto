@@ -818,6 +818,97 @@ service V2 {
       }
     };
   }
+
+  rpc SyncNewApp(SyncNewAppRequest) returns (SyncNewAppResponse) {
+    option (google.api.http) = {
+      post: "/apps",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync new app"
+      description: "Synchronizes a new app from the provided app URL"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Target environment for the app sync (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: true
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "App successfully synced"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SyncNewAppResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - app sync failed"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1087,4 +1178,34 @@ message Webhook {
   string environment = 7;
   google.protobuf.Timestamp createdAt = 8;
   google.protobuf.Timestamp updatedAt = 9;
+}
+
+message SyncNewAppRequest {
+  string appURL = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The URL of the app to sync"
+      example: "\"https://api.myapp.com/api/inngest\""
+    }
+  ];
+}
+
+message SyncNewAppResponse {
+  SyncResponse data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message SyncResponse {
+  optional App app = 1;
+  optional SyncError error = 2;
+}
+
+message App {
+  string id = 1;
+  string externalID = 2;
+}
+
+message SyncError {
+  string code = 1;
+  string message = 2;
+  optional string data = 3;
 }
