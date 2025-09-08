@@ -204,6 +204,8 @@ type Response struct {
 	// Attempts returns the number of attempts taken to execute the request.
 	// This is optional and may be unset.
 	Attempts int
+
+	SomeField bool
 }
 
 // Client returns a new HTTP transport.
