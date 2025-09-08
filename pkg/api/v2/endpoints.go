@@ -273,3 +273,37 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	// 3. Return the list with proper pagination metadata
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
+
+func (s *Service) SyncNewApp(ctx context.Context, req *apiv2.SyncNewAppRequest) (*apiv2.SyncNewAppResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := s.base.GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate required fields
+	if req.AppURL == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App URL is required")
+	}
+
+	// For now, return not implemented since this requires app sync infrastructure
+	// In a real implementation, this would:
+	// 1. Validate the app URL format and reachability
+	// 2. Sync the app configuration from the provided URL
+	// 3. Create or update the app in the specified environment
+	// 4. Return the synced app details or error information
+	return &apiv2.SyncNewAppResponse{
+		Data: &apiv2.SyncResponse{
+			App: nil,
+			Error: &apiv2.SyncError{
+				Code:    "app_sync_not_implemented",
+				Message: "App synchronization not implemented in OSS",
+				Data:    nil,
+			},
+		},
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+	}, nil
+}
