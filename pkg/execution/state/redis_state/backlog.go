@@ -1009,8 +1009,9 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 // NOTE: this function only work with key queues
 func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
 	opt := queueIterOpt{
-		batchSize: 1000,
-		interval:  50 * time.Millisecond,
+		batchSize:                 1000,
+		interval:                  50 * time.Millisecond,
+		enableMillisecondIncrease: true,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -1078,10 +1079,12 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 				break
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
+			if opt.enableMillisecondIncrease {
+				// shift the starting point 1ms so it doesn't try to grab the same stuff again
+				// NOTE: this could result skipping items if the previous batch of items are all on
+				// the same millisecond
+				ptFrom = ptFrom.Add(time.Millisecond)
+			}
 
 			// wait a little before processing the next batch
 			<-time.After(opt.interval)
