@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 )
@@ -19,12 +20,14 @@ type Service struct {
 	signingKeys SigningKeysProvider
 	eventKeys   EventKeysProvider
 	base        *apiv2base.Base
+	resolver    *resolvers.Resolver
 }
 
 // ServiceOptions contains configuration for the V2 service
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
+	GraphQLResolver     *resolvers.Resolver
 }
 
 func NewService(opts ServiceOptions) *Service {
@@ -32,6 +35,7 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys: opts.SigningKeysProvider,
 		eventKeys:   opts.EventKeysProvider,
 		base:        apiv2base.NewBase(),
+		resolver:    opts.GraphQLResolver,
 	}
 }
 
