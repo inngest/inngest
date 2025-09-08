@@ -35,8 +35,8 @@ export function getDefaultEnvironment(
 ): Environment | null {
   let isMultiProd = false;
   let prodCount = 0;
-  for (const workspace of environments) {
-    if (workspace.type === EnvironmentType.Production) {
+  for (const env of environments) {
+    if (env.type === EnvironmentType.Production) {
       prodCount++;
     }
     if (prodCount > 1) {
