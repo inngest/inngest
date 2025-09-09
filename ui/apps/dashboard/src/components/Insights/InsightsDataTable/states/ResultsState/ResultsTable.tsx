@@ -17,9 +17,11 @@ export function ResultsTable() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex-1 overflow-auto" id="insights-table-container">
         <Table
+          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border max-w-[350px]"
           columns={columns}
           data={data.rows}
-          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
+          enableHeaderTruncation
+          headerClassName="max-w-[350px]"
         />
       </div>
       <ResultsTableFooter />

@@ -31,6 +31,8 @@ type BaseTableProps<T> = {
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
   cellClassName?: string;
+  headerClassName?: string;
+  enableHeaderTruncation?: boolean;
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -50,6 +52,8 @@ export function Table<T>({
   columns,
   expandedIDs = [],
   cellClassName,
+  headerClassName,
+  enableHeaderTruncation = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -117,7 +121,8 @@ export function Table<T>({
                     key={header.id}
                     className={cn(
                       isIconOnlyColumn ? '' : tableColumnStyles,
-                      'text-muted text-nowrap text-left text-xs font-medium'
+                      'text-muted text-nowrap text-left text-xs font-medium',
+                      headerClassName
                     )}
                   >
                     {header.isPlaceholder ? null : (
@@ -131,7 +136,13 @@ export function Table<T>({
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {enableHeaderTruncation ? (
+                          <span className="min-w-0 flex-1 truncate">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
                         {{
                           asc: <RiSortAsc className="text-light h-4 w-4" />,
                           desc: <RiSortDesc className="text-light h-4 w-4" />,
