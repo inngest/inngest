@@ -48,6 +48,7 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
           </>
         }
+        className="border-subtle border-t"
         title={<InsightsSQLEditorResultsTitle />}
       >
         <InsightsDataTable />
