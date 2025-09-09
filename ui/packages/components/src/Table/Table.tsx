@@ -33,6 +33,7 @@ type BaseTableProps<T> = {
   cellClassName?: string;
   headerClassName?: string;
   enableHeaderTruncation?: boolean;
+  rowClassName?: string;
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -54,6 +55,7 @@ export function Table<T>({
   cellClassName,
   headerClassName,
   enableHeaderTruncation = false,
+  rowClassName,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -177,7 +179,8 @@ export function Table<T>({
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
                       : 'border-light box-border h-[42px] border-b',
-                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : '',
+                    rowClassName
                   )}
                   onClick={(e) => {
                     const modalsContainer = document.getElementById('modals');
