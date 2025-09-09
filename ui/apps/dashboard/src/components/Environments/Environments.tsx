@@ -38,6 +38,10 @@ export default function Environments() {
     return filterEnvironments(EnvironmentType.Test, searchParam, filterStatus, envs);
   }, [searchParam, envs, filterStatus]);
 
+  const prodEnvsData = useMemo(() => {
+    return filterEnvironments(EnvironmentType.Production, searchParam, filterStatus, envs);
+  }, [searchParam, envs, filterStatus]);
+
   if (fetching) {
     return (
       <div className="my-16 flex h-full w-full items-center justify-center">
@@ -46,33 +50,37 @@ export default function Environments() {
     );
   }
 
+  const isMultiProd = prodEnvsData.total > 1;
+
   return (
     <>
       <div className="mx-auto w-full max-w-[860px] px-12 py-16">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2">
-            <div className="flex w-full items-center justify-between">
-              <h2 className="text-xl font-medium">Production environment</h2>
+        {!isMultiProd && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex w-full items-center justify-between">
+                <h2 className="text-xl font-medium">Production environment</h2>
+              </div>
+
+              <p className="text-muted max-w-[400px] text-sm">
+                This is where you&apos;ll deploy all of your production apps.
+              </p>
             </div>
 
-            <p className="text-muted max-w-[400px] text-sm">
-              This is where you&apos;ll deploy all of your production apps.
-            </p>
-          </div>
-
-          <div className="border-muted rounded-md border">
-            <div className="border-l-primary-moderate flex min-w-0 items-center justify-between overflow-x-auto rounded-[4px] border-l-4 px-4 py-3">
-              <h3 className="flex flex-shrink-0 items-center gap-2 text-sm font-medium tracking-wide">
-                <StatusDot status="ACTIVE" size="small" />
-                Production
-              </h3>
-              <div className="flex flex-shrink-0 items-center gap-2 pl-2">
-                <EnvViewButton env={{ slug: 'production' }} />
-                <EnvKeysDropdownButton env={{ slug: 'production' }} />
+            <div className="border-muted rounded-md border">
+              <div className="border-l-primary-moderate flex min-w-0 items-center justify-between overflow-x-auto rounded-[4px] border-l-4 px-4 py-3">
+                <h3 className="flex flex-shrink-0 items-center gap-2 text-sm font-medium tracking-wide">
+                  <StatusDot status="ACTIVE" size="small" />
+                  Production
+                </h3>
+                <div className="flex flex-shrink-0 items-center gap-2 pl-2">
+                  <EnvViewButton env={{ slug: 'production' }} />
+                  <EnvKeysDropdownButton env={{ slug: 'production' }} />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="mb-2 flex flex-col gap-3">
           <div className="border-subtle mt-8 flex w-full items-center justify-between border-t pt-8">
@@ -103,6 +111,21 @@ export default function Environments() {
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3 pt-6">
+            {isMultiProd && (
+              <>
+                <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-md font-medium">Production environments</h2>
+                </div>
+                <div className="border-subtle overflow-hidden rounded-md border">
+                  <CustomEnvironmentListTable
+                    envs={prodEnvsData.filtered}
+                    paginationKey={getPaginationKey(filterStatus, searchParam)}
+                    unfilteredEnvsCount={prodEnvsData.total}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="flex w-full flex-wrap items-center justify-between gap-3">
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
