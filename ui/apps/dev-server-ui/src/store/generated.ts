@@ -595,6 +595,7 @@ export type QueryRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
+  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -1393,6 +1394,7 @@ export const GetRunsDocument = `
     filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
+    preview: true
   ) {
     edges {
       node {

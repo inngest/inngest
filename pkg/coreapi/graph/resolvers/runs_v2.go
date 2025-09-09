@@ -19,7 +19,7 @@ const (
 	maxRunItems     = 400
 )
 
-func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
+func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) (*models.RunsV2Connection, error) {
 	opts := toRunsQueryOpt(num, cur, order, filter)
 	runs, err := qr.Data.GetTraceRuns(ctx, opts)
 	if err != nil {

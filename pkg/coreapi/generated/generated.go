@@ -328,7 +328,7 @@ type ComplexityRoot struct {
 		Run                    func(childComplexity int, runID string) int
 		RunTraceSpanOutputByID func(childComplexity int, outputID string) int
 		RunTrigger             func(childComplexity int, runID string) int
-		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) int
+		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) int
 		Stream                 func(childComplexity int, query models.StreamQuery) int
 		WorkerConnection       func(childComplexity int, connectionID ulid.ULID) int
 		WorkerConnections      func(childComplexity int, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) int
@@ -619,7 +619,7 @@ type QueryResolver interface {
 	FunctionBySlug(ctx context.Context, query models.FunctionQuery) (*models.Function, error)
 	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
-	Runs(ctx context.Context, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error)
+	Runs(ctx context.Context, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) (*models.RunsV2Connection, error)
 	Run(ctx context.Context, runID string) (*models.FunctionRunV2, error)
 	RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error)
 	RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error)
@@ -2081,7 +2081,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Runs(childComplexity, args["first"].(int), args["after"].(*string), args["orderBy"].([]*models.RunsV2OrderBy), args["filter"].(models.RunsFilterV2)), true
+		return e.complexity.Query.Runs(childComplexity, args["first"].(int), args["after"].(*string), args["orderBy"].([]*models.RunsV2OrderBy), args["filter"].(models.RunsFilterV2), args["preview"].(*bool)), true
 
 	case "Query.stream":
 		if e.complexity.Query.Stream == nil {
@@ -3150,6 +3150,7 @@ input RerunFromStepInput {
     after: String
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
+    preview: Boolean
   ): RunsV2Connection!
   # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
   run(runID: String!): FunctionRunV2
@@ -4380,6 +4381,15 @@ func (ec *executionContext) field_Query_runs_args(ctx context.Context, rawArgs m
 		}
 	}
 	args["filter"] = arg3
+	var arg4 *bool
+	if tmp, ok := rawArgs["preview"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
+		arg4, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["preview"] = arg4
 	return args, nil
 }
 
@@ -13735,7 +13745,7 @@ func (ec *executionContext) _Query_runs(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Runs(rctx, fc.Args["first"].(int), fc.Args["after"].(*string), fc.Args["orderBy"].([]*models.RunsV2OrderBy), fc.Args["filter"].(models.RunsFilterV2))
+		return ec.resolvers.Query().Runs(rctx, fc.Args["first"].(int), fc.Args["after"].(*string), fc.Args["orderBy"].([]*models.RunsV2OrderBy), fc.Args["filter"].(models.RunsFilterV2), fc.Args["preview"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

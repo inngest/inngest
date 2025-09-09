@@ -262,6 +262,7 @@ export const GET_RUNS = gql`
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
+      preview: true
     ) {
       edges {
         node {
