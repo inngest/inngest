@@ -38,6 +38,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var runID string
 		var debugSessionID string
 		var debugRunID string
+		var status string
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -108,6 +109,13 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 
 			if string(attr.Key) == meta.Attrs.DebugRunID.Key() {
 				debugRunID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
+				status = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
@@ -189,6 +197,10 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			DebugRunID: sql.NullString{
 				String: debugRunID,
 				Valid:  debugRunID != "",
+			},
+			Status: sql.NullString{
+				String: status,
+				Valid:  status != "",
 			},
 		})
 		if err != nil {

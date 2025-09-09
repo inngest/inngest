@@ -342,8 +342,9 @@ INSERT INTO spans (
   links,
   output,
   debug_run_id,
-  debug_session_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  debug_session_id,
+  status
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetSpansByRunID :many
 SELECT
@@ -370,3 +371,4 @@ SELECT
 FROM spans
 WHERE span_id = ?
 LIMIT 1;
+
