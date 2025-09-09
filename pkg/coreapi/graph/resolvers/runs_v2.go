@@ -386,9 +386,8 @@ func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.
 	return &resp, nil
 }
 
-func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
-	preview := false
-	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter, &preview)
+func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection, preview *bool) (int, error) {
+	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter, preview)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)

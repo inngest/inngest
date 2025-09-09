@@ -1777,7 +1777,15 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	res, err := w.GetTraceRuns(ctx, opt)
+	var (
+		res []*cqrs.TraceRun
+		err error
+	)
+	if opt.Preview {
+		res, err = w.GetSpanRuns(ctx, opt)
+	} else {
+		res, err = w.GetTraceRuns(ctx, opt)
+	}
 	if err != nil {
 		return 0, err
 	}
