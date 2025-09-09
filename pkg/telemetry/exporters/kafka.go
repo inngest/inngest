@@ -212,7 +212,12 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 				status = "error"
 
 				if strings.Contains(err.Error(), consts.KafkaMsgTooLargeError) {
-					l.Error("error", err, "span proto size", proto.Size(span), "marhsalled span proto size", len(byt), "span.output size", len(span.Output))
+					batchSize := len(span.Events)
+					evtPayloadSizes := make([]int, len(span.Events))
+					for i, evt := range span.Events {
+						evtPayloadSizes[i] = len(evt.Name)
+					}
+					l.Error("error on producing span MESSAGE_TOO_LARGE", "error", err, "span proto size", proto.Size(span), "marhsalled span proto size", len(byt), "span.output size", len(span.Output), "batchSize", batchSize, "evt payload sizes:", evtPayloadSizes)
 				}
 			}
 

@@ -86,6 +86,16 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
+type normalizedSpan interface {
+	GetTraceID() string
+	GetRunID() string
+	GetDynamicSpanID() sql.NullString
+	GetParentSpanID() sql.NullString
+	GetStartTime() interface{}
+	GetEndTime() interface{}
+	GetSpanFragments() any
+}
+
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
 	if err != nil {
@@ -93,41 +103,107 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	// We need an ordered map here because we loop over it later
+	return mapRootSpansFromRows(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
+
+	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	return mapRootSpansFromRows(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	for _, span := range spans {
+		if span.DebugRunID.Valid {
+			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+		}
+	}
+
+	var allRoots []*cqrs.OtelSpan
+
+	for _, runSpans := range spansByDebugRun {
+		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+		if err != nil {
+			return nil, err
+		}
+		allRoots = append(allRoots, rootSpan)
+	}
+
+	return allRoots, nil
+}
+
+// Uses generics to accept slices of any type that implements normalizedSpan interface
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
-	// A map of dynamic span IDs to the specific span ID that contains an
-	// output
+	// A map of dynamic span IDs to the specific span ID that contains an output
 	outputDynamicRefs := make(map[string]string)
 	var root *cqrs.OtelSpan
+	var runID ulid.ULID
 
 	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		// Use interface methods to get the fields directly
+		traceID := span.GetTraceID()
+		runIDStr := span.GetRunID()
+		dynamicSpanID := span.GetDynamicSpanID()
+		parentSpanID := span.GetParentSpanID()
+		startTime := span.GetStartTime()
+		endTime := span.GetEndTime()
+		spanFragments := span.GetSpanFragments()
+
+		st := strings.Split(startTime.(string), " m=")[0]
+		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
 			return nil, err
 		}
 
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+		et := strings.Split(endTime.(string), " m=")[0]
+		parsedEndTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
 			return nil, err
 		}
 
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
+		var parentSpanIDPtr *string
+		if parentSpanID.Valid {
+			parentSpanIDPtr = &parentSpanID.String
+		}
+
+		runID, err := ulid.Parse(runIDStr)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing run ID from span", "error", err)
+			return nil, err
 		}
 
 		newSpan := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
+				SpanID:       dynamicSpanID.String,
+				TraceID:      traceID,
+				ParentSpanID: parentSpanIDPtr,
+				StartTime:    parsedStartTime,
+				EndTime:      parsedEndTime,
 				Name:         "",
 				Attributes:   make(map[string]any),
 			},
@@ -139,7 +215,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		var outputSpanID *string
 		var fragments []map[string]interface{}
 		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
@@ -159,7 +235,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
-					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
+					outputDynamicRefs[dynamicSpanID.String] = outputRef
 				}
 			}
 		}
@@ -185,6 +261,14 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			newSpan.RunID = *newSpan.Attributes.RunID
 		}
 
+		if newSpan.Attributes.DebugRunID != nil {
+			newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
+		}
+
+		if newSpan.Attributes.DebugSessionID != nil {
+			newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
+		}
+
 		if newSpan.Attributes.StartedAt != nil {
 			newSpan.StartTime = *newSpan.Attributes.StartedAt
 		}
@@ -206,7 +290,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		spanMap.Set(span.DynamicSpanID.String, newSpan)
+		spanMap.Set(dynamicSpanID.String, newSpan)
 	}
 
 	for _, span := range spanMap.AllFromFront() {
@@ -216,6 +300,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
 				// We've found the span ID that we need to target for
 				// this span. So let's use it!
+				var err error
 				span.OutputID, err = encodeSpanOutputID(targetSpanID)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)

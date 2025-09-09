@@ -5,9 +5,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useShared } from '../SharedContext/SharedContext';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
-import { Skeleton } from '../Skeleton';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
@@ -19,6 +19,10 @@ import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { useStepSelection } from './utils';
+
+//
+// userland traces can land after the run is completed
+const RESIDUAL_POLL_INTERVAL = 6000;
 
 type Props = {
   standalone: boolean;
@@ -54,6 +58,11 @@ export const RunDetailsV3 = ({
   pollInterval: initialPollInterval,
   initialRunData,
 }: Props) => {
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
   const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -160,13 +169,19 @@ export const RunDetailsV3 = ({
     enabled: Boolean(outputID),
   });
 
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setPollInterval(undefined);
+    }
+  }, [pollingFlagReady, pollingDisabled]);
+
   if (runData?.trace.endedAt && pollInterval) {
     //
     // Stop polling for ended runs, but still give it
     // a few seconds for any lingering userland traces.
     setTimeout(() => {
       setPollInterval(undefined);
-    }, 6000);
+    }, RESIDUAL_POLL_INTERVAL);
   }
 
   const waiting = isWaiting(

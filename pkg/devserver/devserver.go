@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
@@ -587,9 +588,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 	}
 
+	apiv2Base := apiv2base.NewBase()
 	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
 		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-	})
+	}, apiv2Base)
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
 	}
