@@ -2493,22 +2493,22 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
-	evtIDs := []string{}
-	expHandler, err := run.NewExpressionHandler(ctx,
-		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if expHandler.HasEventFilters() {
-		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
-		if err != nil {
-			return nil, err
-		}
-		for _, e := range evts {
-			evtIDs = append(evtIDs, e.ID.String())
-		}
-	}
+	// evtIDs := []string{}
+	// expHandler, err := run.NewExpressionHandler(ctx,
+	// 	run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if expHandler.HasEventFilters() {
+	// 	evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	for _, e := range evts {
+	// 		evtIDs = append(evtIDs, e.ID.String())
+	// 	}
+	// }
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 	filter := builder.filter
@@ -2592,6 +2592,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			return nil, err
 		}
 
+		// TODO Event ID filtering based on CEL filtering
+
 		if runSpanMap[span.RunID] == nil {
 			runSpanMap[span.RunID] = make(map[string][]*spanRow)
 		}
@@ -2666,7 +2668,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		// Find min start_time and max end_time across all spans in this group
 		startTime := spans[0].StartTime
 		var endTime *time.Time
-		var status enums.RunStatus = enums.RunStatusRunning // default
+		var status = enums.RunStatusRunning
 
 		for _, span := range spans {
 			if span.StartTime.Before(startTime) {
