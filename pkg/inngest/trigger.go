@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cespare/xxhash/v2"
@@ -133,6 +134,35 @@ func (e EventTrigger) TitleName() string {
 	}
 
 	return strings.Join(words, joiner)
+}
+
+// MatchesAnyPattern checks if this event trigger matches any of the provided patterns.
+func (e EventTrigger) MatchesAnyPattern(patterns []string) bool {
+	return slices.Contains(patterns, e.Event)
+}
+
+// GenerateMatchingPatterns returns all matching trigger patterns for the given event name
+// including wildcards (e.g., "foo/bar" -> ["foo/bar", "foo/*"])
+func GenerateMatchingPatterns(eventName string) []string {
+	patterns := []string{eventName}
+
+	parts := strings.Split(eventName, "/")
+	if len(parts) > 1 {
+		for n := range parts[0 : len(parts)-1] {
+			prefix := strings.Join(parts[0:n+1], "/")
+			patterns = append(patterns, prefix+"/*")
+		}
+	}
+
+	parts = strings.Split(eventName, ".")
+	if len(parts) > 1 {
+		for n := range parts[0 : len(parts)-1] {
+			prefix := strings.Join(parts[0:n+1], ".")
+			patterns = append(patterns, prefix+".*")
+		}
+	}
+
+	return patterns
 }
 
 func (e EventTrigger) Validate(ctx context.Context) error {
