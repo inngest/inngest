@@ -16,7 +16,6 @@ jobs:
   audit:
     name: pnpm security audit
     runs-on: ubuntu-latest
-    working-directory: ui
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-and-build
@@ -26,6 +25,7 @@ jobs:
       # peer dependencies and are not installed in every usage, so we omit them
       # here and only check what's shipped directly by us.
       - run: pnpm audit --audit-level=critical --prod --no-optional
+        working-directory: ui
               
 
 
