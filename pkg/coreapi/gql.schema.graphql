@@ -592,6 +592,8 @@ type RunTraceSpan {
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
   userlandSpan: UserlandSpan
+  debugRunID: ULID
+  debugSessionID: ULID
 }
 
 type UserlandSpan {
@@ -625,6 +627,19 @@ type RunTraceTrigger {
   isBatch: Boolean! # indicates if this trigger is a batch trigger
   batchID: ULID # the batchID of this list of events if available
   cron: String # The cron expression if available
+}
+
+# debug types
+
+type DebugRun {
+  debugRun: RunTraceSpan
+  runSteps: [RunStep!]
+}
+
+type RunStep {
+  stepID: String!
+  name: String!
+  stepOp: StepOp
 }
 
 # connect

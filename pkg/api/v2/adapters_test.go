@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -15,6 +16,17 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
+
+// Helper functions for tests
+func newTestGRPCServer(serviceOpts ServiceOptions, grpcOpts GRPCServerOptions) *grpc.Server {
+	base := apiv2base.NewBase()
+	return NewGRPCServer(serviceOpts, grpcOpts, base)
+}
+
+func newTestGRPCServerFromHTTPOptions(serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions) *grpc.Server {
+	base := apiv2base.NewBase()
+	return NewGRPCServerFromHTTPOptions(serviceOpts, httpOpts, base)
+}
 
 func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 	ctx := context.Background()
@@ -31,7 +43,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 			})
 		}
 
-		authzFunc := HTTPMiddlewareToGRPCInterceptor(allowMiddleware)
+		authzFunc := apiv2base.HTTPMiddlewareToGRPCInterceptor(allowMiddleware)
 
 		// Create context with valid authorization header
 		md := metadata.Pairs("authorization", "Bearer valid-token")
@@ -48,7 +60,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 			})
 		}
 
-		authzFunc := HTTPMiddlewareToGRPCInterceptor(blockMiddleware)
+		authzFunc := apiv2base.HTTPMiddlewareToGRPCInterceptor(blockMiddleware)
 
 		err := authzFunc(ctx, "/api.v2.V2/CreatePartnerAccount")
 		require.Error(t, err)
@@ -69,7 +81,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 			})
 		}
 
-		authzFunc := HTTPMiddlewareToGRPCInterceptor(headerCheckMiddleware)
+		authzFunc := apiv2base.HTTPMiddlewareToGRPCInterceptor(headerCheckMiddleware)
 
 		// Create context with invalid authorization header
 		md := metadata.Pairs("authorization", "Bearer invalid-token")
@@ -94,7 +106,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 			AuthzMiddleware: blockMiddleware,
 		}
 
-		server := NewGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
+		server := newTestGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
 
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
@@ -132,7 +144,7 @@ func TestNewGRPCServerFromHTTPOptions(t *testing.T) {
 	t.Run("works without middleware", func(t *testing.T) {
 		httpOpts := HTTPHandlerOptions{}
 
-		server := NewGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
+		server := newTestGRPCServerFromHTTPOptions(ServiceOptions{}, httpOpts)
 
 		// Setup in-memory connection
 		lis := bufconn.Listen(1024 * 1024)
@@ -177,7 +189,7 @@ func TestGRPCServerOptions(t *testing.T) {
 			AuthzMiddleware: httpMiddleware,
 		}
 
-		server := NewGRPCServer(ServiceOptions{}, opts)
+		server := newTestGRPCServer(ServiceOptions{}, opts)
 		require.NotNil(t, server)
 	})
 }

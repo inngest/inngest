@@ -41,6 +41,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	if p.md != nil {
 		AddMetadataTenantAttrs(rawAttrs, p.md.ID)
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugRunID, p.md.Config.DebugRunID())
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, p.md.Config.DebugSessionID())
 	} else if p.qi != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
 		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.qi.Identifier.WorkflowID)

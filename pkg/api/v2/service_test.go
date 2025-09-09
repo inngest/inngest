@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+
 func TestService_Health(t *testing.T) {
 	service := NewService(ServiceOptions{})
 
@@ -62,7 +63,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("creates HTTP handler without auth middleware", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -80,7 +81,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -96,7 +97,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("handles health endpoint correctly", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -114,7 +115,7 @@ func TestNewHTTPHandler(t *testing.T) {
 
 	t.Run("strips /api/v2 prefix correctly", func(t *testing.T) {
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)

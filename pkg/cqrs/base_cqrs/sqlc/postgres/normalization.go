@@ -337,6 +337,32 @@ func (r *GetSpansByRunIDRow) ToSQLite() (*sqlc.GetSpansByRunIDRow, error) {
 	}, nil
 }
 
+func (r *GetSpansByDebugRunIDRow) ToSQLite() (*sqlc.GetSpansByDebugRunIDRow, error) {
+	return &sqlc.GetSpansByDebugRunIDRow{
+		TraceID:        r.TraceID,
+		RunID:          r.RunID,
+		DebugSessionID: r.DebugSessionID,
+		DynamicSpanID:  r.DynamicSpanID,
+		StartTime:      r.StartTime,
+		EndTime:        r.EndTime,
+		ParentSpanID:   r.ParentSpanID,
+		SpanFragments:  r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpansByDebugSessionIDRow) ToSQLite() (*sqlc.GetSpansByDebugSessionIDRow, error) {
+	return &sqlc.GetSpansByDebugSessionIDRow{
+		TraceID:       r.TraceID,
+		RunID:         r.RunID,
+		DebugRunID:    r.DebugRunID,
+		DynamicSpanID: r.DynamicSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		ParentSpanID:  r.ParentSpanID,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
 	data, err := json.Marshal(v)
 	if err != nil {

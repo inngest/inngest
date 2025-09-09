@@ -10,8 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/stretchr/testify/require"
 )
+
+// Helper function for tests
+func newTestHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HTTPHandlerOptions) (http.Handler, error) {
+	base := apiv2base.NewBase()
+	return NewHTTPHandler(ctx, serviceOpts, httpOpts, base)
+}
 
 type healthResponse struct {
 	Data     healthData       `json:"data"`
@@ -30,7 +37,7 @@ type responseMetadata struct {
 func TestHTTPGateway_Health(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("GET /api/v2/health returns success", func(t *testing.T) {
@@ -91,7 +98,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -114,7 +121,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthnMiddleware: authMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
@@ -139,7 +146,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test protected endpoint (CreatePartnerAccount)
@@ -166,7 +173,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		opts := HTTPHandlerOptions{
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test health endpoint (should not trigger authz middleware)
@@ -203,7 +210,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 			AuthnMiddleware: authnMiddleware,
 			AuthzMiddleware: authzMiddleware,
 		}
-		handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 		require.NoError(t, err)
 
 		// Test protected endpoint (CreatePartnerAccount) - should hit both middlewares
@@ -222,7 +229,7 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 func TestHTTPGateway_Routing(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("routes without /api/v2 prefix return 404", func(t *testing.T) {
@@ -263,7 +270,7 @@ func TestHTTPGateway_Routing(t *testing.T) {
 func TestHTTPGateway_ContentTypes(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("accepts application/json content type for valid methods", func(t *testing.T) {
@@ -303,7 +310,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 		cancel()
 
 		opts := HTTPHandlerOptions{}
-		handler, err := NewHTTPHandler(cancelledCtx, ServiceOptions{}, opts)
+		handler, err := newTestHTTPHandler(cancelledCtx, ServiceOptions{}, opts)
 
 		require.NoError(t, err)
 		require.NotNil(t, handler)
@@ -313,7 +320,7 @@ func TestHTTPGateway_ErrorHandling(t *testing.T) {
 func TestHTTPGateway_ResponseFormat(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("response format matches expected schema", func(t *testing.T) {
@@ -362,7 +369,7 @@ func TestHTTPGateway_ResponseFormat(t *testing.T) {
 func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(t, err)
 
 	t.Run("handles concurrent requests", func(t *testing.T) {
@@ -393,7 +400,7 @@ func TestHTTPGateway_ConcurrentRequests(t *testing.T) {
 func BenchmarkHTTPGateway_Health(b *testing.B) {
 	ctx := context.Background()
 	opts := HTTPHandlerOptions{}
-	handler, err := NewHTTPHandler(ctx, ServiceOptions{}, opts)
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{}, opts)
 	require.NoError(b, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
