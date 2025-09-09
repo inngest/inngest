@@ -22,7 +22,6 @@ export const GetRunsDocument = graphql(`
           timeField: $timeField
           fnSlug: $functionSlug
           query: $celQuery
-          preview: true
         }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
