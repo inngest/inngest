@@ -14,4 +14,6 @@ const (
 	KindPauseBlockFlush = "pbf"    // Flushes pauses from the buffer to blocks.
 	KindJobPromote      = "jps"    // job promotion service
 	KindCancel          = "cancel" // cancel signals eager cancellation of queue items
+	KindFunctionPause   = "fp"     // pause function
+	KindFunctionUnpause = "fup"    // unpause function
 )

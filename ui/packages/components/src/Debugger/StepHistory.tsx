@@ -6,31 +6,18 @@ import { Button } from '../Button';
 import { Pill } from '../Pill';
 import { IO } from '../RunDetailsV3/IO';
 import { Tabs } from '../RunDetailsV3/Tabs';
+import type { RunTraceSpan } from '../SharedContext/useGetDebugRun';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusTextClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
+import { exampleAiOutput, exampleInput, exampleOutput } from './History';
 
 export type StepHistoryProps = {
-  id: string;
-  dateStarted: Date;
-  status: string;
-  tagCount: number;
-  input: any;
-  output: any;
-  aiOutput: any;
+  debugRun: RunTraceSpan;
   defaultOpen?: boolean;
 };
 
-export const StepHistory = ({
-  id,
-  dateStarted,
-  status,
-  tagCount,
-  input,
-  output,
-  aiOutput,
-  defaultOpen = false,
-}: StepHistoryProps) => {
+export const StepHistory = ({ debugRun, defaultOpen = false }: StepHistoryProps) => {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -40,23 +27,24 @@ export const StepHistory = ({
         onClick={() => setOpen(!open)}
       >
         <div className="text-muted w-[30%] whitespace-nowrap text-sm">
-          {dateStarted.toLocaleString()}
+          {debugRun.startedAt?.toLocaleString()}
         </div>
 
         <div
           className={cn(
             'flex w-[30%] flex-row items-center gap-2 text-sm',
-            getStatusTextClass(status)
+            getStatusTextClass(debugRun.status)
           )}
         >
-          <StatusDot status={status} className="h-2.5 w-2.5" />
-          {status}
+          <StatusDot status={debugRun.status} className="h-2.5 w-2.5" />
+          {debugRun.status}
         </div>
         <div className="w-[20%]">
           <Pill appearance="outlined" kind="primary">
             <div className="flex flex-row items-center gap-1">
               <RiLightbulbLine className="text-muted h-2.5 w-2.5" />
-              {tagCount}
+
+              {Math.floor(Math.random() * 100)}
             </div>
           </Pill>
         </div>
@@ -78,27 +66,37 @@ export const StepHistory = ({
       {open && (
         <div className="flex w-full flex-col">
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4 py-6">
-            {aiOutput && <AITrace aiOutput={aiOutput} />}
+            {exampleAiOutput && <AITrace aiOutput={exampleAiOutput} />}
           </div>
           <Tabs
             defaultActive={'input'}
             tabs={[
-              ...(input
+              ...(exampleInput
                 ? [
                     {
                       label: 'Input',
                       id: 'input',
-                      node: <IO raw={JSON.stringify(input, null, 2)} title="Input" parsed={true} />,
+                      node: (
+                        <IO
+                          raw={JSON.stringify(exampleInput, null, 2)}
+                          title="Input"
+                          parsed={true}
+                        />
+                      ),
                     },
                   ]
                 : []),
-              ...(output
+              ...(exampleOutput
                 ? [
                     {
                       label: 'Output',
                       id: 'output',
                       node: (
-                        <IO title="output" raw={JSON.stringify(output, null, 2)} parsed={true} />
+                        <IO
+                          title="output"
+                          raw={JSON.stringify(exampleOutput, null, 2)}
+                          parsed={true}
+                        />
                       ),
                     },
                   ]
