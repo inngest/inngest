@@ -33,7 +33,30 @@ export function getActiveEnvironment(
 export function getDefaultEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
-  return environments.find((e) => e.type === EnvironmentType.Production) || null;
+  let isMultiProd = false;
+  let prodCount = 0;
+  for (const env of environments) {
+    if (env.type === EnvironmentType.Production) {
+      prodCount++;
+    }
+    if (prodCount > 1) {
+      isMultiProd = true;
+      break;
+    }
+  }
+  if (isMultiProd) {
+    return null;
+  }
+
+  const env = environments.find((e) => e.type === EnvironmentType.Production);
+  if (env) {
+    return {
+      ...env,
+      slug: 'production',
+      name: 'Production',
+    };
+  }
+  return null;
 }
 
 function getRecentCutOffDate(): Date {
@@ -123,23 +146,16 @@ export function workspaceToEnvironment(
     | 'lastDeployedAt'
   >
 ): Environment {
-  const isProduction = workspace.type === EnvironmentType.Production;
-
-  let environmentName = workspace.name;
-  if (isProduction) {
-    environmentName = 'Production';
-  }
-
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
-    environmentName,
+    environmentName: workspace.name,
     environmentSlug: workspace.slug,
     environmentType: workspace.type,
   });
 
   return {
     id: workspace.id,
-    name: environmentName,
+    name: workspace.name,
     slug,
     type: workspace.type,
     hasParent: Boolean(workspace.parentID),
@@ -169,12 +185,8 @@ export function getEnvironmentSlug({
   environmentSlug,
   environmentType,
 }: getEnvironmentSlugProps): string {
-  const isProduction = environmentType === EnvironmentType.Production;
-
   let slug = environmentSlug || '';
-  if (isProduction) {
-    slug = staticSlugs.production;
-  } else if (environmentType === EnvironmentType.BranchParent) {
+  if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
   } else if (!slug) {
     slug = `${slugify(environmentName)}-${environmentID.split('-')[0]}`;
