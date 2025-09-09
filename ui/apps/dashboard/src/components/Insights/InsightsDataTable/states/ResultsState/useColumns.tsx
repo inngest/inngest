@@ -5,6 +5,7 @@ import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
+import { InsightsTextCell } from './InsightsTextCell';
 
 type InsightsEntry = InsightsFetchResult['rows'][number];
 type InsightsColumnValue = InsightsEntry['values'][string];
@@ -28,7 +29,7 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
               return <TimeCell date={new Date(value)} />;
             case 'number':
             case 'string':
-              return <TextCell>{String(value)}</TextCell>;
+              return <InsightsTextCell>{String(value)}</InsightsTextCell>;
           }
         },
         header: col.name,
