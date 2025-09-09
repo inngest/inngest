@@ -1,0 +1,32 @@
+name: UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/**"
+  pull_request:
+    paths:
+      - "ui/**"
+
+jobs:
+  # A flag we can use to warn us of critical known issues in the chain. This
+  # should be caught in a number of places (including GitHub as CVEs), but we
+  # also perform a check here.
+  audit:
+    name: pnpm security audit
+    runs-on: ubuntu-latest
+    working-directory: ui
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-and-build
+        with:
+          build: false
+      # Optional dependencies are packages like frameworks, which are actually
+      # peer dependencies and are not installed in every usage, so we omit them
+      # here and only check what's shipped directly by us.
+      - run: pnpm audit --audit-level=critical --prod --no-optional
+              
+
+
+
