@@ -79,7 +79,8 @@
       "cipher-base@<=1.0.4": ">=1.0.5",
       "minimatch@<5.0.0": ">=5.0.0",
       "nodemon": ">=3.0.0",
-      "nodemon>minimatch": "3.1.2"
+      "nodemon>minimatch": "3.1.2",
+      "nodemon>brace-expansion": "1.1.11"
     }
   }
 }
