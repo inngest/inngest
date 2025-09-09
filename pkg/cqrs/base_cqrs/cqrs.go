@@ -2599,126 +2599,154 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	// Convert grouped spans to TraceRuns
-	res := []*cqrs.TraceRun{}
-	var count uint
+	type runGroup struct {
+		runID         string
+		dynamicSpanID string
+		spans         []*spanRow
+		startTime     time.Time
+	}
 
+	// Collect all run groups first
+	var runGroups []runGroup
 	for runID, spanGroups := range runSpanMap {
-		for _, spans := range spanGroups {
+		for dynamicSpanID, spans := range spanGroups {
 			if len(spans) == 0 {
 				continue
 			}
-
-			// Use first span for metadata (they should all have the same
-			// metadata)
-			firstSpan := spans[0]
-
-			// Parse UUIDs
-			accountUUID, err := uuid.Parse(firstSpan.AccountID)
-			if err != nil {
-				l.Debug("invalid account ID", "account_id", firstSpan.AccountID, "error", err)
-				continue
-			}
-			appUUID, err := uuid.Parse(firstSpan.AppID)
-			if err != nil {
-				l.Debug("invalid app ID", "app_id", firstSpan.AppID, "error", err)
-				continue
-			}
-			functionUUID, err := uuid.Parse(firstSpan.FunctionID)
-			if err != nil {
-				l.Debug("invalid function ID", "function_id", firstSpan.FunctionID, "error", err)
-				continue
-			}
-
-			// Find min start_time and max end_time across all spans in this
-			// group
+			// Find earliest start time for sorting
 			startTime := spans[0].StartTime
-			var endTime *time.Time
-			var status enums.RunStatus = enums.RunStatusRunning // default
-
 			for _, span := range spans {
 				if span.StartTime.Before(startTime) {
 					startTime = span.StartTime
 				}
-				if span.EndTime != nil && (endTime == nil || span.EndTime.After(*endTime)) {
-					endTime = span.EndTime
-				}
-				// Get the latest non-empty status
-				if span.Status != nil && *span.Status != "" {
-					// Convert StepStatus string to RunStatus enum
-					if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
-						switch stepStatus {
-						case enums.StepStatusCompleted:
-							status = enums.RunStatusCompleted
-						case enums.StepStatusFailed, enums.StepStatusErrored:
-							status = enums.RunStatusFailed
-						case enums.StepStatusRunning:
-							status = enums.RunStatusRunning
-						case enums.StepStatusCancelled:
-							status = enums.RunStatusCancelled
-						case enums.StepStatusTimedOut:
-							status = enums.RunStatusCancelled // Map timeout to cancelled
-						case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
-							status = enums.RunStatusRunning // These are all "in progress" states
-						}
+			}
+			runGroups = append(runGroups, runGroup{
+				runID:         runID,
+				dynamicSpanID: dynamicSpanID,
+				spans:         spans,
+				startTime:     startTime,
+			})
+		}
+	}
+
+	// Sort by start_time DESC (newest first), then by run_id for stable ordering
+	sort.Slice(runGroups, func(i, j int) bool {
+		if runGroups[i].startTime.Equal(runGroups[j].startTime) {
+			return runGroups[i].runID < runGroups[j].runID
+		}
+		return runGroups[i].startTime.After(runGroups[j].startTime)
+	})
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+
+	for _, group := range runGroups {
+		spans := group.spans
+
+		// Use first span for metadata (they should all have the same metadata)
+		firstSpan := spans[0]
+
+		// Parse UUIDs
+		accountUUID, err := uuid.Parse(firstSpan.AccountID)
+		if err != nil {
+			l.Debug("invalid account ID", "account_id", firstSpan.AccountID, "error", err)
+			continue
+		}
+		appUUID, err := uuid.Parse(firstSpan.AppID)
+		if err != nil {
+			l.Debug("invalid app ID", "app_id", firstSpan.AppID, "error", err)
+			continue
+		}
+		functionUUID, err := uuid.Parse(firstSpan.FunctionID)
+		if err != nil {
+			l.Debug("invalid function ID", "function_id", firstSpan.FunctionID, "error", err)
+			continue
+		}
+
+		// Find min start_time and max end_time across all spans in this group
+		startTime := spans[0].StartTime
+		var endTime *time.Time
+		var status enums.RunStatus = enums.RunStatusRunning // default
+
+		for _, span := range spans {
+			if span.StartTime.Before(startTime) {
+				startTime = span.StartTime
+			}
+			if span.EndTime != nil && (endTime == nil || span.EndTime.After(*endTime)) {
+				endTime = span.EndTime
+			}
+			// Get the latest non-empty status
+			if span.Status != nil && *span.Status != "" {
+				// Convert StepStatus string to RunStatus enum
+				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
+					switch stepStatus {
+					case enums.StepStatusCompleted:
+						status = enums.RunStatusCompleted
+					case enums.StepStatusFailed, enums.StepStatusErrored:
+						status = enums.RunStatusFailed
+					case enums.StepStatusRunning:
+						status = enums.RunStatusRunning
+					case enums.StepStatusCancelled:
+						status = enums.RunStatusCancelled
+					case enums.StepStatusTimedOut:
+						status = enums.RunStatusCancelled // Map timeout to cancelled
+					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
+						status = enums.RunStatusRunning // These are all "in progress" states
 					}
 				}
-			}
-
-			// Calculate duration
-			var duration time.Duration
-			if endTime != nil {
-				duration = endTime.Sub(startTime)
-			}
-
-			// Build cursor for pagination
-			var cursor string
-			if resCursorLayout != nil {
-				c := &cqrs.TracePageCursor{
-					ID:      runID,
-					Cursors: map[string]cqrs.TraceCursor{},
-				}
-				for field := range resCursorLayout.Cursors {
-					switch field {
-					case "start_time":
-						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMilli()}
-					case "end_time":
-						if endTime != nil {
-							c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMilli()}
-						}
-					}
-				}
-				if encoded, err := c.Encode(); err == nil {
-					cursor = encoded
-				}
-			}
-
-			traceRun := &cqrs.TraceRun{
-				AccountID:   accountUUID,
-				WorkspaceID: accountUUID, // Using account ID as workspace ID for now
-				AppID:       appUUID,
-				FunctionID:  functionUUID,
-				TraceID:     firstSpan.TraceID,
-				RunID:       runID,
-				QueuedAt:    startTime,
-				StartedAt:   startTime,
-				Duration:    duration,
-				Status:      status,
-				Cursor:      cursor,
-			}
-
-			if endTime != nil {
-				traceRun.EndedAt = *endTime
-			}
-
-			res = append(res, traceRun)
-			count++
-
-			// enough items, don't need to proceed anymore
-			if opt.Items > 0 && count >= opt.Items {
-				break
 			}
 		}
 
+		// Calculate duration
+		var duration time.Duration
+		if endTime != nil {
+			duration = endTime.Sub(startTime)
+		}
+
+		// Build cursor for pagination
+		var cursor string
+		if resCursorLayout != nil {
+			c := &cqrs.TracePageCursor{
+				ID:      group.runID,
+				Cursors: map[string]cqrs.TraceCursor{},
+			}
+			for field := range resCursorLayout.Cursors {
+				switch field {
+				case "start_time":
+					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMilli()}
+				case "end_time":
+					if endTime != nil {
+						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMilli()}
+					}
+				}
+			}
+			if encoded, err := c.Encode(); err == nil {
+				cursor = encoded
+			}
+		}
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountUUID,
+			WorkspaceID: accountUUID, // Using account ID as workspace ID for now
+			AppID:       appUUID,
+			FunctionID:  functionUUID,
+			TraceID:     firstSpan.TraceID,
+			RunID:       group.runID,
+			QueuedAt:    startTime,
+			StartedAt:   startTime,
+			Duration:    duration,
+			Status:      status,
+			Cursor:      cursor,
+		}
+
+		if endTime != nil {
+			traceRun.EndedAt = *endTime
+		}
+
+		res = append(res, traceRun)
+		count++
+
+		// enough items, don't need to proceed anymore
 		if opt.Items > 0 && count >= opt.Items {
 			break
 		}
