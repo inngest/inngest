@@ -17,10 +17,13 @@ jobs:
     name: pnpm security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-and-build
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4.0.0
         with:
-          build: false
+          version: "8.15.8"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       # Optional dependencies are packages like frameworks, which are actually
       # peer dependencies and are not installed in every usage, so we omit them
       # here and only check what's shipped directly by us.
