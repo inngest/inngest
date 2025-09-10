@@ -71,14 +71,14 @@ const (
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
-	PartitionPausedRequeueExtension           = 24 * time.Hour
+	PartitionPausedRequeueExtension           = 5 * time.Minute
 	PartitionLookahead                        = time.Second
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
 	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
 
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
-	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour
+	ShadowPartitionRefillPausedRequeueExtension          = 5 * time.Minute
 	BacklogDefaultRequeueExtension                       = 2 * time.Second
 
 	// default values
