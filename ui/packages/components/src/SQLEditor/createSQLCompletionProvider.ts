@@ -25,43 +25,57 @@ export function createSQLCompletionProvider(
       const suggestions: languages.CompletionItem[] = [];
 
       columns.forEach((column) => {
-        suggestions.push({
-          kind: languages.CompletionItemKind.Field,
-          insertText: column,
-          label: column,
-          range,
-        });
+        if (labelMatchesPrefix(column, word.word)) {
+          suggestions.push({
+            kind: languages.CompletionItemKind.Field,
+            insertText: column,
+            label: column,
+            range,
+          });
+        }
       });
 
       functions.forEach((func) => {
-        suggestions.push({
-          kind: languages.CompletionItemKind.Function,
-          insertText: func.signature,
-          insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          label: func.name,
-          range,
-        });
+        if (labelMatchesPrefix(func.name, word.word)) {
+          suggestions.push({
+            kind: languages.CompletionItemKind.Function,
+            insertText: func.signature,
+            insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            label: func.name,
+            range,
+          });
+        }
       });
 
       keywords.forEach((keyword) => {
-        suggestions.push({
-          kind: languages.CompletionItemKind.Keyword,
-          insertText: keyword,
-          label: keyword,
-          range,
-        });
+        if (labelMatchesPrefix(keyword, word.word)) {
+          suggestions.push({
+            kind: languages.CompletionItemKind.Keyword,
+            insertText: keyword,
+            label: keyword,
+            range,
+          });
+        }
       });
 
       tables.forEach((table) => {
-        suggestions.push({
-          kind: languages.CompletionItemKind.Class,
-          insertText: table,
-          label: table,
-          range,
-        });
+        if (labelMatchesPrefix(table, word.word)) {
+          suggestions.push({
+            kind: languages.CompletionItemKind.Class,
+            insertText: table,
+            label: table,
+            range,
+          });
+        }
       });
 
       return { suggestions };
     },
   };
+}
+
+function labelMatchesPrefix(label: string, prefix: string): boolean {
+  if (prefix === '') return true;
+
+  return label.toLowerCase().startsWith(prefix.toLowerCase());
 }
