@@ -1,4 +1,4 @@
-import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/createSQLCompletionProvider';
+import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/types';
 
 const KEYWORDS = [
   'AND',
