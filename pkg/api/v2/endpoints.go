@@ -273,3 +273,7 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	// 3. Return the list with proper pagination metadata
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
+
+func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*apiv2.PatchEnvsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
+}
