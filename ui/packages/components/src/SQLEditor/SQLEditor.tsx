@@ -6,7 +6,8 @@ import type { editor } from 'monaco-editor';
 
 import { EDITOR_OPTIONS } from './constants';
 import type { SQLCompletionConfig } from './createSQLCompletionProvider';
-import { useMonacoWithTheme, useSQLCompletions } from './hooks';
+import { useMonacoWithTheme } from './hooks/useMonacoWithTheme';
+import { useSQLCompletions } from './hooks/useSQLCompletions';
 
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 
