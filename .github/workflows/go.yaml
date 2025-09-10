@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - "ui/**"
 
+permissions:
+  contents: read
+
 jobs:
   golangci:
     name: Lint
