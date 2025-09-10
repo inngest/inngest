@@ -85,6 +85,15 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				}
 			}
 
+			// If we've been given a trace ID, it should overwrite whatever
+			// we've found in the span's own context; the caller knows best
+			if string(attr.Key) == meta.Attrs.DynamicTraceID.Key() {
+				traceID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
 			// Capture but omit the dynamic span ID attribute from the span attributes
 			if string(attr.Key) == meta.Attrs.DynamicSpanID.Key() {
 				dynamicSpanID = attr.Value.AsString()

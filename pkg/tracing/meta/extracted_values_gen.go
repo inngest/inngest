@@ -31,6 +31,7 @@ type ExtractedValues struct {
 	RunID *ulid.ULID
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
+	DynamicTraceID *string
 	InternalLocation *string
 	internalError *string
 	IsFunctionOutput *bool
