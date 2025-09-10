@@ -72,6 +72,7 @@ export default function Page() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        preview: tracesPreviewEnabled,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -92,7 +93,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField, search]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, search, tracesPreviewEnabled]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({

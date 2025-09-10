@@ -496,7 +496,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
-  totalCount: Int!
+  totalCount(preview: Boolean): Int!
 }
 
 type FunctionRunV2Edge {
