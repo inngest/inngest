@@ -1749,8 +1749,9 @@ INSERT INTO spans (
   links,
   output,
   debug_run_id,
-  debug_session_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  debug_session_id,
+  status
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
@@ -1771,6 +1772,7 @@ type InsertSpanParams struct {
 	Output         interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
+	Status         sql.NullString
 }
 
 // New
@@ -1793,6 +1795,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Output,
 		arg.DebugRunID,
 		arg.DebugSessionID,
+		arg.Status,
 	)
 	return err
 }

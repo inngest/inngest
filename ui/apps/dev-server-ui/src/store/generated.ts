@@ -645,6 +645,7 @@ export type QueryRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
+  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -842,6 +843,11 @@ export type RunsV2Connection = {
   edges: Array<FunctionRunV2Edge>;
   pageInfo: PageInfo;
   totalCount: Scalars['Int'];
+};
+
+
+export type RunsV2ConnectionTotalCountArgs = {
+  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 export type RunsV2OrderBy = {
@@ -1079,6 +1085,7 @@ export type GetRunsQueryVariables = Exact<{
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
+  preview?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
@@ -1088,6 +1095,7 @@ export type CountRunsQueryVariables = Exact<{
   startTime: Scalars['Time'];
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
+  preview?: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
@@ -1470,11 +1478,12 @@ export const RerunFromStepDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null) {
+    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false) {
   runs(
     filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
+    preview: $preview
   ) {
     edges {
       node {
@@ -1507,12 +1516,13 @@ export const GetRunsDocument = `
 }
     `;
 export const CountRunsDocument = `
-    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!) {
+    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $preview: Boolean = false) {
   runs(
     filter: {from: $startTime, status: $status, timeField: $timeField}
     orderBy: [{field: $timeField, direction: DESC}]
+    preview: $preview
   ) {
-    totalCount
+    totalCount(preview: $preview)
   }
 }
     `;

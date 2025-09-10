@@ -223,7 +223,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
 			if !strings.Contains(*opts.Response.Err, state.ErrFunctionCancelled.Error()) {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
 					Name:      event.FnFailedName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,
@@ -233,7 +233,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			// Add function cancelled event
 			if *opts.Response.Err == state.ErrFunctionCancelled.Error() {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
 					Name:      event.FnCancelledName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,

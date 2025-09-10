@@ -38,6 +38,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var runID string
 		var debugSessionID string
 		var debugRunID string
+		var status string
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -84,6 +85,15 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				}
 			}
 
+			// If we've been given a trace ID, it should overwrite whatever
+			// we've found in the span's own context; the caller knows best
+			if string(attr.Key) == meta.Attrs.DynamicTraceID.Key() {
+				traceID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
 			// Capture but omit the dynamic span ID attribute from the span attributes
 			if string(attr.Key) == meta.Attrs.DynamicSpanID.Key() {
 				dynamicSpanID = attr.Value.AsString()
@@ -108,6 +118,13 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 
 			if string(attr.Key) == meta.Attrs.DebugRunID.Key() {
 				debugRunID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
+				status = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
@@ -189,6 +206,10 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			DebugRunID: sql.NullString{
 				String: debugRunID,
 				Valid:  debugRunID != "",
+			},
+			Status: sql.NullString{
+				String: status,
+				Valid:  status != "",
 			},
 		})
 		if err != nil {

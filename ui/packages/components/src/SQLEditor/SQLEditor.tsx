@@ -6,19 +6,23 @@ import type { editor } from 'monaco-editor';
 
 import { EDITOR_OPTIONS } from './constants';
 import { useMonacoWithTheme } from './hooks/useMonacoWithTheme';
+import { useSQLCompletions } from './hooks/useSQLCompletions';
+import type { SQLCompletionConfig } from './types';
 
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 
 export type SQLEditorProps = {
+  completionConfig: SQLCompletionConfig;
   content: string;
   onChange: (value: string) => void;
   onMount?: SQLEditorMountCallback;
 };
 
-export function SQLEditor({ content, onChange, onMount }: SQLEditorProps) {
+export function SQLEditor({ completionConfig, content, onChange, onMount }: SQLEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useMonacoWithTheme(wrapperRef);
+  useSQLCompletions(completionConfig);
 
   const handleContentChange = useCallback(
     (newValue: string | undefined) => {

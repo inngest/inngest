@@ -99,8 +99,8 @@ export function getInsightsStatus({
   isError,
   isLoading,
 }: GetInsightsStatusParams): InsightsStatus {
-  if (isError) return 'error';
   if (isLoading) return 'loading';
+  if (isError) return 'error';
   if (data !== undefined) return 'success';
   return 'initial';
 }

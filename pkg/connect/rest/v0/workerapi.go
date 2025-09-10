@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -25,6 +26,7 @@ import (
 
 func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	start := time.Now()
 	connectionID, err := ulid.New(ulid.Now(), rand.Reader)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not generate connection id", "err", err)
@@ -64,6 +66,11 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "authentication failed"))
 		return
 	}
+
+	l = l.With(
+		"account_id", res.AccountID,
+		"env_id", res.EnvID,
+	)
 
 	entitlements, err := cr.EntitlementProvider.RetrieveConnectEntitlements(ctx, res)
 	if err != nil {
@@ -126,6 +133,13 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not marshal response"))
 		return
 	}
+
+	dur := time.Since(start)
+	l.Debug("completed connect start request",
+		"dur", dur,
+		"gateway_group", gatewayGroup,
+		"gateway_url", gatewayURL.String(),
+	)
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	_, _ = w.Write(msg)

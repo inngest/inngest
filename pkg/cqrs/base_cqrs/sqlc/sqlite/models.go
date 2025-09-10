@@ -138,6 +138,7 @@ type Span struct {
 	Output         interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
+	Status         sql.NullString
 }
 
 type Trace struct {
