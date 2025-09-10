@@ -26,22 +26,28 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ./go.mod
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 8.15.8
+
       - name: Build UI
         run: make build-ui
+
       - name: Build dev serve
         run: |
           go build -cover -o ./inngest-bin ./cmd
+
       - name: Run E2E tests
         run: |
           cd ./tests/js
@@ -89,10 +95,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ./go.mod
+
       - name: Build dev server
         run: go build -cover -o ./inngest-bin ./cmd
 
@@ -139,10 +147,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ./go.mod
 
       - name: Run execution tests
         run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
