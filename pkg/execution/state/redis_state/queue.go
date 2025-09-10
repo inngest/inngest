@@ -2078,6 +2078,21 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
+	if item.Data.Throttle != nil && (item.Data.Throttle.KeyExpressionHash == "" || item.Data.Throttle.KeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash) {
+		// TODO: Re-evaluate throttle key
+		status := "missing-expr-hash"
+		if item.Data.Throttle.KeyExpressionHash != "" {
+			status = "expr-hash-mismatch"
+		}
+
+		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"status": status,
+			},
+		})
+	}
+
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
@@ -2112,6 +2127,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency = constraints.Concurrency.SystemConcurrency
 	}
 
+	marshaledConstraints, err := json.Marshal(constraints)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal constraints: %w", err)
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
@@ -2126,6 +2146,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency,
 		constraints.CustomConcurrencyLimit(1),
 		constraints.CustomConcurrencyLimit(2),
+		string(marshaledConstraints),
 
 		// Key queues v2
 		checkConstraintsVal,
@@ -2215,7 +2236,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case -7:
-		if item.Data.Throttle == nil {
+		if constraints.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
 			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
 		}

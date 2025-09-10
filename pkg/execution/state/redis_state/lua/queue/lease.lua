@@ -53,10 +53,11 @@ local concurrencyAcct 				= tonumber(ARGV[7])
 local concurrencyPartition    = tonumber(ARGV[8])
 local customConcurrencyKey1   = tonumber(ARGV[9])
 local customConcurrencyKey2   = tonumber(ARGV[10])
+local marshaledConstraints    = ARGV[11]
 
 -- key queues v2
-local checkConstraints    = tonumber(ARGV[11])
-local refilledFromBacklog = tonumber(ARGV[12])
+local checkConstraints    = tonumber(ARGV[12])
+local refilledFromBacklog = tonumber(ARGV[13])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -89,13 +90,17 @@ item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
 -- NOTE: we can probably skip this entire section if item comes from backlog?
 if checkConstraints == 1 then
+  local constraints = cjson.decode(marshaledConstraints)
+
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 	-- us to target specific queue items with rate limiting individually.
 	--
 	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
 	-- with o(1) operations vs o(log(n)).
-	if item.data ~= nil and item.data.throttle ~= nil and item.data.throttle.p > 0 and refilledFromBacklog == 0 then
-		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
+  local itemHasThrottle = item.data ~= nil and item.data.throttle ~= nil
+  local throttleConstraintExists = constraints.t ~= nil and constraints.t.p > 0
+	if itemHasThrottle and throttleConstraintExists and refilledFromBacklog == 0 then
+		local throttleResult = gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b)
 		if throttleResult == false then
 			return -7
 		end
