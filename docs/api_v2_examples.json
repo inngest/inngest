@@ -14,7 +14,14 @@
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "403": {
         "// TODO": "Add example data for get /account 403"
       },
@@ -77,12 +84,14 @@
           {
             "createdAt": "2024-01-10T09:15:00Z",
             "id": "a1b2c3d4-e5f6-4789-abc1-234567890def",
+            "isArchived": false,
             "name": "production",
             "type": "PRODUCTION"
           },
           {
             "createdAt": "2024-01-12T11:30:00Z",
             "id": "b2c3d4e5-f6a7-4890-bcd2-34567890abef",
+            "isArchived": false,
             "name": "staging",
             "type": "TEST"
           }
@@ -104,7 +113,14 @@
           }
         ]
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "403": {
         "// TODO": "Add example data for get /envs 403"
       },
@@ -125,6 +141,7 @@
         "data": {
           "createdAt": "2024-01-20T14:22:33Z",
           "id": "c3d4e5f6-a7b8-4901-cde3-4567890bcfa0",
+          "isArchived": false,
           "name": "development",
           "type": "BRANCH"
         },
@@ -136,7 +153,14 @@
       "400": {
         "// TODO": "Add example data for post /envs 400"
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "403": {
         "// TODO": "Add example data for post /envs 403"
       },
@@ -164,7 +188,14 @@
           "fetched_at": "2024-01-20T14:22:33Z"
         }
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "500": {
         "errors": [
           {
@@ -212,7 +243,14 @@
           }
         ]
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "403": {
         "// TODO": "Add example data for get /keys/events 403"
       },
@@ -259,7 +297,14 @@
           }
         ]
       },
-      "401": "Authentication failed",
+      "401": {
+        "errors": [
+          {
+            "code": "authentication_required",
+            "message": "Authentication failed"
+          }
+        ]
+      },
       "403": {
         "// TODO": "Add example data for get /keys/signing 403"
       },
