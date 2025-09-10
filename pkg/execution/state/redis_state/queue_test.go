@@ -3727,7 +3727,9 @@ func TestQueueRateLimit(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock))
+	q := NewQueue(
+		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock),
+	)
 
 	idA, idB := uuid.New(), uuid.New()
 
@@ -3739,6 +3741,17 @@ func TestQueueRateLimit(t *testing.T) {
 			Limit:  1,
 			Period: 5, // Admit one every 5 seconds
 			Burst:  0, // No burst.
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     1,
+					Period:                    5,
+					Burst:                     0,
+					ThrottleKeyExpressionHash: util.XXHash(throttle.Key),
+				},
+			}
 		}
 
 		aa, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -3787,6 +3800,16 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing another function succeeds", func(t *testing.T) {
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						Limit:                     1,
+						Period:                    5,
+						Burst:                     0,
+						ThrottleKeyExpressionHash: util.XXHash("another-key"),
+					},
+				}
+			}
 			ba, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
 				FunctionID: idB,
 				Data: osqueue.Item{
@@ -3827,6 +3850,17 @@ func TestQueueRateLimit(t *testing.T) {
 			Limit:  1,
 			Period: 10, // Admit one every 10 seconds
 			Burst:  3,  // With bursts of 3
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					ThrottleKeyExpressionHash: util.XXHash("burst-plz"),
+					Limit:                     1,
+					Period:                    10,
+					Burst:                     3,
+				},
+			}
 		}
 
 		items := []osqueue.QueueItem{}
