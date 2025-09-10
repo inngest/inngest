@@ -36,6 +36,9 @@ export const EDITOR_OPTIONS: editor.IEditorOptions = {
     verticalScrollbarSize: 10,
   },
   suggest: {
+    showFunctions: true,
+    showKeywords: true,
+    showSnippets: true,
     showWords: false,
   },
   wordWrap: 'off',
