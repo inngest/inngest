@@ -2710,7 +2710,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
 		}, items)
-		requirePartitionScoreEquals(t, r, &idA, now.Add(24*time.Hour))
+		requirePartitionScoreEquals(t, r, &idA, now.Add(PartitionPausedRequeueExtension))
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
