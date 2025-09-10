@@ -81,10 +81,10 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 
 		// Handle basePath conversion to servers for OpenAPI v3
 		handleBasePath(&v2Doc, v3Doc)
-		
+
 		// Add parameter constraints for OpenAPI v3
 		addParameterConstraints(v3Doc)
-		
+
 		// Apply examples from external JSON file with validation
 		if err := applyExamples(v3Doc, inputDir); err != nil {
 			return fmt.Errorf("failed to apply examples for %s: %w", path, err)
@@ -204,4 +204,3 @@ func addParameterConstraints(v3Doc *openapi3.T) {
 		}
 	}
 }
-

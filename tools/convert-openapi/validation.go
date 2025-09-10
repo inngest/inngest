@@ -209,12 +209,12 @@ func validateIntegerSchema(data interface{}, fieldPath string) error {
 		return nil
 	}
 
-	switch data.(type) {
+	switch d := data.(type) {
 	case int, int32, int64:
 		return nil
 	case float64:
 		// JSON numbers are parsed as float64, check if it's actually an integer
-		if f, ok := data.(float64); ok && f == float64(int64(f)) {
+		if d == float64(int64(d)) {
 			return nil
 		}
 		return fmt.Errorf("expected integer at path '%s', got float", fieldPath)
