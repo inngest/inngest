@@ -821,7 +821,7 @@ service V2 {
 
   rpc PatchEnv(PatchEnvRequest) returns (PatchEnvsResponse) {
     option (google.api.http) = {
-      patch: "/env/{id}",
+      patch: "/envs/{id}",
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {

@@ -590,7 +590,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/PatchEnv", runtime.WithHTTPPathPattern("/env/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/PatchEnv", runtime.WithHTTPPathPattern("/envs/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -818,7 +818,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/PatchEnv", runtime.WithHTTPPathPattern("/env/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/PatchEnv", runtime.WithHTTPPathPattern("/envs/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -845,7 +845,7 @@ var (
 	pattern_V2_FetchAccountSigningKeys_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"keys", "signing"}, ""))
 	pattern_V2_CreateWebhook_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"env", "webhooks"}, ""))
 	pattern_V2_ListWebhooks_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"env", "webhooks"}, ""))
-	pattern_V2_PatchEnv_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"env", "id"}, ""))
+	pattern_V2_PatchEnv_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"envs", "id"}, ""))
 )
 
 var (

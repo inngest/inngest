@@ -2253,7 +2253,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"FilterType\x12\t\n" +
 	"\x05ALLOW\x10\x00\x12\b\n" +
-	"\x04DENY\x10\x012\xd7;\n" +
+	"\x04DENY\x10\x012\xd8;\n" +
 	"\x02V2\x12\xb2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\xf8\x01\x92A\xe5\x01\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
@@ -2464,8 +2464,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00ri\n" +
 	"g\n" +
-	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\x8a\x06\n" +
-	"\bPatchEnv\x12\x17.api.v2.PatchEnvRequest\x1a\x19.api.v2.PatchEnvsResponse\"\xc9\x05\x92A\xb1\x05\x12\x12Update environment\x1aLPartially updates an environment. Only the provided fields will be modified.JP\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\x8b\x06\n" +
+	"\bPatchEnv\x12\x17.api.v2.PatchEnvRequest\x1a\x19.api.v2.PatchEnvsResponse\"\xca\x05\x92A\xb1\x05\x12\x12Update environment\x1aLPartially updates an environment. Only the provided fields will be modified.JP\n" +
 	"\x03200\x12I\n" +
 	" Environment successfully updated\x12%\n" +
 	"#\x1a!#/definitions/v2PatchEnvsResponseJL\n" +
@@ -2489,7 +2489,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0e:\x01*2\t/env/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
+	"/envs/{id}B\xc8\x02\x92A\x91\x02\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
