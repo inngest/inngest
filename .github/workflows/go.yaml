@@ -1,4 +1,4 @@
-MMMname: Go
+name: Go
 
 on:
   push:
