@@ -97,7 +97,7 @@ if checkConstraints == 1 then
 	--
 	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
 	-- with o(1) operations vs o(log(n)).
-	if item.data ~= nil and constraints.t ~= nil and constraints.t.p > 0 and refilledFromBacklog == 0 then
+	if constraints.t ~= nil and constraints.t.p > 0 and refilledFromBacklog == 0 then
 		local throttleResult = gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b)
 		if throttleResult == false then
 			return -7
