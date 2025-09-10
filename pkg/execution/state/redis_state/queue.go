@@ -2112,6 +2112,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency = constraints.Concurrency.SystemConcurrency
 	}
 
+	marshaledConstraints, err := json.Marshal(constraints)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal constraints: %w", err)
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
@@ -2126,6 +2131,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency,
 		constraints.CustomConcurrencyLimit(1),
 		constraints.CustomConcurrencyLimit(2),
+		string(marshaledConstraints),
 
 		// Key queues v2
 		checkConstraintsVal,
