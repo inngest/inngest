@@ -590,11 +590,21 @@ func IncrAPICacheHit(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
 func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "http_api_cache_miss",
 		Description: "The number of times a HTTP API request is not served from cache",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueThrottleKeyExpressionMismatchCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_throttle_key_expr_mismatch",
+		Description: "The total number of times a throttle key expression mismatch was detected",
 		Tags:        opts.Tags,
 	})
 }

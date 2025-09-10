@@ -2078,6 +2078,21 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
+	if item.Data.Throttle.KeyExpressionHash == "" || item.Data.Throttle.KeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash {
+		// TODO: Re-evaluate throttle key
+		status := "missing-expr-hash"
+		if item.Data.Throttle.KeyExpressionHash != "" {
+			status = "expr-hash-mismatch"
+		}
+
+		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"status": status,
+			},
+		})
+	}
+
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
