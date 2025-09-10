@@ -818,6 +818,100 @@ service V2 {
       }
     };
   }
+
+  rpc PatchEnv(PatchEnvRequest) returns (PatchEnvsResponse) {
+    option (google.api.http) = {
+      patch: "/env/{id}",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update environment"
+      description: "Partially updates an environment. Only the provided fields will be modified."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Environment successfully updated"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2PatchEnvsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - environment not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "422"
+        value: {
+          description: "Unprocessable Entity - business logic validation failed"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -882,6 +976,7 @@ message Env {
   string name = 2;
   EnvType type = 3;
   google.protobuf.Timestamp createdAt = 4;
+  bool isArchived = 5;
 }
 
 message CreateAccountData {
@@ -1088,4 +1183,22 @@ message Webhook {
   string environment = 7;
   google.protobuf.Timestamp createdAt = 8;
   google.protobuf.Timestamp updatedAt = 9;
+}
+
+message PatchEnvRequest {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The ID of the environment to update"
+    }
+  ];
+  optional bool isArchived = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Updates the archived status of the environment. Set to true to archive the environment or false to unarchive it."
+    }
+  ];
+}
+
+message PatchEnvsResponse {
+  Env data = 1;
+  ResponseMetadata metadata = 2;
 }
