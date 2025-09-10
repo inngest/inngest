@@ -248,16 +248,25 @@ func (tp *otelTracerProvider) UpdateSpan(
 		return fmt.Errorf("target span is not dynamic; has no DynamicSpanID")
 	}
 
+	attrs := meta.NewAttrSet(
+		meta.Attr(meta.Attrs.DynamicSpanID, &opts.TargetSpan.DynamicSpanID),
+		meta.Attr(meta.Attrs.DynamicStatus, &opts.Status),
+	)
+
+	if opts.TargetSpan.DynamicSpanTraceParent != "" {
+		splitTp := strings.Split(opts.TargetSpan.DynamicSpanTraceParent, "-")
+		if len(splitTp) != 4 {
+			attrs.AddErr(fmt.Errorf("invalid traceparent format when setting dynamic span data: %q", opts.TargetSpan.DynamicSpanTraceParent))
+		} else {
+			meta.AddAttr(attrs, meta.Attrs.DynamicTraceID, &splitTp[1])
+		}
+	}
+
 	carrier := propagation.MapCarrier{
 		"traceparent": opts.TargetSpan.DynamicSpanTraceParent,
 		"tracestate":  opts.TargetSpan.DynamicSpanTraceState,
 	}
 	ctx := defaultPropagator.Extract(context.Background(), carrier)
-
-	attrs := meta.NewAttrSet(
-		meta.Attr(meta.Attrs.DynamicSpanID, &opts.TargetSpan.DynamicSpanID),
-		meta.Attr(meta.Attrs.DynamicStatus, &opts.Status),
-	)
 
 	if opts.Status.IsEnded() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
