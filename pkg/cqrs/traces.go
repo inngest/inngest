@@ -53,6 +53,9 @@ type OtelSpan struct {
 	AppID      uuid.UUID `json:"app_id,omitempty,omitzero"`
 	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
 
+	DebugRunID     ulid.ULID `json:"debug_run_id,omitempty,omitzero"`
+	DebugSessionID ulid.ULID `json:"debug_session_id,omitempty,omitzero"`
+
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
 }
 
@@ -66,6 +69,20 @@ func (s *OtelSpan) GetFunctionID() uuid.UUID {
 
 func (s *OtelSpan) GetRunID() ulid.ULID {
 	return s.RunID
+}
+
+func (s *OtelSpan) GetDebugRunID() *ulid.ULID {
+	if s.DebugRunID.IsZero() {
+		return nil
+	}
+	return &s.DebugRunID
+}
+
+func (s *OtelSpan) GetDebugSessionID() *ulid.ULID {
+	if s.DebugSessionID.IsZero() {
+		return nil
+	}
+	return &s.DebugSessionID
 }
 
 func (s *OtelSpan) GetSpanID() string {
@@ -120,8 +137,8 @@ func (s *OtelSpan) GetIsRoot() bool {
 // this span was queued), then the time will match the span's start time in
 // order to show no queued time in the UI.
 func (s *OtelSpan) GetQueuedAtTime() time.Time {
-	if q := s.Attributes.QueuedAt; q != nil {
-		return *q
+	if s.Attributes != nil && s.Attributes.QueuedAt != nil {
+		return *s.Attributes.QueuedAt
 	}
 
 	// This should always be a value, so if we don't have one, just use when
@@ -132,12 +149,18 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 // Get the time that the span started. Note that this is not necessarily when
 // the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
+	if s.Attributes == nil {
+		return nil
+	}
 	return s.Attributes.StartedAt
 }
 
 // Get the time that the span ended. Note that this is not necessarily when the
 // span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
+	if s.Attributes == nil {
+		return nil
+	}
 	return s.Attributes.EndedAt
 }
 
@@ -383,6 +406,10 @@ type TraceReader interface {
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
+	// GetSpansByDebugRunID retrieves all spans related to the specified debug run
+	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*OtelSpan, error)
+	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
+	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
@@ -402,6 +429,8 @@ type GetTraceRunOpt struct {
 	Order  []GetTraceRunOrder
 	Cursor string
 	Items  uint
+	// Whether the run list should use the tracing preview stores
+	Preview bool
 }
 
 type FindOrCreateTraceRunOpt struct {

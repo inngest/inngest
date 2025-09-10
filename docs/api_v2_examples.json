@@ -1,0 +1,388 @@
+{
+  "/account": {
+    "get": {
+      "200": {
+        "data": {
+          "createdAt": "2024-01-10T09:15:00Z",
+          "email": "user@company.com",
+          "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+          "name": "Current User",
+          "updatedAt": "2024-01-20T12:00:00Z"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for get /account 403"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/env/webhooks": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /env/webhooks 200"
+      },
+      "400": {
+        "// TODO": "Add example data for get /env/webhooks 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /env/webhooks 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /env/webhooks 403"
+      },
+      "500": {
+        "// TODO": "Add example data for get /env/webhooks 500"
+      }
+    },
+    "post": {
+      "201": {
+        "// TODO": "Add example data for post /env/webhooks 201"
+      },
+      "400": {
+        "// TODO": "Add example data for post /env/webhooks 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /env/webhooks 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /env/webhooks 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /env/webhooks 409"
+      },
+      "422": {
+        "// TODO": "Add example data for post /env/webhooks 422"
+      },
+      "500": {
+        "// TODO": "Add example data for post /env/webhooks 500"
+      }
+    }
+  },
+  "/envs": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-10T09:15:00Z",
+            "id": "a1b2c3d4-e5f6-4789-abc1-234567890def",
+            "name": "production",
+            "type": "PRODUCTION"
+          },
+          {
+            "createdAt": "2024-01-12T11:30:00Z",
+            "id": "b2c3d4e5-f6a7-4890-bcd2-34567890abef",
+            "name": "staging",
+            "type": "TEST"
+          }
+        ],
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "hasMore": false,
+          "limit": 50
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Environment name is required"
+          }
+        ]
+      },
+      "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for get /envs 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /envs 404"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    },
+    "post": {
+      "201": {
+        "data": {
+          "createdAt": "2024-01-20T14:22:33Z",
+          "id": "c3d4e5f6-a7b8-4901-cde3-4567890bcfa0",
+          "name": "development",
+          "type": "BRANCH"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for post /envs 400"
+      },
+      "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for post /envs 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /envs 409"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/health": {
+    "get": {
+      "200": {
+        "data": {
+          "status": "ok"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "401": "Authentication failed",
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/keys/events": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "environment": "production",
+            "id": "d4e5f6a7-b8c9-4012-def4-567890cdab12",
+            "key": "inngest-event-key-prod-abc123",
+            "name": "Production Event Key"
+          },
+          {
+            "createdAt": "2024-01-18T14:22:33Z",
+            "environment": "staging",
+            "id": "e5f6a7b8-c9d0-4123-efa5-67890dbc1234",
+            "key": "inngest-event-key-stage-def456",
+            "name": "Staging Event Key"
+          }
+        ],
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
+          "hasMore": true,
+          "limit": 20
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "invalid_field_format",
+            "message": "Limit must be at least 1"
+          }
+        ]
+      },
+      "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for get /keys/events 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /keys/events 404"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/keys/signing": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "environment": "production",
+            "id": "f6a7b8c9-d0e1-4234-fab6-7890ecd23456",
+            "key": "signkey-prod-abc123def456",
+            "name": ""
+          }
+        ],
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 20
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "invalid_field_format",
+            "message": "Limit must be at least 1"
+          }
+        ]
+      },
+      "401": "Authentication failed",
+      "403": {
+        "// TODO": "Add example data for get /keys/signing 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /keys/signing 404"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/partner/accounts": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "email": "partner1@company.com",
+            "id": "a7b8c9d0-e1f2-4345-abc7-890fed345678",
+            "name": "Partner Account 1",
+            "updatedAt": "2024-01-15T10:30:00Z"
+          },
+          {
+            "createdAt": "2024-01-18T14:22:33Z",
+            "email": "partner2@company.com",
+            "id": "b8c9d0e1-f2a3-4456-bcd8-90aef4567890",
+            "name": "Partner Account 2",
+            "updatedAt": "2024-01-18T14:22:33Z"
+          }
+        ],
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": "01K3SB60E36ZMPEV43BG0H20MW",
+          "hasMore": true,
+          "limit": 2
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for get /partner/accounts 400"
+      },
+      "401": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
+      "403": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    },
+    "post": {
+      "201": {
+        "data": {
+          "apiKey": "api-abcdef1234567890",
+          "createdAt": "2024-01-20T14:22:33Z",
+          "email": "user@example.com",
+          "id": "c9d0e1f2-a3b4-4567-cde9-01bfa5678901",
+          "name": "Jane Smith",
+          "updatedAt": "2024-01-20T14:22:33Z"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetched_at": "2024-01-20T14:22:33Z"
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "validation_error",
+            "message": "Email is required"
+          }
+        ]
+      },
+      "401": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
+      "403": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to the partner API.  Please reach out to sales@inngest.com to gain access."
+          }
+        ]
+      },
+      "409": {
+        "// TODO": "Add example data for post /partner/accounts 409"
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  }
+}

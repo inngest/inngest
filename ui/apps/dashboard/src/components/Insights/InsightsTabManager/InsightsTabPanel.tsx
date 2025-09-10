@@ -5,6 +5,7 @@ import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/Insig
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
 import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryTitle';
+import { InsightsSQLEditorResultsTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorResultsTitle';
 import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
@@ -43,11 +44,12 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
       <Section
         actions={
           <>
+            <InsightsSQLEditorDownloadCSVButton temporarilyHide />
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-            <InsightsSQLEditorDownloadCSVButton />
           </>
         }
-        title="Results"
+        className="border-subtle border-t"
+        title={<InsightsSQLEditorResultsTitle />}
       >
         <InsightsDataTable />
       </Section>

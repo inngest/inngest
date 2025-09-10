@@ -495,6 +495,24 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindFunctionPause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadPauseFunction{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
+	case KindFunctionUnpause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadUnpauseFunction{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -537,6 +555,26 @@ type PayloadPauseTimeout struct {
 	// Pause is the full pause struct for the timeout job.  Note that the identifier
 	// should not exist in the pause, as it already exists in the queue item.
 	Pause state.Pause `json:"pause"`
+}
+
+// PayloadPauseFunction represents the queue item payload for the internal system queue for
+// pausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadPauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user requested to pause the function.
+	PausedAt int64 `json:"pat"`
+
+	// CancelRunningImmediately determines whether pending jobs should be cancelled immediately or after a set duration.
+	CancelRunningImmediately bool `json:"cri,omitempty"`
+}
+
+// PayloadUnpauseFunction represents the queue item payload for the internal system queue for
+// unpausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadUnpauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user originally requested to pause the function.
+	// This is included in the unpause job to create a consistent identifier for pause periods and make unpausing idempotent.
+	PausedAt int64 `json:"pat"`
+	// UnpausedAt represents the unix timestamp in milliseconds when the user requested to unpause the function.
+	UnpausedAt int64 `json:"upat"`
 }
 
 func HashID(_ context.Context, id string) string {

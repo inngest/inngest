@@ -251,6 +251,7 @@ export const GET_RUNS = gql`
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
     $celQuery: String = null
+    $preview: Boolean = false
   ) {
     runs(
       filter: {
@@ -262,6 +263,7 @@ export const GET_RUNS = gql`
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
+      preview: $preview
     ) {
       edges {
         node {
@@ -299,12 +301,14 @@ export const COUNT_RUNS = gql`
     $startTime: Time!
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
+    $preview: Boolean = false
   ) {
     runs(
       filter: { from: $startTime, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
+      preview: $preview
     ) {
-      totalCount
+      totalCount(preview: $preview)
     }
   }
 `;
@@ -329,6 +333,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       resourceAttrs
     }
     outputID
+    debugRunID
+    debugSessionID
     spanID
     stepID
     stepOp
@@ -576,6 +582,108 @@ export const GET_EVENT_RUNS = gql`
           name
           slug
         }
+      }
+    }
+  }
+`;
+
+export const CREATE_DEBUG_SESSION = gql`
+  mutation CreateDebugSession($input: CreateDebugSessionInput!) {
+    createDebugSession(input: $input) {
+      debugSessionID
+      debugRunID
+    }
+  }
+`;
+
+export const DEBUG_RUN = gql`
+  query GetDebugRun($query: DebugRunQuery!) {
+    debugRun(query: $query) {
+      debugRun {
+        runID
+        spanID
+        traceID
+        name
+        status
+        attempts
+        duration
+        queuedAt
+        startedAt
+        endedAt
+        stepID
+        stepOp
+        isRoot
+        parentSpanID
+        isUserland
+        debugRunID
+        debugSessionID
+        childrenSpans {
+          runID
+          spanID
+          traceID
+          name
+          status
+          attempts
+          duration
+          queuedAt
+          startedAt
+          endedAt
+          stepID
+          stepOp
+          isRoot
+          parentSpanID
+          isUserland
+          debugRunID
+          debugSessionID
+        }
+      }
+      runSteps {
+        stepID
+        name
+        stepOp
+      }
+    }
+  }
+`;
+
+export const DEBUG_SESSION = gql`
+  query GetDebugSession($query: DebugSessionQuery!) {
+    debugSession(query: $query) {
+      runID
+      spanID
+      traceID
+      name
+      status
+      attempts
+      duration
+      queuedAt
+      startedAt
+      endedAt
+      stepID
+      stepOp
+      isRoot
+      parentSpanID
+      isUserland
+      debugRunID
+      debugSessionID
+      childrenSpans {
+        runID
+        spanID
+        traceID
+        name
+        status
+        attempts
+        duration
+        queuedAt
+        startedAt
+        endedAt
+        stepID
+        stepOp
+        isRoot
+        parentSpanID
+        isUserland
+        debugRunID
+        debugSessionID
       }
     }
   }

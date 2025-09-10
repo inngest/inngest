@@ -121,21 +121,24 @@ type QueueSnapshotChunk struct {
 }
 
 type Span struct {
-	SpanID        string
-	TraceID       string
-	ParentSpanID  sql.NullString
-	Name          string
-	StartTime     time.Time
-	EndTime       time.Time
-	Attributes    pqtype.NullRawMessage
-	Links         pqtype.NullRawMessage
-	DynamicSpanID sql.NullString
-	AccountID     string
-	AppID         string
-	FunctionID    string
-	RunID         string
-	EnvID         string
-	Output        pqtype.NullRawMessage
+	SpanID         string
+	TraceID        string
+	ParentSpanID   sql.NullString
+	Name           string
+	StartTime      time.Time
+	EndTime        time.Time
+	Attributes     pqtype.NullRawMessage
+	Links          pqtype.NullRawMessage
+	DynamicSpanID  sql.NullString
+	AccountID      string
+	AppID          string
+	FunctionID     string
+	RunID          string
+	EnvID          string
+	Output         pqtype.NullRawMessage
+	DebugRunID     sql.NullString
+	DebugSessionID sql.NullString
+	Status         sql.NullString
 }
 
 type Trace struct {

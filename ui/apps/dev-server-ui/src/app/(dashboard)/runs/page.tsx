@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
@@ -33,7 +34,13 @@ import {
 const pollInterval = 400;
 
 export default function Page() {
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
   const [autoRefresh, setAutoRefresh] = useState(true);
+
   const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(true);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
@@ -49,6 +56,12 @@ export default function Page() {
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
 
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setAutoRefresh(false);
+    }
+  }, [pollingDisabled, pollingFlagReady]);
+
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
@@ -59,6 +72,7 @@ export default function Page() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        preview: tracesPreviewEnabled,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -79,7 +93,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField, search]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, search, tracesPreviewEnabled]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({

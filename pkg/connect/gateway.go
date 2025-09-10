@@ -187,7 +187,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			_ = ws.CloseNow()
 		}()
 
-		ch.log.Debug("WebSocket connection established, sending hello")
+		ch.log.Trace("WebSocket connection established, sending hello")
 
 		{
 			err = wsproto.Write(ctx, ws, &connectpb.ConnectMessage{
@@ -722,8 +722,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			reply, err := grpcClient.Ack(ctx, &connectpb.AckMessage{
 				RequestId: data.RequestId,
-				Ts:        timestamppb.Now()})
-
+				Ts:        timestamppb.Now(),
+			})
 			if err != nil {
 				// This should never happen: Failing the ack means we will redeliver the same request even though
 				// the worker already started processing it.
@@ -1209,7 +1209,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 				return fmt.Errorf("could not send response through grpc: %w", err)
 			}
 
-			l.Info("sent response through gRPC", "result", result)
+			l.Debug("sent response through gRPC", "result", result)
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:

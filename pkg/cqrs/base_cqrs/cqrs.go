@@ -86,6 +86,16 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
+type normalizedSpan interface {
+	GetTraceID() string
+	GetRunID() string
+	GetDynamicSpanID() sql.NullString
+	GetParentSpanID() sql.NullString
+	GetStartTime() interface{}
+	GetEndTime() interface{}
+	GetSpanFragments() any
+}
+
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
 	if err != nil {
@@ -93,41 +103,107 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		return nil, err
 	}
 
-	// We need an ordered map here because we loop over it later
+	return mapRootSpansFromRows(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
+
+	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	return mapRootSpansFromRows(ctx, spans)
+}
+
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
+		return nil, err
+	}
+
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	for _, span := range spans {
+		if span.DebugRunID.Valid {
+			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+		}
+	}
+
+	var allRoots []*cqrs.OtelSpan
+
+	for _, runSpans := range spansByDebugRun {
+		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+		if err != nil {
+			return nil, err
+		}
+		allRoots = append(allRoots, rootSpan)
+	}
+
+	return allRoots, nil
+}
+
+// Uses generics to accept slices of any type that implements normalizedSpan interface
+func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
-	// A map of dynamic span IDs to the specific span ID that contains an
-	// output
+	// A map of dynamic span IDs to the specific span ID that contains an output
 	outputDynamicRefs := make(map[string]string)
 	var root *cqrs.OtelSpan
+	var runID ulid.ULID
 
 	for _, span := range spans {
-		st := strings.Split(span.StartTime.(string), " m=")[0]
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		// Use interface methods to get the fields directly
+		traceID := span.GetTraceID()
+		runIDStr := span.GetRunID()
+		dynamicSpanID := span.GetDynamicSpanID()
+		parentSpanID := span.GetParentSpanID()
+		startTime := span.GetStartTime()
+		endTime := span.GetEndTime()
+		spanFragments := span.GetSpanFragments()
+
+		st := strings.Split(startTime.(string), " m=")[0]
+		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
 			return nil, err
 		}
 
-		et := strings.Split(span.EndTime.(string), " m=")[0]
-		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+		et := strings.Split(endTime.(string), " m=")[0]
+		parsedEndTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
 			return nil, err
 		}
 
-		var parentSpanID *string
-		if span.ParentSpanID.Valid {
-			parentSpanID = &span.ParentSpanID.String
+		var parentSpanIDPtr *string
+		if parentSpanID.Valid {
+			parentSpanIDPtr = &parentSpanID.String
+		}
+
+		runID, err := ulid.Parse(runIDStr)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing run ID from span", "error", err)
+			return nil, err
 		}
 
 		newSpan := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{
-				SpanID:       span.DynamicSpanID.String,
-				TraceID:      span.TraceID,
-				ParentSpanID: parentSpanID,
-				StartTime:    startTime,
-				EndTime:      endTime,
+				SpanID:       dynamicSpanID.String,
+				TraceID:      traceID,
+				ParentSpanID: parentSpanIDPtr,
+				StartTime:    parsedStartTime,
+				EndTime:      parsedEndTime,
 				Name:         "",
 				Attributes:   make(map[string]any),
 			},
@@ -139,7 +215,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		var outputSpanID *string
 		var fragments []map[string]interface{}
 		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
@@ -159,7 +235,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
-					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
+					outputDynamicRefs[dynamicSpanID.String] = outputRef
 				}
 			}
 		}
@@ -185,6 +261,14 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			newSpan.RunID = *newSpan.Attributes.RunID
 		}
 
+		if newSpan.Attributes.DebugRunID != nil {
+			newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
+		}
+
+		if newSpan.Attributes.DebugSessionID != nil {
+			newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
+		}
+
 		if newSpan.Attributes.StartedAt != nil {
 			newSpan.StartTime = *newSpan.Attributes.StartedAt
 		}
@@ -206,7 +290,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		spanMap.Set(span.DynamicSpanID.String, newSpan)
+		spanMap.Set(dynamicSpanID.String, newSpan)
 	}
 
 	for _, span := range spanMap.AllFromFront() {
@@ -216,6 +300,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
 				// We've found the span ID that we need to target for
 				// this span. So let's use it!
+				var err error
 				span.OutputID, err = encodeSpanOutputID(targetSpanID)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
@@ -1692,7 +1777,15 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// explicitly set it to zero so it would not attempt to paginate
 	opt.Items = 0
-	res, err := w.GetTraceRuns(ctx, opt)
+	var (
+		res []*cqrs.TraceRun
+		err error
+	)
+	if opt.Preview {
+		res, err = w.GetSpanRuns(ctx, opt)
+	} else {
+		res, err = w.GetTraceRuns(ctx, opt)
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -1701,6 +1794,10 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	if opt.Preview {
+		return w.GetSpanRuns(ctx, opt)
+	}
+
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
@@ -2387,4 +2484,427 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	}
 
 	return res, nil
+}
+
+// GetSpanRuns retrieves a list of span-based runs using the same filtering
+// logic as GetTraceRuns but working against the spans table with executor.run +
+// EXTEND span grouping
+func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
+	// use evtIDs as post query filter
+	// evtIDs := []string{}
+	// expHandler, err := run.NewExpressionHandler(ctx,
+	// 	run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if expHandler.HasEventFilters() {
+	// 	evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	for _, e := range evts {
+	// 		evtIDs = append(evtIDs, e.ID.String())
+	// 	}
+	// }
+
+	builder := newSpanRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	resCursorLayout := builder.cursorLayout
+
+	// Query spans table directly, similar to how GetTraceRuns queries
+	// trace_runs
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("spans").
+		Select(
+			"run_id",
+			"account_id",
+			"app_id",
+			"function_id",
+			"trace_id",
+			"dynamic_span_id",
+			"start_time",
+			"end_time",
+			"status",
+			"span_id",
+			"name",
+			"attributes",
+			"links",
+			"output",
+		).
+		Where(sq.C("dynamic_span_id").In(
+			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+		)).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Define span row structure for scanning
+	type spanRow struct {
+		RunID         string
+		AccountID     string
+		AppID         string
+		FunctionID    string
+		TraceID       string
+		DynamicSpanID string
+		StartTime     time.Time
+		EndTime       *time.Time
+		Status        *string
+		SpanID        string
+		Name          string
+		Attributes    *string
+		Links         *string
+		Output        *string
+	}
+
+	// Group spans by run_id and dynamic_span_id
+	runSpanMap := make(map[string]map[string][]*spanRow)
+	for rows.Next() {
+		var span spanRow
+		err := rows.Scan(
+			&span.RunID,
+			&span.AccountID,
+			&span.AppID,
+			&span.FunctionID,
+			&span.TraceID,
+			&span.DynamicSpanID,
+			&span.StartTime,
+			&span.EndTime,
+			&span.Status,
+			&span.SpanID,
+			&span.Name,
+			&span.Attributes,
+			&span.Links,
+			&span.Output,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO Event ID filtering based on CEL filtering
+
+		if runSpanMap[span.RunID] == nil {
+			runSpanMap[span.RunID] = make(map[string][]*spanRow)
+		}
+		runSpanMap[span.RunID][span.DynamicSpanID] = append(runSpanMap[span.RunID][span.DynamicSpanID], &span)
+	}
+
+	// Convert grouped spans to TraceRuns
+	type runGroup struct {
+		runID         string
+		dynamicSpanID string
+		spans         []*spanRow
+		startTime     time.Time
+	}
+
+	// Collect all run groups first
+	var runGroups []runGroup
+	for runID, spanGroups := range runSpanMap {
+		for dynamicSpanID, spans := range spanGroups {
+			if len(spans) == 0 {
+				continue
+			}
+			// Find earliest start time for sorting
+			startTime := spans[0].StartTime
+			for _, span := range spans {
+				if span.StartTime.Before(startTime) {
+					startTime = span.StartTime
+				}
+			}
+			runGroups = append(runGroups, runGroup{
+				runID:         runID,
+				dynamicSpanID: dynamicSpanID,
+				spans:         spans,
+				startTime:     startTime,
+			})
+		}
+	}
+
+	// Sort by start_time DESC (newest first), then by run_id for stable ordering
+	sort.Slice(runGroups, func(i, j int) bool {
+		if runGroups[i].startTime.Equal(runGroups[j].startTime) {
+			return runGroups[i].runID < runGroups[j].runID
+		}
+		return runGroups[i].startTime.After(runGroups[j].startTime)
+	})
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+
+	for _, group := range runGroups {
+		spans := group.spans
+
+		// Use first span for metadata (they should all have the same metadata)
+		firstSpan := spans[0]
+
+		// Parse UUIDs
+		accountUUID, err := uuid.Parse(firstSpan.AccountID)
+		if err != nil {
+			l.Debug("invalid account ID", "account_id", firstSpan.AccountID, "error", err)
+			continue
+		}
+		appUUID, err := uuid.Parse(firstSpan.AppID)
+		if err != nil {
+			l.Debug("invalid app ID", "app_id", firstSpan.AppID, "error", err)
+			continue
+		}
+		functionUUID, err := uuid.Parse(firstSpan.FunctionID)
+		if err != nil {
+			l.Debug("invalid function ID", "function_id", firstSpan.FunctionID, "error", err)
+			continue
+		}
+
+		// Find min start_time and max end_time across all spans in this group
+		startTime := spans[0].StartTime
+		var endTime *time.Time
+		var status = enums.RunStatusRunning
+
+		for _, span := range spans {
+			if span.StartTime.Before(startTime) {
+				startTime = span.StartTime
+			}
+			if span.EndTime != nil && (endTime == nil || span.EndTime.After(*endTime)) {
+				endTime = span.EndTime
+			}
+			// Get the latest non-empty status
+			if span.Status != nil && *span.Status != "" {
+				// Convert StepStatus string to RunStatus enum
+				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
+					switch stepStatus {
+					case enums.StepStatusCompleted:
+						status = enums.RunStatusCompleted
+					case enums.StepStatusFailed, enums.StepStatusErrored:
+						status = enums.RunStatusFailed
+					case enums.StepStatusRunning:
+						status = enums.RunStatusRunning
+					case enums.StepStatusCancelled:
+						status = enums.RunStatusCancelled
+					case enums.StepStatusTimedOut:
+						status = enums.RunStatusCancelled // Map timeout to cancelled
+					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
+						status = enums.RunStatusRunning // These are all "in progress" states
+					}
+				}
+			}
+		}
+
+		// Calculate duration
+		var duration time.Duration
+		if endTime != nil {
+			duration = endTime.Sub(startTime)
+		}
+
+		// Build cursor for pagination
+		var cursor string
+		if resCursorLayout != nil {
+			c := &cqrs.TracePageCursor{
+				ID:      group.runID,
+				Cursors: map[string]cqrs.TraceCursor{},
+			}
+			for field := range resCursorLayout.Cursors {
+				switch field {
+				case "start_time":
+					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMilli()}
+				case "end_time":
+					if endTime != nil {
+						c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMilli()}
+					}
+				}
+			}
+			if encoded, err := c.Encode(); err == nil {
+				cursor = encoded
+			}
+		}
+
+		traceRun := &cqrs.TraceRun{
+			AccountID:   accountUUID,
+			WorkspaceID: accountUUID, // Using account ID as workspace ID for now
+			AppID:       appUUID,
+			FunctionID:  functionUUID,
+			TraceID:     firstSpan.TraceID,
+			RunID:       group.runID,
+			QueuedAt:    startTime,
+			StartedAt:   startTime,
+			Duration:    duration,
+			Status:      status,
+			Cursor:      cursor,
+		}
+
+		if endTime != nil {
+			traceRun.EndedAt = *endTime
+		}
+
+		res = append(res, traceRun)
+		count++
+
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
+	}
+
+	return res, nil
+}
+
+// newSpanRunsQueryBuilder creates a query builder for span-based runs Similar
+// to newRunsQueryBuilder but adapted for spans table structure
+func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
+	// filters
+	filter := []sq.Expression{}
+	if len(opt.Filter.AppID) > 0 {
+		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+	}
+	if len(opt.Filter.FunctionID) > 0 {
+		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.Status) > 0 {
+		statusStrings := make([]string, 0, len(opt.Filter.Status))
+		for _, s := range opt.Filter.Status {
+			statusStrings = append(statusStrings, s.String())
+		}
+		filter = append(filter, sq.C("status").In(statusStrings))
+	}
+
+	// Map time fields - spans use start_time/end_time instead of
+	// queued_at/started_at/ended_at
+	var tsfield string
+	switch opt.Filter.TimeField {
+	case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+		tsfield = "start_time"
+	case enums.TraceRunTimeEndedAt:
+		tsfield = "end_time"
+	default:
+		tsfield = "start_time"
+	}
+
+	// Convert time to Unix milliseconds to match spans storage format
+	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From))
+	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until))
+
+	// cursor
+	resCursorLayout := &cqrs.TracePageCursor{
+		Cursors: map[string]cqrs.TraceCursor{},
+	}
+
+	// decode request cursor if there's one
+	var reqCursor *cqrs.TracePageCursor
+	if len(opt.Cursor) > 0 {
+		reqCursor = &cqrs.TracePageCursor{Cursors: map[string]cqrs.TraceCursor{}}
+		if err := reqCursor.Decode(opt.Cursor); err != nil {
+			l.Debug("cursor decode failed", "error", err)
+			reqCursor = nil
+		}
+	}
+
+	// orders
+	order := []sqexp.OrderedExpression{}
+	for _, o := range opt.Order {
+		// Map enum field names to column names
+		var field string
+		switch o.Field {
+		case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+			field = "start_time"
+		case enums.TraceRunTimeEndedAt:
+			field = "end_time"
+		default:
+			field = "start_time"
+		}
+
+		resCursorLayout.Add(field)
+
+		switch o.Direction {
+		case enums.TraceRunOrderAsc:
+			order = append(order, sq.C(field).Asc())
+		case enums.TraceRunOrderDesc:
+			order = append(order, sq.C(field).Desc())
+		}
+	}
+
+	// Always add run_id as final sort field for stable pagination
+	order = append(order, sq.C("run_id").Asc())
+	resCursorLayout.Add("run_id")
+
+	// cursor-based pagination filter
+	if reqCursor != nil {
+		cursorFilters := []sq.Expression{}
+		for i, o := range opt.Order {
+			// Map field names same as above
+			var field string
+			switch o.Field {
+			case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+				field = "start_time"
+			case enums.TraceRunTimeEndedAt:
+				field = "end_time"
+			default:
+				field = "start_time"
+			}
+
+			if cursor := reqCursor.Find(field); cursor != nil {
+				// Build cursor condition for this field
+				var baseCondition sq.Expression
+				if o.Direction == enums.TraceRunOrderAsc {
+					baseCondition = sq.C(field).Gt(cursor.Value)
+				} else {
+					baseCondition = sq.C(field).Lt(cursor.Value)
+				}
+
+				// Build compound condition for tie-breaking
+				equalityConditions := []sq.Expression{sq.C(field).Eq(cursor.Value)}
+
+				// Add conditions for all subsequent fields in sort order
+				for j := i + 1; j < len(opt.Order); j++ {
+					var nextField string
+					switch opt.Order[j].Field {
+					case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
+						nextField = "start_time"
+					case enums.TraceRunTimeEndedAt:
+						nextField = "end_time"
+					default:
+						nextField = "start_time"
+					}
+
+					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
+						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursor.Value))
+						} else {
+							equalityConditions = append(equalityConditions, sq.C(nextField).Lt(nextCursor.Value))
+						}
+					}
+				}
+
+				// Add run_id tie-breaker
+				if runIDCursor := reqCursor.Find("run_id"); runIDCursor != nil {
+					equalityConditions = append(equalityConditions, sq.C("run_id").Gt(runIDCursor.Value))
+				}
+
+				// Combine: (field > cursor_value) OR (field = cursor_value AND next_conditions)
+				tieBreakingCondition := sq.And(equalityConditions...)
+				cursorFilters = append(cursorFilters, sq.Or(baseCondition, tieBreakingCondition))
+			}
+		}
+
+		if len(cursorFilters) > 0 {
+			filter = append(filter, sq.Or(cursorFilters...))
+		}
+	}
+
+	return &runsQueryBuilder{
+		filter:       filter,
+		order:        order,
+		cursor:       reqCursor,
+		cursorLayout: resCursorLayout,
+	}
 }
