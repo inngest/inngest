@@ -30,7 +30,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ./go.mod
+          go-version-file: ./go.mod
 
       - uses: actions/setup-node@v4
         with:
@@ -99,7 +99,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ./go.mod
+          go-version-file: ./go.mod
 
       - name: Build dev server
         run: go build -cover -o ./inngest-bin ./cmd
@@ -151,7 +151,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ./go.mod
+          go-version-file: ./go.mod
 
       - name: Run execution tests
         run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
