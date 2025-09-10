@@ -54,7 +54,7 @@ export function createSQLCompletionProvider(
 
       tables.forEach((table) => {
         suggestions.push({
-          kind: languages.CompletionItemKind.Reference,
+          kind: languages.CompletionItemKind.Class,
           insertText: table,
           label: table,
           range,
