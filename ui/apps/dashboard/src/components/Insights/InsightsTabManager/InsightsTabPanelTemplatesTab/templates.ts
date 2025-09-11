@@ -10,7 +10,9 @@ function makeEventVolumePerHourQuery(event?: string) {
 FROM
     events
 WHERE
-    event_ts > {{ start_time }}${event ? `\n    AND event_name = '${event}'` : ''}
+    event_ts > toUnixTimestamp(subtractDays(now(), 3)) * 1000${
+      event ? `\n    AND event_name = '${event}'` : ''
+    }
 GROUP BY
     hour_bucket,
     event_name
