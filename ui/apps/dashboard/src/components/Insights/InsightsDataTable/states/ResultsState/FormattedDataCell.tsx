@@ -16,7 +16,7 @@ export function FormattedDataCell({ value, type }: FormattedDataCellProps) {
     <div
       className={cn(
         'text-basis text-left text-sm font-medium',
-        'w-fit overflow-x-hidden py-[2px] pr-[2px]',
+        'w-fit overflow-x-hidden py-0 pr-[2px]',
         isNumericValue ? 'max-w-none' : 'max-w-[400px]',
         needsMinWidth ? 'min-w-[320px]' : '',
         'max-h-[150px] overflow-y-auto',

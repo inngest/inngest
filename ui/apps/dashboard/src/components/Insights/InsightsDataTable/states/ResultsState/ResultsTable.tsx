@@ -24,7 +24,7 @@ export function ResultsTable() {
         <Table
           columns={columns}
           data={effectiveData.rows}
-          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
+          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border align-top text-left py-[10px]"
         />
       </div>
       <ResultsTableFooter />
