@@ -90,6 +90,7 @@ func MarshalV1(
 	stackIndex int,
 	env string,
 	attempt int,
+	maxAttempts int,
 ) ([]byte, error) {
 	rawEvts, err := sl.LoadEvents(ctx, md.ID)
 	if err != nil {
@@ -125,6 +126,7 @@ func MarshalV1(
 				Current: stackIndex,
 			},
 			Attempt:                   attempt,
+			MaxAttempts:               maxAttempts,
 			DisableImmediateExecution: md.Config.ForceStepPlan,
 		},
 		Version: md.Config.RequestVersion,

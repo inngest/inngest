@@ -2409,6 +2409,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeRunComplete:
 		// TODO: Handle finalization
 		return fmt.Errorf("run complete not implemented")
+	case enums.OpcodeStepFailed:
+		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2569,8 +2571,13 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		return ErrHandledStepError
 	}
 
-	// This was the final step attempt and we still failed.
-	//
+	// This was the final step attempt and we still failed, so we convert the Error to Failed
+	// and use that handler.
+	gen.Op = enums.OpcodeStepFailed
+	return e.handleStepFailed(ctx, runCtx, gen, edge)
+}
+
+func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// First, save the error to our state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -2617,7 +2624,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepError"},
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepFailed"},
 				Metadata:    runCtx.Metadata(),
 				QueueItem:   &nextItem,
 				Parent:      tracing.RunSpanRefFromMetadata(metadata),
@@ -2626,7 +2633,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		if err != nil {
 			// return fmt.Errorf("error creating span for next step after
 			// StepError: %w", err)
-			e.log.Debug("error creating span for next step after StepError", "error", err)
+			e.log.Debug("error creating span for next step after StepFailed", "error", err)
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
