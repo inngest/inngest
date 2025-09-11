@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 
 type FormattedDataCellProps = {
@@ -7,7 +8,7 @@ type FormattedDataCellProps = {
   type: 'json' | 'number' | 'string';
 };
 
-export function FormattedDataCell({ value, type }: FormattedDataCellProps) {
+function FormattedDataCellComponent({ value, type }: FormattedDataCellProps) {
   const prettyJson = type === 'json' ? safePrettyJSONObjectOrArray(value) : null;
   const needsMinWidth = type === 'json' || isLikelyWrapping(value);
   const isNumericValue = type === 'number';
@@ -35,6 +36,8 @@ export function FormattedDataCell({ value, type }: FormattedDataCellProps) {
     </div>
   );
 }
+
+export const FormattedDataCell = memo(FormattedDataCellComponent);
 
 function safePrettyJSONObjectOrArray(text: string): string | null {
   try {
