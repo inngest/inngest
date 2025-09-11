@@ -14,7 +14,7 @@ import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './util
 type Props = {
   data: MetricsResponse | undefined;
   limit?: number;
-  isMarketplace?: boolean;
+  isMarketplace: boolean;
 };
 
 export function AccountConcurrency({ data, limit, isMarketplace = false }: Props) {
