@@ -9,6 +9,20 @@ import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMac
 import { ResultsTableFooter, assertData } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 
+type InsightsEntry = InsightsFetchResult['rows'][number];
+type InsightsColumnValue = InsightsEntry['values'][string];
+type InsightsTableProps = {
+  cellClassName: string;
+  columns: ColumnDef<InsightsEntry, InsightsColumnValue>[];
+  data: InsightsEntry[];
+};
+
+function InsightsTable({ columns, data, cellClassName }: InsightsTableProps) {
+  return <Table<InsightsEntry> cellClassName={cellClassName} columns={columns} data={data} />;
+}
+
+const MemoizedInsightsTable = memo(InsightsTable);
+
 export function ResultsTable() {
   const { data } = useInsightsStateMachineContext();
 
@@ -29,17 +43,3 @@ export function ResultsTable() {
     </div>
   );
 }
-
-type InsightsEntry = InsightsFetchResult['rows'][number];
-type InsightsColumnValue = InsightsEntry['values'][string];
-type InsightsTableProps = {
-  cellClassName: string;
-  columns: ColumnDef<InsightsEntry, InsightsColumnValue>[];
-  data: InsightsEntry[];
-};
-
-function InsightsTable({ columns, data, cellClassName }: InsightsTableProps) {
-  return <Table<InsightsEntry> cellClassName={cellClassName} columns={columns} data={data} />;
-}
-
-const MemoizedInsightsTable = memo(InsightsTable);
