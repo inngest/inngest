@@ -15,6 +15,7 @@ const (
 	SpanNameStepDiscovery    = "executor.step.discovery"
 	SpanNameStep             = "executor.step"
 	SpanNameExecution        = "executor.execution"
+	SpanNameStepFailed       = "executor.failed"
 	SpanNameDynamicExtension = "EXTEND"
 
 	// Link attributes

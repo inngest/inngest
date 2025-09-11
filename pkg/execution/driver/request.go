@@ -41,6 +41,9 @@ type SDKRequestContext struct {
 	// Attempt is the zero-index attempt number.
 	Attempt int `json:"attempt"`
 
+	// MaxAttempts is the maximum number of attempts allowed for this function.
+	MaxAttempts int `json:"max_attempts"`
+
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
 
