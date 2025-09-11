@@ -55,9 +55,11 @@ export const mapConcurrency = (
 export const Concurrency = ({
   workspace,
   entities,
+  isMarketplace = false,
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
+  isMarketplace?: boolean;
 }) => {
   const chartOptions = workspace && mapConcurrency(workspace, entities);
 
@@ -79,12 +81,14 @@ export const Concurrency = ({
             }
           />
         </div>
-        <Button
-          label="Increase Concurrency"
-          kind="secondary"
-          appearance="outlined"
-          href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
-        />
+        {!isMarketplace && (
+          <Button
+            label="Increase Concurrency"
+            kind="secondary"
+            appearance="outlined"
+            href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
+          />
+        )}
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart
