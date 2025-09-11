@@ -71,14 +71,14 @@ const (
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
-	PartitionPausedRequeueExtension           = 24 * time.Hour
+	PartitionPausedRequeueExtension           = 5 * time.Minute
 	PartitionLookahead                        = time.Second
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
 	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
 
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
-	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour
+	ShadowPartitionRefillPausedRequeueExtension          = 5 * time.Minute
 	BacklogDefaultRequeueExtension                       = 2 * time.Second
 
 	// default values
@@ -2078,6 +2078,17 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
+	// Check if throttle is outdated
+	if outdatedThrottleReason := constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
+		// TODO: Re-evaluate throttle with event data
+		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"reason": outdatedThrottleReason.String(),
+			},
+		})
+	}
+
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
@@ -2112,6 +2123,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency = constraints.Concurrency.SystemConcurrency
 	}
 
+	marshaledConstraints, err := json.Marshal(constraints)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal constraints: %w", err)
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
@@ -2126,6 +2142,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency,
 		constraints.CustomConcurrencyLimit(1),
 		constraints.CustomConcurrencyLimit(2),
+		string(marshaledConstraints),
 
 		// Key queues v2
 		checkConstraintsVal,
@@ -2215,7 +2232,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case -7:
-		if item.Data.Throttle == nil {
+		if constraints.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
 			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
 		}

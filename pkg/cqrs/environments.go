@@ -18,7 +18,7 @@ type Environment struct {
 // EnvironmentReader provides the function to retrieve environments
 type EnvironmentReader interface {
 	// GetEnvironmentBySlug returns the environment with the provided slug
-	GetEnvironmentBySlug(ctx context.Context, slug string) (*Environment, error)
+	GetEnvironmentBySlug(ctx context.Context, accountID uuid.UUID, slug string) (*Environment, error)
 	// GetEnvironmentByUUID returns the environment with the provided ID
 	GetEnvironmentByUUID(ctx context.Context, id uuid.UUID) (*Environment, error)
 }

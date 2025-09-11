@@ -14,9 +14,10 @@ import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './util
 type Props = {
   data: MetricsResponse | undefined;
   limit?: number;
+  isMarketplace: boolean;
 };
 
-export function AccountConcurrency({ data, limit }: Props) {
+export function AccountConcurrency({ data, limit, isMarketplace = false }: Props) {
   let option = {};
   if (data) {
     option = createChartOption({ limit, resp: data });
@@ -40,12 +41,14 @@ export function AccountConcurrency({ data, limit }: Props) {
             text="The number of concurrently running steps across all environments"
           />
         </div>
-        <Button
-          appearance="outlined"
-          href={pathCreator.billing({ highlight: 'concurrency', ref: 'app-concurrency-chart' })}
-          kind="secondary"
-          label="Increase Concurrency"
-        />
+        {!isMarketplace && (
+          <Button
+            appearance="outlined"
+            href={pathCreator.billing({ highlight: 'concurrency', ref: 'app-concurrency-chart' })}
+            kind="secondary"
+            label="Increase Concurrency"
+          />
+        )}
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart className="h-full w-full" group="metricsDashboard" option={option} />
