@@ -2078,27 +2078,15 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
-	if item.Data.Throttle != nil {
-		var status string
-
-		if constraints.Throttle == nil {
-			status = "no-throttle"
-		} else if item.Data.Throttle.KeyExpressionHash == "" || item.Data.Throttle.KeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash {
-			// TODO: Re-evaluate throttle key
-			status = "missing-expr-hash"
-			if item.Data.Throttle.KeyExpressionHash != "" {
-				status = "expr-hash-mismatch"
-			}
-		}
-
-		if status != "" {
-			metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"status": status,
-				},
-			})
-		}
+	// Check if throttle is outdated
+	if outdatedThrottleReason := constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
+		// TODO: Re-evaluate throttle with event data
+		metrics.IncrQueueThrottleKeyExpressionMismatchCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"reason": outdatedThrottleReason.String(),
+			},
+		})
 	}
 
 	keys := []string{
