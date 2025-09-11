@@ -30,8 +30,8 @@ export function ResultsTable() {
   );
 }
 
-type InsightsColumnValue = InsightsEntry['values'][string];
 type InsightsEntry = InsightsFetchResult['rows'][number];
+type InsightsColumnValue = InsightsEntry['values'][string];
 type InsightsTableProps = {
   cellClassName: string;
   columns: ColumnDef<InsightsEntry, InsightsColumnValue>[];
