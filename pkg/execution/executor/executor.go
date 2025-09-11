@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -2373,6 +2374,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeRunComplete:
 		// TODO: Handle finalization
 		return fmt.Errorf("run complete not implemented")
+	case enums.OpcodeStepFailed:
+		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2533,8 +2536,32 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		return ErrHandledStepError
 	}
 
-	// This was the final step attempt and we still failed.
-	//
+	// This was the final step attempt and we still failed, so we convert the Error to Failed
+	// and use that handler.
+	gen.Op = enums.OpcodeStepFailed
+	return e.handleStepFailed(ctx, runCtx, gen, edge)
+}
+
+func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	spew.Dump("gen: ", gen)
+
+	// Create trace span for the StepFailed opcode
+	metadata := runCtx.Metadata()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStepFailed,
+		&tracing.CreateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleStepFailed"},
+			Metadata:   metadata,
+			Parent:     tracing.RunSpanRefFromMetadata(metadata),
+			Attributes: tracing.GeneratorAttrs(&gen),
+		},
+	)
+	if err != nil {
+		e.log.Debug("error creating span for StepFailed", "error", err)
+	} else {
+		defer func() { _ = span.Send() }() // Claude says this is needed to account for multiple return points below?
+	}
+
 	// First, save the error to our state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -2581,7 +2608,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepError"},
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepFailed"},
 				Metadata:    runCtx.Metadata(),
 				QueueItem:   &nextItem,
 				Parent:      tracing.RunSpanRefFromMetadata(metadata),
@@ -2590,7 +2617,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		if err != nil {
 			// return fmt.Errorf("error creating span for next step after
 			// StepError: %w", err)
-			e.log.Debug("error creating span for next step after StepError", "error", err)
+			e.log.Debug("error creating span for next step after StepFailed", "error", err)
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -3778,12 +3805,12 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ResumeSignalResult, err error) {
 	if workspaceID == uuid.Nil {
 		err = fmt.Errorf("workspace ID is empty")
-		return
+		return res, err
 	}
 
 	if signalID == "" {
 		err = fmt.Errorf("signal ID is empty")
-		return
+		return res, err
 	}
 
 	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
@@ -3800,14 +3827,14 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
 	if err != nil {
 		err = fmt.Errorf("error getting pause by signal ID: %w", err)
-		return
+		return res, err
 	}
 
 	res = &execution.ResumeSignalResult{}
 
 	if pause == nil {
 		l.Debug("no pause found for signal")
-		return
+		return res, err
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
@@ -3819,7 +3846,7 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
 		}
 
-		return
+		return res, err
 	}
 
 	l.Debug("resuming pause from signal", "pause.DataKey", pause.DataKey)
@@ -3843,13 +3870,13 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			err = nil
 		}
 
-		return
+		return res, err
 	}
 
 	res.MatchedSignal = true
 	res.RunID = &pause.Identifier.RunID
 
-	return
+	return res, err
 }
 
 type execError struct {
