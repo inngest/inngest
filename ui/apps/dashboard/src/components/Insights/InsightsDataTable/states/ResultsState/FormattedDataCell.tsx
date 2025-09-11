@@ -19,7 +19,7 @@ export function FormattedDataCell({ value, type }: FormattedDataCellProps) {
         'w-fit overflow-x-hidden py-0 pr-[2px]',
         isNumericValue ? 'max-w-none' : 'max-w-[400px]',
         needsMinWidth ? 'min-w-[320px]' : '',
-        'max-h-[150px] overflow-y-auto',
+        'max-h-[150px] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1',
         isNumericValue
           ? 'whitespace-nowrap [overflow-wrap:normal]'
           : 'whitespace-pre-wrap [overflow-wrap:anywhere]'
