@@ -6,9 +6,9 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 )
 
-func (constraints PartitionConstraintConfig) HasOutdatedThrottle(qi osqueue.QueueItem) enums.OutdatedThrottleReason {
+func (q PartitionConstraintConfig) HasOutdatedThrottle(qi osqueue.QueueItem) enums.OutdatedThrottleReason {
 	itemThrottle := qi.Data.Throttle
-	constraintThrottle := constraints.Throttle
+	constraintThrottle := q.Throttle
 
 	switch {
 	// Neither item nor constraint have throttle set
