@@ -2078,7 +2078,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
-	if item.Data.Throttle != nil && (item.Data.Throttle.KeyExpressionHash == "" || item.Data.Throttle.KeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash) {
+	if item.Data.Throttle != nil && constraints.Throttle != nil && (item.Data.Throttle.KeyExpressionHash == "" || item.Data.Throttle.KeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash) {
 		// TODO: Re-evaluate throttle key
 		status := "missing-expr-hash"
 		if item.Data.Throttle.KeyExpressionHash != "" {
