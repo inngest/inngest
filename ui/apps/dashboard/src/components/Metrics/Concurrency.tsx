@@ -59,7 +59,7 @@ export const Concurrency = ({
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
-  isMarketplace?: boolean;
+  isMarketplace: boolean;
 }) => {
   const chartOptions = workspace && mapConcurrency(workspace, entities);
 

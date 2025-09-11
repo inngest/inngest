@@ -25,7 +25,7 @@ export type MetricsFilters = {
   entities: EntityLookup;
   scope: MetricsScope;
   concurrencyLimit?: number;
-  isMarketplace?: boolean;
+  isMarketplace: boolean;
 };
 
 const GetVolumeMetrics = graphql(`
