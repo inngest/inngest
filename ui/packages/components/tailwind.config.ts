@@ -51,6 +51,11 @@ export default {
           coolModerate: 'rgb(var(--color-quaternary-cool-moderate) / <alpha-value>)',
           coolxIntense: 'rgb(var(--color-quaternary-cool-xIntense) / <alpha-value>)',
           cool3xIntense: 'rgb(var(--color-quaternary-cool-3xIntense) / <alpha-value>)',
+          warmer3xSubtle: 'rgb(var(--color-quaternary-warmer-3xSubtle) / <alpha-value>)',
+          warmerxSubtle: 'rgb(var(--color-quaternary-warmer-xSubtle) / <alpha-value>)',
+          warmerModerate: 'rgb(var(--color-quaternary-warmer-moderate) / <alpha-value>)',
+          warmerxIntense: 'rgb(var(--color-quaternary-warmer-xIntense) / <alpha-value>)',
+          warmer3xIntense: 'rgb(var(--color-quaternary-warmer-3xIntense) / <alpha-value>)',
         },
         accent: {
           '3xSubtle': 'rgb(var(--color-accent-3xSubtle) / <alpha-value>)',

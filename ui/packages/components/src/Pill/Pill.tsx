@@ -11,7 +11,7 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
-export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error';
+export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error' | 'secondary';
 export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
 
 export function Pill({
@@ -153,6 +153,9 @@ export const getPillColors = ({
   const solidPillStyles = {
     default: `bg-canvasMuted text-basis ${clickable ? 'hover:bg-surfaceMuted' : ''}`,
     primary: `bg-primary-intense text-alwaysWhite ${clickable ? 'hover:bg-primary-xIntense' : ''}`,
+    secondary: `bg-quarternary-warmer-xIntense text-alwaysWhite ${
+      clickable ? 'hover:bg-primary-xIntense' : ''
+    }`,
     warning: `bg-accent-moderate text-alwaysWhite ${clickable ? 'hover:bg-accent-intense' : ''}`,
     error: `bg-tertiary-moderate text-alwaysWhite ${clickable ? 'hover:bg-tertiary-intense' : ''}`,
     info: `bg-secondary-moderate text-alwaysWhite ${clickable ? 'hover:bg-secondary-intense' : ''}`,
