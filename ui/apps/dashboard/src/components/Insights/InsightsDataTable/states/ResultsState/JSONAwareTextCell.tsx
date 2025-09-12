@@ -15,7 +15,7 @@ export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
 
   return (
     <div className={cn('text-basis text-sm font-medium')}>
-      <pre className="m-0 max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all">
+      <pre className="max-h-[150px] max-w-[350px] overflow-x-auto overflow-y-auto whitespace-pre">
         {formattedJSON}
       </pre>
     </div>
