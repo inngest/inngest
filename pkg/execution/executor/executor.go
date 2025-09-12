@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -2543,25 +2542,6 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 }
 
 func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	spew.Dump("gen: ", gen)
-
-	// Create trace span for the StepFailed opcode
-	metadata := runCtx.Metadata()
-	span, err := e.tracerProvider.CreateDroppableSpan(
-		meta.SpanNameStepFailed,
-		&tracing.CreateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleStepFailed"},
-			Metadata:   metadata,
-			Parent:     tracing.RunSpanRefFromMetadata(metadata),
-			Attributes: tracing.GeneratorAttrs(&gen),
-		},
-	)
-	if err != nil {
-		e.log.Debug("error creating span for StepFailed", "error", err)
-	} else {
-		defer func() { _ = span.Send() }() // Claude says this is needed to account for multiple return points below?
-	}
-
 	// First, save the error to our state store.
 	output, err := gen.Output()
 	if err != nil {
