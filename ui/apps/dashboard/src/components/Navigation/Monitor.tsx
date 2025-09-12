@@ -22,7 +22,7 @@ export default function Monitor({
       {collapsed ? (
         <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-disabled leading-4.5 mb-1 text-xs font-medium">Monitor</div>
+        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">Monitor</div>
       )}
       <MenuItem
         href={getNavRoute(activeEnv, 'metrics')}
