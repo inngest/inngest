@@ -13,8 +13,6 @@ import {
   getSpinnerStyles,
 } from './buttonStyles';
 
-// testing as well
-
 export type ButtonKind = 'primary' | 'secondary' | 'danger';
 export type ButtonAppearance = 'solid' | 'outlined' | 'ghost';
 export type ButtonSize = 'small' | 'medium' | 'large';
