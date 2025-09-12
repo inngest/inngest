@@ -168,6 +168,9 @@ export const getPillColors = ({
     primary: `border border-success bg-success text-success ${
       clickable ? 'hover:bg-primary-xSubtle' : ''
     }`,
+    secondary: `border border-quatenary-warmerxIntense bg-canvasBase text-info ${
+      clickable ? 'hover:bg-quatenary-warmer3xSubtle' : ''
+    }`,
     warning: `border border-warning bg-warning text-warning ${
       clickable ? 'hover:bg-accent-xSubtle' : ''
     }`,
@@ -180,6 +183,9 @@ export const getPillColors = ({
   const solidBrightPillStyles = {
     default: `bg-canvasSubtle text-subtle ${clickable ? 'hover:bg-surfaceSubtle' : ''}`,
     primary: `bg-success text-primary-2xIntense ${clickable ? 'hover:bg-primary-2xSubtle' : ''}`,
+    secondary: `bg-quatenary-warmer3xIntense text-onContrast ${
+      clickable ? 'hover:bg-quatenary-warmerxIntense' : ''
+    }`,
     warning: `bg-warning text-accent-2xIntense ${clickable ? 'hover:bg-accent-2xSubtle' : ''}`,
     error: `bg-error text-tertiary-2xIntense ${clickable ? 'hover:bg-tertiary-2xSubtle' : ''}`,
     info: `bg-info text-secondary-2xIntense ${clickable ? 'hover:bg-secondary-2xSubtle' : ''}`,
