@@ -7,6 +7,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import TableBlankState from '@inngest/components/Functions/TableBlankState';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { type Function, type PageInfo } from '@inngest/components/types/function';
@@ -128,21 +129,6 @@ export function FunctionsTable({
     }
   }, [mergedData]);
 
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasFunctionsData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasFunctionsData, isFetching]
-  );
-
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
@@ -162,7 +148,7 @@ export function FunctionsTable({
         />
         <FunctionsStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div className="h-[calc(100%-58px)] overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={mergedData || []}
@@ -183,6 +169,11 @@ export function FunctionsTable({
             router.push(pathCreator.function({ functionSlug: row.original.slug }))
           }
           getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug })}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
         />
         {!hasNextPage && hasFunctionsData && isScrollable && !isFetchingNextPage && !isFetching && (
           <div className="flex flex-col items-center pb-4 pt-8">

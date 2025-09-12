@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -170,21 +171,15 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     }
   }, [nextPageRuns, isScrollRequest]);
 
-  const fetchMoreOnScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
-    (event) => {
-      if (runs.length > 0) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-        const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isLoading && lastCursor && hasNextPage) {
-          setIsScrollRequest(true);
-          setCursor(lastCursor);
-        }
+  const loadMore = useCallback(() => {
+    if (runs.length > 0 && !isLoading && hasNextPage) {
+      const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
+      if (lastCursor) {
+        setIsScrollRequest(true);
+        setCursor(lastCursor);
       }
-    },
-    [isLoading, hasNextPage, runs, nextPageInfo, firstPageInfo]
-  );
+    }
+  }, [isLoading, hasNextPage, runs, nextPageInfo, firstPageInfo]);
 
   const onScrollToTop = useCallback(() => {
     setIsScrollRequest(false);
@@ -218,13 +213,19 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
       onRefresh={onRefresh}
-      onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
       getTrigger={getTrigger}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
+      infiniteScrollTrigger={
+        <InfiniteScrollTrigger
+          onIntersect={loadMore}
+          hasMore={hasNextPage ?? false}
+          isLoading={isLoading}
+        />
+      }
     />
   );
 });

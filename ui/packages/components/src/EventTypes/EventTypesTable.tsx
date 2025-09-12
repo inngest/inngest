@@ -7,6 +7,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
@@ -149,21 +150,6 @@ export function EventTypesTable({
     }
   }, [mergedData]);
 
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasEventTypesData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
-  );
-
   useEffect(() => {
     const sortEntry = sorting[0];
     if (!sortEntry) return;
@@ -201,7 +187,7 @@ export function EventTypesTable({
         />
         <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div className="h-[calc(100%-58px)] overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={mergedData || []}
@@ -223,6 +209,11 @@ export function EventTypesTable({
           }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
           getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
         />
         {!hasNextPage &&
           hasEventTypesData &&
