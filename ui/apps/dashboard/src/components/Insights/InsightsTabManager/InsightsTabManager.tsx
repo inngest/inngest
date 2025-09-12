@@ -5,8 +5,8 @@ import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
+import { ChatPlaceholder } from '../InsightsChat/ChatPlaceholder';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
-import { ChatPlaceholder } from './ChatPlaceholder';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
