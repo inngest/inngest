@@ -502,6 +502,8 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
 
+	matchingPatterns := inngest.GenerateMatchingPatterns(evt.Name)
+
 	for _, fn := range fns {
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
@@ -523,6 +525,11 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 			for _, t := range copied.Triggers {
 				if t.EventTrigger == nil {
+					continue
+				}
+
+				// Only process triggers that match the current event
+				if !t.EventTrigger.MatchesAnyPattern(matchingPatterns) {
 					continue
 				}
 
