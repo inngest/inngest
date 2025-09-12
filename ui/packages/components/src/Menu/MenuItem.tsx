@@ -37,7 +37,7 @@ export const MenuItem = ({
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(
-            `my-1 flex h-8 w-full flex-row items-center rounded px-1.5  ${
+            `my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5  ${
               comingSoon
                 ? 'text-disabled hover:bg-disabled cursor-not-allowed'
                 : active
