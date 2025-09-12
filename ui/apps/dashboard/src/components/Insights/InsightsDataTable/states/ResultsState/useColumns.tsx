@@ -5,7 +5,6 @@ import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
-import { CellPadding } from './CellPadding';
 import { JSONAwareTextCell } from './JSONAwareTextCell';
 
 type InsightsEntry = InsightsFetchResult['rows'][number];
@@ -23,30 +22,16 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
         cell: ({ getValue }) => {
           const value = getValue();
 
-          if (value == null) {
-            return (
-              <CellPadding>
-                <TextCell />
-              </CellPadding>
-            );
-          }
+          if (value == null) return <TextCell />;
 
           switch (col.type) {
             case 'date':
-              return (
-                <CellPadding>
-                  <TimeCell date={new Date(value)} />
-                </CellPadding>
-              );
+              return <TimeCell date={new Date(value)} />;
             case 'string':
               return <JSONAwareTextCell>{String(value)}</JSONAwareTextCell>;
             case 'number':
             default:
-              return (
-                <CellPadding>
-                  <TextCell>{String(value)}</TextCell>
-                </CellPadding>
-              );
+              return <TextCell>{String(value)}</TextCell>;
           }
         },
         header: col.name,

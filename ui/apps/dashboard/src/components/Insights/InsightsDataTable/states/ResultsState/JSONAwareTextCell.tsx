@@ -1,6 +1,5 @@
 import { TextCell } from '@inngest/components/Table';
 
-import { CellPadding } from './CellPadding';
 import { getFormattedJSONObjectOrArrayString } from './json';
 
 interface JSONAwareTextCellProps {
@@ -10,24 +9,16 @@ interface JSONAwareTextCellProps {
 export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
   const formattedJSON = getFormattedJSONObjectOrArrayString(children);
 
-  if (formattedJSON === null) {
-    return (
-      <CellPadding>
-        <TextCell>{children}</TextCell>
-      </CellPadding>
-    );
-  }
+  if (formattedJSON === null) return <TextCell>{children}</TextCell>;
 
   return (
-    <CellPadding>
-      <div className="text-basis text-sm font-medium">
-        <pre
-          tabIndex={-1}
-          className="m-0 max-h-[150px] max-w-[350px] overflow-hidden whitespace-pre break-all focus:outline-none group-focus-within:overflow-auto"
-        >
-          {formattedJSON}
-        </pre>
-      </div>
-    </CellPadding>
+    <div className="text-basis text-sm font-medium">
+      <pre
+        tabIndex={-1}
+        className="m-0 max-h-[150px] w-full max-w-none overflow-hidden whitespace-pre break-all focus:outline-none group-focus-within:overflow-auto"
+      >
+        {formattedJSON}
+      </pre>
+    </div>
   );
 }
