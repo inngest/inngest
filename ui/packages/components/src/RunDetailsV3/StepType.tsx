@@ -63,8 +63,13 @@ const StepTypeIcon: Record<string, StepType> = {
 export const StepType = ({ stepType }: { stepType?: string | null | '' }) => {
   const TypePill = stepType ? StepTypeIcon[stepType] : null;
   return TypePill ? (
-    <Pill appearance="outlined" kind="secondary">
-      <TypePill.icon className="fill-quaternary-warmerxIntense h-2.5 w-2.5 shrink-0" />
+    <Pill
+      appearance="outlined"
+      kind="secondary"
+      iconSide="iconOnly"
+      icon={<TypePill.icon className="fill-quaternary-warmerxIntense h-2.5 w-2.5 shrink-0" />}
+    >
+      {TypePill.label}
     </Pill>
   ) : null;
 };

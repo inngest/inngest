@@ -30,7 +30,7 @@ export function Pill({
   appearance?: PillAppearance;
   kind?: PillKind;
   icon?: React.ReactNode;
-  iconSide?: 'right' | 'left';
+  iconSide?: 'right' | 'left' | 'iconOnly';
   /**
    * Use this when you want one of the sides to be flat. The other sides will be
    * rounded.
@@ -88,14 +88,14 @@ export function Pill({
     <NextLink href={href} className="flex" onClick={(e) => e.stopPropagation()}>
       <span ref={pillRef} className={cn('rounded', classNames)}>
         {icon && iconSide === 'left' && icon}
-        <span className="truncate">{children}</span>
+        {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
         {icon && iconSide === 'right' && icon}
       </span>
     </NextLink>
   ) : (
     <span ref={pillRef} className={cn(roundedClasses, classNames)}>
       {icon && iconSide === 'left' && icon}
-      <span className="truncate">{children}</span>
+      {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
       {icon && iconSide === 'right' && icon}
     </span>
   );
@@ -168,7 +168,7 @@ export const getPillColors = ({
     primary: `border border-success bg-success text-success ${
       clickable ? 'hover:bg-primary-xSubtle' : ''
     }`,
-    secondary: `border border-quatenary-warmerxIntense bg-canvasBase text-info ${
+    secondary: `border border-quaternary-warmerxIntense bg-canvasBase text-info ${
       clickable ? 'hover:bg-quatenary-warmer3xSubtle' : ''
     }`,
     warning: `border border-warning bg-warning text-warning ${
