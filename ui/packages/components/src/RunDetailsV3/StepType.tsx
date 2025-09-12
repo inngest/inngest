@@ -67,6 +67,7 @@ export const StepType = ({ stepType }: { stepType?: string | null | '' }) => {
       appearance="outlined"
       kind="secondary"
       iconSide="iconOnly"
+      className="shrink-0 px-2 py-0.5"
       icon={<TypePill.icon className="fill-quaternary-warmerxIntense h-2.5 w-2.5 shrink-0" />}
     >
       {TypePill.label}

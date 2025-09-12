@@ -83,7 +83,7 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
                 />
               </div>
             )}
-            <StepType stepType={'INVOKE'} />
+            <StepType stepType={trace.stepType} />
             <div
               className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
                 !hasChildren && 'pl-1.5'
