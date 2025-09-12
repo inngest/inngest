@@ -21,7 +21,10 @@ export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
   return (
     <CellPadding>
       <div className="text-basis text-sm font-medium">
-        <pre className="m-0 max-h-[150px] max-w-[350px] overflow-x-auto overflow-y-auto whitespace-pre break-all">
+        <pre
+          tabIndex={-1}
+          className="m-0 max-h-[150px] max-w-[350px] overflow-x-auto overflow-y-auto whitespace-pre break-all focus:outline-none"
+        >
           {formattedJSON}
         </pre>
       </div>
