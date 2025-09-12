@@ -129,12 +129,6 @@ export function FunctionsTable({
     }
   }, [mergedData]);
 
-  const loadMore = useCallback(() => {
-    if (hasFunctionsData && hasNextPage && !isFetching && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, hasFunctionsData, isFetching]);
-
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
@@ -177,7 +171,7 @@ export function FunctionsTable({
           getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug })}
         />
         <InfiniteScrollTrigger
-          onIntersect={loadMore}
+          onIntersect={fetchNextPage}
           hasMore={hasNextPage ?? false}
           isLoading={isFetching || isFetchingNextPage}
         />

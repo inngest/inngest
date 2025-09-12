@@ -224,12 +224,6 @@ export function EventsTable({
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
 
-  const loadMore = useCallback(() => {
-    if (hasEventsData && hasNextPage && !isFetching && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventsData, isFetching]);
-
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
@@ -375,7 +369,7 @@ export function EventsTable({
           }}
         />
         <InfiniteScrollTrigger
-          onIntersect={loadMore}
+          onIntersect={fetchNextPage}
           hasMore={hasNextPage ?? false}
           isLoading={isFetching || isFetchingNextPage}
         />

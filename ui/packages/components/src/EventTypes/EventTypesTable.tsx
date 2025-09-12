@@ -150,12 +150,6 @@ export function EventTypesTable({
     }
   }, [mergedData]);
 
-  const loadMore = useCallback(() => {
-    if (hasEventTypesData && hasNextPage && !isFetching && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]);
-
   useEffect(() => {
     const sortEntry = sorting[0];
     if (!sortEntry) return;
@@ -217,7 +211,7 @@ export function EventTypesTable({
           getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
         />
         <InfiniteScrollTrigger
-          onIntersect={loadMore}
+          onIntersect={fetchNextPage}
           hasMore={hasNextPage ?? false}
           isLoading={isFetching || isFetchingNextPage}
         />
