@@ -1050,11 +1050,6 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
-
-		// XXX: remove these in a state store refactor.
-		fnRunState.kg.Event(ctx, isSharded, i.WorkflowID, i.RunID),
-		fnRunState.kg.History(ctx, isSharded, i.RunID),
-		fnRunState.kg.Errors(ctx, isSharded, i),
 	}
 
 	performedDeletion := false
