@@ -549,24 +549,17 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, fnID, runID)).Build()
 	}).AsBytes()
-	if err == nil {
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
-		return events, nil
-	}
-
-	// Pre-batch days for backcompat.
-	byt, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, fnID, runID)).Build()
-	}).AsBytes()
 	if err != nil {
 		if err == rueidis.Nil {
 			return nil, state.ErrEventNotFound
 		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
-	return []json.RawMessage{byt}, nil
+
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+	}
+	return events, nil
 }
 
 func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
@@ -688,36 +681,18 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	// Load events.
 	events := []map[string]any{}
-	switch metadata.Version {
-	case 0: // pre-batch days
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if err == rueidis.Nil {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get event; %w", err)
+
+	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
+	}).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, state.ErrEventNotFound
 		}
-		event := map[string]any{}
-		if err := json.Unmarshal(byt, &event); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event; %w", err)
-		}
-		events = []map[string]any{event}
-	default: // current default is 1
-		// Load the batch of events
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get batch; %w", err)
-		}
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
+		return nil, fmt.Errorf("failed to get batch; %w", err)
+	}
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
 	}
 
 	actions := []state.MemoizedStep{}
