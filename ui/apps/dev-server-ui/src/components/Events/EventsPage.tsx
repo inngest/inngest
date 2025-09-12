@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -24,9 +25,20 @@ export default function EventsPage({
   eventTypeNames?: string[];
   showHeader?: boolean;
 }) {
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
   const router = useRouter();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
+
+  useEffect(() => {
+    if (pollingFlagReady && pollingDisabled) {
+      setAutoRefresh(false);
+    }
+  }, [pollingDisabled, pollingFlagReady]);
 
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();

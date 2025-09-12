@@ -365,11 +365,15 @@ INSERT INTO spans (
   dynamic_span_id,
   attributes,
   links,
-  output
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+  output,
+  debug_run_id,
+  debug_session_id,
+  status
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
 
 -- name: GetSpansByRunID :many
 SELECT
+  run_id,
   trace_id,
   dynamic_span_id,
   MIN(start_time) as start_time,
@@ -387,6 +391,49 @@ WHERE run_id = CAST($1 AS CHAR(26))
 GROUP BY dynamic_span_id
 ORDER BY start_time;
 
+-- name: GetSpansByDebugRunID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_session_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_run_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetSpansByDebugSessionID :many
+SELECT
+  trace_id,
+  run_id,
+  debug_run_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE debug_session_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+
 -- name: GetSpanOutput :one
 SELECT
   -- input, TODO
@@ -394,3 +441,4 @@ SELECT
 FROM spans
 WHERE span_id = $1
 LIMIT 1;
+

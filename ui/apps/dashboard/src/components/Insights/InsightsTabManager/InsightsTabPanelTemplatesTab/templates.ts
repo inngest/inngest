@@ -1,6 +1,6 @@
 import type { QueryTemplate } from '@/components/Insights/types';
 
-// TODO: account_id and workspace_id will be sent directly without the user specifying them.
+// TODO: account_id will be derived by the BE.
 
 function makeEventVolumePerHourQuery(event?: string) {
   return `SELECT
@@ -10,9 +10,9 @@ function makeEventVolumePerHourQuery(event?: string) {
 FROM
     events
 WHERE
-    account_id = '{{ account_id }}'
-    AND workspace_id = '{{ workspace_id }}'
-    AND event_ts > {{ start_time }}${event ? `\n    AND event_name = '${event}'` : ''}
+    event_ts > toUnixTimestamp(subtractDays(now(), 3)) * 1000${
+      event ? `\n    AND event_name = '${event}'` : ''
+    }
 GROUP BY
     hour_bucket,
     event_name

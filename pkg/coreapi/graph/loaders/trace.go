@@ -40,6 +40,30 @@ func (k *TraceRequestKey) String() string {
 	return fmt.Sprintf("%s:%s", k.TraceID, k.RunID)
 }
 
+type DebugRunRequestKey struct {
+	DebugRunID ulid.ULID
+}
+
+func (k *DebugRunRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugRunRequestKey) String() string {
+	return k.DebugRunID.String()
+}
+
+type DebugSessionRequestKey struct {
+	DebugSessionID ulid.ULID
+}
+
+func (k *DebugSessionRequestKey) Raw() any {
+	return k
+}
+
+func (k *DebugSessionRequestKey) String() string {
+	return k.DebugSessionID.String()
+}
+
 type traceReader struct {
 	loaders *loaders
 	reader  cqrs.TraceReader
@@ -163,22 +187,27 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	attempts := span.GetAttempts()
 
+	debugRunID := span.GetDebugRunID()
+	debugSessionID := span.GetDebugSessionID()
+
 	gqlSpan := &models.RunTraceSpan{
-		AppID:        span.GetAppID(),
-		Attempts:     &attempts,
-		Duration:     duration,
-		EndedAt:      span.GetEndedAtTime(),
-		FunctionID:   span.GetFunctionID(),
-		IsRoot:       span.GetIsRoot(),
-		Name:         span.GetStepName(),
-		OutputID:     span.GetOutputID(),
-		ParentSpanID: span.GetParentSpanID(),
-		QueuedAt:     span.GetQueuedAtTime(),
-		RunID:        span.GetRunID(),
-		SpanID:       span.GetSpanID(),
-		StartedAt:    span.GetStartedAtTime(),
-		Status:       status,
-		TraceID:      span.GetTraceID(),
+		AppID:          span.GetAppID(),
+		Attempts:       &attempts,
+		Duration:       duration,
+		EndedAt:        span.GetEndedAtTime(),
+		FunctionID:     span.GetFunctionID(),
+		IsRoot:         span.GetIsRoot(),
+		Name:           span.GetStepName(),
+		OutputID:       span.GetOutputID(),
+		ParentSpanID:   span.GetParentSpanID(),
+		QueuedAt:       span.GetQueuedAtTime(),
+		RunID:          span.GetRunID(),
+		SpanID:         span.GetSpanID(),
+		StartedAt:      span.GetStartedAtTime(),
+		Status:         status,
+		TraceID:        span.GetTraceID(),
+		DebugRunID:     debugRunID,
+		DebugSessionID: debugSessionID,
 
 		// IsUserland: , TODO
 		// UserlandSpan: , TODO
@@ -576,25 +605,27 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	}
 
 	span := &models.RunTraceSpan{
-		AppID:        uuid.MustParse(pb.GetAppId()),
-		FunctionID:   uuid.MustParse(pb.GetFunctionId()),
-		TraceID:      pb.GetTraceId(),
-		ParentSpanID: pb.ParentSpanId,
-		SpanID:       pb.GetSpanId(),
-		RunID:        ulid.MustParse(pb.GetRunId()),
-		IsRoot:       pb.GetIsRoot(),
-		IsUserland:   pb.GetIsUserland(),
-		UserlandSpan: userlandSpan,
-		Name:         pb.GetName(),
-		Status:       status,
-		Attempts:     &attempts,
-		Duration:     &duration,
-		QueuedAt:     pb.GetQueuedAt().AsTime().Truncate(time.Millisecond),
-		StartedAt:    startedAt,
-		EndedAt:      endedAt,
-		OutputID:     pb.OutputId,
-		StepOp:       stepOp,
-		StepID:       pb.StepId,
+		AppID:          uuid.MustParse(pb.GetAppId()),
+		FunctionID:     uuid.MustParse(pb.GetFunctionId()),
+		TraceID:        pb.GetTraceId(),
+		ParentSpanID:   pb.ParentSpanId,
+		SpanID:         pb.GetSpanId(),
+		RunID:          ulid.MustParse(pb.GetRunId()),
+		IsRoot:         pb.GetIsRoot(),
+		IsUserland:     pb.GetIsUserland(),
+		UserlandSpan:   userlandSpan,
+		Name:           pb.GetName(),
+		Status:         status,
+		Attempts:       &attempts,
+		Duration:       &duration,
+		QueuedAt:       pb.GetQueuedAt().AsTime().Truncate(time.Millisecond),
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		OutputID:       pb.OutputId,
+		StepOp:         stepOp,
+		StepID:         pb.StepId,
+		DebugRunID:     nil, // Not available in legacy protobuf format
+		DebugSessionID: nil, // Not available in legacy protobuf format
 	}
 
 	if pb.GetStepInfo() != nil {

@@ -3,9 +3,17 @@ import { Header } from '@inngest/components/Header/Header';
 import PageTitle from '@/components/Billing/PageTitle';
 import Layout from '@/components/Layout/Layout';
 import Toaster from '@/components/Toaster';
+import { getProfileDisplay } from '@/queries/server-only/profile';
 import { pathCreator } from '@/utils/urls';
 
 export default async function BillingLayout({ children }: React.PropsWithChildren) {
+  const profile = await getProfileDisplay();
+  if (profile.isMarketplace) {
+    // Unreachable unless a user messed with the URL. Marketplace accounts
+    // should not be able to navigate to the billing pages
+    throw new Error('Marketplace accounts cannot access billing');
+  }
+
   return (
     <Layout>
       <div className="bg-canvasSubtle flex h-full flex-col">

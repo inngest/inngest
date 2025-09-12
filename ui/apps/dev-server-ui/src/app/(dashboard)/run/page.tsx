@@ -1,12 +1,18 @@
 'use client';
 
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 
 export default function Page() {
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
   const [runID] = useSearchParam('runID');
   const getTrigger = useGetTrigger();
 
@@ -19,7 +25,7 @@ export default function Page() {
       <RunDetailsV3
         standalone
         getTrigger={getTrigger}
-        pollInterval={2500}
+        pollInterval={pollingFlagReady && pollingDisabled ? 0 : 2500}
         runID={runID}
         tracesPreviewEnabled={true}
       />

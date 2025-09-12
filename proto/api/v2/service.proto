@@ -352,6 +352,17 @@ service V2 {
         }
       }
       responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Internal Server Error"

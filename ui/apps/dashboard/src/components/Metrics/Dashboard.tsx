@@ -90,6 +90,7 @@ const MetricsLookupDocument = graphql(`
 const AccountConcurrencyLookupDocument = graphql(`
   query AccountConcurrencyLookup {
     account {
+      marketplace
       entitlements {
         concurrency {
           limit
@@ -140,6 +141,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
   const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
+  const isMarketplace = Boolean(accountConcurrencyLimitRes?.account.marketplace);
 
   const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
@@ -204,6 +206,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           entities={mappedEntities}
           scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
           concurrencyLimit={concurrencyLimit}
+          isMarketplace={isMarketplace}
         />
       </div>
     </div>

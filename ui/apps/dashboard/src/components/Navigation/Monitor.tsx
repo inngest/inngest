@@ -22,15 +22,7 @@ export default function Monitor({
       {collapsed ? (
         <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-disabled leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
-      )}
-      {isInsightsEnabled && (
-        <MenuItem
-          href={getNavRoute(activeEnv, 'insights')}
-          collapsed={collapsed}
-          text="Insights"
-          icon={<InsightsIcon className="h-[18px] w-[18px]" />}
-        />
+        <div className="text-disabled leading-4.5 mb-1 text-xs font-medium">Monitor</div>
       )}
       <MenuItem
         href={getNavRoute(activeEnv, 'metrics')}
@@ -50,6 +42,14 @@ export default function Monitor({
         text="Events"
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
       />
+      {isInsightsEnabled && (
+        <MenuItem
+          href={getNavRoute(activeEnv, 'insights')}
+          collapsed={collapsed}
+          text="Insights"
+          icon={<InsightsIcon className="h-[18px] w-[18px]" />}
+        />
+      )}
     </div>
   );
 }

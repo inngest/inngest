@@ -34,7 +34,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-
 type Opt func(s *svc)
 
 func WithExecutionManager(l cqrs.Manager) func(s *svc) {
@@ -261,6 +260,9 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
+		case queue.KindFunctionPause, queue.KindFunctionUnpause:
+			// NOOP:
+			// Function pausing and unpausing is not implemented in the dev server.
 		case queue.KindJobPromote:
 			err = s.handleJobPromote(ctx, item)
 		default:
