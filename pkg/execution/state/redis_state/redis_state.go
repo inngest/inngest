@@ -1,7 +1,6 @@
 package redis_state
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -437,22 +436,6 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	return nil
 }
 
-func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IsComplete"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-
-	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("status").Build()
-	}).AsBytes()
-	if err != nil {
-		return false, err
-	}
-	return !bytes.Equal(val, []byte("0")), nil
-}
-
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Exists"), redis_telemetry.ScopeFnRunState)
 
@@ -761,29 +744,6 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 	return stack, nil
-}
-
-func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StackIndex"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
-	}).AsStrSlice()
-	if err != nil {
-		return 0, err
-	}
-	if len(stack) == 0 {
-		return 0, nil
-	}
-	for n, i := range stack {
-		if i == stepID {
-			return n + 1, nil
-		}
-	}
-	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
