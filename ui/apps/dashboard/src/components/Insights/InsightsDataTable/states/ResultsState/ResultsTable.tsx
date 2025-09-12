@@ -39,7 +39,7 @@ export function ResultsTable() {
         <MemoizedInsightsTable
           columns={columns}
           data={dataToUse.rows}
-          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border align-top p-2.5"
+          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border align-top p-0"
         />
       </div>
       <ResultsTableFooter />
