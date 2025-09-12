@@ -23,7 +23,7 @@ export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
       <div className="text-basis text-sm font-medium">
         <pre
           tabIndex={-1}
-          className="m-0 max-h-[150px] max-w-[350px] overflow-x-auto overflow-y-auto whitespace-pre break-all focus:outline-none"
+          className="m-0 max-h-[150px] max-w-[350px] overflow-hidden whitespace-pre break-all focus:outline-none group-focus-within:overflow-auto"
         >
           {formattedJSON}
         </pre>
