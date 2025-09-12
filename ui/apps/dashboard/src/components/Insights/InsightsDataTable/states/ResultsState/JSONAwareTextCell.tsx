@@ -1,6 +1,4 @@
-import { Button } from '@inngest/components/Button/Button';
 import { TextCell } from '@inngest/components/Table';
-import { RiSidebarFoldLine } from '@remixicon/react';
 
 import { getFormattedJSONObjectOrArrayString } from './json';
 
