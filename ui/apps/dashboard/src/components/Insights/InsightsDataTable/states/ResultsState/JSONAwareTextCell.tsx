@@ -1,4 +1,5 @@
 import { TextCell } from '@inngest/components/Table';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { getFormattedJSONObjectOrArrayString } from './json';
 
@@ -13,8 +14,10 @@ export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
   }
 
   return (
-    <TextCell>
-      <pre className="m-0 whitespace-pre-wrap">{formattedJSON}</pre>
-    </TextCell>
+    <div className={cn('text-basis text-sm font-medium')}>
+      <pre className="m-0 max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all">
+        {formattedJSON}
+      </pre>
+    </div>
   );
 }
