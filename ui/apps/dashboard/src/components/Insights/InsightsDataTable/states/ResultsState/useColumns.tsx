@@ -23,12 +23,13 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
         cell: ({ getValue }) => {
           const value = getValue();
 
-          if (value == null)
+          if (value == null) {
             return (
               <CellPadding>
                 <TextCell />
               </CellPadding>
             );
+          }
 
           switch (col.type) {
             case 'date':
