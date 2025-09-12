@@ -434,9 +434,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		return nil, nil
 	}
 
-	if span.Attributes.StepRunType != nil {
+	if gqlSpan.Name == FinalizationSpanName {
+		gqlSpan.StepType = strings.ToUpper(FinalizationSpanName)
+	} else if span.Attributes.StepRunType != nil {
 		gqlSpan.StepType = *span.Attributes.StepRunType
-	} else if gqlSpan.StepOp != nil && gqlSpan.StepType == "" {
+	} else if gqlSpan.StepOp != nil {
 		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
