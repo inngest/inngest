@@ -222,8 +222,8 @@ export const CANCEL_RUN = gql`
 `;
 
 export const RERUN = gql`
-  mutation Rerun($runID: ULID!) {
-    rerun(runID: $runID)
+  mutation Rerun($runID: ULID!, $debugRunID: ULID = null, $debugSessionID: ULID = null) {
+    rerun(runID: $runID, debugRunID: $debugRunID, debugSessionID: $debugSessionID)
   }
 `;
 
@@ -231,14 +231,14 @@ export const RERUN_FROM_STEP = gql`
   mutation RerunFromStep(
     $runID: ULID!
     $fromStep: RerunFromStepInput!
-    $debugSessionID: ULID = null
     $debugRunID: ULID = null
+    $debugSessionID: ULID = null
   ) {
     rerun(
       runID: $runID
       fromStep: $fromStep
-      debugSessionID: $debugSessionID
       debugRunID: $debugRunID
+      debugSessionID: $debugSessionID
     )
   }
 `;

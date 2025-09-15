@@ -5,8 +5,10 @@ import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Timeline } from '../RunDetailsV3/Timeline';
+import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRun } from '../SharedContext/useGetRun';
+import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
@@ -22,6 +24,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const [runID] = useSearchParam('runID');
   const [debugRunID] = useSearchParam('debugRunID');
   const [debugSessionID] = useSearchParam('debugSessionID');
+  const { selectedStep } = useStepSelection({
+    debugRunID,
+    runID,
+  });
+
+  const { rerun } = useRerun();
 
   const { data: debugRunData } = useGetDebugRun({
     functionSlug,
@@ -78,6 +86,16 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const handleRerun = async () => {
+    if (runID) {
+      const result = await rerun({
+        runID,
+        debugRunID,
+        debugSessionID,
+      });
+    }
+  };
+
   return (
     <>
       <div className="mx-4 my-8 flex flex-row items-center justify-between">
@@ -94,7 +112,13 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           </div>
         </div>
 
-        <Button kind="primary" appearance="outlined" size="medium" label="Rerun function" />
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          label="Rerun function"
+          onClick={handleRerun}
+        />
       </div>
 
       <div className="flex h-full w-full flex-row" ref={containerRef}>
@@ -105,7 +129,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                 <Tooltip>
                   <TooltipTrigger>
                     {running ? (
-                      <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                      <RiPauseLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-pointer rounded-md p-1" />
                     ) : (
                       <Play runID={runID} debugRunID={debugRunID} debugSessionID={debugSessionID} />
                     )}
@@ -117,17 +141,19 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
 
                 <Tooltip>
                   <TooltipTrigger>
-                    <StepOver className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    <StepOver className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-not-allowed rounded-md p-1 opacity-50" />
                   </TooltipTrigger>
-                  <TooltipContent className="whitespace-pre-line">Step Over</TooltipContent>
+                  <TooltipContent className="whitespace-pre-line">
+                    Step Over coming soon!
+                  </TooltipContent>
                 </Tooltip>
 
                 <div className="bg-canvasMuted my-2 h-8 w-px" />
                 <Tooltip>
                   <TooltipTrigger>
-                    <RiStopLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    <RiStopLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-not-allowed rounded-md p-1 opacity-50" />
                   </TooltipTrigger>
-                  <TooltipContent className="whitespace-pre-line">Stop</TooltipContent>
+                  <TooltipContent className="whitespace-pre-line">Stop coming soon!</TooltipContent>
                 </Tooltip>
               </div>
             </div>
@@ -154,14 +180,14 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           </div>
         </div>
         <div style={{ width: `${100 - leftWidth}%` }}>
-          <div className="flex flex-col items-start justify-start gap-2">
+          <div className="flex flex-col items-start justify-start">
             <div className="border-muted flex h-12 w-full flex-row items-center justify-end border-b border-t px-4">
               <Button
                 kind="secondary"
                 appearance="outlined"
                 size="medium"
                 label="Edit and rerun from step"
-                disabled={true}
+                disabled={!selectedStep?.trace.stepID}
               />
             </div>
 

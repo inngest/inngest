@@ -1063,6 +1063,8 @@ export type CancelRunMutation = { __typename?: 'Mutation', cancelRun: { __typena
 
 export type RerunMutationVariables = Exact<{
   runID: Scalars['ULID'];
+  debugRunID?: InputMaybe<Scalars['ULID']>;
+  debugSessionID?: InputMaybe<Scalars['ULID']>;
 }>;
 
 
@@ -1071,8 +1073,8 @@ export type RerunMutation = { __typename?: 'Mutation', rerun: any };
 export type RerunFromStepMutationVariables = Exact<{
   runID: Scalars['ULID'];
   fromStep: RerunFromStepInput;
-  debugSessionID?: InputMaybe<Scalars['ULID']>;
   debugRunID?: InputMaybe<Scalars['ULID']>;
+  debugSessionID?: InputMaybe<Scalars['ULID']>;
 }>;
 
 
@@ -1463,17 +1465,17 @@ export const CancelRunDocument = `
 }
     `;
 export const RerunDocument = `
-    mutation Rerun($runID: ULID!) {
-  rerun(runID: $runID)
+    mutation Rerun($runID: ULID!, $debugRunID: ULID = null, $debugSessionID: ULID = null) {
+  rerun(runID: $runID, debugRunID: $debugRunID, debugSessionID: $debugSessionID)
 }
     `;
 export const RerunFromStepDocument = `
-    mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!, $debugSessionID: ULID = null, $debugRunID: ULID = null) {
+    mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!, $debugRunID: ULID = null, $debugSessionID: ULID = null) {
   rerun(
     runID: $runID
     fromStep: $fromStep
-    debugSessionID: $debugSessionID
     debugRunID: $debugRunID
+    debugSessionID: $debugSessionID
   )
 }
     `;

@@ -67,32 +67,49 @@ function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: numb
 export type StepInfoType = {
   trace: Trace;
   runID: string;
+  debugRunID?: string;
 };
 
 type Listener = {
   callback: (step: StepInfoType | undefined) => void;
   runID?: string;
+  debugRunID?: string;
 };
 
 const stepSelectionEmitter = {
   listeners: new Set<Listener>(),
 
-  subscribe(callback: (step: StepInfoType | undefined) => void, runID?: string) {
-    const listener = { callback, runID };
+  subscribe(
+    callback: (step: StepInfoType | undefined) => void,
+    runID?: string,
+    debugRunID?: string
+  ) {
+    const listener = { callback, runID, debugRunID };
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   },
 
   emit(step: StepInfoType | undefined) {
     this.listeners.forEach((listener) => {
-      if (!listener.runID || !step || listener.runID === step.runID) {
+      if (
+        !listener.runID ||
+        !step ||
+        listener.runID === step.runID ||
+        listener.debugRunID === step.debugRunID
+      ) {
         listener.callback(step);
       }
     });
   },
 };
 
-export const useStepSelection = (runID?: string) => {
+export const useStepSelection = ({
+  runID,
+  debugRunID,
+}: {
+  runID?: string;
+  debugRunID?: string;
+}) => {
   const [selectedStep, setSelectedStep] = useState<StepInfoType | undefined>(undefined);
 
   useEffect(() => {

@@ -58,7 +58,6 @@ export const StepHistory = ({ debugRun, defaultOpen = false }: StepHistoryProps)
             className="text-muted text-xs"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('view version');
             }}
           />
         </div>
