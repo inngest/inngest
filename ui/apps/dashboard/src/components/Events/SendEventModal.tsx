@@ -107,7 +107,10 @@ export function SendEventModal({
   onClose,
   initialData,
 }: SendEventModalProps) {
-  const [payload, setPayload] = useState(() => {
+  const [payload, setPayload] = useState<
+    | { name: string; data: Record<string, unknown> }
+    | { name: string; data: Record<string, unknown> }[]
+  >(() => {
     try {
       if (initialData) {
         const parsedData = JSON.parse(initialData);
