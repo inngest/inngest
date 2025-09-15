@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
 import { createChannel } from '../realtime';
-import { createCustomerSupportNetwork } from './test-agents/customer-support-network';
-import type { CustomerSupportState } from './test-agents/state';
+import type { InsightsAgentState } from './agents/event-matcher';
+import { createInsightsNetwork } from './agents/network';
 
 export const runAgentNetwork = inngest.createFunction(
   {
@@ -29,12 +29,14 @@ export const runAgentNetwork = inngest.createFunction(
     }
 
     try {
-      const network = createCustomerSupportNetwork(
+      const clientState = (userMessage as any)?.state || {};
+      const network = createInsightsNetwork(
         threadId,
-        createState<CustomerSupportState>(
+        createState<InsightsAgentState>(
           {
             userId,
-          },
+            ...(clientState as Partial<InsightsAgentState>),
+          } as InsightsAgentState,
           {
             messages: history as Message[] | undefined,
             threadId,
