@@ -37,7 +37,7 @@ export default function Provider({ children }: React.PropsWithChildren) {
             dangerGhostButton
           ),
           input:
-            '!border !ring-0 focus:ring-0 bg-canvasBase border-muted hover:border-muted focus:border-muted placeholder-disabled text-basis focus:outline-primary-moderate w-full border text-sm leading-none outline-2 transition-all focus:outline rounded-md',
+            '!border !ring-0 focus:ring-0 bg-canvasBase border-muted hover:border-muted focus:border-muted placeholder-disabled text-basis focus:outline-primary-moderate border text-sm leading-none outline-2 transition-all focus:outline rounded-md',
           rootBox: 'px-6 mx-auto max-w-[1200px]',
           card: 'shadow-none border-0 bg-canvasBase',
           actionCard: 'bg-canvasSubtle text-basis',
