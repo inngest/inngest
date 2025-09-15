@@ -19,7 +19,6 @@ export default function Provider({ children }: React.PropsWithChildren) {
 
   return (
     <ClerkProvider
-      clerkJSVersion="5.88.0"
       appearance={{
         layout: {
           logoPlacement: 'outside' as const,
@@ -73,6 +72,7 @@ export default function Provider({ children }: React.PropsWithChildren) {
           socialButtons: 'flex flex-col gap-4',
           organizationProfileMembersSearchInput: 'pl-8',
           organizationPreviewMainIdentifier__organizationList: 'text-basis hover:text-basis',
+          otpCodeFieldInput: 'w-full',
           profileSection: 'flex-col-reverse gap-2 border border-subtle rounded-md p-6 pt-0 mb-8',
           profileSectionTitleText: '!text-muted text-lg',
           profileSection__organizationProfile: 'border-0',
