@@ -6,7 +6,7 @@ import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/r
 import { SHOW_DOCS_LINKS } from '../../temp-flags';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
-const BASE_DOCS_URL = 'https://docs.inngest.com/';
+const BASE_DOCS_URL = 'https://www.inngest.com/docs';
 
 const RESOURCES = [
   {
