@@ -13,6 +13,7 @@ type CustomLinkProps = {
   iconAfter?: React.ReactNode;
   arrowOnHover?: boolean;
   target?: HTMLAttributeAnchorTarget | undefined;
+  rel?: string;
 };
 
 export type LinkProps = CustomLinkProps & NextLinkProps;
