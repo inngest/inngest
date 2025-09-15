@@ -1,18 +1,32 @@
 'use client';
 
+import { Link } from '@inngest/components/Link/Link';
 import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
 
 import { SHOW_DOCS_LINKS } from '../../temp-flags';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
-const ROADMAP_URL = 'https://roadmap.inngest.com/roadmap';
 
-// TODO: Update these to point to the correct URLs.
 const RESOURCES = [
-  { href: BASE_DOCS_URL, label: 'How to write your own query', icon: RiQuillPenLine },
-  { href: BASE_DOCS_URL, label: 'Insights documentation', icon: RiExternalLinkLine },
-  { href: ROADMAP_URL, label: 'Send us feedback', icon: RiChatPollLine },
+  {
+    href: BASE_DOCS_URL,
+    label: 'How to write your own query',
+    icon: RiQuillPenLine,
+    show: SHOW_DOCS_LINKS,
+  },
+  {
+    href: BASE_DOCS_URL,
+    label: 'Insights documentation',
+    icon: RiExternalLinkLine,
+    show: SHOW_DOCS_LINKS,
+  },
+  {
+    href: '/support',
+    label: 'Send us feedback',
+    icon: RiChatPollLine,
+    show: true,
+  },
 ];
 
 export function InsightsTabPanelTemplatesTab() {
@@ -27,28 +41,25 @@ export function InsightsTabPanelTemplatesTab() {
         </div>
         <InsightsTabPanelTemplatesTabGrid />
       </div>
-      {SHOW_DOCS_LINKS && (
-        <div className="flex w-[360px] flex-shrink-0 flex-col">
-          <div className="flex flex-col gap-4">
-            <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
-            <div className="flex flex-col gap-3">
-              {RESOURCES.map(({ icon: Icon, label, href }) => (
-                <div className="flex items-center gap-2" key={label}>
-                  <Icon className="text-muted-foreground h-4 w-4" />
-                  <a
-                    className="hover:text-foreground text-muted-foreground text-sm transition-colors hover:underline"
-                    href={href}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    {label}
-                  </a>
-                </div>
-              ))}
-            </div>
+      <div className="flex w-[360px] flex-shrink-0 flex-col">
+        <div className="flex flex-col gap-4">
+          <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
+          <div className="flex flex-col gap-3">
+            {RESOURCES.filter(({ show }) => show).map(({ icon: Icon, label, href }) => (
+              <div className="flex items-center gap-2" key={label}>
+                <Icon className="text-muted-foreground h-4 w-4" />
+                <Link
+                  className="text-muted-foreground hover:underline hover:decoration-current"
+                  href={href}
+                  target="_blank"
+                >
+                  {label}
+                </Link>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
