@@ -51,6 +51,7 @@ export function InsightsTabPanelTemplatesTab() {
                 <Link
                   className="text-muted-foreground hover:underline hover:decoration-current"
                   href={href}
+                  rel="noopener noreferrer"
                   target="_blank"
                 >
                   {label}
