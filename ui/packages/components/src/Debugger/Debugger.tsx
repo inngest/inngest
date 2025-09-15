@@ -4,6 +4,7 @@ import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator
 import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
+import { RerunModal } from '../Rerun/RerunModal';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
@@ -22,6 +23,7 @@ import { Play } from './Play';
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
+  const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const [debugRunID] = useSearchParam('debugRunID');
   const [debugSessionID] = useSearchParam('debugSessionID');
   const { selectedStep } = useStepSelection({
@@ -46,6 +48,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50);
   const [running, setRunning] = useState(false);
+  console.log('shit selectedStep', selectedStep);
+  console.log('shit run id', runID);
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -188,7 +192,22 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                 size="medium"
                 label="Edit and rerun from step"
                 disabled={!selectedStep?.trace.stepID}
+                onClick={() => setRerunModalOpen(true)}
               />
+              {runID && selectedStep?.trace.stepID && (
+                <RerunModal
+                  open={rerunModalOpen}
+                  setOpen={setRerunModalOpen}
+                  runID={runID}
+                  stepID={selectedStep?.trace.stepID}
+                  debugRunID={debugRunID}
+                  debugSessionID={debugSessionID}
+                  redirect={false}
+                  //
+                  // TODO: fetch step result
+                  input={''}
+                />
+              )}
             </div>
 
             <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
