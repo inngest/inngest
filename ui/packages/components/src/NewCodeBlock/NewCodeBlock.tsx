@@ -10,7 +10,12 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
+import {
+  RiCollapseDiagonalLine,
+  RiDownload2Line,
+  RiEdit2Line,
+  RiExpandDiagonalLine,
+} from '@remixicon/react';
 import { JSONTree } from 'react-json-tree';
 import { useLocalStorage } from 'react-use';
 
@@ -22,6 +27,8 @@ import { Skeleton } from '../Skeleton';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { jsonTreeTheme } from '../utils/jsonTree';
 import { isDark } from '../utils/theme';
+
+const EMPTY_INPUT = JSON.stringify({ data: {} }, null, 2);
 
 export type CodeBlockAction = {
   label: string;
@@ -63,6 +70,7 @@ export const NewCodeBlock = ({
   const [mode, setMode] = useState<'rich' | 'raw'>('rich');
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
+  const [editEmtpy, setEditEmtpy] = useState(false);
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
@@ -208,10 +216,10 @@ export const NewCodeBlock = ({
           </div>
         </div>
         <div className={cn('bg-codeEditor h-full overflow-y-auto py-3')}>
-          {isOutputTooLarge ? (
+          {isOutputTooLarge && !editEmtpy ? (
             <>
               <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
-              <div className="bg-codeEditor flex h-24 items-center justify-center">
+              <div className="bg-codeEditor flex h-24 flex-row items-center justify-center gap-2">
                 <Button
                   label="Download Raw"
                   icon={<RiDownload2Line />}
@@ -219,6 +227,15 @@ export const NewCodeBlock = ({
                   appearance="outlined"
                   kind="secondary"
                 />
+                {!readOnly && (
+                  <Button
+                    label="Add New Input"
+                    icon={<RiEdit2Line />}
+                    onClick={() => setEditEmtpy(true)}
+                    appearance="outlined"
+                    kind="secondary"
+                  />
+                )}
               </div>
             </>
           ) : loading ? (
@@ -243,7 +260,7 @@ export const NewCodeBlock = ({
               className={cn('h-full', className)}
               theme="inngest-theme"
               defaultLanguage={language}
-              value={content}
+              value={editEmtpy ? EMPTY_INPUT : content}
               options={{
                 wordWrap: wordWrap ? 'on' : 'off',
                 contextmenu: false,
