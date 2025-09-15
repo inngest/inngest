@@ -112,9 +112,21 @@ export function SendEventModal({
     | { name: string; data: Record<string, unknown> }[]
   >(() => {
     try {
-      return initialData
-        ? { name: eventName, data: JSON.parse(initialData) }
-        : { name: eventName, data: {} };
+      if (initialData) {
+        const parsedData = JSON.parse(initialData);
+        if (Array.isArray(parsedData)) {
+          return parsedData.map((item) => ({
+            name: item.name || eventName,
+            data: item.data || {},
+          }));
+        } else {
+          return {
+            name: eventName,
+            data: parsedData.data || {},
+          };
+        }
+      }
+      return { name: eventName, data: {} };
     } catch (error) {
       console.error('Failed to parse initialData:', error);
       return { name: eventName, data: {} };
