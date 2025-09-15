@@ -72,7 +72,6 @@ export default function Provider({ children }: React.PropsWithChildren) {
           socialButtons: 'flex flex-col gap-4',
           organizationProfileMembersSearchInput: 'pl-8',
           organizationPreviewMainIdentifier__organizationList: 'text-basis hover:text-basis',
-          otpCodeFieldInputs: 'w-full',
           profileSection: 'flex-col-reverse gap-2 border border-subtle rounded-md p-6 pt-0 mb-8',
           profileSectionTitleText: '!text-muted text-lg',
           profileSection__organizationProfile: 'border-0',
