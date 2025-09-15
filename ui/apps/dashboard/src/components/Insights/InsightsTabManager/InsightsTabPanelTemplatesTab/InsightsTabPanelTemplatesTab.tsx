@@ -6,12 +6,13 @@ import { SHOW_DOCS_LINKS } from '../../temp-flags';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
+const ROADMAP_URL = 'https://roadmap.inngest.com/roadmap';
 
 // TODO: Update these to point to the correct URLs.
 const RESOURCES = [
   { href: BASE_DOCS_URL, label: 'How to write your own query', icon: RiQuillPenLine },
   { href: BASE_DOCS_URL, label: 'Insights documentation', icon: RiExternalLinkLine },
-  { href: BASE_DOCS_URL, label: 'Send us feedback', icon: RiChatPollLine },
+  { href: ROADMAP_URL, label: 'Send us feedback', icon: RiChatPollLine },
 ];
 
 export function InsightsTabPanelTemplatesTab() {
