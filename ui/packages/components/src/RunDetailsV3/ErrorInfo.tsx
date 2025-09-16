@@ -24,19 +24,23 @@ const InngestStatus = ({ inngestStatus }: { inngestStatus: InngestStatus | null 
         className={'mx-1 inline-flex h-2.5 w-2.5 rounded-full'}
         style={{ backgroundColor: inngestStatus.indicatorColor }}
       ></span>
-      {inngestStatus.description}
+      <div className="w-0 grow overflow-hidden text-ellipsis whitespace-nowrap">
+        {inngestStatus.description}
+      </div>
     </LinkElement>
   );
 
 const SDKError = ({ error }: ErrorInfoProps) => (
-  <div className={`flex items-center gap-2 rounded text-sm ${getStatusTextClass('FAILED')}`}>
+  <div
+    className={`flex min-w-0 items-center gap-2 rounded text-sm ${getStatusTextClass('FAILED')}`}
+  >
     <div
       className={`mx-1 inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${getStatusBackgroundClass(
         'FAILED'
       )}`}
     />
     <OptionalTooltip tooltip={error?.length > 55 ? error : ''} side="left">
-      <div className="min-w-0 overflow-x-hidden text-ellipsis whitespace-nowrap">{error}</div>
+      <div className="w-0 grow overflow-hidden text-ellipsis whitespace-nowrap">{error}</div>
     </OptionalTooltip>
   </div>
 );
@@ -52,7 +56,6 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
         return <span className="text-muted text-sm leading-tight">{system}</span>;
       },
       header: 'System',
-      size: 25,
       enableSorting: false,
     }),
     columnHelper.accessor('status', {
@@ -79,6 +82,7 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
             { system: 'App', status: '', error },
           ]}
           columns={columns}
+          cellClassName="[&:first-child]:w-24"
         />
       </div>
     )

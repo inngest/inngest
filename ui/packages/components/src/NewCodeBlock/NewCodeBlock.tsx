@@ -124,96 +124,93 @@ export const NewCodeBlock = ({
           fullScreen && 'bg-codeEditor fixed inset-0 z-[52]'
         )}
       >
-        <div className={cn('bg-canvasSubtle')}>
-          <div className={cn('bg-codeEditor flex items-center justify-between')}>
-            <p
-              className={cn(
-                header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
-                'px-5 pt-2.5 text-sm',
-                'max-h-24 max-w-96 text-ellipsis break-words'
-              )}
-            >
-              {parsed ? (
-                <SegmentedControl defaultValue={mode}>
-                  <SegmentedControl.Button value="rich" onClick={() => setMode('rich')}>
-                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                      Parsed {header?.title}
-                    </div>
-                  </SegmentedControl.Button>
-                  <SegmentedControl.Button value="raw" onClick={() => setMode('raw')}>
-                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                      Raw {header?.title}
-                    </div>
-                  </SegmentedControl.Button>
-                </SegmentedControl>
-              ) : (
-                <Pill
-                  kind={header?.status === 'error' ? 'error' : 'default'}
-                  appearance="outlined"
-                  className="my-2 max-w-96 overflow-x-auto rounded-full p-3"
+        <div
+          className={cn('bg-codeEditor mx-4 mt-2 flex flex-row items-center justify-between gap-4')}
+        >
+          <div
+            className={cn(
+              header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
+              'inline-flex max-h-24 w-0 grow overflow-hidden text-ellipsis whitespace-nowrap text-sm'
+            )}
+          >
+            {parsed ? (
+              <SegmentedControl defaultValue={mode}>
+                <SegmentedControl.Button value="rich" onClick={() => setMode('rich')}>
+                  <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                    Parsed {header?.title}
+                  </div>
+                </SegmentedControl.Button>
+                <SegmentedControl.Button value="raw" onClick={() => setMode('raw')}>
+                  <div className="w-0 overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                    Raw {header?.title}
+                  </div>
+                </SegmentedControl.Button>
+              </SegmentedControl>
+            ) : (
+              <Pill
+                kind={header?.status === 'error' ? 'error' : 'default'}
+                appearance="outlined"
+                className="my-2 overflow-x-auto rounded-full p-3"
+              >
+                <OptionalTooltip
+                  tooltip={header?.title?.length && header?.title?.length > 55 ? header?.title : ''}
+                  side="left"
                 >
-                  <OptionalTooltip
-                    tooltip={
-                      header?.title?.length && header?.title?.length > 55 ? header?.title : ''
-                    }
-                    side="left"
-                  >
-                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
-                      {header?.title}
-                    </div>
-                  </OptionalTooltip>
-                </Pill>
-              )}
-            </p>
+                  <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                    {header?.title}
+                  </div>
+                </OptionalTooltip>
+              </Pill>
+            )}
+          </div>
 
-            {!isOutputTooLarge && (
-              <div className="mr-4 flex items-center gap-2 py-2">
-                {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                  <Button
-                    key={idx}
-                    icon={icon}
-                    onClick={onClick}
-                    size="small"
-                    aria-label={label}
-                    title={title ?? label}
-                    label={label}
-                    disabled={disabled}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                ))}
-                <CopyButton
-                  size="small"
-                  code={content}
-                  isCopying={isCopying}
-                  handleCopyClick={handleCopyClick}
-                  appearance="outlined"
-                />
+          {!isOutputTooLarge && (
+            <div className="flex items-center gap-2">
+              {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
                 <Button
-                  icon={wordWrap ? <IconOverflowText /> : <IconWrapText />}
-                  onClick={() => setWordWrap(!wordWrap)}
+                  key={idx}
+                  icon={icon}
+                  onClick={onClick}
                   size="small"
-                  aria-label={wordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  title={wordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  tooltip={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                  aria-label={label}
+                  title={title ?? label}
+                  label={label}
+                  disabled={disabled}
                   appearance="outlined"
                   kind="secondary"
                 />
-                {allowFullScreen && (
-                  <Button
-                    onClick={() => setFullScreen(!fullScreen)}
-                    size="small"
-                    icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
-                    aria-label="Full screen"
-                    title="Full screen"
-                    tooltip="Full screen"
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                )}
-              </div>
-            )}
-          </div>
+              ))}
+              <CopyButton
+                size="small"
+                code={content}
+                isCopying={isCopying}
+                handleCopyClick={handleCopyClick}
+                appearance="outlined"
+              />
+              <Button
+                icon={wordWrap ? <IconOverflowText /> : <IconWrapText />}
+                onClick={() => setWordWrap(!wordWrap)}
+                size="small"
+                aria-label={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                title={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                tooltip={wordWrap ? 'Do not wrap text' : 'Wrap text'}
+                appearance="outlined"
+                kind="secondary"
+              />
+              {allowFullScreen && (
+                <Button
+                  onClick={() => setFullScreen(!fullScreen)}
+                  size="small"
+                  icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                  aria-label="Full screen"
+                  title="Full screen"
+                  tooltip="Full screen"
+                  appearance="outlined"
+                  kind="secondary"
+                />
+              )}
+            </div>
+          )}
         </div>
         <div className={cn('bg-codeEditor h-full overflow-y-auto py-3')}>
           {isOutputTooLarge && !editEmtpy ? (
