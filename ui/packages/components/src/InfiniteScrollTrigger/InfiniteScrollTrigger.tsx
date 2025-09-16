@@ -13,7 +13,7 @@ export function InfiniteScrollTrigger({
   onIntersect,
   hasMore,
   isLoading,
-  rootMargin = '300px',
+  rootMargin = '200px',
 }: InfiniteScrollTriggerProps) {
   const triggerRef = useRef<HTMLDivElement>(null);
 
