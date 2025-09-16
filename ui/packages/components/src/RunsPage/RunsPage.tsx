@@ -54,7 +54,6 @@ type Props = {
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
-  onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pollInterval?: number;
   apps?: Option[];
@@ -63,6 +62,7 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   searchError?: Error;
+  infiniteScrollTrigger?: React.ReactNode;
 };
 
 export function RunsPage({
@@ -74,7 +74,6 @@ export function RunsPage({
   isLoadingInitial,
   isLoadingMore,
   onRefresh,
-  onScroll,
   onScrollToTop,
   apps,
   functions,
@@ -83,6 +82,7 @@ export function RunsPage({
   scope,
   totalCount,
   searchError,
+  infiniteScrollTrigger,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -371,11 +371,7 @@ export function RunsPage({
         )}
       </div>
 
-      <div
-        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
-        onScroll={onScroll}
-        ref={containerRef}
-      >
+      <div className="h-[calc(100%-58px)] overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
@@ -384,6 +380,7 @@ export function RunsPage({
           visibleColumns={columnVisibility}
           scope={scope}
         />
+        {infiniteScrollTrigger}
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>

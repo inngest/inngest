@@ -6,6 +6,7 @@ import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Pill } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
@@ -139,7 +140,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
-        includeInternalEvents: includeInternalEvents ?? true,
+        includeInternalEvents: includeInternalEvents ?? false,
       },
     ],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -222,21 +223,6 @@ export function EventsTable({
   }, [eventsData]);
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
-
-  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
-    (event) => {
-      if (hasEventsData && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventsData, isFetching]
-  );
 
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
@@ -347,7 +333,7 @@ export function EventsTable({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div className="h-[calc(100%-58px)] overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={eventsData?.events || []}
@@ -381,6 +367,11 @@ export function EventsTable({
               });
             }
           }}
+        />
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isFetching || isFetchingNextPage}
         />
         {!hasNextPage && hasEventsData && isScrollable && !isFetchingNextPage && !isFetching && (
           <div className="flex flex-col items-center pb-4 pt-8">

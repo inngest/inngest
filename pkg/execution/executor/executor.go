@@ -1025,6 +1025,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// set function trace context so downstream execution have the function
 	// trace context set
 	ctx = extractTraceCtx(ctx, md)
+	runSpanRef := tracing.RunSpanRefFromMetadata(&md)
+	parentRef := tracing.SpanRefFromQueueItem(&item)
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
@@ -1065,6 +1067,21 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				l.ReportError(err, "error updating metadata on function start")
 			}
 
+			// Set some run span details to be explicit that this has been
+			// kicked off
+			if err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+				QueueItem:  &item,
+				Metadata:   &md,
+				Status:     enums.StepStatusRunning,
+				TargetSpan: runSpanRef,
+				Attributes: meta.NewAttrSet(
+					meta.Attr(meta.Attrs.StartedAt, &md.Config.StartedAt),
+				),
+			}); err != nil {
+				l.ReportError(err, "error updating run span on function start")
+			}
+
 			for _, e := range e.lifecycles {
 				go e.OnFunctionStarted(context.WithoutCancel(ctx), md, item, events)
 			}
@@ -1081,6 +1098,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		httpClient: e.httpClient,
 	}
 
+	st := time.Now()
+
 	// Set the parent span for this execution.
 	var execParent *meta.SpanReference
 	if isSleepResume {
@@ -1089,11 +1108,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		execParent, err = e.tracerProvider.CreateSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				FollowsFrom: tracing.SpanRefFromQueueItem(&item),
+				FollowsFrom: parentRef,
 				Debug:       &tracing.SpanDebugData{Location: "executor.Execute"},
 				Metadata:    &md,
-				Parent:      tracing.RunSpanRefFromMetadata(&md),
+				Parent:      runSpanRef,
 				QueueItem:   &item,
+				StartTime:   st,
 			},
 		)
 		if err != nil {
@@ -1104,10 +1124,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	} else {
 		// If we're here, we assume that the step span has already been
 		// created, so add it here.
-		execParent = tracing.SpanRefFromQueueItem(&item)
+		execParent = parentRef
 	}
 
-	st := time.Now()
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
@@ -3335,10 +3354,12 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName},
 		&pause,
 	)
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
-	if err != nil {
+
+	// A pause may already exist if the write succeeded but we timed out before
+	// returning (MDB i/o timeouts). In that case, we ignore the
+	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
+	// to avoid duplicate invokes instead.
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return err
 	}
 

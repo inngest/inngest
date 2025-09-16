@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -29,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -708,4 +710,226 @@ func TestFinalize(t *testing.T) {
 		err = rq.Requeue(ctx, queueShard, item2, time.Now())
 		require.ErrorIs(t, err, redis_state.ErrQueueItemNotFound)
 	})
+}
+
+// mockDriverV2 implements driver.DriverV2 for testing
+type mockDriverV2 struct {
+	response *state.DriverResponse
+	t        *testing.T
+}
+
+func (m *mockDriverV2) Name() string { return "http" }
+
+func (m *mockDriverV2) Do(ctx context.Context, sl statev2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
+	return m.response, nil, nil
+}
+
+// This tests a scenario where a run used to hang when retrying an invoke and the invoke's pause was already created.
+func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
+	ctx := context.Background()
+
+	// Set up database and function loader
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	targetFnID := uuid.New()
+
+	// Create the invoking function
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{
+				ID:   "invoke-step",
+				Name: "invoke-step",
+				URI:  "/invoke-step",
+			},
+		},
+	}
+
+	// Create the target function being invoked
+	targetFn := inngest.Function{
+		ID:              targetFnID,
+		FunctionVersion: 1,
+		Name:            "target-fn",
+		Slug:            "target-fn",
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+	targetConfig, err := json.Marshal(targetFn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     targetFnID,
+		AppID:  appID,
+		Name:   targetFn.Name,
+		Slug:   targetFn.Slug,
+		Config: string(targetConfig),
+	})
+	require.NoError(t, err)
+
+	// Set up Redis
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
+	var sm state.Manager
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
+	}
+
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
+
+	genID := "invoke-step"
+
+	mockDriver := &mockDriverV2{
+		t: t,
+		response: &state.DriverResponse{
+			StatusCode: 206,
+			Generator: []*state.GeneratorOpcode{{
+				Op: enums.OpcodeInvokeFunction,
+				ID: genID,
+				Opts: map[string]any{
+					"function_id": uuid.New().String(),
+					"payload":     map[string]any{"data": map[string]any{"test": "value"}},
+				},
+			}},
+		},
+	}
+
+	pm := pauses.NewRedisOnlyManager(sm)
+
+	eventCaptured := false
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pm),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithSendingEventHandler(func(ctx context.Context, evt event.Event, item queue.Item) error {
+			if evt.Name == "inngest/function.invoked" {
+				eventCaptured = true
+			}
+			return nil
+		}),
+		executor.WithDriverV2(mockDriver),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			event.NewOSSTrackedEventWithID(event.Event{
+				Name: "test/event",
+			}, evtID),
+		},
+	})
+	require.NoError(t, err)
+
+	pauseID := inngest.DeterministicSha1UUID(run.ID.RunID.String() + genID)
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: wsID,
+		Identifier: state.PauseIdentifier{
+			RunID:      run.ID.RunID,
+			FunctionID: fnID,
+			AccountID:  aID,
+		},
+		GroupID:          "test-group",
+		Incoming:         "$trigger",
+		Expires:          state.Time(time.Now().Add(time.Hour)),
+	}
+
+	_, err = pm.Write(ctx, pauses.Index{WorkspaceID: wsID, EventName: "test/event"}, &pause)
+	require.NoError(t, err, "First pause write should succeed")
+
+	_, err = exec.Execute(ctx, state.Identifier{
+		WorkflowID: fnID,
+		RunID:      run.ID.RunID,
+		AccountID:  aID,
+	}, queue.Item{
+		WorkspaceID: wsID,
+		Kind:        queue.KindStart,
+		Identifier: state.Identifier{
+			WorkflowID: fnID,
+			RunID:      run.ID.RunID,
+			AccountID:  aID,
+		},
+		Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: "invoke-step"}},
+	}, inngest.Edge{
+		Incoming: "$trigger",
+		Outgoing: "invoke-step",
+	})
+
+	require.NoError(t, err)
+	require.True(t, eventCaptured)
 }
