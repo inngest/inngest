@@ -3335,10 +3335,12 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName},
 		&pause,
 	)
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
-	if err != nil {
+
+	// A pause may already exist if the write succeeded but we timed out before
+	// returning (MDB i/o timeouts). In that case, we ignore the
+	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
+	// to avoid duplicate invokes instead.
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return err
 	}
 
