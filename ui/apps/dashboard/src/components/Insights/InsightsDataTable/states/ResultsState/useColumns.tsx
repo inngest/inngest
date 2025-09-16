@@ -11,6 +11,7 @@ type InsightsEntry = InsightsFetchResult['rows'][number];
 type InsightsColumnValue = InsightsEntry['values'][string];
 type Column = ColumnDef<InsightsEntry, InsightsColumnValue>;
 
+// TODO: Support 'json' column type when BE supports it.
 export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
   const columns = useMemo(() => {
     const cols = data?.columns ?? [];
