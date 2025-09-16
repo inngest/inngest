@@ -8,7 +8,6 @@ interface JSONAwareTextCellProps {
 
 export function JSONAwareTextCell({ children }: JSONAwareTextCellProps) {
   const formattedJSON = getFormattedJSONObjectOrArrayString(children);
-
   if (formattedJSON === null) return <TextCell>{children}</TextCell>;
 
   return (
