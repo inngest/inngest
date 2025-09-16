@@ -2291,14 +2291,14 @@ export type Workflow = {
   archivedAt: Maybe<Scalars['Time']>;
   cancellationRunCount: Scalars['Int'];
   cancellations: CancellationConnection;
-  configuration: FunctionConfiguration;
+  configuration: Maybe<FunctionConfiguration>;
   current: Maybe<WorkflowVersion>;
   failureHandler: Maybe<Workflow>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
   isParentArchived: Scalars['Boolean'];
   isPaused: Scalars['Boolean'];
-  latestVersion: WorkflowVersion;
+  latestVersion: Maybe<WorkflowVersion>;
   metrics: MetricsResponse;
   name: Scalars['String'];
   previous: Array<Maybe<WorkflowVersion>>;
@@ -2672,7 +2672,7 @@ export type AppQueryVariables = Exact<{
 }>;
 
 
-export type AppQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', app: { __typename?: 'App', id: string, externalID: string, appVersion: string | null, name: string, method: AppMethod, functions: Array<{ __typename?: 'Workflow', id: string, name: string, slug: string, latestVersion: { __typename?: 'WorkflowVersion', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> } }>, latestSync: { __typename?: 'Deploy', commitAuthor: string | null, commitHash: string | null, commitMessage: string | null, commitRef: string | null, error: string | null, framework: string | null, id: string, lastSyncedAt: string, platform: string | null, repoURL: string | null, sdkLanguage: string, sdkVersion: string, status: string, url: string | null, vercelDeploymentID: string | null, vercelDeploymentURL: string | null, vercelProjectID: string | null, vercelProjectURL: string | null, appVersion: string | null } | null } } };
+export type AppQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', app: { __typename?: 'App', id: string, externalID: string, appVersion: string | null, name: string, method: AppMethod, functions: Array<{ __typename?: 'Workflow', id: string, name: string, slug: string, latestVersion: { __typename?: 'WorkflowVersion', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> } | null }>, latestSync: { __typename?: 'Deploy', commitAuthor: string | null, commitHash: string | null, commitMessage: string | null, commitRef: string | null, error: string | null, framework: string | null, id: string, lastSyncedAt: string, platform: string | null, repoURL: string | null, sdkLanguage: string, sdkVersion: string, status: string, url: string | null, vercelDeploymentID: string | null, vercelDeploymentURL: string | null, vercelProjectID: string | null, vercelProjectURL: string | null, appVersion: string | null } | null } } };
 
 export type AppNavDataQueryVariables = Exact<{
   envID: Scalars['ID'];
@@ -3555,7 +3555,7 @@ export type GetFunctionQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', id: string, workflow: { __typename?: 'Workflow', id: string, name: string, slug: string, isPaused: boolean, isArchived: boolean, app: { __typename?: 'App', name: string }, current: { __typename?: 'WorkflowVersion', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string, condition: string | null }>, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null } | null, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string, condition: string | null }>, failureHandler: { __typename?: 'Workflow', slug: string, name: string } | null, configuration: { __typename?: 'FunctionConfiguration', priority: string | null, cancellations: Array<{ __typename?: 'CancellationConfiguration', event: string, timeout: string | null, condition: string | null }>, retries: { __typename?: 'RetryConfiguration', value: number, isDefault: boolean | null }, eventsBatch: { __typename?: 'EventsBatchConfiguration', maxSize: number, timeout: string, key: string | null } | null, concurrency: Array<{ __typename?: 'ConcurrencyConfiguration', scope: ConcurrencyScope, key: string | null, limit: { __typename?: 'ConcurrencyLimitConfiguration', value: number, isPlanLimit: boolean | null } }>, rateLimit: { __typename?: 'RateLimitConfiguration', limit: number, period: string, key: string | null } | null, debounce: { __typename?: 'DebounceConfiguration', period: string, key: string | null } | null, throttle: { __typename?: 'ThrottleConfiguration', burst: number, key: string | null, limit: number, period: string } | null, singleton: { __typename?: 'SingletonConfiguration', key: string | null, mode: SingletonMode } | null } } | null } };
+export type GetFunctionQuery = { __typename?: 'Query', workspace: { __typename?: 'Workspace', id: string, workflow: { __typename?: 'Workflow', id: string, name: string, slug: string, isPaused: boolean, isArchived: boolean, app: { __typename?: 'App', name: string }, current: { __typename?: 'WorkflowVersion', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string, condition: string | null }>, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null } | null, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string, condition: string | null }>, failureHandler: { __typename?: 'Workflow', slug: string, name: string } | null, configuration: { __typename?: 'FunctionConfiguration', priority: string | null, cancellations: Array<{ __typename?: 'CancellationConfiguration', event: string, timeout: string | null, condition: string | null }>, retries: { __typename?: 'RetryConfiguration', value: number, isDefault: boolean | null }, eventsBatch: { __typename?: 'EventsBatchConfiguration', maxSize: number, timeout: string, key: string | null } | null, concurrency: Array<{ __typename?: 'ConcurrencyConfiguration', scope: ConcurrencyScope, key: string | null, limit: { __typename?: 'ConcurrencyLimitConfiguration', value: number, isPlanLimit: boolean | null } }>, rateLimit: { __typename?: 'RateLimitConfiguration', limit: number, period: string, key: string | null } | null, debounce: { __typename?: 'DebounceConfiguration', period: string, key: string | null } | null, throttle: { __typename?: 'ThrottleConfiguration', burst: number, key: string | null, limit: number, period: string } | null, singleton: { __typename?: 'SingletonConfiguration', key: string | null, mode: SingletonMode } | null } | null } | null } };
 
 export type GetFunctionUsageQueryVariables = Exact<{
   id: Scalars['ID'];
