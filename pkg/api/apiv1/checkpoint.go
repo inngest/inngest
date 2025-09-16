@@ -141,6 +141,8 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			AccountID: auth.AccountID(),
 			EnvID:     auth.WorkspaceID(),
 			Steps:     input.Steps,
+
+			md: md,
 		}, w)
 	}
 
@@ -189,37 +191,40 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w http.ResponseWriter) {
-	md, err := a.State.LoadMetadata(ctx, sv2.ID{
-		RunID:      input.RunID,
-		FunctionID: input.FnID,
-		Tenant: sv2.Tenant{
-			AccountID: input.AccountID,
-			EnvID:     input.EnvID,
-			AppID:     input.AppID,
-		},
-	})
-	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
-		// Handle run not found with 404
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
-		return
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error loading state for background checkpoint steps", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
-		return
+	if input.md == nil {
+		md, err := a.State.LoadMetadata(ctx, sv2.ID{
+			RunID:      input.RunID,
+			FunctionID: input.FnID,
+			Tenant: sv2.Tenant{
+				AccountID: input.AccountID,
+				EnvID:     input.EnvID,
+				AppID:     input.AppID,
+			},
+		})
+		if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
+			// Handle run not found with 404
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
+			return
+		}
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error loading state for background checkpoint steps", "error", err)
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
+			return
+		}
+		input.md = &md
 	}
 
-	l := logger.StdlibLogger(ctx).With("run_id", md.ID.RunID)
+	l := logger.StdlibLogger(ctx).With("run_id", input.md.ID.RunID)
 
 	// Load the function config.
-	fn, err := a.fn(ctx, md.ID.FunctionID)
+	fn, err := a.fn(ctx, input.md.ID.FunctionID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Warn("error loading fn for background checkpoint steps", "error", err)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading function config"))
 		return
 	}
 
-	runCtx := a.runContext(ctx, md, fn)
+	runCtx := a.runContext(ctx, *input.md, fn)
 
 	// If the opcodes contain a function finished op, we don't need to bother serializing
 	// to the state store.  We only care about serializing state if we switch from sync -> async,
@@ -233,7 +238,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 	// at some point in the future.
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
-		tracing.AddMetadataTenantAttrs(attrs, md.ID)
+		tracing.AddMetadataTenantAttrs(attrs, input.md.ID)
 
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
@@ -249,10 +254,10 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				// Checkpointing happens in this API when either the function finishes or we move to
 				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
 				// as all complete functions will never re-enter.
-				_, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
+				_, err := a.State.SaveStep(ctx, input.md.ID, op.ID, []byte(output))
 				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 					// Ignore.
-					l.Warn("duplicate checkpoint step", "id", md.ID)
+					l.Warn("duplicate checkpoint step", "id", input.md.ID)
 					continue
 				}
 				if err != nil {
@@ -263,7 +268,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			_, err = a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent:    md.Config.NewFunctionTrace(),
+					Parent:    input.md.Config.NewFunctionTrace(),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
 					Attributes: attrs.Merge(
@@ -292,7 +297,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			_, err = a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent:    md.Config.NewFunctionTrace(),
+					Parent:    input.md.Config.NewFunctionTrace(),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
 					Attributes: attrs.Merge(
@@ -349,7 +354,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			}
 
 			// Call finalize and process the entire op.
-			if err := a.finalize(ctx, md, result.Data); err != nil {
+			if err := a.finalize(ctx, *input.md, result.Data); err != nil {
 				l.Error("error finalizing sync run", "error", err)
 			}
 
