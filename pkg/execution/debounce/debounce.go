@@ -113,6 +113,10 @@ func (d DebounceItem) GetEvent() event.Event {
 	return d.Event
 }
 
+func (d DebounceItem) GetAccountID() uuid.UUID {
+	return d.AccountID
+}
+
 func (d DebounceItem) GetWorkspaceID() uuid.UUID {
 	return d.WorkspaceID
 }
@@ -781,7 +785,6 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 		[]string{keyPtr, keyDbc, keyMigrating},
 		[]string{fakeDebounceID.String()},
 	).ToAny()
-
 	if err != nil {
 		return nil, 0, fmt.Errorf("error running script: %w", err)
 	}

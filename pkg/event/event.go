@@ -31,6 +31,7 @@ var (
 
 // TrackedEvent represents an event created for a specific workspace.
 type TrackedEvent interface {
+	GetAccountID() uuid.UUID
 	GetWorkspaceID() uuid.UUID
 	GetInternalID() ulid.ULID
 	GetEvent() Event
@@ -167,6 +168,10 @@ type InternalEvent struct {
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	// Event is the underlying event received.
 	Event Event `json:"event"`
+}
+
+func (i InternalEvent) GetAccountID() uuid.UUID {
+	return i.AccountID
 }
 
 func (i InternalEvent) GetWorkspaceID() uuid.UUID {
