@@ -134,7 +134,7 @@ export function FunctionsTable({
   }
 
   return (
-    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 mx-3 flex h-11 items-center gap-1.5">
         <Search
           name="search"
@@ -148,7 +148,7 @@ export function FunctionsTable({
         />
         <FunctionsStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto" ref={containerRef}>
+      <div className="flex-1 overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={mergedData || []}
