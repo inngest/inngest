@@ -1,0 +1,1 @@
+ALTER TABLE spans DROP COLUMN input;
