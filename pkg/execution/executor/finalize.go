@@ -152,12 +152,11 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	if len(evts) == 0 {
 		evts, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
 		if err != nil {
-			l.Error(
+			l.Warn(
 				"error loading run events to finalize",
 				"error", err,
 				"run_id", opts.Metadata.ID.RunID,
 			)
-			return err
 		}
 	}
 

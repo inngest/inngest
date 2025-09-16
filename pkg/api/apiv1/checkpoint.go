@@ -502,8 +502,11 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 			return // no need to update
 		}
 		_, err = a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
-			Config: config,
-			ID:     fnID,
+			Config:    config,
+			ID:        fnID,
+			AccountID: auth.AccountID(),
+			EnvID:     auth.WorkspaceID(),
+			AppID:     app.ID,
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to update fn config",
