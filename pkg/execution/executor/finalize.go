@@ -48,6 +48,18 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		e.preDeleteStateSizeReporter(ctx, opts.Metadata)
 	}
 
+	// If there are no input events, fetch them.
+	if len(opts.Optional.InputEvents) == 0 {
+		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
+		if err != nil {
+			l.Warn(
+				"error loading run events to finalize",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+		}
+	}
+
 	// Delete the function state in every case.
 	_, err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -143,23 +155,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	var (
 		fnSlug = opts.Optional.FnSlug
 		evts   = opts.Optional.InputEvents
-		err    error
 	)
-
-	l := logger.StdlibLogger(ctx)
-
-	// If there are no input events, fetch them.
-	if len(evts) == 0 {
-		evts, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
-		if err != nil {
-			l.Error(
-				"error loading run events to finalize",
-				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
-			)
-			return err
-		}
-	}
 
 	// Find the function slug.
 	if fnSlug == "" {

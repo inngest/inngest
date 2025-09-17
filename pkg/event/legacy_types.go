@@ -64,6 +64,11 @@ func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 	return o.ID
 }
 
+func (o ossTrackedEvent) GetAccountID() uuid.UUID {
+	// There are no accounts in OSS yet.
+	return consts.DevServerAccountID
+}
+
 func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
 	// There are no workspaces in OSS yet.
 	return consts.DevServerEnvID

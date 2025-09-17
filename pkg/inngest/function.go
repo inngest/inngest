@@ -320,9 +320,6 @@ func (f Function) Validate(ctx context.Context) error {
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
 	}
-	if len(f.Triggers) == 0 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
-	}
 
 	if f.Concurrency != nil {
 		if cerr := f.Concurrency.Validate(ctx); cerr != nil {
@@ -379,8 +376,12 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	if len(f.Steps) != 1 {
-		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+	if f.Driver.URI == "" {
+		// Backwards compatible functions:  we used to store driver information in "steps", allowing DAGs
+		// in functions.  We no longer need this.
+		if len(f.Steps) != 1 {
+			err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+		}
 	}
 
 	// Validate priority expression

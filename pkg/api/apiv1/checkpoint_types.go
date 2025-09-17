@@ -198,6 +198,9 @@ type checkpointSteps struct {
 	// Plus auth data added from auth.
 	AccountID uuid.UUID `json:"-"`
 	EnvID     uuid.UUID `json:"-"`
+
+	// Optional metadata.
+	md *sv2.Metadata
 }
 
 // checkpointRunContext implements execution.RunContext for use in checkpoint API calls
