@@ -11,7 +11,7 @@ import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/reac
 import type { Query, QuerySnapshot } from '@/components/Insights/types';
 
 interface QueryHelperPanelSectionItemProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   query: Query | QuerySnapshot;
@@ -19,7 +19,7 @@ interface QueryHelperPanelSectionItemProps {
 }
 
 export function QueryHelperPanelSectionItem({
-  activeTabId,
+  activeSavedQueryId,
   onQueryDelete,
   onQuerySelect,
   query,
@@ -33,7 +33,7 @@ export function QueryHelperPanelSectionItem({
   const displayText = query.name;
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
-  const isActiveTab = activeTabId === query.id;
+  const isActiveTab = sectionType === 'saved' && activeSavedQueryId === query.id;
 
   useEffect(() => {
     const el = textRef.current;

@@ -5,7 +5,7 @@ import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionC
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
 
 export interface QueryHelperPanelSectionContentProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   queries: {
@@ -17,7 +17,7 @@ export interface QueryHelperPanelSectionContentProps {
 }
 
 export function QueryHelperPanelSectionContent({
-  activeTabId,
+  activeSavedQueryId,
   onQueryDelete,
   onQuerySelect,
   queries,
@@ -25,7 +25,7 @@ export function QueryHelperPanelSectionContent({
 }: QueryHelperPanelSectionContentProps) {
   const { data, error, isLoading } = queries;
 
-  if (isLoading) {
+  if (isLoading && !data?.length) {
     return <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>;
   }
 
@@ -51,7 +51,7 @@ export function QueryHelperPanelSectionContent({
     <div className="flex flex-col gap-1">
       {data.map((query) => (
         <QueryHelperPanelSectionItem
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           key={query.id}
           onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}

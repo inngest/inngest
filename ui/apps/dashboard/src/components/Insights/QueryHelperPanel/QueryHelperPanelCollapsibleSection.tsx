@@ -9,13 +9,13 @@ import {
 } from './QueryHelperPanelSectionContent';
 
 interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   title: string;
 }
 
 export function QueryHelperPanelCollapsibleSection({
-  activeTabId,
+  activeSavedQueryId,
   onQueryDelete,
   onQuerySelect,
   queries,
@@ -41,7 +41,7 @@ export function QueryHelperPanelCollapsibleSection({
       </button>
       {isOpen && (
         <QueryHelperPanelSectionContent
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}
           queries={queries}
