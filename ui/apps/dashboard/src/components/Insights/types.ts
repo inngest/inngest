@@ -17,3 +17,10 @@ export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
   explanation: string;
   templateKind: 'error' | 'time' | 'warning';
 }
+
+export interface Tab {
+  id: string;
+  name: string;
+  query: string;
+  savedQueryId?: string;
+}

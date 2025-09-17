@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
+import type { Query, QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -24,7 +24,7 @@ export interface UseInsightsTabManagerReturn {
   actions: TabManagerActions;
   activeTabId: string;
   tabManager: JSX.Element;
-  tabs: Query[];
+  tabs: Tab[];
 }
 
 export interface UseInsightsTabManagerProps {
@@ -35,13 +35,13 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps
 ): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<Query[]>([HOME_TAB]);
+  const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
 
   const createTabBase = useCallback(
-    (query: Query) => {
-      setTabs((prev) => [...prev, query]);
-      setActiveTabId(query.id);
+    (tab: Tab) => {
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
     },
     [setActiveTabId]
   );
@@ -66,16 +66,16 @@ export function useInsightsTabManager(
         });
       },
       createNewTab: () => {
-        createTabBase(makeEmptyUnsavedQuery());
+        createTabBase(makeEmptyUnsavedTab());
       },
       createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => {
         if (isQueryTemplate(query)) {
-          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query, name: query.name });
+          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query, name: query.name });
           return;
         }
 
         if (isQuerySnapshot(query)) {
-          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query });
+          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query });
           return;
         }
 
@@ -85,12 +85,7 @@ export function useInsightsTabManager(
           return;
         }
 
-        createTabBase({
-          id: ulid(),
-          name: query.name,
-          query: query.query,
-          savedQueryId: query.id,
-        });
+        createTabBase({ id: ulid(), name: query.name, query: query.query, savedQueryId: query.id });
       },
       focusTab: setActiveTabId,
       openTemplatesTab: () => {
@@ -101,7 +96,7 @@ export function useInsightsTabManager(
           setActiveTabId(TEMPLATES_TAB.id);
         }
       },
-      updateTab: (id: string, tab: Partial<Omit<Query, 'id'>>) => {
+      updateTab: (id: string, tab: Partial<Omit<Tab, 'id'>>) => {
         setTabs((prevTabs) => prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)));
       },
     }),
@@ -135,7 +130,7 @@ interface InsightsTabManagerInternalProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  tabs: Query[];
+  tabs: Tab[];
 }
 
 function InsightsTabManagerInternal({
@@ -205,6 +200,6 @@ export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: 
   return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
 }
 
-function makeEmptyUnsavedQuery(): Query {
+function makeEmptyUnsavedTab(): Tab {
   return { id: ulid(), name: UNTITLED_QUERY, query: '' };
 }

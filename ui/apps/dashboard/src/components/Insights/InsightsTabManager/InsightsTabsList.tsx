@@ -15,7 +15,7 @@ import {
 } from '@remixicon/react';
 
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import type { Query } from '@/components/Insights/types';
+import type { Tab } from '@/components/Insights/types';
 import { hasDiffWithSavedQuery } from './InsightsTabManager';
 import { useTabManagerActions } from './TabManagerContext';
 import { HOME_TAB, TEMPLATES_TAB } from './constants';
@@ -24,7 +24,7 @@ interface InsightsTabsListProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  tabs: Query[];
+  tabs: Tab[];
 }
 
 export function InsightsTabsList({
@@ -116,7 +116,7 @@ export function InsightsTabsList({
   );
 }
 
-function IndicatorTabIcon({ tab }: { tab: Query }) {
+function IndicatorTabIcon({ tab }: { tab: Tab }) {
   const { queries } = useStoredQueries();
 
   if (tab.id === TEMPLATES_TAB.id) {
