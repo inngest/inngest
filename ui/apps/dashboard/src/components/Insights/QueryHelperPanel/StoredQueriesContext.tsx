@@ -30,10 +30,8 @@ interface StoredQueriesProviderProps {
 }
 
 export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
-  const [querySnapshots = {}, setQuerySnapshots] = useLocalStorage<QueryRecord<QuerySnapshot>>(
-    'insights-query-snapshots',
-    MOCK_QUERY_SNAPSHOTS
-  );
+  const [querySnapshots, setQuerySnapshots] =
+    useState<QueryRecord<QuerySnapshot>>(MOCK_QUERY_SNAPSHOTS);
 
   const [savedQueries = {}, setSavedQueries] = useLocalStorage<QueryRecord<Query>>(
     'insights-saved-queries',
