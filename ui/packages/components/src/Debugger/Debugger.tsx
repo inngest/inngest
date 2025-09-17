@@ -48,8 +48,6 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50);
   const [running, setRunning] = useState(false);
-  console.log('shit selectedStep', selectedStep);
-  console.log('shit run id', runID);
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
