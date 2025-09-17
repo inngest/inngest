@@ -136,6 +136,7 @@ type Span struct {
 	RunID          string
 	EnvID          string
 	Output         interface{}
+	Input          interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString

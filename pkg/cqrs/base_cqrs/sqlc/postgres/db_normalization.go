@@ -790,7 +790,7 @@ func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSe
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (*sqlc_sqlite.GetSpanOutputRow, error) {
 	// TODO
 	return nil, nil
 }
