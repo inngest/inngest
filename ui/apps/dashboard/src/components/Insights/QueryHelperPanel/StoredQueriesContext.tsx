@@ -6,7 +6,6 @@ import { useLocalStorage } from 'react-use';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
 import { getOrderedQuerySnapshots } from '../queries';
-import { MOCK_QUERY_SNAPSHOTS, MOCK_SAVED_QUERIES } from './mocks';
 
 type ID = string;
 type QueryRecord<T> = Record<ID, T>;
@@ -30,12 +29,11 @@ interface StoredQueriesProviderProps {
 }
 
 export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
-  const [querySnapshots, setQuerySnapshots] =
-    useState<QueryRecord<QuerySnapshot>>(MOCK_QUERY_SNAPSHOTS);
+  const [querySnapshots, setQuerySnapshots] = useState<QueryRecord<QuerySnapshot>>({});
 
   const [savedQueries = {}, setSavedQueries] = useLocalStorage<QueryRecord<Query>>(
     'insights-saved-queries',
-    MOCK_SAVED_QUERIES
+    {}
   );
 
   const [unsavedQueries, setUnsavedQueries] = useState<QueryRecord<UnsavedQuery>>({});
