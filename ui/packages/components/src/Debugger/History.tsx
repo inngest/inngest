@@ -4,8 +4,11 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { Button } from '../Button';
 import { ErrorCard } from '../Error/ErrorCard';
 import { Pill } from '../Pill';
-import type { RunTraceSpan } from '../SharedContext/useGetDebugRun';
-import { useGetDebugSession } from '../SharedContext/useGetDebugSession';
+import {
+  useGetDebugSession,
+  type DebugSessionResult,
+  type DebugSessionRun,
+} from '../SharedContext/useGetDebugSession';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusTextClass } from '../Status/statusClasses';
@@ -139,11 +142,7 @@ type HistoryProps = {
   runID?: string;
 };
 
-type HistoryTable = RunTraceSpan & {
-  // TODO: remove these once we have the actual data
-  tags?: string[];
-  versions?: string[];
-};
+type HistoryTable = DebugSessionRun;
 
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
   const { data, loading, error } = useGetDebugSession({
@@ -249,17 +248,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
 
   return (
     <div className="flex w-full flex-col justify-start gap-2 ">
-      <Table
-        noHeader={true}
-        data={
-          data
-            ? data
-                .filter((run): run is RunTraceSpan => !!run && !!run.runID)
-                .map((run) => ({ ...run, tags: ['tag'], versions: ['version'] }))
-            : []
-        }
-        columns={columns}
-      />
+      <Table noHeader={true} data={data.debugRuns} columns={columns} />
       {/* {data.map(
         (run, i) =>
           run && (

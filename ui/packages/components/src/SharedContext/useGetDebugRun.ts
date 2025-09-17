@@ -38,7 +38,7 @@ export type RunTraceSpan = {
 
 export type DebugRunData = {
   debugRun: RunTraceSpan | null;
-  runSteps?: RunStep[] | null;
+  originalRun?: RunTraceSpan | null;
 };
 
 export type DebugRunResult = {

@@ -600,47 +600,34 @@ export const DEBUG_RUN = gql`
   query GetDebugRun($query: DebugRunQuery!) {
     debugRun(query: $query) {
       debugRun {
-        runID
-        spanID
-        traceID
-        name
-        status
-        attempts
-        duration
-        queuedAt
-        startedAt
-        endedAt
-        stepID
-        stepOp
-        isRoot
-        parentSpanID
-        isUserland
-        debugRunID
-        debugSessionID
+        ...TraceDetails
         childrenSpans {
-          runID
-          spanID
-          traceID
-          name
-          status
-          attempts
-          duration
-          queuedAt
-          startedAt
-          endedAt
-          stepID
-          stepOp
-          isRoot
-          parentSpanID
-          isUserland
-          debugRunID
-          debugSessionID
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+              childrenSpans {
+                ...TraceDetails
+              }
+            }
+          }
         }
       }
-      runSteps {
-        stepID
-        name
-        stepOp
+      originalRun {
+        ...TraceDetails
+        childrenSpans {
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+              childrenSpans {
+                ...TraceDetails
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -649,41 +636,14 @@ export const DEBUG_RUN = gql`
 export const DEBUG_SESSION = gql`
   query GetDebugSession($query: DebugSessionQuery!) {
     debugSession(query: $query) {
-      runID
-      spanID
-      traceID
-      name
-      status
-      attempts
-      duration
-      queuedAt
-      startedAt
-      endedAt
-      stepID
-      stepOp
-      isRoot
-      parentSpanID
-      isUserland
-      debugRunID
-      debugSessionID
-      childrenSpans {
-        runID
-        spanID
-        traceID
-        name
+      debugRuns {
         status
-        attempts
-        duration
         queuedAt
         startedAt
         endedAt
-        stepID
-        stepOp
-        isRoot
-        parentSpanID
-        isUserland
         debugRunID
-        debugSessionID
+        tags
+        versions
       }
     }
   }

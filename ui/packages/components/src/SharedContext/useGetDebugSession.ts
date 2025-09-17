@@ -10,10 +10,22 @@ export type GetDebugSessionPayload = {
   runID?: string;
 };
 
+export type DebugSessionRun = {
+  status: RunTraceSpan['status'];
+  queuedAt: RunTraceSpan['queuedAt'];
+  startedAt: RunTraceSpan['startedAt'];
+  endedAt: RunTraceSpan['endedAt'];
+  debugRunID: RunTraceSpan['debugRunID'];
+  tags: [string];
+  versions: [string];
+};
+
 export type DebugSessionResult = {
   error?: Error;
   loading: boolean;
-  data?: (RunTraceSpan | null)[];
+  data?: {
+    debugRuns: DebugSessionRun[];
+  };
 };
 
 type UseGetDebugSessionOptions = {
@@ -44,7 +56,8 @@ export const useGetDebugSession = ({
       if (result.error) {
         throw result.error;
       }
-      return result.data || [];
+
+      return result.data || { debugRuns: [] };
     }, [shared.getDebugSession, functionSlug, debugSessionID, runID]),
     refetchInterval,
     enabled: enabled && !!functionSlug,

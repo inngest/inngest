@@ -594,6 +594,7 @@ type RunTraceSpan {
   userlandSpan: UserlandSpan
   debugRunID: ULID
   debugSessionID: ULID
+  debugPaused: Boolean!
 }
 
 type UserlandSpan {
@@ -633,7 +634,21 @@ type RunTraceTrigger {
 
 type DebugRun {
   debugRun: RunTraceSpan
-  runSteps: [RunStep!]
+  originalRun: RunTraceSpan
+}
+
+type DebugSessionRun {
+  status: RunTraceSpanStatus!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+  debugRunID: ULID
+  tags: [String!]
+  versions: [String!]
+}
+
+type DebugSession {
+  debugRuns: [DebugSessionRun!]
 }
 
 type RunStep {

@@ -74,17 +74,28 @@ func (tr *traceReader) GetDebugSessionTrace(ctx context.Context, keys dataloader
 				return
 			}
 
-			var gqlSpans []*models.RunTraceSpan
+			var debugSessionRuns []*models.DebugSessionRun
 			for _, rootSpan := range rootSpans {
-				gqlSpan, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+				runTraceSpan, err := tr.convertRunSpanToGQL(ctx, rootSpan)
 				if err != nil {
 					res.Error = fmt.Errorf("error converting debug session span to GQL: %w", err)
 					return
 				}
-				gqlSpans = append(gqlSpans, gqlSpan)
+				debugSessionRuns = append(debugSessionRuns, &models.DebugSessionRun{
+					Status:     runTraceSpan.Status,
+					QueuedAt:   rootSpan.GetQueuedAtTime(),
+					StartedAt:  runTraceSpan.StartedAt,
+					EndedAt:    runTraceSpan.EndedAt,
+					DebugRunID: runTraceSpan.DebugRunID,
+					// TODO: add tags and versions
+					Tags:     []string{},
+					Versions: []string{},
+				})
 			}
 
-			res.Data = gqlSpans
+			res.Data = &models.DebugSession{
+				DebugRuns: debugSessionRuns,
+			}
 		}(ctx, results[i], key)
 	}
 
