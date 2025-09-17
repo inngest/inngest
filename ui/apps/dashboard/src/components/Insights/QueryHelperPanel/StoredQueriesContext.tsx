@@ -6,7 +6,6 @@ import { useLocalStorage } from 'react-use';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
 import { getOrderedQuerySnapshots } from '../queries';
-import { MOCK_QUERY_SNAPSHOTS, MOCK_SAVED_QUERIES } from './mocks';
 
 type ID = string;
 type QueryRecord<T> = Record<ID, T>;
@@ -30,14 +29,11 @@ interface StoredQueriesProviderProps {
 }
 
 export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
-  const [querySnapshots = {}, setQuerySnapshots] = useLocalStorage<QueryRecord<QuerySnapshot>>(
-    'insights-query-snapshots',
-    MOCK_QUERY_SNAPSHOTS
-  );
+  const [querySnapshots, setQuerySnapshots] = useState<QueryRecord<QuerySnapshot>>({});
 
   const [savedQueries = {}, setSavedQueries] = useLocalStorage<QueryRecord<Query>>(
     'insights-saved-queries',
-    MOCK_SAVED_QUERIES
+    {}
   );
 
   const [unsavedQueries, setUnsavedQueries] = useState<QueryRecord<UnsavedQuery>>({});
@@ -77,11 +73,11 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const saveQuerySnapshot = useCallback(
     (snapshot: QuerySnapshot) => {
-      setQuerySnapshots(
-        withId(removeQuerySnapshotIfOverLimit(querySnapshots, 10), snapshot.id, snapshot)
+      setQuerySnapshots((current) =>
+        withId(removeQuerySnapshotIfOverLimit(current, 10), snapshot.id, snapshot)
       );
     },
-    [setQuerySnapshots, querySnapshots]
+    [setQuerySnapshots]
   );
 
   const queries = useMemo(() => {
