@@ -1041,18 +1041,23 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 
 const getSpanOutput = `-- name: GetSpanOutput :one
 SELECT
-  -- input, TODO
+  input,
   output
 FROM spans
 WHERE span_id = ?
 LIMIT 1
 `
 
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (interface{}, error) {
+type GetSpanOutputRow struct {
+	Input  interface{}
+	Output interface{}
+}
+
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (*GetSpanOutputRow, error) {
 	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
-	var output interface{}
-	err := row.Scan(&output)
-	return output, err
+	var i GetSpanOutputRow
+	err := row.Scan(&i.Input, &i.Output)
+	return &i, err
 }
 
 const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
@@ -1748,10 +1753,11 @@ INSERT INTO spans (
   attributes,
   links,
   output,
+  input,
   debug_run_id,
   debug_session_id,
   status
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
@@ -1770,6 +1776,7 @@ type InsertSpanParams struct {
 	Attributes     interface{}
 	Links          interface{}
 	Output         interface{}
+	Input          interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString
@@ -1793,6 +1800,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Attributes,
 		arg.Links,
 		arg.Output,
+		arg.Input,
 		arg.DebugRunID,
 		arg.DebugSessionID,
 		arg.Status,
