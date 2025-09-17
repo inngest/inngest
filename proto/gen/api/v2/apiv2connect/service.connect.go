@@ -57,6 +57,10 @@ const (
 	V2CreateWebhookProcedure = "/api.v2.V2/CreateWebhook"
 	// V2ListWebhooksProcedure is the fully-qualified name of the V2's ListWebhooks RPC.
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
+	// V2FetchEventTypesProcedure is the fully-qualified name of the V2's FetchEventTypes RPC.
+	V2FetchEventTypesProcedure = "/api.v2.V2/FetchEventTypes"
+	// V2FetchEventTypeProcedure is the fully-qualified name of the V2's FetchEventType RPC.
+	V2FetchEventTypeProcedure = "/api.v2.V2/FetchEventType"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -73,6 +77,8 @@ type V2Client interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	FetchEventTypes(context.Context, *connect.Request[v2.FetchEventTypesRequest]) (*connect.Response[v2.FetchEventTypesResponse], error)
+	FetchEventType(context.Context, *connect.Request[v2.FetchEventTypeRequest]) (*connect.Response[v2.FetchEventTypeResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -152,6 +158,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 			connect.WithClientOptions(opts...),
 		),
+		fetchEventTypes: connect.NewClient[v2.FetchEventTypesRequest, v2.FetchEventTypesResponse](
+			httpClient,
+			baseURL+V2FetchEventTypesProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchEventTypes")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchEventType: connect.NewClient[v2.FetchEventTypeRequest, v2.FetchEventTypeResponse](
+			httpClient,
+			baseURL+V2FetchEventTypeProcedure,
+			connect.WithSchema(v2Methods.ByName("FetchEventType")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -168,6 +186,8 @@ type v2Client struct {
 	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
 	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
+	fetchEventTypes         *connect.Client[v2.FetchEventTypesRequest, v2.FetchEventTypesResponse]
+	fetchEventType          *connect.Client[v2.FetchEventTypeRequest, v2.FetchEventTypeResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -225,6 +245,16 @@ func (c *v2Client) ListWebhooks(ctx context.Context, req *connect.Request[v2.Lis
 	return c.listWebhooks.CallUnary(ctx, req)
 }
 
+// FetchEventTypes calls api.v2.V2.FetchEventTypes.
+func (c *v2Client) FetchEventTypes(ctx context.Context, req *connect.Request[v2.FetchEventTypesRequest]) (*connect.Response[v2.FetchEventTypesResponse], error) {
+	return c.fetchEventTypes.CallUnary(ctx, req)
+}
+
+// FetchEventType calls api.v2.V2.FetchEventType.
+func (c *v2Client) FetchEventType(ctx context.Context, req *connect.Request[v2.FetchEventTypeRequest]) (*connect.Response[v2.FetchEventTypeResponse], error) {
+	return c.fetchEventType.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -239,6 +269,8 @@ type V2Handler interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	FetchEventTypes(context.Context, *connect.Request[v2.FetchEventTypesRequest]) (*connect.Response[v2.FetchEventTypesResponse], error)
+	FetchEventType(context.Context, *connect.Request[v2.FetchEventTypeRequest]) (*connect.Response[v2.FetchEventTypeResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -314,6 +346,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2FetchEventTypesHandler := connect.NewUnaryHandler(
+		V2FetchEventTypesProcedure,
+		svc.FetchEventTypes,
+		connect.WithSchema(v2Methods.ByName("FetchEventTypes")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2FetchEventTypeHandler := connect.NewUnaryHandler(
+		V2FetchEventTypeProcedure,
+		svc.FetchEventType,
+		connect.WithSchema(v2Methods.ByName("FetchEventType")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -338,6 +382,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateWebhookHandler.ServeHTTP(w, r)
 		case V2ListWebhooksProcedure:
 			v2ListWebhooksHandler.ServeHTTP(w, r)
+		case V2FetchEventTypesProcedure:
+			v2FetchEventTypesHandler.ServeHTTP(w, r)
+		case V2FetchEventTypeProcedure:
+			v2FetchEventTypeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -389,4 +437,12 @@ func (UnimplementedV2Handler) CreateWebhook(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListWebhooks is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchEventTypes(context.Context, *connect.Request[v2.FetchEventTypesRequest]) (*connect.Response[v2.FetchEventTypesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchEventTypes is not implemented"))
+}
+
+func (UnimplementedV2Handler) FetchEventType(context.Context, *connect.Request[v2.FetchEventTypeRequest]) (*connect.Response[v2.FetchEventTypeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchEventType is not implemented"))
 }

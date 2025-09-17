@@ -30,6 +30,8 @@ const (
 	V2_FetchAccountSigningKeys_FullMethodName = "/api.v2.V2/FetchAccountSigningKeys"
 	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
+	V2_FetchEventTypes_FullMethodName         = "/api.v2.V2/FetchEventTypes"
+	V2_FetchEventType_FullMethodName          = "/api.v2.V2/FetchEventType"
 )
 
 // V2Client is the client API for V2 service.
@@ -48,6 +50,8 @@ type V2Client interface {
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
+	FetchEventTypes(ctx context.Context, in *FetchEventTypesRequest, opts ...grpc.CallOption) (*FetchEventTypesResponse, error)
+	FetchEventType(ctx context.Context, in *FetchEventTypeRequest, opts ...grpc.CallOption) (*FetchEventTypeResponse, error)
 }
 
 type v2Client struct {
@@ -168,6 +172,26 @@ func (c *v2Client) ListWebhooks(ctx context.Context, in *ListWebhooksRequest, op
 	return out, nil
 }
 
+func (c *v2Client) FetchEventTypes(ctx context.Context, in *FetchEventTypesRequest, opts ...grpc.CallOption) (*FetchEventTypesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchEventTypesResponse)
+	err := c.cc.Invoke(ctx, V2_FetchEventTypes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) FetchEventType(ctx context.Context, in *FetchEventTypeRequest, opts ...grpc.CallOption) (*FetchEventTypeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchEventTypeResponse)
+	err := c.cc.Invoke(ctx, V2_FetchEventType_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -184,6 +208,8 @@ type V2Server interface {
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
+	FetchEventTypes(context.Context, *FetchEventTypesRequest) (*FetchEventTypesResponse, error)
+	FetchEventType(context.Context, *FetchEventTypeRequest) (*FetchEventTypeResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -226,6 +252,12 @@ func (UnimplementedV2Server) CreateWebhook(context.Context, *CreateWebhookReques
 }
 func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListWebhooks not implemented")
+}
+func (UnimplementedV2Server) FetchEventTypes(context.Context, *FetchEventTypesRequest) (*FetchEventTypesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchEventTypes not implemented")
+}
+func (UnimplementedV2Server) FetchEventType(context.Context, *FetchEventTypeRequest) (*FetchEventTypeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchEventType not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -446,6 +478,42 @@ func _V2_ListWebhooks_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_FetchEventTypes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchEventTypesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).FetchEventTypes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_FetchEventTypes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).FetchEventTypes(ctx, req.(*FetchEventTypesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_FetchEventType_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchEventTypeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).FetchEventType(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_FetchEventType_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).FetchEventType(ctx, req.(*FetchEventTypeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -496,6 +564,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWebhooks",
 			Handler:    _V2_ListWebhooks_Handler,
+		},
+		{
+			MethodName: "FetchEventTypes",
+			Handler:    _V2_FetchEventTypes_Handler,
+		},
+		{
+			MethodName: "FetchEventType",
+			Handler:    _V2_FetchEventType_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

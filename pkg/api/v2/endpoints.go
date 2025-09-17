@@ -273,3 +273,40 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	// 3. Return the list with proper pagination metadata
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
+
+func (s *Service) FetchEventTypes(ctx context.Context, req *apiv2.FetchEventTypesRequest) (*apiv2.FetchEventTypesResponse, error) {
+	// Validate pagination parameters
+	if req.Limit != nil {
+		if *req.Limit < 1 {
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Limit must be at least 1")
+		}
+		if *req.Limit > 250 {
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Limit cannot exceed 250")
+		}
+	}
+
+	// For now, return empty list
+	// In a full implementation, this would:
+	// 1. Extract account/workspace from auth context
+	// 2. Query the database for unique event names with MIN(event_ts) as createdAt
+	// 3. Apply cursor-based pagination
+	// 4. Return the list with proper pagination metadata
+
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Event types not implemented in OSS")
+}
+
+func (s *Service) FetchEventType(ctx context.Context, req *apiv2.FetchEventTypeRequest) (*apiv2.FetchEventTypeResponse, error) {
+	// Validate required fields
+	if req.Id == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Event type ID is required")
+	}
+
+	// For now, return not implemented
+	// In a full implementation, this would:
+	// 1. Extract account/workspace from auth context
+	// 2. Query the database for the specific event type by name
+	// 3. Generate or retrieve TypeScript schema from event data
+	// 4. Return the event type with schema information
+
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Event type schema retrieval not implemented in OSS")
+}
