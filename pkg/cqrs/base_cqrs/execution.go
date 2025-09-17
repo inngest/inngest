@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/inngest/inngest/pkg/event_trigger_patterns"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -47,7 +48,7 @@ func (w wrapper) FunctionsByTrigger(ctx context.Context, eventName string) ([]in
 	}
 	
 	// Generate matching patterns once for efficient trigger matching
-	matchingPatterns := inngest.GenerateMatchingPatterns(eventName)
+	matchingPatterns := event_trigger_patterns.GenerateMatchingPatterns(eventName)
 	
 	all := []inngest.Function{}
 	for _, fn := range fns {
