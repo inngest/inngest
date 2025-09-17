@@ -1,11 +1,12 @@
 import { ulid } from 'ulid';
 
-import type { Query, QuerySnapshot, QueryTemplate } from './types';
+import type { InsightsQuery as GQLInsightsQuery } from '@/gql/graphql';
+import type { Query as LocalQuery, Query, QuerySnapshot, QueryTemplate } from './types';
 
 type QueryRecord<T> = Record<string, T>;
 
 export function isQuerySnapshot(q: Query | QuerySnapshot): q is QuerySnapshot {
-  return !('saved' in q);
+  return !('savedQueryId' in q);
 }
 
 export function isQueryTemplate(q: Query | QuerySnapshot | QueryTemplate): q is QueryTemplate {
@@ -20,7 +21,7 @@ export function getOrderedQuerySnapshots(
 
 export function getOrderedSavedQueries(queries: QueryRecord<Query>): Query[] {
   return Object.values(queries)
-    .filter((query) => query.saved)
+    .filter((query) => query.savedQueryId !== undefined)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -31,4 +32,24 @@ export function makeQuerySnapshot(query: string, name?: string): QuerySnapshot {
     name: name ?? query,
     query,
   };
+}
+
+export function toLocalQuery(q: GQLInsightsQuery): LocalQuery {
+  return {
+    id: q.id,
+    name: q.name,
+    query: q.sql,
+    savedQueryId: q.id,
+  };
+}
+
+export function toLocalQueryArray(
+  queries: GQLInsightsQuery[] | undefined
+): LocalQuery[] | undefined {
+  if (!queries) return undefined;
+  return queries.map(toLocalQuery);
+}
+
+export function isSavedQuery(q: LocalQuery): boolean {
+  return q.savedQueryId !== undefined;
 }

@@ -6,11 +6,11 @@ export interface QuerySnapshot {
 }
 
 export interface Query extends Omit<QuerySnapshot, 'createdAt'> {
-  saved: boolean;
+  savedQueryId?: string;
 }
 
-export interface UnsavedQuery extends Omit<Query, 'saved'> {
-  saved: false;
+export interface UnsavedQuery extends Query {
+  savedQueryId?: undefined;
 }
 
 export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
