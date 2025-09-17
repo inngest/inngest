@@ -31,7 +31,6 @@ export function AccountConcurrency({ data, limit, isMarketplace = false }: Props
           <Info
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >

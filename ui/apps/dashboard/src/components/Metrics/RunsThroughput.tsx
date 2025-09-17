@@ -27,7 +27,6 @@ export const RunsThrougput = ({
             text="Total number of runs processed your env, app or function."
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-runs-throughput"
                 target="_new"
