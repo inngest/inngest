@@ -25,6 +25,7 @@ export type MetricsFilters = {
   entities: EntityLookup;
   scope: MetricsScope;
   concurrencyLimit?: number;
+  isMarketplace: boolean;
 };
 
 const GetVolumeMetrics = graphql(`
@@ -232,6 +233,7 @@ export const MetricsVolume = ({
   entities,
   scope,
   concurrencyLimit,
+  isMarketplace = false,
 }: MetricsFilters) => {
   const [volumeOpen, setVolumeOpen] = useState(true);
 
@@ -278,8 +280,16 @@ export const MetricsVolume = ({
               <Backlog workspace={data?.workspace} entities={entities} />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <Concurrency workspace={data?.workspace} entities={entities} />
-              <AccountConcurrency data={data?.accountConcurrency} limit={concurrencyLimit} />
+              <Concurrency
+                workspace={data?.workspace}
+                entities={entities}
+                isMarketplace={isMarketplace}
+              />
+              <AccountConcurrency
+                data={data?.accountConcurrency}
+                limit={concurrencyLimit}
+                isMarketplace={isMarketplace}
+              />
             </div>
             <div className="col-span-2 flex flex-row flex-wrap items-center justify-center gap-2 overflow-hidden md:flex-nowrap">
               <Feedback />

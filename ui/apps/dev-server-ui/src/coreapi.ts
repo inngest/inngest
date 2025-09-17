@@ -251,6 +251,7 @@ export const GET_RUNS = gql`
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
     $celQuery: String = null
+    $preview: Boolean = false
   ) {
     runs(
       filter: {
@@ -262,6 +263,7 @@ export const GET_RUNS = gql`
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
+      preview: $preview
     ) {
       edges {
         node {
@@ -299,12 +301,14 @@ export const COUNT_RUNS = gql`
     $startTime: Time!
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
+    $preview: Boolean = false
   ) {
     runs(
       filter: { from: $startTime, status: $status, timeField: $timeField }
       orderBy: [{ field: $timeField, direction: DESC }]
+      preview: $preview
     ) {
-      totalCount
+      totalCount(preview: $preview)
     }
   }
 `;
@@ -501,7 +505,7 @@ export const GET_EVENTS = gql`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
-    $includeInternalEvents: Boolean = true
+    $includeInternalEvents: Boolean = false
   ) {
     eventsV2(
       first: 50

@@ -26,11 +26,13 @@ type ExtractedValues struct {
 	DropSpan *bool
 	EnvID *uuid.UUID
 	EventIDs *[]string
+	EventsInput *string
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
+	DynamicTraceID *string
 	InternalLocation *string
 	internalError *string
 	IsFunctionOutput *bool

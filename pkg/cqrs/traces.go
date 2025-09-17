@@ -429,6 +429,8 @@ type GetTraceRunOpt struct {
 	Order  []GetTraceRunOrder
 	Cursor string
 	Items  uint
+	// Whether the run list should use the tracing preview stores
+	Preview bool
 }
 
 type FindOrCreateTraceRunOpt struct {

@@ -25,7 +25,7 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
 
   const footerHeaderSecondaryCTA =
     !app.error && app.functionCount > 0 ? (
-      <Link size="small" href={pathCreator.functions({ envSlug: envSlug })} arrowOnHover>
+      <Link size="small" href={pathCreator.functions({ envSlug: envSlug })}>
         View functions
       </Link>
     ) : null;
@@ -55,10 +55,7 @@ const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: strin
               return (
                 <tr key={func.id} className="bg-canvaseBase hover:bg-canvasSubtle/50">
                   <td className="py-2">
-                    <Link
-                      href={pathCreator.function({ envSlug, functionSlug: func.slug })}
-                      arrowOnHover
-                    >
+                    <Link href={pathCreator.function({ envSlug, functionSlug: func.slug })}>
                       {func.name}
                     </Link>
                   </td>

@@ -211,8 +211,10 @@ CREATE TABLE spans (
   run_id TEXT NOT NULL,
   env_id TEXT NOT NULL,
   output JSONB,
+  input JSONB,
   debug_run_id TEXT,
   debug_session_id TEXT,
+  status TEXT,
 
   PRIMARY KEY (trace_id, span_id)
 );

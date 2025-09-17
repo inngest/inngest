@@ -295,7 +295,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				iterated++
 			}
 
-			l.Debug("iterated items in partition",
+			l.Trace("iterated items in partition",
 				"count", iterated,
 				"start", start.Format(time.StampMilli),
 				"end", end.Format(time.StampMilli),

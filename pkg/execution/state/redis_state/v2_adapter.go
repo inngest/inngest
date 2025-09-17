@@ -103,13 +103,6 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		return state.State{}, err
 	}
 
-	metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
-		PkgName: "redis_state",
-		Tags: map[string]any{
-			"account_id": s.Metadata.ID.Tenant.AccountID,
-		},
-	})
-
 	// XXX: We do the exact same size calculations done in `mgr.New` to return a v2 state without changing the v1 interface.
 	var stepsByt []byte
 	if len(s.Steps) > 0 {
@@ -143,11 +136,19 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 			AccountID: s.Metadata.ID.Tenant.AccountID,
 		},
 	}
+	stateSize := len(events) + len(stepsByt) + len(stepInputsByt)
 	metadata.Metrics = state.RunMetrics{
 		EventSize: len(events),
-		StateSize: len(events) + len(stepsByt) + len(stepInputsByt),
+		StateSize: stateSize,
 		StepCount: len(s.Steps),
 	}
+
+	metrics.IncrStateWrittenCounter(ctx, stateSize, metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": s.Metadata.ID.Tenant.AccountID,
+		},
+	})
 
 	steps := make(map[string]json.RawMessage)
 	for _, step := range s.Steps {

@@ -136,8 +136,10 @@ type Span struct {
 	RunID          string
 	EnvID          string
 	Output         pqtype.NullRawMessage
+	Input          pqtype.NullRawMessage
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
+	Status         sql.NullString
 }
 
 type Trace struct {

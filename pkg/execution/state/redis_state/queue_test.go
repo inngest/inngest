@@ -2050,6 +2050,196 @@ func TestQueueLease(t *testing.T) {
 		require.False(t, r.Exists(defaultPart.concurrencyKey(kg)), evaluatedKey, concurrencyKeyQueue.concurrencyKey(kg), r.Dump())
 		require.False(t, r.Exists(kg.Concurrency("account", accountId.String())))
 	})
+
+	t.Run("leasing with throttle item data or constraints", func(t *testing.T) {
+		t.Run("item with throttle but no constraints", func(t *testing.T) {
+			r.FlushAll()
+			fnID, accountID := uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: nil,
+				}
+			}
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Kind: osqueue.KindStart,
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+						AccountID:  accountID,
+					},
+					Throttle: &osqueue.Throttle{
+						Key:               "throttle-key",
+						Limit:             1,
+						Burst:             0,
+						Period:            5,
+						KeyExpressionHash: util.XXHash("expr"),
+					},
+				},
+			}, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		})
+
+		t.Run("item with throttle and matching constraints", func(t *testing.T) {
+			r.FlushAll()
+			fnID, accountID := uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						ThrottleKeyExpressionHash: util.XXHash("expr"),
+						Limit:                     1,
+						Burst:                     0,
+						Period:                    5,
+					},
+				}
+			}
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Kind: osqueue.KindStart,
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+						AccountID:  accountID,
+					},
+					Throttle: &osqueue.Throttle{
+						Key:               "throttle-key",
+						Limit:             1,
+						Burst:             0,
+						Period:            5,
+						KeyExpressionHash: util.XXHash("expr"),
+					},
+				},
+			}, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		})
+
+		t.Run("item with throttle and mismatching constraints", func(t *testing.T) {
+			r.FlushAll()
+			fnID, accountID := uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						ThrottleKeyExpressionHash: util.XXHash("different-constraints"),
+						Limit:                     5,
+						Burst:                     1,
+						Period:                    60,
+					},
+				}
+			}
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Kind: osqueue.KindStart,
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+						AccountID:  accountID,
+					},
+					Throttle: &osqueue.Throttle{
+						Key:               "throttle-key",
+						Limit:             1,
+						Burst:             0,
+						Period:            5,
+						KeyExpressionHash: util.XXHash("expr"),
+					},
+				},
+			}, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		})
+
+		t.Run("item without throttle but constraints", func(t *testing.T) {
+			r.FlushAll()
+			fnID, accountID := uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						ThrottleKeyExpressionHash: util.XXHash("expr"),
+						Limit:                     1,
+						Burst:                     0,
+						Period:                    5,
+					},
+				}
+			}
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Kind: osqueue.KindStart,
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+						AccountID:  accountID,
+					},
+					Throttle: nil,
+				},
+			}, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		})
+
+		t.Run("non-start item with throttle constraints", func(t *testing.T) {
+			r.FlushAll()
+			fnID, accountID := uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						ThrottleKeyExpressionHash: util.XXHash("expr"),
+						Limit:                     1,
+						Burst:                     0,
+						Period:                    5,
+					},
+				}
+			}
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+						AccountID:  accountID,
+					},
+					Throttle: nil,
+				},
+			}, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			leaseID, err := q.Lease(ctx, item, 10*time.Second, q.clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		})
+	})
 }
 
 func TestQueueExtendLease(t *testing.T) {
@@ -2710,7 +2900,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 			{ID: idB.String(), FunctionID: &idB, AccountID: accountId},
 			{ID: idC.String(), FunctionID: &idC, AccountID: accountId},
 		}, items)
-		requirePartitionScoreEquals(t, r, &idA, now.Add(24*time.Hour))
+		requirePartitionScoreEquals(t, r, &idA, now.Add(PartitionPausedRequeueExtension))
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
@@ -3727,7 +3917,9 @@ func TestQueueRateLimit(t *testing.T) {
 	defer rc.Close()
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock))
+	q := NewQueue(
+		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}, WithClock(clock),
+	)
 
 	idA, idB := uuid.New(), uuid.New()
 
@@ -3739,6 +3931,17 @@ func TestQueueRateLimit(t *testing.T) {
 			Limit:  1,
 			Period: 5, // Admit one every 5 seconds
 			Burst:  0, // No burst.
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Limit:                     1,
+					Period:                    5,
+					Burst:                     0,
+					ThrottleKeyExpressionHash: util.XXHash(throttle.Key),
+				},
+			}
 		}
 
 		aa, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -3787,6 +3990,16 @@ func TestQueueRateLimit(t *testing.T) {
 		// clock.Advance(10 * time.Millisecond)
 
 		t.Run("Leasing another function succeeds", func(t *testing.T) {
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Throttle: &PartitionThrottle{
+						Limit:                     1,
+						Period:                    5,
+						Burst:                     0,
+						ThrottleKeyExpressionHash: util.XXHash("another-key"),
+					},
+				}
+			}
 			ba, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
 				FunctionID: idB,
 				Data: osqueue.Item{
@@ -3827,6 +4040,17 @@ func TestQueueRateLimit(t *testing.T) {
 			Limit:  1,
 			Period: 10, // Admit one every 10 seconds
 			Burst:  3,  // With bursts of 3
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					ThrottleKeyExpressionHash: util.XXHash("burst-plz"),
+					Limit:                     1,
+					Period:                    10,
+					Burst:                     3,
+				},
+			}
 		}
 
 		items := []osqueue.QueueItem{}

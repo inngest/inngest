@@ -48,6 +48,18 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		e.preDeleteStateSizeReporter(ctx, opts.Metadata)
 	}
 
+	// If there are no input events, fetch them.
+	if len(opts.Optional.InputEvents) == 0 {
+		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
+		if err != nil {
+			l.Warn(
+				"error loading run events to finalize",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+		}
+	}
+
 	// Delete the function state in every case.
 	_, err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
@@ -143,23 +155,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	var (
 		fnSlug = opts.Optional.FnSlug
 		evts   = opts.Optional.InputEvents
-		err    error
 	)
-
-	l := logger.StdlibLogger(ctx)
-
-	// If there are no input events, fetch them.
-	if len(evts) == 0 {
-		evts, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
-		if err != nil {
-			l.Error(
-				"error loading run events to finalize",
-				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
-			)
-			return err
-		}
-	}
 
 	// Find the function slug.
 	if fnSlug == "" {
@@ -223,7 +219,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
 			if !strings.Contains(*opts.Response.Err, state.ErrFunctionCancelled.Error()) {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
 					Name:      event.FnFailedName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,
@@ -233,7 +229,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			// Add function cancelled event
 			if *opts.Response.Err == state.ErrFunctionCancelled.Error() {
 				freshEvents = append(freshEvents, event.Event{
-					ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
 					Name:      event.FnCancelledName,
 					Timestamp: now.UnixMilli(),
 					Data:      data,
@@ -246,5 +242,9 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 }
 
 func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
-	return tracing.DriverResponseAttrs(&f.Response, f.Optional.OutputSpanRef)
+	// We're explicitly not setting any output span reference here and passing
+	// `nil` instead. We do this because we need to be setting the function
+	// output twice - once for the execution itself and once for the run span -
+	// in order to appropriately filter this in Cloud and other data stores.
+	return tracing.DriverResponseAttrs(&f.Response, nil)
 }

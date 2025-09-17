@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
@@ -72,6 +73,7 @@ export default function Page() {
         status: filteredStatus,
         timeField,
         celQuery: search,
+        preview: tracesPreviewEnabled,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -92,7 +94,7 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField, search]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, search, tracesPreviewEnabled]
   );
 
   const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
@@ -141,21 +143,6 @@ export default function Page() {
 
   const getTrigger = useGetTrigger();
 
-  const onScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
-    (event) => {
-      if (runs && runs.length > 0) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
-
-        // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching) {
-          fetchNextPage();
-        }
-      }
-    },
-    [isFetching, runs]
-  );
-
   const onScrollToTop = useCallback(() => {
     // TODO: What should this do?
   }, []);
@@ -195,13 +182,19 @@ export default function Page() {
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
-        onScroll={onScroll}
         onScrollToTop={onScrollToTop}
         onRefresh={fetchNextPage}
         getTrigger={getTrigger}
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
+        infiniteScrollTrigger={
+          <InfiniteScrollTrigger
+            onIntersect={fetchNextPage}
+            hasMore={hasNextPage ?? false}
+            isLoading={isFetching}
+          />
+        }
       />
     </>
   );

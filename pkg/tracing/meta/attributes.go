@@ -25,6 +25,7 @@ var Attrs = struct {
 	DropSpan        attr[*bool]
 	EnvID           attr[*uuid.UUID]
 	EventIDs        attr[*[]string]
+	EventsInput     attr[*string]
 	FunctionID      attr[*uuid.UUID]
 	FunctionVersion attr[*int]
 	RunID           attr[*ulid.ULID]
@@ -32,6 +33,15 @@ var Attrs = struct {
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
 	DynamicStatus attr[*enums.StepStatus]
+	// DynamicTraceID is a trace ID for this span that should overwrite
+	// whatever trace ID is currently set within the span's own context.
+	//
+	// We need this due to Go's otel library sometimes being stubborn about
+	// inheriting a particular `traceparent`'s context based on span IDs. In
+	// our particular case, a zero-value span ID (e.g. `"0000000000000000"`)
+	// would result in the entire `traceparent` being ignored and a new trace
+	// ID being created.
+	DynamicTraceID attr[*string]
 
 	// Internal and debugging
 	InternalLocation attr[*string]
@@ -110,11 +120,13 @@ var Attrs = struct {
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DropSpan:                           BoolAttr("executor.drop"),
+	DynamicTraceID:                     StringAttr("dynamic.trace.id"),
 	DynamicSpanID:                      StringAttr("dynamic.span.id"),
 	DynamicStatus:                      StepStatusAttr("dynamic.status"),
 	EndedAt:                            TimeAttr("ended_at"),
 	EnvID:                              UUIDAttr("env.id"),
 	EventIDs:                           StringSliceAttr("event.ids"),
+	EventsInput:                        StringAttr("events.input"),
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),

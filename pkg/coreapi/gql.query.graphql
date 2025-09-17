@@ -31,6 +31,7 @@ type Query {
     after: String
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
+    preview: Boolean
   ): RunsV2Connection!
   # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
   run(runID: String!): FunctionRunV2

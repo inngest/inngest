@@ -50,6 +50,10 @@ type BatchItem struct {
 	Version         int         `json:"v"`
 }
 
+func (b BatchItem) GetAccountID() uuid.UUID {
+	return b.AccountID
+}
+
 func (b BatchItem) GetWorkspaceID() uuid.UUID {
 	return b.WorkspaceID
 }

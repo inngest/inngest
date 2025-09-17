@@ -42,7 +42,6 @@ export default function NewUser() {
         <div className="border-subtle border-t px-3 py-2">
           <Link
             href="https://docs.google.com/forms/d/e/1FAIpQLSd7kPNKpDJiGS5qFLtMFH3Qbc2R0vn0egznPd6MJlsQlWVUUg/viewform"
-            arrowOnHover={true}
             target="_blank"
           >
             Take survey

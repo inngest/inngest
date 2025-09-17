@@ -180,7 +180,7 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 max-h-[calc(100vh-8rem)] w-[188px] divide-none overflow-y-auto rounded border shadow focus:outline-none">
+          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 max-h-[calc(100vh-8rem)] w-[250px] divide-none overflow-y-auto rounded border shadow focus:outline-none">
             {defaultEnvironment !== null && <EnvironmentItem environment={defaultEnvironment} />}
 
             {testEnvironments.length > 0 &&
