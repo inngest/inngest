@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useStoredQueries } from './StoredQueriesContext';
 
@@ -14,15 +12,7 @@ interface QueryHelperPanelProps {
 
 export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, queries, querySnapshots } = useStoredQueries();
-
-  const savedQueries = useMemo(() => {
-    return temporarilyWrapData(getOrderedSavedQueries(queries));
-  }, [queries]);
-
-  const orderedQuerySnapshots = useMemo(() => {
-    return temporarilyWrapData(getOrderedQuerySnapshots(querySnapshots));
-  }, [querySnapshots]);
+  const { deleteQuery, deleteQuerySnapshot, querySnapshots, savedQueries } = useStoredQueries();
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -60,20 +50,11 @@ export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
           activeTabId={activeTabId}
           onQueryDelete={deleteQuerySnapshot}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={orderedQuerySnapshots}
+          queries={querySnapshots}
           title="Query history"
           sectionType="history"
         />
       </div>
     </div>
   );
-}
-
-// TODO: Use real error, loading values when data is fetched from the server.
-function temporarilyWrapData<T>(data: T): {
-  data: T;
-  error: undefined;
-  isLoading: boolean;
-} {
-  return { data, error: undefined, isLoading: false };
 }
