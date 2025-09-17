@@ -5,7 +5,7 @@ import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
-import { ChatPlaceholder } from '../InsightsChat/ChatPlaceholder';
+import { InsightsChat } from '../InsightsChat/InsightsChat';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -175,7 +175,7 @@ function InsightsTabManagerInternal({
                   tab={tab}
                 />
               </div>
-              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && <ChatPlaceholder />}
+              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && <InsightsChat />}
             </div>
           </InsightsStateMachineContextProvider>
         ))}
