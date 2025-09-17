@@ -32,6 +32,7 @@ import {
   useStringArraySearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
+import { parseCelSearchError } from '../utils/searchErrorParser';
 import { EventDetails } from './EventDetails';
 import TotalCount from './TotalCount';
 import { useColumns } from './columns';
@@ -167,6 +168,8 @@ export function EventsTable({
       totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
     }),
   });
+
+  const searchError = parseCelSearchError(error);
   /* TODO: Find out what to do with the event types filter, since it will affect performance */
 
   // const { data: eventTypesData } = useQuery({
@@ -224,9 +227,9 @@ export function EventsTable({
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
 
-  if (error) {
-    return <ErrorCard error={error} reset={() => refetch()} />;
-  }
+  // if (error && !searchError) {
+  //   return <ErrorCard error={error} reset={() => refetch()} />;
+  // }
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
@@ -327,6 +330,7 @@ export function EventsTable({
                 placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
                 value={search}
                 preset="events"
+                searchError={searchError}
               />
             </div>
           </>
