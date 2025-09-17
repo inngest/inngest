@@ -73,11 +73,11 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const saveQuerySnapshot = useCallback(
     (snapshot: QuerySnapshot) => {
-      setQuerySnapshots(
-        withId(removeQuerySnapshotIfOverLimit(querySnapshots, 10), snapshot.id, snapshot)
+      setQuerySnapshots((current) =>
+        withId(removeQuerySnapshotIfOverLimit(current, 10), snapshot.id, snapshot)
       );
     },
-    [setQuerySnapshots, querySnapshots]
+    [setQuerySnapshots]
   );
 
   const queries = useMemo(() => {
