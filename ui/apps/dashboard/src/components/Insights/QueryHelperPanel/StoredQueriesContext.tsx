@@ -1,11 +1,12 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { useLocalStorage } from 'react-use';
+import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
-import { getOrderedQuerySnapshots } from '../queries';
+import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
+import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
 type ID = string;
 type QueryRecord<T> = Record<ID, T>;
@@ -14,10 +15,22 @@ interface StoredQueriesContextValue {
   addUnsavedQuery: (query: UnsavedQuery) => void;
   deleteQuery: (queryId: string) => void;
   deleteQuerySnapshot: (snapshotId: string) => void;
+  isSavedQueriesFetching: boolean;
   queries: QueryRecord<Query>;
-  querySnapshots: QueryRecord<QuerySnapshot>;
+  querySnapshots: {
+    data: QuerySnapshot[];
+    error: undefined;
+    isLoading: boolean;
+  };
   removeUnsavedQuery: (id: ID) => void;
+  savedQueries: {
+    data: undefined | Query[];
+    error: undefined | string;
+    isLoading: boolean;
+  };
+  savedQueriesError: undefined | string;
   saveQuery: (query: Query, onSuccess: () => void) => void;
+  updateQuery: (query: Query, onSuccess: () => void) => void;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
 }
 
@@ -31,10 +44,15 @@ interface StoredQueriesProviderProps {
 export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
   const [querySnapshots, setQuerySnapshots] = useState<QueryRecord<QuerySnapshot>>({});
 
-  const [savedQueries = {}, setSavedQueries] = useLocalStorage<QueryRecord<Query>>(
-    'insights-saved-queries',
-    {}
-  );
+  const {
+    savedQueries: beSavedQueries,
+    savedQueriesError,
+    isSavedQueriesFetching,
+    saveQuery: beSaveQuery,
+    updateQuery: beUpdateQuery,
+    deleteQuery: beDeleteQuery,
+    refetchSavedQueries,
+  } = useInsightsSavedQueries();
 
   const [unsavedQueries, setUnsavedQueries] = useState<QueryRecord<UnsavedQuery>>({});
 
@@ -48,20 +66,46 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   }, []);
 
   const saveQuery = useCallback(
-    (query: Query, onSuccess: () => void) => {
-      setSavedQueries(withId(savedQueries, query.id, { ...query, saved: true } as Query));
-      setUnsavedQueries((prev) => withoutId(prev, query.id));
-      onSuccess();
+    async (query: Query, onSuccess: () => void) => {
+      try {
+        await beSaveQuery({ name: query.name, query: query.query });
+        setUnsavedQueries((prev) => withoutId(prev, query.id));
+        onSuccess();
+        refetchSavedQueries();
+        toast.success('Query created');
+      } catch (e) {
+        toast.error('Failed to create query');
+      }
     },
-    [setSavedQueries, savedQueries]
+    [beSaveQuery, refetchSavedQueries]
   );
 
   const deleteQuery = useCallback(
-    (queryId: string) => {
-      setSavedQueries(withoutId(savedQueries, queryId));
-      tabManagerActions.breakQueryAssociation(queryId);
+    async (queryId: string) => {
+      try {
+        await beDeleteQuery({ id: queryId });
+        tabManagerActions.breakQueryAssociation(queryId);
+        refetchSavedQueries();
+        toast.success('Query deleted');
+      } catch (e) {
+        toast.error('Failed to delete query');
+      }
     },
-    [savedQueries, setSavedQueries, tabManagerActions]
+    [beDeleteQuery, tabManagerActions, refetchSavedQueries]
+  );
+
+  const updateQuery = useCallback(
+    async (query: Query, onSuccess: () => void) => {
+      try {
+        await beUpdateQuery({ id: query.id, name: query.name, query: query.query });
+        onSuccess();
+        refetchSavedQueries();
+        toast.success('Query updated');
+      } catch (e) {
+        toast.error('Failed to update query');
+      }
+    },
+    [beUpdateQuery, refetchSavedQueries]
   );
 
   const deleteQuerySnapshot = useCallback(
@@ -81,8 +125,28 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   );
 
   const queries = useMemo(() => {
-    return mergeRight(unsavedQueries, savedQueries);
-  }, [unsavedQueries, savedQueries]);
+    const beQueries: QueryRecord<Query> = Object.fromEntries(
+      (beSavedQueries ?? []).map((q) => [q.id, q])
+    );
+    return mergeRight(unsavedQueries, beQueries);
+  }, [unsavedQueries, beSavedQueries]);
+
+  const savedQueries = useMemo(() => {
+    return {
+      data: getOrderedSavedQueries(queries),
+      error: savedQueriesError ? savedQueriesError.message : undefined,
+      isLoading: isSavedQueriesFetching,
+    };
+  }, [queries, savedQueriesError, isSavedQueriesFetching]);
+
+  const orderedQuerySnapshots = useMemo(
+    () => ({
+      data: getOrderedQuerySnapshots(querySnapshots),
+      error: undefined,
+      isLoading: false,
+    }),
+    [querySnapshots]
+  );
 
   return (
     <StoredQueriesContext.Provider
@@ -90,11 +154,15 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         addUnsavedQuery,
         deleteQuery,
         deleteQuerySnapshot,
+        isSavedQueriesFetching,
         queries,
-        querySnapshots,
+        querySnapshots: orderedQuerySnapshots,
         removeUnsavedQuery,
+        savedQueries,
+        savedQueriesError: savedQueriesError?.message,
         saveQuery,
         saveQuerySnapshot,
+        updateQuery,
       }}
     >
       {children}

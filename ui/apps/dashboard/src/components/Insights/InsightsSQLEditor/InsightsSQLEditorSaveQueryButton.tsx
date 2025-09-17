@@ -3,7 +3,6 @@
 import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
-import { toast } from 'sonner';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
@@ -36,7 +35,6 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
         const newTab: Query = { id: tab.id, name, query, saved: true };
         saveQuery(newTab, () => {
           tabManagerActions.updateTab(tab.id, newTab);
-          toast.success(`Successfully ${tab.saved ? 'updated' : 'saved'} query`);
         });
       }}
       size="medium"
