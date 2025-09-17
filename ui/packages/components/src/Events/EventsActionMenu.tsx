@@ -25,9 +25,9 @@ export const EventsActionMenu = ({
     useBooleanSearchParam('includeInternal');
   const handleToggle = (include: boolean) => {
     if (include) {
-      remove();
+      setIncludeInternalEvents(true);
     } else {
-      setIncludeInternalEvents(false);
+      remove();
     }
   };
 
@@ -67,7 +67,7 @@ export const EventsActionMenu = ({
             <div className="text-basis text-sm">Show internal events</div>
             <Switch
               id="show-internal-events"
-              checked={includeInternalEvents ?? true}
+              checked={includeInternalEvents ?? false}
               onCheckedChange={handleToggle}
               onClick={(e) => {
                 e.stopPropagation();

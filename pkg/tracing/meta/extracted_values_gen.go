@@ -26,6 +26,7 @@ type ExtractedValues struct {
 	DropSpan *bool
 	EnvID *uuid.UUID
 	EventIDs *[]string
+	EventsInput *string
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID

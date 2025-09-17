@@ -341,10 +341,11 @@ INSERT INTO spans (
   attributes,
   links,
   output,
+  input,
   debug_run_id,
   debug_session_id,
   status
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetSpansByRunID :many
 SELECT
@@ -407,7 +408,7 @@ ORDER BY start_time;
 
 -- name: GetSpanOutput :one
 SELECT
-  -- input, TODO
+  input,
   output
 FROM spans
 WHERE span_id = ?

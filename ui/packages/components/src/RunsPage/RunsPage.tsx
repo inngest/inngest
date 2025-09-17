@@ -54,7 +54,6 @@ type Props = {
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
-  onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
   pollInterval?: number;
   apps?: Option[];
@@ -63,6 +62,7 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   searchError?: Error;
+  infiniteScrollTrigger?: React.ReactNode;
 };
 
 export function RunsPage({
@@ -74,7 +74,6 @@ export function RunsPage({
   isLoadingInitial,
   isLoadingMore,
   onRefresh,
-  onScroll,
   onScrollToTop,
   apps,
   functions,
@@ -83,6 +82,7 @@ export function RunsPage({
   scope,
   totalCount,
   searchError,
+  infiniteScrollTrigger,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -264,7 +264,7 @@ export function RunsPage({
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
   return (
-    <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <main className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
@@ -371,11 +371,7 @@ export function RunsPage({
         )}
       </div>
 
-      <div
-        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
-        onScroll={onScroll}
-        ref={containerRef}
-      >
+      <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
@@ -384,6 +380,7 @@ export function RunsPage({
           visibleColumns={columnVisibility}
           scope={scope}
         />
+        {infiniteScrollTrigger}
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
