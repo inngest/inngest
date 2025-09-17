@@ -199,11 +199,7 @@ export default function FunctionList() {
           <Info
             text="List of all function in the development environment."
             action={
-              <Link
-                arrowOnHover
-                className="text-sm"
-                href={'https://www.inngest.com/docs/functions'}
-              >
+              <Link className="text-sm" href={'https://www.inngest.com/docs/functions'}>
                 Learn how to create a function
               </Link>
             }
