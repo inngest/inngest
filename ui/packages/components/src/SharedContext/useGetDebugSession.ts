@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import type { Trace } from '../RunDetailsV3/types';
 import { useShared } from './SharedContext';
-import type { RunTraceSpan } from './useGetDebugRun';
 
 export type GetDebugSessionPayload = {
   functionSlug: string;
@@ -11,11 +11,11 @@ export type GetDebugSessionPayload = {
 };
 
 export type DebugSessionRun = {
-  status: RunTraceSpan['status'];
-  queuedAt: RunTraceSpan['queuedAt'];
-  startedAt: RunTraceSpan['startedAt'];
-  endedAt: RunTraceSpan['endedAt'];
-  debugRunID: RunTraceSpan['debugRunID'];
+  status: Trace['status'];
+  queuedAt: Trace['queuedAt'];
+  startedAt: Trace['startedAt'];
+  endedAt: Trace['endedAt'];
+  debugRunID: Trace['debugRunID'];
   tags: [string];
   versions: [string];
 };

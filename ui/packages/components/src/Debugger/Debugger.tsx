@@ -33,13 +33,9 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
 
   const { rerun } = useRerun();
 
-  const { data: debugRunData } = useGetDebugRun({
+  const { data: debugRunData, loading } = useGetDebugRun({
     functionSlug,
     debugRunID,
-    runID,
-  });
-
-  const { data: runData, loading: runLoading } = useGetRun({
     runID,
   });
 
@@ -107,8 +103,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           <div className="flex flex-row items-center gap-x-2 text-sm">
             <RiGitForkLine className="text-muted h-6 w-6" />
             <div>Forked from:</div>
-            {runData?.trace?.status && (
-              <StatusDot status={runData?.trace?.status} className="h-3 w-3" />
+            {debugRunData?.originalRun?.status && (
+              <StatusDot status={debugRunData.originalRun.status} className="h-3 w-3" />
             )}
             <div>{runID && <Link href={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
           </div>
@@ -160,12 +156,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               </div>
             </div>
             <div>
-              {runLoading ? (
+              {loading ? (
                 <Skeleton className="h-24 w-full" />
               ) : debugRunData?.debugRun ? (
                 <DebugRun debugRun={debugRunData?.debugRun} />
-              ) : runID && runData ? (
-                <Timeline runID={runID} trace={runData?.trace} />
+              ) : runID && debugRunData?.originalRun ? (
+                <Timeline runID={runID} trace={debugRunData.originalRun} />
               ) : null}
             </div>
           </div>
