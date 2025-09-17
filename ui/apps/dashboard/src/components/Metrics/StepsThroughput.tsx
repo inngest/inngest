@@ -24,7 +24,6 @@ export const StepsThroughput = ({
             text="Total number of steps processed your env, app or function."
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#total-steps-throughput"
                 target="_new"
