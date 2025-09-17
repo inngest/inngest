@@ -9,7 +9,7 @@ import type {
   RemoveInsightsQueryMutation,
   UpdateInsightsQueryMutation,
 } from '@/gql/graphql';
-import { toLocalQuery } from '../query';
+import { toLocalQuery } from '../queries';
 import type { Query as LocalQuery } from '../types';
 
 const createInsightsQueryDocument = graphql(`

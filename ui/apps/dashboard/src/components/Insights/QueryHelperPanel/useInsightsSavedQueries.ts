@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, type CombinedError } from 'urql';
 
 import { graphql } from '@/gql';
-import { toLocalQueryArray } from '../query';
+import { toLocalQueryArray } from '../queries';
 import type { Query as InsightsQueryLocal } from '../types';
 import {
   useModifySavedQueries,

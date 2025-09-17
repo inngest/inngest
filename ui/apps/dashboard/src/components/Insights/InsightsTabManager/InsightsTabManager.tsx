@@ -50,13 +50,10 @@ export function useInsightsTabManager(
     () => ({
       breakQueryAssociation: (id: string) => {
         const isOpen = activeTabId === id;
-        const replacementId = ulid();
-
         setTabs((prevTabs) =>
-          prevTabs.map((tab) => (tab.id === id ? { ...tab, id: replacementId, saved: false } : tab))
+          prevTabs.map((tab) => (tab.id === id ? { ...tab, savedQueryId: undefined } : tab))
         );
-
-        if (isOpen) setActiveTabId(replacementId);
+        if (isOpen) setActiveTabId(id);
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
@@ -82,16 +79,17 @@ export function useInsightsTabManager(
           return;
         }
 
-        const tabWithSameSavedQueryId = findTabWithId(query.id, tabs);
+        const tabWithSameSavedQueryId = tabs.find((tab) => tab.savedQueryId === query.id);
         if (tabWithSameSavedQueryId !== undefined) {
           setActiveTabId(tabWithSameSavedQueryId.id);
           return;
         }
 
         createTabBase({
-          ...query,
-          id: query.saved ? query.id : ulid(),
-          name: query.saved ? query.name : UNTITLED_QUERY,
+          id: ulid(),
+          name: query.name,
+          query: query.query,
+          savedQueryId: query.id,
         });
       },
       focusTab: setActiveTabId,
@@ -201,12 +199,12 @@ function findTabWithId(id: string, tabs: Query[]): undefined | Query {
 }
 
 export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Query): boolean {
-  const savedQuery = savedQueries[tab.id];
+  const savedQuery = tab.savedQueryId ? savedQueries[tab.savedQueryId] : undefined;
   if (savedQuery === undefined) return false;
 
   return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
 }
 
 function makeEmptyUnsavedQuery(): Query {
-  return { id: ulid(), name: UNTITLED_QUERY, query: '', saved: false };
+  return { id: ulid(), name: UNTITLED_QUERY, query: '' };
 }
