@@ -227,9 +227,9 @@ export function EventsTable({
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
 
-  // if (error && !searchError) {
-  //   return <ErrorCard error={error} reset={() => refetch()} />;
-  // }
+  if (error && !searchError) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
