@@ -14,7 +14,10 @@ export const parseCelSearchError = (error: Error | null | undefined) => {
     (error.message.includes('expression_invalid') ||
       error.message.includes('invalid CEL expression'))
   ) {
-    return error;
+    // Match urql behavior
+    return {
+      message: error.message.replace(/\[GraphQL\]\s*/g, '').split(' [GraphQL]')[0],
+    };
   }
 
   return undefined;
