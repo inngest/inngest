@@ -242,5 +242,9 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 }
 
 func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
-	return tracing.DriverResponseAttrs(&f.Response, f.Optional.OutputSpanRef)
+	// We're explicitly not setting any output span reference here and passing
+	// `nil` instead. We do this because we need to be setting the function
+	// output twice - once for the execution itself and once for the run span -
+	// in order to appropriately filter this in Cloud and other data stores.
+	return tracing.DriverResponseAttrs(&f.Response, nil)
 }
