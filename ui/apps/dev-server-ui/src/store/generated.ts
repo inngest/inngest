@@ -1640,7 +1640,7 @@ export const CountWorkerConnectionsDocument = `
 }
     `;
 export const GetEventsV2Document = `
-    query GetEventsV2($cursor: String, $startTime: Time!, $endTime: Time, $celQuery: String = null, $eventNames: [String!] = null, $includeInternalEvents: Boolean = true) {
+    query GetEventsV2($cursor: String, $startTime: Time!, $endTime: Time, $celQuery: String = null, $eventNames: [String!] = null, $includeInternalEvents: Boolean = false) {
   eventsV2(
     first: 50
     after: $cursor

@@ -1022,18 +1022,23 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 
 const getSpanOutput = `-- name: GetSpanOutput :one
 SELECT
-  -- input, TODO
+  input,
   output
 FROM spans
 WHERE span_id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (pqtype.NullRawMessage, error) {
+type GetSpanOutputRow struct {
+	Input  pqtype.NullRawMessage
+	Output pqtype.NullRawMessage
+}
+
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (*GetSpanOutputRow, error) {
 	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
-	var output pqtype.NullRawMessage
-	err := row.Scan(&output)
-	return output, err
+	var i GetSpanOutputRow
+	err := row.Scan(&i.Input, &i.Output)
+	return &i, err
 }
 
 const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
@@ -1729,10 +1734,11 @@ INSERT INTO spans (
   attributes,
   links,
   output,
+  input,
   debug_run_id,
   debug_session_id,
   status
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 `
 
 type InsertSpanParams struct {
@@ -1751,6 +1757,7 @@ type InsertSpanParams struct {
 	Attributes     pqtype.NullRawMessage
 	Links          pqtype.NullRawMessage
 	Output         pqtype.NullRawMessage
+	Input          pqtype.NullRawMessage
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString
@@ -1774,6 +1781,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Attributes,
 		arg.Links,
 		arg.Output,
+		arg.Input,
 		arg.DebugRunID,
 		arg.DebugSessionID,
 		arg.Status,

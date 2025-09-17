@@ -27,9 +27,11 @@ func (m MultipleTriggers) Triggers() []Trigger {
 func (m MultipleTriggers) Validate(ctx context.Context) error {
 	var err error
 
-	if len(m) < 1 {
-		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
-	} else if len(m) > consts.MaxTriggers {
+	if len(m) == 0 {
+		return nil
+	}
+
+	if len(m) > consts.MaxTriggers {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of triggers: %d", consts.MaxTriggers))
 	}
 

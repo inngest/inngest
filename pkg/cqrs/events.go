@@ -61,6 +61,10 @@ func (e Event) GetInternalID() ulid.ULID {
 	return e.InternalID()
 }
 
+func (e Event) GetAccountID() uuid.UUID {
+	return e.AccountID
+}
+
 func (e Event) GetWorkspaceID() uuid.UUID {
 	return e.WorkspaceID
 }

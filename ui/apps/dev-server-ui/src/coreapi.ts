@@ -505,7 +505,7 @@ export const GET_EVENTS = gql`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
-    $includeInternalEvents: Boolean = true
+    $includeInternalEvents: Boolean = false
   ) {
     eventsV2(
       first: 50

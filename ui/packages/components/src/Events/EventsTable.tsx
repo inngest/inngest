@@ -140,7 +140,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
-        includeInternalEvents: includeInternalEvents ?? true,
+        includeInternalEvents: includeInternalEvents ?? false,
       },
     ],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -229,7 +229,7 @@ export function EventsTable({
   }
 
   return (
-    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+    <div className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
         <div className="mx-3 flex h-11 items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5">
@@ -333,7 +333,7 @@ export function EventsTable({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" ref={containerRef}>
+      <div className="flex-1 overflow-y-auto" ref={containerRef}>
         <Table
           columns={columns}
           data={eventsData?.events || []}

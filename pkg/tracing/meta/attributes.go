@@ -25,6 +25,7 @@ var Attrs = struct {
 	DropSpan        attr[*bool]
 	EnvID           attr[*uuid.UUID]
 	EventIDs        attr[*[]string]
+	EventsInput     attr[*string]
 	FunctionID      attr[*uuid.UUID]
 	FunctionVersion attr[*int]
 	RunID           attr[*ulid.ULID]
@@ -125,6 +126,7 @@ var Attrs = struct {
 	EndedAt:                            TimeAttr("ended_at"),
 	EnvID:                              UUIDAttr("env.id"),
 	EventIDs:                           StringSliceAttr("event.ids"),
+	EventsInput:                        StringAttr("events.input"),
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
