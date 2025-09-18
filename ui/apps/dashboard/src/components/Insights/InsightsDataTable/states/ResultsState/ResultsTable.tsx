@@ -17,7 +17,7 @@ type InsightsTableProps = {
   data: InsightsEntry[];
 };
 
-function InsightsTable({ columns, data, cellClassName }: InsightsTableProps) {
+function InsightsTable({ cellClassName, columns, data }: InsightsTableProps) {
   return <Table<InsightsEntry> cellClassName={cellClassName} columns={columns} data={data} />;
 }
 
@@ -25,7 +25,6 @@ const MemoizedInsightsTable = memo(InsightsTable);
 
 export function ResultsTable() {
   const { data } = useInsightsStateMachineContext();
-
   const { columns } = useColumns(data);
 
   if (!assertData(data)) return null;
@@ -34,9 +33,9 @@ export function ResultsTable() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex-1 overflow-auto" id="insights-table-container">
         <MemoizedInsightsTable
+          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border align-top px-4 py-2.5 group focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-inset outline-none"
           columns={columns}
           data={data.rows}
-          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
         />
       </div>
       <ResultsTableFooter />
