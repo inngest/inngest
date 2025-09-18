@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { RiPlayLine } from '@remixicon/react';
+import { ulid } from 'ulid';
 
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useRerun } from '../SharedContext/useRerun';
@@ -27,6 +27,7 @@ export const Play = ({
         runID,
         fromStep: {
           stepID: selectedStep.trace.stepID,
+          // TODO: get input from step
           input: '[{}]',
         },
         debugRunID,
@@ -35,7 +36,7 @@ export const Play = ({
     } else if (runID) {
       const result = await rerun({
         runID,
-        debugRunID,
+        debugRunID: ulid(),
         debugSessionID,
       });
     }

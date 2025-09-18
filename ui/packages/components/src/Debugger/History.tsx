@@ -1,14 +1,12 @@
+import { useRouter } from 'next/navigation';
 import { RiLightbulbLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { Button } from '../Button';
 import { ErrorCard } from '../Error/ErrorCard';
 import { Pill } from '../Pill';
-import {
-  useGetDebugSession,
-  type DebugSessionResult,
-  type DebugSessionRun,
-} from '../SharedContext/useGetDebugSession';
+import { useGetDebugSession, type DebugSessionRun } from '../SharedContext/useGetDebugSession';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusTextClass } from '../Status/statusClasses';
@@ -142,13 +140,16 @@ type HistoryProps = {
   runID?: string;
 };
 
-type HistoryTable = DebugSessionRun;
+type HistoryTable = DebugSessionRun | null;
 
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
+  const { pathCreator } = usePathCreator();
+  const router = useRouter();
   const { data, loading, error } = useGetDebugSession({
     functionSlug,
     debugSessionID,
     runID,
+    refetchInterval: 1000,
   });
 
   if (loading) {
@@ -164,6 +165,17 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
   if (error || !data) {
     return <ErrorCard error={error || new Error('No data found')} />;
   }
+
+  const load = (debugRunID: string) => {
+    const debuggerPath = pathCreator.debugger({
+      functionSlug,
+      runID,
+      debugRunID,
+      debugSessionID,
+    });
+
+    router.push(debuggerPath);
+  };
 
   const columnHelper = createColumnHelper<HistoryTable>();
 
@@ -248,17 +260,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
 
   return (
     <div className="flex w-full flex-col justify-start gap-2 ">
-      <Table noHeader={true} data={data.debugRuns} columns={columns} />
-      {/* {data.map(
-        (run, i) =>
-          run && (
-            <StepHistory
-              debugRun={run}
-              defaultOpen={i === data.length - 1}
-              key={`step-history-${run.spanID}`}
-            />
-          )
-      )} */}
+      <Table noHeader={true} data={data.debugRuns ?? []} columns={columns} />
     </div>
   );
 };
