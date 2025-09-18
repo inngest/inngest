@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 // Temporary mock schemas. Replace with real API call later.
@@ -118,7 +118,7 @@ const mockSchemas: Record<string, unknown> = {
   },
 };
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ error: 'Please sign in to view schemas' }, { status: 401 });

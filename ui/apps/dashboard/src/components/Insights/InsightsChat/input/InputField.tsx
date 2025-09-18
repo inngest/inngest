@@ -9,9 +9,7 @@ import {
   type HTMLAttributes,
   type KeyboardEventHandler,
 } from 'react';
-import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiCloseLine, RiSendPlane2Line, RiStopFill } from '@remixicon/react';
 
 import SendButton from './SendButton';
 
@@ -76,20 +74,14 @@ export const ResponsivePromptInput = ({
   onSubmit,
   placeholder = 'Ask insights agent to query...',
   disabled = false,
-  status,
   className,
-  onPlusClick,
-  onMicClick,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   placeholder?: string;
   disabled?: boolean;
-  status?: ChatStatus;
   className?: string;
-  onPlusClick?: () => void;
-  onMicClick?: () => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -142,16 +134,6 @@ export const ResponsivePromptInput = ({
       }, 0);
     }
   }, [isExpanded]);
-
-  const SubmitIcon = () => {
-    if (status === 'submitted')
-      return (
-        <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-      );
-    if (status === 'streaming') return <RiStopFill className="size-4" />;
-    if (status === 'error') return <RiCloseLine className="size-4" />;
-    return <RiSendPlane2Line className="size-4" />;
-  };
 
   if (isExpanded) {
     return (

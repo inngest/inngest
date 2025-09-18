@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, type ComponentProps, type RefObject } from 'react';
+import { type ComponentProps } from 'react';
 import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownLine } from '@remixicon/react';

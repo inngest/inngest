@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 // Temporary mock event types. Replace with real API call later.
@@ -21,7 +21,7 @@ const mockEventTypes: string[] = [
   'error.logged',
 ];
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ error: 'Please sign in to view events' }, { status: 401 });

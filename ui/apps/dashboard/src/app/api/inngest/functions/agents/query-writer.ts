@@ -50,8 +50,11 @@ const generateSqlTool = createTool({
     })
     .strict() as any,
   handler: ({ sql: rawSql, title, reasoning }: GenerateSqlInput, ctx: any): GenerateSqlResult => {
-    const network = (ctx?.network as Network<InsightsState>) || undefined;
-    const raw = typeof rawSql === 'string' ? (rawSql as string) : '';
+    const network = ctx?.network as Network<InsightsState> | undefined;
+    if (!network) {
+      throw new Error('Agent network context is required');
+    }
+    const raw = String(rawSql);
     const sql = sanitizeSql(raw);
     network.state.data.sql = sql;
 
@@ -68,7 +71,7 @@ export const queryWriterAgent = createAgent<InsightsState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }): Promise<string> => {
-    const selected = Array.isArray(network?.state?.data?.selectedEvents)
+    const selected = Array.isArray(network?.state.data.selectedEvents)
       ? (network!.state.data.selectedEvents as string[])
       : [];
     return [

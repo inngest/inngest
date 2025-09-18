@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAgents,
   type AgentStatus,
   type RealtimeEvent,
   type TextUIPart,
-  type ToolCallUIPart,
 } from '@inngest/use-agents';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
@@ -71,14 +70,13 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
   const onEvent = useCallback(
     (evt: RealtimeEvent) => {
       try {
-        const data = (evt?.data || {}) as Record<string, unknown>;
-        const evtThreadId =
-          typeof data['threadId'] === 'string' ? (data['threadId'] as string) : undefined;
+        const data = ((evt as any).data || {}) as Record<string, unknown>;
+        const evtThreadId = typeof data['threadId'] === 'string' ? data['threadId'] : undefined;
         if (evtThreadId && evtThreadId !== threadId) return; // ignore other threads
 
         switch (evt.event) {
           case 'run.started': {
-            const scope = typeof data['scope'] === 'string' ? (data['scope'] as string) : undefined;
+            const scope = typeof data['scope'] === 'string' ? data['scope'] : undefined;
             if (scope === 'network') {
               setNetworkActive(true);
               setTextCompleted(false);
@@ -92,13 +90,12 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             break;
           }
           case 'part.created': {
-            const type = typeof data['type'] === 'string' ? (data['type'] as string) : undefined;
+            const type = typeof data['type'] === 'string' ? data['type'] : undefined;
             const tn =
               typeof (data as { metadata?: { toolName?: string } }).metadata?.toolName === 'string'
-                ? ((data as { metadata?: { toolName?: string } }).metadata!.toolName as string)
+                ? (data as { metadata?: { toolName?: string } }).metadata!.toolName
                 : undefined;
-            const partId =
-              typeof data['partId'] === 'string' ? (data['partId'] as string) : undefined;
+            const partId = typeof data['partId'] === 'string' ? data['partId'] : undefined;
             if (type === 'tool-call') setCurrentToolName(tn || null);
             if ((type === 'tool-output' || type === 'tool-call') && partId && tn) {
               partIdToToolNameRef.current.set(partId, tn);
@@ -106,9 +103,8 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             break;
           }
           case 'part.completed': {
-            const type = typeof data['type'] === 'string' ? (data['type'] as string) : undefined;
-            const partId =
-              typeof data['partId'] === 'string' ? (data['partId'] as string) : undefined;
+            const type = typeof data['type'] === 'string' ? data['type'] : undefined;
+            const partId = typeof data['partId'] === 'string' ? data['partId'] : undefined;
             if (type === 'text') {
               setTextStreaming(false);
               setTextCompleted(true);
@@ -155,7 +151,7 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             break;
           }
           case 'stream.ended': {
-            const scope = typeof data['scope'] === 'string' ? (data['scope'] as string) : undefined;
+            const scope = typeof data['scope'] === 'string' ? data['scope'] : undefined;
             if (scope === 'network') {
               setNetworkActive(false);
               setTextStreaming(false);
@@ -169,7 +165,7 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
         }
       } catch {}
     },
-    [threadId]
+    [threadId, onSqlChange, runQuery]
   );
 
   const {
@@ -257,14 +253,11 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
                       if (p.type === 'text') {
                         return <AssistantMessage key={i} part={p} />;
                       }
-                      if (
-                        p.type === 'tool-call' &&
-                        (p as ToolCallUIPart).toolName === 'generate_sql'
-                      ) {
+                      if (p.type === 'tool-call' && (p as any).toolName === 'generate_sql') {
                         return (
                           <ToolMessage
                             key={i}
-                            part={p as ToolCallUIPart}
+                            part={p as any}
                             onSqlChange={onSqlChange}
                             runQuery={runQuery}
                           />
@@ -294,15 +287,6 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             value={inputValue}
             onChange={setInputValue}
             onSubmit={handleSubmit}
-            status={
-              status === 'submitted'
-                ? 'submitted'
-                : status === 'streaming'
-                ? 'streaming'
-                : status === 'error'
-                ? 'error'
-                : 'idle'
-            }
             disabled={status !== 'ready'}
           />
         </div>
