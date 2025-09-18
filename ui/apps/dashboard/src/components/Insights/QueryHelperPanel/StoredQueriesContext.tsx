@@ -69,7 +69,6 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
       if (tab.savedQueryId !== undefined) {
         try {
           await beUpdateQuery({ id: tab.savedQueryId, name: tab.name, query: tab.query });
-          refetchSavedQueries();
           toast.success('Successfully updated query');
         } catch (e) {
           toast.error('Failed to update query');
@@ -78,7 +77,6 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         try {
           const saved = await beSaveQuery({ name: tab.name, query: tab.query });
           tabManagerActions.updateTab(tab.id, { savedQueryId: saved.id });
-          refetchSavedQueries();
           setUnsavedQueries((prev) => withoutId(prev, tab.id));
           toast.success('Successfully saved query');
         } catch (e) {
@@ -86,7 +84,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions]
+    [beSaveQuery, beUpdateQuery, tabManagerActions]
   );
 
   const deleteQuery = useCallback(
@@ -100,7 +98,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         toast.error('Failed to delete query');
       }
     },
-    [beDeleteQuery, tabManagerActions, refetchSavedQueries]
+    [beDeleteQuery, refetchSavedQueries, tabManagerActions]
   );
 
   const deleteQuerySnapshot = useCallback(
