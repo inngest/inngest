@@ -1,12 +1,13 @@
 import { Trace } from '../RunDetailsV3/Trace';
-import type { RunTraceSpan } from '../SharedContext/useGetDebugRun';
+import type { Trace as TraceType } from '../RunDetailsV3/types';
 import { toMaybeDate } from '../utils/date';
 
 type Props = {
-  debugRun: RunTraceSpan;
+  runID: string;
+  debugRun: TraceType;
 };
 
-export const DebugRun = ({ debugRun }: Props) => {
+export const DebugRun = ({ debugRun, runID }: Props) => {
   const minTime = new Date(debugRun.queuedAt);
   const maxTime = toMaybeDate(debugRun.endedAt) ?? new Date();
 
@@ -16,7 +17,7 @@ export const DebugRun = ({ debugRun }: Props) => {
         depth={0}
         maxTime={maxTime}
         minTime={minTime}
-        runID={debugRun.runID}
+        runID={runID}
         trace={{ ...(debugRun as any), name: 'Debug Run' }}
       />
     </div>
