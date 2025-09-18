@@ -6,7 +6,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import { hasDiffWithSavedQuery } from '../InsightsTabManager/InsightsTabManager';
+import { getDisableSaveOrUpdate, getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
 import type { Tab } from '../types';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
@@ -17,8 +17,8 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const [isSaving, setIsSaving] = useState(false);
   const { queries, saveQuery } = useStoredQueries();
 
-  const isSaved = tab.savedQueryId !== undefined;
-  const disabled = tab.name === '' || (isSaved && !hasDiffWithSavedQuery(queries, tab));
+  const isSaved = getIsSavedQuery(tab);
+  const disabled = getDisableSaveOrUpdate(queries, tab);
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
   return (
@@ -29,7 +29,7 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       icon={<Icon className={cn(disabled ? 'text-disabled' : 'text-muted')} size={16} />}
       iconSide="left"
       kind="secondary"
-      label="Save query"
+      label={`${isSaved ? 'Update' : 'Save'} query`}
       loading={isSaving}
       onClick={() => {
         setIsSaving(true);
