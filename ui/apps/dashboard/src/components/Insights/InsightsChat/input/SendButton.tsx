@@ -3,19 +3,17 @@ import { RiArrowUpLine } from '@remixicon/react';
 
 type SendButtonProps = {
   onClick: (e: React.FormEvent) => void;
-  className?: string;
   disabled?: boolean;
 };
 
-const SendButton = ({ onClick, className, disabled }: SendButtonProps) => {
+const SendButton = ({ onClick, disabled }: SendButtonProps) => {
   return (
     <Button
       kind="secondary"
-      appearance="outlined"
       size="small"
-      icon={<RiArrowUpLine />}
+      icon={<RiArrowUpLine className="text-white" />}
       onClick={onClick}
-      className={className}
+      className={`${disabled ? 'cursor-not-allowed bg-[#9ADAB3] opacity-50' : ''} bg-[#007A48]`}
       disabled={disabled}
     />
   );
