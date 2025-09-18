@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/event_trigger_patterns"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/executor"
@@ -502,6 +503,8 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
 
+	matchingPatterns := event_trigger_patterns.GenerateMatchingPatterns(evt.Name)
+
 	for _, fn := range fns {
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
@@ -523,6 +526,11 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 			for _, t := range copied.Triggers {
 				if t.EventTrigger == nil {
+					continue
+				}
+
+				// Only process triggers that match the current event
+				if !t.EventTrigger.MatchesAnyPattern(matchingPatterns) {
 					continue
 				}
 
