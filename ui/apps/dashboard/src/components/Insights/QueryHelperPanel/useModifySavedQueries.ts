@@ -1,16 +1,15 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useMutation } from 'urql';
+import { useMutation, type CombinedError } from 'urql';
 
 import { graphql } from '@/gql';
 import type {
   CreateInsightsQueryMutation,
+  InsightsQuery,
   RemoveInsightsQueryMutation,
   UpdateInsightsQueryMutation,
 } from '@/gql/graphql';
-import { toLocalQuery } from '../queries';
-import type { Query as LocalQuery } from '../types';
 
 const createInsightsQueryDocument = graphql(`
   mutation CreateInsightsQuery($input: NewInsightsQuery!) {
@@ -50,8 +49,8 @@ export type UpdateQueryArgs = { id: string; name: string; query: string };
 
 type UseModifySavedQueriesReturn = {
   deleteQuery: (args: DeleteQueryArgs) => Promise<string[]>;
-  saveQuery: (args: SaveQueryArgs) => Promise<LocalQuery>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<LocalQuery>;
+  saveQuery: (args: SaveQueryArgs) => Promise<InsightsQuery>;
+  updateQuery: (args: UpdateQueryArgs) => Promise<InsightsQuery>;
 };
 
 export function useModifySavedQueries(): UseModifySavedQueriesReturn {
@@ -59,45 +58,45 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   const [, runRemove] = useMutation(removeInsightsQueryDocument);
   const [, runUpdate] = useMutation(updateInsightsQueryDocument);
 
-  const exec = useCallback(
-    async <T>(fn: () => Promise<{ data?: T; error?: unknown }>): Promise<T> => {
+  const executeMutation = useCallback(
+    async <T>(fn: () => Promise<{ data?: T; error?: CombinedError }>): Promise<T> => {
       const res = await fn();
-      if ((res as any).error) throw (res as any).error;
-      if (!res.data) throw new Error('No data');
+      if (res.error) throw res.error;
+      if (res.data === undefined) throw new Error('No data');
       return res.data as T;
     },
     []
   );
 
-  const saveQuery = useCallback<(args: SaveQueryArgs) => Promise<LocalQuery>>(
-    async ({ name, query }) => {
-      const data = await exec<CreateInsightsQueryMutation>(() =>
-        runCreate({ input: { name, sql: query } })
-      );
-      return toLocalQuery(data.createInsightsQuery);
-    },
-    [exec, runCreate]
-  );
-
-  const updateQuery = useCallback<(args: UpdateQueryArgs) => Promise<LocalQuery>>(
-    async ({ id, name, query }) => {
-      const data = await exec<UpdateInsightsQueryMutation>(() =>
-        runUpdate({ id, input: { name, sql: query } })
-      );
-      return toLocalQuery(data.updateInsightsQuery);
-    },
-    [exec, runUpdate]
-  );
-
   const deleteQuery = useCallback<(args: DeleteQueryArgs) => Promise<string[]>>(
     async ({ id }) => {
-      const data = await exec<RemoveInsightsQueryMutation>(() => runRemove({ id }));
+      const data = await executeMutation<RemoveInsightsQueryMutation>(() => runRemove({ id }));
       const ids = data.removeInsightsQuery?.ids;
       if (!ids) throw new Error('No data');
       return ids;
     },
-    [exec, runRemove]
+    [executeMutation, runRemove]
   );
 
-  return { saveQuery, updateQuery, deleteQuery };
+  const saveQuery = useCallback<(args: SaveQueryArgs) => Promise<InsightsQuery>>(
+    async ({ name, query }) => {
+      const data = await executeMutation<CreateInsightsQueryMutation>(() =>
+        runCreate({ input: { name, sql: query } })
+      );
+      return data.createInsightsQuery;
+    },
+    [executeMutation, runCreate]
+  );
+
+  const updateQuery = useCallback<(args: UpdateQueryArgs) => Promise<InsightsQuery>>(
+    async ({ id, name, query }) => {
+      const data = await executeMutation<UpdateInsightsQueryMutation>(() =>
+        runUpdate({ id, input: { name, sql: query } })
+      );
+      return data.updateInsightsQuery;
+    },
+    [executeMutation, runUpdate]
+  );
+
+  return { deleteQuery, saveQuery, updateQuery };
 }

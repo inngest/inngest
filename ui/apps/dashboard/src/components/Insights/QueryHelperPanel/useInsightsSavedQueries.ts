@@ -4,8 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, type CombinedError } from 'urql';
 
 import { graphql } from '@/gql';
-import { toLocalQueryArray } from '../queries';
-import type { Query as InsightsQueryLocal } from '../types';
+import type { InsightsQuery } from '@/gql/graphql';
 import {
   useModifySavedQueries,
   type DeleteQueryArgs,
@@ -31,10 +30,10 @@ export interface UseInsightsSavedQueriesReturn {
   deleteQuery: (args: DeleteQueryArgs) => Promise<string[]>;
   isSavedQueriesFetching: boolean;
   refetchSavedQueries: () => void;
-  savedQueries: undefined | InsightsQueryLocal[];
+  savedQueries: undefined | InsightsQuery[];
   savedQueriesError: undefined | CombinedError;
-  saveQuery: (args: SaveQueryArgs) => Promise<InsightsQueryLocal>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<InsightsQueryLocal>;
+  saveQuery: (args: SaveQueryArgs) => Promise<InsightsQuery>;
+  updateQuery: (args: UpdateQueryArgs) => Promise<InsightsQuery>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
@@ -45,10 +44,7 @@ export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
     reexecute({ requestPolicy: 'network-only' });
   }, [reexecute]);
 
-  const savedQueries = useMemo(
-    () => toLocalQueryArray(result.data?.account.insightsQueries),
-    [result.data]
-  );
+  const savedQueries = useMemo(() => result.data?.account.insightsQueries, [result.data]);
 
   return {
     deleteQuery,

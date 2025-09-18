@@ -4,7 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Query, QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
+import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
+import type { InsightsQuery } from '@/gql/graphql';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -14,10 +15,10 @@ export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
-  createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => void;
+  createTabFromQuery: (query: InsightsQuery | QuerySnapshot | QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
-  updateTab: (id: string, patch: Partial<Omit<Query, 'id'>>) => void;
+  updateTab: (id: string, patch: Partial<Omit<Tab, 'id'>>) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -68,7 +69,7 @@ export function useInsightsTabManager(
       createNewTab: () => {
         createTabBase(makeEmptyUnsavedTab());
       },
-      createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => {
+      createTabFromQuery: (query: InsightsQuery | QuerySnapshot | QueryTemplate) => {
         if (isQueryTemplate(query)) {
           createTabBase({ ...makeEmptyUnsavedTab(), query: query.query, name: query.name });
           return;
@@ -85,7 +86,7 @@ export function useInsightsTabManager(
           return;
         }
 
-        createTabBase({ id: ulid(), name: query.name, query: query.query, savedQueryId: query.id });
+        createTabBase({ id: ulid(), name: query.name, query: query.sql, savedQueryId: query.id });
       },
       focusTab: setActiveTabId,
       openTemplatesTab: () => {
@@ -193,11 +194,14 @@ function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
   return tabs.find((tab) => tab.id === id);
 }
 
-export function hasDiffWithSavedQuery(savedQueries: Query[] | undefined, tab: Tab): boolean {
+export function hasDiffWithSavedQuery(
+  savedQueries: InsightsQuery[] | undefined,
+  tab: Tab
+): boolean {
   if (tab.savedQueryId === undefined || savedQueries === undefined) return false;
   const savedQuery = savedQueries.find((q) => q.id === tab.savedQueryId);
   if (!savedQuery) return false;
-  return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
+  return savedQuery.name !== tab.name || savedQuery.sql !== tab.query;
 }
 
 /**
@@ -224,7 +228,10 @@ export function getIsSavedQuery(tab: Tab): boolean {
  *   period where the UI would show "Update" but allow clicking while data is
  *   still syncing.
  */
-export function getDisableSaveOrUpdate(savedQueries: Query[] | undefined, tab: Tab): boolean {
+export function getDisableSaveOrUpdate(
+  savedQueries: InsightsQuery[] | undefined,
+  tab: Tab
+): boolean {
   const isSavedQuery = getIsSavedQuery(tab);
   return tab.name === '' || (isSavedQuery && !hasDiffWithSavedQuery(savedQueries, tab));
 }

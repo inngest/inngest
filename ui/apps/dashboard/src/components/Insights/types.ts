@@ -5,14 +5,6 @@ export interface QuerySnapshot {
   query: string;
 }
 
-export interface Query extends Omit<QuerySnapshot, 'createdAt'> {
-  savedQueryId: string | undefined;
-}
-
-export interface UnsavedQuery extends Query {
-  savedQueryId: undefined;
-}
-
 export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
   explanation: string;
   templateKind: 'error' | 'success' | 'time' | 'warning';

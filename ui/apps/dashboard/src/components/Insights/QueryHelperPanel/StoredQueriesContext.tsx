@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import type { Query, QuerySnapshot, Tab } from '@/components/Insights/types';
+import type { QuerySnapshot, Tab } from '@/components/Insights/types';
+import type { InsightsQuery } from '@/gql/graphql';
 import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
@@ -16,7 +17,7 @@ interface StoredQueriesContextValue {
   deleteQuerySnapshot: (snapshotId: string) => void;
   isSavedQueriesFetching: boolean;
   queries: {
-    data: undefined | Query[];
+    data: undefined | InsightsQuery[];
     error: undefined | string;
     isLoading: boolean;
   };
