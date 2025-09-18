@@ -54,7 +54,6 @@ function useColumns({
           return (
             <div className="flex items-center">
               <Link
-                arrowOnHover
                 size="medium"
                 className="w-full text-sm"
                 href={pathCreator.function({ envSlug, functionSlug: info.row.original.slug })}
