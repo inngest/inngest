@@ -24,14 +24,38 @@ ORDER BY
 const EVENT_TYPE_VOLUME_PER_HOUR_QUERY = makeEventVolumePerHourQuery();
 const SPECIFIC_EVENT_PER_HOUR_QUERY = makeEventVolumePerHourQuery('{{ event_name }}');
 
-const SPECIFIC_FAILED_FUNCTION_INVOCATIONS_QUERY = `SELECT
-    COUNT(*) as failed_invocations
+const COUNT_ALIAS_MAP: Record<'failed' | 'cancelled' | 'finished', string> = {
+  failed: 'failed_count',
+  cancelled: 'cancelled_count',
+  finished: 'success_count',
+};
+
+function makeFunctionStatusQuery(outcome: 'failed' | 'cancelled' | 'finished') {
+  const base = `SELECT
+    simpleJSONExtractString(event_data, 'function_id') as function_id,
+    COUNT(*) as ${COUNT_ALIAS_MAP[outcome]}
 FROM
     events
 WHERE
-    event_name = 'inngest/function.failed'
-    AND simpleJSONExtractString(event_data, 'function_id') = '{{ function_id }}'
-    AND event_ts > toUnixTimestamp(addDays(now(), -1)) * 1000`;
+    event_name = 'inngest/function.${outcome}'`;
+
+  const successFilter =
+    outcome === 'finished'
+      ? `
+    AND JSONExtractBool(event_data, 'result', 'success') = true`
+      : '';
+
+  return `${base}${successFilter}
+    AND event_ts > toUnixTimestamp(addDays(now(), -1)) * 1000
+GROUP BY
+    function_id
+ORDER BY
+    ${COUNT_ALIAS_MAP[outcome]} DESC`;
+}
+
+const RECENT_FAILED_FUNCTION_COUNT = makeFunctionStatusQuery('failed');
+const RECENT_CANCELLED_FUNCTION_COUNT = makeFunctionStatusQuery('cancelled');
+const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
 export const TEMPLATES: QueryTemplate[] = [
   {
@@ -51,8 +75,22 @@ export const TEMPLATES: QueryTemplate[] = [
   {
     id: 'recent-function-failures',
     name: 'Recent function failures',
-    query: SPECIFIC_FAILED_FUNCTION_INVOCATIONS_QUERY,
-    explanation: 'View failed function invocations in the past 24 hours.',
+    query: RECENT_FAILED_FUNCTION_COUNT,
+    explanation: 'View failed function runs within the past 24 hours.',
     templateKind: 'error',
+  },
+  {
+    id: 'recent-function-cancellations',
+    name: 'Recent function cancellations',
+    query: RECENT_CANCELLED_FUNCTION_COUNT,
+    explanation: 'View cancelled function runs within the past 24 hours.',
+    templateKind: 'warning',
+  },
+  {
+    id: 'recent-function-successes',
+    name: 'Recent function successes',
+    query: RECENT_SUCCESSFUL_FUNCTION_COUNT,
+    explanation: 'View successful function runs within the past 24 hours.',
+    templateKind: 'success',
   },
 ];
