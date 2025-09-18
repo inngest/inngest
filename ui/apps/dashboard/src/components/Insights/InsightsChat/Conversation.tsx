@@ -3,7 +3,7 @@
 import { useCallback, type ComponentProps, type RefObject } from 'react';
 import { Button } from '@inngest/components/Button';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { RiArrowDownLine } from '@remixicon/react';
 
 import { useStickToBottom } from '@/components/Insights/InsightsChat/hooks/use-stick-to-bottom';
 
@@ -32,7 +32,7 @@ export const Conversation = ({
 };
 
 export const ConversationContent = ({ className, ...props }: ComponentProps<'div'>) => (
-  <div className={cn('mx-8 p-4', className)} {...props} />
+  <div className={cn('mx-4 pb-1 pt-4', className)} {...props} />
 );
 
 export const ConversationScrollButton = ({
@@ -40,8 +40,11 @@ export const ConversationScrollButton = ({
   ...props
 }: ComponentProps<typeof Button>) => {
   return (
-    <Button className={cn('rounded-full', className)} appearance="outlined" {...props}>
-      <RiArrowDownSLine className="size-4" />
-    </Button>
+    <Button
+      className={cn('rounded-full', className)}
+      appearance="outlined"
+      icon={<RiArrowDownLine className="text-subtle size-4" />}
+      {...props}
+    />
   );
 };
