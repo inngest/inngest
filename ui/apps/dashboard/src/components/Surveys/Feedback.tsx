@@ -36,7 +36,7 @@ export default function NewUser() {
           experience with Inngest. Your feedback will help shape what we build next.
         </div>
         <div className="border-subtle border-t px-3 py-2">
-          <Link href="https://forms.gle/JJQrV9gKfetFaiQTA" arrowOnHover={true} target="_blank">
+          <Link href="https://forms.gle/JJQrV9gKfetFaiQTA" target="_blank">
             Let&apos;s talk
           </Link>
         </div>

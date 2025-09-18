@@ -25,7 +25,7 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
           >
             <RiAddCircleFill className="text-primary-intense h-4 w-4" />
             <span className="text-primary-intense ml-2.5 text-sm font-medium leading-tight">
-              New insight
+              New query
             </span>
           </button>
           <button

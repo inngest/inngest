@@ -15,7 +15,7 @@ export interface UnsavedQuery extends Query {
 
 export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
   explanation: string;
-  templateKind: 'error' | 'time' | 'warning';
+  templateKind: 'error' | 'success' | 'time' | 'warning';
 }
 
 export interface Tab {

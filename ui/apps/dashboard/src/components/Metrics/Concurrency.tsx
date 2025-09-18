@@ -72,7 +72,6 @@ export const Concurrency = ({
             text="The number of concurrently running steps within this environment"
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/guides/concurrency#concurrency-use-cases"
               >

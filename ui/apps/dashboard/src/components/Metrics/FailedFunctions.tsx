@@ -50,7 +50,6 @@ export const FailedFunctions = ({
             text="Total number of failed runs in your environment, app or function."
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#failed-functions"
                 target="_new"

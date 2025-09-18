@@ -33,7 +33,7 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
 
   const footerHeaderSecondaryCTA =
     !app.error && app.functionCount > 0 ? (
-      <Link size="small" href="/functions" arrowOnHover>
+      <Link size="small" href="/functions">
         View functions
       </Link>
     ) : null;
