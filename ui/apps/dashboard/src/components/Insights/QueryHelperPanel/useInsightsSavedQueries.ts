@@ -8,6 +8,7 @@ import type { InsightsQuery } from '@/gql/graphql';
 import {
   useModifySavedQueries,
   type DeleteQueryArgs,
+  type MutationResult,
   type SaveQueryArgs,
   type UpdateQueryArgs,
 } from './useModifySavedQueries';
@@ -27,13 +28,13 @@ const insightsSavedQueriesQuery = graphql(`
 `);
 
 export interface UseInsightsSavedQueriesReturn {
-  deleteQuery: (args: DeleteQueryArgs) => Promise<string[]>;
+  deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
   isSavedQueriesFetching: boolean;
   refetchSavedQueries: () => void;
   savedQueries: undefined | InsightsQuery[];
   savedQueriesError: undefined | CombinedError;
-  saveQuery: (args: SaveQueryArgs) => Promise<InsightsQuery>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<InsightsQuery>;
+  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQuery>>;
+  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQuery>>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {

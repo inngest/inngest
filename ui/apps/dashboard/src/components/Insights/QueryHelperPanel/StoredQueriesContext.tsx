@@ -50,19 +50,27 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   const saveQuery = useCallback(
     async (tab: Tab) => {
       if (tab.savedQueryId !== undefined) {
-        try {
-          await beUpdateQuery({ id: tab.savedQueryId, name: tab.name, query: tab.query });
+        const result = await beUpdateQuery({
+          id: tab.savedQueryId,
+          name: tab.name,
+          query: tab.query,
+        });
+        if (result.ok) {
           toast.success('Successfully updated query');
-        } catch (e) {
-          toast.error('Failed to update query');
+        } else {
+          toast.error(
+            `Failed to update query${result.error === 'unique' ? ': name must be unique' : ''}`
+          );
         }
       } else {
-        try {
-          const saved = await beSaveQuery({ name: tab.name, query: tab.query });
-          tabManagerActions.updateTab(tab.id, { savedQueryId: saved.id });
+        const result = await beSaveQuery({ name: tab.name, query: tab.query });
+        if (result.ok) {
+          tabManagerActions.updateTab(tab.id, { savedQueryId: result.data.id });
           toast.success('Successfully saved query');
-        } catch (e) {
-          toast.error('Failed to save query');
+        } else {
+          toast.error(
+            `Failed to save query${result.error === 'unique' ? ': name must be unique' : ''}`
+          );
         }
       }
     },
@@ -71,12 +79,12 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const deleteQuery = useCallback(
     async (queryId: string) => {
-      try {
-        await beDeleteQuery({ id: queryId });
+      const result = await beDeleteQuery({ id: queryId });
+      if (result.ok) {
         tabManagerActions.breakQueryAssociation(queryId);
         refetchSavedQueries();
         toast.success('Query deleted');
-      } catch (e) {
+      } else {
         toast.error('Failed to delete query');
       }
     },
