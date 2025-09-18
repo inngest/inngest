@@ -3,22 +3,14 @@ import { ulid } from 'ulid';
 import type { InsightsQuery } from '@/gql/graphql';
 import type { QuerySnapshot, QueryTemplate } from './types';
 
-type QueryRecord<T> = Record<string, T>;
-
 export function isQuerySnapshot(q: InsightsQuery | QuerySnapshot): q is QuerySnapshot {
-  return 'query' in q;
+  return 'isSnapshot' in q && q.isSnapshot;
 }
 
 export function isQueryTemplate(
   q: InsightsQuery | QuerySnapshot | QueryTemplate
 ): q is QueryTemplate {
   return 'templateKind' in q;
-}
-
-export function getOrderedQuerySnapshots(
-  querySnapshots: QueryRecord<QuerySnapshot>
-): QuerySnapshot[] {
-  return Object.values(querySnapshots).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export function getOrderedSavedQueries(
@@ -30,8 +22,8 @@ export function getOrderedSavedQueries(
 
 export function makeQuerySnapshot(query: string, name?: string): QuerySnapshot {
   return {
-    createdAt: Date.now(),
     id: ulid(),
+    isSnapshot: true,
     name: name ?? query,
     query,
   };

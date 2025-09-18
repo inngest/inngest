@@ -6,11 +6,8 @@ import { toast } from 'sonner';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { QuerySnapshot, Tab } from '@/components/Insights/types';
 import type { InsightsQuery } from '@/gql/graphql';
-import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
+import { getOrderedSavedQueries } from '../queries';
 import { useInsightsSavedQueries } from './useInsightsSavedQueries';
-
-type ID = string;
-type QueryRecord<T> = Record<ID, T>;
 
 interface StoredQueriesContextValue {
   deleteQuery: (queryId: string) => void;
@@ -38,7 +35,7 @@ interface StoredQueriesProviderProps {
 }
 
 export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
-  const [querySnapshots, setQuerySnapshots] = useState<QueryRecord<QuerySnapshot>>({});
+  const [querySnapshots, setQuerySnapshots] = useState<QuerySnapshot[]>([]);
 
   const {
     deleteQuery: beDeleteQuery,
@@ -86,21 +83,13 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
     [beDeleteQuery, refetchSavedQueries, tabManagerActions]
   );
 
-  const deleteQuerySnapshot = useCallback(
-    (snapshotId: string) => {
-      setQuerySnapshots(withoutId(querySnapshots, snapshotId));
-    },
-    [querySnapshots, setQuerySnapshots]
-  );
+  const deleteQuerySnapshot = useCallback((snapshotId: string) => {
+    setQuerySnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
+  }, []);
 
-  const saveQuerySnapshot = useCallback(
-    (snapshot: QuerySnapshot) => {
-      setQuerySnapshots((current) =>
-        withId(removeQuerySnapshotIfOverLimit(current, 10), snapshot.id, snapshot)
-      );
-    },
-    [setQuerySnapshots]
-  );
+  const saveQuerySnapshot = useCallback((snapshot: QuerySnapshot) => {
+    setQuerySnapshots((current) => [snapshot, ...current].slice(0, 10));
+  }, []);
 
   const queries = useMemo(() => {
     return {
@@ -111,11 +100,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   }, [beSavedQueries, isSavedQueriesFetching, savedQueriesError]);
 
   const orderedQuerySnapshots = useMemo(
-    () => ({
-      data: getOrderedQuerySnapshots(querySnapshots),
-      error: undefined,
-      isLoading: false,
-    }),
+    () => ({ data: querySnapshots, error: undefined, isLoading: false }),
     [querySnapshots]
   );
 
@@ -143,27 +128,4 @@ export function useStoredQueries(): StoredQueriesContextValue {
   }
 
   return context;
-}
-
-function withId<T>(obj: Record<string, T>, id: string, value: T): Record<string, T> {
-  return { ...obj, [id]: value };
-}
-
-function withoutId<T>(obj: Record<string, T>, id: string): Record<string, T> {
-  const newObj = { ...obj };
-  delete newObj[id];
-  return newObj;
-}
-
-export function removeQuerySnapshotIfOverLimit(
-  querySnapshots: QueryRecord<QuerySnapshot>,
-  limit: number
-): QueryRecord<QuerySnapshot> {
-  if (Object.keys(querySnapshots).length < limit) return querySnapshots;
-
-  const snapshots = getOrderedQuerySnapshots(querySnapshots);
-  const oldestSnapshot = snapshots[snapshots.length - 1];
-  if (oldestSnapshot === undefined) return querySnapshots;
-
-  return withoutId(querySnapshots, oldestSnapshot.id);
 }

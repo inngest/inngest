@@ -1,11 +1,11 @@
 export interface QuerySnapshot {
-  createdAt: number;
   id: string;
+  isSnapshot: true;
   name: string;
   query: string;
 }
 
-export interface QueryTemplate extends Omit<QuerySnapshot, 'createdAt'> {
+export interface QueryTemplate extends Omit<QuerySnapshot, 'isSnapshot'> {
   explanation: string;
   templateKind: 'error' | 'success' | 'time' | 'warning';
 }
