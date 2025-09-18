@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
@@ -13,6 +14,7 @@ type InsightsSQLEditorSaveQueryButtonProps = {
 };
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
+  const [isSaving, setIsSaving] = useState(false);
   const { queries, saveQuery } = useStoredQueries();
 
   const isSaved = tab.savedQueryId !== undefined;
@@ -28,8 +30,12 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       iconSide="left"
       kind="secondary"
       label="Save query"
+      loading={isSaving}
       onClick={() => {
-        saveQuery(tab);
+        setIsSaving(true);
+        saveQuery(tab).finally(() => {
+          setIsSaving(false);
+        });
       }}
       size="medium"
     />
