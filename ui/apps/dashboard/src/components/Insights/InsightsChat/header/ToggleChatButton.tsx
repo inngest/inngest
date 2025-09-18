@@ -1,5 +1,6 @@
 import { Button } from '@inngest/components/Button';
-import { RiArrowLeftLine } from '@remixicon/react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { RiContractRightLine } from '@remixicon/react';
 
 export const ToggleChatButton = ({
   className,
@@ -9,13 +10,15 @@ export const ToggleChatButton = ({
   onClick: () => void;
 }) => {
   return (
-    <Button
-      kind="secondary"
-      appearance="outlined"
-      size="small"
-      icon={<RiArrowLeftLine />}
-      className={className}
-      onClick={onClick}
-    />
+    <OptionalTooltip tooltip="Minimize chat" side="bottom">
+      <Button
+        kind="secondary"
+        appearance="ghost"
+        size="small"
+        icon={<RiContractRightLine />}
+        className={className}
+        onClick={onClick}
+      />
+    </OptionalTooltip>
   );
 };
