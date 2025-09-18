@@ -94,6 +94,9 @@ type InsertFunctionParams struct {
 }
 
 type UpdateFunctionConfigParams struct {
-	Config string
-	ID     uuid.UUID
+	Config    string
+	ID        uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+	AppID     uuid.UUID
 }

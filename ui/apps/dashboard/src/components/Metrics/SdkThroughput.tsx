@@ -66,11 +66,7 @@ export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['w
           <Info
             text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
-              <Link
-                arrowOnHover
-                className="text-sm"
-                href="https://www.inngest.com/docs/sdk/overview"
-              >
+              <Link className="text-sm" href="https://www.inngest.com/docs/sdk/overview">
                 Learn more about SDK throughput.
               </Link>
             }

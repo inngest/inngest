@@ -35,6 +35,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var dynamicSpanID string
 		var functionID string
 		var output any
+		var input any
 		var runID string
 		var debugSessionID string
 		var debugRunID string
@@ -46,6 +47,13 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			// This is always cleaned
 			if string(attr.Key) == meta.Attrs.StepOutput.Key() {
 				output = attr.Value.AsInterface()
+				continue
+			}
+
+			// If input, extract and store separately
+			// This is always cleaned
+			if string(attr.Key) == meta.Attrs.EventsInput.Key() {
+				input = attr.Value.AsInterface()
 				continue
 			}
 
@@ -199,6 +207,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			AccountID: accountID,
 			EnvID:     envID,
 			Output:    output,
+			Input:     input,
 			DebugSessionID: sql.NullString{
 				String: debugSessionID,
 				Valid:  debugSessionID != "",
