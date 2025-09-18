@@ -11,7 +11,7 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
 
-export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error';
+export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error' | 'secondary';
 export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
 
 export function Pill({
@@ -30,7 +30,7 @@ export function Pill({
   appearance?: PillAppearance;
   kind?: PillKind;
   icon?: React.ReactNode;
-  iconSide?: 'right' | 'left';
+  iconSide?: 'right' | 'left' | 'iconOnly';
   /**
    * Use this when you want one of the sides to be flat. The other sides will be
    * rounded.
@@ -88,14 +88,14 @@ export function Pill({
     <NextLink href={href} className="flex" onClick={(e) => e.stopPropagation()}>
       <span ref={pillRef} className={cn('rounded', classNames)}>
         {icon && iconSide === 'left' && icon}
-        <span className="truncate">{children}</span>
+        {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
         {icon && iconSide === 'right' && icon}
       </span>
     </NextLink>
   ) : (
     <span ref={pillRef} className={cn(roundedClasses, classNames)}>
       {icon && iconSide === 'left' && icon}
-      <span className="truncate">{children}</span>
+      {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
       {icon && iconSide === 'right' && icon}
     </span>
   );
@@ -153,6 +153,9 @@ export const getPillColors = ({
   const solidPillStyles = {
     default: `bg-canvasMuted text-basis ${clickable ? 'hover:bg-surfaceMuted' : ''}`,
     primary: `bg-primary-intense text-alwaysWhite ${clickable ? 'hover:bg-primary-xIntense' : ''}`,
+    secondary: `bg-quarternary-warmer-xIntense text-alwaysWhite ${
+      clickable ? 'hover:bg-primary-xIntense' : ''
+    }`,
     warning: `bg-accent-moderate text-alwaysWhite ${clickable ? 'hover:bg-accent-intense' : ''}`,
     error: `bg-tertiary-moderate text-alwaysWhite ${clickable ? 'hover:bg-tertiary-intense' : ''}`,
     info: `bg-secondary-moderate text-alwaysWhite ${clickable ? 'hover:bg-secondary-intense' : ''}`,
@@ -164,6 +167,9 @@ export const getPillColors = ({
     }`,
     primary: `border border-success bg-success text-success ${
       clickable ? 'hover:bg-primary-xSubtle' : ''
+    }`,
+    secondary: `border border-quaternary-warmerxIntense bg-canvasBase text-info ${
+      clickable ? 'hover:bg-quatenary-warmer3xSubtle' : ''
     }`,
     warning: `border border-warning bg-warning text-warning ${
       clickable ? 'hover:bg-accent-xSubtle' : ''
@@ -177,6 +183,9 @@ export const getPillColors = ({
   const solidBrightPillStyles = {
     default: `bg-canvasSubtle text-subtle ${clickable ? 'hover:bg-surfaceSubtle' : ''}`,
     primary: `bg-success text-primary-2xIntense ${clickable ? 'hover:bg-primary-2xSubtle' : ''}`,
+    secondary: `bg-quatenary-warmer3xIntense text-onContrast ${
+      clickable ? 'hover:bg-quatenary-warmerxIntense' : ''
+    }`,
     warning: `bg-warning text-accent-2xIntense ${clickable ? 'hover:bg-accent-2xSubtle' : ''}`,
     error: `bg-error text-tertiary-2xIntense ${clickable ? 'hover:bg-tertiary-2xSubtle' : ''}`,
     info: `bg-info text-secondary-2xIntense ${clickable ? 'hover:bg-secondary-2xSubtle' : ''}`,
