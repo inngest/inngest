@@ -780,6 +780,7 @@ export type EventTypeV2 = {
   __typename?: 'EventTypeV2';
   envID: Scalars['UUID'];
   functions: FunctionsConnection;
+  latestSchema: Maybe<Scalars['String']>;
   name: Scalars['String'];
   usage: Usage;
 };
@@ -1880,6 +1881,7 @@ export type RunTraceSpan = {
   stepID: Maybe<Scalars['String']>;
   stepInfo: Maybe<StepInfo>;
   stepOp: Maybe<StepOp>;
+  stepType: Scalars['String'];
   traceID: Scalars['String'];
   userlandSpan: Maybe<UserlandSpan>;
   workspace: Workspace;
