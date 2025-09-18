@@ -39,7 +39,7 @@ type Query {
   runTrigger(runID: String!): RunTraceTrigger!
 
   debugRun(query: DebugRunQuery!): DebugRun
-  debugSession(query: DebugSessionQuery!): [RunTraceSpan]
+  debugSession(query: DebugSessionQuery!): DebugSession
 
   workerConnections(
     first: Int! = 100

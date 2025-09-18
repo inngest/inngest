@@ -53,6 +53,7 @@
     "recharts": "^2.4.3",
     "sonner": "^1.2.0",
     "tailwind-merge": "^1.10.0",
+    "ulid": "^2.3.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

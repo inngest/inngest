@@ -4,9 +4,12 @@ import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator
 import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
+import { RerunModal } from '../Rerun/RerunModal';
 import { Timeline } from '../RunDetailsV3/Timeline';
+import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRun } from '../SharedContext/useGetRun';
+import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
@@ -20,16 +23,19 @@ import { Play } from './Play';
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
+  const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const [debugRunID] = useSearchParam('debugRunID');
   const [debugSessionID] = useSearchParam('debugSessionID');
-
-  const { data: debugRunData } = useGetDebugRun({
-    functionSlug,
+  const { selectedStep } = useStepSelection({
     debugRunID,
     runID,
   });
 
-  const { data: runData, loading: runLoading } = useGetRun({
+  const { rerun } = useRerun();
+
+  const { data: debugRunData, loading } = useGetDebugRun({
+    functionSlug,
+    debugRunID,
     runID,
   });
 
@@ -78,6 +84,16 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const handleRerun = async () => {
+    if (runID) {
+      const result = await rerun({
+        runID,
+        debugRunID,
+        debugSessionID,
+      });
+    }
+  };
+
   return (
     <>
       <div className="mx-4 my-8 flex flex-row items-center justify-between">
@@ -87,14 +103,20 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           <div className="flex flex-row items-center gap-x-2 text-sm">
             <RiGitForkLine className="text-muted h-6 w-6" />
             <div>Forked from:</div>
-            {runData?.trace?.status && (
-              <StatusDot status={runData?.trace?.status} className="h-3 w-3" />
+            {debugRunData?.originalRun?.status && (
+              <StatusDot status={debugRunData.originalRun.status} className="h-3 w-3" />
             )}
             <div>{runID && <Link href={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
           </div>
         </div>
 
-        <Button kind="primary" appearance="outlined" size="medium" label="Rerun function" />
+        <Button
+          kind="primary"
+          appearance="outlined"
+          size="medium"
+          label="Rerun function"
+          onClick={handleRerun}
+        />
       </div>
 
       <div className="flex h-full w-full flex-row" ref={containerRef}>
@@ -105,7 +127,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                 <Tooltip>
                   <TooltipTrigger>
                     {running ? (
-                      <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                      <RiPauseLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-pointer rounded-md p-1" />
                     ) : (
                       <Play runID={runID} debugRunID={debugRunID} debugSessionID={debugSessionID} />
                     )}
@@ -117,27 +139,29 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
 
                 <Tooltip>
                   <TooltipTrigger>
-                    <StepOver className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    <StepOver className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-not-allowed rounded-md p-1 opacity-50" />
                   </TooltipTrigger>
-                  <TooltipContent className="whitespace-pre-line">Step Over</TooltipContent>
+                  <TooltipContent className="whitespace-pre-line">
+                    Step Over coming soon!
+                  </TooltipContent>
                 </Tooltip>
 
                 <div className="bg-canvasMuted my-2 h-8 w-px" />
                 <Tooltip>
                   <TooltipTrigger>
-                    <RiStopLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    <RiStopLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-not-allowed rounded-md p-1 opacity-50" />
                   </TooltipTrigger>
-                  <TooltipContent className="whitespace-pre-line">Stop</TooltipContent>
+                  <TooltipContent className="whitespace-pre-line">Stop coming soon!</TooltipContent>
                 </Tooltip>
               </div>
             </div>
             <div>
-              {runLoading ? (
+              {loading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : debugRunData?.debugRun ? (
-                <DebugRun debugRun={debugRunData?.debugRun} />
-              ) : runID && runData ? (
-                <Timeline runID={runID} trace={runData?.trace} />
+              ) : debugRunData?.debugRun && runID ? (
+                <DebugRun debugRun={debugRunData?.debugRun} runID={runID} />
+              ) : runID && debugRunData?.originalRun ? (
+                <Timeline runID={runID} trace={debugRunData.originalRun} />
               ) : null}
             </div>
           </div>
@@ -154,15 +178,30 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           </div>
         </div>
         <div style={{ width: `${100 - leftWidth}%` }}>
-          <div className="flex flex-col items-start justify-start gap-2">
+          <div className="flex flex-col items-start justify-start">
             <div className="border-muted flex h-12 w-full flex-row items-center justify-end border-b border-t px-4">
               <Button
                 kind="secondary"
                 appearance="outlined"
                 size="medium"
                 label="Edit and rerun from step"
-                disabled={true}
+                disabled={!selectedStep?.trace.stepID}
+                onClick={() => setRerunModalOpen(true)}
               />
+              {runID && selectedStep?.trace.stepID && (
+                <RerunModal
+                  open={rerunModalOpen}
+                  setOpen={setRerunModalOpen}
+                  runID={runID}
+                  stepID={selectedStep?.trace.stepID}
+                  debugRunID={debugRunID}
+                  debugSessionID={debugSessionID}
+                  redirect={false}
+                  //
+                  // TODO: fetch step result
+                  input={''}
+                />
+              )}
             </div>
 
             <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />

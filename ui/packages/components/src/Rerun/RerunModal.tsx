@@ -11,8 +11,11 @@ export type RerunModalType = {
   open: boolean;
   setOpen: (open: boolean) => void;
   runID: string;
+  debugRunID?: string;
+  debugSessionID?: string;
   stepID: string;
   input: string;
+  redirect?: boolean;
 };
 
 export type RerunResult = {
@@ -34,7 +37,16 @@ const patchInput = (newInput: string) => {
   }
 };
 
-export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalType) => {
+export const RerunModal = ({
+  open,
+  setOpen,
+  runID,
+  stepID,
+  input,
+  debugRunID,
+  debugSessionID,
+  redirect = true,
+}: RerunModalType) => {
   const { rerun } = useRerunFromStep();
   const [newInput, setNewInput] = useState(input);
   const [loading, setLoading] = useState(false);
@@ -102,6 +114,8 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
             setLoading(true);
             const result = await rerun({
               runID,
+              debugRunID,
+              debugSessionID,
               fromStep: { stepID, ...(newInput ? { input: patchInput(newInput) } : {}) },
             });
 
@@ -113,7 +127,7 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
               return;
             }
 
-            if (result.redirect) {
+            if (redirect && result.redirect) {
               router.push(result.redirect);
             }
 

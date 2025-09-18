@@ -52,6 +52,15 @@ export const longDateFormat = {
   fractionalSecondDigits: 3 as const,
 };
 
+export const mediumDateFormat = {
+  year: 'numeric' as const,
+  month: 'numeric' as const,
+  day: 'numeric' as const,
+  hour: 'numeric' as const,
+  hour12: true,
+  minute: 'numeric' as const,
+};
+
 // Format: 20 Jul 2023, 00:08:42
 export function fullDate(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {

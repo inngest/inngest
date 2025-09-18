@@ -107,7 +107,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 }
 
 func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
-
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
@@ -118,7 +117,7 @@ func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID)
 		return nil, nil
 	}
 
-	return mapRootSpansFromRows(ctx, spans)
+	return buildDebugRunSpan(ctx, spans)
 }
 
 func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
@@ -142,7 +141,7 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	var allRoots []*cqrs.OtelSpan
 
 	for _, runSpans := range spansByDebugRun {
-		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+		rootSpan, err := buildDebugRunSpan(ctx, runSpans)
 		if err != nil {
 			return nil, err
 		}
@@ -357,6 +356,141 @@ func encodeSpanOutputID(spanID string) (*string, error) {
 	}
 
 	return &encoded, nil
+}
+
+// buildDebugRunSpan constructs a single debug run span by combining multiple individual run spans.
+// It groups spans by run_id, processes each group with mapRootSpansFromRows, then combines them
+// taking the most recent version of each step to handle run from step partials.
+func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByRunID := make(map[string][]T)
+	for _, span := range spans {
+		runID := span.GetRunID()
+		spansByRunID[runID] = append(spansByRunID[runID], span)
+	}
+
+	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
+	for _, runSpansGroup := range spansByRunID {
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		if err != nil {
+			return nil, err
+		}
+		if runSpan != nil {
+			runSpans = append(runSpans, runSpan)
+		}
+	}
+
+	if len(runSpans) == 0 {
+		return nil, nil
+	}
+
+	return combineRunSpansIntoDebugRun(runSpans), nil
+}
+
+// TODO: dynanic span id is wrong, use something else
+func combineRunSpansIntoDebugRun(runSpans []*cqrs.OtelSpan) *cqrs.OtelSpan {
+	if len(runSpans) == 0 {
+		return nil
+	}
+
+	//
+	// Sort runs by start time to process in chronological order
+	sort.Slice(runSpans, func(i, j int) bool {
+		return runSpans[i].StartTime.Before(runSpans[j].StartTime)
+	})
+
+	//
+	// Use the first run as the base, but we'll replace children with combined versions
+	debugRun := *runSpans[0]
+	debugRun.Children = nil
+
+	//
+	// Collect all steps from all runs, keeping the most recent version of each step
+	stepsBySpanID := make(map[string]*cqrs.OtelSpan)
+
+	for _, run := range runSpans {
+		collectStepsRecursively(run, stepsBySpanID)
+	}
+
+	//
+	// Rebuild the hierarchy from the collected steps
+	return buildHierarchyFromSteps(&debugRun, stepsBySpanID)
+}
+
+// collectStepsRecursively traverses a span tree and collects all steps,
+// keeping the most recent version of each step based on start time.
+func collectStepsRecursively(span *cqrs.OtelSpan, stepsBySpanID map[string]*cqrs.OtelSpan) {
+	if span == nil {
+		return
+	}
+
+	//
+	// For root span, just add it if we don't have it or if this one is more recent
+	if existing, exists := stepsBySpanID[span.SpanID]; !exists || span.StartTime.After(existing.StartTime) {
+		stepsBySpanID[span.SpanID] = span
+	}
+
+	//
+	// Recursively process all children
+	for _, child := range span.Children {
+		collectStepsRecursively(child, stepsBySpanID)
+	}
+}
+
+// buildHierarchyFromSteps rebuilds the parent-child hierarchy from collected steps
+func buildHierarchyFromSteps(debugRun *cqrs.OtelSpan, stepsBySpanID map[string]*cqrs.OtelSpan) *cqrs.OtelSpan {
+	//
+	// Create a copy of the debug run as the root
+	result := *stepsBySpanID[debugRun.SpanID]
+	result.Children = nil
+
+	//
+	// Find direct children of the root span
+	for _, step := range stepsBySpanID {
+		if step.ParentSpanID != nil && *step.ParentSpanID == debugRun.SpanID {
+			childCopy := *step
+			childCopy.Children = buildChildrenRecursively(step.SpanID, stepsBySpanID)
+			result.Children = append(result.Children, &childCopy)
+		}
+	}
+
+	//
+	// Sort children by start time
+	sort.Slice(result.Children, func(i, j int) bool {
+		if !result.Children[i].StartTime.Equal(result.Children[j].StartTime) {
+			return result.Children[i].StartTime.Before(result.Children[j].StartTime)
+		}
+		return result.Children[i].SpanID < result.Children[j].SpanID
+	})
+
+	return &result
+}
+
+// buildChildrenRecursively builds the children hierarchy for a given parent span ID
+func buildChildrenRecursively(parentSpanID string, stepsBySpanID map[string]*cqrs.OtelSpan) []*cqrs.OtelSpan {
+	var children []*cqrs.OtelSpan
+
+	for _, step := range stepsBySpanID {
+		if step.ParentSpanID != nil && *step.ParentSpanID == parentSpanID {
+			childCopy := *step
+			childCopy.Children = buildChildrenRecursively(step.SpanID, stepsBySpanID)
+			children = append(children, &childCopy)
+		}
+	}
+
+	//
+	// Sort children by start time
+	sort.Slice(children, func(i, j int) bool {
+		if !children[i].StartTime.Equal(children[j].StartTime) {
+			return children[i].StartTime.Before(children[j].StartTime)
+		}
+		return children[i].SpanID < children[j].SpanID
+	})
+
+	return children
 }
 
 func sorter(span *cqrs.OtelSpan) {

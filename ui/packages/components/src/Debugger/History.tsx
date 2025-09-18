@@ -1,7 +1,19 @@
+import { useRouter } from 'next/navigation';
+import { RiLightbulbLine } from '@remixicon/react';
+import { createColumnHelper } from '@tanstack/react-table';
+
+import { Button } from '../Button';
 import { ErrorCard } from '../Error/ErrorCard';
-import { useGetDebugSession } from '../SharedContext/useGetDebugSession';
+import { Pill } from '../Pill';
+import { useGetDebugSession, type DebugSessionRun } from '../SharedContext/useGetDebugSession';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Skeleton } from '../Skeleton';
-import { StepHistory } from './StepHistory';
+import { StatusDot } from '../Status/StatusDot';
+import { getStatusTextClass } from '../Status/statusClasses';
+import { Table } from '../Table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
+import { cn } from '../utils/classNames';
+import { mediumDateFormat } from '../utils/date';
 
 export const exampleAiOutput = {
   id: 'chatcmpl-BjpG3gipnAUHsi3txqSt5XLp9G76J',
@@ -128,11 +140,16 @@ type HistoryProps = {
   runID?: string;
 };
 
+type HistoryTable = DebugSessionRun | null;
+
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
+  const { pathCreator } = usePathCreator();
+  const router = useRouter();
   const { data, loading, error } = useGetDebugSession({
     functionSlug,
     debugSessionID,
     runID,
+    refetchInterval: 1000,
   });
 
   if (loading) {
@@ -149,18 +166,109 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     return <ErrorCard error={error || new Error('No data found')} />;
   }
 
+  const load = (debugRunID: string) => {
+    const debuggerPath = pathCreator.debugger({
+      functionSlug,
+      runID,
+      debugRunID,
+      debugSessionID,
+    });
+
+    router.push(debuggerPath);
+  };
+
+  const columnHelper = createColumnHelper<HistoryTable>();
+
+  const columns = [
+    columnHelper.accessor('startedAt', {
+      cell: (rawStartedAt) => {
+        const startedAt = rawStartedAt.getValue();
+        return (
+          <span className="text-muted text-sm leading-tight">
+            {startedAt ? new Date(startedAt).toLocaleString('en-US', mediumDateFormat) : '—'}
+          </span>
+        );
+      },
+      size: 25,
+      enableSorting: true,
+    }),
+    columnHelper.accessor('status', {
+      cell: (rawStatus) => {
+        const status = rawStatus.getValue();
+
+        return (
+          <div
+            className={cn(
+              'no-wrap flex flex-row items-center gap-2 text-sm',
+              getStatusTextClass(status)
+            )}
+          >
+            <StatusDot status={status} className="h-2.5 w-2.5 shrink-0" />
+            {status}
+          </div>
+        );
+      },
+      enableSorting: false,
+    }),
+    columnHelper.accessor('tags', {
+      cell: () => {
+        return (
+          <Tooltip>
+            <TooltipTrigger>
+              <Pill appearance="outlined" kind="primary">
+                <div className="flex flex-row items-center gap-1">
+                  <RiLightbulbLine className="text-muted h-2.5 w-2.5" />
+
+                  {0}
+                </div>
+              </Pill>
+            </TooltipTrigger>
+            <TooltipContent className="whitespace-pre-line text-left">
+              Tags coming soon!
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
+      enableSorting: false,
+    }),
+    columnHelper.accessor('versions', {
+      cell: () => {
+        return (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                disabled={true}
+                kind="secondary"
+                appearance="outlined"
+                size="small"
+                label="View version"
+                className="text-muted text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+            </TooltipTrigger>
+            <TooltipContent className="whitespace-pre-line text-left">
+              Version history coming soon!
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
+      enableSorting: false,
+    }),
+  ];
+
   return (
-    <div className="flex w-full flex-col gap-2">
-      {data.map(
-        (run, i) =>
-          run && (
-            <StepHistory
-              debugRun={run}
-              defaultOpen={i === data.length - 1}
-              key={`step-history-${run.spanID}`}
-            />
-          )
-      )}
+    <div className="flex w-full flex-col justify-start gap-2 ">
+      <Table
+        noHeader={true}
+        data={(data.debugRuns ?? []).sort(
+          (a, b) =>
+            (b?.startedAt ? new Date(b.startedAt).getTime() : 0) -
+            (a?.startedAt ? new Date(a.startedAt).getTime() : 0)
+        )}
+        columns={columns}
+      />
     </div>
   );
 };
