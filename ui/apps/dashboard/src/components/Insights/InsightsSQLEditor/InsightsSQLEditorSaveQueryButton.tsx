@@ -4,22 +4,19 @@ import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 
-import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import { hasDiffWithSavedQuery } from '../InsightsTabManager/InsightsTabManager';
-import { isSavedQuery } from '../queries';
-import type { Query } from '../types';
+import type { Tab } from '../types';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
-  tab: Query;
+  tab: Tab;
 };
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
   const { queries, saveQuery } = useStoredQueries();
-  const { query, queryName: name } = useInsightsStateMachineContext();
 
-  const isSaved = isSavedQuery(tab);
-  const disabled = name === '' || (isSaved && !hasDiffWithSavedQuery(queries, tab));
+  const isSaved = tab.savedQueryId !== undefined;
+  const disabled = tab.name === '' || (isSaved && !hasDiffWithSavedQuery(queries, tab));
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
   return (
@@ -32,7 +29,7 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       kind="secondary"
       label="Save query"
       onClick={() => {
-        saveQuery({ ...tab, name, query });
+        saveQuery(tab);
       }}
       size="medium"
     />

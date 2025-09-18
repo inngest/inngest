@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
+import type { Query, QuerySnapshot, Tab, UnsavedQuery } from '@/components/Insights/types';
 import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
@@ -29,7 +29,7 @@ interface StoredQueriesContextValue {
     isLoading: boolean;
   };
   savedQueriesError: undefined | string;
-  saveQuery: (tab: Query) => Promise<void>;
+  saveQuery: (tab: Tab) => Promise<void>;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
 }
 
@@ -65,7 +65,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   }, []);
 
   const saveQuery = useCallback(
-    async (tab: Query) => {
+    async (tab: Tab) => {
       if (tab.savedQueryId !== undefined) {
         try {
           await beUpdateQuery({ id: tab.savedQueryId, name: tab.name, query: tab.query });
