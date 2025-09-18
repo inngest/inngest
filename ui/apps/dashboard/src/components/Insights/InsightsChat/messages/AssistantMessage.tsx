@@ -7,7 +7,7 @@ export const AssistantMessage = ({ part }: { part: MessagePart }) => {
     return null;
   }
   return (
-    <div className="text-text-basis inline-block max-w-[340px] whitespace-pre-wrap rounded-md px-3 py-2 text-sm">
+    <div className="text-text-basis inline-block max-w-[340px] whitespace-pre-wrap rounded-md px-0 py-1 text-sm">
       {(part as TextUIPart).content}
     </div>
   );
