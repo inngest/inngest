@@ -172,7 +172,7 @@ function InsightsTabManagerInternal({
 }
 
 function getNewActiveTabAfterClose(
-  existingTabs: Query[],
+  existingTabs: Tab[],
   tabIdToClose: string,
   currentActiveTabId: string
 ): undefined | string {
@@ -189,11 +189,11 @@ function getNewActiveTabAfterClose(
   return newlySelectedTabId;
 }
 
-function findTabWithId(id: string, tabs: Query[]): undefined | Query {
+function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
   return tabs.find((tab) => tab.id === id);
 }
 
-export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Query): boolean {
+export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Tab): boolean {
   const savedQuery = tab.savedQueryId ? savedQueries[tab.savedQueryId] : undefined;
   if (savedQuery === undefined) return false;
 
