@@ -2,6 +2,7 @@
 
 import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import type { ToolCallUIPart } from '@inngest/use-agents';
 import { RiCheckLine, RiCloseLine, RiEdit2Line, RiPlayLine } from '@remixicon/react';
@@ -38,46 +39,55 @@ function GenerateSqlToolUI({
   const errorMessage = part.error ? (part.error as Error).message : null;
 
   return (
-    <div className="text-text-basis bg-surfaceSubtle rounded-md p-3 text-sm">
+    <div className="text-text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
       <Disclosure>
         {({ open }) => (
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Disclosure.Button>
-                  {errorMessage ? (
-                    <RiCloseLine className="text-text-error size-5" />
-                  ) : (
-                    <RiCheckLine className="text-text-success size-5" />
-                  )}
+                <Disclosure.Button className="flex items-center justify-center">
+                  <div
+                    className={cn(
+                      'flex h-4 w-4 items-center justify-center rounded-full',
+                      errorMessage ? 'bg-error' : 'bg-[#65BD8B]'
+                    )}
+                  >
+                    {errorMessage ? (
+                      <RiCloseLine className="text-onContrast size-3" />
+                    ) : (
+                      <RiCheckLine className="text-onContrast size-3" />
+                    )}
+                  </div>
                 </Disclosure.Button>
-                <span className="font-medium">{title || 'Generated SQL'}</span>
+                <span className="font-sm">{title || 'Generated SQL'}</span>
               </div>
 
               {sql && (
                 <div className="flex items-center gap-2">
-                  <Button
+                  {/* <Button
                     icon={<RiEdit2Line className="size-4" />}
                     appearance="ghost"
                     size="small"
                     onClick={() => onSqlChange(sql)}
-                  />
-                  <Button
-                    icon={<RiPlayLine className="size-4" />}
-                    appearance="ghost"
-                    size="small"
-                    onClick={() => {
-                      onSqlChange(sql);
-                      try {
-                        runQuery();
-                      } catch {}
-                    }}
-                  />
+                  /> */}
+                  <OptionalTooltip tooltip="Run this query" side="bottom">
+                    <Button
+                      icon={<RiPlayLine className="text-muted size-8 scale-110" />}
+                      appearance="ghost"
+                      size="small"
+                      onClick={() => {
+                        onSqlChange(sql);
+                        try {
+                          runQuery();
+                        } catch {}
+                      }}
+                    />
+                  </OptionalTooltip>
                 </div>
               )}
             </div>
             <Disclosure.Panel className="mt-2">
-              <pre className="bg-canvasSubtle text-text-basis mt-1 overflow-auto rounded p-2 text-xs">
+              <pre className="bg-canvasSubtle mt-1 overflow-auto rounded p-2 text-xs text-xs">
                 {sql || errorMessage}
               </pre>
             </Disclosure.Panel>
