@@ -24,6 +24,15 @@ ORDER BY
 const EVENT_TYPE_VOLUME_PER_HOUR_QUERY = makeEventVolumePerHourQuery();
 const SPECIFIC_EVENT_PER_HOUR_QUERY = makeEventVolumePerHourQuery('{{ event_name }}');
 
+const SPECIFIC_FAILED_FUNCTION_INVOCATIONS_QUERY = `SELECT
+    COUNT(*) as failed_invocations
+FROM
+    events
+WHERE
+    event_name = 'inngest/function.failed'
+    AND simpleJSONExtractString(event_data, 'function_id') = '{{ function_id }}'
+    AND event_ts > toUnixTimestamp(addDays(now(), -1)) * 1000`;
+
 export const TEMPLATES: QueryTemplate[] = [
   {
     id: 'event-type-volume-per-hour',
@@ -38,5 +47,12 @@ export const TEMPLATES: QueryTemplate[] = [
     query: SPECIFIC_EVENT_PER_HOUR_QUERY,
     explanation: 'View hourly volume of a specific event.',
     templateKind: 'time',
+  },
+  {
+    id: 'recent-function-failures',
+    name: 'Recent function failures',
+    query: SPECIFIC_FAILED_FUNCTION_INVOCATIONS_QUERY,
+    explanation: 'View failed function invocations in the past 24 hours.',
+    templateKind: 'error',
   },
 ];
