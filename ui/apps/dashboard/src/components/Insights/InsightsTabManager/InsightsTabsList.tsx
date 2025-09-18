@@ -47,7 +47,7 @@ export function InsightsTabsList({
           const tab = tabs.find((t) => t.id === tabId);
           if (tab === undefined) return;
 
-          if (hasDiffWithSavedQuery(queries, tab)) {
+          if (hasDiffWithSavedQuery(queries.data, tab)) {
             setPendingCloseTabId(tabId);
             return;
           }
@@ -121,7 +121,7 @@ function IndicatorTabIcon({ tab }: { tab: Tab }) {
 
   if (tab.id === TEMPLATES_TAB.id) {
     return <RiBookReadLine size={16} />;
-  } else if (hasDiffWithSavedQuery(queries, tab)) {
+  } else if (hasDiffWithSavedQuery(queries.data, tab)) {
     return <RiCircleFill className="fill-amber-500" size={16} />;
   } else {
     return <RiCodeSSlashLine size={16} />;

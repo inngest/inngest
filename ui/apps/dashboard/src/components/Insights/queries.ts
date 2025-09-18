@@ -19,10 +19,9 @@ export function getOrderedQuerySnapshots(
   return Object.values(querySnapshots).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-export function getOrderedSavedQueries(queries: QueryRecord<Query>): Query[] {
-  return Object.values(queries)
-    .filter((query) => query.savedQueryId !== undefined)
-    .sort((a, b) => a.name.localeCompare(b.name));
+export function getOrderedSavedQueries(queries: Query[] | undefined): undefined | Query[] {
+  if (queries === undefined) return undefined;
+  return [...queries].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function makeQuerySnapshot(query: string, name?: string): QuerySnapshot {

@@ -193,10 +193,10 @@ function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
   return tabs.find((tab) => tab.id === id);
 }
 
-export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Tab): boolean {
-  const savedQuery = tab.savedQueryId ? savedQueries[tab.savedQueryId] : undefined;
-  if (savedQuery === undefined) return false;
-
+export function hasDiffWithSavedQuery(savedQueries: Query[] | undefined, tab: Tab): boolean {
+  if (tab.savedQueryId === undefined || savedQueries === undefined) return false;
+  const savedQuery = savedQueries.find((q) => q.id === tab.savedQueryId);
+  if (!savedQuery) return false;
   return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
 }
 
@@ -224,7 +224,7 @@ export function getIsSavedQuery(tab: Tab): boolean {
  *   period where the UI would show "Update" but allow clicking while data is
  *   still syncing.
  */
-export function getDisableSaveOrUpdate(savedQueries: Record<string, Query>, tab: Tab): boolean {
+export function getDisableSaveOrUpdate(savedQueries: Query[] | undefined, tab: Tab): boolean {
   const isSavedQuery = getIsSavedQuery(tab);
   return tab.name === '' || (isSavedQuery && !hasDiffWithSavedQuery(savedQueries, tab));
 }

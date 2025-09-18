@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import type { Query, QuerySnapshot, Tab, UnsavedQuery } from '@/components/Insights/types';
+import type { Query, QuerySnapshot, Tab } from '@/components/Insights/types';
 import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
@@ -12,23 +12,19 @@ type ID = string;
 type QueryRecord<T> = Record<ID, T>;
 
 interface StoredQueriesContextValue {
-  addUnsavedQuery: (query: UnsavedQuery) => void;
   deleteQuery: (queryId: string) => void;
   deleteQuerySnapshot: (snapshotId: string) => void;
   isSavedQueriesFetching: boolean;
-  queries: QueryRecord<Query>;
+  queries: {
+    data: undefined | Query[];
+    error: undefined | string;
+    isLoading: boolean;
+  };
   querySnapshots: {
     data: QuerySnapshot[];
     error: undefined;
     isLoading: boolean;
   };
-  removeUnsavedQuery: (id: ID) => void;
-  savedQueries: {
-    data: undefined | Query[];
-    error: undefined | string;
-    isLoading: boolean;
-  };
-  savedQueriesError: undefined | string;
   saveQuery: (tab: Tab) => Promise<void>;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
 }
@@ -53,17 +49,6 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
     refetchSavedQueries,
   } = useInsightsSavedQueries();
 
-  const [unsavedQueries, setUnsavedQueries] = useState<QueryRecord<UnsavedQuery>>({});
-
-  const addUnsavedQuery = useCallback((query: UnsavedQuery) => {
-    const unsavedQuery: UnsavedQuery = { ...query, savedQueryId: undefined };
-    setUnsavedQueries((prev) => withId(prev, query.id, unsavedQuery));
-  }, []);
-
-  const removeUnsavedQuery = useCallback((id: ID) => {
-    setUnsavedQueries((prev) => withoutId(prev, id));
-  }, []);
-
   const saveQuery = useCallback(
     async (tab: Tab) => {
       if (tab.savedQueryId !== undefined) {
@@ -77,7 +62,6 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         try {
           const saved = await beSaveQuery({ name: tab.name, query: tab.query });
           tabManagerActions.updateTab(tab.id, { savedQueryId: saved.id });
-          setUnsavedQueries((prev) => withoutId(prev, tab.id));
           toast.success('Successfully saved query');
         } catch (e) {
           toast.error('Failed to save query');
@@ -118,19 +102,12 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   );
 
   const queries = useMemo(() => {
-    const beQueries: QueryRecord<Query> = Object.fromEntries(
-      (beSavedQueries ?? []).map((q) => [q.id, q])
-    );
-    return mergeRight(unsavedQueries, beQueries);
-  }, [unsavedQueries, beSavedQueries]);
-
-  const savedQueries = useMemo(() => {
     return {
-      data: getOrderedSavedQueries(queries),
+      data: getOrderedSavedQueries(beSavedQueries),
       error: savedQueriesError ? savedQueriesError.message : undefined,
       isLoading: isSavedQueriesFetching,
     };
-  }, [queries, savedQueriesError, isSavedQueriesFetching]);
+  }, [beSavedQueries, isSavedQueriesFetching, savedQueriesError]);
 
   const orderedQuerySnapshots = useMemo(
     () => ({
@@ -144,15 +121,11 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
   return (
     <StoredQueriesContext.Provider
       value={{
-        addUnsavedQuery,
         deleteQuery,
         deleteQuerySnapshot,
         isSavedQueriesFetching,
         queries,
         querySnapshots: orderedQuerySnapshots,
-        removeUnsavedQuery,
-        savedQueries,
-        savedQueriesError: savedQueriesError?.message,
         saveQuery,
         saveQuerySnapshot,
       }}
@@ -169,10 +142,6 @@ export function useStoredQueries(): StoredQueriesContextValue {
   }
 
   return context;
-}
-
-function mergeRight<T>(a: Record<string, T>, b: Record<string, T>): Record<string, T> {
-  return { ...a, ...b };
 }
 
 function withId<T>(obj: Record<string, T>, id: string, value: T): Record<string, T> {

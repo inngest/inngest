@@ -12,7 +12,7 @@ interface QueryHelperPanelProps {
 
 export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, querySnapshots, savedQueries } = useStoredQueries();
+  const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } = useStoredQueries();
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -42,7 +42,7 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
           activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={savedQueries}
+          queries={queries}
           title="Saved queries"
           sectionType="saved"
         />
