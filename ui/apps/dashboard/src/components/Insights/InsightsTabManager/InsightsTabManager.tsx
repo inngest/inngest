@@ -11,7 +11,7 @@ import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 export interface TabManagerActions {
-  breakQueryAssociation: (id: string) => void;
+  breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => void;
@@ -48,12 +48,12 @@ export function useInsightsTabManager(
 
   const actions = useMemo(
     () => ({
-      breakQueryAssociation: (id: string) => {
-        const isOpen = activeTabId === id;
+      breakQueryAssociation: (savedQueryId: string) => {
         setTabs((prevTabs) =>
-          prevTabs.map((tab) => (tab.id === id ? { ...tab, savedQueryId: undefined } : tab))
+          prevTabs.map((tab) =>
+            tab.savedQueryId === savedQueryId ? { ...tab, savedQueryId: undefined } : tab
+          )
         );
-        if (isOpen) setActiveTabId(id);
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
