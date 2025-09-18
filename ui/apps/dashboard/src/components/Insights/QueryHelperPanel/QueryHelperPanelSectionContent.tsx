@@ -31,7 +31,7 @@ export function QueryHelperPanelSectionContent({
   }
 
   if (error) {
-    return <QueryHelperPanelStaticMessage>{error}</QueryHelperPanelStaticMessage>;
+    return <QueryHelperPanelStaticMessage>Failed to load queries</QueryHelperPanelStaticMessage>;
   }
 
   if (!data?.length) {
