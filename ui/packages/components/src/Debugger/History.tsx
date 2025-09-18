@@ -260,7 +260,15 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
 
   return (
     <div className="flex w-full flex-col justify-start gap-2 ">
-      <Table noHeader={true} data={data.debugRuns ?? []} columns={columns} />
+      <Table
+        noHeader={true}
+        data={(data.debugRuns ?? []).sort(
+          (a, b) =>
+            (b?.startedAt ? new Date(b.startedAt).getTime() : 0) -
+            (a?.startedAt ? new Date(a.startedAt).getTime() : 0)
+        )}
+        columns={columns}
+      />
     </div>
   );
 };

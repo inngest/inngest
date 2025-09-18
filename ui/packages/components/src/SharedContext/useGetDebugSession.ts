@@ -16,8 +16,8 @@ export type DebugSessionRun = {
   startedAt: Trace['startedAt'];
   endedAt: Trace['endedAt'];
   debugRunID: Trace['debugRunID'];
-  tags: [string];
-  versions: [string];
+  tags: string[] | null;
+  versions: string[] | null;
 };
 
 export type DebugSessionResult = {
