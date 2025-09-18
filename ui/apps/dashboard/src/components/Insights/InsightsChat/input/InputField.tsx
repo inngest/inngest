@@ -20,7 +20,7 @@ export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
     className={cn(
-      'border-border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-3xl border shadow-sm',
+      'border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-lg border pt-4 shadow-sm',
       className
     )}
     {...props}
@@ -51,11 +51,12 @@ export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTe
 
     return (
       <textarea
+        id="user-input"
         ref={ref}
         rows={rows}
         onKeyDown={handleKeyDown}
         className={cn(
-          'bg-canvasBase placeholder-disabled focus:outline-primary-moderate w-full rounded-md border-none border-none p-3 text-sm text-xs outline-0 ring-0 transition-all focus:border-none focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
+          'bg-canvasBase placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
           className
         )}
         {...props}
@@ -71,7 +72,7 @@ export const ResponsivePromptInput = ({
   value,
   onChange,
   onSubmit,
-  placeholder = 'Ask anything',
+  placeholder = 'Ask insights agent to query...',
   disabled = false,
   className,
 }: {
@@ -138,20 +139,21 @@ export const ResponsivePromptInput = ({
     return (
       <PromptInput onSubmit={onSubmit} className={className}>
         <div className="flex flex-col">
-          <div className="relative mb-3 w-full">
+          <div className="relative mb-2 w-full">
             <PromptInputTextarea
               ref={textareaRef}
+              rows={5}
               value={value}
               onChange={onChange}
               placeholder={placeholder}
               disabled={disabled}
-              className="max-h-[15lh] min-h-[3lh] w-full resize-none px-6 py-0 pt-4 text-base leading-6 placeholder:text-base"
+              className="max-h-[30lh] min-h-[3lh] w-full resize-none px-4 py-0 pt-0 leading-6 placeholder:text-base"
             />
             <div className="from-surfaceBase pointer-events-none absolute left-0 right-0 top-0 h-3 bg-gradient-to-b to-transparent" />
             {/* Bottom gradient overlay */}
             <div className="from-surfaceBase pointer-events-none absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-t to-transparent" />
           </div>
-          <div className="flex items-center justify-between px-3 pb-3">
+          <div className="flex items-center justify-end px-3 pb-3">
             <div className="flex items-center gap-2">
               <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
             </div>
@@ -163,7 +165,7 @@ export const ResponsivePromptInput = ({
 
   return (
     <PromptInput onSubmit={onSubmit} className={className}>
-      <div className="flex h-14 items-center gap-2 px-3">
+      <div className="flex h-14 items-center gap-2 px-0 pb-0">
         {/* Plus button removed */}
         <div className="flex-1">
           <PromptInputTextarea
@@ -172,11 +174,14 @@ export const ResponsivePromptInput = ({
             onChange={onChange}
             placeholder={placeholder}
             disabled={disabled}
-            className="h-[32px] w-full bg-transparent px-0 py-0 text-base leading-6 placeholder:text-base"
+            className="w-full resize-none px-4 py-0 pt-3 leading-6"
           />
         </div>
-        {/* Mic button removed */}
-        <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
+        <div className="relative top-1 flex items-center justify-end px-3 pb-0">
+          <div className="flex items-center gap-2 pr-0.5">
+            <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
+          </div>
+        </div>
       </div>
     </PromptInput>
   );
