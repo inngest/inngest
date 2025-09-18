@@ -1,4 +1,5 @@
 import { Button } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiEraserLine } from '@remixicon/react';
 
 type ClearThreadButtonProps = {
@@ -9,14 +10,16 @@ type ClearThreadButtonProps = {
 
 export default function ClearThreadButton({ onClick, className, style }: ClearThreadButtonProps) {
   return (
-    <Button
-      kind="secondary"
-      appearance="outlined"
-      size="small"
-      icon={<RiEraserLine />}
-      className={className}
-      onClick={onClick}
-      style={style}
-    />
+    <OptionalTooltip tooltip="Clear chat" side="bottom">
+      <Button
+        kind="secondary"
+        appearance="ghost"
+        size="small"
+        icon={<RiEraserLine />}
+        className={className}
+        onClick={onClick}
+        style={style}
+      />
+    </OptionalTooltip>
   );
 }
