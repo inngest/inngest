@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button/index';
-import { Link } from '@inngest/components/Link';
 import { RiCloseLine } from '@remixicon/react';
 
 const HIDE_FEATURE_LAUNCH = 'inngest-feature-launch-hide';
