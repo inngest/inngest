@@ -13,7 +13,7 @@ export const runAgentNetwork = inngest.createFunction(
     name: 'Insights SQL Agent',
   },
   { event: 'insights-agent/chat.requested' },
-  async ({ event, publish }) => {
+  async ({ event, publish, step }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -28,24 +28,26 @@ export const runAgentNetwork = inngest.createFunction(
       throw new Error('userId is required for agent chat execution');
     }
 
+    // Determine the target channel for publishing (channelKey takes priority)
+    const targetChannel = await step.run('generate-target-channel', async () => {
+      return channelKey || userId;
+    });
+
     try {
-      const clientState = (userMessage as any)?.state || {};
+      const clientState = userMessage.state || {};
       const network = createInsightsNetwork(
         threadId,
         createState<InsightsAgentState>(
           {
             userId,
-            ...(clientState as Partial<InsightsAgentState>),
-          } as InsightsAgentState,
+            ...clientState,
+          },
           {
             messages: history as Message[] | undefined,
             threadId,
           }
         )
       );
-
-      // Determine the target channel for publishing (channelKey takes priority)
-      const targetChannel = channelKey || userId;
 
       // Run the network with streaming enabled
       await network.run(userMessage, {
@@ -79,7 +81,6 @@ export const runAgentNetwork = inngest.createFunction(
       };
       try {
         // Use the same target channel as the main flow
-        const targetChannel = channelKey || userId;
         await publish(createChannel(targetChannel).agent_stream(errorChunk));
       } catch {}
 
