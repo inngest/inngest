@@ -78,9 +78,14 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       data: {
         ...app,
         functions: app.functions.map((fn) => {
+          let triggers = undefined;
+          if (fn.latestVersion !== null) {
+            triggers = fn.latestVersion.triggers;
+          }
+
           return {
             ...fn,
-            triggers: fn.latestVersion.triggers,
+            triggers: triggers ?? [],
           };
         }),
         latestSync,
