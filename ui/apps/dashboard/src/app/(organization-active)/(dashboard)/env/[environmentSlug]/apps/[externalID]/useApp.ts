@@ -15,14 +15,12 @@ const query = graphql(`
         externalID
         functions {
           id
-          latestSyncedConfig {
-            triggers {
-              type
-              value
-            }
-          }
           name
           slug
+          triggers {
+            type
+            value
+          }
         }
         appVersion
         name
@@ -80,7 +78,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
         functions: app.functions.map((fn) => {
           return {
             ...fn,
-            triggers: fn.latestSyncedConfig?.triggers || [],
+            triggers: fn.triggers,
           };
         }),
         latestSync,
