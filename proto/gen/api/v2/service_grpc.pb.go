@@ -30,6 +30,7 @@ const (
 	V2_FetchAccountSigningKeys_FullMethodName = "/api.v2.V2/FetchAccountSigningKeys"
 	V2_CreateWebhook_FullMethodName           = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName            = "/api.v2.V2/ListWebhooks"
+	V2_SyncNewApp_FullMethodName              = "/api.v2.V2/SyncNewApp"
 )
 
 // V2Client is the client API for V2 service.
@@ -48,6 +49,7 @@ type V2Client interface {
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
+	SyncNewApp(ctx context.Context, in *SyncNewAppRequest, opts ...grpc.CallOption) (*SyncNewAppResponse, error)
 }
 
 type v2Client struct {
@@ -168,6 +170,16 @@ func (c *v2Client) ListWebhooks(ctx context.Context, in *ListWebhooksRequest, op
 	return out, nil
 }
 
+func (c *v2Client) SyncNewApp(ctx context.Context, in *SyncNewAppRequest, opts ...grpc.CallOption) (*SyncNewAppResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncNewAppResponse)
+	err := c.cc.Invoke(ctx, V2_SyncNewApp_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -184,6 +196,7 @@ type V2Server interface {
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
+	SyncNewApp(context.Context, *SyncNewAppRequest) (*SyncNewAppResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -226,6 +239,9 @@ func (UnimplementedV2Server) CreateWebhook(context.Context, *CreateWebhookReques
 }
 func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListWebhooks not implemented")
+}
+func (UnimplementedV2Server) SyncNewApp(context.Context, *SyncNewAppRequest) (*SyncNewAppResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncNewApp not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -446,6 +462,24 @@ func _V2_ListWebhooks_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_SyncNewApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncNewAppRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).SyncNewApp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_SyncNewApp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).SyncNewApp(ctx, req.(*SyncNewAppRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -496,6 +530,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWebhooks",
 			Handler:    _V2_ListWebhooks_Handler,
+		},
+		{
+			MethodName: "SyncNewApp",
+			Handler:    _V2_SyncNewApp_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

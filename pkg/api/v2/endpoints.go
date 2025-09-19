@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -272,4 +273,48 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	// 2. Apply cursor-based pagination
 	// 3. Return the list with proper pagination metadata
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
+}
+
+func (s *Service) SyncNewApp(ctx context.Context, req *apiv2.SyncNewAppRequest) (*apiv2.SyncNewAppResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := s.base.GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate required fields
+	if req.AppURL == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App URL is required")
+	}
+
+	// Check if GraphQL resolver is available
+	if s.resolver == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App synchronization not configured")
+	}
+
+	// Create mutation resolver from the main resolver
+	mutationResolver := s.resolver.Mutation()
+
+	// Call the existing GraphQL CreateApp mutation
+	input := models.CreateAppInput{
+		URL: req.AppURL,
+	}
+
+	app, err := mutationResolver.CreateApp(ctx, input)
+	if err != nil {
+		// Return HTTP error following REST conventions
+		return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorValidationError, err.Error())
+	}
+
+	// Return successful response with just the app data
+	return &apiv2.SyncNewAppResponse{
+		Data: &apiv2.App{
+			Id:         app.ID.String(),
+			ExternalID: app.Name, // ExternalID is the same as Name for now
+		},
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+	}, nil
 }
