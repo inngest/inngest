@@ -74,11 +74,9 @@ const GetFunctionsDocument = graphql(`
           name
           isPaused
           isArchived
-          current {
-            triggers {
-              type
-              value
-            }
+          triggers {
+            type
+            value
           }
         }
       }
