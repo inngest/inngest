@@ -6,7 +6,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import { getDisableSaveOrUpdate, getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
+import { getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
 import type { Tab } from '../types';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
@@ -15,10 +15,10 @@ type InsightsSQLEditorSaveQueryButtonProps = {
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const { queries, saveQuery } = useStoredQueries();
+  const { saveQuery } = useStoredQueries();
 
   const isSaved = getIsSavedQuery(tab);
-  const disabled = getDisableSaveOrUpdate(queries.data, tab) || isSaving;
+  const disabled = tab.name === '' || tab.query === '' || isSaving;
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
   return (

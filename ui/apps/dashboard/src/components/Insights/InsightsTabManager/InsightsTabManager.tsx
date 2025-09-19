@@ -216,26 +216,6 @@ export function getIsSavedQuery(tab: Tab): boolean {
   return tab.savedQueryId !== undefined;
 }
 
-/**
- * Computes whether the Save/Update button should be disabled for a tab.
- *
- * Behavior in slow/failed query list refetch scenarios:
- * - If the tab was just saved, `tab.savedQueryId` is set immediately.
- * - Until the saved queries list refetches (or if it fails), the corresponding
- *   saved query may not be present in `savedQueries`.
- * - `hasDiffWithSavedQuery` returns false when the saved query is not found.
- *   Combined with `isSaved`, this keeps the button disabled, preventing a brief
- *   period where the UI would show "Update" but allow clicking while data is
- *   still syncing.
- */
-export function getDisableSaveOrUpdate(
-  savedQueries: InsightsQuery[] | undefined,
-  tab: Tab
-): boolean {
-  const isSavedQuery = getIsSavedQuery(tab);
-  return tab.name === '' || (isSavedQuery && !hasDiffWithSavedQuery(savedQueries, tab));
-}
-
 function makeEmptyUnsavedTab(): Tab {
   return { id: ulid(), name: UNTITLED_QUERY, query: '' };
 }
