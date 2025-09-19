@@ -23,8 +23,8 @@ function GenerateSqlToolUI({
       return { title: null, sql: null };
     }
     const output = part.output as ToolResultPayload<GenerateSqlResult>;
-    const title = output?.data.title;
-    const sql = output?.data.sql;
+    const title = output.data.title;
+    const sql = output.data.sql;
     if (!title || !sql) {
       return { title: 'Error generating SQL', sql: null };
     }
