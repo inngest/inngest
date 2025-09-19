@@ -21,7 +21,7 @@ export default function FeaturelaunchTues() {
 
     // Check if today is Tuesday, September 23th
     const today = new Date();
-    const targetDate = new Date(2025, 8, 19); // Month is 0-indexed, so 8 = September
+    const targetDate = new Date(2025, 8, 23); // Month is 0-indexed, so 8 = September
 
     // Check if it's the same date (year, month, day)
     const isTargetDate =
@@ -65,7 +65,7 @@ export default function FeaturelaunchTues() {
                 window.open('https://app.inngest.com/env/production/insights', '_blank')
               }
             >
-              Use Insights
+              Use insights
             </button>
           </div>
         </div>

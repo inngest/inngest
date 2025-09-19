@@ -21,7 +21,7 @@ export default function FeaturelaunchMon() {
 
     // Check if today is Monday, September 22nd
     const today = new Date();
-    const targetDate = new Date(2025, 8, 22); // Month is 0-indexed, so 8 = September
+    const targetDate = new Date(2025, 8, 19); // Month is 0-indexed, so 8 = September
 
     // Check if it's the same date (year, month, day)
     const isTargetDate =
@@ -59,13 +59,18 @@ export default function FeaturelaunchMon() {
         </div>
         <div className="text-muted px-3 pb-3 pt-3 text-sm">
           Build unbreakable APIs using steps directly in your API endpoints, without the need for
-          background workflows
+          background workflows.
           <div className="pt-2">
             <button
               className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
-              onClick={() => window.open('https://www.inngest.com/blog', '_blank')}
+              onClick={() =>
+                window.open(
+                  'https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis',
+                  '_blank'
+                )
+              }
             >
-              Read the blog post
+              Learn more
             </button>
           </div>
         </div>
