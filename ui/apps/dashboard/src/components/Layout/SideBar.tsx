@@ -74,7 +74,7 @@ export default function SideBar({
         <div className="mx-4">
           <SeatOverageWidget collapsed={collapsed} />
           {isWidgetOpen && <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />}
-          <Alert />
+          <Alert collapsed={collapsed} />
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} />
         </div>

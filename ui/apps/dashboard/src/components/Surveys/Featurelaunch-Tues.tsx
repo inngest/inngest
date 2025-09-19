@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link';
 import { RiCloseLine } from '@remixicon/react';
@@ -8,13 +8,18 @@ import { RiCloseLine } from '@remixicon/react';
 const HIDE_FEATURE_LAUNCH_TUES = 'inngest-feature-launch-tues-hide';
 
 export default function FeaturelaunchTues() {
-  const [open, setOpen] = useState(() => {
-    if (typeof window === 'undefined') return false;
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+
+    if (typeof window === 'undefined') return;
 
     // Check if already dismissed
-    if (window.localStorage.getItem(HIDE_FEATURE_LAUNCH_TUES) === 'true') return false;
+    if (window.localStorage.getItem(HIDE_FEATURE_LAUNCH_TUES) === 'true') return;
 
-    // Check if today is Tuesday, September 18th
+    // Check if today is Tuesday, September 23th
     const today = new Date();
     const targetDate = new Date(2025, 8, 19); // Month is 0-indexed, so 8 = September
 
@@ -24,13 +29,17 @@ export default function FeaturelaunchTues() {
       today.getMonth() === targetDate.getMonth() &&
       today.getDate() === targetDate.getDate();
 
-    return isTargetDate;
-  });
+    if (isTargetDate) {
+      setOpen(true);
+    }
+  }, []);
 
   const dismiss = () => {
     setOpen(false);
     window.localStorage.setItem(HIDE_FEATURE_LAUNCH_TUES, 'true');
   };
+
+  if (!mounted) return null;
 
   return (
     open && (
@@ -47,14 +56,16 @@ export default function FeaturelaunchTues() {
           />
         </div>
         <div className="text-muted px-3 pb-3 pt-3 text-sm">
-          Introducing enhanced observability features for better monitoring and debugging of your
-          workflows.
+          You can now query events to analyze trends, usage, and performance right where your
+          workflows run. No tool switching required
           <div className="pt-2">
             <button
               className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
-              onClick={() => window.open('https://www.inngest.com/blog', '_blank')}
+              onClick={() =>
+                window.open('https://app.inngest.com/env/production/insights', '_blank')
+              }
             >
-              Read the blog post
+              Use Insights
             </button>
           </div>
         </div>

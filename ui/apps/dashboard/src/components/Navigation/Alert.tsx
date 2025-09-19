@@ -8,7 +8,7 @@ import { RiCloseLine } from '@remixicon/react';
 const ALERT_NAME = 'inngest-dismissLaunchWeekAlert';
 //
 // TODO: turn this into a proper component
-export const Alert = () => {
+export const Alert = ({ collapsed }: { collapsed: boolean }) => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -36,10 +36,11 @@ export const Alert = () => {
   };
 
   return (
-    show && (
+    show &&
+    !collapsed && (
       <div className="text-basis bg-info border-secondary-2xSubtle mb-5 rounded border py-3 pl-3 pr-2 text-xs leading-tight">
         <div className="gap-x flex flex-row items-start justify-between">
-          <div class="pt-1">
+          <div className="pt-1">
             Launch week is here! Check out our latest features and announcements 🚀{' '}
           </div>
           <Button

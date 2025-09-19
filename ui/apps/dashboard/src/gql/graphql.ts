@@ -780,6 +780,7 @@ export type EventTypeV2 = {
   __typename?: 'EventTypeV2';
   envID: Scalars['UUID'];
   functions: FunctionsConnection;
+  latestSchema: Maybe<Scalars['String']>;
   name: Scalars['String'];
   usage: Usage;
 };
