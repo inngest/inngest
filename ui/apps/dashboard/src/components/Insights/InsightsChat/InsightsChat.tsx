@@ -8,8 +8,6 @@ import {
   type ToolResultPayload,
 } from '@inngest/use-agents';
 
-// Event data is narrowed via RealtimeEvent discriminant; no need to import event types from agent-kit
-
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
 import { LoadingIndicator } from './LoadingIndicator';
@@ -131,7 +129,6 @@ export function InsightsChat({ threadId }: { threadId: string }) {
               setTextCompleted(true);
             } else if (type === 'tool-output' || type === 'tool-call') {
               setCurrentToolName(null);
-              // No-op: onToolResult handles typed tool outputs
             }
             break;
           }
@@ -196,17 +193,7 @@ export function InsightsChat({ threadId }: { threadId: string }) {
       if (!message || status !== 'ready') return;
       // Clear input immediately for snappier UX
       setInputValue('');
-      await sendMessageToThread(threadId, message, {
-        state: () => ({
-          sqlQuery: currentSql,
-          eventTypes,
-          schemas,
-          currentQuery: currentSql,
-          tabTitle,
-          mode: 'insights_sql_playground',
-          timestamp: Date.now(),
-        }),
-      });
+      await sendMessageToThread(threadId, message);
     },
     [inputValue, status, sendMessageToThread, threadId, currentSql, eventTypes, schemas, tabTitle]
   );
