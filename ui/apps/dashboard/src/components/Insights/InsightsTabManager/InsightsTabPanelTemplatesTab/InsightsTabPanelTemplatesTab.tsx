@@ -1,9 +1,10 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
-import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
+import { RiChatPollLine, RiExternalLinkLine, RiMailLine, RiQuillPenLine } from '@remixicon/react';
 
 import { SHOW_DOCS_LINKS } from '../../temp-flags';
+import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://www.inngest.com/docs';
@@ -22,9 +23,15 @@ const RESOURCES = [
     show: SHOW_DOCS_LINKS,
   },
   {
-    href: '/support',
+    href: EXTERNAL_FEEDBACK_LINK,
     label: 'Send us feedback',
     icon: RiChatPollLine,
+    show: true,
+  },
+  {
+    href: '/support',
+    label: 'Request support',
+    icon: RiMailLine,
     show: true,
   },
 ];
