@@ -818,6 +818,159 @@ service V2 {
       }
     };
   }
+
+  rpc FetchEventTypes(FetchEventTypesRequest) returns (FetchEventTypesResponse) {
+    option (google.api.http) = {
+      get: "/event-types"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event types"
+      description: "Lists all unique event types with their first occurrence timestamp"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of event types"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchEventTypesResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc FetchEventType(FetchEventTypeRequest) returns (FetchEventTypeResponse) {
+    option (google.api.http) = {
+      get: "/event-types/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get event type schema"
+      description: "Returns a specific event type with its TypeScript schema definition"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Event type with schema"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2FetchEventTypeResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid event type ID"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - event type not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1087,4 +1240,84 @@ message Webhook {
   string environment = 7;
   google.protobuf.Timestamp createdAt = 8;
   google.protobuf.Timestamp updatedAt = 9;
+}
+
+message FetchEventTypesRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of event types to return per page (min: 1, max: 250)"
+      default: "50"
+    }
+  ];
+}
+
+message FetchEventTypesResponse {
+  repeated EventType data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message EventType {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The event type UUID identifier"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+  string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The event type name"
+      example: "\"user.signup\""
+    }
+  ];
+  google.protobuf.Timestamp createdAt = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The timestamp when this event type was first seen"
+    }
+  ];
+}
+
+message FetchEventTypeRequest {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The event type UUID identifier"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+}
+
+message FetchEventTypeResponse {
+  EventTypeWithSchema data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message EventTypeWithSchema {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The event type UUID identifier"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+  string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The event type name"
+      example: "\"user.signup\""
+    }
+  ];
+  google.protobuf.Timestamp createdAt = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The timestamp when this event type was first seen"
+    }
+  ];
+  string schema = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "TypeScript schema definition for this event type"
+      example: "\"interface UserSignupEvent { id: string; email: string; createdAt: string; }\""
+    }
+  ];
 }
