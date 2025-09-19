@@ -367,6 +367,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					if child.StepInfo != nil {
 						gqlSpan.StepInfo = child.StepInfo
 					}
+					if child.StepType != "" {
+						gqlSpan.StepType = child.StepType
+					}
 					if child.Attempts != nil && *child.Attempts > *gqlSpan.Attempts {
 						gqlSpan.Attempts = child.Attempts
 					}
@@ -428,6 +431,14 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	if !showSpan {
 		return nil, nil
+	}
+
+	if gqlSpan.Name == FinalizationSpanName {
+		gqlSpan.StepType = strings.ToUpper(FinalizationSpanName)
+	} else if span.Attributes.StepRunType != nil {
+		gqlSpan.StepType = *span.Attributes.StepRunType
+	} else if gqlSpan.StepOp != nil {
+		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
 	return gqlSpan, nil

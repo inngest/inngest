@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { InlineSpans } from './InlineSpans';
+import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
+import { FINAL_SPAN_DISPLAY, FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
 
 type Props = {
   depth: number;
@@ -31,7 +32,7 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
     (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
       ? false
       : (trace.childrenSpans?.length ?? 0) > 0;
-
+  const spanName = getSpanName(trace.name);
   return (
     <div className="relative flex w-full flex-col">
       <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
@@ -82,13 +83,13 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
                 />
               </div>
             )}
-
+            <StepType stepType={trace.stepType} />
             <div
               className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
                 !hasChildren && 'pl-1.5'
               }`}
             >
-              {getSpanName(trace.name)}
+              {spanName}
             </div>
           </div>
 
