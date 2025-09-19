@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
-	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -30,7 +29,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -712,16 +710,25 @@ func TestFinalize(t *testing.T) {
 	})
 }
 
-// mockDriverV2 implements driver.DriverV2 for testing
-type mockDriverV2 struct {
+// mockDriverV1 implements driver.DriverV1 for testing
+type mockDriverV1 struct {
 	response *state.DriverResponse
 	t        *testing.T
 }
 
-func (m *mockDriverV2) Name() string { return "http" }
+func (m *mockDriverV1) Name() string { return "http" }
 
-func (m *mockDriverV2) Do(ctx context.Context, sl statev2.StateLoader, opts driver.V2RequestOpts) (*state.DriverResponse, errs.UserError, errs.InternalError) {
-	return m.response, nil, nil
+func (m *mockDriverV1) Execute(
+	ctx context.Context,
+	sl statev2.StateLoader,
+	md statev2.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	step inngest.Step,
+	stackIndex int,
+	attempt int,
+) (*state.DriverResponse, error) {
+	return m.response, nil
 }
 
 // This tests a scenario where a run used to hang when retrying an invoke and the invoke's pause was already created.
@@ -839,7 +846,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 
 	genID := "invoke-step"
 
-	mockDriver := &mockDriverV2{
+	mockDriver := &mockDriverV1{
 		t: t,
 		response: &state.DriverResponse{
 			StatusCode: 206,
@@ -873,7 +880,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 			}
 			return nil
 		}),
-		executor.WithDriverV2(mockDriver),
+		executor.WithDriverV1(mockDriver),
 	)
 	require.NoError(t, err)
 
@@ -904,9 +911,9 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 			FunctionID: fnID,
 			AccountID:  aID,
 		},
-		GroupID:          "test-group",
-		Incoming:         "$trigger",
-		Expires:          state.Time(time.Now().Add(time.Hour)),
+		GroupID:  "test-group",
+		Incoming: "$trigger",
+		Expires:  state.Time(time.Now().Add(time.Hour)),
 	}
 
 	_, err = pm.Write(ctx, pauses.Index{WorkspaceID: wsID, EventName: "test/event"}, &pause)
@@ -932,4 +939,186 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, eventCaptured)
+}
+
+func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		Steps: []inngest.Step{
+			{
+				ID:   "step",
+				Name: "step",
+				URI:  "/step",
+			},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
+	var sm state.Manager
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
+	}
+
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
+
+	nonRetriableDriver := &mockDriverV1{
+		t: t,
+		response: &state.DriverResponse{
+			StatusCode: 400,
+			Err:        func() *string { s := "NonRetriableError"; return &s }(),
+			NoRetry:    true,
+			Header: map[string][]string{
+				"Content-Type":       {"application/json; charset=utf-8"},
+				"X-Inngest-No-Retry": {"true"},
+			},
+		},
+	}
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithDriverV1(nonRetriableDriver),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			event.NewOSSTrackedEventWithID(event.Event{
+				Name: "test/event",
+			}, evtID),
+		},
+	})
+	require.NoError(t, err)
+
+	// Job should have been scheduled
+	jobsAfterSchedule, err := rq.RunJobs(
+		ctx,
+		queueShard.Name,
+		run.ID.Tenant.EnvID,
+		run.ID.FunctionID,
+		run.ID.RunID,
+		1000,
+		0,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, jobsAfterSchedule)
+
+	stateBefore, err := smv2.LoadState(ctx, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stateBefore)
+
+	// Add the job ID to the queue context. This is to avoid that the
+	// finalize call remove the current queue item that it's currently
+	// executing.
+	jobCtx := queue.WithJobID(ctx, jobsAfterSchedule[0].JobID)
+
+	resp, err := exec.Execute(jobCtx, state.Identifier{
+		WorkflowID: fnID,
+		RunID:      run.ID.RunID,
+		AccountID:  aID,
+	}, queue.Item{
+		WorkspaceID: wsID,
+		Kind:        queue.KindStart,
+		Identifier: state.Identifier{
+			WorkflowID: fnID,
+			RunID:      run.ID.RunID,
+			AccountID:  aID,
+		},
+		Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: "step"}},
+	}, inngest.Edge{
+		Incoming: "$trigger",
+		Outgoing: "step",
+	})
+
+	require.Contains(t, err.Error(), "NonRetriableError")
+	// Verifies Execute returns a non-nil response for non-retriable errors, allowing callers to check retryability
+	require.NotNil(t, resp)
+	require.False(t, resp.Retryable())
+
+	// State should have been deleted when finalizing the run
+	_, err = smv2.LoadState(ctx, run.ID)
+	require.ErrorContains(t, err, state.ErrRunNotFound.Error())
 }
