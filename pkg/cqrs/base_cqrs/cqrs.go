@@ -1520,7 +1520,7 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	so := &cqrs.SpanOutput{}
 	var m map[string]any
 
-	so.Data = []byte(fmt.Append(nil, s))
+	so.Data = []byte(fmt.Append(nil, s.Output))
 	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
 		if errData, ok := m["error"]; ok {
 			so.IsError = true
