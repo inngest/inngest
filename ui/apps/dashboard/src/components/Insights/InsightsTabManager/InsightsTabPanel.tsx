@@ -1,5 +1,7 @@
 'use client';
 
+import { Link } from '@inngest/components/Link/Link';
+
 import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/InsightsDataTable';
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
@@ -46,6 +48,9 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
           <>
             <InsightsSQLEditorDownloadCSVButton temporarilyHide />
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+            <Link href="https://tally.so/r/nr7yap" rel="noopener noreferrer" target="_blank">
+              Send us feedback
+            </Link>
           </>
         }
         className="border-subtle border-t"
