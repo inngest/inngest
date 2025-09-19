@@ -7,7 +7,7 @@ import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Select } from '@inngest/components/Select/Select';
-import { RiRefreshLine } from '@remixicon/react';
+import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
 import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
 
@@ -83,7 +83,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
             key={`vercel-projects-${i}`}
             className="mt-4"
             accentPosition="left"
-            accentColor={p.isEnabled ? 'bg-primary-intense' : 'bg-disabled'}
+            accentColor={p.isEnabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
           >
             <Card.Content className="h-36 p-6">
               <div className="flex flex-row items-center justify-between">
@@ -115,6 +115,9 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                           >
                             Learn more
                           </Link>
+                        }
+                        iconElement={
+                          <RiInformationLine className="text-subtle h-[18px] w-[18px]" />
                         }
                       />
                     )}
