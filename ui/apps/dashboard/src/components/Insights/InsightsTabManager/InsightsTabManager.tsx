@@ -186,7 +186,7 @@ function InsightsTabManagerInternal({
               />
             </div>
             {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
-              <InsightsChat tabId={tab.id} threadId={getThreadIdForTab(tab.id)} />
+              <InsightsChat threadId={getThreadIdForTab(tab.id)} />
             )}
           </div>
         </InsightsStateMachineContextProvider>

@@ -73,7 +73,7 @@ function isEventForThisThread(tid: unknown, threadId: string): boolean {
   return typeof tid !== 'string' || tid === threadId;
 }
 
-export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: string }) {
+export function InsightsChat({ threadId }: { threadId: string }) {
   // Read required data from the Insights state context
   const {
     query: currentSql,
@@ -113,13 +113,6 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             setTextCompleted(false);
             break;
           }
-          case 'part.created': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            const { type } = evt.data;
-            if (type === 'tool-call') setCurrentToolName(currentToolName);
-            break;
-          }
           case 'tool_call.arguments.delta': {
             const tid = evt.data.threadId;
             if (!isEventForThisThread(tid, threadId)) return;
@@ -156,7 +149,7 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
         }
       } catch {}
     },
-    [threadId, onSqlChange, runQuery]
+    [threadId]
   );
 
   const {
@@ -226,7 +219,7 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
   const handleToggleChat = useCallback(() => {
     // TODO: replace this with proper state mgmt
     return;
-  }, [tabId, threadId]);
+  }, []);
 
   return (
     <div className="border-subtle flex h-full w-[412px] flex-col border-l bg-white">
