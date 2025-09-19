@@ -1577,7 +1577,7 @@ export type Query = {
   events: Maybe<PaginatedEvents>;
   executionTimeSeries: Array<TimeSeries>;
   insights: InsightsResponse;
-  insightsQuery: Maybe<InsightsQuery>;
+  insightsQuery: InsightsQuery;
   metrics: MetricsResponse;
   plans: Array<Maybe<BillingPlan>>;
   runCountTimeSeries: Array<TimeSeries>;
