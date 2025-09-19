@@ -18,7 +18,7 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const { queries, saveQuery } = useStoredQueries();
 
   const isSaved = getIsSavedQuery(tab);
-  const disabled = getDisableSaveOrUpdate(queries.data, tab);
+  const disabled = getDisableSaveOrUpdate(queries.data, tab) || isSaving;
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
   return (
