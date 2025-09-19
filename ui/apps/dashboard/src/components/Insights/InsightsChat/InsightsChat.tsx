@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useAgents,
   type AgentStatus,
   type RealtimeEvent,
-  type TextUIPart,
+  type ToolResultPayload,
 } from '@inngest/use-agents';
+
+// Event data is narrowed via RealtimeEvent discriminant; no need to import event types from agent-kit
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
@@ -17,6 +19,29 @@ import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
 import { UserMessage } from './messages/UserMessage';
+
+type GenerateSqlResult = {
+  sql: string;
+  title?: string;
+  reasoning?: string;
+};
+
+type SelectEventsResult = {
+  selected: {
+    event_name: string;
+    reason: string;
+  }[];
+  reason: string;
+  totalCandidates: number;
+};
+
+// Using shared ToolResultPayload from @inngest/use-agents
+
+// Tool manifest for typed onToolResult callback
+type InsightsToolManifest = {
+  generate_sql: ToolResultPayload<GenerateSqlResult>;
+  select_events: ToolResultPayload<SelectEventsResult>;
+};
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -43,6 +68,11 @@ function getLoadingMessage(flags: {
   return 'Thinking…';
 }
 
+// Helper: determine if an incoming event belongs to this thread
+function isEventForThisThread(tid: unknown, threadId: string): boolean {
+  return typeof tid !== 'string' || tid === threadId;
+}
+
 export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: string }) {
   // Read required data from the Insights state context
   const {
@@ -64,100 +94,61 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
   const [textCompleted, setTextCompleted] = useState(false);
   const [currentToolName, setCurrentToolName] = useState<string | null>(null);
 
-  const partIdToToolNameRef = useRef<Map<string, string>>(new Map());
-  const autoRanPartIdsRef = useRef<Set<string>>(new Set());
-
   const onEvent = useCallback(
     (evt: RealtimeEvent) => {
       try {
-        const data = ((evt as any).data || {}) as Record<string, unknown>;
-        const evtThreadId = typeof data['threadId'] === 'string' ? data['threadId'] : undefined;
-        if (evtThreadId && evtThreadId !== threadId) return; // ignore other threads
-
         switch (evt.event) {
           case 'run.started': {
-            const scope = typeof data['scope'] === 'string' ? data['scope'] : undefined;
-            if (scope === 'network') {
-              setNetworkActive(true);
-              setTextCompleted(false);
-              setCurrentToolName(null);
-            }
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
+            setNetworkActive(true);
+            setTextCompleted(false);
+            setCurrentToolName(null);
             break;
           }
           case 'text.delta': {
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
             setTextStreaming(true);
             setTextCompleted(false);
             break;
           }
           case 'part.created': {
-            const type = typeof data['type'] === 'string' ? data['type'] : undefined;
-            const tn =
-              typeof (data as { metadata?: { toolName?: string } }).metadata?.toolName === 'string'
-                ? (data as { metadata?: { toolName?: string } }).metadata!.toolName
-                : undefined;
-            const partId = typeof data['partId'] === 'string' ? data['partId'] : undefined;
-            if (type === 'tool-call') setCurrentToolName(tn || null);
-            if ((type === 'tool-output' || type === 'tool-call') && partId && tn) {
-              partIdToToolNameRef.current.set(partId, tn);
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
+            const { type } = evt.data;
+            if (type === 'tool-call') setCurrentToolName(currentToolName);
+            break;
+          }
+          case 'tool_call.arguments.delta': {
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
+            const toolName = evt.data.toolName;
+            if (typeof toolName === 'string' && toolName.length > 0) {
+              setCurrentToolName(toolName);
             }
             break;
           }
           case 'part.completed': {
-            const type = typeof data['type'] === 'string' ? data['type'] : undefined;
-            const partId = typeof data['partId'] === 'string' ? data['partId'] : undefined;
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
+            const { type } = evt.data;
             if (type === 'text') {
               setTextStreaming(false);
               setTextCompleted(true);
             } else if (type === 'tool-output' || type === 'tool-call') {
               setCurrentToolName(null);
-              // Auto-paste and run SQL when generate_sql tool output completes
-              if (type === 'tool-output' && partId && !autoRanPartIdsRef.current.has(partId)) {
-                const toolName = partIdToToolNameRef.current.get(partId);
-                if (toolName === 'generate_sql') {
-                  autoRanPartIdsRef.current.add(partId);
-                  const finalContent = (data as { finalContent?: unknown }).finalContent;
-                  let sql: string | null = null;
-                  try {
-                    if (finalContent && typeof finalContent === 'object') {
-                      const obj = finalContent as Record<string, unknown>;
-                      const envelope = (obj as { data?: unknown }).data as
-                        | Record<string, unknown>
-                        | undefined;
-                      const candidate = envelope?.sql ?? (obj as { sql?: unknown }).sql;
-                      if (typeof candidate === 'string' && candidate.trim()) sql = candidate.trim();
-                    } else if (typeof finalContent === 'string') {
-                      try {
-                        const parsed = JSON.parse(finalContent) as Record<string, unknown>;
-                        const envelope = (parsed as { data?: unknown }).data as
-                          | Record<string, unknown>
-                          | undefined;
-                        const candidate = envelope?.sql ?? (parsed as { sql?: unknown }).sql;
-                        if (typeof candidate === 'string' && candidate.trim())
-                          sql = candidate.trim();
-                      } catch {
-                        // Not JSON; ignore
-                      }
-                    }
-                  } catch {}
-                  if (sql) {
-                    try {
-                      onSqlChange(sql);
-                      runQuery();
-                    } catch {}
-                  }
-                }
-              }
+              // No-op: onToolResult handles typed tool outputs
             }
             break;
           }
           case 'stream.ended': {
-            const scope = typeof data['scope'] === 'string' ? data['scope'] : undefined;
-            if (scope === 'network') {
-              setNetworkActive(false);
-              setTextStreaming(false);
-              setTextCompleted(true);
-              setCurrentToolName(null);
-            }
+            const tid = evt.data.threadId;
+            if (!isEventForThisThread(tid, threadId)) return;
+            setNetworkActive(false);
+            setTextStreaming(false);
+            setTextCompleted(true);
+            setCurrentToolName(null);
             break;
           }
           default:
@@ -175,7 +166,7 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
     setCurrentThreadId,
     clearThreadMessages,
     sendMessageToThread,
-  } = useAgents({
+  } = useAgents<InsightsToolManifest>({
     enableThreadValidation: false,
     state: () => ({
       sqlQuery: currentSql,
@@ -187,6 +178,17 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
       timestamp: Date.now(),
     }),
     onEvent,
+    onToolResult: (res) => {
+      try {
+        if (res.toolName === 'generate_sql') {
+          const sql = res.output.data.sql;
+          if (sql) {
+            onSqlChange(sql.trim());
+            runQuery();
+          }
+        }
+      } catch {}
+    },
   });
 
   // Keep per-tab thread isolated and stable
@@ -222,11 +224,8 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
   }, [messages.length, status, clearThreadMessages, threadId]);
 
   const handleToggleChat = useCallback(() => {
-    try {
-      window.dispatchEvent(
-        new CustomEvent('insights:toggle-chat', { detail: { tabId, threadId } })
-      );
-    } catch {}
+    // TODO: replace this with proper state mgmt
+    return;
   }, [tabId, threadId]);
 
   return (
@@ -239,33 +238,29 @@ export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: str
             <div className="flex-1 space-y-4 p-3">
               {messages.map((m) => (
                 <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                  {m.role === 'user' ? (
-                    <UserMessage
-                      message={{
-                        content: m.parts
-                          .filter((p) => p.type === 'text')
-                          .map((p) => (p as TextUIPart).content)
-                          .join(''),
-                      }}
-                    />
-                  ) : (
-                    m.parts.map((p, i) => {
-                      if (p.type === 'text') {
-                        return <AssistantMessage key={i} part={p} />;
-                      }
-                      if (p.type === 'tool-call' && (p as any).toolName === 'generate_sql') {
-                        return (
-                          <ToolMessage
-                            key={i}
-                            part={p as any}
-                            onSqlChange={onSqlChange}
-                            runQuery={runQuery}
-                          />
-                        );
-                      }
-                      return null;
-                    })
-                  )}
+                  {m.role === 'user'
+                    ? m.parts.map((p, i) => {
+                        if (p.type === 'text') {
+                          return <UserMessage key={i} part={p} />;
+                        }
+                        return null;
+                      })
+                    : m.parts.map((p, i) => {
+                        if (p.type === 'text') {
+                          return <AssistantMessage key={i} part={p} />;
+                        }
+                        if (p.type === 'tool-call' && p.toolName === 'generate_sql') {
+                          return (
+                            <ToolMessage
+                              key={i}
+                              part={p}
+                              onSqlChange={onSqlChange}
+                              runQuery={runQuery}
+                            />
+                          );
+                        }
+                        return null;
+                      })}
                 </div>
               ))}
               {(() => {
