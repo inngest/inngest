@@ -45,6 +45,3 @@ export type GenerateSqlResult = {
   title?: string;
   reasoning?: string;
 };
-
-// AgentKit streams tool results wrapped in an envelope
-export type ToolEnvelope<T> = { data: T } | { error: unknown };
