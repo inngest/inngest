@@ -1880,6 +1880,7 @@ export type RunTraceSpan = {
   stepID: Maybe<Scalars['String']>;
   stepInfo: Maybe<StepInfo>;
   stepOp: Maybe<StepOp>;
+  stepType: Scalars['String'];
   traceID: Scalars['String'];
   userlandSpan: Maybe<UserlandSpan>;
   workspace: Workspace;

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 
 import type { ProfileDisplayType } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
+import { Alert } from '../Navigation/Alert';
 import { Help } from '../Navigation/Help';
 import { Integrations } from '../Navigation/Integrations';
 import Logo from '../Navigation/Logo';
@@ -73,6 +74,7 @@ export default function SideBar({
         <div className="mx-4">
           <SeatOverageWidget collapsed={collapsed} />
           {isWidgetOpen && <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />}
+          <Alert />
           <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} />
         </div>
