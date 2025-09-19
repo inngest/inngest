@@ -13,6 +13,7 @@ import { useInsightsStateMachineContext } from '@/components/Insights/InsightsSt
 import { Section } from '@/components/Insights/Section';
 import type { Query } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
+import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
 type InsightsTabPanelProps = {
   isHomeTab?: boolean;
@@ -48,7 +49,7 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
           <>
             <InsightsSQLEditorDownloadCSVButton temporarilyHide />
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-            <Link href="https://tally.so/r/nr7yap" rel="noopener noreferrer" target="_blank">
+            <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
               Send us feedback
             </Link>
           </>

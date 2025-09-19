@@ -4,6 +4,7 @@ import { Link } from '@inngest/components/Link/Link';
 import { RiChatPollLine, RiExternalLinkLine, RiMailLine, RiQuillPenLine } from '@remixicon/react';
 
 import { SHOW_DOCS_LINKS } from '../../temp-flags';
+import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://www.inngest.com/docs';
@@ -22,7 +23,7 @@ const RESOURCES = [
     show: SHOW_DOCS_LINKS,
   },
   {
-    href: 'https://tally.so/r/nr7yap',
+    href: EXTERNAL_FEEDBACK_LINK,
     label: 'Send us feedback',
     icon: RiChatPollLine,
     show: true,
