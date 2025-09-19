@@ -21,7 +21,7 @@ export default function FeaturelaunchMon() {
 
     // Check if today is Monday, September 22nd
     const today = new Date();
-    const targetDate = new Date(2025, 8, 19); // Month is 0-indexed, so 8 = September
+    const targetDate = new Date(2025, 8, 22); // Month is 0-indexed, so 8 = September
 
     // Check if it's the same date (year, month, day)
     const isTargetDate =

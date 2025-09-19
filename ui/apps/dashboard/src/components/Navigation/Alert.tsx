@@ -17,10 +17,10 @@ export const Alert = ({ collapsed }: { collapsed: boolean }) => {
     // Check if already dismissed
     if (window.localStorage.getItem(ALERT_NAME) === 'true') return;
 
-    // Check if today is during launch week (September 17-21, 2025)
+    // Check if today is during launch week (September 22-26, 2025)
     const today = new Date();
-    const startDate = new Date(2025, 8, 17); // September 17th, 2025
-    const endDate = new Date(2025, 8, 21); // September 21st, 2025
+    const startDate = new Date(2025, 8, 22); // September 22nd, 2025
+    const endDate = new Date(2025, 8, 26); // September 26th, 2025
 
     // Check if today is within the launch week range
     const isDuringLaunchWeek = today >= startDate && today <= endDate;
