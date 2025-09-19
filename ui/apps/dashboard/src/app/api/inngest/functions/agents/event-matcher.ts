@@ -13,22 +13,20 @@ const selectEventsTool = createTool({
   name: 'select_events',
   description:
     "Select 1-5 event names from the provided list that are most relevant to the user's query.",
-  parameters: z
-    .object({
-      events: z
-        .array(
-          z.object({
-            event_name: z.string(),
-            reason: z.string(),
-          })
-        )
-        .min(1)
-        .max(6)
-        .describe(
-          "An array of 1-6 event names selected from the list of available events that best match the user's intent."
-        ),
-    })
-    .strict() as any,
+  parameters: z.object({
+    events: z
+      .array(
+        z.object({
+          event_name: z.string(),
+          reason: z.string(),
+        })
+      )
+      .min(1)
+      .max(6)
+      .describe(
+        "An array of 1-6 event names selected from the list of available events that best match the user's intent."
+      ),
+  }) as any, // TODO: zod version mismatch is causing a type error here; need to align zod versions
   handler: (args: SelectEventsInput, ctx): SelectEventsResult => {
     const network = ctx.network as Network<InsightsState>;
     const selected = args.events;
