@@ -8,11 +8,11 @@ import {
   type ToolResultPayload,
 } from '@inngest/use-agents';
 
+import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ChatHeader } from './header/ChatHeader';
-import { useEvents } from './hooks/use-events';
 import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
@@ -40,6 +40,11 @@ type InsightsToolManifest = {
   generate_sql: ToolResultPayload<GenerateSqlResult>;
   select_events: ToolResultPayload<SelectEventsResult>;
 };
+
+// Types for derived event data
+type Schemas = Record<string, unknown>;
+type EventTypes = string[];
+type AllEventType = { id: string; name: string; latestSchema: string };
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -83,8 +88,34 @@ export function InsightsChat({ threadId }: { threadId: string }) {
   // State for the chat's input value
   const [inputValue, setInputValue] = useState('');
 
-  // Events API hook
-  const { schemas, eventTypes } = useEvents();
+  // Load event types and schemas via GraphQL-backed hook
+  const fetchAllEventTypes = useAllEventTypes();
+  const [schemas, setSchemas] = useState<Schemas | null>(null);
+  const [eventTypes, setEventTypes] = useState<EventTypes>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const events: AllEventType[] = await fetchAllEventTypes();
+        const names: EventTypes = events.map((e) => e.name);
+        const schemaMap: Schemas = {};
+        for (const e of events) {
+          const raw = e.latestSchema.trim();
+          if (!raw) continue;
+          try {
+            schemaMap[e.name] = JSON.parse(raw);
+          } catch {
+            schemaMap[e.name] = raw;
+          }
+        }
+        setEventTypes(names);
+        setSchemas(schemaMap);
+      } catch {
+        setEventTypes([]);
+        setSchemas(null);
+      }
+    })();
+  }, [fetchAllEventTypes]);
 
   // Local loading flags driven by onEvent to show “Thinking…” correctly pre-stream
   const [networkActive, setNetworkActive] = useState(false);
