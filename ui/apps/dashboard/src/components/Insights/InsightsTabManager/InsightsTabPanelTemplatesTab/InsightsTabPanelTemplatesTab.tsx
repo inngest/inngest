@@ -1,7 +1,7 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
-import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
+import { RiChatPollLine, RiExternalLinkLine, RiMailLine, RiQuillPenLine } from '@remixicon/react';
 
 import { SHOW_DOCS_LINKS } from '../../temp-flags';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
@@ -22,9 +22,15 @@ const RESOURCES = [
     show: SHOW_DOCS_LINKS,
   },
   {
-    href: '/support',
+    href: 'https://tally.so/r/nr7yap',
     label: 'Send us feedback',
     icon: RiChatPollLine,
+    show: true,
+  },
+  {
+    href: '/support',
+    label: 'Request support',
+    icon: RiMailLine,
     show: true,
   },
 ];
