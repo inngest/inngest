@@ -4,13 +4,10 @@ import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import type { ToolCallUIPart } from '@inngest/use-agents';
+import type { ToolCallUIPart, ToolResultPayload } from '@inngest/use-agents';
 import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
 import type { GenerateSqlResult } from '@/app/api/inngest/functions/agents/types';
-
-// AgentKit wraps successful tool outputs in a `data` envelope.
-type ToolResultEnvelope<T> = { data: T };
 
 function GenerateSqlToolUI({
   part,
@@ -25,13 +22,15 @@ function GenerateSqlToolUI({
     if (toolPart.state !== 'output-available') {
       return { title: null, sql: null };
     }
-    const output = part.output as ToolResultEnvelope<GenerateSqlResult> | undefined;
+    const output = part.output as ToolResultPayload<GenerateSqlResult>;
     const title = output?.data.title;
     const sql = output?.data.sql;
-
+    if (!title || !sql) {
+      return { title: 'Error generating SQL', sql: null };
+    }
     return {
-      title: typeof title === 'string' && title.trim() ? title.trim() : null,
-      sql: typeof sql === 'string' && sql.trim() ? sql.trim() : null,
+      title: title.trim(),
+      sql: sql.trim(),
     };
   };
 
