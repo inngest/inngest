@@ -30,7 +30,7 @@ export function QueryHelperPanelSectionContent({
     return <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>;
   }
 
-  if (error) {
+  if (error && !data?.length) {
     return <QueryHelperPanelStaticMessage>Failed to load queries</QueryHelperPanelStaticMessage>;
   }
 
