@@ -2302,7 +2302,6 @@ export type Workflow = {
   latestVersion: WorkflowVersion;
   metrics: MetricsResponse;
   name: Scalars['String'];
-  previous: Array<Maybe<WorkflowVersion>>;
   replayCounts: ReplayRunCounts;
   /**
    * A list of all the function's replays.
