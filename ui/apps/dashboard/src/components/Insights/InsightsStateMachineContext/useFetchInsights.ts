@@ -5,7 +5,7 @@ import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import { InsightsColumnType, type InsightsQuery } from '@/gql/graphql';
+import { InsightsColumnType, type InsightsResultsQuery } from '@/gql/graphql';
 import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
 import type { InsightsFetchResult } from './types';
 
@@ -16,8 +16,8 @@ export interface FetchInsightsParams {
 
 type FetchInsightsCallback = (query: string, name: undefined | string) => void;
 
-const insightsQuery = graphql(`
-  query Insights($query: String!, $workspaceID: ID!) {
+const insightResultsQuery = graphql(`
+  query InsightsResults($query: String!, $workspaceID: ID!) {
     insights(query: $query, workspaceID: $workspaceID) {
       columns {
         name
@@ -41,7 +41,7 @@ export function useFetchInsights() {
     ): Promise<InsightsFetchResult> => {
       const res = await client
         .query(
-          insightsQuery,
+          insightResultsQuery,
           { query, workspaceID: environment.id },
           { requestPolicy: 'network-only' }
         )
@@ -103,7 +103,9 @@ function transformValuesByColumns(
   }, {} as Record<string, string | number | Date | null>);
 }
 
-function transformInsightsResponse(insights: InsightsQuery['insights']): InsightsFetchResult {
+function transformInsightsResponse(
+  insights: InsightsResultsQuery['insights']
+): InsightsFetchResult {
   return {
     columns: insights.columns.map((col) => ({
       name: col.name,
