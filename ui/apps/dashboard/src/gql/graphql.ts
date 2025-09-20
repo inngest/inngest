@@ -707,7 +707,6 @@ export type Event = {
   usage: Usage;
   versionCount: Scalars['Int'];
   versions: Array<Maybe<EventType>>;
-  workflows: Array<Workflow>;
   workspaceID: Maybe<Scalars['UUID']>;
 };
 
@@ -2304,7 +2303,6 @@ export type Workflow = {
   latestVersion: WorkflowVersion;
   metrics: MetricsResponse;
   name: Scalars['String'];
-  previous: Array<Maybe<WorkflowVersion>>;
   replayCounts: ReplayRunCounts;
   /**
    * A list of all the function's replays.
