@@ -1,3 +1,4 @@
+import { methodTypes } from '@inngest/components/types/app';
 import type { Function } from '@inngest/components/types/function';
 import {
   transformFramework,
@@ -106,6 +107,14 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
                   url: undefined,
                 };
 
+            // If this is of type "API", the app URL is actually
+            // just the app name.  This is the domain name that the
+            // app operates under.  For these, setting the latestSycnData's
+            // URL is fine and makes this show correctly in our app.
+            if (app.method === methodTypes.Api) {
+              latestSyncData.url = app.name;
+            }
+
             return {
               ...app,
               ...latestSyncData,
@@ -116,7 +125,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
               __typename: 'App' as const,
             };
           })
-          .filter((app) => app.lastSyncedAt);
+          .filter((app) => app.lastSyncedAt || app.method === methodTypes.Api);
 
         return apps;
       }
