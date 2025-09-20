@@ -194,7 +194,8 @@ export type AppCheckResult = {
 
 export enum AppMethod {
   Connect = 'CONNECT',
-  Serve = 'SERVE'
+  Serve = 'SERVE',
+  API = 'API'
 }
 
 export type AppliedAddonMulti = {
