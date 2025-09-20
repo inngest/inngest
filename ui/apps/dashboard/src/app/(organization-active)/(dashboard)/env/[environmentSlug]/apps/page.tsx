@@ -12,6 +12,8 @@ import AppFAQ from '@/components/Apps/AppFAQ';
 import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
 import { StatusMenu } from '@/components/Apps/StatusMenu';
 import { getProdApps } from '@/components/Onboarding/actions';
+import FeaturelaunchMon from '@/components/Surveys/Featurelaunch-Mon';
+import FeaturelaunchTues from '@/components/Surveys/Featurelaunch-Tues';
 import { staticSlugs } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
 import { Apps } from './Apps';
@@ -112,6 +114,8 @@ export default function AppsPage({
           </>
         )}
       </div>
+      <FeaturelaunchMon />
+      <FeaturelaunchTues />
     </>
   );
 }
