@@ -107,7 +107,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     ? '0.00'
     : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
-  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.name}` as Route;
+  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.externalID}` as Route;
   let billingUrl = pathCreator.billing({
     tab: 'plans',
     ref: 'concurrency-limit-popover',

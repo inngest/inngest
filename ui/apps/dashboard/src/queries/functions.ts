@@ -146,6 +146,7 @@ const GetFunctionDocument = graphql(`
         isPaused
         isArchived
         app {
+          externalID
           name
         }
         current {
