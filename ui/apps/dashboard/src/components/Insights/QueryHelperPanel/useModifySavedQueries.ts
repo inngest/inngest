@@ -24,7 +24,7 @@ const createInsightsQueryDocument = graphql(`
 `);
 
 const removeInsightsQueryDocument = graphql(`
-  mutation RemoveInsightsQuery($id: ID!) {
+  mutation RemoveInsightsQuery($id: ULID!) {
     removeInsightsQuery(id: $id) {
       ids
     }
@@ -32,7 +32,7 @@ const removeInsightsQueryDocument = graphql(`
 `);
 
 const updateInsightsQueryDocument = graphql(`
-  mutation UpdateInsightsQuery($id: ID!, $input: UpdateInsightsQuery!) {
+  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {
     updateInsightsQuery(id: $id, input: $input) {
       id
       name
