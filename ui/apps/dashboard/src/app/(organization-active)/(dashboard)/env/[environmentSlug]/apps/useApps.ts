@@ -1,3 +1,4 @@
+import { methodTypes } from '@inngest/components/types/app';
 import type { Function } from '@inngest/components/types/function';
 import {
   transformFramework,
@@ -116,7 +117,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
               __typename: 'App' as const,
             };
           })
-          .filter((app) => app.lastSyncedAt);
+          .filter((app) => app.lastSyncedAt || app.method === methodTypes.Api);
 
         return apps;
       }
