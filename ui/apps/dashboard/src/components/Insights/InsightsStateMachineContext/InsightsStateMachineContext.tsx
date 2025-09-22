@@ -53,6 +53,7 @@ export function InsightsStateMachineContextProvider({
       });
     },
     staleTime: 0,
+    retry: false,
   });
 
   const runQuery = useCallback(() => {

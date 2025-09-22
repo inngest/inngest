@@ -160,6 +160,8 @@ type CheckpointNewRunResponse struct {
 	AppID uuid.UUID `json:"app_id"`
 	// RunID is the function run ID created for this execution.
 	RunID string `json:"run_id"`
+	// Token is the token that can be used to view the run output for redirects.
+	Token string `json:"token,omitempty"`
 }
 
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
