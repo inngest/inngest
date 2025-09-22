@@ -504,6 +504,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if a.outputReader == nil {
+		logger.StdlibLogger(r.Context()).Error("unable to fetch run output in checkpoint API")
 		w.Header().Set("content-type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"unknown","message":"unable to fetch run output"}`))
 		return

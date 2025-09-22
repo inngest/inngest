@@ -59,8 +59,7 @@ func (r runOutputReader) RunOutput(ctx context.Context, envID uuid.UUID, runID u
 		return nil, fmt.Errorf("run not found: %s", runID)
 	}
 
-	switch run.Status {
-	case enums.RunStatusCompleted, enums.RunStatusFailed:
+	if enums.RunStatusEnded(run.Status) {
 		return run.Output, nil
 	}
 
