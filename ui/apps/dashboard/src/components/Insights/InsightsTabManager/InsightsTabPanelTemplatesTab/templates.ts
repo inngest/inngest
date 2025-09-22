@@ -51,7 +51,9 @@ ORDER BY
 
 const RECENT_FAILED_FUNCTION_COUNT = makeFunctionStatusQuery('failed');
 const RECENT_CANCELLED_FUNCTION_COUNT = makeFunctionStatusQuery('cancelled');
-const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
+
+// TODO: Add this back if a clear, reliable pattern for determining successes emerges.
+// const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
 const RECENT_EVENTS_QUERY = `SELECT 
     toDateTime(ts / 1000) AS timestamp,
@@ -100,6 +102,7 @@ export const TEMPLATES: QueryTemplate[] = [
     explanation: 'View cancelled function runs within the past 24 hours.',
     templateKind: 'warning',
   },
+  /*
   {
     id: 'recent-function-successes',
     name: 'Recent function successes',
@@ -107,4 +110,5 @@ export const TEMPLATES: QueryTemplate[] = [
     explanation: 'View successful function runs within the past 24 hours.',
     templateKind: 'success',
   },
+  */
 ];
