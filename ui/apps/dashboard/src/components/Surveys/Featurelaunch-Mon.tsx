@@ -48,7 +48,7 @@ export default function FeaturelaunchMon() {
               className="bg-btnPrimary focus:bg-btnPrimaryHover hover:bg-btnPrimaryHover active:bg-btnPrimaryActive disabled:bg-btnPrimaryDisabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs leading-[18px] text-white disabled:cursor-not-allowed"
               onClick={() =>
                 window.open(
-                  'https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis',
+                  'https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis?ref=launch-app-modal',
                   '_blank'
                 )
               }
@@ -58,7 +58,10 @@ export default function FeaturelaunchMon() {
             <button
               className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
               onClick={() =>
-                window.open('https://www.inngest.com/docs/learn/rest-endpoints', '_blank')
+                window.open(
+                  'https://www.inngest.com/docs/learn/rest-endpoints?ref=launch-app-modal',
+                  '_blank'
+                )
               }
             >
               Read the docs
