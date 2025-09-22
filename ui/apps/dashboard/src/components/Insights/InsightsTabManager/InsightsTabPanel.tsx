@@ -1,5 +1,7 @@
 'use client';
 
+import { Link } from '@inngest/components/Link/Link';
+
 import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/InsightsDataTable';
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
@@ -11,6 +13,7 @@ import { useInsightsStateMachineContext } from '@/components/Insights/InsightsSt
 import { Section } from '@/components/Insights/Section';
 import type { Tab } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
+import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
 type InsightsTabPanelProps = {
   isHomeTab?: boolean;
@@ -46,6 +49,9 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
           <>
             <InsightsSQLEditorDownloadCSVButton temporarilyHide />
             {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+            <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
+              Send us feedback
+            </Link>
           </>
         }
         className="border-subtle border-t"
