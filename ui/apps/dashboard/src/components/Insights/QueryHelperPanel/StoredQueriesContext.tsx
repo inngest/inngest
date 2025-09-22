@@ -56,6 +56,10 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           query: tab.query,
         });
         if (result.ok) {
+          // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
+          // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
+          // that we have a consistent type name to match on regardless of existing saved queries.
+          refetchSavedQueries();
           toast.success('Successfully updated query');
         } else {
           toast.error(
@@ -66,6 +70,10 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         const result = await beSaveQuery({ name: tab.name, query: tab.query });
         if (result.ok) {
           tabManagerActions.updateTab(tab.id, { savedQueryId: result.data.id });
+          // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
+          // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
+          // that we have a consistent type name to match on regardless of existing saved queries.
+          refetchSavedQueries();
           toast.success('Successfully saved query');
         } else {
           toast.error(
@@ -82,6 +90,8 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
       const result = await beDeleteQuery({ id: queryId });
       if (result.ok) {
         tabManagerActions.breakQueryAssociation(queryId);
+        // This is necessary because the query never returns anything that matches the list by __typename.
+        // It returns only a list of deleted IDs.
         refetchSavedQueries();
         toast.success('Query deleted');
       } else {
@@ -136,4 +146,8 @@ export function useStoredQueries(): StoredQueriesContextValue {
   }
 
   return context;
+}
+
+function hadZeroSavedQueries(queries: undefined | InsightsQueryStatement[]) {
+  return queries === undefined || queries.length === 0;
 }
