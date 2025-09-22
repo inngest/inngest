@@ -1,6 +1,6 @@
 'use client';
 
-import type { InsightsQuery } from '@/gql/graphql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import type { QuerySnapshot } from '../types';
 import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
@@ -8,9 +8,9 @@ import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
 export interface QueryHelperPanelSectionContentProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
-  onQuerySelect: (query: InsightsQuery | QuerySnapshot) => void;
+  onQuerySelect: (query: InsightsQueryStatement | QuerySnapshot) => void;
   queries: {
-    data: undefined | Array<InsightsQuery | QuerySnapshot>;
+    data: undefined | Array<InsightsQueryStatement | QuerySnapshot>;
     error: undefined | string;
     isLoading: boolean;
   };

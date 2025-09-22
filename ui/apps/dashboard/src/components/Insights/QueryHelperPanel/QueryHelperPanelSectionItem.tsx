@@ -9,13 +9,13 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/react';
 
 import type { QuerySnapshot } from '@/components/Insights/types';
-import type { InsightsQuery } from '@/gql/graphql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 
 interface QueryHelperPanelSectionItemProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
-  onQuerySelect: (query: InsightsQuery | QuerySnapshot) => void;
-  query: InsightsQuery | QuerySnapshot;
+  onQuerySelect: (query: InsightsQueryStatement | QuerySnapshot) => void;
+  query: InsightsQueryStatement | QuerySnapshot;
   sectionType: 'history' | 'saved';
 }
 
