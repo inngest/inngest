@@ -409,6 +409,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
 	}))
 
+	url := opts.Config.CoreAPI.Addr
+	if url == "0.0.0.0" {
+		url = "127.0.0.1"
+	}
+
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -459,7 +464,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
-			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port),
+			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tracer),
 	)
