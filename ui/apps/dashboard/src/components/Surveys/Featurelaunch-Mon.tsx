@@ -58,7 +58,7 @@ export default function FeaturelaunchMon() {
             <button
               className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
               onClick={() =>
-                window.open('https://www.inngest.com/docs/platform/monitor/insights', '_blank')
+                window.open('https://www.inngest.com/docs/learn/rest-endpoints', '_blank')
               }
             >
               Read the docs
