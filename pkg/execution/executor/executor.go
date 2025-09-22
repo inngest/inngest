@@ -512,9 +512,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		eventIDs = append(eventIDs, id)
 	}
 
+	var eventName *string
+
 	evts := make([]json.RawMessage, len(req.Events))
 	for n, item := range req.Events {
 		evt := item.GetEvent()
+		if eventName == nil {
+			eventName = &evt.Name
+		}
+
 		// serialize this data to the span at the same time
 		byt, err := json.Marshal(evt)
 		if err != nil {
@@ -595,6 +601,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 		),
 	}
 	if req.RunMode == enums.RunModeSync {
