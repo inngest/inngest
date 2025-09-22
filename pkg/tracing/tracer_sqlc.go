@@ -40,6 +40,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var debugSessionID string
 		var debugRunID string
 		var status string
+		var eventIdsByt []byte
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -55,6 +56,26 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			if string(attr.Key) == meta.Attrs.EventsInput.Key() {
 				input = attr.Value.AsInterface()
 				continue
+			}
+
+			if string(attr.Key) == meta.Attrs.EventIDs.Key() {
+				var err error
+				// We store event IDs as a JSON array of strings
+				if eventIdsByt, err = json.Marshal(attr.Value.AsStringSlice()); err != nil {
+					logger.StdlibLogger(ctx).Error("span missing run ID",
+						"span_id", spanID,
+						"trace_id", traceID,
+						"parent_id", parentID,
+						"name", span.Name(),
+						"start_time", span.StartTime(),
+						"end_time", span.EndTime(),
+						"app_id", appID,
+						"function_id", functionID,
+					)
+				}
+				if cleanAttrs {
+					continue
+				}
 			}
 
 			if string(attr.Key) == meta.Attrs.AccountID.Key() {
@@ -220,6 +241,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				String: status,
 				Valid:  status != "",
 			},
+			EventIds: string(eventIdsByt),
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to insert span into database",
