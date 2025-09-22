@@ -120,7 +120,7 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          triggers: fn.current?.triggers || [],
+          triggers: fn.triggers || [],
           usage: undefined,
         };
       }),
