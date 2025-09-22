@@ -147,7 +147,3 @@ export function useStoredQueries(): StoredQueriesContextValue {
 
   return context;
 }
-
-function hadZeroSavedQueries(queries: undefined | InsightsQueryStatement[]) {
-  return queries === undefined || queries.length === 0;
-}
