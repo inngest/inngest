@@ -113,7 +113,7 @@ export default function AppsPage({
           </>
         )}
       </div>
-      <FeaturelaunchTues />
+      <FeaturelaunchTues envSlug={envSlug} />
     </>
   );
 }

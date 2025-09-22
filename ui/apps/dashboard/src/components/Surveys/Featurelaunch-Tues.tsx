@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button/index';
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { RiCloseLine } from '@remixicon/react';
+
+import { pathCreator } from '@/utils/urls';
 
 const HIDE_FEATURE_LAUNCH_TUES = 'inngest-feature-launch-tues-hide';
 
-export default function FeaturelaunchTues() {
+export default function FeaturelaunchTues({ envSlug }: { envSlug: string }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -42,22 +46,17 @@ export default function FeaturelaunchTues() {
           You can now query events to analyze trends, usage, and performance right where your
           workflows run. No tool switching required
           <div className="flex gap-2 pt-2">
-            <button
-              className="bg-btnPrimary focus:bg-btnPrimaryHover hover:bg-btnPrimaryHover active:bg-btnPrimaryActive disabled:bg-btnPrimaryDisabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs leading-[18px] text-white disabled:cursor-not-allowed"
-              onClick={() =>
-                window.open('https://app.inngest.com/env/production/insights', '_blank')
-              }
-            >
-              Use insights
-            </button>
-            <button
+            <Button
+              label="Use insights"
+              onClick={() => router.push(pathCreator.insights({ envSlug }))}
+            />
+            <Button
+              label="Read the docs"
+              appearance="outlined"
+              href="https://www.inngest.com/docs/platform/monitor/insights?ref=launch-app-modal"
+              target="_blank"
               className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
-              onClick={() =>
-                window.open('https://www.inngest.com/docs/platform/monitor/insights', '_blank')
-              }
-            >
-              Read the docs
-            </button>
+            />
           </div>
         </div>
       </div>
