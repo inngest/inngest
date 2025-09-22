@@ -131,7 +131,9 @@ export function InsightsChat({ threadId }: { threadId: string }) {
             if (type === 'text') {
               setTextStreaming(false);
               setTextCompleted(true);
-            } else if (type === 'tool-output' || type === 'tool-call') {
+              break;
+            }
+            if (type === 'tool-output' || type === 'tool-call') {
               setCurrentToolName(null);
             }
             break;
