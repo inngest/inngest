@@ -29,6 +29,7 @@ export interface UseInsightsTabManagerReturn {
 }
 
 export interface UseInsightsTabManagerProps {
+  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
 }
@@ -110,6 +111,7 @@ export function useInsightsTabManager(
         actions={actions}
         activeTabId={activeTabId}
         tabs={tabs}
+        historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
       />
@@ -118,6 +120,7 @@ export function useInsightsTabManager(
       actions,
       activeTabId,
       tabs,
+      props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
     ]
@@ -129,6 +132,7 @@ export function useInsightsTabManager(
 interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
+  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
@@ -138,6 +142,7 @@ function InsightsTabManagerInternal({
   tabs,
   activeTabId,
   actions,
+  historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
 }: InsightsTabManagerInternalProps) {
@@ -164,6 +169,7 @@ function InsightsTabManagerInternal({
               isHomeTab={tab.id === HOME_TAB.id}
               isTemplatesTab={tab.id === TEMPLATES_TAB.id}
               tab={tab}
+              historyWindow={historyWindow}
             />
           </InsightsStateMachineContextProvider>
         ))}
