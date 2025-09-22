@@ -505,7 +505,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 	if a.outputReader == nil {
 		w.Header().Set("content-type", "application/json")
-		w.Write([]byte(`{"status":"unknown","message":"unable to fetch run output"}`))
+		_, _ = w.Write([]byte(`{"status":"unknown","message":"unable to fetch run output"}`))
 		return
 	}
 
@@ -516,14 +516,14 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 		if err == nil {
 			// XXX: (tonyhb) add status code handling here.
-			w.Write(output)
+			_, _ = w.Write(output)
 			return
 		}
 		time.Sleep(CheckpointPollInterval)
 	}
 
 	w.Header().Set("content-type", "application/json")
-	w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
+	_, _ = w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
 }
 
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
