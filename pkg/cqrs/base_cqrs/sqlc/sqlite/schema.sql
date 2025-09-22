@@ -212,6 +212,7 @@ CREATE TABLE spans (
   debug_run_id TEXT,
   debug_session_id TEXT,
   status TEXT,
+  event_ids JSON,
 
   PRIMARY KEY (trace_id, span_id)
 );

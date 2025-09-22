@@ -2534,6 +2534,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			"attributes",
 			"links",
 			"output",
+			"event_ids",
 		).
 		Where(sq.C("dynamic_span_id").In(
 			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
@@ -2566,6 +2567,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		Attributes    *string
 		Links         *string
 		Output        *string
+		EventIDs      *string
 	}
 
 	// Group spans by run_id and dynamic_span_id
@@ -2587,6 +2589,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			&span.Attributes,
 			&span.Links,
 			&span.Output,
+			&span.EventIDs,
 		)
 		if err != nil {
 			return nil, err
@@ -2622,6 +2625,13 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 					startTime = span.StartTime
 				}
 			}
+
+			// order the spans by start time too so that we process each
+			// update step-by-step as they happened
+			sort.Slice(spans, func(i, j int) bool {
+				return spans[i].StartTime.Before(spans[j].StartTime)
+			})
+
 			runGroups = append(runGroups, runGroup{
 				runID:         runID,
 				dynamicSpanID: dynamicSpanID,
@@ -2669,6 +2679,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		startTime := spans[0].StartTime
 		var endTime *time.Time
 		var status = enums.RunStatusRunning
+		var triggerIDs []string
 
 		for _, span := range spans {
 			if span.StartTime.Before(startTime) {
@@ -2695,6 +2706,17 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
 						status = enums.RunStatusRunning // These are all "in progress" states
 					}
+				}
+			}
+
+			if span.EventIDs != nil && *span.EventIDs != "" {
+				// Event IDs are a stringified JSON array of strings. Unpack
+				// them here.
+				var eids []string
+				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err == nil {
+					triggerIDs = append(triggerIDs, eids...)
+				} else {
+					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
 				}
 			}
 		}
@@ -2739,6 +2761,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			Duration:    duration,
 			Status:      status,
 			Cursor:      cursor,
+			TriggerIDs:  triggerIDs,
 		}
 
 		if endTime != nil {
