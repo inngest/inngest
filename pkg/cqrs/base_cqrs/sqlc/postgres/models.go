@@ -140,6 +140,7 @@ type Span struct {
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString
+	EventIds       pqtype.NullRawMessage
 }
 
 type Trace struct {
