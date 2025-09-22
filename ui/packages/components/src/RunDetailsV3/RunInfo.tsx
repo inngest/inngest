@@ -49,7 +49,6 @@ type Run = {
     startedAt: string | null;
     status: string;
     stepID?: string | null;
-    debugRunID?: string | null;
     debugSessionID?: string | null;
   };
   hasAI: boolean;

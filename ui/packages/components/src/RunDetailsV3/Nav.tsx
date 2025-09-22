@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiExternalLinkLine, RiShareForward2Line } from '@remixicon/react';
@@ -14,10 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '../DropdownMenu';
 import { Link } from '../Link';
-import { AlertModal } from '../Modal/AlertModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import { useCreateDebugSession } from '../SharedContext/useCreateDebugSession';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 
 type NavProps = {
@@ -28,7 +25,7 @@ type NavProps = {
   debugSessionID?: string | null;
 };
 
-export const Standalone = ({ standalone, runID }: NavProps) => {
+export const Standalone = ({ runID }: NavProps) => {
   const { pathCreator } = usePathCreator();
 
   return (
@@ -56,55 +53,28 @@ export const Standalone = ({ standalone, runID }: NavProps) => {
   );
 };
 
-export const Nav = ({ standalone, functionSlug, runID, debugRunID, debugSessionID }: NavProps) => {
+export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
   const router = useRouter();
   const { booleanFlag } = useBooleanFlag();
   const { pathCreator } = usePathCreator();
   const { cloud } = useShared();
-  const { createDebugSession, data, isSuccess, error } = useCreateDebugSession();
-  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const { value: debuggerEnabled, isReady: debuggerFlagReady } = booleanFlag(
     'step-over-debugger',
     false
   );
 
-  //
-  // if we have debug run/session id, use those for linkable sessions
   const debuggerRedirect = async (e: React.MouseEvent) => {
-    if (debugRunID && debugSessionID) {
-      const debuggerPath = pathCreator.debugger({
-        functionSlug,
-        runID,
-        debugRunID,
-        debugSessionID,
-      });
-
-      router.push(debuggerPath);
-      return;
-    }
-
     e?.preventDefault && e.preventDefault();
-    createDebugSession({ functionSlug, runID });
+    const debuggerPath = pathCreator.debugger({
+      functionSlug,
+      runID,
+      debugSessionID: runID,
+    });
+
+    router.push(debuggerPath);
+    return;
   };
-
-  useEffect(() => {
-    if (isSuccess && data) {
-      const debuggerPath = pathCreator.debugger({
-        functionSlug,
-        runID,
-        debugRunID: data.debugRunID,
-        debugSessionID: data.debugSessionID,
-      });
-      router.push(debuggerPath);
-    }
-  }, [isSuccess, data]);
-
-  useEffect(() => {
-    if (error) {
-      setShowErrorModal(true);
-    }
-  }, [error]);
 
   return (
     <>
@@ -130,22 +100,6 @@ export const Nav = ({ standalone, functionSlug, runID, debugRunID, debugSessionI
           iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
         />
       ) : null}
-      <AlertModal
-        isOpen={showErrorModal}
-        title={'Error creating debug session'}
-        className="w-[600px]"
-        onClose={() => setShowErrorModal(false)}
-        onSubmit={() => {
-          setShowErrorModal(false);
-          debuggerRedirect({} as React.MouseEvent);
-        }}
-        confirmButtonLabel="Try again"
-        cancelButtonLabel="Close"
-      >
-        <div className="px-6 pt-4">
-          {error?.message || 'There was a problem creating a debug session'}
-        </div>
-      </AlertModal>
     </>
   );
 };

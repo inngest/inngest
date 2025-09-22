@@ -2921,6 +2921,9 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 	// filters
 	filter := []sq.Expression{}
+	//
+	// debug runs are a special kind of run that should not be included in the main runs list
+	filter = append(filter, sq.C("debug_run_id").IsNull())
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}
