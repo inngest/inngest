@@ -62,7 +62,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				var err error
 				// We store event IDs as a JSON array of strings
 				if eventIdsByt, err = json.Marshal(attr.Value.AsStringSlice()); err != nil {
-					logger.StdlibLogger(ctx).Error("span missing run ID",
+					logger.StdlibLogger(ctx).Error("failed to marshal event IDs",
 						"span_id", spanID,
 						"trace_id", traceID,
 						"parent_id", parentID,
