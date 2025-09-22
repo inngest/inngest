@@ -521,7 +521,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			Queue:              rq,
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
-			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 			TraceReader:        ds.Data,
 
 			AppCreator:      dbcqrs,
@@ -529,6 +528,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			EventPublisher:  runner,
 			TracerProvider:  tracer,
 			State:           smv2,
+
+			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
+			RunJWTSecret:      consts.DevServerRunJWTSecret,
 		})
 	})
 

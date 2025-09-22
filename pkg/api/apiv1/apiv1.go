@@ -45,8 +45,6 @@ type Opts struct {
 	QueueShardSelector redis_state.ShardSelector
 	// Broadcaster is used to handle realtime via APIv1
 	Broadcaster realtime.Broadcaster
-	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
-	RealtimeJWTSecret []byte
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
@@ -62,6 +60,12 @@ type Opts struct {
 	TracerProvider tracing.TracerProvider
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
+
+	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
+	RealtimeJWTSecret []byte
+	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
+	// to redirect to an API endpoint that fetches outputs for a specific run.
+	RunJWTSecret []byte
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -126,7 +130,7 @@ func (a *router) setup() {
 
 			// Add the HTTP-based checkpointing API
 			r.Route(CheckpointRoutePrefix, func(sub chi.Router) {
-				sub.Mount("/", NewCheckpointAPI(a.opts))
+				sub.Mount("/", NewCheckpointAPI(a.opts, a.opts.RunJWTSecret))
 			})
 
 			r.Post("/signals", a.receiveSignal)
