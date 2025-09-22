@@ -57,7 +57,7 @@ export type Account = {
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
   id: Scalars['ID'];
-  insightsQueries: Array<InsightsQuery>;
+  insightsQueries: Array<InsightsQueryStatement>;
   marketplace: Maybe<Marketplace>;
   name: Maybe<Scalars['NullString']>;
   paymentIntents: Array<PaymentIntent>;
@@ -1076,8 +1076,8 @@ export enum InsightsColumnType {
   Unknown = 'UNKNOWN'
 }
 
-export type InsightsQuery = {
-  __typename?: 'InsightsQuery';
+export type InsightsQueryStatement = {
+  __typename?: 'InsightsQueryStatement';
   createdAt: Scalars['Time'];
   id: Scalars['ULID'];
   name: Scalars['String'];
@@ -1159,7 +1159,7 @@ export type Mutation = {
   createCancellation: Cancellation;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
-  createInsightsQuery: InsightsQuery;
+  createInsightsQuery: InsightsQueryStatement;
   createSigningKey: SigningKey;
   createStripeSubscription: CreateStripeSubscriptionResponse;
   createUser: Maybe<CreateUserPayload>;
@@ -1193,7 +1193,7 @@ export type Mutation = {
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
   updateIngestKey: IngestKey;
-  updateInsightsQuery: InsightsQuery;
+  updateInsightsQuery: InsightsQueryStatement;
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
   updatePlan: Account;
   updateVercelApp: Maybe<UpdateVercelAppResponse>;
@@ -1582,7 +1582,7 @@ export type Query = {
   events: Maybe<PaginatedEvents>;
   executionTimeSeries: Array<TimeSeries>;
   insights: InsightsResponse;
-  insightsQuery: InsightsQuery;
+  insightsQuery: InsightsQueryStatement;
   metrics: MetricsResponse;
   plans: Array<Maybe<BillingPlan>>;
   runCountTimeSeries: Array<TimeSeries>;
@@ -3310,14 +3310,14 @@ export type InsightsResultsQuery = { __typename?: 'Query', insights: { __typenam
 export type InsightsSavedQueriesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type InsightsSavedQueriesQuery = { __typename?: 'Query', account: { __typename?: 'Account', insightsQueries: Array<{ __typename?: 'InsightsQuery', id: string, name: string, sql: string, createdAt: string, updatedAt: string }> } };
+export type InsightsSavedQueriesQuery = { __typename?: 'Query', account: { __typename?: 'Account', insightsQueries: Array<{ __typename?: 'InsightsQueryStatement', id: string, name: string, sql: string, createdAt: string, updatedAt: string }> } };
 
 export type CreateInsightsQueryMutationVariables = Exact<{
   input: NewInsightsQuery;
 }>;
 
 
-export type CreateInsightsQueryMutation = { __typename?: 'Mutation', createInsightsQuery: { __typename?: 'InsightsQuery', id: string, name: string, sql: string, createdAt: string, updatedAt: string } };
+export type CreateInsightsQueryMutation = { __typename?: 'Mutation', createInsightsQuery: { __typename?: 'InsightsQueryStatement', id: string, name: string, sql: string, createdAt: string, updatedAt: string } };
 
 export type RemoveInsightsQueryMutationVariables = Exact<{
   id: Scalars['ULID'];
@@ -3332,7 +3332,7 @@ export type UpdateInsightsQueryMutationVariables = Exact<{
 }>;
 
 
-export type UpdateInsightsQueryMutation = { __typename?: 'Mutation', updateInsightsQuery: { __typename?: 'InsightsQuery', id: string, name: string, sql: string, createdAt: string, updatedAt: string } };
+export type UpdateInsightsQueryMutation = { __typename?: 'Mutation', updateInsightsQuery: { __typename?: 'InsightsQueryStatement', id: string, name: string, sql: string, createdAt: string, updatedAt: string } };
 
 export type MetricsLookupsQueryVariables = Exact<{
   envSlug: Scalars['String'];
