@@ -17,18 +17,19 @@ var Attrs = struct {
 	EndedAt   attr[*time.Time]
 
 	// Run attributes
-	AccountID       attr[*uuid.UUID]
-	AppID           attr[*uuid.UUID]
-	BatchID         attr[*ulid.ULID]
-	BatchTimestamp  attr[*time.Time]
-	CronSchedule    attr[*string]
-	DropSpan        attr[*bool]
-	EnvID           attr[*uuid.UUID]
-	EventIDs        attr[*[]string]
-	EventsInput     attr[*string]
-	FunctionID      attr[*uuid.UUID]
-	FunctionVersion attr[*int]
-	RunID           attr[*ulid.ULID]
+	AccountID           attr[*uuid.UUID]
+	AppID               attr[*uuid.UUID]
+	BatchID             attr[*ulid.ULID]
+	BatchTimestamp      attr[*time.Time]
+	CronSchedule        attr[*string]
+	DropSpan            attr[*bool]
+	EnvID               attr[*uuid.UUID]
+	EventIDs            attr[*[]string]
+	EventsInput         attr[*string]
+	TriggeringEventName attr[*string]
+	FunctionID          attr[*uuid.UUID]
+	FunctionVersion     attr[*int]
+	RunID               attr[*ulid.ULID]
 
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
@@ -127,6 +128,7 @@ var Attrs = struct {
 	EnvID:                              UUIDAttr("env.id"),
 	EventIDs:                           StringSliceAttr("event.ids"),
 	EventsInput:                        StringAttr("events.input"),
+	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),

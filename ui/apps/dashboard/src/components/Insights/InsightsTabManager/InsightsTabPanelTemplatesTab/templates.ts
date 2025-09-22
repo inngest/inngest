@@ -4,21 +4,19 @@ import type { QueryTemplate } from '@/components/Insights/types';
 
 function makeEventVolumePerHourQuery(event?: string) {
   return `SELECT
-    toStartOfHour(toDateTime(event_ts / 1000)) AS hour_bucket,
-    event_name,
+    toStartOfHour(toDateTime(ts / 1000)) AS hour_bucket,
+    name,
     COUNT(*) AS event_count
 FROM
     events
 WHERE
-    event_ts > toUnixTimestamp(subtractDays(now(), 3)) * 1000${
-      event ? `\n    AND event_name = '${event}'` : ''
-    }
+    ts > toUnixTimestamp(subtractDays(now(), 3)) * 1000${event ? `\n    AND name = '${event}'` : ''}
 GROUP BY
     hour_bucket,
-    event_name
+    name
 ORDER BY
     hour_bucket,
-    event_name DESC`;
+    name DESC`;
 }
 
 const EVENT_TYPE_VOLUME_PER_HOUR_QUERY = makeEventVolumePerHourQuery();
@@ -32,21 +30,21 @@ const COUNT_ALIAS_MAP: Record<'failed' | 'cancelled' | 'finished', string> = {
 
 function makeFunctionStatusQuery(outcome: 'failed' | 'cancelled' | 'finished') {
   const base = `SELECT
-    simpleJSONExtractString(event_data, 'function_id') as function_id,
+    simpleJSONExtractString(data, 'function_id') as function_id,
     COUNT(*) as ${COUNT_ALIAS_MAP[outcome]}
 FROM
     events
 WHERE
-    event_name = 'inngest/function.${outcome}'`;
+    name = 'inngest/function.${outcome}'`;
 
   const successFilter =
     outcome === 'finished'
       ? `
-    AND JSONExtractBool(event_data, 'result', 'success') = true`
+    AND JSONExtractBool(data, 'result', 'success') = true`
       : '';
 
   return `${base}${successFilter}
-    AND event_ts > toUnixTimestamp(addDays(now(), -1)) * 1000
+    AND ts > toUnixTimestamp(addDays(now(), -1)) * 1000
 GROUP BY
     function_id
 ORDER BY
@@ -58,6 +56,13 @@ const RECENT_CANCELLED_FUNCTION_COUNT = makeFunctionStatusQuery('cancelled');
 const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
 export const TEMPLATES: QueryTemplate[] = [
+  {
+    id: 'recent-events',
+    name: 'Recent events',
+    query: 'SELECT * FROM events',
+    explanation: 'View recents events subject to row and plan history limit restrictions.',
+    templateKind: 'time',
+  },
   {
     id: 'event-type-volume-per-hour',
     name: 'Events by type per hour',

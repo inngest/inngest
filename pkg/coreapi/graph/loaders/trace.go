@@ -65,7 +65,7 @@ func (k *DebugSessionRequestKey) String() string {
 }
 
 type traceReader struct {
-	loaders *loaders
+	loaders *Loaders
 	reader  cqrs.TraceReader
 }
 

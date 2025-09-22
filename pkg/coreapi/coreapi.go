@@ -95,7 +95,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	)
 
 	if o.isGraphQLEnabled() {
-		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
+		a.resolver = &resolvers.Resolver{
 			Data:            o.Data,
 			HistoryReader:   o.HistoryReader,
 			Runner:          o.Runner,
@@ -105,7 +105,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 			ServerKind:      o.Config.GetServerKind(),
 			LocalSigningKey: o.LocalSigningKey,
 			RequireKeys:     o.RequireKeys,
-		}}))
+		}
+		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: a.resolver}))
 
 		// TODO - Add option for enabling GraphQL Playground
 		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
@@ -126,12 +127,17 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 type CoreAPI struct {
 	chi.Router
-	data   cqrs.Manager
-	config config.Config
-	log    logger.Logger
-	server *http.Server
-	state  state.Manager
-	runner runner.Runner
+	data     cqrs.Manager
+	config   config.Config
+	log      logger.Logger
+	server   *http.Server
+	state    state.Manager
+	runner   runner.Runner
+	resolver *resolvers.Resolver
+}
+
+func (a *CoreAPI) Resolver() *resolvers.Resolver {
+	return a.resolver
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {
