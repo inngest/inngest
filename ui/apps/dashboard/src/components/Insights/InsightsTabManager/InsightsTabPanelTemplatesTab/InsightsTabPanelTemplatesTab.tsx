@@ -1,7 +1,7 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
-import { RiChatPollLine, RiExternalLinkLine, RiMailLine, RiQuillPenLine } from '@remixicon/react';
+import { RiChatPollLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
 import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
