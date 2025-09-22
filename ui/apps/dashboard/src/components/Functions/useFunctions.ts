@@ -41,7 +41,7 @@ export function useFunctions() {
       const { page, data } = result.data.workspace.workflows;
       const flattenedFunctions = data.map((fn) => ({
         ...fn,
-        triggers: fn.current?.triggers ?? [],
+        triggers: fn.triggers ?? [],
       }));
 
       return {
