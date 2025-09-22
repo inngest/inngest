@@ -4,27 +4,28 @@ import { useCallback, useMemo, useState } from 'react';
 import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
+import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 export interface TabManagerActions {
-  breakQueryAssociation: (id: string) => void;
+  breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
-  createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => void;
+  createTabFromQuery: (query: InsightsQueryStatement | QuerySnapshot | QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
-  updateTab: (id: string, patch: Partial<Omit<Query, 'id'>>) => void;
+  updateTab: (id: string, patch: Partial<Omit<Tab, 'id'>>) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
   actions: TabManagerActions;
   activeTabId: string;
   tabManager: JSX.Element;
-  tabs: Query[];
+  tabs: Tab[];
 }
 
 export interface UseInsightsTabManagerProps {
@@ -35,28 +36,25 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps
 ): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<Query[]>([HOME_TAB]);
+  const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
 
   const createTabBase = useCallback(
-    (query: Query) => {
-      setTabs((prev) => [...prev, query]);
-      setActiveTabId(query.id);
+    (tab: Tab) => {
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
     },
     [setActiveTabId]
   );
 
   const actions = useMemo(
     () => ({
-      breakQueryAssociation: (id: string) => {
-        const isOpen = activeTabId === id;
-        const replacementId = ulid();
-
+      breakQueryAssociation: (savedQueryId: string) => {
         setTabs((prevTabs) =>
-          prevTabs.map((tab) => (tab.id === id ? { ...tab, id: replacementId, saved: false } : tab))
+          prevTabs.map((tab) =>
+            tab.savedQueryId === savedQueryId ? { ...tab, savedQueryId: undefined } : tab
+          )
         );
-
-        if (isOpen) setActiveTabId(replacementId);
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
@@ -69,30 +67,26 @@ export function useInsightsTabManager(
         });
       },
       createNewTab: () => {
-        createTabBase(makeEmptyUnsavedQuery());
+        createTabBase(makeEmptyUnsavedTab());
       },
-      createTabFromQuery: (query: Query | QuerySnapshot | QueryTemplate) => {
+      createTabFromQuery: (query: InsightsQueryStatement | QuerySnapshot | QueryTemplate) => {
         if (isQueryTemplate(query)) {
-          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query, name: query.name });
+          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query, name: query.name });
           return;
         }
 
         if (isQuerySnapshot(query)) {
-          createTabBase({ ...makeEmptyUnsavedQuery(), query: query.query });
+          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query });
           return;
         }
 
-        const tabWithSameSavedQueryId = findTabWithId(query.id, tabs);
+        const tabWithSameSavedQueryId = tabs.find((tab) => tab.savedQueryId === query.id);
         if (tabWithSameSavedQueryId !== undefined) {
           setActiveTabId(tabWithSameSavedQueryId.id);
           return;
         }
 
-        createTabBase({
-          ...query,
-          id: query.saved ? query.id : ulid(),
-          name: query.saved ? query.name : UNTITLED_QUERY,
-        });
+        createTabBase({ id: ulid(), name: query.name, query: query.sql, savedQueryId: query.id });
       },
       focusTab: setActiveTabId,
       openTemplatesTab: () => {
@@ -103,7 +97,7 @@ export function useInsightsTabManager(
           setActiveTabId(TEMPLATES_TAB.id);
         }
       },
-      updateTab: (id: string, tab: Partial<Omit<Query, 'id'>>) => {
+      updateTab: (id: string, tab: Partial<Omit<Tab, 'id'>>) => {
         setTabs((prevTabs) => prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)));
       },
     }),
@@ -137,7 +131,7 @@ interface InsightsTabManagerInternalProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  tabs: Query[];
+  tabs: Tab[];
 }
 
 function InsightsTabManagerInternal({
@@ -179,7 +173,7 @@ function InsightsTabManagerInternal({
 }
 
 function getNewActiveTabAfterClose(
-  existingTabs: Query[],
+  existingTabs: Tab[],
   tabIdToClose: string,
   currentActiveTabId: string
 ): undefined | string {
@@ -196,17 +190,32 @@ function getNewActiveTabAfterClose(
   return newlySelectedTabId;
 }
 
-function findTabWithId(id: string, tabs: Query[]): undefined | Query {
+function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
   return tabs.find((tab) => tab.id === id);
 }
 
-export function hasDiffWithSavedQuery(savedQueries: Record<string, Query>, tab: Query): boolean {
-  const savedQuery = savedQueries[tab.id];
-  if (savedQuery === undefined) return false;
-
-  return savedQuery.name !== tab.name || savedQuery.query !== tab.query;
+export function hasDiffWithSavedQuery(
+  savedQueries: InsightsQueryStatement[] | undefined,
+  tab: Tab
+): boolean {
+  if (tab.savedQueryId === undefined || savedQueries === undefined) return false;
+  const savedQuery = savedQueries.find((q) => q.id === tab.savedQueryId);
+  if (!savedQuery) return false;
+  return savedQuery.name !== tab.name || savedQuery.sql !== tab.query;
 }
 
-function makeEmptyUnsavedQuery(): Query {
-  return { id: ulid(), name: UNTITLED_QUERY, query: '', saved: false };
+/**
+ * Determines whether the given tab represents a saved query.
+ *
+ * Note on slow/failed query list updates:
+ *   - We set `tab.savedQueryId` immediately after a successful create mutation, so
+ *   the tab is considered "saved" on the very next render, even before the
+ *   saved queries list refetch completes.
+ */
+export function getIsSavedQuery(tab: Tab): boolean {
+  return tab.savedQueryId !== undefined;
+}
+
+function makeEmptyUnsavedTab(): Tab {
+  return { id: ulid(), name: UNTITLED_QUERY, query: '' };
 }

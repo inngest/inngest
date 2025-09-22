@@ -11,14 +11,14 @@ import { InsightsSQLEditorResultsTitle } from '@/components/Insights/InsightsSQL
 import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
-import type { Query } from '@/components/Insights/types';
+import type { Tab } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
 type InsightsTabPanelProps = {
   isHomeTab?: boolean;
   isTemplatesTab?: boolean;
-  tab: Query;
+  tab: Tab;
 };
 
 export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTabPanelProps) {

@@ -3,13 +3,14 @@ package loader
 import (
 	"context"
 	"fmt"
+
 	"github.com/graph-gophers/dataloader"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
 type eventReader struct {
-	loaders *loaders
+	loaders *Loaders
 	reader  cqrs.EventReader
 }
 
@@ -29,7 +30,6 @@ func (er *eventReader) GetEvents(ctx context.Context, keys dataloader.Keys) []*d
 	}
 
 	events, err := er.reader.GetEventsByInternalIDs(ctx, eventIds)
-
 	if err != nil {
 		// The whole read from the DB failed, so return the same error for all of them
 		for i := range results {

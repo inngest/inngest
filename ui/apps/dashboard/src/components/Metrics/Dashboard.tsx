@@ -132,9 +132,9 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const apps = data?.envBySlug?.apps
     .filter(({ isArchived }) => isArchived === false)
-    .map((app: { id: string; externalID: string }) => ({
+    .map((app: { id: string; externalID: string; name: string }) => ({
       id: app.id,
-      name: app.externalID,
+      name: app.name,
     }));
 
   const functions = data?.envBySlug?.workflows.data;
