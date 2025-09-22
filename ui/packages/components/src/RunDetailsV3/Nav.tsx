@@ -21,8 +21,6 @@ type NavProps = {
   standalone: boolean;
   functionSlug: string;
   runID: string;
-  debugRunID?: string | null;
-  debugSessionID?: string | null;
 };
 
 export const Standalone = ({ runID }: NavProps) => {

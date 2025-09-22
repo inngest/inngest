@@ -8,7 +8,6 @@ import { RerunModal } from '../Rerun/RerunModal';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
-import { useGetRun } from '../SharedContext/useGetRun';
 import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';

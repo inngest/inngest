@@ -81,13 +81,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
           </div>
 
           {isLazyDone(run) && (
-            <Nav
-              standalone={standalone}
-              functionSlug={run.fn.slug}
-              runID={runID}
-              debugRunID={run.trace.debugRunID}
-              debugSessionID={run.trace.debugSessionID}
-            />
+            <Nav standalone={standalone} functionSlug={run.fn.slug} runID={runID} />
           )}
         </div>
 
