@@ -16,12 +16,18 @@ import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/Ins
 import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
 type InsightsTabPanelProps = {
+  historyWindow?: number;
   isHomeTab?: boolean;
   isTemplatesTab?: boolean;
   tab: Tab;
 };
 
-export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTabPanelProps) {
+export function InsightsTabPanel({
+  historyWindow,
+  isHomeTab,
+  isTemplatesTab,
+  tab,
+}: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
@@ -55,7 +61,7 @@ export function InsightsTabPanel({ isHomeTab, isTemplatesTab, tab }: InsightsTab
           </>
         }
         className="border-subtle border-t"
-        title={<InsightsSQLEditorResultsTitle />}
+        title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
       >
         <InsightsDataTable />
       </Section>

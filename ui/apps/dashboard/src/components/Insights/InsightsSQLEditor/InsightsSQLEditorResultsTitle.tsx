@@ -5,7 +5,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 
 const ROW_LIMIT = 1000;
 
-export function InsightsSQLEditorResultsTitle() {
+type InsightsSQLEditorResultsTitleProps = {
+  historyWindow?: number;
+};
+
+export function InsightsSQLEditorResultsTitle({
+  historyWindow,
+}: InsightsSQLEditorResultsTitleProps) {
+  const historyText = historyWindow ? `${historyWindow} days` : 'specified by plan';
+  const tooltipText = historyWindow
+    ? `Based on your plan, results are limited to the past ${historyWindow} days.`
+    : 'Historical data availability is specified by your plan.';
+
   return (
     <div className="mr-1 flex items-center gap-2">
       <span className="uppercase">Results</span>
@@ -17,8 +28,20 @@ export function InsightsSQLEditorResultsTitle() {
             </Pill>
           </span>
         </TooltipTrigger>
-        <TooltipContent className="p-2 text-xs" side="right" sideOffset={3}>
+        <TooltipContent className="p-2 text-xs" side="bottom" sideOffset={3}>
           Results are currently limited to at most {ROW_LIMIT} rows.
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Pill appearance="outlined" kind="info">
+              History limit : {historyText}
+            </Pill>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="p-2 text-xs" side="bottom" sideOffset={3}>
+          {tooltipText}
         </TooltipContent>
       </Tooltip>
     </div>
