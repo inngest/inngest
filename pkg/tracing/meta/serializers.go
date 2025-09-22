@@ -224,7 +224,10 @@ func TimeAttr(key string) attr[*time.Time] {
 				return BlankAttr
 			}
 
-			return attribute.Int64(withPrefix(key), v.UnixMilli())
+			return attribute.String(
+				withPrefix(key),
+				fmt.Sprintf("%d", v.UnixMilli()),
+			)
 		},
 		deserialize: func(v any) (*time.Time, bool) {
 			switch v := v.(type) {

@@ -26,7 +26,6 @@ export const Backlog = ({
             text="Total number of function runs and steps pending to be processed in your environment, app or function."
             action={
               <Link
-                arrowOnHover
                 className="text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/observability-metrics#backlog"
                 target="_new"

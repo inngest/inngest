@@ -586,6 +586,7 @@ type RunTraceSpan {
   stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
   stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
+  stepType: String!
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cespare/xxhash/v2"
@@ -133,6 +134,11 @@ func (e EventTrigger) TitleName() string {
 	}
 
 	return strings.Join(words, joiner)
+}
+
+// MatchesAnyPattern checks if this event trigger matches any of the provided patterns.
+func (e EventTrigger) MatchesAnyPattern(patterns []string) bool {
+	return slices.Contains(patterns, e.Event)
 }
 
 func (e EventTrigger) Validate(ctx context.Context) error {

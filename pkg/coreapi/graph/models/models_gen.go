@@ -391,6 +391,7 @@ type RunTraceSpan struct {
 	StepOp         *StepOp            `json:"stepOp,omitempty"`
 	StepID         *string            `json:"stepID,omitempty"`
 	StepInfo       StepInfo           `json:"stepInfo,omitempty"`
+	StepType       string             `json:"stepType"`
 	IsRoot         bool               `json:"isRoot"`
 	ParentSpanID   *string            `json:"parentSpanID,omitempty"`
 	ParentSpan     *RunTraceSpan      `json:"parentSpan,omitempty"`

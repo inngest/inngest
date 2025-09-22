@@ -247,7 +247,6 @@ export default function VercelConfigure() {
                         kind="danger"
                         appearance="outlined"
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
-                        iconSide="left"
                         className="h-10 w-10"
                         onClick={() => setPaths(paths.filter((_, n) => n !== i))}
                       />
