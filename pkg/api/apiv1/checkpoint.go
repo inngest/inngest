@@ -35,8 +35,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const CheckpointRoutePrefix = "/http/runs"
+const (
+	CheckpointRoutePrefix = "/http/runs"
 
+	CheckpointOutputWaitMax = time.Minute * 5
+	CheckpointPollInterval  = time.Second * 5
+)
+
+// CheckpointAPI represents an API implementation for the checkpointing implementations.
 type CheckpointAPI interface {
 	// http.Handler allows the checkpoint API to be mounted.
 	http.Handler
@@ -44,6 +50,12 @@ type CheckpointAPI interface {
 	CheckpointNewRun(w http.ResponseWriter, r *http.Request)
 	CheckpointSteps(w http.ResponseWriter, r *http.Request)
 	CheckpointResponse(w http.ResponseWriter, r *http.Request)
+}
+
+// RunOutputReader represents any implementation that fetches run outputs.
+type RunOutputReader interface {
+	// RunOutput fetches run outputs given an environment ID and a run ID.
+	RunOutput(ctx context.Context, envID uuid.UUID, runID ulid.ULID) ([]byte, error)
 }
 
 type checkpointAPI struct {
@@ -57,19 +69,31 @@ type checkpointAPI struct {
 
 	// runClaimsSecret is the secret for creating run claims JWTs
 	runClaimsSecret []byte
+
+	outputReader RunOutputReader
 }
 
-func NewCheckpointAPI(o Opts, runClaimsSecret []byte) CheckpointAPI {
+type CheckpointAPIOpts struct {
+	Opts
+
+	RunClaimsSecret []byte
+
+	RunOutputReader RunOutputReader
+}
+
+func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
 	api := checkpointAPI{
 		Router:          chi.NewRouter(),
 		Opts:            o,
 		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
-		runClaimsSecret: runClaimsSecret,
+		runClaimsSecret: opts.RunClaimsSecret,
+		outputReader:    opts.RunOutputReader,
 	}
 
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
 	api.Post("/{runID}/response", api.CheckpointResponse)
+	api.Get("/{runID}/output", api.Output)
 
 	return api
 }
@@ -463,6 +487,37 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error finalizing run"))
 		return
 	}
+}
+
+func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
+	// Assert that we have a checkpoint JWT in the query param.
+	token := r.URL.Query().Get("token")
+	claims, err := apiv1auth.VerifyRunJWT(r.Context(), a.runClaimsSecret, token)
+	if err != nil || claims == nil {
+		w.WriteHeader(401)
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Unable to find run with auth token"))
+	}
+
+	if a.outputReader == nil {
+		w.Header().Set("content-type", "application/json")
+		w.Write([]byte(`{"status":"unknown","message":"unable to fetch run output"}`))
+		return
+	}
+
+	until := time.Now().Add(CheckpointOutputWaitMax)
+
+	for time.Now().Before(until) {
+		output, err := a.outputReader.RunOutput(r.Context(), claims.Env, claims.RunID)
+		if err == nil {
+			// XXX: (tonyhb) add status code handling here.
+			w.Write(output)
+			return
+		}
+		time.Sleep(CheckpointPollInterval)
+	}
+
+	w.Header().Set("content-type", "application/json")
+	w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
 }
 
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
