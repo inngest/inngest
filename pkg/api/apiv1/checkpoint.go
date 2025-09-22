@@ -37,9 +37,13 @@ import (
 
 const (
 	CheckpointRoutePrefix = "/http/runs"
+)
 
+var (
 	CheckpointOutputWaitMax = time.Minute * 5
-	CheckpointPollInterval  = time.Second * 5
+
+	// CheckpointPollInterval is the duration between each poll for HTTP responses
+	CheckpointPollInterval = time.Second * 2
 )
 
 // CheckpointAPI represents an API implementation for the checkpointing implementations.
@@ -66,10 +70,9 @@ type checkpointAPI struct {
 	// upserted tracks fn IDs and their associated config in memory once upserted, allowing
 	// us to prevent DB queries from hitting the DB each time a sync fn begins.
 	upserted *ccache.Cache
-
 	// runClaimsSecret is the secret for creating run claims JWTs
 	runClaimsSecret []byte
-
+	// outputReader allows us to read run output for a given env / run ID
 	outputReader RunOutputReader
 }
 
@@ -86,14 +89,14 @@ func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
 		Router:          chi.NewRouter(),
 		Opts:            o,
 		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
-		runClaimsSecret: opts.RunClaimsSecret,
-		outputReader:    opts.RunOutputReader,
+		runClaimsSecret: o.RunJWTSecret,
+		outputReader:    o.RunOutputReader,
 	}
 
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
 	api.Post("/{runID}/response", api.CheckpointResponse)
-	api.Get("/{runID}/output", api.Output)
+	api.HandleFunc("/{runID}/output", api.Output)
 
 	return api
 }
@@ -492,10 +495,12 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 	// Assert that we have a checkpoint JWT in the query param.
 	token := r.URL.Query().Get("token")
+
 	claims, err := apiv1auth.VerifyRunJWT(r.Context(), a.runClaimsSecret, token)
 	if err != nil || claims == nil {
 		w.WriteHeader(401)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Unable to find run with auth token"))
+		return
 	}
 
 	if a.outputReader == nil {
@@ -508,6 +513,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 	for time.Now().Before(until) {
 		output, err := a.outputReader.RunOutput(r.Context(), claims.Env, claims.RunID)
+
 		if err == nil {
 			// XXX: (tonyhb) add status code handling here.
 			w.Write(output)
