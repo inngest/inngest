@@ -44,7 +44,7 @@ export default function FeaturelaunchTues({ envSlug }: { envSlug: string }) {
         </div>
         <div className="text-muted px-3 pb-3 pt-3 text-sm">
           You can now query events to analyze trends, usage, and performance right where your
-          workflows run. No tool switching required
+          workflows run. No tool switching required.
           <div className="flex gap-2 pt-2">
             <Button
               label="Use insights"
@@ -55,7 +55,6 @@ export default function FeaturelaunchTues({ envSlug }: { envSlug: string }) {
               appearance="outlined"
               href="https://www.inngest.com/docs/platform/monitor/insights?ref=launch-app-modal"
               target="_blank"
-              className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
             />
           </div>
         </div>
