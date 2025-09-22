@@ -2,15 +2,20 @@
 
 import { Pill } from '@inngest/components/Pill';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { useQuery } from 'urql';
-
-import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 
 const ROW_LIMIT = 1000;
 
-export function InsightsSQLEditorResultsTitle() {
-  const [{ data: entitlementsData }] = useQuery({ query: GetAccountEntitlementsDocument });
-  const historyWindow = entitlementsData?.account.entitlements.history.limit ?? 7;
+type InsightsSQLEditorResultsTitleProps = {
+  historyWindow?: number;
+};
+
+export function InsightsSQLEditorResultsTitle({
+  historyWindow,
+}: InsightsSQLEditorResultsTitleProps) {
+  const historyText = historyWindow ? `${historyWindow} days` : 'specified by plan';
+  const tooltipText = historyWindow
+    ? `Based on your plan, results are limited to the past ${historyWindow} days.`
+    : 'Historical data availability is specified by your plan.';
 
   return (
     <div className="mr-1 flex items-center gap-2">
@@ -31,12 +36,12 @@ export function InsightsSQLEditorResultsTitle() {
         <TooltipTrigger asChild>
           <span>
             <Pill appearance="outlined" kind="info">
-              History limit : {historyWindow} days
+              History limit : {historyText}
             </Pill>
           </span>
         </TooltipTrigger>
         <TooltipContent className="p-2 text-xs" side="bottom" sideOffset={3}>
-          Results are limited to the past {historyWindow} days based on your plan.
+          {tooltipText}
         </TooltipContent>
       </Tooltip>
     </div>
