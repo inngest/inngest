@@ -53,7 +53,7 @@ export default function FeaturelaunchMon() {
             <Button
               label="Read the docs"
               appearance="outlined"
-              href="https://www.inngest.com/docs/platform/monitor/insights"
+              href="https://www.inngest.com/docs/learn/rest-endpoints"
               target="_blank"
             />
           </div>
