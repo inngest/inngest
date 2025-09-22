@@ -82,7 +82,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, tabManagerActions]
+    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions]
   );
 
   const deleteQuery = useCallback(
