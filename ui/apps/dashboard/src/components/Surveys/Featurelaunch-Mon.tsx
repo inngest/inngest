@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button/index';
+import { Button } from '@inngest/components/Button';
 import { RiCloseLine } from '@remixicon/react';
 
 const HIDE_FEATURE_LAUNCH_MON = 'inngest-feature-launch-mon-hide';
@@ -44,25 +44,18 @@ export default function FeaturelaunchMon() {
           Build unbreakable APIs using steps directly in your API endpoints, without the need for
           background workflows.
           <div className="flex gap-2 pt-2">
-            <button
-              className="bg-btnPrimary focus:bg-btnPrimaryHover hover:bg-btnPrimaryHover active:bg-btnPrimaryActive disabled:bg-btnPrimaryDisabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs leading-[18px] text-white disabled:cursor-not-allowed"
-              onClick={() =>
-                window.open(
-                  'https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis',
-                  '_blank'
-                )
-              }
-            >
-              Learn more
-            </button>
-            <button
-              className="border-muted text-btnPrimary bg-canvasBase focus:bg-canvasSubtle hover:bg-canvasSubtle active:bg-canvasMuted disabled:border-disabled disabled:bg-disabled disabled:text-btnPrimaryDisabled relative flex h-8 items-center justify-center justify-items-center whitespace-nowrap rounded-md border px-3 py-1.5 text-xs leading-[18px] disabled:cursor-not-allowed"
-              onClick={() =>
-                window.open('https://www.inngest.com/docs/platform/monitor/insights', '_blank')
-              }
-            >
-              Read the docs
-            </button>
+            <Button
+              kind="primary"
+              label="Learn more"
+              href="https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis"
+              target="_blank"
+            />
+            <Button
+              label="Read the docs"
+              appearance="outlined"
+              href="https://www.inngest.com/docs/platform/monitor/insights"
+              target="_blank"
+            />
           </div>
         </div>
       </div>
