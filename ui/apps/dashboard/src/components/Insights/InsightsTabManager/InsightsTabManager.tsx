@@ -99,7 +99,12 @@ export function useInsightsTabManager(
           return;
         }
 
-        createTabBase({ id: ulid(), name: query.name, query: query.sql, savedQueryId: query.id });
+        createTabBase({
+          id: ulid(),
+          name: query.name,
+          query: query.sql,
+          savedQueryId: query.id,
+        });
       },
       focusTab: setActiveTabId,
       openTemplatesTab: () => {
