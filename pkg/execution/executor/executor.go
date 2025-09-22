@@ -518,7 +518,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	for n, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
-			eventName = &evt.Name
+			name := evt.Name
+			eventName = &name
 		}
 
 		// serialize this data to the span at the same time
