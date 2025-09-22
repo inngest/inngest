@@ -1,7 +1,5 @@
 import type { QueryTemplate } from '@/components/Insights/types';
 
-// TODO: account_id will be derived by the BE.
-
 function makeEventVolumePerHourQuery(event?: string) {
   return `SELECT
     toStartOfHour(toDateTime(ts / 1000)) AS hour_bucket,
@@ -55,11 +53,22 @@ const RECENT_FAILED_FUNCTION_COUNT = makeFunctionStatusQuery('failed');
 const RECENT_CANCELLED_FUNCTION_COUNT = makeFunctionStatusQuery('cancelled');
 const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
+const RECENT_EVENTS_QUERY = `SELECT 
+    toDateTime(ts / 1000) AS timestamp,
+    id,
+    name,
+    data,
+    v
+FROM 
+    events 
+ORDER BY 
+    timestamp DESC`;
+
 export const TEMPLATES: QueryTemplate[] = [
   {
     id: 'recent-events',
     name: 'Recent events',
-    query: 'SELECT * FROM events',
+    query: RECENT_EVENTS_QUERY,
     explanation: 'View recents events subject to row and plan history limit restrictions.',
     templateKind: 'time',
   },
