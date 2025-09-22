@@ -13,3 +13,5 @@ export const TEMPLATES_TAB: Tab = {
 };
 
 export const UNTITLED_QUERY = 'Untitled query';
+
+export const EXTERNAL_FEEDBACK_LINK = 'https://tally.so/r/nr7yap';
