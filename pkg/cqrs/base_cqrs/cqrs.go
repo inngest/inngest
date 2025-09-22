@@ -2643,7 +2643,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		if runGroups[i].startTime.Equal(runGroups[j].startTime) {
 			return runGroups[i].runID < runGroups[j].runID
 		}
-		return runGroups[i].startTime.Before(runGroups[j].startTime)
+		return runGroups[i].startTime.After(runGroups[j].startTime)
 	})
 
 	res := []*cqrs.TraceRun{}
