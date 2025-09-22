@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { QuerySnapshot, Tab } from '@/components/Insights/types';
-import type { InsightsQuery } from '@/gql/graphql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import { getOrderedSavedQueries } from '../queries';
 import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
@@ -14,7 +14,7 @@ interface StoredQueriesContextValue {
   deleteQuerySnapshot: (snapshotId: string) => void;
   isSavedQueriesFetching: boolean;
   queries: {
-    data: undefined | InsightsQuery[];
+    data: undefined | InsightsQueryStatement[];
     error: undefined | string;
     isLoading: boolean;
   };

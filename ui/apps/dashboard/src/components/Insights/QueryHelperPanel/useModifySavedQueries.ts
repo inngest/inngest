@@ -6,7 +6,7 @@ import { CombinedError, useMutation } from 'urql';
 import { graphql } from '@/gql';
 import type {
   CreateInsightsQueryMutation,
-  InsightsQuery,
+  InsightsQueryStatement,
   RemoveInsightsQueryMutation,
   UpdateInsightsQueryMutation,
 } from '@/gql/graphql';
@@ -24,7 +24,7 @@ const createInsightsQueryDocument = graphql(`
 `);
 
 const removeInsightsQueryDocument = graphql(`
-  mutation RemoveInsightsQuery($id: ID!) {
+  mutation RemoveInsightsQuery($id: ULID!) {
     removeInsightsQuery(id: $id) {
       ids
     }
@@ -32,7 +32,7 @@ const removeInsightsQueryDocument = graphql(`
 `);
 
 const updateInsightsQueryDocument = graphql(`
-  mutation UpdateInsightsQuery($id: ID!, $input: UpdateInsightsQuery!) {
+  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {
     updateInsightsQuery(id: $id, input: $input) {
       id
       name
@@ -51,8 +51,8 @@ export type MutationResult<T> = { ok: true; data: T } | { ok: false; error: 'uni
 
 type UseModifySavedQueriesReturn = {
   deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
-  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQuery>>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQuery>>;
+  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
 };
 
 export function useModifySavedQueries(): UseModifySavedQueriesReturn {
@@ -85,7 +85,9 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
     [executeMutation, runRemove]
   );
 
-  const saveQuery = useCallback<(args: SaveQueryArgs) => Promise<MutationResult<InsightsQuery>>>(
+  const saveQuery = useCallback<
+    (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>
+  >(
     async ({ name, query }) => {
       const result = await executeMutation<CreateInsightsQueryMutation>(() =>
         runCreate({ input: { name, sql: query } })
@@ -98,7 +100,7 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   );
 
   const updateQuery = useCallback<
-    (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQuery>>
+    (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>
   >(
     async ({ id, name, query }) => {
       const result = await executeMutation<UpdateInsightsQueryMutation>(() =>

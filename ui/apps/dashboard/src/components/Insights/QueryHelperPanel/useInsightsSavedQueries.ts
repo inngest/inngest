@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery, type CombinedError } from 'urql';
 
 import { graphql } from '@/gql';
-import type { InsightsQuery } from '@/gql/graphql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import {
   useModifySavedQueries,
   type DeleteQueryArgs,
@@ -31,10 +31,10 @@ export interface UseInsightsSavedQueriesReturn {
   deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
   isSavedQueriesFetching: boolean;
   refetchSavedQueries: () => void;
-  savedQueries: undefined | InsightsQuery[];
+  savedQueries: undefined | InsightsQueryStatement[];
   savedQueriesError: undefined | CombinedError;
-  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQuery>>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQuery>>;
+  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {

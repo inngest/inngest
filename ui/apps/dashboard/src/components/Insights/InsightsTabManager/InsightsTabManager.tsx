@@ -5,7 +5,7 @@ import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
-import type { InsightsQuery } from '@/gql/graphql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -15,7 +15,7 @@ export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
-  createTabFromQuery: (query: InsightsQuery | QuerySnapshot | QueryTemplate) => void;
+  createTabFromQuery: (query: InsightsQueryStatement | QuerySnapshot | QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
   updateTab: (id: string, patch: Partial<Omit<Tab, 'id'>>) => void;
@@ -69,7 +69,7 @@ export function useInsightsTabManager(
       createNewTab: () => {
         createTabBase(makeEmptyUnsavedTab());
       },
-      createTabFromQuery: (query: InsightsQuery | QuerySnapshot | QueryTemplate) => {
+      createTabFromQuery: (query: InsightsQueryStatement | QuerySnapshot | QueryTemplate) => {
         if (isQueryTemplate(query)) {
           createTabBase({ ...makeEmptyUnsavedTab(), query: query.query, name: query.name });
           return;
@@ -195,7 +195,7 @@ function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
 }
 
 export function hasDiffWithSavedQuery(
-  savedQueries: InsightsQuery[] | undefined,
+  savedQueries: InsightsQueryStatement[] | undefined,
   tab: Tab
 ): boolean {
   if (tab.savedQueryId === undefined || savedQueries === undefined) return false;
