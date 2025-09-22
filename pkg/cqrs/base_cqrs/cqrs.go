@@ -2622,6 +2622,13 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 					startTime = span.StartTime
 				}
 			}
+
+			// order the spans by start time too so that we process each
+			// update step-by-step as they happened
+			sort.Slice(spans, func(i, j int) bool {
+				return spans[i].StartTime.Before(spans[j].StartTime)
+			})
+
 			runGroups = append(runGroups, runGroup{
 				runID:         runID,
 				dynamicSpanID: dynamicSpanID,
