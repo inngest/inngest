@@ -59,6 +59,13 @@ const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
 export const TEMPLATES: QueryTemplate[] = [
   {
+    id: 'recent-events',
+    name: 'Recent events',
+    query: 'SELECT * FROM events',
+    explanation: 'View recents events subject to row and plan history limit restrictions.',
+    templateKind: 'time',
+  },
+  {
     id: 'event-type-volume-per-hour',
     name: 'Events by type per hour',
     query: EVENT_TYPE_VOLUME_PER_HOUR_QUERY,
