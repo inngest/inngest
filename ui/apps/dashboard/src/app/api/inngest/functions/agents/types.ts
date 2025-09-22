@@ -1,8 +1,11 @@
 // Shared TypeScript-only types for Insights agents and UI
+import { createToolManifest, type StateData } from '@inngest/agent-kit';
 
-export type InsightsToolName = 'select_events' | 'generate_sql';
+import { selectEventsTool } from './event-matcher';
+import { generateSqlTool } from './query-writer';
 
-export type InsightsState = {
+// Consolidated into a single type that extends StateData as required by AgentKit
+export type InsightsAgentState = StateData & {
   // Common conversation/user context
   userId?: string;
 
@@ -17,14 +20,6 @@ export type InsightsState = {
   sql?: string;
 };
 
-// Tool I/O (no runtime validation; types only)
-export type SelectEventsInput = {
-  events: {
-    event_name: string;
-    reason: string;
-  }[];
-};
-
 export type SelectEventsResult = {
   selected: {
     event_name: string;
@@ -34,14 +29,13 @@ export type SelectEventsResult = {
   totalCandidates: number;
 };
 
-export type GenerateSqlInput = {
-  sql: string; // single SELECT statement
-  title?: string;
-  reasoning?: string;
-};
-
 export type GenerateSqlResult = {
   sql: string;
   title?: string;
   reasoning?: string;
 };
+
+// Build a strongly-typed tool manifest from tool definitions - used in the UI to render tool calls
+const manifest = createToolManifest([generateSqlTool, selectEventsTool] as const);
+
+export type ToolManifest = typeof manifest;

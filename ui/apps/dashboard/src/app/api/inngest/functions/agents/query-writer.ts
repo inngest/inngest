@@ -1,8 +1,7 @@
-import { createAgent, createTool, openai, type Network } from '@inngest/agent-kit';
+import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
-import type { InsightsAgentState as InsightsState } from './event-matcher';
-import type { GenerateSqlInput, GenerateSqlResult } from './types';
+import type { GenerateSqlResult, InsightsAgentState as InsightsState } from './types';
 
 const queryGrammar = `
   QueryAST = "SELECT" SelectClause "FROM" From ("WHERE" Expression)? ("GROUP" "BY" GroupBy)? ("ORDER" "BY" OrderBy)? ("LIMIT" <number>)? ("OFFSET" <number>)? ";"? .
@@ -175,69 +174,36 @@ Advanced visualization capabilities
 
 `;
 
-function sanitizeSql(text: string): string {
-  const sql = String(text || '').trim();
-  // Lightweight guardrail: reject clearly unsafe statements
-  const lower = sql.replace(/\s+/g, ' ').toLowerCase();
-  const forbidden = [
-    'insert ',
-    'update ',
-    'delete ',
-    'drop ',
-    'alter ',
-    'create ',
-    'grant ',
-    'revoke ',
-    'truncate ',
-  ];
-  for (const kw of forbidden) {
-    if (lower.includes(kw)) {
-      throw new Error('Only read-only SELECT queries are allowed');
-    }
-  }
-  if (!/^select\s/i.test(sql)) {
-    throw new Error('SQL must start with SELECT');
-  }
-  return sql;
-}
+const GenerateSqlParams = z.object({
+  sql: z
+    .string()
+    .min(1)
+    .describe('A single valid SELECT statement. Do not include DDL/DML or multiple statements.'),
+  title: z.string().min(1).describe('Short 20-30 character title for this query'),
+  reasoning: z
+    .string()
+    .min(1)
+    .describe('Brief 1-2 sentence explanation of how this query addresses the request'),
+});
 
-const generateSqlTool = createTool({
+export const generateSqlTool = createTool({
   name: 'generate_sql',
   description:
     'Provide the final SQL SELECT statement for ClickHouse based on the selected events and schemas.',
-  parameters: z.object({
-    sql: z
-      .string()
-      .min(1)
-      .describe('A single valid SELECT statement. Do not include DDL/DML or multiple statements.'),
-    title: z.string().min(1).describe('Short 20-30 character title for this query'),
-    reasoning: z
-      .string()
-      .min(1)
-      .describe('Brief 1-2 sentence explanation of how this query addresses the request'),
-  }) as any, // TODO: zod version mismatch is causing a type error here; need to align zod versions
-  handler: ({ sql: rawSql, title, reasoning }: GenerateSqlInput, ctx: any): GenerateSqlResult => {
-    const network = ctx?.network as Network<InsightsState> | undefined;
-    if (!network) {
-      throw new Error('Agent network context is required');
-    }
-    const raw = String(rawSql);
-    const sql = sanitizeSql(raw);
-    network.state.data.sql = sql;
-
-    const result: GenerateSqlResult = {
-      sql: sql,
+  parameters: GenerateSqlParams as unknown as AnyZodType,
+  handler: ({ sql, title, reasoning }: z.infer<typeof GenerateSqlParams>) => {
+    return {
+      sql,
       title,
       reasoning,
-    };
-    return result;
+    } as GenerateSqlResult;
   },
 });
 
 export const queryWriterAgent = createAgent<InsightsState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
-  system: async ({ network }): Promise<string> => {
+  system: async ({ network }) => {
     const selected = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
     return [
       'You write ClickHouse-compatible SQL for analytics.',

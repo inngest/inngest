@@ -1,51 +1,52 @@
-import { createAgent, createTool, openai, type Network, type StateData } from '@inngest/agent-kit';
+import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
-import type {
-  SelectEventsInput,
-  SelectEventsResult,
-  InsightsState as SharedInsightsState,
-} from './types';
+import type { InsightsAgentState as InsightsState, SelectEventsResult } from './types';
 
-export interface InsightsState extends StateData, SharedInsightsState {}
+const SelectEventsParams = z.object({
+  events: z
+    .array(
+      z.object({
+        event_name: z.string(),
+        reason: z.string(),
+      })
+    )
+    .min(1)
+    .max(6)
+    .describe(
+      "An array of 1-6 event names selected from the list of available events that best match the user's intent."
+    ),
+});
 
-const selectEventsTool = createTool({
+export const selectEventsTool = createTool({
   name: 'select_events',
   description:
     "Select 1-5 event names from the provided list that are most relevant to the user's query.",
-  parameters: z.object({
-    events: z
-      .array(
-        z.object({
-          event_name: z.string(),
-          reason: z.string(),
-        })
-      )
-      .min(1)
-      .max(6)
-      .describe(
-        "An array of 1-6 event names selected from the list of available events that best match the user's intent."
-      ),
-  }) as any, // TODO: zod version mismatch is causing a type error here; need to align zod versions
-  handler: (args: SelectEventsInput, ctx): SelectEventsResult => {
-    const network = ctx.network as Network<InsightsState>;
-    const selected = args.events;
-
-    if (!Array.isArray(selected) || selected.length === 0) {
+  parameters: SelectEventsParams as unknown as AnyZodType,
+  handler: (args: z.infer<typeof SelectEventsParams>, { network }) => {
+    const { events } = args;
+    if (!Array.isArray(events) || events.length === 0) {
       throw new Error('The model must select at least one event.');
     }
+
+    const selected = events.map((event) => {
+      return {
+        event_name: event.event_name,
+        reason: event.reason,
+      };
+    });
 
     const reason = "Selected by the LLM based on the user's query.";
 
     // Persist selection on network state for downstream agents
-    network.state.data.selectedEvents = selected;
+    network.state.data.selectedEvents = events;
     network.state.data.selectionReason = reason;
 
-    const result: SelectEventsResult = {
+    const result = {
       selected,
       reason,
       totalCandidates: network.state.data.eventTypes?.length || 0,
-    };
+    } as SelectEventsResult;
     return result;
   },
 });

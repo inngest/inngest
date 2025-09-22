@@ -1,11 +1,11 @@
 import { createAgent, openai } from '@inngest/agent-kit';
 
-import type { InsightsAgentState as InsightsState } from './event-matcher';
+import type { InsightsAgentState as InsightsState } from './types';
 
 export const summarizerAgent = createAgent<InsightsState>({
   name: 'Insights Summarizer',
   description: 'Writes a concise summary describing what the generated SQL does and why.',
-  system: async ({ network }): Promise<string> => {
+  system: async ({ network }) => {
     const events = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
     const sql = network?.state.data.sql;
     return [

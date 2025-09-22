@@ -1,8 +1,9 @@
 import { createNetwork, openai, type Network, type State } from '@inngest/agent-kit';
 
-import { eventMatcherAgent, type InsightsAgentState as InsightsState } from './event-matcher';
+import { eventMatcherAgent } from './event-matcher';
 import { queryWriterAgent } from './query-writer';
 import { summarizerAgent } from './summarizer';
+import type { InsightsAgentState as InsightsState } from './types';
 
 // Deterministic, code-first router: EventMatcher → QueryWriter → Summarizer
 const sequenceRouter: Network.Router<InsightsState> = async ({ callCount }) => {
