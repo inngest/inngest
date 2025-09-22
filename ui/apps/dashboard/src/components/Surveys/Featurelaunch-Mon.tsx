@@ -47,13 +47,13 @@ export default function FeaturelaunchMon() {
             <Button
               kind="primary"
               label="Learn more"
-              href="https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis"
+              href="https://www.inngest.com/blog/launch-week-day-1-unbreakable-apis?ref=launch-app-modal"
               target="_blank"
             />
             <Button
               label="Read the docs"
               appearance="outlined"
-              href="https://www.inngest.com/docs/learn/rest-endpoints"
+              href="https://www.inngest.com/docs/learn/rest-endpoints?ref=launch-app-modal"
               target="_blank"
             />
           </div>
