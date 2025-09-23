@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agents';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -160,6 +162,40 @@ function InsightsTabManagerInternal({
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
 }: InsightsTabManagerInternalProps) {
+  // Provide shared transport/connection for all descendant useAgents hooks
+  const { user } = useUser();
+  const transport = useMemo(() => createInMemorySessionTransport(), []);
+  const channelKey = user?.id ? `insights:${user.id}` : undefined;
+  // Type shim to avoid cross-package ReactNode incompatibilities during local linking
+  const AnyAgentProvider = AgentProvider as unknown as React.FC<any>;
+  const providerChildren: ReactNode = (
+    <div>
+      {tabs.map((tab) => (
+        <InsightsStateMachineContextProvider
+          key={tab.id}
+          onQueryChange={(query) => actions.updateTab(tab.id, { query })}
+          onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
+          query={tab.query}
+          queryName={tab.name}
+          renderChildren={true}
+          tabId={tab.id}
+        >
+          <div className={tab.id === activeTabId ? 'flex h-full w-full' : 'hidden h-full w-full'}>
+            <div className="flex-1 overflow-hidden">
+              <InsightsTabPanel
+                isHomeTab={tab.id === HOME_TAB.id}
+                isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                tab={tab}
+              />
+            </div>
+            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
+              <InsightsChat tabId={tab.id} threadId={getThreadIdForTab(tab.id)} />
+            )}
+          </div>
+        </InsightsStateMachineContextProvider>
+      ))}
+    </div>
+  );
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       <InsightsTabsList
@@ -169,31 +205,14 @@ function InsightsTabManagerInternal({
         tabs={tabs}
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
-        {tabs.map((tab) => (
-          <InsightsStateMachineContextProvider
-            key={tab.id}
-            onQueryChange={(query) => actions.updateTab(tab.id, { query })}
-            onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
-            query={tab.query}
-            queryName={tab.name}
-            renderChildren={tab.id === activeTabId}
-            tabId={tab.id}
-          >
-            <div className="flex h-full w-full">
-              <div className="flex-1 overflow-hidden">
-                <InsightsTabPanel
-                  isHomeTab={tab.id === HOME_TAB.id}
-                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                  tab={tab}
-                  historyWindow={historyWindow}
-                />
-              </div>
-              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
-                <InsightsChat tabId={tab.id} threadId={getThreadIdForTab(tab.id)} />
-              )}
-            </div>
-          </InsightsStateMachineContextProvider>
-        ))}
+        <AnyAgentProvider
+          userId={user?.id || undefined}
+          channelKey={channelKey}
+          transport={transport}
+          debug={false}
+        >
+          {providerChildren}
+        </AnyAgentProvider>
       </div>
     </div>
   );
