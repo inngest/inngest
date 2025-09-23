@@ -512,9 +512,16 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		eventIDs = append(eventIDs, id)
 	}
 
+	var eventName *string
+
 	evts := make([]json.RawMessage, len(req.Events))
 	for n, item := range req.Events {
 		evt := item.GetEvent()
+		if eventName == nil {
+			name := evt.Name
+			eventName = &name
+		}
+
 		// serialize this data to the span at the same time
 		byt, err := json.Marshal(evt)
 		if err != nil {
@@ -595,6 +602,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 		),
 	}
 	if req.RunMode == enums.RunModeSync {
@@ -2823,7 +2831,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
 		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
@@ -2875,7 +2883,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		lifecycleItem := runCtx.LifecycleItem()
 
 		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
@@ -3025,7 +3033,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
 		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen),
+			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
@@ -3071,6 +3079,8 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 		}
 	} else {
+		rawBody := resp.Body
+
 		// The response output is actually now the result of this AI call. We need
 		// to modify the opcode data so that accessing the step output is correct.
 		//
@@ -3078,7 +3088,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		// to differentiate between success and failure in the SDK in the single
 		// opcode map.
 		resp.Body, err = json.Marshal(map[string]json.RawMessage{
-			execution.StateDataKey: resp.Body,
+			execution.StateDataKey: rawBody,
 		})
 		if err != nil {
 			return fmt.Errorf("error wrapping ai result in map: %w", err)
@@ -3088,7 +3098,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		lifecycleItem := runCtx.LifecycleItem()
 
 		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen),
+			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, rawBody),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
 			QueueItem:  &lifecycleItem,
