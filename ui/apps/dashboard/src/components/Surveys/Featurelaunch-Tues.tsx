@@ -48,7 +48,9 @@ export default function FeaturelaunchTues({ envSlug }: { envSlug: string }) {
           <div className="flex gap-2 pt-2">
             <Button
               label="Use insights"
-              onClick={() => router.push(pathCreator.insights({ envSlug }))}
+              onClick={() =>
+                router.push(pathCreator.insights({ envSlug }) + '?ref=launch-app-modal')
+              }
             />
             <Button
               label="Read the docs"
