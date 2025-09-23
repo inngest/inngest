@@ -7,7 +7,7 @@ import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://www.inngest.com/docs';
-const INSIGHTS_DOCS_URL = `${BASE_DOCS_URL}/platform/monitor/insights`;
+const INSIGHTS_DOCS_URL = `${BASE_DOCS_URL}/platform/monitor/insights?ref=app-insights`;
 
 const RESOURCES = [
   {
