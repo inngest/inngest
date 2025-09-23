@@ -154,6 +154,13 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, stack)
 	}
 
+	// Always try to capture input
+	if input, err := op.Input(); err == nil {
+		meta.AddAttrIfUnset(rawAttrs, meta.Attrs.StepInput, &input)
+	} else {
+		rawAttrs.AddErr(fmt.Errorf("failed to get step input: %w", err))
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
