@@ -3,6 +3,7 @@
 import { Link } from '@inngest/components/Link/Link';
 import { RiChatPollLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
+import { pathCreator } from '@/utils/urls';
 import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
@@ -21,7 +22,7 @@ const RESOURCES = [
     icon: RiChatPollLine,
   },
   {
-    href: '/support',
+    href: pathCreator.support({ ref: 'app-insights' }),
     label: 'Request support',
     icon: RiMailLine,
   },
