@@ -59,6 +59,10 @@ var Attrs = struct {
 	StepAttempt      attr[*int]
 	StepMaxAttempts  attr[*int]
 	StepCodeLocation attr[*string]
+	// StepInput is the data that has been explicitly captured as input for a
+	// step. This data may not be stored with the span when it hits a store,
+	// and instead may be removed to be stored separately.
+	StepInput attr[*string]
 	// StepOutput is the data that has been returned from the step, in
 	// its wrapped form for the SDK. This data may not be stored with the span
 	// when it hits a store, and instead may be removed to be stored
@@ -155,6 +159,7 @@ var Attrs = struct {
 	StepMaxAttempts:           IntAttr("step.max_attempts"),
 	StepName:                  StringAttr("step.name"),
 	StepOp:                    StepOpAttr("step.op"),
+	StepInput:                 StringAttr("step.input"),
 	StepOutput:                StringAttr("step.output"),
 	StepOutputRef:             StringAttr("step.output_ref"),
 	StepRunType:               StringAttr("step.run.type"),
