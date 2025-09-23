@@ -363,6 +363,13 @@ func (r *GetSpansByDebugSessionIDRow) ToSQLite() (*sqlc.GetSpansByDebugSessionID
 	}, nil
 }
 
+func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
+	return &sqlc.GetSpanOutputRow{
+		Input:  r.Input,
+		Output: r.Output,
+	}, nil
+}
+
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
 	data, err := json.Marshal(v)
 	if err != nil {
