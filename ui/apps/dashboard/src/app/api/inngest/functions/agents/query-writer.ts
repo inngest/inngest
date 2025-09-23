@@ -52,9 +52,7 @@ const generateSqlTool = createTool({
     }
     const raw = String(rawSql);
     const sql = sanitizeSql(raw);
-    if (network) {
-      network.state.data.sql = sql;
-    }
+    network.state.data.sql = sql;
 
     const result: GenerateSqlResult = {
       sql: sql,

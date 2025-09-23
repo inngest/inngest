@@ -6,10 +6,8 @@ export const summarizerAgent = createAgent<InsightsState>({
   name: 'Insights Summarizer',
   description: 'Writes a concise summary describing what the generated SQL does and why.',
   system: async ({ network }): Promise<string> => {
-    const events = Array.isArray(network?.state.data.selectedEvents)
-      ? network!.state.data.selectedEvents.map((e) => e.event_name)
-      : [];
-    const sql = typeof network?.state.data.sql === 'string' ? network.state.data.sql : undefined;
+    const events = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
+    const sql = network?.state.data.sql;
     return [
       'You are a helpful assistant summarizing the result of a SQL generation process.',
       'Write a one sentence short summary that explains:',
@@ -23,5 +21,4 @@ export const summarizerAgent = createAgent<InsightsState>({
       .join('\n');
   },
   model: openai({ model: 'gpt-5-nano-2025-08-07' }),
-  tools: [],
 });
