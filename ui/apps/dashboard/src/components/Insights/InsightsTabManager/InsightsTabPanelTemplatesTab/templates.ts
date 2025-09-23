@@ -1,7 +1,5 @@
 import type { QueryTemplate } from '@/components/Insights/types';
 
-// TODO: account_id will be derived by the BE.
-
 function makeEventVolumePerHourQuery(event?: string) {
   return `SELECT
     toStartOfHour(toDateTime(ts / 1000)) AS hour_bucket,
@@ -53,7 +51,9 @@ ORDER BY
 
 const RECENT_FAILED_FUNCTION_COUNT = makeFunctionStatusQuery('failed');
 const RECENT_CANCELLED_FUNCTION_COUNT = makeFunctionStatusQuery('cancelled');
-const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
+
+// TODO: Add this back if a clear, reliable pattern for determining successes emerges.
+// const RECENT_SUCCESSFUL_FUNCTION_COUNT = makeFunctionStatusQuery('finished');
 
 export const TEMPLATES: QueryTemplate[] = [
   {
@@ -91,6 +91,7 @@ export const TEMPLATES: QueryTemplate[] = [
     explanation: 'View cancelled function runs within the past 24 hours.',
     templateKind: 'warning',
   },
+  /*
   {
     id: 'recent-function-successes',
     name: 'Recent function successes',
@@ -98,4 +99,5 @@ export const TEMPLATES: QueryTemplate[] = [
     explanation: 'View successful function runs within the past 24 hours.',
     templateKind: 'success',
   },
+  */
 ];
