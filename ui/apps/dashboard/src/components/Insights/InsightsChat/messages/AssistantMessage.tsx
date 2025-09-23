@@ -9,7 +9,7 @@ type AssistantMessageProps = {
 
 export const AssistantMessage = ({ part }: AssistantMessageProps) => {
   return (
-    <div className="inline-block max-w-[340px] whitespace-pre-wrap rounded-md bg-indigo-100 px-3 py-2 text-sm text-gray-800">
+    <div className="text-text-basis inline-block max-w-[340px] whitespace-pre-wrap rounded-md px-0 py-1 text-sm">
       {part.content}
     </div>
   );
