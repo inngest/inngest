@@ -48,16 +48,7 @@ function GenerateSqlToolUI({
                     )}
                   </div>
                 </Disclosure.Button>
-                <span
-                  onClick={() => {
-                    // [TEST-STREAM] Diagnostics for tool title click
-                    // eslint-disable-next-line no-console
-                    console.log('[TEST-STREAM] ToolMessage.titleClick', { data: data });
-                  }}
-                  className="font-sm"
-                >
-                  {title || 'Generated SQL'}
-                </span>
+                <span className="font-sm">{title || 'Generated SQL'}</span>
               </div>
 
               {!!sql && (
@@ -74,13 +65,6 @@ function GenerateSqlToolUI({
                       appearance="ghost"
                       size="small"
                       onClick={() => {
-                        // [TEST-STREAM] Diagnostics for tool run button
-                        // eslint-disable-next-line no-console
-                        console.log('[TEST-STREAM] ToolMessage.run', {
-                          hasSql: Boolean(sql),
-                          sqlPreview: typeof sql === 'string' ? sql.slice(0, 120) : undefined,
-                          data: data,
-                        });
                         onSqlChange(sql);
                         try {
                           runQuery();

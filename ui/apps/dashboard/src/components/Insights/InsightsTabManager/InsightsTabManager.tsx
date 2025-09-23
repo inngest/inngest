@@ -48,8 +48,6 @@ export function useInsightsTabManager(
   const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
 
-  console.log('[TEST-STREAM] isInsightsAgentEnabled', isInsightsAgentEnabled);
-
   const onToggleChatPanelVisibility = useCallback(() => {
     if (!isInsightsAgentEnabled.value) return;
     setIsChatPanelVisible((prev) => !prev);

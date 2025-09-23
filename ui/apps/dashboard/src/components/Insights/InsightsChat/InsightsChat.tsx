@@ -140,16 +140,12 @@ export function InsightsChat({
     const sql = readAndClearPendingSql(threadId);
     if (typeof sql === 'string' && sql.length > 0) {
       lastAppliedSqlRef.current = sql;
-      try {
-        onSqlChange(sql.trim());
-      } catch {}
+      onSqlChange(sql.trim());
     }
     if (popPendingAutoRun(threadId)) {
       // Defer run slightly to allow onSqlChange to commit
       setTimeout(() => {
-        try {
-          runQuery();
-        } catch {}
+        runQuery();
       }, 0);
     }
     // Re-run when provider reports new pending SQL ingress
@@ -170,9 +166,6 @@ export function InsightsChat({
       if (!message || status !== 'ready') return;
       // Clear input immediately for snappier UX
       setInputValue('');
-      // [TEST-STREAM] Diagnostics for user submit
-      // eslint-disable-next-line no-console
-      console.log('[TEST-STREAM] user.submit', { threadId, messagePreview: message.slice(0, 120) });
       await sendMessageToThread(threadId, message);
     },
     [inputValue, status, sendMessageToThread, threadId]
@@ -180,19 +173,10 @@ export function InsightsChat({
 
   const handleClearThread = useCallback(() => {
     if (messages.length === 0 || status !== 'ready') return;
-    // [TEST-STREAM] Diagnostics for clear thread
-    // eslint-disable-next-line no-console
-    console.log('[TEST-STREAM] action: clearThreadMessages', {
-      threadId,
-      messageCount: messages.length,
-    });
     clearThreadMessages(threadId);
   }, [messages.length, status, clearThreadMessages, threadId]);
 
   const handleToggleChat = useCallback(() => {
-    // [TEST-STREAM] Diagnostics for toggle chat
-    // eslint-disable-next-line no-console
-    console.log('[TEST-STREAM] action: toggleChat');
     onToggleChat();
   }, [onToggleChat]);
 
