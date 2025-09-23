@@ -37,7 +37,7 @@ export function InsightsTabPanel({
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
-    <>
+    <div className="grid h-full w-full grid-rows-[3fr_5fr] gap-0 overflow-hidden">
       <Section
         actions={
           <>
@@ -65,6 +65,6 @@ export function InsightsTabPanel({
       >
         <InsightsDataTable />
       </Section>
-    </>
+    </div>
   );
 }

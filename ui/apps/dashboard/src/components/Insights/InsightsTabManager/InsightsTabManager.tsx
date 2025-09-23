@@ -6,6 +6,7 @@ import { ulid } from 'ulid';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
+import { InsightsChat } from '../InsightsChat/InsightsChat';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -154,7 +155,7 @@ function InsightsTabManagerInternal({
         onToggleQueryHelperPanelVisibility={onToggleQueryHelperPanelVisibility}
         tabs={tabs}
       />
-      <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
+      <div className="flex h-full w-full flex-1 overflow-hidden">
         {tabs.map((tab) => (
           <InsightsStateMachineContextProvider
             key={tab.id}
@@ -165,12 +166,17 @@ function InsightsTabManagerInternal({
             renderChildren={tab.id === activeTabId}
             tabId={tab.id}
           >
-            <InsightsTabPanel
-              isHomeTab={tab.id === HOME_TAB.id}
-              isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-              tab={tab}
-              historyWindow={historyWindow}
-            />
+            <div className="flex h-full w-full">
+              <div className="flex-1 overflow-hidden">
+                <InsightsTabPanel
+                  isHomeTab={tab.id === HOME_TAB.id}
+                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                  tab={tab}
+                  historyWindow={historyWindow}
+                />
+              </div>
+              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && <InsightsChat />}
+            </div>
           </InsightsStateMachineContextProvider>
         ))}
       </div>
