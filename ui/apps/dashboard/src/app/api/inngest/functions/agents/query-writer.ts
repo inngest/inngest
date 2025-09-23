@@ -51,7 +51,10 @@ const generateSqlTool = createTool({
     .strict() as any,
   handler: ({ sql: rawSql, title, reasoning }: GenerateSqlInput, ctx: any): GenerateSqlResult => {
     const network = ctx?.network as Network<InsightsState> | undefined;
-    const raw = typeof rawSql === 'string' ? rawSql : '';
+    if (!network) {
+      throw new Error('Agent network context is required');
+    }
+    const raw = String(rawSql);
     const sql = sanitizeSql(raw);
     if (network) {
       network.state.data.sql = sql;

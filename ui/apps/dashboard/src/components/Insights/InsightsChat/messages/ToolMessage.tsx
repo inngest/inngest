@@ -5,7 +5,7 @@ import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import type { ToolCallUIPart } from '@inngest/use-agents';
-import { RiCheckLine, RiCloseLine, RiEdit2Line, RiPlayLine } from '@remixicon/react';
+import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
 import type { GenerateSqlResult } from '@/app/api/inngest/functions/agents/types';
 
@@ -41,7 +41,7 @@ function GenerateSqlToolUI({
   return (
     <div className="text-text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
       <Disclosure>
-        {({ open }) => (
+        {() => (
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -62,7 +62,7 @@ function GenerateSqlToolUI({
                 <span className="font-sm">{title || 'Generated SQL'}</span>
               </div>
 
-              {sql && (
+              {!!sql && (
                 <div className="flex items-center gap-2">
                   {/* <Button
                     icon={<RiEdit2Line className="size-4" />}
@@ -87,7 +87,7 @@ function GenerateSqlToolUI({
               )}
             </div>
             <Disclosure.Panel className="mt-2">
-              <pre className="bg-canvasSubtle mt-1 overflow-auto rounded p-2 text-xs text-xs">
+              <pre className="bg-canvasSubtle mt-1 overflow-auto rounded p-2 text-xs">
                 {sql || errorMessage}
               </pre>
             </Disclosure.Panel>

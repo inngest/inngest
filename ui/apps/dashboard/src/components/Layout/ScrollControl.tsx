@@ -11,17 +11,12 @@ export default function ScrollControl({ containerId }: ScrollControlProps) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const el = typeof document !== 'undefined' ? document.getElementById(containerId) : null;
+    const el = document.getElementById(containerId);
     if (!el) return;
 
-    if (pathname === '/env/production/insights') {
-      el.style.overflowY = 'hidden';
-    } else {
-      el.style.overflowY = 'scroll';
-    }
+    el.style.overflowY = pathname === '/env/production/insights' ? 'hidden' : 'scroll';
 
     return () => {
-      if (!el) return;
       el.style.overflowY = '';
     };
   }, [containerId, pathname]);
