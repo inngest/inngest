@@ -26,7 +26,7 @@ local function gcra(key, now_ms, period_ms, limit, burst)
 		return false
 	end
 
-	local expiry = (period_ms / 1000)
+	local expiry = string.format("%d", period_ms / 1000)
 	redis.call("SET", key, new_tat, "EX", expiry)
 
 	return true
