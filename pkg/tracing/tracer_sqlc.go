@@ -53,7 +53,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 
 			// If input, extract and store separately
 			// This is always cleaned
-			if string(attr.Key) == meta.Attrs.EventsInput.Key() {
+			if string(attr.Key) == meta.Attrs.EventsInput.Key() || string(attr.Key) == meta.Attrs.StepInput.Key() {
 				input = attr.Value.AsInterface()
 				continue
 			}
