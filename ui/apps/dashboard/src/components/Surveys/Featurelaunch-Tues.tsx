@@ -49,7 +49,7 @@ export default function FeaturelaunchTues({ envSlug }: { envSlug: string }) {
             <Button
               label="Use insights"
               onClick={() =>
-                router.push(pathCreator.insights({ envSlug }) + '?ref=launch-app-modal')
+                router.push(pathCreator.insights({ envSlug, ref: 'launch-app-modal' }))
               }
             />
             <Button

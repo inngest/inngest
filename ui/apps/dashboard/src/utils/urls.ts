@@ -114,8 +114,8 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
-  insights({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/insights` as Route;
+  insights({ envSlug, ref }: { envSlug: string; ref?: string }): Route {
+    return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}` as Route;
   },
   integrations(): Route {
     return `/settings/integrations` as Route;
