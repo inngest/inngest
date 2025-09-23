@@ -214,8 +214,9 @@ function InsightsTabManagerInternal({
                 onToggleChatPanelVisibility={onToggleChatPanelVisibility}
               />
             </div>
-            {isChatPanelVisible && tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
+            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
               <InsightsChat
+                className={!isChatPanelVisible ? 'hidden' : ''}
                 threadId={getThreadIdForTab(tab.id)}
                 onToggleChat={onToggleChatPanelVisibility}
               />

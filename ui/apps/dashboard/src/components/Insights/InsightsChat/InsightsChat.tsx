@@ -52,9 +52,11 @@ function isEventForThisThread(tid: unknown, threadId: string): boolean {
 export function InsightsChat({
   threadId,
   onToggleChat,
+  className,
 }: {
   threadId: string;
   onToggleChat: () => void;
+  className?: string;
 }) {
   // Read required data from the Insights state context
   const {
@@ -220,7 +222,11 @@ export function InsightsChat({
   }, [onToggleChat]);
 
   return (
-    <div className="border-subtle flex h-full w-[486px] flex-col border-l bg-white">
+    <div
+      className={`border-subtle flex h-full w-[486px] flex-col border-l bg-white ${
+        className ?? ''
+      }`}
+    >
       <div className="bg-surfaceBase flex h-full w-full flex-col">
         <ChatHeader onClearThread={handleClearThread} onToggleChat={handleToggleChat} />
 
