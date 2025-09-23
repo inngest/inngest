@@ -37,6 +37,7 @@ type Query {
   run(runID: String!): FunctionRunV2
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
+  runTrace(runID: String!): RunTraceSpan!
 
   debugRun(query: DebugRunQuery!): DebugRun
   debugSession(query: DebugSessionQuery!): DebugSession

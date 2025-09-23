@@ -146,8 +146,7 @@ type ComplexityRoot struct {
 	}
 
 	DebugRun struct {
-		DebugRun    func(childComplexity int) int
-		OriginalRun func(childComplexity int) int
+		DebugRun func(childComplexity int) int
 	}
 
 	DebugSession struct {
@@ -353,6 +352,7 @@ type ComplexityRoot struct {
 		FunctionRun            func(childComplexity int, query models.FunctionRunQuery) int
 		Functions              func(childComplexity int) int
 		Run                    func(childComplexity int, runID string) int
+		RunTrace               func(childComplexity int, runID string) int
 		RunTraceSpanOutputByID func(childComplexity int, outputID string) int
 		RunTrigger             func(childComplexity int, runID string) int
 		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) int
@@ -661,6 +661,7 @@ type QueryResolver interface {
 	Run(ctx context.Context, runID string) (*models.FunctionRunV2, error)
 	RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error)
 	RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error)
+	RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error)
 	DebugRun(ctx context.Context, query models.DebugRunQuery) (*models.DebugRun, error)
 	DebugSession(ctx context.Context, query models.DebugSessionQuery) (*models.DebugSession, error)
 	WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error)
@@ -1079,13 +1080,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DebugRun.DebugRun(childComplexity), true
-
-	case "DebugRun.originalRun":
-		if e.complexity.DebugRun.OriginalRun == nil {
-			break
-		}
-
-		return e.complexity.DebugRun.OriginalRun(childComplexity), true
 
 	case "DebugSession.debugRuns":
 		if e.complexity.DebugSession.DebugRuns == nil {
@@ -2206,6 +2200,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Run(childComplexity, args["runID"].(string)), true
+
+	case "Query.runTrace":
+		if e.complexity.Query.RunTrace == nil {
+			break
+		}
+
+		args, err := ec.field_Query_runTrace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.RunTrace(childComplexity, args["runID"].(string)), true
 
 	case "Query.runTraceSpanOutputByID":
 		if e.complexity.Query.RunTraceSpanOutputByID == nil {
@@ -3388,6 +3394,7 @@ type CreateDebugSessionResponse {
   run(runID: String!): FunctionRunV2
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
+  runTrace(runID: String!): RunTraceSpan!
 
   debugRun(query: DebugRunQuery!): DebugRun
   debugSession(query: DebugSessionQuery!): DebugSession
@@ -4104,8 +4111,7 @@ type RunTraceTrigger {
 # debug types
 
 type DebugRun {
-  debugRun: RunTraceSpan
-  originalRun: RunTraceSpan
+  debugRun: [RunTraceSpan!]
 }
 
 type DebugSessionRun {
@@ -4634,6 +4640,21 @@ func (ec *executionContext) field_Query_runTraceSpanOutputByID_args(ctx context.
 		}
 	}
 	args["outputID"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_runTrace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["runID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("runID"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["runID"] = arg0
 	return args, nil
 }
 
@@ -7355,109 +7376,12 @@ func (ec *executionContext) _DebugRun_debugRun(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.RunTraceSpan)
+	res := resTmp.([]*models.RunTraceSpan)
 	fc.Result = res
-	return ec.marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
+	return ec.marshalORunTraceSpan2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DebugRun_debugRun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "DebugRun",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "appID":
-				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
-			case "functionID":
-				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
-			case "runID":
-				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
-			case "run":
-				return ec.fieldContext_RunTraceSpan_run(ctx, field)
-			case "spanID":
-				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
-			case "traceID":
-				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
-			case "name":
-				return ec.fieldContext_RunTraceSpan_name(ctx, field)
-			case "status":
-				return ec.fieldContext_RunTraceSpan_status(ctx, field)
-			case "attempts":
-				return ec.fieldContext_RunTraceSpan_attempts(ctx, field)
-			case "duration":
-				return ec.fieldContext_RunTraceSpan_duration(ctx, field)
-			case "outputID":
-				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
-			case "queuedAt":
-				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
-			case "startedAt":
-				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
-			case "endedAt":
-				return ec.fieldContext_RunTraceSpan_endedAt(ctx, field)
-			case "childrenSpans":
-				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
-			case "stepOp":
-				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
-			case "stepID":
-				return ec.fieldContext_RunTraceSpan_stepID(ctx, field)
-			case "stepInfo":
-				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
-			case "stepType":
-				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
-			case "isRoot":
-				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
-			case "parentSpanID":
-				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
-			case "parentSpan":
-				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
-			case "isUserland":
-				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
-			case "userlandSpan":
-				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
-			case "debugRunID":
-				return ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
-			case "debugSessionID":
-				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
-			case "debugPaused":
-				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _DebugRun_originalRun(ctx context.Context, field graphql.CollectedField, obj *models.DebugRun) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_DebugRun_originalRun(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OriginalRun, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.RunTraceSpan)
-	fc.Result = res
-	return ec.marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_DebugRun_originalRun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DebugRun",
 		Field:      field,
@@ -15061,6 +14985,117 @@ func (ec *executionContext) fieldContext_Query_runTrigger(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_runTrace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_runTrace(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().RunTrace(rctx, fc.Args["runID"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.RunTraceSpan)
+	fc.Result = res
+	return ec.marshalNRunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "appID":
+				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
+			case "functionID":
+				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
+			case "runID":
+				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
+			case "run":
+				return ec.fieldContext_RunTraceSpan_run(ctx, field)
+			case "spanID":
+				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
+			case "traceID":
+				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "name":
+				return ec.fieldContext_RunTraceSpan_name(ctx, field)
+			case "status":
+				return ec.fieldContext_RunTraceSpan_status(ctx, field)
+			case "attempts":
+				return ec.fieldContext_RunTraceSpan_attempts(ctx, field)
+			case "duration":
+				return ec.fieldContext_RunTraceSpan_duration(ctx, field)
+			case "outputID":
+				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
+			case "queuedAt":
+				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
+			case "endedAt":
+				return ec.fieldContext_RunTraceSpan_endedAt(ctx, field)
+			case "childrenSpans":
+				return ec.fieldContext_RunTraceSpan_childrenSpans(ctx, field)
+			case "stepOp":
+				return ec.fieldContext_RunTraceSpan_stepOp(ctx, field)
+			case "stepID":
+				return ec.fieldContext_RunTraceSpan_stepID(ctx, field)
+			case "stepInfo":
+				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
+			case "stepType":
+				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
+			case "isRoot":
+				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
+			case "parentSpanID":
+				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
+			case "parentSpan":
+				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
+			case "isUserland":
+				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "userlandSpan":
+				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
+			case "debugRunID":
+				return ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
+			case "debugSessionID":
+				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
+			case "debugPaused":
+				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_runTrace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_debugRun(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_debugRun(ctx, field)
 	if err != nil {
@@ -15099,8 +15134,6 @@ func (ec *executionContext) fieldContext_Query_debugRun(ctx context.Context, fie
 			switch field.Name {
 			case "debugRun":
 				return ec.fieldContext_DebugRun_debugRun(ctx, field)
-			case "originalRun":
-				return ec.fieldContext_DebugRun_originalRun(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type DebugRun", field.Name)
 		},
@@ -24795,10 +24828,6 @@ func (ec *executionContext) _DebugRun(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = ec._DebugRun_debugRun(ctx, field, obj)
 
-		case "originalRun":
-
-			out.Values[i] = ec._DebugRun_originalRun(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -26550,6 +26579,29 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_runTrigger(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "runTrace":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_runTrace(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -29238,6 +29290,10 @@ func (ec *executionContext) marshalNRunHistoryItem2ᚖgithubᚗcomᚋinngestᚋi
 	return ec._RunHistoryItem(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNRunTraceSpan2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx context.Context, sel ast.SelectionSet, v models.RunTraceSpan) graphql.Marshaler {
+	return ec._RunTraceSpan(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalNRunTraceSpan2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunTraceSpan) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -30578,6 +30634,53 @@ func (ec *executionContext) marshalORunHistoryWaitResult2ᚖgithubᚗcomᚋinnge
 		return graphql.Null
 	}
 	return ec._RunHistoryWaitResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunTraceSpan2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunTraceSpan) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx context.Context, sel ast.SelectionSet, v *models.RunTraceSpan) graphql.Marshaler {

@@ -402,6 +402,26 @@ export const GET_RUN = gql`
   }
 `;
 
+export const GET_RUN_TRACE = gql`
+  query GetRunTrace($runID: String!) {
+    runTrace(runID: $runID) {
+      ...TraceDetails
+      childrenSpans {
+        ...TraceDetails
+        childrenSpans {
+          ...TraceDetails
+          childrenSpans {
+            ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const GET_TRACE_RESULT = gql`
   query GetTraceResult($traceID: String!) {
     runTraceSpanOutputByID(outputID: $traceID) {
@@ -608,24 +628,6 @@ export const DEBUG_RUN = gql`
             ...TraceDetails
             childrenSpans {
               ...TraceDetails
-              childrenSpans {
-                ...TraceDetails
-              }
-            }
-          }
-        }
-      }
-      originalRun {
-        ...TraceDetails
-        childrenSpans {
-          ...TraceDetails
-          childrenSpans {
-            ...TraceDetails
-            childrenSpans {
-              ...TraceDetails
-              childrenSpans {
-                ...TraceDetails
-              }
             }
           }
         }

@@ -9,6 +9,7 @@ import { useCreateDebugSession } from '@/hooks/useCreateDebugSession';
 import { useGetDebugRun } from '@/hooks/useGetDebugRun';
 import { useGetDebugSession } from '@/hooks/useGetDebugSession';
 import { useGetRun } from '@/hooks/useGetRun';
+import { useGetRunTrace } from '@/hooks/useGetRunTrace';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerun } from '@/hooks/useRerun';
@@ -21,6 +22,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
   const rerun = useRerun();
   const cancelRun = useCancelRun();
   const getRun = useGetRun();
+  const getRunTrace = useGetRunTrace();
   const getTraceResult = useGetTraceResult();
   const createDebugSession = useCreateDebugSession();
   const getDebugRun = useGetDebugRun();
@@ -35,6 +37,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
     booleanFlag: useBooleanFlag,
     cloud: false,
     getRun,
+    getRunTrace,
     inngestStatus: null,
     getTraceResult,
     getDebugRun,

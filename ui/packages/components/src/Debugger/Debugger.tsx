@@ -9,6 +9,7 @@ import { StepInfo } from '../RunDetailsV3/StepInfo';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
+import { useGetRunTrace } from '../SharedContext/useGetRunTrace';
 import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
@@ -32,6 +33,10 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   });
 
   const { rerun } = useRerun();
+
+  const { data: runTraceData, loading: runTraceLoading } = useGetRunTrace({
+    runID,
+  });
 
   const { data: debugRunData, loading } = useGetDebugRun({
     functionSlug,
@@ -103,9 +108,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           <div className="flex flex-row items-center gap-x-2 text-sm">
             <RiGitForkLine className="text-muted h-6 w-6" />
             <div>Forked from:</div>
-            {debugRunData?.originalRun?.status && (
-              <StatusDot status={debugRunData.originalRun.status} className="h-3 w-3" />
-            )}
+            {runTraceData?.status && <StatusDot status={runTraceData.status} className="h-3 w-3" />}
             <div>{runID && <Link href={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
           </div>
         </div>
@@ -129,7 +132,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                     {running ? (
                       <RiPauseLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-pointer rounded-md p-1" />
                     ) : (
-                      <Play runID={runID} debugRunID={debugRunID} debugSessionID={debugSessionID} />
+                      <Play
+                        functionSlug={functionSlug}
+                        runID={runID}
+                        debugRunID={debugRunID}
+                        debugSessionID={debugSessionID}
+                      />
                     )}
                   </TooltipTrigger>
                   <TooltipContent className="whitespace-pre-line">
@@ -156,12 +164,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               </div>
             </div>
             <div>
-              {loading ? (
+              {loading || runTraceLoading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : debugRunData?.debugRun && runID ? (
+              ) : debugRunData?.debugRun.length && runID ? (
                 <DebugRun debugRun={debugRunData?.debugRun} runID={runID} />
-              ) : runID && debugRunData?.originalRun ? (
-                <Timeline runID={runID} trace={debugRunData.originalRun} />
+              ) : runID && runTraceData ? (
+                <Timeline runID={runID} trace={runTraceData} />
               ) : null}
             </div>
           </div>

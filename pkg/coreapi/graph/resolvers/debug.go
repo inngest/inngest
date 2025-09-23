@@ -6,13 +6,11 @@ import (
 
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
 func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuery) (*models.DebugRun, error) {
-	var debugRunSpan *models.RunTraceSpan
-	var originalRunSpan *models.RunTraceSpan
+	var debugRunSpans []*models.RunTraceSpan
 
 	if query.DebugRunID != nil {
 		debugRunID, err := ulid.Parse(*query.DebugRunID)
@@ -20,7 +18,7 @@ func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuer
 			return nil, fmt.Errorf("invalid debugRunID: %w", err)
 		}
 
-		debugRunSpan, err = loader.LoadOne[models.RunTraceSpan](
+		spans, err := loader.LoadOne[[]*models.RunTraceSpan](
 			ctx,
 			loader.FromCtx(ctx).DebugRunLoader,
 			&loader.DebugRunRequestKey{
@@ -30,39 +28,14 @@ func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuer
 		if err != nil {
 			return nil, err
 		}
-
-	}
-
-	if query.RunID != nil {
-		runID, err := ulid.Parse(*query.RunID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid runID: %w", err)
+		if spans != nil {
+			debugRunSpans = *spans
 		}
 
-		traceRun, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
-		if err != nil {
-			return nil, fmt.Errorf("error retrieving original trace run: %w", err)
-		}
-
-		originalRunSpan, err = loader.LoadOne[models.RunTraceSpan](
-			ctx,
-			loader.FromCtx(ctx).RunTraceLoader,
-			&loader.TraceRequestKey{
-				TraceRunIdentifier: &cqrs.TraceRunIdentifier{
-					FunctionID: traceRun.FunctionID,
-					RunID:      runID,
-					TraceID:    traceRun.TraceID,
-				},
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("error getting original trace run span: %w", err)
-		}
 	}
 
 	return &models.DebugRun{
-		DebugRun:    debugRunSpan,
-		OriginalRun: originalRunSpan,
+		DebugRun: debugRunSpans,
 	}, nil
 }
 

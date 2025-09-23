@@ -114,8 +114,7 @@ type DebounceConfiguration struct {
 }
 
 type DebugRun struct {
-	DebugRun    *RunTraceSpan `json:"debugRun,omitempty"`
-	OriginalRun *RunTraceSpan `json:"originalRun,omitempty"`
+	DebugRun []*RunTraceSpan `json:"debugRun,omitempty"`
 }
 
 type DebugRunQuery struct {

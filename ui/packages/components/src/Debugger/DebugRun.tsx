@@ -4,12 +4,18 @@ import { toMaybeDate } from '../utils/date';
 
 type Props = {
   runID: string;
-  debugRun: TraceType;
+  debugRun: TraceType[];
 };
 
 export const DebugRun = ({ debugRun, runID }: Props) => {
-  const minTime = new Date(debugRun.queuedAt);
-  const maxTime = toMaybeDate(debugRun.endedAt) ?? new Date();
+  const latest = debugRun?.at(-1);
+
+  if (!latest) {
+    return null;
+  }
+
+  const minTime = new Date(latest.queuedAt);
+  const maxTime = toMaybeDate(latest.endedAt) ?? new Date();
 
   return (
     <div className={`w-full pb-4 pr-8`}>
@@ -18,7 +24,7 @@ export const DebugRun = ({ debugRun, runID }: Props) => {
         maxTime={maxTime}
         minTime={minTime}
         runID={runID}
-        trace={{ ...(debugRun as any), name: 'Debug Run' }}
+        trace={{ ...(latest as any), name: 'Debug Run' }}
       />
     </div>
   );

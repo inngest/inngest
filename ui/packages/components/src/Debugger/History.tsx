@@ -8,7 +8,7 @@ import { Pill } from '../Pill';
 import { useGetDebugSession, type DebugSessionRun } from '../SharedContext/useGetDebugSession';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Skeleton } from '../Skeleton';
-import { StatusCell, Table, TimeCell } from '../Table';
+import { StatusCell, Table, TextCell, TimeCell } from '../Table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 
 export const exampleAiOutput = {
@@ -138,6 +138,18 @@ type HistoryProps = {
 
 type HistoryTable = DebugSessionRun | null;
 
+export const EmptyHistory = () => {
+  return (
+    <div className="bg-canvasBase text-basis mx-auto my-6 flex flex-col items-center">
+      <div className="text-center">
+        <p className="mb-2 text-xl">No debug runs yet for this session.</p>
+        <p className="text-subtle max-w-xl text-sm">Initiate a debug run with the controls above</p>
+      </div>
+      {/* <div className="flex items-center gap-3">{actions}</div> */}
+    </div>
+  );
+};
+
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
   const { pathCreator } = usePathCreator();
   const router = useRouter();
@@ -179,7 +191,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     columnHelper.accessor('startedAt', {
       cell: (rawStartedAt) => {
         const startedAt = rawStartedAt.getValue();
-        return <TimeCell date={startedAt ? new Date(startedAt) : '--'} />;
+        return startedAt ? <TimeCell date={new Date(startedAt)} /> : <TextCell>-</TextCell>;
       },
       size: 25,
       enableSorting: true,
@@ -245,7 +257,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
   ];
 
   if (data.debugRuns?.length === 0) {
-    return null;
+    return <EmptyHistory />;
   }
 
   return (
@@ -265,8 +277,8 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
         }
         data={(data.debugRuns ?? []).sort(
           (a, b) =>
-            (b?.startedAt ? new Date(b.startedAt).getTime() : 0) -
-            (a?.startedAt ? new Date(a.startedAt).getTime() : 0)
+            (a?.startedAt ? new Date(a.startedAt).getTime() : 0) -
+            (b?.startedAt ? new Date(b.startedAt).getTime() : 0)
         )}
         columns={columns}
       />

@@ -15,7 +15,7 @@ export function useGetDebugRun() {
     });
 
     return {
-      data: debugRun,
+      data: debugRun ? { debugRun: debugRun.debugRun || [] } : undefined,
       loading: false,
       error: undefined,
     };
