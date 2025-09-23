@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const validationResult = chatRequestSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: validationResult.error.errors?.[0]?.message ?? 'Invalid request' },
+        { error: validationResult.error.errors[0]?.message ?? 'Invalid request' },
         { status: 400 }
       );
     }

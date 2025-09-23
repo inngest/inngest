@@ -50,10 +50,12 @@ const generateSqlTool = createTool({
     })
     .strict() as any,
   handler: ({ sql: rawSql, title, reasoning }: GenerateSqlInput, ctx: any): GenerateSqlResult => {
-    const network = (ctx?.network as Network<InsightsState>) || undefined;
-    const raw = typeof rawSql === 'string' ? (rawSql as string) : '';
+    const network = ctx?.network as Network<InsightsState> | undefined;
+    const raw = typeof rawSql === 'string' ? rawSql : '';
     const sql = sanitizeSql(raw);
-    network.state.data.sql = sql;
+    if (network) {
+      network.state.data.sql = sql;
+    }
 
     const result: GenerateSqlResult = {
       sql: sql,
@@ -68,8 +70,8 @@ export const queryWriterAgent = createAgent<InsightsState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }): Promise<string> => {
-    const selected = Array.isArray(network?.state?.data?.selectedEvents)
-      ? (network!.state.data.selectedEvents as string[])
+    const selected = Array.isArray(network?.state.data.selectedEvents)
+      ? network!.state.data.selectedEvents.map((e) => e.event_name)
       : [];
     return [
       'You write ClickHouse-compatible SQL for analytics.',

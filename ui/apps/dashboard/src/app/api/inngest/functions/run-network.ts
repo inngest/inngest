@@ -13,7 +13,7 @@ export const runAgentNetwork = inngest.createFunction(
     name: 'Insights SQL Agent',
   },
   { event: 'insights-agent/chat.requested' },
-  async ({ event, step, publish }) => {
+  async ({ event, publish }) => {
     const {
       threadId: providedThreadId,
       userMessage,

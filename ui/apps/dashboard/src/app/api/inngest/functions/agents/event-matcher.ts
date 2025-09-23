@@ -30,7 +30,7 @@ const selectEventsTool = createTool({
     })
     .strict() as any,
   handler: (args: SelectEventsInput, ctx): SelectEventsResult => {
-    const network = ctx?.network as Network<InsightsState>;
+    const network = ctx.network as Network<InsightsState>;
     const selected = args.events;
 
     if (!Array.isArray(selected) || selected.length === 0) {
@@ -46,7 +46,7 @@ const selectEventsTool = createTool({
     const result: SelectEventsResult = {
       selected,
       reason,
-      totalCandidates: network?.state?.data?.eventTypes?.length || 0,
+      totalCandidates: network.state.data.eventTypes?.length || 0,
     };
     return result;
   },
@@ -56,7 +56,7 @@ export const eventMatcherAgent = createAgent<InsightsState>({
   name: 'Insights Event Matcher',
   description: "Analyzes available events and selects 1-5 that best match the user's intent.",
   system: async ({ network }): Promise<string> => {
-    const events = network?.state?.data?.eventTypes || [];
+    const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 50); // avoid overly long prompts
     return [
       'You are an event selection specialist.',

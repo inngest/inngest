@@ -6,13 +6,10 @@ export const summarizerAgent = createAgent<InsightsState>({
   name: 'Insights Summarizer',
   description: 'Writes a concise summary describing what the generated SQL does and why.',
   system: async ({ network }): Promise<string> => {
-    const events = Array.isArray(network?.state?.data?.selectedEvents)
-      ? (network!.state.data.selectedEvents as string[])
+    const events = Array.isArray(network?.state.data.selectedEvents)
+      ? network!.state.data.selectedEvents.map((e) => e.event_name)
       : [];
-    const sql =
-      typeof network?.state?.data?.sql === 'string'
-        ? (network!.state.data.sql as string)
-        : undefined;
+    const sql = typeof network?.state.data.sql === 'string' ? network.state.data.sql : undefined;
     return [
       'You are a helpful assistant summarizing the result of a SQL generation process.',
       'Write a one sentence short summary that explains:',
