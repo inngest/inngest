@@ -60,7 +60,7 @@ func TestLuaCompatibility(t *testing.T) {
 					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
 					require.NoError(t, err)
 					t.Cleanup(func() {
-						container.Terminate(ctx)
+						_ = container.Terminate(ctx)
 					})
 
 					valkeyClient, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
@@ -76,7 +76,7 @@ func TestLuaCompatibility(t *testing.T) {
 					require.NoError(t, err)
 
 					t.Cleanup(func() {
-						container.Terminate(ctx)
+						_ = container.Terminate(ctx)
 					})
 
 					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password)
