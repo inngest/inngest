@@ -60,7 +60,7 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				defer container.Terminate(ctx)
 
-				valkeyClient, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password)
+				valkeyClient, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
 				require.NoError(t, err)
 				defer valkeyClient.Close()
 

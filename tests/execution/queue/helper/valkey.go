@@ -17,14 +17,14 @@ import (
 )
 
 // NewValkeyClient initializes a new valkey client (using redis protocol)
-func NewValkeyClient(addr, username, password string) (rueidis.Client, error) {
+func NewValkeyClient(addr, username, password string, cluster bool) (rueidis.Client, error) {
 	return rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:       []string{addr},
 		Username:          username,
 		Password:          password,
 		SelectDB:          0,
 		DisableCache:      true,
-		ForceSingleClient: true, // Force single client mode even if server is in cluster mode
+		ForceSingleClient: !cluster, // Force single client mode only when NOT in cluster mode
 		Dialer: net.Dialer{
 			Timeout: 30 * time.Second,
 		},
@@ -295,6 +295,9 @@ type valkeyConfig struct {
 
 	// Custom Docker image (defaults to valkey/valkey:8.0.1)
 	image string
+
+	// cluster mode (defaults to false for standalone mode)
+	cluster bool
 }
 
 // WithValkeyConfiguration sets a custom Valkey configuration
@@ -315,6 +318,13 @@ func WithValkeyMaxMemory(maxMemory int64) ValkeyOption {
 func WithValkeyImage(image string) ValkeyOption {
 	return func(vc *valkeyConfig) {
 		vc.image = image
+	}
+}
+
+// WithValkeyCluster enables or disables cluster mode for Valkey
+func WithValkeyCluster(enabled bool) ValkeyOption {
+	return func(vc *valkeyConfig) {
+		vc.cluster = enabled
 	}
 }
 
@@ -402,7 +412,9 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 		if config.customConfig.Port == 0 {
 			configContent += fmt.Sprintf("port %d\n", port)
 		}
-		configContent += "cluster-enabled yes\n"
+		if config.cluster {
+			configContent += "cluster-enabled yes\n"
+		}
 		configContent += "appendonly yes\n"
 
 		// Write config to temporary file
@@ -426,13 +438,16 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 		req.Cmd = []string{"valkey-server", "/usr/local/etc/valkey/valkey.conf"}
 	} else {
 		// Use default command line configuration
-		req.Cmd = []string{
+		cmd := []string{
 			"valkey-server",
 			"--port", fmt.Sprintf("%d", port),
-			"--cluster-enabled", "yes",
 			"--requirepass", passwd,
 			"--appendonly", "yes",
 		}
+		if config.cluster {
+			cmd = append(cmd, "--cluster-enabled", "yes")
+		}
+		req.Cmd = cmd
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -457,7 +472,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 
 	for range 5 {
 		// Create client with the mapped port
-		rc, err := NewValkeyClient(connectAddr, "", passwd)
+		rc, err := NewValkeyClient(connectAddr, "", passwd, config.cluster)
 		if err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			<-time.After(time.Second)
@@ -474,14 +489,16 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 
 		fmt.Println("RESP:", pong)
 		if pong == "PONG" {
-			// Initialize cluster slots
-			_, err = rc.Do(ctx, rc.B().Arbitrary("CLUSTER", "ADDSLOTSRANGE", "0", "16383").Build()).ToString()
-			if err != nil {
-				if err.Error() != "" && (err.Error() == "ERR Slot 0 is already busy" || err.Error() == "ERR Slot 0 is already assigned in the cluster" || err.Error() == "ERR already assigned") {
-					fmt.Println("Slots already assigned")
-				} else {
-					rc.Close()
-					return nil, fmt.Errorf("failed to initialize cluster slots: %w", err)
+			// Initialize cluster slots only if cluster mode is enabled
+			if config.cluster {
+				_, err = rc.Do(ctx, rc.B().Arbitrary("CLUSTER", "ADDSLOTSRANGE", "0", "16383").Build()).ToString()
+				if err != nil {
+					if err.Error() != "" && (err.Error() == "ERR Slot 0 is already busy" || err.Error() == "ERR Slot 0 is already assigned in the cluster" || err.Error() == "ERR already assigned") {
+						fmt.Println("Slots already assigned")
+					} else {
+						rc.Close()
+						return nil, fmt.Errorf("failed to initialize cluster slots: %w", err)
+					}
 				}
 			}
 

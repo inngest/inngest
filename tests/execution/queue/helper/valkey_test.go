@@ -17,7 +17,7 @@ func TestValkeyClientPing(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address (which is now the full connectAddr)
-	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password)
+	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
@@ -39,7 +39,7 @@ func TestValkeyCustomConfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address (which is now the full connectAddr)
-	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password)
+	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
@@ -90,7 +90,7 @@ func TestValkeyCustomImage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create client with the stored address
-	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password)
+	rc, err := NewValkeyClient(vc.Addr, vc.Username, vc.Password, false)
 	require.NoError(t, err)
 
 	res, err := rc.Do(ctx, rc.B().Ping().Build()).ToString()
