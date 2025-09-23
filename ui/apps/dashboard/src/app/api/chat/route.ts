@@ -10,7 +10,7 @@ const userMessageSchema = z.object({
   content: z.string().min(1, 'Message content is required'),
   role: z.literal('user'),
   state: z.record(z.unknown()).optional(),
-  clientTimestamp: z.coerce.date().optional(), // ✅ Coerce string to Date object
+  clientTimestamp: z.coerce.date().optional(),
   systemPrompt: z.string().optional(),
 });
 
@@ -19,7 +19,7 @@ const chatRequestSchema = z.object({
   userMessage: userMessageSchema,
   threadId: z.string().uuid().optional(),
   userId: z.string().optional(),
-  channelKey: z.string().optional(), // NEW: Support channelKey for flexible subscriptions
+  channelKey: z.string().optional(),
   history: z.array(z.any()).optional(), // TODO: define a more specific schema for history items
 });
 
