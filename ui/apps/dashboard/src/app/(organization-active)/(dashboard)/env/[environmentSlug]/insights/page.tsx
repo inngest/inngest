@@ -1,23 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from 'urql';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 
 function InsightsContent() {
   const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] = useState(true);
 
-  const [{ data: entitlementsData }] = useQuery({ query: GetAccountEntitlementsDocument });
-  const historyWindow = entitlementsData?.account.entitlements.history.limit;
-
   const { actions, activeTabId, tabManager, tabs } = useInsightsTabManager({
-    historyWindow,
     isQueryHelperPanelVisible,
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });

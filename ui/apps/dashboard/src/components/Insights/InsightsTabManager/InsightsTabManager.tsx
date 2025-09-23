@@ -33,7 +33,6 @@ export interface UseInsightsTabManagerReturn {
 }
 
 export interface UseInsightsTabManagerProps {
-  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
 }
@@ -145,7 +144,6 @@ interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
   getThreadIdForTab: (tabId: string) => string;
-  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
@@ -158,7 +156,7 @@ function InsightsTabManagerInternal({
   getThreadIdForTab,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-}: Omit<InsightsTabManagerInternalProps, 'historyWindow'>) {
+}: InsightsTabManagerInternalProps) {
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(() => createInMemorySessionTransport(), []);
