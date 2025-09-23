@@ -1,12 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  useAgents,
-  type AgentStatus,
-  type RealtimeEvent,
-  type ToolResultPayload,
-} from '@inngest/use-agents';
+import { type AgentStatus, type RealtimeEvent } from '@inngest/use-agents';
 
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
@@ -17,29 +12,7 @@ import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
 import { UserMessage } from './messages/UserMessage';
-
-type GenerateSqlResult = {
-  sql: string;
-  title?: string;
-  reasoning?: string;
-};
-
-type SelectEventsResult = {
-  selected: {
-    event_name: string;
-    reason: string;
-  }[];
-  reason: string;
-  totalCandidates: number;
-};
-
-// Using shared ToolResultPayload from @inngest/use-agents
-
-// Tool manifest for typed onToolResult callback
-type InsightsToolManifest = {
-  generate_sql: ToolResultPayload<GenerateSqlResult>;
-  select_events: ToolResultPayload<SelectEventsResult>;
-};
+import { useInsightsAgent } from './useInsightsAgent';
 
 // Types for derived event data
 type Schemas = Record<string, unknown>;
@@ -187,7 +160,7 @@ export function InsightsChat({ threadId }: { threadId: string }) {
     setCurrentThreadId,
     clearThreadMessages,
     sendMessageToThread,
-  } = useAgents<InsightsToolManifest>({
+  } = useInsightsAgent({
     enableThreadValidation: false,
     state: () => ({
       sqlQuery: currentSql,
@@ -202,7 +175,7 @@ export function InsightsChat({ threadId }: { threadId: string }) {
     onToolResult: (res) => {
       try {
         if (res.toolName === 'generate_sql') {
-          const sql = res.output.data.sql;
+          const sql = res.data.sql;
           if (sql) {
             onSqlChange(sql.trim());
             runQuery();
@@ -226,7 +199,7 @@ export function InsightsChat({ threadId }: { threadId: string }) {
       setInputValue('');
       await sendMessageToThread(threadId, message);
     },
-    [inputValue, status, sendMessageToThread, threadId, currentSql, eventTypes, schemas, tabTitle]
+    [inputValue, status, sendMessageToThread, threadId]
   );
 
   const handleClearThread = useCallback(() => {
@@ -250,21 +223,21 @@ export function InsightsChat({ threadId }: { threadId: string }) {
               {messages.map((m) => (
                 <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                   {m.role === 'user'
-                    ? m.parts.map((p, i) => {
-                        if (p.type === 'text') {
-                          return <UserMessage key={i} part={p} />;
+                    ? m.parts.map((part, i) => {
+                        if (part.type === 'text') {
+                          return <UserMessage key={i} part={part} />;
                         }
                         return null;
                       })
-                    : m.parts.map((p, i) => {
-                        if (p.type === 'text') {
-                          return <AssistantMessage key={i} part={p} />;
+                    : m.parts.map((part, i) => {
+                        if (part.type === 'text') {
+                          return <AssistantMessage key={i} part={part} />;
                         }
-                        if (p.type === 'tool-call' && p.toolName === 'generate_sql') {
+                        if (part.type === 'tool-call') {
                           return (
                             <ToolMessage
                               key={i}
-                              part={p}
+                              part={part}
                               onSqlChange={onSqlChange}
                               runQuery={runQuery}
                             />

@@ -4,37 +4,23 @@ import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import type { ToolCallUIPart, ToolResultPayload } from '@inngest/use-agents';
+import { getToolData, type AgentToolPart } from '@inngest/use-agents';
 import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
-import type { GenerateSqlResult } from '@/app/api/inngest/functions/agents/types';
+import type { InsightsAgentConfig } from '../useInsightsAgent';
 
 function GenerateSqlToolUI({
   part,
   onSqlChange,
   runQuery,
 }: {
-  part: ToolCallUIPart;
+  part: AgentToolPart<InsightsAgentConfig>;
   onSqlChange: (sql: string) => void;
   runQuery: () => void;
 }) {
-  const getToolData = (toolPart: ToolCallUIPart): { title: string | null; sql: string | null } => {
-    if (toolPart.state !== 'output-available') {
-      return { title: null, sql: null };
-    }
-    const output = part.output as ToolResultPayload<GenerateSqlResult>;
-    const title = output.data.title;
-    const sql = output.data.sql;
-    if (!title || !sql) {
-      return { title: 'Error generating SQL', sql: null };
-    }
-    return {
-      title: title.trim(),
-      sql: sql.trim(),
-    };
-  };
-
-  const { title, sql } = getToolData(part);
+  const data = getToolData<InsightsAgentConfig, 'generate_sql'>(part, 'generate_sql');
+  const title = data?.title || null;
+  const sql = data?.sql || null;
   const errorMessage = part.error ? (part.error as Error).message : null;
 
   return (
@@ -102,13 +88,9 @@ export const ToolMessage = ({
   onSqlChange,
   runQuery,
 }: {
-  part: ToolCallUIPart;
+  part: AgentToolPart<InsightsAgentConfig>;
   onSqlChange: (sql: string) => void;
   runQuery: () => void;
 }) => {
-  if (part.toolName !== 'generate_sql') {
-    return null;
-  }
-
   return <GenerateSqlToolUI part={part} onSqlChange={onSqlChange} runQuery={runQuery} />;
 };
