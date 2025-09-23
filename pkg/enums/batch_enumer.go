@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _BatchName = "AppendNewFullMaxSize"
+const _BatchName = "AppendNewFullMaxSizeExists"
 
-var _BatchIndex = [...]uint8{0, 6, 9, 13, 20}
+var _BatchIndex = [...]uint8{0, 6, 9, 13, 20, 26}
 
-const _BatchLowerName = "appendnewfullmaxsize"
+const _BatchLowerName = "appendnewfullmaxsizeexists"
 
 func (i Batch) String() string {
 	if i < 0 || i >= Batch(len(_BatchIndex)-1) {
@@ -29,9 +29,10 @@ func _BatchNoOp() {
 	_ = x[BatchNew-(1)]
 	_ = x[BatchFull-(2)]
 	_ = x[BatchMaxSize-(3)]
+	_ = x[BatchExists-(4)]
 }
 
-var _BatchValues = []Batch{BatchAppend, BatchNew, BatchFull, BatchMaxSize}
+var _BatchValues = []Batch{BatchAppend, BatchNew, BatchFull, BatchMaxSize, BatchExists}
 
 var _BatchNameToValueMap = map[string]Batch{
 	_BatchName[0:6]:        BatchAppend,
@@ -42,6 +43,8 @@ var _BatchNameToValueMap = map[string]Batch{
 	_BatchLowerName[9:13]:  BatchFull,
 	_BatchName[13:20]:      BatchMaxSize,
 	_BatchLowerName[13:20]: BatchMaxSize,
+	_BatchName[20:26]:      BatchExists,
+	_BatchLowerName[20:26]: BatchExists,
 }
 
 var _BatchNames = []string{
@@ -49,6 +52,7 @@ var _BatchNames = []string{
 	_BatchName[6:9],
 	_BatchName[9:13],
 	_BatchName[13:20],
+	_BatchName[20:26],
 }
 
 // BatchString retrieves an enum value from the enum constants string name.
