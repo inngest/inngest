@@ -35,11 +35,15 @@ func TestLuaCompatibility(t *testing.T) {
 		{
 			Name:       "Basic Valkey",
 			ServerType: "valkey",
+			ValkeyOpts: []helper.ValkeyOption{
+				helper.WithValkeyImage("valkey/valkey:8.0.1"),
+			},
 		},
 		{
 			Name:       "Basic Garnet",
 			ServerType: "garnet",
 			GarnetOpts: []helper.GarnetOption{
+				helper.WithImage("ghcr.io/microsoft/garnet:1.0.83"),
 				helper.WithConfiguration(&helper.GarnetConfiguration{
 					EnableLua: true,
 				}),
