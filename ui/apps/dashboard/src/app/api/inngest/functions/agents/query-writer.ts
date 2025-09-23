@@ -34,21 +34,17 @@ const generateSqlTool = createTool({
   name: 'generate_sql',
   description:
     'Provide the final SQL SELECT statement for ClickHouse based on the selected events and schemas.',
-  parameters: z
-    .object({
-      sql: z
-        .string()
-        .min(1)
-        .describe(
-          'A single valid SELECT statement. Do not include DDL/DML or multiple statements.'
-        ),
-      title: z.string().min(1).describe('Short 20-30 character title for this query'),
-      reasoning: z
-        .string()
-        .min(1)
-        .describe('Brief 1-2 sentence explanation of how this query addresses the request'),
-    })
-    .strict() as any,
+  parameters: z.object({
+    sql: z
+      .string()
+      .min(1)
+      .describe('A single valid SELECT statement. Do not include DDL/DML or multiple statements.'),
+    title: z.string().min(1).describe('Short 20-30 character title for this query'),
+    reasoning: z
+      .string()
+      .min(1)
+      .describe('Brief 1-2 sentence explanation of how this query addresses the request'),
+  }) as any, // TODO: zod version mismatch is causing a type error here; need to align zod versions
   handler: ({ sql: rawSql, title, reasoning }: GenerateSqlInput, ctx: any): GenerateSqlResult => {
     const network = ctx?.network as Network<InsightsState> | undefined;
     if (!network) {
@@ -73,9 +69,7 @@ export const queryWriterAgent = createAgent<InsightsState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }): Promise<string> => {
-    const selected = Array.isArray(network?.state.data.selectedEvents)
-      ? network!.state.data.selectedEvents.map((e) => e.event_name)
-      : [];
+    const selected = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
     return [
       'You write ClickHouse-compatible SQL for analytics.',
       '',
@@ -94,5 +88,5 @@ export const queryWriterAgent = createAgent<InsightsState>({
   },
   model: openai({ model: 'gpt-5-nano-2025-08-07' }),
   tools: [generateSqlTool],
-  tool_choice: 'any',
+  tool_choice: 'generate_sql',
 });
