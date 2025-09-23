@@ -120,7 +120,7 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          triggers: fn.triggers || [],
+          triggers: fn.triggers,
           usage: undefined,
         };
       }),
@@ -146,16 +146,8 @@ const GetFunctionDocument = graphql(`
         app {
           externalID
           name
-        }
-        current {
-          triggers {
-            type
-            value
-            condition
-          }
-          deploy {
-            id
-            createdAt
+          latestSync {
+            lastSyncedAt
           }
         }
         triggers {
