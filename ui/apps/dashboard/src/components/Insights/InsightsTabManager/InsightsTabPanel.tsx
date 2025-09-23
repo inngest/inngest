@@ -22,6 +22,7 @@ type InsightsTabPanelProps = {
   isTemplatesTab?: boolean;
   tab: Tab;
   isChatPanelVisible: boolean;
+  isInsightsAgentEnabled: boolean;
   onToggleChatPanelVisibility: () => void;
 };
 
@@ -31,6 +32,7 @@ export function InsightsTabPanel({
   isTemplatesTab,
   tab,
   isChatPanelVisible,
+  isInsightsAgentEnabled,
   onToggleChatPanelVisibility,
 }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
@@ -48,7 +50,7 @@ export function InsightsTabPanel({
           <>
             <InsightsSQLEditorSaveQueryButton tab={tab} />
             <InsightsSQLEditorQueryButton />
-            {!isChatPanelVisible && (
+            {isInsightsAgentEnabled && !isChatPanelVisible && (
               <>
                 <VerticalDivider />
                 <MaximizeChatButton onClick={onToggleChatPanelVisibility} />

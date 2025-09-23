@@ -23,6 +23,10 @@ function GenerateSqlToolUI({
   const sql = data?.sql || null;
   const errorMessage = part.error ? (part.error as Error).message : null;
 
+  if (data === undefined) {
+    return null;
+  }
+
   return (
     <div className="text-text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
       <Disclosure>
@@ -44,7 +48,16 @@ function GenerateSqlToolUI({
                     )}
                   </div>
                 </Disclosure.Button>
-                <span className="font-sm">{title || 'Generated SQL'}</span>
+                <span
+                  onClick={() => {
+                    // [TEST-STREAM] Diagnostics for tool title click
+                    // eslint-disable-next-line no-console
+                    console.log('[TEST-STREAM] ToolMessage.titleClick', { data: data });
+                  }}
+                  className="font-sm"
+                >
+                  {title || 'Generated SQL'}
+                </span>
               </div>
 
               {!!sql && (
@@ -61,6 +74,13 @@ function GenerateSqlToolUI({
                       appearance="ghost"
                       size="small"
                       onClick={() => {
+                        // [TEST-STREAM] Diagnostics for tool run button
+                        // eslint-disable-next-line no-console
+                        console.log('[TEST-STREAM] ToolMessage.run', {
+                          hasSql: Boolean(sql),
+                          sqlPreview: typeof sql === 'string' ? sql.slice(0, 120) : undefined,
+                          data: data,
+                        });
                         onSqlChange(sql);
                         try {
                           runQuery();

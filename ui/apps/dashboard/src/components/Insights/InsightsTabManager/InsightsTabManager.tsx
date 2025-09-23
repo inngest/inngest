@@ -6,10 +6,12 @@ import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agen
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { InsightsChat } from '../InsightsChat/InsightsChat';
+import { InsightsChatProvider } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -44,10 +46,16 @@ export function useInsightsTabManager(
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
+  const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
+
+  console.log('[TEST-STREAM] isInsightsAgentEnabled', isInsightsAgentEnabled);
 
   const onToggleChatPanelVisibility = useCallback(() => {
+    if (!isInsightsAgentEnabled.value) return;
     setIsChatPanelVisible((prev) => !prev);
-  }, []);
+  }, [isInsightsAgentEnabled.value]);
+
+  const effectiveChatPanelVisible = isInsightsAgentEnabled.value && isChatPanelVisible;
 
   const threadIdMapRef = useRef<Record<string, string>>({});
   const getThreadIdForTab = useCallback((tabId: string): string => {
@@ -138,7 +146,8 @@ export function useInsightsTabManager(
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
-        isChatPanelVisible={isChatPanelVisible}
+        isChatPanelVisible={effectiveChatPanelVisible}
+        isInsightsAgentEnabled={isInsightsAgentEnabled.value}
         onToggleChatPanelVisibility={onToggleChatPanelVisibility}
       />
     ),
@@ -150,7 +159,8 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
-      isChatPanelVisible,
+      effectiveChatPanelVisible,
+      isInsightsAgentEnabled.value,
       onToggleChatPanelVisibility,
     ]
   );
@@ -167,6 +177,7 @@ interface InsightsTabManagerInternalProps {
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
   isChatPanelVisible: boolean;
+  isInsightsAgentEnabled: boolean;
   onToggleChatPanelVisibility: () => void;
 }
 
@@ -179,16 +190,22 @@ function InsightsTabManagerInternal({
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
   isChatPanelVisible,
+  isInsightsAgentEnabled,
   onToggleChatPanelVisibility,
 }: InsightsTabManagerInternalProps) {
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
-  const transport = useMemo(() => createInMemorySessionTransport(), []);
+  const transport = useMemo(
+    () => (isInsightsAgentEnabled ? createInMemorySessionTransport() : undefined),
+    [isInsightsAgentEnabled]
+  );
   const channelKey = user?.id ? `insights:${user.id}` : undefined;
+
   // Type shim to avoid cross-package ReactNode incompatibilities during local linking
   const AnyAgentProvider = AgentProvider as unknown as React.FC<any>;
+
   const providerChildren: ReactNode = (
-    <div>
+    <div className="h-full w-full">
       {tabs.map((tab) => (
         <InsightsStateMachineContextProvider
           key={tab.id}
@@ -196,7 +213,7 @@ function InsightsTabManagerInternal({
           onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
           query={tab.query}
           queryName={tab.name}
-          renderChildren={true}
+          renderChildren={tab.id === activeTabId}
           tabId={tab.id}
         >
           <div
@@ -204,7 +221,7 @@ function InsightsTabManagerInternal({
               tab.id === activeTabId ? 'flex h-full w-full' : 'invisible h-0 w-full overflow-hidden'
             }
           >
-            <div className="w-full overflow-hidden">
+            <div className="min-w-0 flex-1 overflow-hidden">
               <InsightsTabPanel
                 isHomeTab={tab.id === HOME_TAB.id}
                 isTemplatesTab={tab.id === TEMPLATES_TAB.id}
@@ -212,15 +229,18 @@ function InsightsTabManagerInternal({
                 historyWindow={historyWindow}
                 isChatPanelVisible={isChatPanelVisible}
                 onToggleChatPanelVisibility={onToggleChatPanelVisibility}
+                isInsightsAgentEnabled={isInsightsAgentEnabled}
               />
             </div>
-            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
-              <InsightsChat
-                className={!isChatPanelVisible ? 'hidden' : ''}
-                threadId={getThreadIdForTab(tab.id)}
-                onToggleChat={onToggleChatPanelVisibility}
-              />
-            )}
+            {isInsightsAgentEnabled &&
+              tab.id !== HOME_TAB.id &&
+              tab.id !== TEMPLATES_TAB.id &&
+              isChatPanelVisible && (
+                <InsightsChat
+                  threadId={getThreadIdForTab(tab.id)}
+                  onToggleChat={onToggleChatPanelVisibility}
+                />
+              )}
           </div>
         </InsightsStateMachineContextProvider>
       ))}
@@ -235,14 +255,18 @@ function InsightsTabManagerInternal({
         tabs={tabs}
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
-        <AnyAgentProvider
-          userId={user?.id || undefined}
-          channelKey={channelKey}
-          transport={transport}
-          debug={false}
-        >
-          {providerChildren}
-        </AnyAgentProvider>
+        {isInsightsAgentEnabled ? (
+          <AnyAgentProvider
+            userId={user?.id || undefined}
+            channelKey={channelKey}
+            transport={transport}
+            debug={false}
+          >
+            <InsightsChatProvider>{providerChildren}</InsightsChatProvider>
+          </AnyAgentProvider>
+        ) : (
+          providerChildren
+        )}
       </div>
     </div>
   );

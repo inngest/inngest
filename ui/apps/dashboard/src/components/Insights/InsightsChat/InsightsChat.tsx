@@ -1,18 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { type AgentStatus, type RealtimeEvent } from '@inngest/use-agents';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type AgentStatus } from '@inngest/use-agents';
 
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
+import { useInsightsChatProvider } from './InsightsChatProvider';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ChatHeader } from './header/ChatHeader';
 import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
 import { UserMessage } from './messages/UserMessage';
-import { useInsightsAgent } from './useInsightsAgent';
 
 // Types for derived event data
 type Schemas = Record<string, unknown>;
@@ -42,11 +42,6 @@ function getLoadingMessage(flags: {
     }
   }
   return 'Thinking…';
-}
-
-// Helper: determine if an incoming event belongs to this thread
-function isEventForThisThread(tid: unknown, threadId: string): boolean {
-  return typeof tid !== 'string' || tid === threadId;
 }
 
 export function InsightsChat({
@@ -98,71 +93,7 @@ export function InsightsChat({
     })();
   }, [fetchAllEventTypes]);
 
-  // Local loading flags driven by onEvent to show “Thinking…” correctly pre-stream
-  const [networkActive, setNetworkActive] = useState(false);
-  const [textStreaming, setTextStreaming] = useState(false);
-  const [textCompleted, setTextCompleted] = useState(false);
-  const [currentToolName, setCurrentToolName] = useState<string | null>(null);
-
-  const onEvent = useCallback(
-    (evt: RealtimeEvent) => {
-      try {
-        switch (evt.event) {
-          case 'run.started': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            setNetworkActive(true);
-            setTextCompleted(false);
-            setCurrentToolName(null);
-            break;
-          }
-          case 'text.delta': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            setTextStreaming(true);
-            setTextCompleted(false);
-            break;
-          }
-          case 'tool_call.arguments.delta': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            const toolName = evt.data.toolName;
-            if (typeof toolName === 'string' && toolName.length > 0) {
-              setCurrentToolName(toolName);
-            }
-            break;
-          }
-          case 'part.completed': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            const { type } = evt.data;
-            if (type === 'text') {
-              setTextStreaming(false);
-              setTextCompleted(true);
-              break;
-            }
-            if (type === 'tool-output' || type === 'tool-call') {
-              setCurrentToolName(null);
-            }
-            break;
-          }
-          case 'stream.ended': {
-            const tid = evt.data.threadId;
-            if (!isEventForThisThread(tid, threadId)) return;
-            setNetworkActive(false);
-            setTextStreaming(false);
-            setTextCompleted(true);
-            setCurrentToolName(null);
-            break;
-          }
-          default:
-            break;
-        }
-      } catch {}
-    },
-    [threadId]
-  );
-
+  // Provider-backed agent state and actions
   const {
     messages,
     status,
@@ -170,9 +101,27 @@ export function InsightsChat({
     setCurrentThreadId,
     clearThreadMessages,
     sendMessageToThread,
-  } = useInsightsAgent({
-    enableThreadValidation: false,
-    state: () => ({
+    getThreadFlags,
+    readAndClearPendingSql,
+    popPendingAutoRun,
+    pendingSqlVersion,
+    setThreadClientState,
+  } = useInsightsChatProvider();
+
+  // Derive loading flags for this thread from provider
+  const { networkActive, textStreaming, textCompleted, currentToolName } = useMemo(
+    () => getThreadFlags(threadId),
+    [getThreadFlags, threadId]
+  );
+
+  // Keep per-tab thread isolated and stable
+  useEffect(() => {
+    if (currentThreadId !== threadId) setCurrentThreadId(threadId);
+  }, [currentThreadId, setCurrentThreadId, threadId]);
+
+  // Keep provider's per-thread client state up to date
+  useEffect(() => {
+    setThreadClientState(threadId, {
       sqlQuery: currentSql,
       eventTypes,
       schemas,
@@ -180,25 +129,39 @@ export function InsightsChat({
       tabTitle,
       mode: 'insights_sql_playground',
       timestamp: Date.now(),
-    }),
-    onEvent,
-    onToolResult: (res) => {
-      try {
-        if (res.toolName === 'generate_sql') {
-          const sql = res.data.sql;
-          if (sql) {
-            onSqlChange(sql.trim());
-            runQuery();
-          }
-        }
-      } catch {}
-    },
-  });
+    });
+  }, [setThreadClientState, threadId, currentSql, eventTypes, schemas, tabTitle]);
 
-  // Keep per-tab thread isolated and stable
+  // Apply pending SQL from background tool-output when becoming active, then optionally auto-run
+  const lastAppliedSqlRef = useRef<string | null>(null);
   useEffect(() => {
-    if (currentThreadId !== threadId) setCurrentThreadId(threadId);
-  }, [currentThreadId, setCurrentThreadId, threadId]);
+    // Only act for this thread when it's the active one
+    if (currentThreadId !== threadId) return;
+    const sql = readAndClearPendingSql(threadId);
+    if (typeof sql === 'string' && sql.length > 0) {
+      lastAppliedSqlRef.current = sql;
+      try {
+        onSqlChange(sql.trim());
+      } catch {}
+    }
+    if (popPendingAutoRun(threadId)) {
+      // Defer run slightly to allow onSqlChange to commit
+      setTimeout(() => {
+        try {
+          runQuery();
+        } catch {}
+      }, 0);
+    }
+    // Re-run when provider reports new pending SQL ingress
+  }, [
+    currentThreadId,
+    threadId,
+    readAndClearPendingSql,
+    popPendingAutoRun,
+    onSqlChange,
+    runQuery,
+    pendingSqlVersion,
+  ]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -207,6 +170,9 @@ export function InsightsChat({
       if (!message || status !== 'ready') return;
       // Clear input immediately for snappier UX
       setInputValue('');
+      // [TEST-STREAM] Diagnostics for user submit
+      // eslint-disable-next-line no-console
+      console.log('[TEST-STREAM] user.submit', { threadId, messagePreview: message.slice(0, 120) });
       await sendMessageToThread(threadId, message);
     },
     [inputValue, status, sendMessageToThread, threadId]
@@ -214,16 +180,25 @@ export function InsightsChat({
 
   const handleClearThread = useCallback(() => {
     if (messages.length === 0 || status !== 'ready') return;
+    // [TEST-STREAM] Diagnostics for clear thread
+    // eslint-disable-next-line no-console
+    console.log('[TEST-STREAM] action: clearThreadMessages', {
+      threadId,
+      messageCount: messages.length,
+    });
     clearThreadMessages(threadId);
   }, [messages.length, status, clearThreadMessages, threadId]);
 
   const handleToggleChat = useCallback(() => {
+    // [TEST-STREAM] Diagnostics for toggle chat
+    // eslint-disable-next-line no-console
+    console.log('[TEST-STREAM] action: toggleChat');
     onToggleChat();
   }, [onToggleChat]);
 
   return (
     <div
-      className={`border-subtle flex h-full w-[486px] flex-col border-l bg-white ${
+      className={`border-subtle flex h-full w-[486px] shrink-0 flex-col border-l bg-white ${
         className ?? ''
       }`}
     >
