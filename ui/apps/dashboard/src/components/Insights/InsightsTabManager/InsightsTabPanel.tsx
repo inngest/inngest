@@ -12,6 +12,7 @@ import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/Insights
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
 import type { Tab } from '@/components/Insights/types';
+import { MaximizeChatButton } from '../InsightsChat/header/MaximizeChatButton';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
@@ -20,6 +21,8 @@ type InsightsTabPanelProps = {
   isHomeTab?: boolean;
   isTemplatesTab?: boolean;
   tab: Tab;
+  isChatPanelVisible: boolean;
+  onToggleChatPanelVisibility: () => void;
 };
 
 export function InsightsTabPanel({
@@ -27,6 +30,8 @@ export function InsightsTabPanel({
   isHomeTab,
   isTemplatesTab,
   tab,
+  isChatPanelVisible,
+  onToggleChatPanelVisibility,
 }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
@@ -43,6 +48,12 @@ export function InsightsTabPanel({
           <>
             <InsightsSQLEditorSaveQueryButton tab={tab} />
             <InsightsSQLEditorQueryButton />
+            {!isChatPanelVisible && (
+              <>
+                <VerticalDivider />
+                <MaximizeChatButton onClick={onToggleChatPanelVisibility} />
+              </>
+            )}
           </>
         }
         className="min-h-[255px]"
@@ -67,4 +78,8 @@ export function InsightsTabPanel({
       </Section>
     </div>
   );
+}
+
+function VerticalDivider() {
+  return <div className="border-subtle mx-1 h-[28px] border-l" />;
 }

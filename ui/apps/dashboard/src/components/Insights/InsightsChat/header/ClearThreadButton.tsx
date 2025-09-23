@@ -15,7 +15,7 @@ export default function ClearThreadButton({ onClick, className, style }: ClearTh
         kind="secondary"
         appearance="ghost"
         size="small"
-        icon={<RiEraserLine />}
+        icon={<RiEraserLine className="text-muted" />}
         className={className}
         onClick={onClick}
         style={style}

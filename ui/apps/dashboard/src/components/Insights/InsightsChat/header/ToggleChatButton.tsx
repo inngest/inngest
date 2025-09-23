@@ -15,7 +15,7 @@ export const ToggleChatButton = ({
         kind="secondary"
         appearance="ghost"
         size="small"
-        icon={<RiContractRightLine />}
+        icon={<RiContractRightLine className="text-muted" />}
         className={className}
         onClick={onClick}
       />

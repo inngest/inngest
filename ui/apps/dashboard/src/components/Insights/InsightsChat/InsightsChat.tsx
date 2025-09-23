@@ -49,7 +49,13 @@ function isEventForThisThread(tid: unknown, threadId: string): boolean {
   return typeof tid !== 'string' || tid === threadId;
 }
 
-export function InsightsChat({ threadId }: { threadId: string }) {
+export function InsightsChat({
+  threadId,
+  onToggleChat,
+}: {
+  threadId: string;
+  onToggleChat: () => void;
+}) {
   // Read required data from the Insights state context
   const {
     query: currentSql,
@@ -210,12 +216,11 @@ export function InsightsChat({ threadId }: { threadId: string }) {
   }, [messages.length, status, clearThreadMessages, threadId]);
 
   const handleToggleChat = useCallback(() => {
-    // TODO: replace this with proper state mgmt
-    return;
-  }, []);
+    onToggleChat();
+  }, [onToggleChat]);
 
   return (
-    <div className="border-subtle flex h-full w-[412px] flex-col border-l bg-white">
+    <div className="border-subtle flex h-full w-[486px] flex-col border-l bg-white">
       <div className="bg-surfaceBase flex h-full w-full flex-col">
         <ChatHeader onClearThread={handleClearThread} onToggleChat={handleToggleChat} />
 

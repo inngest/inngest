@@ -43,6 +43,12 @@ export function useInsightsTabManager(
 ): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
+
+  const onToggleChatPanelVisibility = useCallback(() => {
+    setIsChatPanelVisible((prev) => !prev);
+  }, []);
+
   const threadIdMapRef = useRef<Record<string, string>>({});
   const getThreadIdForTab = useCallback((tabId: string): string => {
     const existing = threadIdMapRef.current[tabId];
@@ -132,6 +138,8 @@ export function useInsightsTabManager(
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
+        isChatPanelVisible={isChatPanelVisible}
+        onToggleChatPanelVisibility={onToggleChatPanelVisibility}
       />
     ),
     [
@@ -142,6 +150,8 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
+      isChatPanelVisible,
+      onToggleChatPanelVisibility,
     ]
   );
 
@@ -156,6 +166,8 @@ interface InsightsTabManagerInternalProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
+  isChatPanelVisible: boolean;
+  onToggleChatPanelVisibility: () => void;
 }
 
 function InsightsTabManagerInternal({
@@ -166,6 +178,8 @@ function InsightsTabManagerInternal({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
+  isChatPanelVisible,
+  onToggleChatPanelVisibility,
 }: InsightsTabManagerInternalProps) {
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
@@ -185,17 +199,26 @@ function InsightsTabManagerInternal({
           renderChildren={true}
           tabId={tab.id}
         >
-          <div className={tab.id === activeTabId ? 'flex h-full w-full' : 'hidden h-full w-full'}>
-            <div className="flex-1 overflow-hidden">
+          <div
+            className={
+              tab.id === activeTabId ? 'flex h-full w-full' : 'invisible h-0 w-full overflow-hidden'
+            }
+          >
+            <div className="w-full overflow-hidden">
               <InsightsTabPanel
                 isHomeTab={tab.id === HOME_TAB.id}
                 isTemplatesTab={tab.id === TEMPLATES_TAB.id}
                 tab={tab}
                 historyWindow={historyWindow}
+                isChatPanelVisible={isChatPanelVisible}
+                onToggleChatPanelVisibility={onToggleChatPanelVisibility}
               />
             </div>
-            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
-              <InsightsChat tabId={tab.id} threadId={getThreadIdForTab(tab.id)} />
+            {isChatPanelVisible && tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
+              <InsightsChat
+                threadId={getThreadIdForTab(tab.id)}
+                onToggleChat={onToggleChatPanelVisibility}
+              />
             )}
           </div>
         </InsightsStateMachineContextProvider>

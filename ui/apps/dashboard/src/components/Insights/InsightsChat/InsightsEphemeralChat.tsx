@@ -33,7 +33,6 @@ export function InsightsEphemeralChat({ tabTitle, currentSql, onSqlChange }: Pro
     currentThreadId,
     setCurrentThreadId,
     clearThreadMessages,
-    rehydrateMessageState,
   } = useAgents({
     enableThreadValidation: false,
     transport,
@@ -61,7 +60,7 @@ export function InsightsEphemeralChat({ tabTitle, currentSql, onSqlChange }: Pro
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!inputValue.trim() || status !== 'idle') return;
+      if (!inputValue.trim() || status !== 'ready') return;
       await sendMessage(inputValue);
       setInputValue('');
     },
@@ -75,7 +74,7 @@ export function InsightsEphemeralChat({ tabTitle, currentSql, onSqlChange }: Pro
         <button
           className="text-xs text-gray-500 hover:text-gray-700"
           onClick={() => clearThreadMessages(threadId)}
-          disabled={messages.length === 0 || status !== 'idle'}
+          disabled={messages.length === 0 || status !== 'ready'}
         >
           Clear
         </button>
@@ -104,16 +103,12 @@ export function InsightsEphemeralChat({ tabTitle, currentSql, onSqlChange }: Pro
                       // try parse JSON, else treat as raw sql
                       const parsed = JSON.parse(output);
                       if (parsed && typeof parsed === 'object') {
-                        if (typeof (parsed as any).sql === 'string')
-                          suggestedSql = (parsed as any).sql;
-                        else if (typeof (parsed as any).query === 'string')
-                          suggestedSql = (parsed as any).query;
+                        if (typeof parsed.sql === 'string') suggestedSql = parsed.sql;
+                        else if (typeof parsed.query === 'string') suggestedSql = parsed.query;
                       }
                     } else if (output && typeof output === 'object') {
-                      if (typeof (output as any).sql === 'string')
-                        suggestedSql = (output as any).sql;
-                      else if (typeof (output as any).query === 'string')
-                        suggestedSql = (output as any).query;
+                      if (typeof output.sql === 'string') suggestedSql = output.sql;
+                      else if (typeof output.query === 'string') suggestedSql = output.query;
                     }
                   } catch {
                     /* ignore */
@@ -169,7 +164,7 @@ export function InsightsEphemeralChat({ tabTitle, currentSql, onSqlChange }: Pro
           placeholder="Ask anything…"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          disabled={status !== 'idle'}
+          disabled={status !== 'ready'}
         />
       </form>
     </div>
