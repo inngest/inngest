@@ -21,12 +21,16 @@ export const runAgentNetwork = inngest.createFunction(
       channelKey,
       history,
     } = event.data as ChatRequestEvent;
-    const threadId = providedThreadId || uuidv4();
 
     // Validate required userId
     if (!userId) {
       throw new Error('userId is required for agent chat execution');
     }
+
+    // Generate a threadId
+    const threadId = await step.run('generate-thread-id', async () => {
+      return providedThreadId || uuidv4();
+    });
 
     // Determine the target channel for publishing (channelKey takes priority)
     const targetChannel = await step.run('generate-target-channel', async () => {
