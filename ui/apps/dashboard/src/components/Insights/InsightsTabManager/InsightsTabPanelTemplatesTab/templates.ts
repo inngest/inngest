@@ -2,13 +2,15 @@ import type { QueryTemplate } from '@/components/Insights/types';
 
 function makeEventVolumePerHourQuery(event?: string) {
   return `SELECT
-    toStartOfHour(toDateTime(ts / 1000)) AS hour_bucket,
+    toStartOfHour(fromUnixTimestamp64Milli(ts)) AS hour_bucket,
     name,
     COUNT(*) AS event_count
 FROM
     events
 WHERE
-    ts > toUnixTimestamp(subtractDays(now(), 3)) * 1000${event ? `\n    AND name = '${event}'` : ''}
+    ts > toUnixTimestamp64Milli(subtractDays(now64(), 3))${
+      event ? `\n    AND name = '${event}'` : ''
+    }
 GROUP BY
     hour_bucket,
     name
@@ -42,7 +44,7 @@ WHERE
       : '';
 
   return `${base}${successFilter}
-    AND ts > toUnixTimestamp(addDays(now(), -1)) * 1000
+    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
 GROUP BY
     function_id
 ORDER BY
