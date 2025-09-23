@@ -5,7 +5,7 @@ import { InlineSpans } from './InlineSpans';
 import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { FINAL_SPAN_DISPLAY, FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
+import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
 
 type Props = {
   depth: number;

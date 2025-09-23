@@ -129,7 +129,6 @@ export const StepInfo = ({
   tracesPreviewEnabled,
 }: {
   selectedStep: StepInfoType;
-
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
 }) => {

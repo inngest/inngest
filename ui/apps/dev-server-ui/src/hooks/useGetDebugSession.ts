@@ -22,6 +22,6 @@ export function useGetDebugSession() {
       }
     );
 
-    return { data: { debugRuns: debugSession?.debugRuns }, loading: false, error: undefined };
+    return { data: { debugRuns: debugSession?.debugRuns || [] }, loading: false, error: undefined };
   }, []);
 }

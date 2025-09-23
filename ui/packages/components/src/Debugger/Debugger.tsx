@@ -5,6 +5,7 @@ import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { RerunModal } from '../Rerun/RerunModal';
+import { StepInfo } from '../RunDetailsV3/StepInfo';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
@@ -204,6 +205,13 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             </div>
 
             <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
+            {selectedStep && (
+              <StepInfo
+                selectedStep={selectedStep}
+                pollInterval={1000}
+                tracesPreviewEnabled={true}
+              />
+            )}
           </div>
         </div>
       </div>

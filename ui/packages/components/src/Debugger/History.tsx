@@ -8,12 +8,8 @@ import { Pill } from '../Pill';
 import { useGetDebugSession, type DebugSessionRun } from '../SharedContext/useGetDebugSession';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Skeleton } from '../Skeleton';
-import { StatusDot } from '../Status/StatusDot';
-import { getStatusTextClass } from '../Status/statusClasses';
-import { Table } from '../Table';
+import { StatusCell, Table, TimeCell } from '../Table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
-import { cn } from '../utils/classNames';
-import { mediumDateFormat } from '../utils/date';
 
 export const exampleAiOutput = {
   id: 'chatcmpl-BjpG3gipnAUHsi3txqSt5XLp9G76J',
@@ -183,11 +179,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     columnHelper.accessor('startedAt', {
       cell: (rawStartedAt) => {
         const startedAt = rawStartedAt.getValue();
-        return (
-          <span className="text-muted text-sm leading-tight">
-            {startedAt ? new Date(startedAt).toLocaleString('en-US', mediumDateFormat) : '—'}
-          </span>
-        );
+        return <TimeCell date={startedAt ? new Date(startedAt) : '--'} />;
       },
       size: 25,
       enableSorting: true,
@@ -195,18 +187,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     columnHelper.accessor('status', {
       cell: (rawStatus) => {
         const status = rawStatus.getValue();
-
-        return (
-          <div
-            className={cn(
-              'no-wrap flex flex-row items-center gap-2 text-sm',
-              getStatusTextClass(status)
-            )}
-          >
-            <StatusDot status={status} className="h-2.5 w-2.5 shrink-0" />
-            {status}
-          </div>
-        );
+        return <StatusCell key={status} status={status} label={status} size="small" />;
       },
       enableSorting: false,
     }),
@@ -216,7 +197,12 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
           <Tooltip>
             <TooltipTrigger>
               <Pill appearance="outlined" kind="primary">
-                <div className="flex flex-row items-center gap-1">
+                <div
+                  className="flex flex-row items-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
                   <RiLightbulbLine className="text-muted h-2.5 w-2.5" />
 
                   {0}
@@ -258,10 +244,25 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     }),
   ];
 
+  if (data.debugRuns?.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="flex w-full flex-col justify-start gap-2 ">
+    <div className="flex w-full flex-col justify-start gap-2">
       <Table
         noHeader={true}
+        onRowClick={(row) =>
+          row.original &&
+          router.push(
+            pathCreator.debugger({
+              functionSlug,
+              runID,
+              debugSessionID: runID,
+              debugRunID: row.original.debugRunID,
+            })
+          )
+        }
         data={(data.debugRuns ?? []).sort(
           (a, b) =>
             (b?.startedAt ? new Date(b.startedAt).getTime() : 0) -
