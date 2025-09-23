@@ -2597,6 +2597,7 @@ export type WorkspaceRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsOrderBy>;
+  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 
