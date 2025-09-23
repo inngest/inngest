@@ -270,10 +270,7 @@ export default function VercelConfigure() {
               </div>
               <div className="flex flex-row gap-4">
                 <div
-                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6 ${
-                    project.deploymentProtection === VercelDeploymentProtection.Disabled &&
-                    'bg-disabled'
-                  }`}
+                  className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6`}
                 >
                   <div className="text-basis text-lg font-medium">Deployment protection key</div>
                   <div className="text-muted text-base font-normal">
@@ -287,11 +284,7 @@ export default function VercelConfigure() {
                     </Link>
                   </div>
                   <Input
-                    className={`text-basis mt-4 h-10 px-2 py-2 text-base ${
-                      project.deploymentProtection === VercelDeploymentProtection.Disabled &&
-                      'border-subtle bg-disabled'
-                    }`}
-                    readOnly={project.deploymentProtection === VercelDeploymentProtection.Disabled}
+                    className={`text-basis mt-4 h-10 px-2 py-2 text-base`}
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, protectionBypassSecret: value })
                     }
