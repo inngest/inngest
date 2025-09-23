@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
+import { Schemas } from '@/lib/schemas';
+
 // Temporary mock schemas. Replace with real API call later.
 const mockSchemas: Record<string, unknown> = {
   'app/user.created': {
@@ -118,11 +120,22 @@ const mockSchemas: Record<string, unknown> = {
   },
 };
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ error: 'Please sign in to view schemas' }, { status: 401 });
   }
 
   return NextResponse.json(mockSchemas);
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Please sign in to create schemas' }, { status: 401 });
+  }
+
+  const schema = Schemas.createSchema(body);
+  return NextResponse.json(schema);
 }
