@@ -199,6 +199,20 @@ type QueueManager interface {
 	Shard(ctx context.Context, shardName string) (QueueShard, bool)
 }
 
+type QueueProcessor interface {
+	EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error)
+	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error)
+	Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error)
+	ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error)
+	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
+	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
+	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
+
+	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error)
+	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
+}
+
 // PartitionPriorityFinder returns the priority for a given queue partition.
 type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 
