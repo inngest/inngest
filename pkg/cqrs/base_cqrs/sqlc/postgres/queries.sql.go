@@ -1025,8 +1025,8 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id = $1
-LIMIT 1
+WHERE span_id IN ($1)
+LIMIT 2
 `
 
 type GetSpanOutputRow struct {
@@ -1034,8 +1034,18 @@ type GetSpanOutputRow struct {
 	Output pqtype.NullRawMessage
 }
 
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (*GetSpanOutputRow, error) {
-	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
+func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) (*GetSpanOutputRow, error) {
+	query := getSpanOutput
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	row := q.db.QueryRowContext(ctx, query, queryParams...)
 	var i GetSpanOutputRow
 	err := row.Scan(&i.Input, &i.Output)
 	return &i, err

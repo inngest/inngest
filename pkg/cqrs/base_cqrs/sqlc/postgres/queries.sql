@@ -441,6 +441,6 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id = $1
-LIMIT 1;
+WHERE span_id IN (sqlc.slice('ids'))
+LIMIT 2;
 
