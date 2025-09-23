@@ -487,6 +487,9 @@ type garnetConfig struct {
 
 	// maxMemory in bytes
 	maxMemory int64
+
+	// Custom Docker image (defaults to ghcr.io/microsoft/garnet:1.0.83)
+	image string
 }
 
 // WithConfiguration sets a custom Garnet configuration
@@ -502,9 +505,18 @@ func WithMaxMemory(maxMemory int64) GarnetOption {
 	}
 }
 
+// WithImage sets a custom Docker image for Garnet
+func WithImage(image string) GarnetOption {
+	return func(gc *garnetConfig) {
+		gc.image = image
+	}
+}
+
 func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 	// Apply options
-	config := &garnetConfig{}
+	config := &garnetConfig{
+		image: "ghcr.io/microsoft/garnet:1.0.83", // Default image
+	}
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -515,7 +527,7 @@ func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 
 	// Build container request based on configuration
 	req := testcontainers.ContainerRequest{
-		Image:         "ghcr.io/microsoft/garnet:1.0.83",
+		Image:         config.image,
 		ImagePlatform: "linux/amd64", // Necessary for Lua support
 		ExposedPorts:  []string{fmt.Sprintf("%d/tcp", port)},
 		WaitingFor:    wait.ForLog("* Ready to accept connections").WithStartupTimeout(30 * time.Second),
