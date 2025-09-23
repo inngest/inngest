@@ -436,7 +436,7 @@ GROUP BY dynamic_span_id
 ORDER BY start_time;
 
 
--- name: GetSpanOutput :one
+-- name: GetSpanOutput :many
 SELECT
   input,
   output

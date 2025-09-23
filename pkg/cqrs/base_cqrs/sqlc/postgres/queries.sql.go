@@ -1020,7 +1020,7 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
-const getSpanOutput = `-- name: GetSpanOutput :one
+const getSpanOutput = `-- name: GetSpanOutput :many
 SELECT
   input,
   output
@@ -1034,7 +1034,7 @@ type GetSpanOutputRow struct {
 	Output pqtype.NullRawMessage
 }
 
-func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) (*GetSpanOutputRow, error) {
+func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
 	query := getSpanOutput
 	var queryParams []interface{}
 	if len(ids) > 0 {
@@ -1045,10 +1045,26 @@ func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) (*GetSpanOutp
 	} else {
 		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
-	row := q.db.QueryRowContext(ctx, query, queryParams...)
-	var i GetSpanOutputRow
-	err := row.Scan(&i.Input, &i.Output)
-	return &i, err
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpanOutputRow
+	for rows.Next() {
+		var i GetSpanOutputRow
+		if err := rows.Scan(&i.Input, &i.Output); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
