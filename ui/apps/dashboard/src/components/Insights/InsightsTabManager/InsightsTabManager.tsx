@@ -33,6 +33,7 @@ export interface UseInsightsTabManagerReturn {
 }
 
 export interface UseInsightsTabManagerProps {
+  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
 }
@@ -123,6 +124,7 @@ export function useInsightsTabManager(
         activeTabId={activeTabId}
         tabs={tabs}
         getThreadIdForTab={getThreadIdForTab}
+        historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
       />
@@ -132,6 +134,7 @@ export function useInsightsTabManager(
       activeTabId,
       tabs,
       getThreadIdForTab,
+      props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
     ]
@@ -144,6 +147,7 @@ interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
   getThreadIdForTab: (tabId: string) => string;
+  historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
@@ -154,6 +158,7 @@ function InsightsTabManagerInternal({
   activeTabId,
   actions,
   getThreadIdForTab,
+  historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
 }: InsightsTabManagerInternalProps) {
@@ -181,6 +186,7 @@ function InsightsTabManagerInternal({
                 isHomeTab={tab.id === HOME_TAB.id}
                 isTemplatesTab={tab.id === TEMPLATES_TAB.id}
                 tab={tab}
+                historyWindow={historyWindow}
               />
             </div>
             {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
@@ -231,8 +237,8 @@ function getNewActiveTabAfterClose(
   return newlySelectedTabId;
 }
 
-function findTabWithId(id: string, tabs: Tab[]): undefined | Tab {
-  return tabs.find((tab) => tab.id === id);
+function findTabWithId(id: string, tabs: Tab[]): string | undefined {
+  return tabs.find((tab) => tab.id === id)?.id;
 }
 
 export function hasDiffWithSavedQuery(
