@@ -1,20 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  createInMemorySessionTransport,
   useAgents,
   type AgentStatus,
   type RealtimeEvent,
   type TextUIPart,
   type ToolCallUIPart,
 } from '@inngest/use-agents';
-import { v4 as uuidv4 } from 'uuid';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
 import { LoadingIndicator } from './LoadingIndicator';
+import { ChatHeader } from './header/ChatHeader';
 import { useEvents } from './hooks/use-events';
 import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
@@ -46,7 +44,7 @@ function getLoadingMessage(flags: {
   return 'Thinking…';
 }
 
-export function InsightsChat() {
+export function InsightsChat({ tabId, threadId }: { tabId: string; threadId: string }) {
   // Read required data from the Insights state context
   const {
     query: currentSql,
@@ -55,73 +53,35 @@ export function InsightsChat() {
     runQuery,
   } = useInsightsStateMachineContext();
 
-  // Generate a unique thread ID for the initial chat
-  const [threadId] = useState<string>(() => uuidv4());
-
   // State for the chat's input value
   const [inputValue, setInputValue] = useState('');
-
-  // Get the user from the Clerk useUser hook
-  const { user } = useUser();
 
   // Events API hook
   const { schemas, eventTypes } = useEvents();
 
-  // Transport: ephemeral threads, delegate network to our API
-  const transport = useMemo(() => {
-    // InMemorySessionTransport only delegates sendMessage and getRealtimeToken to HTTP.
-    // Defaults are /api/chat and /api/realtime/token, so no config needed.
-    return createInMemorySessionTransport();
-  }, []);
-
-  // Track active stream lifecycle; set true on submit, false on 'stream.ended'
-  const [streamActive, setStreamActive] = useState(false);
+  // Local loading flags driven by onEvent to show “Thinking…” correctly pre-stream
   const [networkActive, setNetworkActive] = useState(false);
   const [textStreaming, setTextStreaming] = useState(false);
   const [textCompleted, setTextCompleted] = useState(false);
   const [currentToolName, setCurrentToolName] = useState<string | null>(null);
 
-  // Event data is fetched inside useEvents
+  const partIdToToolNameRef = useRef<Map<string, string>>(new Map());
+  const autoRanPartIdsRef = useRef<Set<string>>(new Set());
 
-  const {
-    messages,
-    sendMessage,
-    status,
-    currentThreadId,
-    setCurrentThreadId,
-    clearThreadMessages,
-  } = useAgents({
-    enableThreadValidation: false,
-    transport,
-    userId: user?.id,
-    channelKey: user?.id ? `insights:${user.id}` : undefined,
-    state: () => ({
-      sqlQuery: currentSql,
-      // Insights network context for Event Matcher and Query Writer
-      eventTypes,
-      schemas,
-      currentQuery: currentSql,
-      tabTitle,
-      mode: 'insights_sql_playground',
-      timestamp: Date.now(),
-    }),
-    onEvent: (evt: RealtimeEvent, meta: { scope?: string }) => {
+  const onEvent = useCallback(
+    (evt: RealtimeEvent) => {
       try {
+        const data = evt.data as Record<string, unknown> | undefined;
+        if (!data) return;
+        const evtThreadId = data['threadId'] as string | undefined;
+        if (evtThreadId && evtThreadId !== threadId) return; // ignore other threads
+
         switch (evt.event) {
           case 'run.started': {
-            if (meta.scope === 'network') {
+            const scope = data['scope'] as string | undefined;
+            if (scope === 'network') {
               setNetworkActive(true);
               setTextCompleted(false);
-              setCurrentToolName(null);
-            }
-            break;
-          }
-          case 'stream.ended': {
-            if (meta.scope === 'network') {
-              setStreamActive(false);
-              setNetworkActive(false);
-              setTextStreaming(false);
-              setTextCompleted(true);
               setCurrentToolName(null);
             }
             break;
@@ -132,21 +92,72 @@ export function InsightsChat() {
             break;
           }
           case 'part.created': {
-            type CreatedData = { type?: string; metadata?: { toolName?: string } };
-            const data = evt.data as CreatedData | undefined;
-            if (data?.type === 'tool-call') {
-              const tn = data.metadata?.toolName;
-              setCurrentToolName((typeof tn === 'string' && tn) || null);
+            const type = data['type'] as string | undefined;
+            const tn =
+              typeof (data as { metadata?: { toolName?: string } }).metadata?.toolName === 'string'
+                ? ((data as { metadata?: { toolName?: string } }).metadata!.toolName as string)
+                : undefined;
+            const partId = data['partId'] as string | undefined;
+            if (type === 'tool-call') setCurrentToolName(tn || null);
+            if ((type === 'tool-output' || type === 'tool-call') && partId && tn) {
+              partIdToToolNameRef.current.set(partId, tn);
             }
             break;
           }
           case 'part.completed': {
-            type CompletedData = { type?: string };
-            const data = evt.data as CompletedData | undefined;
-            if (data?.type === 'text') {
+            const type = data['type'] as string | undefined;
+            const partId = data['partId'] as string | undefined;
+            if (type === 'text') {
               setTextStreaming(false);
               setTextCompleted(true);
-            } else if (data?.type === 'tool-output' || data?.type === 'tool-call') {
+            } else if (type === 'tool-output' || type === 'tool-call') {
+              setCurrentToolName(null);
+              // Auto-paste and run SQL when generate_sql tool output completes
+              if (type === 'tool-output' && partId && !autoRanPartIdsRef.current.has(partId)) {
+                const toolName = partIdToToolNameRef.current.get(partId);
+                if (toolName === 'generate_sql') {
+                  autoRanPartIdsRef.current.add(partId);
+                  const finalContent = (data as { finalContent?: unknown }).finalContent;
+                  let sql: string | null = null;
+                  try {
+                    if (finalContent && typeof finalContent === 'object') {
+                      const obj = finalContent as Record<string, unknown>;
+                      const envelope = (obj as { data?: unknown }).data as
+                        | Record<string, unknown>
+                        | undefined;
+                      const candidate = envelope?.sql ?? (obj as { sql?: unknown }).sql;
+                      if (typeof candidate === 'string' && candidate.trim()) sql = candidate.trim();
+                    } else if (typeof finalContent === 'string') {
+                      try {
+                        const parsed = JSON.parse(finalContent) as Record<string, unknown>;
+                        const envelope = (parsed as { data?: unknown }).data as
+                          | Record<string, unknown>
+                          | undefined;
+                        const candidate = envelope?.sql ?? (parsed as { sql?: unknown }).sql;
+                        if (typeof candidate === 'string' && candidate.trim())
+                          sql = candidate.trim();
+                      } catch {
+                        // Not JSON; ignore
+                      }
+                    }
+                  } catch {}
+                  if (sql) {
+                    try {
+                      onSqlChange(sql);
+                      runQuery();
+                    } catch {}
+                  }
+                }
+              }
+            }
+            break;
+          }
+          case 'stream.ended': {
+            const scope = data['scope'] as string | undefined;
+            if (scope === 'network') {
+              setNetworkActive(false);
+              setTextStreaming(false);
+              setTextCompleted(true);
               setCurrentToolName(null);
             }
             break;
@@ -156,6 +167,28 @@ export function InsightsChat() {
         }
       } catch {}
     },
+    [threadId, onSqlChange, runQuery]
+  );
+
+  const {
+    messages,
+    status,
+    currentThreadId,
+    setCurrentThreadId,
+    clearThreadMessages,
+    sendMessageToThread,
+  } = useAgents({
+    enableThreadValidation: false,
+    state: () => ({
+      sqlQuery: currentSql,
+      eventTypes,
+      schemas,
+      currentQuery: currentSql,
+      tabTitle,
+      mode: 'insights_sql_playground',
+      timestamp: Date.now(),
+    }),
+    onEvent,
   });
 
   // Keep per-tab thread isolated and stable
@@ -166,31 +199,46 @@ export function InsightsChat() {
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!inputValue.trim() || streamActive) return;
-      setStreamActive(true);
-      await sendMessage(inputValue);
+      const message = inputValue.trim();
+      if (!message || status !== 'ready') return;
+      // Clear input immediately for snappier UX
       setInputValue('');
+      await sendMessageToThread(threadId, message, {
+        state: () => ({
+          sqlQuery: currentSql,
+          eventTypes,
+          schemas,
+          currentQuery: currentSql,
+          tabTitle,
+          mode: 'insights_sql_playground',
+          timestamp: Date.now(),
+        }),
+      });
     },
-    [inputValue, streamActive, sendMessage]
+    [inputValue, status, sendMessageToThread, threadId, currentSql, eventTypes, schemas, tabTitle]
   );
 
+  const handleClearThread = useCallback(() => {
+    if (messages.length === 0 || status !== 'ready') return;
+    clearThreadMessages(threadId);
+  }, [messages.length, status, clearThreadMessages, threadId]);
+
+  const handleToggleChat = useCallback(() => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('insights:toggle-chat', { detail: { tabId, threadId } })
+      );
+    } catch {}
+  }, [tabId, threadId]);
+
   return (
-    <div className="flex h-full w-[412px] flex-col border-l border-gray-200 bg-white">
+    <div className="border-subtle flex h-full w-[412px] flex-col border-l bg-white">
       <div className="bg-surfaceBase flex h-full w-full flex-col">
-        <div className="border-border-muted flex items-center justify-between border-b px-3 py-2">
-          <div className="text-text-basis text-sm font-medium">AI Assistant</div>
-          <button
-            className="text-text-subtle hover:text-text-basis text-xs"
-            onClick={() => clearThreadMessages(threadId)}
-            disabled={messages.length === 0 || streamActive}
-          >
-            Clear
-          </button>
-        </div>
+        <ChatHeader onClearThread={handleClearThread} onToggleChat={handleToggleChat} />
 
         <Conversation>
           <ConversationContent>
-            <div className="flex-1 space-y-3 p-3">
+            <div className="flex-1 space-y-4 p-3">
               {messages.map((m) => (
                 <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
                   {m.role === 'user' ? (
@@ -244,7 +292,7 @@ export function InsightsChat() {
             value={inputValue}
             onChange={setInputValue}
             onSubmit={handleSubmit}
-            disabled={streamActive}
+            disabled={status !== 'ready'}
           />
         </div>
       </div>

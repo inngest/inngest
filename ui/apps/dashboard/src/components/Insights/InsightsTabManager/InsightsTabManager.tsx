@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ulid } from 'ulid';
+import { v4 as uuidv4 } from 'uuid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
@@ -40,6 +41,14 @@ export function useInsightsTabManager(
 ): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const threadIdMapRef = useRef<Record<string, string>>({});
+  const getThreadIdForTab = useCallback((tabId: string): string => {
+    const existing = threadIdMapRef.current[tabId];
+    if (existing) return existing;
+    const id = uuidv4();
+    threadIdMapRef.current[tabId] = id;
+    return id;
+  }, []);
 
   const createTabBase = useCallback(
     (tab: Tab) => {
@@ -112,6 +121,7 @@ export function useInsightsTabManager(
         actions={actions}
         activeTabId={activeTabId}
         tabs={tabs}
+        getThreadIdForTab={getThreadIdForTab}
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
@@ -121,6 +131,7 @@ export function useInsightsTabManager(
       actions,
       activeTabId,
       tabs,
+      getThreadIdForTab,
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
@@ -133,6 +144,7 @@ export function useInsightsTabManager(
 interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
+  getThreadIdForTab: (tabId: string) => string;
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
@@ -143,6 +155,7 @@ function InsightsTabManagerInternal({
   tabs,
   activeTabId,
   actions,
+  getThreadIdForTab,
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
@@ -175,7 +188,9 @@ function InsightsTabManagerInternal({
                   historyWindow={historyWindow}
                 />
               </div>
-              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && <InsightsChat />}
+              {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && (
+                <InsightsChat tabId={tab.id} threadId={getThreadIdForTab(tab.id)} />
+              )}
             </div>
           </InsightsStateMachineContextProvider>
         ))}
