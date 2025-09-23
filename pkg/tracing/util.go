@@ -298,7 +298,13 @@ func GatewayResponseAttrs(resp *exechttp.Response, userErr *state.UserError, op 
 		meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 	}
 
-	if op.Op == enums.OpcodeAIGateway {
+	// Always try capture output
+	output, err := op.Output()
+	if err == nil {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &output)
+	} else {
+		rawAttrs.AddErr(fmt.Errorf("failed to get step output in gateway response attrs: %w", err))
+	}
 		if req, err := op.AIGatewayOpts(); err == nil {
 			if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.AIResponseMetadata, &parsed)
