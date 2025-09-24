@@ -790,9 +790,18 @@ func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSe
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (*sqlc_sqlite.GetSpanOutputRow, error) {
-	// TODO
-	return nil, nil
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
+	rows, err := q.db.GetSpanOutput(ctx, spanIds)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpanOutputRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
 }
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {

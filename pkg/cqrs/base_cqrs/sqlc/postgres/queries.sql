@@ -386,7 +386,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
@@ -407,7 +408,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
@@ -428,7 +430,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE debug_session_id = CAST($1 AS CHAR(26))
@@ -436,11 +439,11 @@ GROUP BY dynamic_span_id
 ORDER BY start_time;
 
 
--- name: GetSpanOutput :one
+-- name: GetSpanOutput :many
 SELECT
   input,
   output
 FROM spans
-WHERE span_id = $1
-LIMIT 1;
+WHERE span_id IN (sqlc.slice('ids'))
+LIMIT 2;
 
