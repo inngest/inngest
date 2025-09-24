@@ -430,7 +430,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 				{
 					Type:   mount.TypeBind,
 					Source: configPath,
-					Target: "/usr/local/etc/valkey/valkey.conf",
+					Target: "/etc/valkey/valkey.conf",
 				},
 			}
 			hc.Memory = config.maxMemory
