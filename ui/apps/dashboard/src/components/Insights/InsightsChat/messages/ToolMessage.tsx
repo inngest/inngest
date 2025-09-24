@@ -28,7 +28,7 @@ function GenerateSqlToolUI({
   }
 
   return (
-    <div className="text-text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
+    <div className="text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
       <Disclosure>
         {() => (
           <>
