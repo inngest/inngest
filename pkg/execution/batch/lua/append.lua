@@ -53,7 +53,7 @@ end
 -- return early with status=exists if this event was already appended.
 local newEvent = redis.call("SADD", batchIdempotenceKey, eventID)
 if newEvent == 0 then
-  resp = { status = "exists", batchID = batchID, batchPointerKey = batchPointerKey }
+  resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
   return cjson.encode(resp)
 end
 
