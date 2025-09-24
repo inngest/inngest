@@ -10,6 +10,7 @@ import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEd
 import { InsightsSQLEditorResultsTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorResultsTitle';
 import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import { Resizeable } from '@/components/Insights/Resizeable';
 import { Section } from '@/components/Insights/Section';
 import type { Tab } from '@/components/Insights/types';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
@@ -37,34 +38,39 @@ export function InsightsTabPanel({
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
-    <>
-      <Section
-        actions={
-          <>
-            <InsightsSQLEditorSaveQueryButton tab={tab} />
-            <InsightsSQLEditorQueryButton />
-          </>
-        }
-        className="min-h-[255px]"
-        title={<InsightsSQLEditorQueryTitle tab={tab} />}
-      >
-        <InsightsSQLEditor />
-      </Section>
-      <Section
-        actions={
-          <>
-            <InsightsSQLEditorDownloadCSVButton temporarilyHide />
-            {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-            <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
-              Send us feedback
-            </Link>
-          </>
-        }
-        className="border-subtle border-t"
-        title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
-      >
-        <InsightsDataTable />
-      </Section>
-    </>
+    <Resizeable
+      first={
+        <Section
+          actions={
+            <>
+              <InsightsSQLEditorSaveQueryButton tab={tab} />
+              <InsightsSQLEditorQueryButton />
+            </>
+          }
+          className="h-auto min-h-[255px]"
+          title={<InsightsSQLEditorQueryTitle tab={tab} />}
+        >
+          <InsightsSQLEditor />
+        </Section>
+      }
+      orientation="vertical"
+      second={
+        <Section
+          actions={
+            <>
+              <InsightsSQLEditorDownloadCSVButton temporarilyHide />
+              {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+              <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
+                Send us feedback
+              </Link>
+            </>
+          }
+          className="border-subtle h-auto border-t"
+          title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
+        >
+          <InsightsDataTable />
+        </Section>
+      }
+    />
   );
 }
