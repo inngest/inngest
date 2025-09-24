@@ -107,6 +107,71 @@ func TestBatchAppendIdempotence(t *testing.T) {
 	require.Equal(t, enums.BatchItemExists, res.Status)
 }
 
+// When the same event is appended to different batches, we would end up processing the duplicate event a second time in the second batch.
+// Currently Idempotency for eventIDs are only tracked within a batch. When a batch is full and scheduled, we lose track of eventIDs already processed.
+func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil)
+
+	accountId := uuid.New()
+	fnId := uuid.New()
+	function := inngest.Function{
+		ID: fnId,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+	bi := BatchItem{
+		AccountID:  accountId,
+		FunctionID: fnId,
+		Event: event.Event{
+			ID: "test-event",
+			Data: map[string]any{
+				"hello": "world",
+			},
+		},
+		Version: 0,
+	}
+
+	// var lastEventID ulid.ULID
+	var lastBatchID string
+	for i := range 10 {
+		bi.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
+		res, err := bm.Append(context.Background(), bi, function)
+		require.NoError(t, err)
+		require.NotEmpty(t, res.BatchID)
+		require.NotEmpty(t, res.BatchPointerKey)
+		switch i {
+		case 0:
+			require.Equal(t, enums.BatchNew, res.Status)
+		case 9:
+			require.Equal(t, enums.BatchFull, res.Status)
+		default:
+			require.Equal(t, enums.BatchAppend, res.Status)
+		}
+		// lastEventID = bi.EventID
+		lastBatchID = res.BatchID
+	}
+
+	// append the last batchitem again. Since last batch was full, this event goes to a new batch and ends up getting appended to a batch.
+	res, err := bm.Append(context.Background(), bi, function)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
+	require.NotEqual(t, res.BatchID, lastBatchID)
+	require.NotEmpty(t, res.BatchPointerKey)
+	require.Equal(t, enums.BatchNew, res.Status)
+}
+
 func TestBatchCleanup(t *testing.T) {
 	r := miniredis.RunT(t)
 
