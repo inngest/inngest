@@ -1,11 +1,12 @@
+import { Trace } from '../RunDetailsV3/Trace';
 import type { Trace as TraceType } from '../RunDetailsV3/types';
 import { toMaybeDate } from '../utils/date';
 import { DebugTrace } from './DebugTrace';
 
 type Props = {
   runID?: string;
-  debugTraces?: TraceType[];
-  runTrace?: TraceType;
+  debugTraces: TraceType[];
+  runTrace: TraceType;
 };
 
 export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
@@ -14,16 +15,14 @@ export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
     return null;
   }
 
-  if (!runTrace) {
-    console.error('DebugRun component currently requires a runTrace', runID);
+  const latest = debugTraces?.at(-1);
+  if (!latest) {
+    console.error('DebugRun component, no debug runs found', runID);
     return null;
   }
 
-  const latest = debugTraces?.at(-1);
-  const minTime = latest ? new Date(latest.queuedAt) : new Date(runTrace.queuedAt);
-  const maxTime = latest?.endedAt
-    ? new Date(latest.endedAt)
-    : toMaybeDate(runTrace.endedAt) ?? new Date();
+  const minTime = new Date(latest.queuedAt);
+  const maxTime = toMaybeDate(latest.endedAt) ?? new Date();
 
   return (
     <div className={`w-full pb-4 pr-8`}>
@@ -32,8 +31,7 @@ export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
         maxTime={maxTime}
         minTime={minTime}
         runID={runID}
-        runTrace={runTrace}
-        debugTraces={debugTraces}
+        trace={{ ...(latest as any), name: 'Debug Run' }}
       />
     </div>
   );

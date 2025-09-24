@@ -11,20 +11,16 @@ type Props = {
   depth: number;
   minTime: Date;
   maxTime: Date;
-  runTrace: Trace;
-  debugTraces?: Trace[];
+  trace: Trace;
   runID: string;
 };
 
 const INDENT_WIDTH = 40;
 
-export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, runID }: Props) => {
+export function DebugTrace({ depth, maxTime, minTime, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
   const { selectStep, selectedStep } = useStepSelection({ runID });
   const expanderRef = useRef<HTMLDivElement>(null);
-
-  const latest = debugTraces?.at(-1);
-  const trace = latest ?? runTrace;
 
   //
   // Don't show single finalization step for successful runs
@@ -36,9 +32,7 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
     (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
       ? false
       : (trace.childrenSpans?.length ?? 0) > 0;
-
   const spanName = getSpanName(trace.name);
-
   return (
     <div className="relative flex w-full flex-col">
       <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
@@ -52,7 +46,7 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
               : 'hover:bg-canvasSubtle hover:bg-opacity-60'
           } `}
           onClick={() => {
-            selectStep({ trace: trace, runID });
+            selectStep({ trace, runID });
           }}
         >
           <div
@@ -114,8 +108,7 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
                   depth={depth + 1}
                   maxTime={maxTime}
                   minTime={minTime}
-                  runTrace={child}
-                  debugTraces={debugTraces}
+                  trace={child}
                   runID={runID}
                 />
               );
@@ -125,4 +118,4 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
       </div>
     </div>
   );
-};
+}
