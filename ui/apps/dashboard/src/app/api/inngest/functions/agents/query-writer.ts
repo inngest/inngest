@@ -45,11 +45,11 @@ Available Columns
 When querying events, you have access to the following columns:
 
 Column	Type	Description
-event_id	String	Unique identifier for the event
-event_name	String	The name/type of the event
-event_data	JSON	The event payload data - users can send any JSON structure here
-event_ts	DateTime	Timestamp when the event occurred
-event_v	String	Event format version
+id	String	Unique identifier for the event
+name	String	The name/type of the event
+data	JSON	The event payload data - users can send any JSON structure here
+ts	DateTime	Timestamp when the event occurred
+v	String	Event format version
 For more details on the event format, see the Inngest Event Format documentation.
 
 Data Retention
@@ -72,7 +72,7 @@ String manipulation and search capabilities.
 String search functions
 String manipulation functions
 JSON Functions
-Essential for working with event_data payloads. View ClickHouse JSON functions documentation
+Essential for working with data payloads. View ClickHouse JSON functions documentation
 
 Date/Time Functions
 For analyzing event timing and patterns. View ClickHouse date/time functions documentation
@@ -112,12 +112,12 @@ Working with Event Data
 Common Schema vs Event-Specific Schema
 Common Schema: These columns are available for every user and every event:
 
-event_id
-event_name
-event_ts
-event_v
-event_data
-Event-Specific Schema: Within event_data, users can send any JSON they want, so the structure and available fields will be specific to their payloads. You can use ClickHouse's JSON functions to extract and query specific fields within your event data.
+id
+name
+ts
+v
+data
+Event-Specific Schema: Within data, users can send any JSON they want, so the structure and available fields will be specific to their payloads. You can use ClickHouse's JSON functions to extract and query specific fields within your event data.
 
 Example Queries
 Basic Event Filtering
@@ -126,16 +126,16 @@ Copy
 Copied
 SELECT count(*)
 FROM events
-WHERE event_name = 'inngest/function.failed'
-AND simpleJSONExtractString(event_data, 'function_id') = 'generate-report'
-AND event_ts > toUnixTimestamp(addHours(now(), -1)) * 1000;
+WHERE name = 'inngest/function.failed'
+AND simpleJSONExtractString(data, 'function_id') = 'generate-report'
+AND ts > toUnixTimestamp(addHours(now(), -1)) * 1000;
 Extracting JSON Data and Aggregating
 
 Copy
 Copied
-SELECT simpleJSONExtractString(event_data, 'user_id') as user_id, count(*) 
+SELECT simpleJSONExtractString(data, 'user_id') as user_id, count(*) 
 FROM events
-WHERE event_name = 'order.created'
+WHERE name = 'order.created'
 GROUP BY user_id
 ORDER BY count(*) DESC
 LIMIT 10;
@@ -153,13 +153,13 @@ Correct:
 
 Copy
 Copied
-SELECT toString(ARRAY_AGG(event_id)) as event_ids FROM events
+SELECT toString(ARRAY_AGG(id)) as ids FROM events
 Incorrect:
 
 
 Copy
 Copied
-SELECT ARRAY_AGG(event_id) as event_ids FROM events  -- This will cause serialization errors
+SELECT ARRAY_AGG(id) as ids FROM events  -- This will cause serialization errors
 Roadmap
 Coming Soon
 Query support for function runs
