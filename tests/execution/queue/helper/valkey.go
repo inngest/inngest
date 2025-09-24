@@ -435,7 +435,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 			}
 			hc.Memory = config.maxMemory
 		}
-		req.Cmd = []string{"valkey-server", "/usr/local/etc/valkey/valkey.conf"}
+		req.Cmd = []string{"valkey-server", "/etc/valkey/valkey.conf"}
 	} else {
 		// Use default command line configuration
 		cmd := []string{
