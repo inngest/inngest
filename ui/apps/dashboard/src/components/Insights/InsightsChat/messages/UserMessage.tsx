@@ -1,6 +1,6 @@
 'use client';
 
-import type { MessagePart } from '@inngest/use-agents';
+import type { MessagePart } from '@inngest/use-agent';
 
 export const UserMessage = ({ part }: { part: MessagePart }) => {
   if (part.type !== 'text') {

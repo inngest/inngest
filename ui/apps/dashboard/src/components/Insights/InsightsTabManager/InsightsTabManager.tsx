@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agents';
+import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agent';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -4,7 +4,7 @@ import { Disclosure } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { getToolData, type AgentToolPart } from '@inngest/use-agents';
+import { getToolData, type AgentToolPart } from '@inngest/use-agent';
 import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
 
 import type { InsightsAgentConfig } from '../useInsightsAgent';

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { TextUIPart } from '@inngest/use-agents';
+import type { TextUIPart } from '@inngest/use-agent';
 
 type AssistantMessageProps = {
   part: TextUIPart;
