@@ -194,13 +194,7 @@ function InsightsTabManagerInternal({
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
-    () =>
-      isInsightsAgentEnabled
-        ? createInMemorySessionTransport({
-            baseURL:
-              process.env.NEXT_PUBLIC_INNGEST_API_BASE_URL ?? process.env.INNGEST_API_BASE_URL,
-          })
-        : undefined,
+    () => (isInsightsAgentEnabled ? createInMemorySessionTransport() : undefined),
     [isInsightsAgentEnabled]
   );
   const channelKey = user?.id ? `insights:${user.id}` : undefined;
