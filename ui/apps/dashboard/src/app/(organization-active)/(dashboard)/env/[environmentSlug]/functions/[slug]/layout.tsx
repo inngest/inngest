@@ -53,7 +53,7 @@ export default function FunctionLayout({
   const { isArchived = false, isPaused } = fn ?? {};
 
   const doesFunctionAcceptPayload =
-    fn?.current?.triggers.some((trigger) => {
+    fn?.triggers.some((trigger) => {
       return trigger.type == FunctionTriggerTypes.Event;
     }) ?? false;
 

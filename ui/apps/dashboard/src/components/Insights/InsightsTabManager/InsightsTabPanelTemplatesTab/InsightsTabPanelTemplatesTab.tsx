@@ -1,38 +1,30 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
-import { RiChatPollLine, RiExternalLinkLine, RiMailLine, RiQuillPenLine } from '@remixicon/react';
+import { RiChatPollLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
 
-import { SHOW_DOCS_LINKS } from '../../temp-flags';
+import { pathCreator } from '@/utils/urls';
 import { EXTERNAL_FEEDBACK_LINK } from '../constants';
 import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
 const BASE_DOCS_URL = 'https://www.inngest.com/docs';
+const INSIGHTS_DOCS_URL = `${BASE_DOCS_URL}/platform/monitor/insights?ref=app-insights`;
 
 const RESOURCES = [
   {
-    href: BASE_DOCS_URL,
-    label: 'How to write your own query',
-    icon: RiQuillPenLine,
-    show: SHOW_DOCS_LINKS,
-  },
-  {
-    href: BASE_DOCS_URL,
+    href: INSIGHTS_DOCS_URL,
     label: 'Insights documentation',
     icon: RiExternalLinkLine,
-    show: SHOW_DOCS_LINKS,
   },
   {
     href: EXTERNAL_FEEDBACK_LINK,
     label: 'Send us feedback',
     icon: RiChatPollLine,
-    show: true,
   },
   {
-    href: '/support',
+    href: pathCreator.support({ ref: 'app-insights' }),
     label: 'Request support',
     icon: RiMailLine,
-    show: true,
   },
 ];
 
@@ -52,7 +44,7 @@ export function InsightsTabPanelTemplatesTab() {
         <div className="flex flex-col gap-4">
           <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
           <div className="flex flex-col gap-3">
-            {RESOURCES.filter(({ show }) => show).map(({ icon: Icon, label, href }) => (
+            {RESOURCES.map(({ icon: Icon, label, href }) => (
               <div className="flex items-center gap-2" key={label}>
                 <Icon className="text-muted-foreground h-4 w-4" />
                 <Link
