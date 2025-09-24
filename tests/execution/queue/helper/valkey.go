@@ -367,7 +367,7 @@ func formatValkeyConfig(config *ValkeyConfiguration) string {
 func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 	// Apply options
 	config := &valkeyConfig{
-		image: "valkey/valkey:8.0.1", // Default image
+		image: "valkey/valkey:8.0.3", // Default image
 	}
 	for _, opt := range opts {
 		opt(config)
