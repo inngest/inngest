@@ -269,7 +269,7 @@ func (b redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID,
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
-		b.b.KeyGenerator().BatchIdempotencetKey(ctx, functionId, batchID),
+		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId, batchID),
 	}
 
 	args, err := redis_state.StrSlice([]any{})

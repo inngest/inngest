@@ -551,9 +551,9 @@ type BatchKeyGenerator interface {
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
 	Batch(ctx context.Context, functionId uuid.UUID, batchId ulid.ULID) string
-	// BatchIdempotencetKey returns the key used to store the specific batch of
+	// BatchIdempotenceKey returns the key used to store the specific batch of
 	// events, that is used to check if a batch event has already been appended to a batch.
-	BatchIdempotencetKey(ctx context.Context, functionId uuid.UUID, batchId ulid.ULID) string
+	BatchIdempotenceKey(ctx context.Context, functionId uuid.UUID, batchId ulid.ULID) string
 	// BatchMetadata returns the key used to store the metadata related
 	// to a batch
 	BatchMetadata(ctx context.Context, functionId uuid.UUID, batchId ulid.ULID) string
@@ -587,7 +587,7 @@ func (u batchKeyGenerator) Batch(ctx context.Context, functionId uuid.UUID, batc
 	return fmt.Sprintf("{%s}:batches:%s", u.PrefixByFunctionId(ctx, u.queueDefaultKey, true, functionId), batchID)
 }
 
-func (u batchKeyGenerator) BatchIdempotencetKey(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) string {
+func (u batchKeyGenerator) BatchIdempotenceKey(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:batch_idempotence:%s", u.PrefixByFunctionId(ctx, u.queueDefaultKey, true, functionId), batchID)
 }
 

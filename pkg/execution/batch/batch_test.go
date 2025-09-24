@@ -146,7 +146,7 @@ func TestBatchCleanup(t *testing.T) {
 	require.True(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotencetKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.Equal(t, 4, len(r.Keys()))
 
 	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
@@ -154,7 +154,7 @@ func TestBatchCleanup(t *testing.T) {
 
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
-	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotencetKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
 	require.Equal(t, 1, len(r.Keys()))
 }
