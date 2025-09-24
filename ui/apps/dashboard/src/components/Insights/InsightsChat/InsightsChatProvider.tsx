@@ -9,7 +9,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import type { AgentStatus, ToolOutputOf } from '@inngest/use-agents';
+import type { AgentStatus, ToolOutputOf } from '@inngest/use-agent';
 
 import {
   useInsightsAgent,

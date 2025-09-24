@@ -1,5 +1,5 @@
 import { createState, type AgentMessageChunk, type Message } from '@inngest/agent-kit';
-import type { ChatRequestEvent } from '@inngest/use-agents';
+import type { ChatRequestEvent } from '@inngest/use-agent';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';

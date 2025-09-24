@@ -3,7 +3,7 @@ import {
   type AgentKitEvent,
   type UseAgentsConfig,
   type UseAgentsReturn,
-} from '@inngest/use-agents';
+} from '@inngest/use-agent';
 
 import type { ToolManifest } from '@/app/api/inngest/functions/agents/types';
 
