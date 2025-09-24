@@ -49,7 +49,8 @@ if is_status_empty(batchMetadataKey) then
   set_batch_status(batchMetadataKey, batchStatusAppending)
 end
 
--- check if event has already been appended to 
+-- check if event has already been appended to this batch
+-- return early with status=exists if this event was already appended.
 local newEvent = redis.call("SADD", batchIdempotenceKey, eventID)
 if newEvent == 0 then
   resp = { status = "exists", batchID = batchID, batchPointerKey = batchPointerKey }
