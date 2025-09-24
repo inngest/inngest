@@ -235,7 +235,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
         </div>
         <div className="flex h-full flex-col" style={{ width: `${100 - leftWidth}%` }}>
           <div className="flex w-full flex-col items-start justify-start">
-            <div className="border-muted flex h-12 w-full flex-row items-center justify-end border-b border-t px-4">
+            <div className="border-muted sticky top-0 flex h-12 w-full flex-row items-center justify-end border-b border-t px-4">
               <Button
                 kind="secondary"
                 appearance="outlined"
@@ -261,7 +261,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             </div>
 
             <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
-            <div className="border-muted sticky top-0 flex h-screen w-full flex-col justify-start overflow-y-auto">
+            <div className="border-muted flex min-h-screen w-full flex-col justify-start">
               {selectedStep && (
                 <StepInfo
                   selectedStep={selectedStep}
