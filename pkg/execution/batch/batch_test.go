@@ -104,7 +104,7 @@ func TestBatchAppendIdempotence(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, res.BatchID)
 	require.NotEmpty(t, res.BatchPointerKey)
-	require.Equal(t, enums.BatchExists, res.Status)
+	require.Equal(t, enums.BatchItemExists, res.Status)
 }
 
 func TestBatchCleanup(t *testing.T) {

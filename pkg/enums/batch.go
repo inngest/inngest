@@ -13,6 +13,6 @@ const (
 	BatchFull
 	// BatchNew indicates the batch has reached the size limit of a batch
 	BatchMaxSize
-	// BatchExists represents status when appending an item that was already appended to a batch
-	BatchExists
+	// BatchItemExists represents status when appending an item that was already appended to a batch
+	BatchItemExists
 )
