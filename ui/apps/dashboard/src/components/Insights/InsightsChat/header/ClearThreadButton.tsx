@@ -5,10 +5,9 @@ import { RiEraserLine } from '@remixicon/react';
 type ClearThreadButtonProps = {
   onClick: () => void;
   className?: string;
-  style?: React.CSSProperties;
 };
 
-export default function ClearThreadButton({ onClick, className, style }: ClearThreadButtonProps) {
+export default function ClearThreadButton({ onClick, className }: ClearThreadButtonProps) {
   return (
     <OptionalTooltip tooltip="Clear chat" side="bottom">
       <Button
