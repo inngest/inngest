@@ -17,7 +17,6 @@ export default function ClearThreadButton({ onClick, className }: ClearThreadBut
         icon={<RiEraserLine className="text-muted" />}
         className={className}
         onClick={onClick}
-        style={style}
       />
     </OptionalTooltip>
   );
