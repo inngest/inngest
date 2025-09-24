@@ -2743,8 +2743,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	metadata := runCtx.Metadata()
-
 	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
@@ -2764,15 +2762,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if dr := metadata.Config.DebugRunID(); dr != nil {
-		nextItem.Metadata[meta.Attrs.DebugRunID.Key()] = dr.String()
-	}
-	if ds := metadata.Config.DebugSessionID(); ds != nil {
-		nextItem.Metadata[meta.Attrs.DebugSessionID.Key()] = ds.String()
-	}
-
 	lifecycleItem := runCtx.LifecycleItem()
-	fmt.Printf("DEBUG: handleGeneratorSleep - metadata: %+v\n", metadata)
+	metadata := runCtx.Metadata()
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{

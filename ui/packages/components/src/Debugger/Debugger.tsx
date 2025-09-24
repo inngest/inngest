@@ -210,11 +210,13 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <div>
               {loading || runTraceLoading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : debugRunData?.debugTraces.length && runID ? (
-                <DebugRun debugRun={debugRunData?.debugTraces} runID={runID} />
-              ) : runID && runTraceData ? (
-                <Timeline runID={runID} trace={runTraceData} />
-              ) : null}
+              ) : (
+                <DebugRun
+                  debugTraces={debugRunData?.debugTraces}
+                  runTrace={runTraceData}
+                  runID={runID}
+                />
+              )}
             </div>
           </div>
         </div>

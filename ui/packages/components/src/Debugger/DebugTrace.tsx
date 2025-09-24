@@ -12,7 +12,7 @@ type Props = {
   minTime: Date;
   maxTime: Date;
   runTrace: Trace;
-  debugTraces: Trace[];
+  debugTraces?: Trace[];
   runID: string;
 };
 
@@ -24,38 +24,35 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
   const expanderRef = useRef<HTMLDivElement>(null);
 
   const latest = debugTraces?.at(-1);
-
-  if (!latest) {
-    return null;
-  }
+  const trace = latest ?? runTrace;
 
   //
   // Don't show single finalization step for successful runs
   // unless they have children (e.g. failed attempts)
   const hasChildren =
     depth === 0 &&
-    runTrace.childrenSpans?.length === 1 &&
-    runTrace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
-    (runTrace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
+    trace.childrenSpans?.length === 1 &&
+    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
+    (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
       ? false
-      : (runTrace.childrenSpans?.length ?? 0) > 0;
+      : (trace.childrenSpans?.length ?? 0) > 0;
 
-  const spanName = getSpanName(runTrace.name);
+  const spanName = getSpanName(trace.name);
 
   return (
     <div className="relative flex w-full flex-col">
-      <TimelineHeader trace={runTrace} minTime={minTime} maxTime={maxTime} />
+      <TimelineHeader trace={trace} minTime={minTime} maxTime={maxTime} />
       <div className="flex flex-col">
         <div
           className={`flex h-7 w-full cursor-pointer flex-row items-center justify-start gap-1 bg-opacity-50 py-0.5 pl-4 ${
-            (!selectedStep && runTrace.isRoot) ||
-            (selectedStep?.trace?.spanID === runTrace.spanID &&
-              selectedStep?.trace?.name === runTrace.name)
+            (!selectedStep && trace.isRoot) ||
+            (selectedStep?.trace?.spanID === trace.spanID &&
+              selectedStep?.trace?.name === trace.name)
               ? 'bg-secondary-3xSubtle'
               : 'hover:bg-canvasSubtle hover:bg-opacity-60'
           } `}
           onClick={() => {
-            selectStep({ trace: runTrace, runID });
+            selectStep({ trace: trace, runID });
           }}
         >
           <div
@@ -69,8 +66,8 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
                   //
                   // Use placeholder width of 28 (single digit expander) to reduce flickering
                   left: `${depth * INDENT_WIDTH + (expanderRef.current?.clientWidth ?? 28) + 17}px`,
-                  top: runTrace.isRoot ? '2rem' : '1rem',
-                  height: `calc(100% - ${runTrace.isRoot ? '2rem' : '1rem'})`,
+                  top: trace.isRoot ? '2rem' : '1rem',
+                  height: `calc(100% - ${trace.isRoot ? '2rem' : '1rem'})`,
                 }}
               />
             )}
@@ -85,7 +82,7 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
                 ref={expanderRef}
               >
                 <div className="text-sm font-medium leading-tight">
-                  {runTrace.childrenSpans?.length}
+                  {trace.childrenSpans?.length}
                 </div>
                 <RiArrowRightSLine
                   className={`text-subtle m-0 h-3.5 w-3.5 shrink-0 transition-transform duration-[250ms] ${
@@ -94,7 +91,7 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
                 />
               </div>
             )}
-            <StepType stepType={runTrace.stepType} />
+            <StepType stepType={trace.stepType} />
             <div
               className={`text-basis overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal leading-tight ${
                 !hasChildren && 'pl-1.5'
@@ -105,12 +102,12 @@ export const DebugTrace = ({ depth, maxTime, minTime, runTrace, debugTraces, run
           </div>
 
           <div className="border-light/80 flex w-[70%] flex-row border-l-2">
-            <InlineSpans maxTime={maxTime} minTime={minTime} trace={runTrace} depth={depth} />
+            <InlineSpans maxTime={maxTime} minTime={minTime} trace={trace} depth={depth} />
           </div>
         </div>
         {expanded && hasChildren && (
           <>
-            {runTrace.childrenSpans?.map((child, i) => {
+            {trace.childrenSpans?.map((child, i) => {
               return (
                 <DebugTrace
                   key={`${child.name}-${i}`}

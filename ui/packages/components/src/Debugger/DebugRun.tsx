@@ -3,20 +3,27 @@ import { toMaybeDate } from '../utils/date';
 import { DebugTrace } from './DebugTrace';
 
 type Props = {
-  runID: string;
-  debugTraces: TraceType[];
-  runTrace: TraceType;
+  runID?: string;
+  debugTraces?: TraceType[];
+  runTrace?: TraceType;
 };
 
 export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
-  const latest = debugTraces?.at(-1);
-
-  if (!latest) {
+  if (!runID) {
+    console.error('DebugRun component currently requires a runID', runID);
     return null;
   }
 
-  const minTime = new Date(latest.queuedAt);
-  const maxTime = toMaybeDate(latest.endedAt) ?? new Date();
+  if (!runTrace) {
+    console.error('DebugRun component currently requires a runTrace', runID);
+    return null;
+  }
+
+  const latest = debugTraces?.at(-1);
+  const minTime = latest ? new Date(latest.queuedAt) : new Date(runTrace.queuedAt);
+  const maxTime = latest?.endedAt
+    ? new Date(latest.endedAt)
+    : toMaybeDate(runTrace.endedAt) ?? new Date();
 
   return (
     <div className={`w-full pb-4 pr-8`}>
