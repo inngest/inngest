@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
 import { Button } from '../Button';
 import { RerunModal } from '../Rerun/RerunModal';
 import { StepInfo } from '../RunDetailsV3/StepInfo';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
+import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
 import { useGetRunTrace } from '../SharedContext/useGetRunTrace';
 import { useRerun } from '../SharedContext/useRerun';
@@ -21,7 +24,10 @@ import { DebugRun } from './DebugRun';
 import { History } from './History';
 import { Play } from './Play';
 
+const DEBUG_RUN_REFETCH_INTERVAL = 1000;
+
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
+  const router = useRouter();
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
@@ -31,6 +37,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     debugRunID,
     runID,
   });
+
+  const { booleanFlag } = useBooleanFlag();
+  const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
+    'polling-disabled',
+    false
+  );
 
   const { rerun } = useRerun();
 
@@ -42,13 +54,13 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     functionSlug,
     debugRunID,
     runID,
+    refetchInterval: pollingFlagReady && pollingDisabled ? 0 : DEBUG_RUN_REFETCH_INTERVAL,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50);
-  const [running, setRunning] = useState(false);
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -96,6 +108,22 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
         debugRunID,
         debugSessionID,
       });
+
+      if (result.error) {
+        console.error('error rerunning function', result.error);
+        toast.error(`Error rerunning function, see console for more details.`);
+        return;
+      }
+
+      if (result.data?.newRunID) {
+        router.push(
+          pathCreator.debugger({
+            functionSlug,
+            runID: result.data?.newRunID,
+            debugSessionID: result.data?.newRunID,
+          })
+        );
+      }
     }
   };
 
@@ -113,13 +141,20 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
           </div>
         </div>
 
-        <Button
-          kind="primary"
-          appearance="outlined"
-          size="medium"
-          label="Rerun function"
-          onClick={handleRerun}
-        />
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              kind="primary"
+              appearance="outlined"
+              size="medium"
+              label="Rerun function"
+              onClick={handleRerun}
+            />
+          </TooltipTrigger>
+          <TooltipContent className="whitespace-pre-line">
+            Reruns function and start a new debug session
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="flex h-full w-full flex-row" ref={containerRef}>
@@ -129,8 +164,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
               <div className="flex flex-row items-center gap-x-2">
                 <Tooltip>
                   <TooltipTrigger>
-                    {running ? (
-                      <RiPauseLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-pointer rounded-md p-1" />
+                    {runTraceData?.status === 'RUNNING' ? (
+                      <RiPauseLine className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-not-allowed rounded-md p-1" />
                     ) : (
                       <Play
                         functionSlug={functionSlug}
@@ -141,7 +176,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                     )}
                   </TooltipTrigger>
                   <TooltipContent className="whitespace-pre-line">
-                    {running ? 'Pause' : 'Play'}
+                    {runTraceData?.status === 'RUNNING' ? 'Pause coming soon!' : 'Play'}
                   </TooltipContent>
                 </Tooltip>
 

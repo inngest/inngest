@@ -244,6 +244,8 @@ func (tp *otelTracerProvider) UpdateSpan(
 		return fmt.Errorf("no target span")
 	}
 
+	fmt.Printf("DEBUG: UpdateSpan - target span: %+v\n", opts.TargetSpan)
+
 	if opts.TargetSpan.DynamicSpanID == "" {
 		return fmt.Errorf("target span is not dynamic; has no DynamicSpanID")
 	}

@@ -44,8 +44,8 @@ export const Play = ({ functionSlug, runID, debugRunID, debugSessionID }: PlayPr
         })
       : await rerun({
           runID,
-          debugRunID: debugRunID ?? newDebugRunID,
           debugSessionID,
+          debugRunID: ulid(),
         });
 
     if (result.error) {

@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -38,6 +39,20 @@ func AddMetadataTenantAttrs(rawAttrs *meta.SerializableAttrs, id statev2.ID) {
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
 	rawAttrs := meta.NewAttrSet()
 	now := s.StartTime()
+
+	// Log debug information for EXTEND spans
+	if s.Name() == meta.SpanNameDynamicExtension {
+		fmt.Printf("DEBUG: EXTEND span OnStart - md: %v, qi: %v\n", p.md != nil, p.qi != nil)
+		if p.md != nil {
+			debugRunID := p.md.Config.DebugRunID()
+			debugSessionID := p.md.Config.DebugSessionID()
+			fmt.Printf("DEBUG: EXTEND span - md debug info - runID: %v, sessionID: %v\n", debugRunID, debugSessionID)
+		}
+		if p.qi != nil {
+			fmt.Printf("DEBUG: EXTEND span - qi metadata: %+v\n", p.qi.Metadata)
+		}
+		fmt.Printf("DEBUG: EXTEND span - raw attrs: %+v\n", rawAttrs)
+	}
 
 	if p.md != nil {
 		AddMetadataTenantAttrs(rawAttrs, p.md.ID)
