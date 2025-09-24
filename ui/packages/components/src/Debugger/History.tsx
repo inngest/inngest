@@ -123,24 +123,26 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
     columnHelper.accessor('versions', {
       cell: () => {
         return (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button
-                disabled={true}
-                kind="secondary"
-                appearance="outlined"
-                size="small"
-                label="View version"
-                className="text-muted text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              />
-            </TooltipTrigger>
-            <TooltipContent className="whitespace-pre-line text-left">
-              Version history coming soon!
-            </TooltipContent>
-          </Tooltip>
+          <div className="flex w-full justify-end">
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  disabled={true}
+                  kind="secondary"
+                  appearance="outlined"
+                  size="small"
+                  label="View version"
+                  className="text-muted text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                />
+              </TooltipTrigger>
+              <TooltipContent className="whitespace-pre-line text-left">
+                Version history coming soon!
+              </TooltipContent>
+            </Tooltip>
+          </div>
         );
       },
       enableSorting: false,
