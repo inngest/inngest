@@ -9,9 +9,14 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import type { AgentStatus, RealtimeEvent } from '@inngest/use-agents';
+import type { AgentStatus, ToolOutputOf } from '@inngest/use-agents';
 
-import { useInsightsAgent, type ClientState } from './useInsightsAgent';
+import {
+  useInsightsAgent,
+  type ClientState,
+  type InsightsAgentConfig,
+  type InsightsAgentEvent,
+} from './useInsightsAgent';
 
 type ThreadFlags = {
   networkActive: boolean;
@@ -85,12 +90,9 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     return has;
   }, []);
 
-  const onEvent = useCallback((evt: RealtimeEvent) => {
+  const onEvent = useCallback((evt: InsightsAgentEvent) => {
     try {
-      // Attempt to extract threadId generically
-      const data = (evt as unknown as { data?: any }).data || {};
-      const tid: string | undefined =
-        typeof data?.threadId === 'string' ? data.threadId : undefined;
+      const tid = typeof evt.data.threadId === 'string' ? evt.data.threadId : undefined;
       if (!tid) return;
 
       setThreadFlags((prev) => {
@@ -118,7 +120,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
             };
           }
           case 'tool_call.arguments.delta': {
-            const toolName: string | undefined = data?.toolName;
+            // evt is narrowed by the discriminant here
+            const toolName = evt.data.toolName;
             return {
               ...prev,
               [tid]: {
@@ -131,35 +134,34 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
             };
           }
           case 'part.completed': {
-            const type: string | undefined = data?.type;
+            // evt is narrowed by the discriminant here
+            const partType = evt.data.type;
             // Clear tool name once tool step completes
             const nextFlags: ThreadFlags = {
               ...prevFlags,
               currentToolName:
-                type === 'tool-output' || type === 'tool-call' ? null : prevFlags.currentToolName,
+                partType === 'tool-output' || partType === 'tool-call'
+                  ? null
+                  : prevFlags.currentToolName,
             };
 
             // If text part completes, mark completion
-            if (type === 'text') {
+            if (partType === 'text') {
               nextFlags.textStreaming = false;
               nextFlags.textCompleted = true;
             }
 
-            // Capture generated SQL from tool-output
-            if (
-              type === 'tool-output' &&
-              data?.finalContent &&
-              typeof data.finalContent === 'object' &&
-              'data' in data.finalContent &&
-              data.finalContent?.data &&
-              typeof (data.finalContent as { data?: any }).data === 'object' &&
-              'sql' in (data.finalContent as { data?: any }).data &&
-              typeof (data.finalContent as { data: any }).data.sql === 'string'
-            ) {
-              const sql: string = (data.finalContent as { data: { sql: string } }).data.sql;
-              pendingSqlByThreadRef.current.set(tid, sql);
-              pendingAutoRunRef.current.add(tid);
-              setPendingSqlVersion((v) => v + 1);
+            // Capture generated SQL from tool-output (typed via manifest)
+            if (partType === 'tool-output' && evt.data.toolName === 'generate_sql') {
+              const output = evt.data.finalContent as
+                | ToolOutputOf<InsightsAgentConfig, 'generate_sql'>
+                | undefined;
+              const sql = output?.data.sql;
+              if (sql && sql.length > 0) {
+                pendingSqlByThreadRef.current.set(tid, sql);
+                pendingAutoRunRef.current.add(tid);
+                setPendingSqlVersion((v) => v + 1);
+              }
             }
 
             return {
