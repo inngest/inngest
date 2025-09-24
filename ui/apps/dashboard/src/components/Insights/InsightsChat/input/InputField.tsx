@@ -56,7 +56,7 @@ export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTe
         rows={rows}
         onKeyDown={handleKeyDown}
         className={cn(
-          'bg-canvasBase placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
+          'bg-surfaceBase placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
           className
         )}
         {...props}
