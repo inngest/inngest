@@ -239,6 +239,70 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
+
+			t.Run("backlog refill with throttle", func(t *testing.T) {
+				shard := setup(t)
+
+				// Test data setup
+				accountID := uuid.New()
+				functionID := uuid.New()
+				runID := ulid.Make()
+				now := time.Now().Truncate(time.Second)
+
+				expr := "event.data.customerID"
+				exprHash := util.XXHash(expr)
+				throttleKey := "customer-test"
+				keyHash := util.XXHash(throttleKey)
+
+				constraints := redis_state.PartitionConstraintConfig{
+					Throttle: &redis_state.PartitionThrottle{
+						ThrottleKeyExpressionHash: exprHash,
+						Limit:                     5,
+						Burst:                     0,
+						Period:                    60,
+					},
+				}
+
+				// Initialize queue
+				q := redis_state.NewQueue(shard,
+					redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+						return true
+					}),
+					redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+						return constraints
+					}))
+
+				// Create a queue item for testing
+				queueItem := queue.QueueItem{
+					FunctionID: functionID,
+					Data: queue.Item{
+						Kind: queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID: accountID,
+							RunID:     runID,
+						},
+						Throttle: &queue.Throttle{
+							Limit:               5,
+							Burst:               0,
+							Period:              60,
+							Key:                 keyHash,
+							UnhashedThrottleKey: throttleKey,
+							KeyExpressionHash:   exprHash,
+						},
+					},
+				}
+
+				// Enqueue to backlog
+				qi, err := q.EnqueueItem(ctx, shard, queueItem, now, queue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				backlog := q.ItemBacklog(ctx, qi)
+				sp := q.ItemShadowPartition(ctx, qi)
+
+				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, now.Add(time.Minute), constraints)
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+			})
 		})
 	}
 }
