@@ -146,7 +146,7 @@ type ComplexityRoot struct {
 	}
 
 	DebugRun struct {
-		DebugRun func(childComplexity int) int
+		DebugTraces func(childComplexity int) int
 	}
 
 	DebugSession struct {
@@ -1074,12 +1074,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DebounceConfiguration.Period(childComplexity), true
 
-	case "DebugRun.debugRun":
-		if e.complexity.DebugRun.DebugRun == nil {
+	case "DebugRun.debugTraces":
+		if e.complexity.DebugRun.DebugTraces == nil {
 			break
 		}
 
-		return e.complexity.DebugRun.DebugRun(childComplexity), true
+		return e.complexity.DebugRun.DebugTraces(childComplexity), true
 
 	case "DebugSession.debugRuns":
 		if e.complexity.DebugSession.DebugRuns == nil {
@@ -4111,7 +4111,7 @@ type RunTraceTrigger {
 # debug types
 
 type DebugRun {
-  debugRun: [RunTraceSpan!]
+  debugTraces: [RunTraceSpan!]
 }
 
 type DebugSessionRun {
@@ -7353,8 +7353,8 @@ func (ec *executionContext) fieldContext_DebounceConfiguration_key(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _DebugRun_debugRun(ctx context.Context, field graphql.CollectedField, obj *models.DebugRun) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_DebugRun_debugRun(ctx, field)
+func (ec *executionContext) _DebugRun_debugTraces(ctx context.Context, field graphql.CollectedField, obj *models.DebugRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DebugRun_debugTraces(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -7367,7 +7367,7 @@ func (ec *executionContext) _DebugRun_debugRun(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.DebugRun, nil
+		return obj.DebugTraces, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7381,7 +7381,7 @@ func (ec *executionContext) _DebugRun_debugRun(ctx context.Context, field graphq
 	return ec.marshalORunTraceSpan2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_DebugRun_debugRun(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DebugRun",
 		Field:      field,
@@ -15132,8 +15132,8 @@ func (ec *executionContext) fieldContext_Query_debugRun(ctx context.Context, fie
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "debugRun":
-				return ec.fieldContext_DebugRun_debugRun(ctx, field)
+			case "debugTraces":
+				return ec.fieldContext_DebugRun_debugTraces(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type DebugRun", field.Name)
 		},
@@ -24824,9 +24824,9 @@ func (ec *executionContext) _DebugRun(ctx context.Context, sel ast.SelectionSet,
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("DebugRun")
-		case "debugRun":
+		case "debugTraces":
 
-			out.Values[i] = ec._DebugRun_debugRun(ctx, field, obj)
+			out.Values[i] = ec._DebugRun_debugTraces(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

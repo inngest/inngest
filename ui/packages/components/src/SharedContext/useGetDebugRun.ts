@@ -11,7 +11,7 @@ export type GetDebugRunPayload = {
 };
 
 export type DebugRunData = {
-  debugRun: Trace[];
+  debugTraces: Trace[];
 };
 
 export type DebugRunResult = {

@@ -634,7 +634,7 @@ type RunTraceTrigger {
 # debug types
 
 type DebugRun {
-  debugRun: [RunTraceSpan!]
+  debugTraces: [RunTraceSpan!]
 }
 
 type DebugSessionRun {

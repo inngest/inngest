@@ -1,14 +1,15 @@
-import { Trace } from '../RunDetailsV3/Trace';
 import type { Trace as TraceType } from '../RunDetailsV3/types';
 import { toMaybeDate } from '../utils/date';
+import { DebugTrace } from './DebugTrace';
 
 type Props = {
   runID: string;
-  debugRun: TraceType[];
+  debugTraces: TraceType[];
+  runTrace: TraceType;
 };
 
-export const DebugRun = ({ debugRun, runID }: Props) => {
-  const latest = debugRun?.at(-1);
+export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
+  const latest = debugTraces?.at(-1);
 
   if (!latest) {
     return null;
@@ -19,12 +20,13 @@ export const DebugRun = ({ debugRun, runID }: Props) => {
 
   return (
     <div className={`w-full pb-4 pr-8`}>
-      <Trace
+      <DebugTrace
         depth={0}
         maxTime={maxTime}
         minTime={minTime}
         runID={runID}
-        trace={{ ...(latest as any), name: 'Debug Run' }}
+        runTrace={runTrace}
+        debugTraces={debugTraces}
       />
     </div>
   );

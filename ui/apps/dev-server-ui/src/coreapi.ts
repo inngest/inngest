@@ -620,7 +620,7 @@ export const CREATE_DEBUG_SESSION = gql`
 export const DEBUG_RUN = gql`
   query GetDebugRun($query: DebugRunQuery!) {
     debugRun(query: $query) {
-      debugRun {
+      debugTraces {
         ...TraceDetails
         childrenSpans {
           ...TraceDetails

@@ -25,6 +25,7 @@ import { History } from './History';
 import { Play } from './Play';
 
 const DEBUG_RUN_REFETCH_INTERVAL = 1000;
+const RUN_REFETCH_INTERVAL = 1000;
 
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const router = useRouter();
@@ -33,6 +34,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const [debugRunID] = useSearchParam('debugRunID');
   const [debugSessionID] = useSearchParam('debugSessionID');
+  const [runDone, setRunDone] = useState(false);
   const { selectedStep } = useStepSelection({
     debugRunID,
     runID,
@@ -48,6 +50,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
 
   const { data: runTraceData, loading: runTraceLoading } = useGetRunTrace({
     runID,
+    refetchInterval: runDone || (pollingFlagReady && pollingDisabled) ? 0 : RUN_REFETCH_INTERVAL,
   });
 
   const { data: debugRunData, loading } = useGetDebugRun({
@@ -56,6 +59,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
     runID,
     refetchInterval: pollingFlagReady && pollingDisabled ? 0 : DEBUG_RUN_REFETCH_INTERVAL,
   });
+
+  useEffect(() => {
+    if (runTraceData?.status === 'COMPLETED') {
+      setRunDone(true);
+    }
+  }, [runTraceData?.status]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -201,8 +210,8 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <div>
               {loading || runTraceLoading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : debugRunData?.debugRun.length && runID ? (
-                <DebugRun debugRun={debugRunData?.debugRun} runID={runID} />
+              ) : debugRunData?.debugTraces.length && runID ? (
+                <DebugRun debugRun={debugRunData?.debugTraces} runID={runID} />
               ) : runID && runTraceData ? (
                 <Timeline runID={runID} trace={runTraceData} />
               ) : null}

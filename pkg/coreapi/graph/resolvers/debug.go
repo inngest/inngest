@@ -35,7 +35,7 @@ func (qr *queryResolver) DebugRun(ctx context.Context, query models.DebugRunQuer
 	}
 
 	return &models.DebugRun{
-		DebugRun: debugRunSpans,
+		DebugTraces: debugRunSpans,
 	}, nil
 }
 
