@@ -102,17 +102,17 @@ importers:
         specifier: ^0.1.2
         version: 0.1.2(tailwindcss@3.4.1)
       '@inngest/agent-kit':
-        specifier: 0.11.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94
-        version: 0.11.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94(inngest@3.40.3)(zod@3.22.4)
+        specifier: 0.11.0
+        version: 0.11.0(inngest@3.40.3)(zod@3.22.4)
       '@inngest/components':
         specifier: workspace:*
         version: link:../../packages/components
       '@inngest/realtime':
         specifier: ^0.4.0
         version: 0.4.0(express@5.1.0)(next@14.2.32)(react@18.2.0)(typescript@5.1.3)
-      '@inngest/use-agents':
-        specifier: 0.2.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94
-        version: 0.2.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94(@inngest/realtime@0.4.0)(react-dom@18.2.0)(react@18.2.0)(uuid@13.0.0)
+      '@inngest/use-agent':
+        specifier: 0.2.0
+        version: 0.2.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0)
       '@launchdarkly/node-server-sdk':
         specifier: ^9.0.3
         version: 9.0.3
@@ -5381,8 +5381,8 @@ packages:
       - supports-color
     dev: true
 
-  /@inngest/agent-kit@0.11.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94(inngest@3.40.3)(zod@3.22.4):
-    resolution: {integrity: sha512-86nYfgg5JTwjycGdeUkGfQt+kCDq8Q1G/UNrWEL8+AeDOe2Y6335S1zF66ZknD3O0OV1+lLNxoM31kYO0NGTQw==}
+  /@inngest/agent-kit@0.11.0(inngest@3.40.3)(zod@3.22.4):
+    resolution: {integrity: sha512-UAIq0/WVB0QnQxyK1UmmAeq1KbkQf3RdG/5ay9t7KHYk0RFJTzEs2T5fbeExbAT9D1JMrpoGDvMzBw77s6i3oQ==}
     peerDependencies:
       inngest: '>=3.39.0'
       zod: '>=3.22 <4'
@@ -5439,10 +5439,9 @@ packages:
       - typescript
     dev: false
 
-  /@inngest/use-agents@0.2.0-alpha-20250924000141-d3d24028fd576193e2adfa963a69864a2fc46d94(@inngest/realtime@0.4.0)(react-dom@18.2.0)(react@18.2.0)(uuid@13.0.0):
-    resolution: {integrity: sha512-wa2vzBvxYUbhLJunye4N66JlPRkkIX78PHtwj/vYcbA4hpFAwOktsdsHLtkr38mljGt+w6hfRShsbkDbfYKvSg==}
+  /@inngest/use-agent@0.2.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0):
+    resolution: {integrity: sha512-oT6yCzwIhlePXpn8rxyJwzBwZFOnr4MpjBsytohULvC3kjKdS0Qz0j/EtY6JZcZ86TJwbhggeMLFbFIe62LI1w==}
     peerDependencies:
-      '@inngest/realtime': '>=0.3.0'
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
       uuid: '>=9.0.0'
@@ -5452,6 +5451,19 @@ packages:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       uuid: 13.0.0
+    transitivePeerDependencies:
+      - '@sveltejs/kit'
+      - '@vercel/node'
+      - aws-lambda
+      - encoding
+      - express
+      - fastify
+      - h3
+      - hono
+      - koa
+      - next
+      - supports-color
+      - typescript
     dev: false
 
   /@isaacs/cliui@8.0.2:
@@ -8566,7 +8578,7 @@ packages:
     resolution: {integrity: sha512-USm05zrsFxYLPdWWq+K3STlWiT/3ELn3RcV5hJMghpeAIhxfsUIg6mt12CBJBInWMV4VneoV7SfGv8xIwo2qNQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
-      rollup: '>=2.79.2'
+      rollup: '>=3.29.5'
     peerDependenciesMeta:
       rollup:
         optional: true
