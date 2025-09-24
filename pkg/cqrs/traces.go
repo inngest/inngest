@@ -480,6 +480,10 @@ type SpanIdentifier struct {
 
 	// Whether the output should direct to the tracing preview stores
 	Preview *bool `json:"preview,omitempty,omitzero"`
+
+	// InputSpanID is the span ID of the span that produced the input for the
+	// span.
+	InputSpanID *string `json:"in_sid,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {
