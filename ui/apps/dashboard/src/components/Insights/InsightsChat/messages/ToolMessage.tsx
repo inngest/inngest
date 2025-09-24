@@ -38,7 +38,7 @@ function GenerateSqlToolUI({
                   <div
                     className={cn(
                       'flex h-4 w-4 items-center justify-center rounded-full',
-                      errorMessage ? 'bg-error' : 'bg-[#65BD8B]'
+                      errorMessage ? 'bg-error' : 'bg-primary-subtle'
                     )}
                   >
                     {errorMessage ? (
