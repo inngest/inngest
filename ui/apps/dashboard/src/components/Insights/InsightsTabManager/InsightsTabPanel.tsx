@@ -1,7 +1,7 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
-import { Resizeable } from '@inngest/components/Resizeable/Resizeable';
+import { Resizable } from '@inngest/components/Resizable/Resizable';
 
 import type { Tab } from '@/components/Insights/types';
 import { InsightsDataTable } from '../InsightsDataTable/InsightsDataTable';
@@ -39,7 +39,7 @@ export function InsightsTabPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Resizeable
+      <Resizable
         defaultSplitPercentage={37.5}
         minSplitPercentage={20}
         maxSplitPercentage={80}

@@ -7,7 +7,7 @@ import { Notch } from './Notch';
 import { initializeSplitFromStorage } from './split';
 import type { Orientation } from './types';
 
-export type ResizeableProps = {
+export type ResizableProps = {
   defaultSplitPercentage?: number;
   first: ReactNode;
   maxSplitPercentage?: number;
@@ -17,7 +17,7 @@ export type ResizeableProps = {
   splitKey?: string;
 };
 
-export function Resizeable({
+export function Resizable({
   defaultSplitPercentage = 50,
   first,
   maxSplitPercentage = 100,
@@ -25,7 +25,7 @@ export function Resizeable({
   orientation,
   second,
   splitKey,
-}: ResizeableProps) {
+}: ResizableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
