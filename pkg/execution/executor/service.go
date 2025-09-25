@@ -497,9 +497,9 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 
 	switch c.Kind {
 	case enums.CancellationKindStartTimeout:
-		return s.handleEagerCancelStartTimeout(ctx, c)
+		return s.handleEagerCancelStartTimeout(ctx, c, item)
 	case enums.CancellationKindFinishTimeout:
-		return s.handleEagerCancelFinishTimeout(ctx, c)
+		return s.handleEagerCancelFinishTimeout(ctx, c, item)
 	case enums.CancellationKindRun:
 		return s.handleEagerCancelRun(ctx, c)
 	case enums.CancellationKindBulkRun:
@@ -511,7 +511,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	}
 }
 
-func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation) error {
+func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -574,7 +574,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 
 }
 
-func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation) error {
+func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -639,22 +639,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 			l.Error("queue does not conform to queue manager")
 			return nil
 		}
-		// Retrieve current queue shard.
-		queueName := queue.KindCancel
-		shard, err := s.shardSelector(ctx, c.AccountID, &queueName)
-		if err != nil {
-			return fmt.Errorf("could not retrieve queue shard to re-enqueue eager cancellation for prolonged start timeout:%w", err)
-		}
-
-		// Retrieve queueItem
-		qi, err := qm.LoadQueueItem(ctx, shard.Name, c.ID.String())
-		if err != nil {
-			if errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				return nil
-			}
-			return fmt.Errorf("could not load queue item: %w", err)
-		}
-		err = qm.Requeue(ctx, shard, *qi, jobEnqueuedAt.Add(*timeout))
+		err = qm.Enqueue(ctx, item, jobEnqueuedAt.Add(*timeout), queue.EnqueueOpts{})
 		if err != nil {
 			return err
 		}
