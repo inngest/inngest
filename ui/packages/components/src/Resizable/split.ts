@@ -1,14 +1,13 @@
 'use client';
 
-/**
- * Split utilities
- *
- * We distinguish between the "current" split and the "stored" split:
- * - Current split is applied directly to a CSS variable for instant, jank-free updates during drag.
- *   Reading/writing React state or localStorage on every mousemove would be too slow.
- * - Stored split is persisted (eg. in localStorage) when interaction ends so layouts are restored later.
- */
 import type { Orientation } from './types';
+
+/*
+ * We distinguish between the "current" split and the "stored" split:
+ * - Current split is applied directly to a CSS variable for instant updates during drag.
+ *   - Reading/writing React state or localStorage on every mousemove would be too slow.
+ * - Stored split is persisted (in localStorage) when interaction ends so layouts are restored later.
+ */
 
 export const SPLIT_CSS_VAR = '--split';
 
