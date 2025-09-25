@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import type React from 'react';
 
 import { cn } from '../utils/classNames';
-import { makeOnMove, readCurrentSplit, writeStoredSplit } from './split';
+import { addSplitListeners, makeOnMove, makeOnStopDrag } from './split';
 import type { Orientation } from './types';
 
 type NotchProps = {
@@ -22,33 +22,24 @@ export function Notch({
   orientation,
   splitKey,
 }: NotchProps) {
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       e.preventDefault();
 
       const el = containerRef.current;
       if (el === null) return;
 
       const onMove = makeOnMove(el, { minSplitPercentage, maxSplitPercentage, orientation });
+      const onStop = makeOnStopDrag({
+        el,
+        maxSplitPercentage,
+        minSplitPercentage,
+        onMove,
+        orientation,
+        splitKey,
+      });
 
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener(
-        'mouseup',
-        () => {
-          window.removeEventListener('mousemove', onMove);
-
-          if (splitKey) {
-            const n = readCurrentSplit(el);
-            if (n === null) return;
-
-            writeStoredSplit(
-              splitKey,
-              Math.max(minSplitPercentage, Math.min(maxSplitPercentage, n))
-            );
-          }
-        },
-        { once: true }
-      );
+      addSplitListeners(onMove, onStop);
     },
     [containerRef, maxSplitPercentage, minSplitPercentage, orientation, splitKey]
   );
@@ -60,7 +51,7 @@ export function Notch({
         buildCrossAxisSizeClass(orientation),
         buildTrackClasses(orientation)
       )}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <div
         className={cn(

@@ -28,12 +28,62 @@ export function computeSplitPercentageFromEvent(
     : ((ev.clientX - r.left) / r.width) * 100;
 }
 
-export function makeOnMove(el: HTMLElement, options: OnMoveOptions): (ev: MouseEvent) => void {
+export function makeOnMove(el: HTMLElement, options: OnMoveOptions): (ev: PointerEvent) => void {
   const { maxSplitPercentage, minSplitPercentage, orientation } = options;
 
-  return (ev: MouseEvent) => {
+  return (ev: PointerEvent) => {
     const pct = computeSplitPercentageFromEvent(el, ev, orientation);
     writeCurrentSplit(el, clamp(pct, minSplitPercentage, maxSplitPercentage));
+  };
+}
+
+export function addSplitListeners(
+  onMove: (ev: PointerEvent) => void,
+  onStop: (ev: Event) => void
+): void {
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onStop);
+  window.addEventListener('pointercancel', onStop);
+  window.addEventListener('blur', onStop);
+  window.addEventListener('contextmenu', onStop);
+}
+
+export function removeSplitListeners(
+  onMove: (ev: PointerEvent) => void,
+  onStop: (ev: Event) => void
+): void {
+  window.removeEventListener('pointermove', onMove);
+  window.removeEventListener('pointerup', onStop);
+  window.removeEventListener('pointercancel', onStop);
+  window.removeEventListener('blur', onStop);
+  window.removeEventListener('contextmenu', onStop);
+}
+
+type StopDragOptions = {
+  el: HTMLElement;
+  maxSplitPercentage: number;
+  minSplitPercentage: number;
+  onMove: (ev: PointerEvent) => void;
+  orientation: Orientation;
+  splitKey?: string;
+};
+
+export function makeOnStopDrag({
+  el,
+  maxSplitPercentage,
+  minSplitPercentage,
+  onMove,
+  splitKey,
+}: StopDragOptions) {
+  return function onStop() {
+    removeSplitListeners(onMove, onStop);
+
+    if (splitKey) {
+      const n = readCurrentSplit(el);
+      if (n === null) return;
+
+      writeStoredSplit(splitKey, clamp(n, minSplitPercentage, maxSplitPercentage));
+    }
   };
 }
 
