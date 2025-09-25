@@ -30,8 +30,7 @@ export function Notch({
       if (el === null) return;
 
       const onMove = makeOnMove(el, { minSplitPercentage, maxSplitPercentage, orientation });
-      const onStop = makeOnStopDrag({
-        el,
+      const onStop = makeOnStopDrag(el, {
         maxSplitPercentage,
         minSplitPercentage,
         onMove,
