@@ -11,4 +11,8 @@ const (
 	CancellationKindRun
 	// CancellationKindBacklog represents a backlog that needs to be cancelled
 	CancellationKindBacklog
+	// CancellationKindStartTimeout represents a single timed out run to be cancelled.
+	CancellationKindStartTimeout
+	// CancellationKindFinishTimeout represents a single timed out run to be cancelled.
+	CancellationKindFinishTimeout
 )

@@ -496,6 +496,10 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	}
 
 	switch c.Kind {
+	case enums.CancellationKindStartTimeout:
+		return s.handleEagerCancelStartTimeout(ctx, c)
+	case enums.CancellationKindFinishTimeout:
+		return s.handleEagerCancelFinishTimeout(ctx, c)
 	case enums.CancellationKindRun:
 		return s.handleEagerCancelRun(ctx, c)
 	case enums.CancellationKindBulkRun:
@@ -505,6 +509,157 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	default:
 		return fmt.Errorf("unhandled cancellation kind: %s", c.Kind)
 	}
+}
+
+func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation) error {
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+		"target_run_id", c.TargetID)
+
+	runID, err := ulid.Parse(c.TargetID)
+	if err != nil {
+		l.Error("invalid runID provided for cancellation", "error", err)
+		return fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	// Get the most recent function state
+	fn, err := s.findFunctionByID(ctx, c.FunctionID)
+	if err != nil {
+		return err
+	}
+
+	if fn.Timeouts == nil || fn.Timeouts.Finish == nil {
+		// timeout was removed. do nothing
+		return nil
+	}
+
+	timeout := fn.Timeouts.FinishDuration()
+	if timeout == nil || *timeout <= 0 {
+		// timeout was removed. do nothing
+		return nil
+	}
+
+	// Get the metadata to check if the run has started.
+	metadata, err := s.state.Metadata(ctx, consts.DevServerAccountID, runID)
+	if err != nil && (errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound)) {
+		// already gone, do nothing
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error loading metadata for cancellation: %w", err)
+	}
+
+	jobStarteddAt := metadata.StartedAt
+	timeSinceStart := time.Since(jobStarteddAt)
+	if timeSinceStart > *timeout {
+		// cancel the run
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.FunctionID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
+		}
+		l.Trace("Running eager cancellation for finish timeout", "run_id", c.TargetID)
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	}
+
+	// TODO: reenqueue the cancellation for later time?
+	return nil
+
+}
+
+func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation) error {
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+		"target_run_id", c.TargetID)
+
+	runID, err := ulid.Parse(c.TargetID)
+	if err != nil {
+		l.Error("invalid runID provided for cancellation", "error", err)
+		return fmt.Errorf("error parsing runID: %w", err)
+	}
+	// Get the most recent function state
+	fn, err := s.findFunctionByID(ctx, c.FunctionID)
+	if err != nil {
+		return err
+	}
+
+	if fn.Timeouts == nil || fn.Timeouts.Start == nil {
+		// timeout was removed. do nothing.
+		return nil
+	}
+
+	timeout := fn.Timeouts.StartDuration()
+	if timeout == nil || *timeout <= 0 {
+		l.Error("HULU: no timeout when processing eager cancellation, bye")
+		// timeout was removed. do nothing.
+		return nil
+	}
+
+	// Get the metadata to check if the run has started.
+	metadata, err := s.state.Metadata(ctx, consts.DevServerAccountID, runID)
+	if err != nil && (errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound)) {
+		// already gone.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error loading metadata for cancellation: %w", err)
+	}
+
+	jobEnqueuedAt := ulid.Time(runID.Time())
+	timeSinceEnqueue := time.Since(jobEnqueuedAt)
+	if timeSinceEnqueue > *timeout {
+		// cancel the run if it hasn't started yet.
+		if metadata.StartedAt.IsZero() {
+			id := sv2.ID{
+				RunID:      runID,
+				FunctionID: c.FunctionID,
+				Tenant: sv2.Tenant{
+					AccountID: c.AccountID,
+					EnvID:     c.WorkspaceID,
+					AppID:     c.AppID,
+				},
+			}
+			l.Trace("Running eager cancellation for start timeout", "run_id", c.TargetID)
+			return s.exec.Cancel(ctx, id, execution.CancelRequest{
+				CancellationID: &c.ID,
+			})
+		}
+	} else {
+		// timeout was extended, requeue eager cancellation.
+		qm, ok := s.queue.(redis_state.QueueManager)
+		if !ok {
+			l.Error("queue does not conform to queue manager")
+			return nil
+		}
+		// Retrieve current queue shard.
+		queueName := queue.KindCancel
+		shard, err := s.shardSelector(ctx, c.AccountID, &queueName)
+		if err != nil {
+			return fmt.Errorf("could not retrieve queue shard to re-enqueue eager cancellation for prolonged start timeout:%w", err)
+		}
+
+		// Retrieve queueItem
+		qi, err := qm.LoadQueueItem(ctx, shard.Name, c.ID.String())
+		if err != nil {
+			if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+				return nil
+			}
+			return fmt.Errorf("could not load queue item: %w", err)
+		}
+		err = qm.Requeue(ctx, shard, *qi, jobEnqueuedAt.Add(*timeout))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
