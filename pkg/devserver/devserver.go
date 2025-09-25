@@ -37,6 +37,7 @@ import (
 	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
+	"github.com/inngest/inngest/pkg/devserver/devutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -408,6 +409,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
 	}))
 
+	url := opts.Config.CoreAPI.Addr
+	if url == "0.0.0.0" {
+		url = "127.0.0.1"
+	}
+
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -458,7 +464,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
-			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port),
+			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tracer),
 	)
@@ -506,32 +512,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
-	devAPI.Route("/v1", func(r chi.Router) {
-		// Add the V1 API to our dev server API.
-		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
-		caching := apiv1.NewCacheMiddleware(cache)
-
-		apiv1.AddRoutes(r, apiv1.Opts{
-			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
-			CachingMiddleware:  caching,
-			FunctionReader:     ds.Data,
-			FunctionRunReader:  ds.Data,
-			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
-			Executor:           ds.Executor,
-			Queue:              rq,
-			QueueShardSelector: shardSelector,
-			Broadcaster:        broadcaster,
-			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
-			TraceReader:        ds.Data,
-
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tracer,
-			State:           smv2,
-		})
-	})
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -559,6 +539,35 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return err
 	}
+
+	devAPI.Route("/v1", func(r chi.Router) {
+		// Add the V1 API to our dev server API.
+		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
+		caching := apiv1.NewCacheMiddleware(cache)
+
+		apiv1.AddRoutes(r, apiv1.Opts{
+			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
+			CachingMiddleware:  caching,
+			FunctionReader:     ds.Data,
+			FunctionRunReader:  ds.Data,
+			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
+			Executor:           ds.Executor,
+			Queue:              rq,
+			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
+			TraceReader:        ds.Data,
+
+			AppCreator:      dbcqrs,
+			FunctionCreator: dbcqrs,
+			EventPublisher:  runner,
+			TracerProvider:  tracer,
+			State:           smv2,
+			RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
+
+			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
+			RunJWTSecret:      consts.DevServerRunJWTSecret,
+		})
+	})
 
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),

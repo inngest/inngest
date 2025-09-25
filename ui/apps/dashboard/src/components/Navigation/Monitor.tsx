@@ -45,6 +45,7 @@ export default function Monitor({
       {isInsightsEnabled && (
         <MenuItem
           href={getNavRoute(activeEnv, 'insights')}
+          beta
           collapsed={collapsed}
           text="Insights"
           icon={<InsightsIcon className="h-[18px] w-[18px]" />}

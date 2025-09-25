@@ -19,6 +19,7 @@ import {
   isFunctionTimeField,
 } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
+import { parseCelSearchError } from '@inngest/components/utils/searchErrorParser';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -42,7 +43,7 @@ export default function Page() {
   );
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(true);
+  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(false);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -97,7 +98,7 @@ export default function Page() {
     [filterApp, filteredStatus, calculatedStartTime, timeField, search, tracesPreviewEnabled]
   );
 
-  const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
+  const { data, error, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['runs'],
     queryFn,
     refetchInterval: autoRefresh ? pollInterval : false,
@@ -110,6 +111,8 @@ export default function Page() {
       return lastPage.pageInfo.endCursor;
     },
   });
+
+  const searchError = parseCelSearchError(error);
 
   useEffect(() => {
     setTotalCount(undefined);
@@ -188,6 +191,7 @@ export default function Page() {
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
+        searchError={searchError}
         infiniteScrollTrigger={
           <InfiniteScrollTrigger
             onIntersect={fetchNextPage}

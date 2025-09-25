@@ -42,7 +42,7 @@ export function Card({
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
       <div
         className={cn(
-          'border-subtle w-full grow overflow-hidden border',
+          'border-subtle min-h-full w-full grow overflow-hidden border',
           contentClass,
           contentClassName
         )}

@@ -1,28 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useStoredQueries } from './StoredQueriesContext';
 
 interface QueryHelperPanelProps {
-  activeTabId: string;
+  activeSavedQueryId?: string;
 }
 
-export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
+export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, queries, querySnapshots } = useStoredQueries();
-
-  const savedQueries = useMemo(() => {
-    return temporarilyWrapData(getOrderedSavedQueries(queries));
-  }, [queries]);
-
-  const orderedQuerySnapshots = useMemo(() => {
-    return temporarilyWrapData(getOrderedQuerySnapshots(querySnapshots));
-  }, [querySnapshots]);
+  const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } = useStoredQueries();
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -35,7 +25,7 @@ export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
           >
             <RiAddCircleFill className="text-primary-intense h-4 w-4" />
             <span className="text-primary-intense ml-2.5 text-sm font-medium leading-tight">
-              New insight
+              New query
             </span>
           </button>
           <button
@@ -49,31 +39,22 @@ export function QueryHelperPanel({ activeTabId }: QueryHelperPanelProps) {
       </div>
       <div className="no-scrollbar flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
         <QueryHelperPanelCollapsibleSection
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={savedQueries}
+          queries={queries}
           title="Saved queries"
           sectionType="saved"
         />
         <QueryHelperPanelCollapsibleSection
-          activeTabId={activeTabId}
+          activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuerySnapshot}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={orderedQuerySnapshots}
+          queries={querySnapshots}
           title="Query history"
           sectionType="history"
         />
       </div>
     </div>
   );
-}
-
-// TODO: Use real error, loading values when data is fetched from the server.
-function temporarilyWrapData<T>(data: T): {
-  data: T;
-  error: undefined;
-  isLoading: boolean;
-} {
-  return { data, error: undefined, isLoading: false };
 }

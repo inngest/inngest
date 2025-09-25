@@ -26,6 +26,8 @@ type ExtractedValues struct {
 	DropSpan *bool
 	EnvID *uuid.UUID
 	EventIDs *[]string
+	EventsInput *string
+	TriggeringEventName *string
 	FunctionID *uuid.UUID
 	FunctionVersion *int
 	RunID *ulid.ULID
@@ -41,6 +43,7 @@ type ExtractedValues struct {
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
+	StepInput *string
 	StepOutput *string
 	StepOutputRef *string
 	StepHasOutput *bool

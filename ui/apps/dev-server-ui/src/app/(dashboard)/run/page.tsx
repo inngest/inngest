@@ -27,7 +27,7 @@ export default function Page() {
         getTrigger={getTrigger}
         pollInterval={pollingFlagReady && pollingDisabled ? 0 : 2500}
         runID={runID}
-        tracesPreviewEnabled={true}
+        tracesPreviewEnabled={false}
       />
     </div>
   );

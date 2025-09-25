@@ -58,10 +58,6 @@ type Producer interface {
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
 }
 
-type Enqueuer interface {
-	EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error)
-}
-
 type Consumer interface {
 	// Run is a blocking function which listens to the queue and executes the
 	// given function each time a new Item becomes available.

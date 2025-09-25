@@ -154,6 +154,13 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, stack)
 	}
 
+	// Always try to capture input
+	if input, err := op.Input(); err == nil {
+		meta.AddAttrIfUnset(rawAttrs, meta.Attrs.StepInput, &input)
+	} else {
+		rawAttrs.AddErr(fmt.Errorf("failed to get step input: %w", err))
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
@@ -262,7 +269,7 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	return rawAttrs
 }
 
-func GatewayResponseAttrs(resp *exechttp.Response, userErr *state.UserError, op state.GeneratorOpcode) *meta.SerializableAttrs {
+func GatewayResponseAttrs(resp *exechttp.Response, userErr *state.UserError, op state.GeneratorOpcode, rawAiResponseBody []byte) *meta.SerializableAttrs {
 	now := time.Now()
 
 	rawAttrs := meta.NewAttrSet(
@@ -296,11 +303,19 @@ func GatewayResponseAttrs(resp *exechttp.Response, userErr *state.UserError, op 
 	} else {
 		status := enums.StepStatusCompleted
 		meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
+
+		// Always try capture output
+		output, err := op.Output()
+		if err == nil {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &output)
+		} else {
+			rawAttrs.AddErr(fmt.Errorf("failed to get step output in gateway response attrs: %w", err))
+		}
 	}
 
-	if op.Op == enums.OpcodeAIGateway {
+	if op.Op == enums.OpcodeAIGateway && rawAiResponseBody != nil {
 		if req, err := op.AIGatewayOpts(); err == nil {
-			if parsed, err := aigateway.ParseOutput(req.Format, op.Data); err == nil {
+			if parsed, err := aigateway.ParseOutput(req.Format, rawAiResponseBody); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.AIResponseMetadata, &parsed)
 			} else {
 				rawAttrs.AddErr(fmt.Errorf("failed to parse AI gateway output: %w", err))

@@ -79,21 +79,18 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		)
 		defer cancel()
 
-		doneCh := make(chan T)
-		errCh := make(chan error)
+		doneCh := make(chan pair[T])
 
 		go func(ctx context.Context) {
 			res, err := f(ctx)
-			if err != nil {
-				errCh <- err
-			}
-			doneCh <- res
+			doneCh <- pair[T]{res: res, err: err}
 		}(ctx)
 
 		// wait for one of the results to come back
 		select {
-		case resp = <-doneCh:
-		case err = <-errCh:
+		case p := <-doneCh:
+			resp = p.res
+			err = p.err
 		case <-ctx.Done():
 			err = ErrCritContextDeadlineExceeded
 		}
@@ -102,4 +99,9 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 	}
 
 	return f(context.WithoutCancel(ctx))
+}
+
+type pair[T any] struct {
+	res T
+	err error
 }

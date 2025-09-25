@@ -35,10 +35,12 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var dynamicSpanID string
 		var functionID string
 		var output any
+		var input any
 		var runID string
 		var debugSessionID string
 		var debugRunID string
 		var status string
+		var eventIdsByt []byte
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -47,6 +49,33 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			if string(attr.Key) == meta.Attrs.StepOutput.Key() {
 				output = attr.Value.AsInterface()
 				continue
+			}
+
+			// If input, extract and store separately
+			// This is always cleaned
+			if string(attr.Key) == meta.Attrs.EventsInput.Key() || string(attr.Key) == meta.Attrs.StepInput.Key() {
+				input = attr.Value.AsInterface()
+				continue
+			}
+
+			if string(attr.Key) == meta.Attrs.EventIDs.Key() {
+				var err error
+				// We store event IDs as a JSON array of strings
+				if eventIdsByt, err = json.Marshal(attr.Value.AsStringSlice()); err != nil {
+					logger.StdlibLogger(ctx).Error("failed to marshal event IDs",
+						"span_id", spanID,
+						"trace_id", traceID,
+						"parent_id", parentID,
+						"name", span.Name(),
+						"start_time", span.StartTime(),
+						"end_time", span.EndTime(),
+						"app_id", appID,
+						"function_id", functionID,
+					)
+				}
+				if cleanAttrs {
+					continue
+				}
 			}
 
 			if string(attr.Key) == meta.Attrs.AccountID.Key() {
@@ -199,6 +228,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			AccountID: accountID,
 			EnvID:     envID,
 			Output:    output,
+			Input:     input,
 			DebugSessionID: sql.NullString{
 				String: debugSessionID,
 				Valid:  debugSessionID != "",
@@ -211,6 +241,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				String: status,
 				Valid:  status != "",
 			},
+			EventIds: string(eventIdsByt),
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to insert span into database",

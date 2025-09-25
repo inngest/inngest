@@ -1,6 +1,6 @@
 'use client';
 
-import { RiAlertLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
+import { RiAlertLine, RiCheckLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
 
 import type { QueryTemplate } from '@/components/Insights/types';
 import { useTabManagerActions } from '../TabManagerContext';
@@ -40,6 +40,11 @@ const TEMPLATE_KIND_CONFIG: Record<
     backgroundColor: 'bg-warning',
     icon: RiAlertLine,
     textColor: 'text-warning',
+  },
+  success: {
+    backgroundColor: 'bg-success',
+    icon: RiCheckLine,
+    textColor: 'text-success',
   },
 };
 

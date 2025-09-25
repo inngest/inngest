@@ -74,11 +74,9 @@ const GetFunctionsDocument = graphql(`
           name
           isPaused
           isArchived
-          current {
-            triggers {
-              type
-              value
-            }
+          triggers {
+            type
+            value
           }
         }
       }
@@ -122,7 +120,7 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          triggers: fn.current?.triggers || [],
+          triggers: fn.triggers,
           usage: undefined,
         };
       }),
@@ -146,17 +144,10 @@ const GetFunctionDocument = graphql(`
         isPaused
         isArchived
         app {
+          externalID
           name
-        }
-        current {
-          triggers {
-            type
-            value
-            condition
-          }
-          deploy {
-            id
-            createdAt
+          latestSync {
+            lastSyncedAt
           }
         }
         triggers {

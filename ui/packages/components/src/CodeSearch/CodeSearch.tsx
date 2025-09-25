@@ -18,7 +18,6 @@ import { isDark } from '../utils/theme';
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 const MAX_HEIGHT = 10 * LINE_HEIGHT;
-const VALIDATION_DELAY = 500;
 
 const EVENT_PATHS = [
   'event.data.',
@@ -98,98 +97,6 @@ function isOperator(str: string): boolean {
   return [...NUMERIC_OPERATORS, ...STRING_OPERATORS].includes(str);
 }
 
-interface ValidationError {
-  message: string;
-  startColumn: number;
-  endColumn: number;
-  lineNumber: number;
-}
-
-function validateExpression(
-  content: string,
-  allowedPaths: readonly EventPath[],
-  preset: keyof typeof EVENT_PATH_PRESETS
-): ValidationError | null {
-  const lines = content.split('\n');
-
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const currentLine = lines[lineIndex] ?? '';
-    const line = currentLine.trim();
-
-    if (!line) continue;
-
-    const parts = line.split(' ').filter((p) => p !== '');
-
-    // Check if the first word is a valid path
-    const firstWord = parts[0];
-    if (!firstWord) continue;
-
-    const startColumn = currentLine.indexOf(firstWord) + 1;
-
-    if (
-      !allowedPaths.includes(firstWord as EventPath) &&
-      !allowedPaths.some((path) => path.endsWith('.') && firstWord.startsWith(path))
-    ) {
-      const availableFields = preset === 'events' ? 'event fields' : 'event or output fields';
-      return {
-        message: `Invalid field: ${firstWord}. Search by ${availableFields}.`,
-        startColumn,
-        endColumn: startColumn + firstWord.length,
-        lineNumber: lineIndex + 1,
-      };
-    }
-
-    // Not enough parts to validate operator and value
-    if (parts.length < 3) continue;
-
-    const operator = parts[1];
-    if (!operator) continue;
-
-    const value = parts.slice(2).join(' ');
-    const valueStartInLine = currentLine.indexOf(value);
-    const valueStartColumn = valueStartInLine + 1;
-
-    // Validate operator
-    const validOperators = getOperatorsForPath(firstWord);
-    if (!validOperators.includes(operator)) {
-      return {
-        message: `Invalid operator for ${firstWord}: ${operator}. Valid operators are: ${validOperators.join(
-          ', '
-        )}`,
-        startColumn: currentLine.indexOf(operator) + 1,
-        endColumn: currentLine.indexOf(operator) + operator.length + 1,
-        lineNumber: lineIndex + 1,
-      };
-    }
-
-    // Validate value type
-    if (firstWord === 'event.id' || firstWord === 'event.name' || firstWord === 'event.v') {
-      const isValidString =
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"));
-
-      if (!isValidString) {
-        return {
-          message: `${firstWord} must be a string`,
-          startColumn: valueStartColumn,
-          endColumn: valueStartColumn + value.length,
-          lineNumber: lineIndex + 1,
-        };
-      }
-    } else if (firstWord === 'event.ts') {
-      if (!/^\d+$/.test(value)) {
-        return {
-          message: `${firstWord} must be an integer`,
-          startColumn: valueStartColumn,
-          endColumn: valueStartColumn + value.length,
-          lineNumber: lineIndex + 1,
-        };
-      }
-    }
-  }
-  return null;
-}
-
 export default function CodeSearch({
   onSearch,
   placeholder,
@@ -209,8 +116,6 @@ export default function CodeSearch({
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<Monaco>();
-  const [editorValidationError, setEditorValidationError] = useState<ValidationError | null>(null);
-  const validationTimerRef = useRef<NodeJS.Timeout>();
 
   const monaco = useMonaco();
 
@@ -339,76 +244,38 @@ export default function CodeSearch({
     }
   };
 
-  const updateMarkers = (error: ValidationError | null) => {
-    if (!editorRef.current || !monacoRef.current) return;
-
-    const model = editorRef.current.getModel();
-    if (!model) return;
-
-    if (error) {
-      const marker: editor.IMarkerData = {
-        severity: monacoRef.current.MarkerSeverity.Error,
-        message: error.message,
-        startLineNumber: error.lineNumber,
-        startColumn: error.startColumn,
-        endLineNumber: error.lineNumber,
-        endColumn: error.endColumn,
-      };
-      monacoRef.current.editor.setModelMarkers(model, 'owner', [marker]);
-      setEditorValidationError(error);
-    } else {
-      monacoRef.current.editor.setModelMarkers(model, 'owner', []);
-      setEditorValidationError(null);
-    }
-  };
-
   const handleReset = () => {
     if (editorRef.current) {
       editorRef.current.setValue('');
       setContent('');
-      updateMarkers(null);
       onSearch('');
     }
   };
 
   const handleSearch = (editorContent?: string) => {
     const updatedContent = editorContent || content;
-    if (!editorValidationError) {
-      // Remove empty lines and trim whitespace
-      const processedContent = updatedContent
-        .split('\n')
-        .filter((line) => line.trim() !== '')
-        .join('\n')
-        .trim();
 
-      onSearch(processedContent);
-    }
+    // Remove empty lines and trim whitespace
+    const processedContent = updatedContent
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .join('\n')
+      .trim();
+
+    onSearch(processedContent);
   };
 
   const handleContentChange = (value: string | undefined) => {
     const newContent = value || '';
     setContent(newContent);
     updateEditorHeight();
-
-    // Clear existing timer
-    if (validationTimerRef.current) {
-      clearTimeout(validationTimerRef.current);
-    }
-
-    // Set new timer for validation
-    validationTimerRef.current = setTimeout(() => {
-      const error = validateExpression(newContent, eventPaths, preset);
-      updateMarkers(error);
-    }, VALIDATION_DELAY);
   };
-
-  const expressionError = editorValidationError || searchError;
 
   return (
     <>
-      {expressionError && (
+      {searchError && (
         <Alert severity="error" className="flex items-center justify-between text-sm">
-          {expressionError.message}
+          {searchError.message}
         </Alert>
       )}
       {monaco && (
@@ -483,7 +350,12 @@ export default function CodeSearch({
         </div>
       )}
       <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
-        <Button onClick={() => handleSearch()} label="Search" size="small" />
+        <Button
+          onClick={() => handleSearch()}
+          label="Search"
+          size="small"
+          data-sentry-id="code-search-search-button"
+        />
         <Button
           onClick={handleReset}
           appearance="ghost"

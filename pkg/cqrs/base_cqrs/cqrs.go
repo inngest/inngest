@@ -152,13 +152,19 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	return allRoots, nil
 }
 
+type IODynamicRef struct {
+	OutputRef string
+	InputRef  string
+}
+
 // Uses generics to accept slices of any type that implements normalizedSpan interface
 func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cqrs.OtelSpan, error) {
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
-	// A map of dynamic span IDs to the specific span ID that contains an output
-	outputDynamicRefs := make(map[string]string)
+	// A map of dynamic span IDs to the specific span ID that contains I/O
+	dynamicRefs := make(map[string]*IODynamicRef)
+
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 
@@ -212,8 +218,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			MarkedAsDropped: false,
 		}
 
-		var outputSpanID *string
-		var fragments []map[string]interface{}
+		var (
+			outputSpanID *string
+			inputSpanID  *string
+			fragments    []map[string]interface{}
+		)
 		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
@@ -235,7 +244,20 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
-					outputDynamicRefs[dynamicSpanID.String] = outputRef
+					if io, ok := dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+						io.OutputRef = outputRef
+					} else {
+						dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
+					}
+				}
+
+				if inputRef, ok := fragment["input_span_id"].(string); ok {
+					inputSpanID = &inputRef
+					if io, ok := dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+						io.InputRef = inputRef
+					} else {
+						dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
+					}
 				}
 			}
 		}
@@ -282,8 +304,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 
 		// If this span has finished, set a preliminary output ID.
-		if outputSpanID != nil && *outputSpanID != "" {
-			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
+		if (outputSpanID != nil && *outputSpanID != "") || (inputSpanID != nil && *inputSpanID != "") {
+			newSpan.OutputID, err = encodeSpanOutputID(outputSpanID, inputSpanID)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
 				return nil, err
@@ -294,22 +316,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	}
 
 	for _, span := range spanMap.AllFromFront() {
-		// If we have an output reference for this span, set the appropriate
-		// target span ID here
-		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
-			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
-				// We've found the span ID that we need to target for
-				// this span. So let's use it!
-				var err error
-				span.OutputID, err = encodeSpanOutputID(targetSpanID)
-				if err != nil {
-					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-					return nil, err
-				}
-			}
-
-		}
-
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
@@ -343,12 +349,17 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-func encodeSpanOutputID(spanID string) (*string, error) {
+func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {
 	p := true
+	osid := ""
+	if outputSpanID != nil {
+		osid = *outputSpanID
+	}
 
 	id := &cqrs.SpanIdentifier{
-		SpanID:  spanID,
-		Preview: &p,
+		SpanID:      osid,
+		InputSpanID: inputSpanID,
+		Preview:     &p,
 	}
 
 	encoded, err := id.Encode()
@@ -1508,29 +1519,47 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve output")
+	ids := []string{}
+	if opts.SpanID != "" {
+		ids = append(ids, opts.SpanID)
+	}
+	if opts.InputSpanID != nil && *opts.InputSpanID != "" {
+		ids = append(ids, *opts.InputSpanID)
 	}
 
-	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
 
 	so := &cqrs.SpanOutput{}
-	var m map[string]any
 
-	so.Data = []byte(fmt.Append(nil, s))
-	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-		if errData, ok := m["error"]; ok {
-			so.IsError = true
-			so.Data, _ = json.Marshal(errData)
-		} else if successData, ok := m["data"]; ok {
-			so.Data, _ = json.Marshal(successData)
-		} else {
-			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+	for _, row := range rows {
+		if row.Input != nil {
+			so.Input = []byte(fmt.Append(nil, row.Input))
+		}
+
+		if row.Output != nil {
+			var m map[string]any
+
+			so.Data = []byte(fmt.Append(nil, row.Output))
+			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+				if errData, ok := m["error"]; ok {
+					so.IsError = true
+					so.Data, _ = json.Marshal(errData)
+				} else if successData, ok := m["data"]; ok {
+					so.Data, _ = json.Marshal(successData)
+				} else {
+					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+
+					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+				}
+			}
 		}
 	}
 
@@ -2534,6 +2563,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			"attributes",
 			"links",
 			"output",
+			"event_ids",
+			"input",
 		).
 		Where(sq.C("dynamic_span_id").In(
 			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
@@ -2566,6 +2597,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		Attributes    *string
 		Links         *string
 		Output        *string
+		EventIDs      *string
+		Input         *string
 	}
 
 	// Group spans by run_id and dynamic_span_id
@@ -2587,6 +2620,8 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			&span.Attributes,
 			&span.Links,
 			&span.Output,
+			&span.EventIDs,
+			&span.Input,
 		)
 		if err != nil {
 			return nil, err
@@ -2622,6 +2657,13 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 					startTime = span.StartTime
 				}
 			}
+
+			// order the spans by start time too so that we process each
+			// update step-by-step as they happened
+			sort.Slice(spans, func(i, j int) bool {
+				return spans[i].StartTime.Before(spans[j].StartTime)
+			})
+
 			runGroups = append(runGroups, runGroup{
 				runID:         runID,
 				dynamicSpanID: dynamicSpanID,
@@ -2669,6 +2711,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		startTime := spans[0].StartTime
 		var endTime *time.Time
 		var status = enums.RunStatusRunning
+		var triggerIDs []string
 
 		for _, span := range spans {
 			if span.StartTime.Before(startTime) {
@@ -2695,6 +2738,17 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
 						status = enums.RunStatusRunning // These are all "in progress" states
 					}
+				}
+			}
+
+			if span.EventIDs != nil && *span.EventIDs != "" {
+				// Event IDs are a stringified JSON array of strings. Unpack
+				// them here.
+				var eids []string
+				if err := json.Unmarshal([]byte(*span.EventIDs), &eids); err == nil {
+					triggerIDs = append(triggerIDs, eids...)
+				} else {
+					l.Debug("invalid event IDs in span", "run_id", span.RunID, "dynamic_span_id", span.DynamicSpanID, "error", err)
 				}
 			}
 		}
@@ -2739,6 +2793,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			Duration:    duration,
 			Status:      status,
 			Cursor:      cursor,
+			TriggerIDs:  triggerIDs,
 		}
 
 		if endTime != nil {

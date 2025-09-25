@@ -338,6 +338,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     spanID
     stepID
     stepOp
+    stepType
     stepInfo {
       __typename
       ... on InvokeStepInfo {

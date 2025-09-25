@@ -1039,20 +1039,51 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 	return items, nil
 }
 
-const getSpanOutput = `-- name: GetSpanOutput :one
+const getSpanOutput = `-- name: GetSpanOutput :many
 SELECT
-  -- input, TODO
+  input,
   output
 FROM spans
-WHERE span_id = ?
-LIMIT 1
+WHERE span_id IN (/*SLICE:ids*/?)
+LIMIT 2
 `
 
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
-	var output interface{}
-	err := row.Scan(&output)
-	return output, err
+type GetSpanOutputRow struct {
+	Input  interface{}
+	Output interface{}
+}
+
+func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
+	query := getSpanOutput
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpanOutputRow
+	for rows.Next() {
+		var i GetSpanOutputRow
+		if err := rows.Scan(&i.Input, &i.Output); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSpansByDebugRunID = `-- name: GetSpansByDebugRunID :many
@@ -1068,7 +1099,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = ?
@@ -1132,7 +1164,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE debug_session_id = ?
@@ -1195,7 +1228,8 @@ SELECT
     'name', name,
     'attributes', attributes,
     'links', links,
-    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = ?
@@ -1748,10 +1782,12 @@ INSERT INTO spans (
   attributes,
   links,
   output,
+  input,
   debug_run_id,
   debug_session_id,
-  status
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  status,
+  event_ids
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
@@ -1770,9 +1806,11 @@ type InsertSpanParams struct {
 	Attributes     interface{}
 	Links          interface{}
 	Output         interface{}
+	Input          interface{}
 	DebugRunID     sql.NullString
 	DebugSessionID sql.NullString
 	Status         sql.NullString
+	EventIds       interface{}
 }
 
 // New
@@ -1793,9 +1831,11 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Attributes,
 		arg.Links,
 		arg.Output,
+		arg.Input,
 		arg.DebugRunID,
 		arg.DebugSessionID,
 		arg.Status,
+		arg.EventIds,
 	)
 	return err
 }

@@ -160,7 +160,6 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
           text="Interact with the chart to see the status and total number of your function runs over a period of time."
           action={
             <Link
-              arrowOnHover
               className="text-sm"
               href="https://www.inngest.com/docs/platform/monitor/observability-metrics#function-status"
               target="_new"
