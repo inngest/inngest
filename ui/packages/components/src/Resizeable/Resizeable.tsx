@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 import { cn } from '../utils/classNames';
 import { Notch } from './Notch';
-import { clamp, updateSplit } from './common';
+import { initializeSplitFromStorage } from './split';
 import type { Orientation } from './types';
 
 export type ResizeableProps = {
@@ -14,6 +14,7 @@ export type ResizeableProps = {
   minSplitPercentage?: number;
   orientation: Orientation;
   second: ReactNode;
+  splitKey?: string;
 };
 
 export function Resizeable({
@@ -23,6 +24,7 @@ export function Resizeable({
   minSplitPercentage = 0,
   orientation,
   second,
+  splitKey,
 }: ResizeableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -30,8 +32,13 @@ export function Resizeable({
     const el = containerRef.current;
     if (el === null) return;
 
-    updateSplit(el, clamp(defaultSplitPercentage, minSplitPercentage, maxSplitPercentage));
-  }, [defaultSplitPercentage, minSplitPercentage, maxSplitPercentage]);
+    initializeSplitFromStorage(el, {
+      defaultSplitPercentage,
+      maxSplitPercentage,
+      minSplitPercentage,
+      splitKey,
+    });
+  }, [defaultSplitPercentage, minSplitPercentage, maxSplitPercentage, splitKey]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
@@ -46,6 +53,7 @@ export function Resizeable({
         maxSplitPercentage={maxSplitPercentage}
         minSplitPercentage={minSplitPercentage}
         orientation={orientation}
+        splitKey={splitKey}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import type React from 'react';
 
 import { cn } from '../utils/classNames';
-import { clamp, updateSplit } from './common';
+import { makeOnMove, readCurrentSplit, writeStoredSplit } from './split';
 import type { Orientation } from './types';
 
 type NotchProps = {
@@ -12,6 +12,7 @@ type NotchProps = {
   maxSplitPercentage: number;
   minSplitPercentage: number;
   orientation: Orientation;
+  splitKey?: string;
 };
 
 export function Notch({
@@ -19,6 +20,7 @@ export function Notch({
   maxSplitPercentage,
   minSplitPercentage,
   orientation,
+  splitKey,
 }: NotchProps) {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -34,11 +36,21 @@ export function Notch({
         'mouseup',
         () => {
           window.removeEventListener('mousemove', onMove);
+
+          if (splitKey) {
+            const n = readCurrentSplit(el);
+            if (n === null) return;
+
+            writeStoredSplit(
+              splitKey,
+              Math.max(minSplitPercentage, Math.min(maxSplitPercentage, n))
+            );
+          }
         },
         { once: true }
       );
     },
-    [containerRef, minSplitPercentage, maxSplitPercentage, orientation]
+    [containerRef, maxSplitPercentage, minSplitPercentage, orientation, splitKey]
   );
 
   return (
@@ -73,21 +85,6 @@ export function Notch({
   );
 }
 
-type OnMoveOptions = {
-  maxSplitPercentage: number;
-  minSplitPercentage: number;
-  orientation: Orientation;
-};
-
-function makeOnMove(el: HTMLElement, options: OnMoveOptions): (ev: MouseEvent) => void {
-  const { maxSplitPercentage, minSplitPercentage, orientation } = options;
-
-  return (ev: MouseEvent) => {
-    const pct = computeSplitPercentageFromEvent(el, ev, orientation);
-    updateSplit(el, clamp(pct, minSplitPercentage, maxSplitPercentage));
-  };
-}
-
 function buildCrossAxisSizeClass(orientation: Orientation): string {
   return orientation === 'vertical' ? 'h-6' : 'w-6';
 }
@@ -108,15 +105,4 @@ function buildTrackClasses(orientation: Orientation): string {
   return orientation === 'vertical'
     ? 'left-0 right-0 top-[var(--split)] -translate-y-1/2 cursor-row-resize'
     : 'top-0 bottom-0 left-[var(--split)] -translate-x-1/2 cursor-col-resize';
-}
-
-function computeSplitPercentageFromEvent(
-  el: HTMLElement,
-  ev: MouseEvent,
-  orientation: Orientation
-): number {
-  const r = el.getBoundingClientRect();
-  return orientation === 'vertical'
-    ? ((ev.clientY - r.top) / r.height) * 100
-    : ((ev.clientX - r.left) / r.width) * 100;
 }
