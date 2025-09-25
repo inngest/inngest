@@ -54,6 +54,10 @@ export function FunctionConfiguration({
   getFunctionLink,
   getBillingUrl,
 }: FunctionConfigurationProps) {
+  if (!inngestFunction.configuration) {
+    return null;
+  }
+
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
 
