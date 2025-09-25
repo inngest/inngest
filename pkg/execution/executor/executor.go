@@ -713,9 +713,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	st, err := e.smv2.Create(ctx, newState)
-	switch err {
-	case nil, state.ErrIdentifierExists: // no-op
-	case state.ErrIdentifierTomestone:
+	switch {
+	case err == nil: // no-op
+	case errors.Is(err, state.ErrIdentifierExists): // no-op
+	case errors.Is(err, state.ErrIdentifierTomestone):
 		return nil, ErrFunctionSkippedIdempotency
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
