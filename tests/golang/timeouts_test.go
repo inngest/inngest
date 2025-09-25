@@ -70,19 +70,18 @@ func TestTimeoutStart(t *testing.T) {
 	// XXX: Hit API to ensure runs have been cancelled here alongside testing counts.
 }
 
-// TestTimeoutStartEagerCancellation ensures that the Timeouts.Start config works correctly.
+// TestTimeoutStartEagerCancellation ensures that eager cancellation for Timeouts.Start config works correctly.
 //
-// In this test, the function has a throttle config of 1 function run every 5 seconds.
-// The function has a start timeout of 7 seconds.
-// We create 4 function runs. This means that last two function runs should BOTH be cancelled IMMEDIATELY after the timeout.
+// In this test, the function has a throttle config of 1 function run every 2 seconds.
+// The function has a start timeout of 5 seconds.
+// We create 10 function runs. This means that last 7 function runs should all be cancelled IMMEDIATELY after the timeout.
+// Without eager cancellation, we would cancel each of the last 7 runs in a just-in-time manner when throttle config allows the run to be scheduled.
 func TestStartTimeoutEagerCancellation(t *testing.T) {
-	ctx := context.Background()
-	c := client.New(t)
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "eager-cancellation-start")
 	defer server.Close()
 
 	trigger := randomSuffix("test/timeouts-start")
-	timeoutStart := 7 * time.Second
+	timeoutStart := 5 * time.Second
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
@@ -90,7 +89,7 @@ func TestStartTimeoutEagerCancellation(t *testing.T) {
 			ID: "eager-cancellation-start",
 			Throttle: &inngestgo.ConfigThrottle{
 				Limit:  1,
-				Period: 5. * time.Second,
+				Period: 2 * time.Second,
 			},
 			Timeouts: &inngestgo.ConfigTimeouts{
 				Start: &timeoutStart,
@@ -105,7 +104,8 @@ func TestStartTimeoutEagerCancellation(t *testing.T) {
 	require.NoError(t, err)
 	registerFuncs()
 
-	for i := 0; i < 4; i++ {
+	numEvents := 10
+	for i := 0; i < numEvents; i++ {
 		go func() {
 			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
@@ -117,34 +117,25 @@ func TestStartTimeoutEagerCancellation(t *testing.T) {
 		}()
 	}
 
-	<-time.After(8 * time.Second)
+	<-time.After(6 * time.Second)
 
-	eventsFilter := models.EventsFilter{
-		EventNames: []string{trigger},
-	}
-	res, err := c.GetEvents(ctx, client.GetEventsOpts{
-		PageSize: 40,
-		Filter:   eventsFilter,
-	})
-	require.NoError(t, err)
-	require.Equal(t, res.TotalCount, 4)
-	var runIDs []string
-	for _, edge := range res.Edges {
-		require.Greater(t, len(edge.Node.Runs), 0)
-		runIDs = append(runIDs, edge.Node.Runs[0].ID.String())
-	}
+	runIDs := getRunIDs(t, trigger, numEvents)
 
 	cancelledRuns := 0
+	ctx := context.Background()
+	c := client.New(t)
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
 		for _, runID := range runIDs {
-			run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{})
-
+			run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+				Timeout:  50 * time.Millisecond,
+				Interval: 10 * time.Millisecond,
+			})
 			require.NotNil(t, run.Trace)
 			if run.Trace.Status == models.RunTraceSpanStatusCancelled.String() {
 				cancelledRuns++
 			}
 		}
-		require.Equal(t, cancelledRuns, 2)
+		require.Equal(t, cancelledRuns, 7)
 	})
 }
 
@@ -242,13 +233,10 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 	// finish timeout is 3 seconds, so the function should be cancelled after the
 	// first step.
 	t.Run("When steps take too long", func(t *testing.T) {
-		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
+		inngestClient, server, registerFuncs := NewSDKHandler(t, "eager-cancellation-finish")
 		defer server.Close()
 
-		var (
-			progressA, progressB, progressC int32
-			stepDuration                    = 10
-		)
+		stepDuration := 10
 
 		trigger := randomSuffix("test/timeouts-finish")
 		timeoutFinish := 3 * time.Second
@@ -256,7 +244,7 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 		_, err := inngestgo.CreateFunction(
 			inngestClient,
 			inngestgo.FunctionOpts{
-				ID: "timeouts-finish",
+				ID: "eager-cancellation-finish",
 				Timeouts: &inngestgo.ConfigTimeouts{
 					Finish: &timeoutFinish,
 				},
@@ -267,19 +255,11 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 
 				_, _ = step.Run(ctx, "a", func(ctx context.Context) (any, error) {
 					<-time.After(time.Duration(stepDuration) * time.Second)
-					atomic.AddInt32(&progressA, 1)
 					return nil, nil
 				})
 
 				_, _ = step.Run(ctx, "b", func(ctx context.Context) (any, error) {
 					<-time.After(time.Duration(stepDuration) * time.Second)
-					atomic.AddInt32(&progressB, 1)
-					return nil, nil
-				})
-
-				_, _ = step.Run(ctx, "c", func(ctx context.Context) (any, error) {
-					<-time.After(time.Duration(stepDuration) * time.Second)
-					atomic.AddInt32(&progressC, 1)
 					return nil, nil
 				})
 
@@ -289,7 +269,8 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 		require.NoError(t, err)
 		registerFuncs()
 
-		for i := 0; i < 10; i++ {
+		numEvents := 10
+		for i := 0; i < numEvents; i++ {
 			go func() {
 				_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 					Name: trigger,
@@ -303,27 +284,17 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 
 		<-time.After(4 * time.Second)
 
-		eventsFilter := models.EventsFilter{
-			EventNames: []string{trigger},
-		}
+		runIDs := getRunIDs(t, trigger, numEvents)
 		ctx := context.Background()
 		c := client.New(t)
-		res, err := c.GetEvents(ctx, client.GetEventsOpts{
-			PageSize: 40,
-			Filter:   eventsFilter,
-		})
-		require.NoError(t, err)
-		require.Equal(t, res.TotalCount, 10)
-		var runIDs []string
-		for _, edge := range res.Edges {
-			require.Greater(t, len(edge.Node.Runs), 0)
-			runIDs = append(runIDs, edge.Node.Runs[0].ID.String())
-		}
 
 		cancelledRuns := 0
 		t.Run("trace run should have appropriate data", func(t *testing.T) {
 			for _, runID := range runIDs {
-				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{})
+				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+					Timeout:  50 * time.Millisecond,
+					Interval: 10 * time.Millisecond,
+				})
 				require.NotNil(t, run.Trace)
 
 				if run.Trace.Status == models.RunTraceSpanStatusCancelled.String() {
@@ -345,4 +316,26 @@ func TestFinishTimeoutEagerCancellationTimeoutIncreased(t *testing.T) {
 
 func TestFinishTimeoutEagerCancellationTimeoutDecreased(t *testing.T) {
 	require.True(t, false)
+}
+
+func getRunIDs(t *testing.T, eventName string, expectedEvts int) []string {
+	t.Helper()
+
+	ctx := context.Background()
+	c := client.New(t)
+	eventsFilter := models.EventsFilter{
+		EventNames: []string{eventName},
+	}
+	res, err := c.GetEvents(ctx, client.GetEventsOpts{
+		PageSize: 40,
+		Filter:   eventsFilter,
+	})
+	require.NoError(t, err)
+	require.Equal(t, res.TotalCount, expectedEvts)
+	var runIDs []string
+	for _, edge := range res.Edges {
+		require.Greater(t, len(edge.Node.Runs), 0)
+		runIDs = append(runIDs, edge.Node.Runs[0].ID.String())
+	}
+	return runIDs
 }
