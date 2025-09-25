@@ -313,7 +313,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
-		if resp != nil && !resp.Retryable() {
+		//
+		// If the error did not come from the response (which is likely the case here)
+		// and is likely a system error we should skip checking if the response is
+		// retryable and always retry.
+		if resp != nil && resp.Err != nil && !resp.Retryable() {
 			return false, nil
 		}
 
