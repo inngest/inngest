@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { redirect, usePathname } from 'next/navigation';
 
 import { pathCreator } from '@/utils/urls';
 
@@ -22,8 +22,7 @@ export default function MarketplaceAccessControl({
 
     if (!isAllowed) {
       // Redirect to usage page if trying to access non-whitelisted page
-      window.location.href = pathCreator.billing({ tab: 'usage' });
-      return null;
+      redirect(pathCreator.billing({ tab: 'usage' }));
     }
   }
 
