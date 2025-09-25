@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Split utilities
  *
@@ -6,7 +8,6 @@
  *   Reading/writing React state or localStorage on every mousemove would be too slow.
  * - Stored split is persisted (eg. in localStorage) when interaction ends so layouts are restored later.
  */
-
 import type { Orientation } from './types';
 
 export const SPLIT_CSS_VAR = '--split';
