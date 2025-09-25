@@ -109,7 +109,7 @@ export function writeStoredSplit(splitKey: string, value: number): void {
   try {
     localStorage.setItem(splitKey, String(value));
   } catch {
-    console.warn('Failed to write stored resizeable split value.');
+    console.warn('Failed to write stored resizable split value.');
   }
 }
 
