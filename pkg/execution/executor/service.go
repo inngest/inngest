@@ -569,9 +569,18 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 		})
 	}
 
-	// TODO: reenqueue the cancellation for later time?
+	// timeout was extended, requeue eager cancellation.
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Error("queue does not conform to queue manager")
+		return nil
+	}
+	err = qm.Enqueue(ctx, item, jobStarteddAt.Add(*timeout), queue.EnqueueOpts{})
+	// Ignore if the system job was already requeued.
+	if err != nil && err != redis_state.ErrQueueItemExists {
+		return err
+	}
 	return nil
-
 }
 
 func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
@@ -613,36 +622,36 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		return fmt.Errorf("error loading metadata for cancellation: %w", err)
 	}
 
+	// start timeout does not affect already started runs.
+	if !metadata.StartedAt.IsZero() {
+		return nil
+	}
 	jobEnqueuedAt := ulid.Time(runID.Time())
 	timeSinceEnqueue := time.Since(jobEnqueuedAt)
 	if timeSinceEnqueue > *timeout {
-		// cancel the run if it hasn't started yet.
-		if metadata.StartedAt.IsZero() {
-			id := sv2.ID{
-				RunID:      runID,
-				FunctionID: c.FunctionID,
-				Tenant: sv2.Tenant{
-					AccountID: c.AccountID,
-					EnvID:     c.WorkspaceID,
-					AppID:     c.AppID,
-				},
-			}
-			l.Trace("Running eager cancellation for start timeout", "run_id", c.TargetID)
-			return s.exec.Cancel(ctx, id, execution.CancelRequest{
-				CancellationID: &c.ID,
-			})
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.FunctionID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
 		}
-	} else {
-		// timeout was extended, requeue eager cancellation.
-		qm, ok := s.queue.(redis_state.QueueManager)
-		if !ok {
-			l.Error("queue does not conform to queue manager")
-			return nil
-		}
-		err = qm.Enqueue(ctx, item, jobEnqueuedAt.Add(*timeout), queue.EnqueueOpts{})
-		if err != nil {
-			return err
-		}
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	}
+	// timeout was extended, requeue eager cancellation.
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Error("queue does not conform to queue manager")
+		return nil
+	}
+	err = qm.Enqueue(ctx, item, jobEnqueuedAt.Add(*timeout), queue.EnqueueOpts{})
+	// Ignore if the system job was already requeued.
+	if err != nil && err != redis_state.ErrQueueItemExists {
+		return err
 	}
 	return nil
 }
