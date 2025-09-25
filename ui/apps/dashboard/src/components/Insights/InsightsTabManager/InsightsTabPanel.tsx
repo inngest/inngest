@@ -54,9 +54,7 @@ export function InsightsTabPanel({
             className="h-full"
             title={<InsightsSQLEditorQueryTitle tab={tab} />}
           >
-            <div className="h-full min-h-0 overflow-hidden">
-              <InsightsSQLEditor />
-            </div>
+            <InsightsSQLEditor />
           </Section>
         }
         orientation="vertical"
@@ -74,9 +72,7 @@ export function InsightsTabPanel({
             className="border-subtle h-full border-t"
             title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
           >
-            <div className="h-full min-h-0 overflow-auto">
-              <InsightsDataTable />
-            </div>
+            <InsightsDataTable />
           </Section>
         }
         splitKey="insights-tab-panel-split-vertical"
