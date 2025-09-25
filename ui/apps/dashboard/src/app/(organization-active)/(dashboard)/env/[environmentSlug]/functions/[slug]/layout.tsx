@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { use, useCallback, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
@@ -27,16 +27,19 @@ const InvokeFunctionDocument = graphql(`
 
 type FunctionLayoutProps = {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     environmentSlug: string;
     slug: string;
-  };
+  }>;
 };
 
-export default function FunctionLayout({
-  children,
-  params: { environmentSlug, slug },
-}: FunctionLayoutProps) {
+export default function FunctionLayout(props: FunctionLayoutProps) {
+  const params = use(props.params);
+
+  const { environmentSlug, slug } = params;
+
+  const { children } = props;
+
   const [invokOpen, setInvokeOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);

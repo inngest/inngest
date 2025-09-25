@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { use } from 'react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -20,11 +20,12 @@ const GetFunctionPauseStateDocument = graphql(`
 `);
 
 type FunctionReplayPageProps = {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 };
-export default function FunctionReplayPage({ params }: FunctionReplayPageProps) {
+export default function FunctionReplayPage(props: FunctionReplayPageProps) {
+  const params = use(props.params);
   const env = useEnvironment();
   const functionSlug = decodeURIComponent(params.slug);
   const [{ data }] = useQuery({

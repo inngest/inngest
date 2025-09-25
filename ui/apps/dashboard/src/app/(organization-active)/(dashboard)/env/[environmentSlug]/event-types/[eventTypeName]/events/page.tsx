@@ -1,10 +1,12 @@
 import EventsPage from '@/components/Events/EventsPage';
 
-export default function Page({
-  params: { environmentSlug: envSlug, eventTypeName },
-}: {
-  params: { environmentSlug: string; eventTypeName: string };
+export default async function Page(props: {
+  params: Promise<{ environmentSlug: string; eventTypeName: string }>;
 }) {
+  const params = await props.params;
+
+  const { environmentSlug: envSlug, eventTypeName } = params;
+
   const decodedEventTypeName = decodeURIComponent(eventTypeName);
   return (
     <>

@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
 import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/Connect';
@@ -11,7 +12,11 @@ import { useSteps } from '@/components/PostgresIntegration/Context';
 import { pathCreator } from '@/utils/urls';
 import { verifyAutoSetup, verifyCredentials, verifyLogicalReplication } from './actions';
 
-export default function NeonStep({ params: { step } }: { params: { step: string } }) {
+export default function NeonStep(props: { params: Promise<{ step: string }> }) {
+  const params = use(props.params);
+
+  const { step } = params;
+
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
   const router = useRouter();
   const firstStep = STEPS_ORDER[0]!;

@@ -3,11 +3,10 @@ import { auth } from '@clerk/nextjs/server';
 
 import ImpersonationClient from './impersonationClient';
 
-export default async function ImpersonateUsers({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
+export default async function ImpersonateUsers(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const searchParams = await props.searchParams;
   const user = auth();
   const userId = searchParams['user_id'];
 

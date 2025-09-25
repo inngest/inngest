@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
@@ -14,11 +14,11 @@ import { useEventTypeVolume, useEventTypes } from '@/components/EventTypes/useEv
 import SendEventButton from '@/components/Events/SendEventButton';
 import { pathCreator } from '@/utils/urls';
 
-export default function EventTypesPage({
-  params: { environmentSlug: envSlug },
-}: {
-  params: { environmentSlug: string };
-}) {
+export default function EventTypesPage(props0: { params: Promise<{ environmentSlug: string }> }) {
+  const params = use(props0.params);
+
+  const { environmentSlug: envSlug } = params;
+
   const router = useRouter();
   const internalPathCreator = useMemo(() => {
     return {

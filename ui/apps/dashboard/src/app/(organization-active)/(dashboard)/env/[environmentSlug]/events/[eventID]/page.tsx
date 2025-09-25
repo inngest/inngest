@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 
@@ -8,13 +9,14 @@ import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
 
 type Props = {
-  params: {
+  params: Promise<{
     eventID: string;
     environmentSlug: string;
-  };
+  }>;
 };
 
-export default function Page({ params }: Props) {
+export default function Page(props: Props) {
+  const params = use(props.params);
   const eventID = decodeURIComponent(params.eventID);
   const envSlug = params.environmentSlug;
 

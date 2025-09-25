@@ -21,10 +21,11 @@ const signInRedirectErrorMessages = {
 } as const;
 
 type SignInPageProps = {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default function SignInPage({ searchParams }: SignInPageProps) {
+export default async function SignInPage(props: SignInPageProps) {
+  const searchParams = await props.searchParams;
   function hasErrorMessage(error: string): error is keyof typeof signInRedirectErrorMessages {
     return error in signInRedirectErrorMessages;
   }

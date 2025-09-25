@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { use, useCallback, useMemo } from 'react';
 import type { Route } from 'next';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -26,15 +26,16 @@ import StepBacklogChart from './StepBacklogChart';
 import StepsRunningChart from './StepsRunningChart';
 
 type FunctionDashboardProps = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
     slug: string;
-  };
+  }>;
 };
 
 const DEFAULT_TIME = '1d';
 
-export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
+export default function FunctionDashboardPage(props: FunctionDashboardProps) {
+  const params = use(props.params);
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');

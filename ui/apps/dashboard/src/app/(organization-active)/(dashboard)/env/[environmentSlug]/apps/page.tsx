@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
@@ -48,13 +48,18 @@ async function fetchInitialData(): Promise<LoadingState> {
   }
 }
 
-export default function AppsPage({
-  params: { environmentSlug: envSlug },
-  searchParams: { archived },
-}: {
-  params: { environmentSlug: string };
-  searchParams: { archived: string };
+export default function AppsPage(props: {
+  params: Promise<{ environmentSlug: string }>;
+  searchParams: Promise<{ archived: string }>;
 }) {
+  const searchParams = use(props.searchParams);
+
+  const { archived } = searchParams;
+
+  const params = use(props.params);
+
+  const { environmentSlug: envSlug } = params;
+
   const [{ hasProductionApps, isLoading }, setState] = useState<LoadingState>({
     hasProductionApps: true,
     isLoading: true,

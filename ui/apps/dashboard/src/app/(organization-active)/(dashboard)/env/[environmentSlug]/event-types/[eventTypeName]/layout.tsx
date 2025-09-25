@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
 
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
@@ -10,16 +10,19 @@ import { pathCreator } from '@/utils/urls';
 
 type EventLayoutProps = {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     environmentSlug: string;
     eventTypeName: string;
-  };
+  }>;
 };
 
-export default function EventLayout({
-  children,
-  params: { environmentSlug: envSlug, eventTypeName: eventSlug },
-}: EventLayoutProps) {
+export default function EventLayout(props: EventLayoutProps) {
+  const params = use(props.params);
+
+  const { environmentSlug: envSlug, eventTypeName: eventSlug } = params;
+
+  const { children } = props;
+
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
 

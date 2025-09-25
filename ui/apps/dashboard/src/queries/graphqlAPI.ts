@@ -18,7 +18,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
   } else {
     // Need to forward the `Cookie` header for non-Clerk users.
 
-    const allCookies = cookies()
+    const allCookies = (await cookies())
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');

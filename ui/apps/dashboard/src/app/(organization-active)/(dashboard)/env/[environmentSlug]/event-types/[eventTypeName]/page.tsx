@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import NextLink from 'next/link';
 import { useEventTypeVolume } from '@inngest/components/EventTypes/useEventTypeVolume';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -14,15 +15,16 @@ import {
 import LatestLogsList from '@/components/Events/LatestLogsList';
 
 type EventDashboardProps = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
     eventTypeName: string;
-  };
+  }>;
 };
 
 export const runtime = 'nodejs';
 
-export default function EventDashboard({ params }: EventDashboardProps) {
+export default function EventDashboard(props: EventDashboardProps) {
+  const params = use(props.params);
   const eventNameDecoded = decodeURIComponent(params.eventTypeName);
   const { data, isLoading: isLoadingVolume } = useEventTypeVolume(
     eventNameDecoded,
