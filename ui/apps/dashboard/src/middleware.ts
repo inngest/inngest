@@ -22,7 +22,7 @@ const afterAuth = async (
   authMiddleware: ClerkMiddlewareAuth,
   request: NextMiddlewareRequestParam
 ) => {
-  const auth = authMiddleware();
+  const auth = await authMiddleware();
   const isSignedIn = !!auth.userId;
   const isUserSetup = isSignedIn && !!auth.sessionClaims.externalID;
   const hasActiveOrganization = !!auth.orgId;
@@ -60,7 +60,7 @@ const afterAuth = async (
   return NextResponse.next();
 };
 
-export default clerkMiddleware((auth, request) => {
+export default clerkMiddleware(async (auth, request) => {
   const hasJwtCookie = request.cookies.getAll().some((cookie) => {
     // Our non-Clerk JWT is either named "jwt" or "jwt-staging".
     return cookie.name.startsWith('jwt');
@@ -74,12 +74,12 @@ export default clerkMiddleware((auth, request) => {
   // Some clerk-nextjs shenanigans. We must check auth user id before calling
   // auth.protect() below becuase that will always return a 404 by design.
   // https://discord.com/channels/856971667393609759/1021521740800733244/threads/1253004875273338922
-  if (!auth().userId && !isPublicRoute(request)) {
-    return auth().redirectToSignIn();
+  if (!(await auth()).userId && !isPublicRoute(request)) {
+    return (await auth()).redirectToSignIn();
   }
 
   if (!isPublicRoute(request)) {
-    auth().protect();
+    await auth.protect();
     return afterAuth(auth, request);
   }
 });

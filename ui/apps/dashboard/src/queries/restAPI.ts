@@ -8,7 +8,7 @@ const restAPI = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        const { getToken } = auth();
+        const { getToken } = await auth();
         const sessionToken = await getToken();
 
         // TODO: Does this need to be changed for Vercel Marketplace? Vercel

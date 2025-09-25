@@ -25,7 +25,7 @@ export async function getBooleanFlag(
 ): Promise<boolean> {
   const user = await currentUser();
   const clerk = clerkClient();
-  const { orgId } = auth();
+  const { orgId } = await auth();
 
   let organization: Awaited<ReturnType<typeof clerk.organizations.getOrganization>> | undefined;
 

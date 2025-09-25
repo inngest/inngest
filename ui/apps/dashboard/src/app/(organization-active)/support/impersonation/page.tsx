@@ -7,7 +7,7 @@ export default async function ImpersonateUsers(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const searchParams = await props.searchParams;
-  const user = auth();
+  const user = await auth();
   const userId = searchParams['user_id'];
 
   if (!user.userId || !userId) {

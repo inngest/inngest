@@ -6,7 +6,7 @@ import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from '
 import 'server-only';
 
 const requestMiddleware: RequestMiddleware = async (request) => {
-  const { getToken } = auth();
+  const { getToken } = await auth();
   const sessionToken = await getToken();
 
   let headers = request.headers;

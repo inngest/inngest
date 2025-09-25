@@ -88,7 +88,7 @@ const getCustomerId = async (email: string, name?: string) => {
 };
 
 export async function POST(req: Request) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'Please sign in to create a ticket' }, { status: 401 });
   }

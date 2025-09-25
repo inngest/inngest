@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useSession } from '@clerk/nextjs';
 import * as Sentry from '@sentry/nextjs';
 import { authExchange } from '@urql/exchange-auth';
 import { requestPolicyExchange } from '@urql/exchange-request-policy';
@@ -33,7 +33,8 @@ export default function URQLProviderWrapper({ children }: { children: React.Reac
 }
 
 export function URQLProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, signOut } = useAuth();
+  const { signOut, isLoaded } = useAuth();
+  const { session } = useSession();
   const router = useRouter();
 
   const client = useMemo(() => {
@@ -73,7 +74,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
           retryIf: isUnauthenticatedError,
         }),
         authExchange(async (utils) => {
-          let sessionToken = await getToken();
+          let sessionToken = isLoaded && session ? await session.getToken() : null;
           return {
             addAuthToOperation: (operation) => {
               if (!sessionToken) return operation;
@@ -83,14 +84,14 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
             },
             didAuthError: isUnauthenticatedError,
             refreshAuth: async () => {
-              sessionToken = await getToken({ skipCache: true });
+              sessionToken = session ? await session.getToken({ skipCache: true }) : null;
             },
           };
         }),
         fetchExchange,
       ],
     });
-  }, [getToken, router, signOut]);
+  }, [session, isLoaded, router, signOut]);
 
   return <Provider value={client}>{children}</Provider>;
 }

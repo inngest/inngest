@@ -68,7 +68,7 @@ export const getProfile = async (): Promise<ProfileType> => {
     throw new Error('User is not logged in');
   }
 
-  const { orgId } = auth();
+  const { orgId } = await auth();
   return { user, org: orgId ? await getOrg(orgId) : undefined };
 };
 
@@ -78,7 +78,9 @@ export const getOrg = async (organizationId: string): Promise<Organization | und
   }
 
   const orgs = (
-    await clerkClient().organizations.getOrganizationMembershipList({
+    await (
+      await clerkClient()
+    ).organizations.getOrganizationMembershipList({
       organizationId,
     })
   ).data.map((o: OrganizationMembership) => o.organization);
