@@ -1,14 +1,13 @@
 'use client';
 
-/**
- * Split utilities
- *
- * We distinguish between the "current" split and the "stored" split:
- * - Current split is applied directly to a CSS variable for instant, jank-free updates during drag.
- *   Reading/writing React state or localStorage on every mousemove would be too slow.
- * - Stored split is persisted (eg. in localStorage) when interaction ends so layouts are restored later.
- */
 import type { Orientation } from './types';
+
+/*
+ * We distinguish between the "current" split and the "stored" split:
+ * - Current split is applied directly to a CSS variable for instant updates during drag.
+ *   - Reading/writing React state or localStorage on every mousemove would be too slow.
+ * - Stored split is persisted (in localStorage) when interaction ends so layouts are restored later.
+ */
 
 export const SPLIT_CSS_VAR = '--split';
 
@@ -38,6 +37,30 @@ export function makeOnMove(el: HTMLElement, options: OnMoveOptions): (ev: Pointe
   };
 }
 
+type StopDragOptions = {
+  maxSplitPercentage: number;
+  minSplitPercentage: number;
+  onMove: (ev: PointerEvent) => void;
+  orientation: Orientation;
+  splitKey?: string;
+};
+
+export function makeOnStopDrag(
+  el: HTMLElement,
+  { maxSplitPercentage, minSplitPercentage, onMove, splitKey }: StopDragOptions
+) {
+  return function onStop() {
+    removeSplitListeners(onMove, onStop);
+
+    if (splitKey) {
+      const n = readCurrentSplit(el);
+      if (n === null) return;
+
+      writeStoredSplit(splitKey, clamp(n, minSplitPercentage, maxSplitPercentage));
+    }
+  };
+}
+
 export function addSplitListeners(
   onMove: (ev: PointerEvent) => void,
   onStop: (ev: Event) => void
@@ -58,34 +81,6 @@ export function removeSplitListeners(
   window.removeEventListener('pointercancel', onStop);
   window.removeEventListener('blur', onStop);
   window.removeEventListener('contextmenu', onStop);
-}
-
-type StopDragOptions = {
-  el: HTMLElement;
-  maxSplitPercentage: number;
-  minSplitPercentage: number;
-  onMove: (ev: PointerEvent) => void;
-  orientation: Orientation;
-  splitKey?: string;
-};
-
-export function makeOnStopDrag({
-  el,
-  maxSplitPercentage,
-  minSplitPercentage,
-  onMove,
-  splitKey,
-}: StopDragOptions) {
-  return function onStop() {
-    removeSplitListeners(onMove, onStop);
-
-    if (splitKey) {
-      const n = readCurrentSplit(el);
-      if (n === null) return;
-
-      writeStoredSplit(splitKey, clamp(n, minSplitPercentage, maxSplitPercentage));
-    }
-  };
 }
 
 export function readCurrentSplit(el: HTMLElement): number | null {

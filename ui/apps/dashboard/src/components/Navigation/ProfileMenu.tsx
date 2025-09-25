@@ -75,19 +75,18 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </NextLink>
 
-          {!isMarketplace && (
-            <NextLink href={pathCreator.billing()} scroll={false}>
-              <Listbox.Option
-                className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-                value="billing"
-              >
-                <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                  <RiBillLine className="text-muted mr-2 h-4 w-4" />
-                  <div>Billing</div>
-                </div>
-              </Listbox.Option>
-            </NextLink>
-          )}
+          <NextLink href={pathCreator.billing()} scroll={false}>
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="billing"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiBillLine className="text-muted mr-2 h-4 w-4" />
+                <div>Billing</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
+
           <a href="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
