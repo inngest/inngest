@@ -143,10 +143,11 @@ func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
 		Version: 0,
 	}
 
-	// var lastEventID ulid.ULID
 	var lastBatchID string
 	for i := range 10 {
+		// append a new event to the batch
 		bi.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
+
 		res, err := bm.Append(context.Background(), bi, function)
 		require.NoError(t, err)
 		require.NotEmpty(t, res.BatchID)
@@ -159,7 +160,6 @@ func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
 		default:
 			require.Equal(t, enums.BatchAppend, res.Status)
 		}
-		// lastEventID = bi.EventID
 		lastBatchID = res.BatchID
 	}
 
