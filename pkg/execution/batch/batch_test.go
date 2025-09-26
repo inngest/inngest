@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -227,6 +228,65 @@ func TestBatchCleanup(t *testing.T) {
 	bm = NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetCleanupCutoff(0))
 	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
+	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	require.Equal(t, 1, len(r.Keys()))
+}
+
+func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	// Set a large deletion cutoff to keep the eventIDs in the idempotence set.
+	// Set a 5s TLL to ensure that after 5s of inactivity, the key is cleared.
+	bm := NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetTTL(5), WithRedisBatchIdempotenceSetCleanupCutoff(300))
+
+	accountId := uuid.New()
+	fnId := uuid.New()
+
+	res, err := bm.Append(context.Background(), BatchItem{
+		AccountID:  accountId,
+		FunctionID: fnId,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event: event.Event{
+			ID: "test-event",
+		},
+		Version: 0,
+	}, inngest.Function{
+		ID: fnId,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
+	require.NotEmpty(t, res.BatchPointerKey)
+	require.Equal(t, enums.BatchNew, res.Status)
+
+	require.True(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	require.Equal(t, 4, len(r.Keys()))
+
+	// DeleteKeys does not remove items from BatchIdempotenceKey sinc the cutoff is 5m.
+	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
+	require.NoError(t, err)
+	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
+	require.Equal(t, 2, len(r.Keys()))
+
+	// TTL is set to 5s on every append, and the key should be gone after that even without an explicit DeleteKeys call.
+	r.FastForward(6 * time.Second)
 	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.Equal(t, 1, len(r.Keys()))
 }

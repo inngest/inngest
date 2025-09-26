@@ -25,6 +25,7 @@ import (
 const (
 	defaultBatchSizeLimit                = 10 * 1024 * 1024 // 10MiB
 	defaultEventIdempotenceCleanupCutOff = 120              // 120 seconds
+	defaultEventIdempotenceSetTTL        = 1800             // 30 minutes
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -41,6 +42,12 @@ func WithRedisBatchIdempotenceSetCleanupCutoff(l int64) RedisBatchManagerOpt {
 	}
 }
 
+func WithRedisBatchIdempotenceSetTTL(ttl int64) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.idempotenceSetTTL = ttl
+	}
+}
+
 func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.log = l
@@ -53,6 +60,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager
 		q:                                  q,
 		sizeLimit:                          defaultBatchSizeLimit,
 		idempotenceSetCleanupCutoffSeconds: defaultEventIdempotenceCleanupCutOff,
+		idempotenceSetTTL:                  defaultEventIdempotenceSetTTL,
 		log:                                logger.StdlibLogger(context.Background()),
 	}
 
@@ -72,7 +80,9 @@ type redisBatchManager struct {
 	// All event IDs appended to a batch are tracked in a set to ensure idempotence to guard against processsing of duplicate eventIDs.
 	// This cutoff denotes the last X seconds of eventsIDs to keep active in the idempotence set.
 	idempotenceSetCleanupCutoffSeconds int64
-	log                                logger.Logger
+	// Every append call sets the TTL to this value to ensure that after this amount of inactivity, this set gets cleared.
+	idempotenceSetTTL int64
+	log               logger.Logger
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -156,6 +166,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		enums.BatchStatusStarted,
 		b.sizeLimit,
 		nowUnixSeconds,
+		b.idempotenceSetTTL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error preparing batch: %w", err)

@@ -15,6 +15,7 @@ local batchStatusStarted = ARGV[7]
 local batchSizeLimit = tonumber(ARGV[8])
 
 local nowUnixSeconds = tonumber(ARGV[9])
+local idempotenceSetTTL = tonumber(ARGV[10])
 
 -- helper functions
 -- $include(helpers.lua)
@@ -54,6 +55,7 @@ end
 -- check if event has already been appended to this batch
 -- return early with status=exists if this event was already appended.
 local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
+redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
 if newEvent == 0 then
   resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
   return cjson.encode(resp)
