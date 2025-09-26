@@ -354,7 +354,7 @@ export default function CodeSearch({
           onClick={() => handleSearch()}
           label="Search"
           size="small"
-          data-sentry-id="code-search-search-button"
+          data-sentry-component="code-search-search-button"
         />
         <Button
           onClick={handleReset}
