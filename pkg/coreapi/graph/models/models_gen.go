@@ -114,8 +114,7 @@ type DebounceConfiguration struct {
 }
 
 type DebugRun struct {
-	DebugRun *RunTraceSpan `json:"debugRun,omitempty"`
-	RunSteps []*RunStep    `json:"runSteps,omitempty"`
+	DebugTraces []*RunTraceSpan `json:"debugTraces,omitempty"`
 }
 
 type DebugRunQuery struct {
@@ -125,11 +124,25 @@ type DebugRunQuery struct {
 	RunID        *string `json:"runID,omitempty"`
 }
 
+type DebugSession struct {
+	DebugRuns []*DebugSessionRun `json:"debugRuns,omitempty"`
+}
+
 type DebugSessionQuery struct {
 	WorkspaceID    string  `json:"workspaceId"`
 	FunctionSlug   string  `json:"functionSlug"`
 	DebugSessionID *string `json:"debugSessionID,omitempty"`
 	RunID          *string `json:"runID,omitempty"`
+}
+
+type DebugSessionRun struct {
+	Status     RunTraceSpanStatus `json:"status"`
+	QueuedAt   time.Time          `json:"queuedAt"`
+	StartedAt  *time.Time         `json:"startedAt,omitempty"`
+	EndedAt    *time.Time         `json:"endedAt,omitempty"`
+	DebugRunID *ulid.ULID         `json:"debugRunID,omitempty"`
+	Tags       []string           `json:"tags,omitempty"`
+	Versions   []string           `json:"versions,omitempty"`
 }
 
 type Event struct {
@@ -385,6 +398,7 @@ type RunTraceSpan struct {
 	UserlandSpan   *UserlandSpan      `json:"userlandSpan,omitempty"`
 	DebugRunID     *ulid.ULID         `json:"debugRunID,omitempty"`
 	DebugSessionID *ulid.ULID         `json:"debugSessionID,omitempty"`
+	DebugPaused    bool               `json:"debugPaused"`
 }
 
 type RunTraceSpanOutput struct {

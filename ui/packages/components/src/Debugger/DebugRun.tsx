@@ -1,23 +1,34 @@
-import { Trace } from '../RunDetailsV3/Trace';
-import type { RunTraceSpan } from '../SharedContext/useGetDebugRun';
+import type { Trace as TraceType } from '../RunDetailsV3/types';
 import { toMaybeDate } from '../utils/date';
+import { DebugTrace } from './DebugTrace';
 
 type Props = {
-  debugRun: RunTraceSpan;
+  runID: string;
+  debugTraces?: TraceType[];
+  runTrace: TraceType;
 };
 
-export const DebugRun = ({ debugRun }: Props) => {
-  const minTime = new Date(debugRun.queuedAt);
-  const maxTime = toMaybeDate(debugRun.endedAt) ?? new Date();
+export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
+  if (!runID) {
+    console.error('DebugRun component currently requires a runID', runID);
+    return null;
+  }
+
+  //
+  // hrm....what to do about total run time for a debug run where things may be
+  // paused for long periods of time? for now using the original duration
+  const minTime = new Date(runTrace.queuedAt);
+  const maxTime = toMaybeDate(runTrace.endedAt) ?? new Date();
 
   return (
     <div className={`w-full pb-4 pr-8`}>
-      <Trace
+      <DebugTrace
         depth={0}
         maxTime={maxTime}
         minTime={minTime}
-        runID={debugRun.runID}
-        trace={{ ...(debugRun as any), name: 'Debug Run' }}
+        runID={runID}
+        runTrace={runTrace}
+        debugTraces={debugTraces}
       />
     </div>
   );

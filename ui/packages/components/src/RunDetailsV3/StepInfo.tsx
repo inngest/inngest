@@ -32,7 +32,7 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, type StepInfoType } from './utils';
+import { maybeBooleanToString, useStepSelection, type StepInfoType } from './utils';
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
@@ -127,17 +127,19 @@ export const StepInfo = ({
   selectedStep,
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
+  debug = false,
 }: {
   selectedStep: StepInfoType;
-
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
+  debug?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
   const [pollInterval, setPollInterval] = useState(initialPollInterval);
+  const { selectStep } = useStepSelection({ runID });
   const { loading, data: result } = useGetTraceResult({
     traceID: trace.outputID,
     refetchInterval: pollInterval ? pollInterval : undefined,
@@ -193,7 +195,7 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && (!cloud || prettyInput) && (
+        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
           <>
             <Button
               kind="primary"
