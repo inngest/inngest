@@ -163,13 +163,13 @@ func TestBatchAppendIdempotenceDifferentBatches(t *testing.T) {
 		lastBatchID = res.BatchID
 	}
 
-	// append the last batchitem again. Since last batch was full, this event goes to a new batch and ends up getting appended to a batch.
+	// Append the last batchitem again. This should be rejected from the next batch.
 	res, err := bm.Append(context.Background(), bi, function)
 	require.NoError(t, err)
 	require.NotEmpty(t, res.BatchID)
 	require.NotEqual(t, res.BatchID, lastBatchID)
 	require.NotEmpty(t, res.BatchPointerKey)
-	require.Equal(t, enums.BatchNew, res.Status)
+	require.Equal(t, enums.BatchItemExists, res.Status)
 }
 
 func TestBatchCleanup(t *testing.T) {
@@ -211,15 +211,22 @@ func TestBatchCleanup(t *testing.T) {
 	require.True(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
-	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.Equal(t, 4, len(r.Keys()))
 
+	bm = NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetCleanupCutoff(200))
 	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
-	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId, ulid.MustParse(res.BatchID))))
+	require.True(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.True(t, r.Exists(bc.KeyGenerator().BatchPointer(context.Background(), fnId)))
+	require.Equal(t, 2, len(r.Keys()))
+
+	bm = NewRedisBatchManager(bc, nil, WithRedisBatchIdempotenceSetCleanupCutoff(0))
+	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
+	require.NoError(t, err)
+	require.False(t, r.Exists(bc.KeyGenerator().BatchIdempotenceKey(context.Background(), fnId)))
 	require.Equal(t, 1, len(r.Keys()))
 }

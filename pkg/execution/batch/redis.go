@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	defaultBatchSizeLimit = 10 * 1024 * 1024 // 10MiB
+	defaultBatchSizeLimit                = 10 * 1024 * 1024 // 10MiB
+	defaultEventIdempotenceCleanupCutOff = 120              // 120 seconds
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -31,6 +32,12 @@ type RedisBatchManagerOpt func(m *redisBatchManager)
 func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.sizeLimit = l
+	}
+}
+
+func WithRedisBatchIdempotenceSetCleanupCutoff(l int64) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.idempotenceSetCleanupCutoffSeconds = l
 	}
 }
 
@@ -42,10 +49,11 @@ func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 
 func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := redisBatchManager{
-		b:         b,
-		q:         q,
-		sizeLimit: defaultBatchSizeLimit,
-		log:       logger.StdlibLogger(context.Background()),
+		b:                                  b,
+		q:                                  q,
+		sizeLimit:                          defaultBatchSizeLimit,
+		idempotenceSetCleanupCutoffSeconds: defaultEventIdempotenceCleanupCutOff,
+		log:                                logger.StdlibLogger(context.Background()),
 	}
 
 	for _, apply := range opts {
@@ -61,7 +69,10 @@ type redisBatchManager struct {
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
-	log       logger.Logger
+	// All event IDs appended to a batch are tracked in a set to ensure idempotence to guard against processsing of duplicate eventIDs.
+	// This cutoff denotes the last X seconds of eventsIDs to keep active in the idempotence set.
+	idempotenceSetCleanupCutoffSeconds int64
+	log                                logger.Logger
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -131,6 +142,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		batchPointer,
 	}
 
+	nowUnixSeconds := time.Now().Unix()
 	// script args
 	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
 	args, err := redis_state.StrSlice([]any{
@@ -143,6 +155,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
 		b.sizeLimit,
+		nowUnixSeconds,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error preparing batch: %w", err)
@@ -269,10 +282,13 @@ func (b redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID,
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
-		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId, batchID),
 	}
+	nowUnixSeconds := time.Now().Unix()
 
-	args, err := redis_state.StrSlice([]any{})
+	args, err := redis_state.StrSlice([]any{
+		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId),
+		nowUnixSeconds - b.idempotenceSetCleanupCutoffSeconds,
+	})
 	if err != nil {
 		return fmt.Errorf("error constructing batch deletion: %w", err)
 	}

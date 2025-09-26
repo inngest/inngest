@@ -14,6 +14,8 @@ local batchStatusAppending = ARGV[6]
 local batchStatusStarted = ARGV[7]
 local batchSizeLimit = tonumber(ARGV[8])
 
+local nowUnixSeconds = tonumber(ARGV[9])
+
 -- helper functions
 -- $include(helpers.lua)
 
@@ -38,9 +40,9 @@ local resp = { status = "append", batchID = batchID, batchPointerKey = batchPoin
 --   * Batch
 --   * BatchMetadata
 local keyfmt = "%s:batches:%s"
-local idempotenceKeyFmt = "%s:batch_idempotence:%s"
+local idempotenceKeyFmt = "%s:batch_idempotence"
 local batchKey = string.format(keyfmt, prefix, batchID)
-local batchIdempotenceKey = string.format(idempotenceKeyFmt, prefix, batchID)
+local batchIdempotenceKey = string.format(idempotenceKeyFmt, prefix)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
 -- set the batch status if it doesn't exist but don't overwrite
@@ -51,7 +53,7 @@ end
 
 -- check if event has already been appended to this batch
 -- return early with status=exists if this event was already appended.
-local newEvent = redis.call("SADD", batchIdempotenceKey, eventID)
+local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
 if newEvent == 0 then
   resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
   return cjson.encode(resp)
