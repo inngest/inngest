@@ -5,7 +5,7 @@ dev: docs
 # specifically for tests
 .PHONY: run
 run:
-	TEST_MODE=true LOG_LEVEL=trace DEBUG=1 go run ./cmd dev --tick=50 --no-poll --verbose $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=info DEBUG=1 go run ./cmd dev --tick=50 --no-poll --verbose $(PARAMS)
 
 # Start with debug mode in Delve
 .PHONY: debug
