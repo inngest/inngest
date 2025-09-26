@@ -8,6 +8,7 @@ import { BillingBanner } from '@/components/BillingBanner';
 import { ExecutionOverageBanner } from '@/components/ExecutionOverage';
 import { getProfileDisplay } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
+import ScrollControl from './ScrollControl';
 import SideBar from './SideBar';
 
 type LayoutProps = {
@@ -20,7 +21,10 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
   const profile = await getProfileDisplay();
 
   return (
-    <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
+    <div
+      id="layout-scroll-container"
+      className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none"
+    >
       <SideBar activeEnv={activeEnv} collapsed={collapsed} profile={profile} />
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
@@ -36,6 +40,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
 
         {children}
       </div>
+      <ScrollControl containerId="layout-scroll-container" />
     </div>
   );
 }

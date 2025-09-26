@@ -12,6 +12,7 @@ import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/Insights
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
 import type { Tab } from '@/components/Insights/types';
+import { MaximizeChatButton } from '../InsightsChat/header/MaximizeChatButton';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
@@ -20,6 +21,9 @@ type InsightsTabPanelProps = {
   isHomeTab?: boolean;
   isTemplatesTab?: boolean;
   tab: Tab;
+  isChatPanelVisible: boolean;
+  isInsightsAgentEnabled: boolean;
+  onToggleChatPanelVisibility: () => void;
 };
 
 export function InsightsTabPanel({
@@ -27,6 +31,9 @@ export function InsightsTabPanel({
   isHomeTab,
   isTemplatesTab,
   tab,
+  isChatPanelVisible,
+  isInsightsAgentEnabled,
+  onToggleChatPanelVisibility,
 }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
@@ -37,12 +44,18 @@ export function InsightsTabPanel({
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
-    <>
+    <div className="grid h-full w-full grid-rows-[3fr_5fr] gap-0 overflow-hidden">
       <Section
         actions={
           <>
             <InsightsSQLEditorSaveQueryButton tab={tab} />
             <InsightsSQLEditorQueryButton />
+            {isInsightsAgentEnabled && !isChatPanelVisible && (
+              <>
+                <VerticalDivider />
+                <MaximizeChatButton onClick={onToggleChatPanelVisibility} />
+              </>
+            )}
           </>
         }
         className="min-h-[255px]"
@@ -65,6 +78,10 @@ export function InsightsTabPanel({
       >
         <InsightsDataTable />
       </Section>
-    </>
+    </div>
   );
+}
+
+function VerticalDivider() {
+  return <div className="border-subtle mx-1 h-[28px] border-l" />;
 }
