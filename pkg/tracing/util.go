@@ -206,7 +206,7 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 			}
 		}
 
-	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepFailed:
 		{
 			// Output (success or error)
 			if output, err := op.Output(); err == nil {
