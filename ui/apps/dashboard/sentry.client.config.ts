@@ -13,7 +13,7 @@ Sentry.init({
     /^https:\/\/api\.inngest\.net\//, // The staging API origin.
     'localhost', // The local API origin.
   ],
-  replaysSessionSampleRate: 0.0,
+  replaysSessionSampleRate: 0.5,
   replaysOnErrorSampleRate: 1.0,
 });
 
