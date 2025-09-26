@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CancellationKindName = "bulk_runrunbacklog"
+const _CancellationKindName = "bulk_runrunbacklogstart_timeoutfinish_timeout"
 
-var _CancellationKindIndex = [...]uint8{0, 8, 11, 18}
+var _CancellationKindIndex = [...]uint8{0, 8, 11, 18, 31, 45}
 
-const _CancellationKindLowerName = "bulk_runrunbacklog"
+const _CancellationKindLowerName = "bulk_runrunbacklogstart_timeoutfinish_timeout"
 
 func (i CancellationKind) String() string {
 	if i < 0 || i >= CancellationKind(len(_CancellationKindIndex)-1) {
@@ -28,9 +28,11 @@ func _CancellationKindNoOp() {
 	_ = x[CancellationKindBulkRun-(0)]
 	_ = x[CancellationKindRun-(1)]
 	_ = x[CancellationKindBacklog-(2)]
+	_ = x[CancellationKindStartTimeout-(3)]
+	_ = x[CancellationKindFinishTimeout-(4)]
 }
 
-var _CancellationKindValues = []CancellationKind{CancellationKindBulkRun, CancellationKindRun, CancellationKindBacklog}
+var _CancellationKindValues = []CancellationKind{CancellationKindBulkRun, CancellationKindRun, CancellationKindBacklog, CancellationKindStartTimeout, CancellationKindFinishTimeout}
 
 var _CancellationKindNameToValueMap = map[string]CancellationKind{
 	_CancellationKindName[0:8]:        CancellationKindBulkRun,
@@ -39,12 +41,18 @@ var _CancellationKindNameToValueMap = map[string]CancellationKind{
 	_CancellationKindLowerName[8:11]:  CancellationKindRun,
 	_CancellationKindName[11:18]:      CancellationKindBacklog,
 	_CancellationKindLowerName[11:18]: CancellationKindBacklog,
+	_CancellationKindName[18:31]:      CancellationKindStartTimeout,
+	_CancellationKindLowerName[18:31]: CancellationKindStartTimeout,
+	_CancellationKindName[31:45]:      CancellationKindFinishTimeout,
+	_CancellationKindLowerName[31:45]: CancellationKindFinishTimeout,
 }
 
 var _CancellationKindNames = []string{
 	_CancellationKindName[0:8],
 	_CancellationKindName[8:11],
 	_CancellationKindName[11:18],
+	_CancellationKindName[18:31],
+	_CancellationKindName[31:45],
 }
 
 // CancellationKindString retrieves an enum value from the enum constants string name.
