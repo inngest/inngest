@@ -526,6 +526,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	// Get the most recent function state
 	fn, err := s.findFunctionByID(ctx, c.FunctionID)
 	if err != nil {
+		l.Error("error finding most recent function state", "error", err.Error())
 		return err
 	}
 
@@ -547,6 +548,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 		return nil
 	}
 	if err != nil {
+		l.Error("error loading metadata for eager cancellation of finish timeout", "error", err.Error())
 		return fmt.Errorf("error loading metadata for cancellation: %w", err)
 	}
 
@@ -563,7 +565,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 				AppID:     c.AppID,
 			},
 		}
-		l.Trace("Running eager cancellation for finish timeout", "run_id", c.TargetID)
+		l.Trace("Running eager cancellation for finish timeout")
 		return s.exec.Cancel(ctx, id, execution.CancelRequest{
 			CancellationID: &c.ID,
 		})
@@ -575,11 +577,13 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 		l.Error("queue does not conform to queue manager")
 		return nil
 	}
-	err = qm.Enqueue(ctx, item, jobStarteddAt.Add(*timeout), queue.EnqueueOpts{})
+	requeueAt := jobStarteddAt.Add(*timeout)
+	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
 		return err
 	}
+	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
 	return nil
 }
 
@@ -597,6 +601,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	// Get the most recent function state
 	fn, err := s.findFunctionByID(ctx, c.FunctionID)
 	if err != nil {
+		l.Error("error finding most recent function state", "error", err.Error())
 		return err
 	}
 
@@ -607,7 +612,6 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 
 	timeout := fn.Timeouts.StartDuration()
 	if timeout == nil || *timeout <= 0 {
-		l.Error("HULU: no timeout when processing eager cancellation, bye")
 		// timeout was removed. do nothing.
 		return nil
 	}
@@ -619,6 +623,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		return nil
 	}
 	if err != nil {
+		l.Error("error loading metadata for eager cancellation of start timeout", "error", err.Error())
 		return fmt.Errorf("error loading metadata for cancellation: %w", err)
 	}
 
@@ -638,6 +643,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 				AppID:     c.AppID,
 			},
 		}
+		l.Trace("Running eager cancellation for start timeout")
 		return s.exec.Cancel(ctx, id, execution.CancelRequest{
 			CancellationID: &c.ID,
 		})
@@ -648,11 +654,13 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		l.Error("queue does not conform to queue manager")
 		return nil
 	}
-	err = qm.Enqueue(ctx, item, jobEnqueuedAt.Add(*timeout), queue.EnqueueOpts{})
+	requeueAt := jobEnqueuedAt.Add(*timeout)
+	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
 		return err
 	}
+	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)
 	return nil
 }
 
