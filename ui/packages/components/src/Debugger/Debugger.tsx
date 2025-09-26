@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { Button } from '../Button';
 import { RerunModal } from '../Rerun/RerunModal';
 import { StepInfo } from '../RunDetailsV3/StepInfo';
-import { Timeline } from '../RunDetailsV3/Timeline';
 import { useStepSelection } from '../RunDetailsV3/utils';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetDebugRun } from '../SharedContext/useGetDebugRun';
@@ -210,14 +209,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <div>
               {loading || runTraceLoading ? (
                 <Skeleton className="h-24 w-full" />
-              ) : debugRunData?.debugTraces.length && runTraceData && runID ? (
+              ) : runTraceData && runID ? (
                 <DebugRun
                   debugTraces={debugRunData?.debugTraces}
                   runID={runID}
                   runTrace={runTraceData}
                 />
-              ) : runID && runTraceData ? (
-                <Timeline runID={runID} trace={runTraceData} />
               ) : null}
             </div>
           </div>
@@ -267,6 +264,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                   selectedStep={selectedStep}
                   pollInterval={1000}
                   tracesPreviewEnabled={true}
+                  debug={true}
                 />
               )}
             </div>

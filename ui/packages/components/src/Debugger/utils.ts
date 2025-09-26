@@ -1,17 +1,35 @@
 import type { Trace } from '../RunDetailsV3/types';
 
-/**
- * TODO: this can go away when our individual debug traces are complete. Currently
- * they are partial an only contain the step from which the were run onward.
- *
- * This mapper papers over that ^
- */
-export const debugTraceMapper = (runTrace: Trace, debugTraces: Trace[]) => {
-  return debugTraces.map((trace) => {
-    return {
-      ...trace,
-      debugRunID: trace.debugRunID,
-      debugSessionID: trace.debugSessionID,
-    };
-  });
+//
+// A set of helpers to constuct a debug run trace from a set of related debug runs
+// that may contains partials because our run from step traces do not include prior steps.
+// Currently it simply chooses the latest step trace, but it would probably be better to
+// send them all back as well so the UI can show step over step comps.
+
+export const findSpan = (span: Trace, targetStepID: string): Trace | undefined => {
+  if (span.stepID === targetStepID) {
+    return span;
+  }
+  return span.childrenSpans?.reduce<Trace | undefined>(
+    (found, child) => found || findSpan(child, targetStepID),
+    undefined
+  );
 };
+
+export const latestDebugSpan = (originalSpan: Trace, debugRuns: Trace[]): Trace | undefined => {
+  const stepID = originalSpan.stepID;
+  if (!stepID) {
+    return undefined;
+  }
+  return [...debugRuns]
+    .reverse()
+    .reduce<Trace | undefined>((latest, run) => latest || findSpan(run, stepID), undefined);
+};
+
+export const overlayDebugRuns = (original: Trace, debugRuns: Trace[]): Trace => ({
+  ...original,
+  childrenSpans: original.childrenSpans?.map((child) => {
+    const latest = latestDebugSpan(child, debugRuns);
+    return latest ? overlayDebugRuns(latest, debugRuns) : overlayDebugRuns(child, debugRuns);
+  }),
+});

@@ -3,8 +3,8 @@ import { toMaybeDate } from '../utils/date';
 import { DebugTrace } from './DebugTrace';
 
 type Props = {
-  runID?: string;
-  debugTraces: TraceType[];
+  runID: string;
+  debugTraces?: TraceType[];
   runTrace: TraceType;
 };
 
@@ -14,14 +14,11 @@ export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
     return null;
   }
 
-  const latest = debugTraces?.at(-1);
-  if (!latest) {
-    console.error('DebugRun component, no debug runs found', runID);
-    return null;
-  }
-
-  const minTime = new Date(latest.queuedAt);
-  const maxTime = toMaybeDate(latest.endedAt) ?? new Date();
+  //
+  // hrm....what to do about total run time for a debug run where things may be
+  // paused for long periods of time? for now using the original duration
+  const minTime = new Date(runTrace.queuedAt);
+  const maxTime = toMaybeDate(runTrace.endedAt) ?? new Date();
 
   return (
     <div className={`w-full pb-4 pr-8`}>
@@ -30,7 +27,8 @@ export const DebugRun = ({ debugTraces, runTrace, runID }: Props) => {
         maxTime={maxTime}
         minTime={minTime}
         runID={runID}
-        trace={{ ...(latest as any), name: 'Debug Run' }}
+        runTrace={runTrace}
+        debugTraces={debugTraces}
       />
     </div>
   );
