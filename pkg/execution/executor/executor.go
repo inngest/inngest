@@ -514,7 +514,7 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 
 // enqueue a system job in the future for eager cancellation of timed out jobs.
 func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since time.Time, timeout *time.Duration, cancellationKind enums.CancellationKind, id state.Identifier) error {
-	l := logger.StdlibLogger(context.Background()).With("run_id", id.RunID)
+	l := logger.StdlibLogger(context.Background()).With("run_id", id.RunID, "kind", cancellationKind)
 
 	// no timeout or invalid timeout, nothing to do
 	if timeout == nil || *timeout <= 0 {
@@ -537,6 +537,9 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	eagerCancelJobID := fmt.Sprintf("%s-%s:%s", systemJobPrefix, id.WorkflowID, id.IdempotencyKey())
 	queueName := queue.KindCancel
 	maxAttempts := consts.MaxRetries + 1
+
+	l = l.With("systemJobId", eagerCancelJobID, "enqueueAt", enqueueAt)
+
 	// Schedule for async functons (the default)
 	c := cqrs.Cancellation{
 		ID:          ulid.MustNew(ulid.Now(), rand.Reader),
@@ -565,8 +568,10 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	}, enqueueAt, queue.EnqueueOpts{})
 
 	if err != nil && err != redis_state.ErrQueueItemExists {
+		l.Trace("Error enqueueing system job", "error", err.Error())
 		return err
 	}
+	l.Trace("Enqueued system job for eager cancellation of timed out job")
 
 	return nil
 }
@@ -1094,8 +1099,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if md.Config.StartedAt.IsZero() {
 		md.Config.StartedAt = start
 
-		// Add a system job to eager-cancel this function run on timeouts, only if this is a non-batch event.
-		// TODO only if not a batch??
+		// Add a system job to eager-cancel this function run on timeouts
 		if ef.Function.Timeouts != nil && ef.Function.Timeouts.Finish != nil {
 			if err := e.createEagerCancellationForTimeout(ctx, start, ef.Function.Timeouts.FinishDuration(), enums.CancellationKindFinishTimeout, id); err != nil {
 				return nil, err

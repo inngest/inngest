@@ -139,6 +139,8 @@ func TestStartTimeoutEagerCancellation(t *testing.T) {
 	})
 }
 
+// TODO: tests changing the timeout config for queued/ongoing runs
+
 // func TestStartTimeoutEagerCancellationTimeoutRemoved(t *testing.T) {
 // 	require.True(t, false)
 // }
@@ -305,6 +307,8 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 		})
 	})
 }
+
+// TODO: tests changing the timeout config for queued/ongoing runs
 
 // func TestFinishTimeoutEagerCancellationTimeoutRemoved(t *testing.T) {
 // 	require.True(t, false)
