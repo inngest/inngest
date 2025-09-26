@@ -18,6 +18,7 @@ const (
 	OpcodeGateway   // Gateway call
 	OpcodeWaitForSignal
 	OpcodeRunComplete
+	OpcodeStepFailed
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -26,6 +27,7 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeStep:        {},
 	OpcodeStepRun:     {},
 	OpcodeRunComplete: {},
+	OpcodeStepFailed:  {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This

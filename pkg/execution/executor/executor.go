@@ -452,6 +452,66 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
+func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger, idempontenceKey string, evtMap map[string]any, id sv2.ID, req execution.ScheduleRequest) error {
+	for _, c := range req.Function.Cancel {
+		expires := time.Now().Add(consts.CancelTimeout)
+		if c.Timeout != nil {
+			dur, err := str2duration.ParseDuration(*c.Timeout)
+			if err != nil {
+				return fmt.Errorf("error parsing cancel duration: %w", err)
+			}
+			expires = time.Now().Add(dur)
+		}
+
+		// The triggering event ID should be the first ID in the batch.
+		triggeringID := req.Events[0].GetInternalID().String()
+		idSrc := fmt.Sprintf("%s-%s", idempontenceKey, c.Event)
+
+		var expr *string
+		// Evaluate the expression.  This lets us inspect the expression's attributes
+		// so that we can store only the attrs used in the expression in the pause,
+		// saving space, bandwidth, etc.
+		if c.If != nil {
+
+			// Remove `event` data from the expression and replace with actual event
+			// data as values, now that we have the event.
+			//
+			// This improves performance in matching, as we can then use the values within
+			// aggregate trees.
+			interpolated, err := expressions.Interpolate(ctx, *c.If, map[string]any{
+				"event": evtMap,
+			})
+			if err != nil {
+				l.Warn(
+					"error interpolating cancellation expression",
+					"error", err,
+					"expression", expr,
+				)
+			}
+			expr = &interpolated
+			idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
+		}
+
+		// NOTE: making this deterministic so pause creation is also idempotent
+		pauseID := inngest.DeterministicSha1UUID(idSrc)
+		pause := state.Pause{
+			WorkspaceID:       id.Tenant.EnvID,
+			Identifier:        sv2.NewPauseIdentifier(id),
+			ID:                pauseID,
+			Expires:           state.Time(expires),
+			Event:             &c.Event,
+			Expression:        expr,
+			Cancel:            true,
+			TriggeringEventID: &triggeringID,
+		}
+		_, err := e.pm.Write(ctx, pauses.Index{WorkspaceID: req.WorkspaceID, EventName: c.Event}, &pause)
+		if err != nil && err != state.ErrPauseAlreadyExists {
+			return err
+		}
+	}
+	return nil
+}
+
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 //
@@ -735,66 +795,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	//
-	// Create cancellation pauses immediately, only if this is a non-batch event.
-	//
 	if req.BatchID == nil {
-		for _, c := range req.Function.Cancel {
-			expires := time.Now().Add(consts.CancelTimeout)
-			if c.Timeout != nil {
-				dur, err := str2duration.ParseDuration(*c.Timeout)
-				if err != nil {
-					return &metadata, fmt.Errorf("error parsing cancel duration: %w", err)
-				}
-				expires = time.Now().Add(dur)
-			}
 
-			// The triggering event ID should be the first ID in the batch.
-			triggeringID := req.Events[0].GetInternalID().String()
-			idSrc := fmt.Sprintf("%s-%s", key, c.Event)
-
-			var expr *string
-			// Evaluate the expression.  This lets us inspect the expression's attributes
-			// so that we can store only the attrs used in the expression in the pause,
-			// saving space, bandwidth, etc.
-			if c.If != nil {
-
-				// Remove `event` data from the expression and replace with actual event
-				// data as values, now that we have the event.
-				//
-				// This improves performance in matching, as we can then use the values within
-				// aggregate trees.
-				interpolated, err := expressions.Interpolate(ctx, *c.If, map[string]any{
-					"event": evtMap,
-				})
-				if err != nil {
-					l.Warn(
-						"error interpolating cancellation expression",
-						"error", err,
-						"expression", expr,
-					)
-				}
-				expr = &interpolated
-				idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
-			}
-
-			// NOTE: making this deterministic so pause creation is also idempotent
-			pauseID := inngest.DeterministicSha1UUID(idSrc)
-			pause := state.Pause{
-				WorkspaceID:       stv1ID.WorkspaceID,
-				Identifier:        sv2.NewPauseIdentifier(metadata.ID),
-				ID:                pauseID,
-				Expires:           state.Time(expires),
-				Event:             &c.Event,
-				Expression:        expr,
-				Cancel:            true,
-				TriggeringEventID: &triggeringID,
-			}
-			_, err = e.pm.Write(ctx, pauses.Index{WorkspaceID: req.WorkspaceID, EventName: c.Event}, &pause)
-			switch err {
-			case nil, state.ErrPauseAlreadyExists: // no-op
-			default:
-				return &metadata, fmt.Errorf("error saving pause: %w", err)
+		// Create cancellation pauses immediately, only if this is a non-batch event.
+		if len(req.Function.Cancel) > 0 {
+			if err := e.createCancellationPauses(ctx, l, key, evtMap, metadata.ID, req); err != nil {
+				return &metadata, err
 			}
 		}
 	}
@@ -2409,6 +2415,8 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeRunComplete:
 		// TODO: Handle finalization
 		return fmt.Errorf("run complete not implemented")
+	case enums.OpcodeStepFailed:
+		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2569,8 +2577,13 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		return ErrHandledStepError
 	}
 
-	// This was the final step attempt and we still failed.
-	//
+	// This was the final step attempt and we still failed, so we convert the Error to Failed
+	// and use that handler.
+	gen.Op = enums.OpcodeStepFailed
+	return e.handleStepFailed(ctx, runCtx, gen, edge)
+}
+
+func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// First, save the error to our state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -2617,7 +2630,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepError"},
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepFailed"},
 				Metadata:    runCtx.Metadata(),
 				QueueItem:   &nextItem,
 				Parent:      tracing.RunSpanRefFromMetadata(metadata),
@@ -2626,7 +2639,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 		if err != nil {
 			// return fmt.Errorf("error creating span for next step after
 			// StepError: %w", err)
-			e.log.Debug("error creating span for next step after StepError", "error", err)
+			e.log.Debug("error creating span for next step after StepFailed", "error", err)
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
