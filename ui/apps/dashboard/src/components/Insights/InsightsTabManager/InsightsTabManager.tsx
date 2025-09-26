@@ -154,7 +154,7 @@ function InsightsTabManagerInternal({
         onToggleQueryHelperPanelVisibility={onToggleQueryHelperPanelVisibility}
         tabs={tabs}
       />
-      <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
+      <div className="h-full w-full flex-1 overflow-hidden">
         {tabs.map((tab) => (
           <InsightsStateMachineContextProvider
             key={tab.id}
