@@ -47,7 +47,11 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 			}
 
 			sort.Slice(gqlRoots, func(i, j int) bool {
-				return gqlRoots[i].StartedAt.Before(*gqlRoots[j].StartedAt)
+				a, b := gqlRoots[i].StartedAt, gqlRoots[j].StartedAt
+				if a == nil || b == nil {
+					return a == nil && b != nil
+				}
+				return a.Before(*b)
 			})
 
 			res.Data = gqlRoots
@@ -100,7 +104,11 @@ func (tr *traceReader) GetDebugSessionTrace(ctx context.Context, keys dataloader
 				}
 
 				sort.Slice(converted, func(i, j int) bool {
-					return converted[i].StartedAt.Before(*converted[j].StartedAt)
+					a, b := converted[i].StartedAt, converted[j].StartedAt
+					if a == nil || b == nil {
+						return a == nil && b != nil
+					}
+					return a.Before(*b)
 				})
 
 				last := converted[len(converted)-1]

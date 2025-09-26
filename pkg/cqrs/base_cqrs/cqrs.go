@@ -131,16 +131,16 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 		return nil, nil
 	}
 
-	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	spansByDebugSession := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
 	for _, span := range spans {
 		if span.DebugRunID.Valid {
-			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
 		}
 	}
 
 	var allDebugRuns [][]*cqrs.OtelSpan
 
-	for _, runSpans := range spansByDebugRun {
+	for _, runSpans := range spansByDebugSession {
 		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
 		if err != nil {
 			return nil, err
