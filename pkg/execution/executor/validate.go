@@ -180,7 +180,6 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
 		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
-			logger.StdlibLogger(ctx).Error("NETFLIX JIT-CANCELLATION ", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err
 			}
@@ -199,8 +198,8 @@ func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
 		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *r.f.Timeouts.FinishDuration() {
 			return nil
 		}
-		logger.StdlibLogger(ctx).Error(
-			"NETFLIX JIT-CANCELLATION finish timeout reached",
+		logger.StdlibLogger(ctx).Info(
+			"finish timeout reached",
 			"run_id", r.md.ID.RunID,
 			"started_at", started.UTC(),
 			"timeout", r.f.Timeouts.Finish,
