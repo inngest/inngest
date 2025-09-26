@@ -135,6 +135,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
 	args, err := redis_state.StrSlice([]any{
 		config.MaxSize,
+		bi.EventID.String(),
 		bi,
 		newULID,
 		// This is used within the Lua script to create the batch metadata key
@@ -268,6 +269,7 @@ func (b redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID,
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
+		b.b.KeyGenerator().BatchIdempotenceKey(ctx, functionId, batchID),
 	}
 
 	args, err := redis_state.StrSlice([]any{})

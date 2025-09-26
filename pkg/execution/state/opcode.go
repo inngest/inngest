@@ -111,7 +111,7 @@ func (g GeneratorOpcode) Input() (string, error) {
 func (g GeneratorOpcode) Output() (string, error) {
 	// OpcodeStepError MUST always wrap the output in an "error"
 	// field, allowing the SDK to differentiate between an error and data.
-	if g.Op == enums.OpcodeStepError {
+	if g.Op == enums.OpcodeStepError || g.Op == enums.OpcodeStepFailed {
 		byt, err := json.Marshal(map[string]any{"error": g.Error})
 		return string(byt), err
 	}

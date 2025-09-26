@@ -348,7 +348,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
-		case enums.OpcodeStepError:
+		case enums.OpcodeStepError, enums.OpcodeStepFailed:
 			// StepErrors are unique.  Firstly, we must always store traces.  However, if
 			// we retry the step, we move from sync -> async, requiring jobs to be scheduled.
 			//

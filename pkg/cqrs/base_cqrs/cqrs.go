@@ -106,8 +106,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
-
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
@@ -118,10 +117,10 @@ func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID)
 		return nil, nil
 	}
 
-	return mapRootSpansFromRows(ctx, spans)
+	return buildDebugRunSpan(ctx, spans)
 }
 
-func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
@@ -132,24 +131,24 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 		return nil, nil
 	}
 
-	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	spansByDebugSession := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
 	for _, span := range spans {
 		if span.DebugRunID.Valid {
-			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
 		}
 	}
 
-	var allRoots []*cqrs.OtelSpan
+	var allDebugRuns [][]*cqrs.OtelSpan
 
-	for _, runSpans := range spansByDebugRun {
-		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+	for _, runSpans := range spansByDebugSession {
+		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
 		if err != nil {
 			return nil, err
 		}
-		allRoots = append(allRoots, rootSpan)
+		allDebugRuns = append(allDebugRuns, debugRunSpans)
 	}
 
-	return allRoots, nil
+	return allDebugRuns, nil
 }
 
 type IODynamicRef struct {
@@ -368,6 +367,36 @@ func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, err
 	}
 
 	return &encoded, nil
+}
+
+// group by run id, sort by started at, let the frontend handle overlay.
+func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByRunID := make(map[string][]T)
+	for _, span := range spans {
+		runID := span.GetRunID()
+		spansByRunID[runID] = append(spansByRunID[runID], span)
+	}
+
+	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
+	for _, runSpansGroup := range spansByRunID {
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		if err != nil {
+			return nil, err
+		}
+		if runSpan != nil {
+			runSpans = append(runSpans, runSpan)
+		}
+	}
+
+	if len(runSpans) == 0 {
+		return nil, nil
+	}
+
+	return runSpans, nil
 }
 
 func sorter(span *cqrs.OtelSpan) {
@@ -2819,6 +2848,9 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 	// filters
 	filter := []sq.Expression{}
+	//
+	// debug runs are a special kind of run that should not be included in the main runs list
+	filter = append(filter, sq.C("debug_run_id").IsNull())
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}

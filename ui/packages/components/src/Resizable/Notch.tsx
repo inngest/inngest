@@ -66,7 +66,7 @@ export function Notch({
       >
         <div
           className={cn(
-            'bg-surfaceSubtle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full',
+            'bg-surfaceSubtle border-muted absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border',
             buildHandleStripeClasses(orientation)
           )}
         />

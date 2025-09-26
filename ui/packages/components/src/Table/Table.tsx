@@ -31,6 +31,7 @@ type BaseTableProps<T> = {
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
   cellClassName?: string;
+  noHeader?: boolean;
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -50,6 +51,7 @@ export function Table<T>({
   columns,
   expandedIDs = [],
   cellClassName,
+  noHeader = false,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -107,43 +109,45 @@ export function Table<T>({
   return (
     <div className="">
       <table className={cn(tableStyles)}>
-        <thead className={tableHeadStyles}>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="h-9">
-              {headerGroup.headers.map((header) => {
-                const isIconOnlyColumn = header.column.columnDef.header === undefined;
-                return (
-                  <th
-                    key={header.id}
-                    className={cn(
-                      isIconOnlyColumn ? '' : tableColumnStyles,
-                      'text-muted text-nowrap text-left text-xs font-medium'
-                    )}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <div
-                        className={cn(
-                          header.column.getCanSort()
-                            ? 'flex cursor-pointer select-none items-center gap-1'
-                            : header.column.getIsSorted()
-                            ? 'flex items-center gap-1'
-                            : ''
-                        )}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {{
-                          asc: <RiSortAsc className="text-light h-4 w-4" />,
-                          desc: <RiSortDesc className="text-light h-4 w-4" />,
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          ))}
-        </thead>
+        {!noHeader && (
+          <thead className={tableHeadStyles}>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="h-9">
+                {headerGroup.headers.map((header) => {
+                  const isIconOnlyColumn = header.column.columnDef.header === undefined;
+                  return (
+                    <th
+                      key={header.id}
+                      className={cn(
+                        isIconOnlyColumn ? '' : tableColumnStyles,
+                        'text-muted text-nowrap text-left text-xs font-medium'
+                      )}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={cn(
+                            header.column.getCanSort()
+                              ? 'flex cursor-pointer select-none items-center gap-1'
+                              : header.column.getIsSorted()
+                              ? 'flex items-center gap-1'
+                              : ''
+                          )}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {{
+                            asc: <RiSortAsc className="text-light h-4 w-4" />,
+                            desc: <RiSortDesc className="text-light h-4 w-4" />,
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+        )}
         <tbody>
           {isEmpty && (
             <tr>

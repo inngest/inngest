@@ -4,54 +4,44 @@ import { useQuery } from '@tanstack/react-query';
 import type { Trace } from '../RunDetailsV3/types';
 import { useShared } from './SharedContext';
 
-export type GetDebugRunPayload = {
-  functionSlug: string;
-  debugRunID?: string;
-  runID?: string;
+export type GetRunTracePayload = {
+  runID: string;
 };
 
-export type DebugRunData = {
-  debugTraces: Trace[];
-};
-
-export type DebugRunResult = {
+export type GetRunTraceResult = {
   error?: Error;
   loading: boolean;
-  data?: DebugRunData;
+  data?: Trace;
 };
 
-type UseGetDebugRunOptions = {
-  functionSlug?: string;
-  debugRunID?: string;
+type UseGetRunTraceOptions = {
   runID?: string;
   refetchInterval?: number;
   enabled?: boolean;
 };
 
-export const useGetDebugRun = ({
-  functionSlug,
-  debugRunID,
+export const useGetRunTrace = ({
   runID,
   refetchInterval,
   enabled = true,
-}: UseGetDebugRunOptions) => {
+}: UseGetRunTraceOptions) => {
   const shared = useShared();
 
   const queryResult = useQuery({
-    queryKey: ['debugRun', functionSlug, debugRunID, runID],
+    queryKey: ['runTrace', runID],
     queryFn: useCallback(async () => {
-      if (!functionSlug) {
-        console.info('no functionSlug provided, skipping getDebugRun');
+      if (!runID) {
+        console.info('no runID provided, skipping getRunTrace');
         return undefined;
       }
-      const result = await shared.getDebugRun({ functionSlug, debugRunID, runID });
+      const result = await shared.getRunTrace({ runID });
       if (result.error) {
         throw result.error;
       }
       return result.data;
-    }, [shared.getDebugRun, functionSlug, debugRunID, runID]),
+    }, [shared.getRun, runID]),
     refetchInterval,
-    enabled: enabled && !!functionSlug,
+    enabled,
   });
 
   return {

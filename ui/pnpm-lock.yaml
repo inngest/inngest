@@ -523,6 +523,9 @@ importers:
       tailwind-merge:
         specifier: ^1.10.0
         version: 1.10.0
+      ulid:
+        specifier: ^2.3.0
+        version: 2.3.0
       zod:
         specifier: ^3.22.4
         version: 3.22.4
