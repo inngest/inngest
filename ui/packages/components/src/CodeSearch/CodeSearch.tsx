@@ -350,7 +350,12 @@ export default function CodeSearch({
         </div>
       )}
       <div className="bg-codeEditor flex items-center gap-4 py-4 pl-4">
-        <Button onClick={() => handleSearch()} label="Search" size="small" />
+        <Button
+          onClick={() => handleSearch()}
+          label="Search"
+          size="small"
+          data-sentry-id="code-search-search-button"
+        />
         <Button
           onClick={handleReset}
           appearance="ghost"
