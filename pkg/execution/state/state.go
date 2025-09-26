@@ -360,14 +360,6 @@ type StateLoader interface {
 
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (State, error)
-
-	// IsComplete returns whether the given identifier is complete, ie. the
-	// pending count in the identifier's metadata is zero.
-	IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (complete bool, err error)
-
-	// StackIndex returns the index for the given step ID within the function stack of
-	// a given run.
-	StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error)
 }
 
 // FunctionLoader loads function definitions based off of an identifier.
