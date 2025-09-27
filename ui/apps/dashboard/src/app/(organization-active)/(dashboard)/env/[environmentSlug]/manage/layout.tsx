@@ -4,12 +4,16 @@ import ChildEmptyState from './ChildEmptyState';
 
 type ManageLayoutProps = {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     environmentSlug: string;
-  };
+  }>;
 };
 
-export default async function ManageLayout({ children, params }: ManageLayoutProps) {
+export default async function ManageLayout(props: ManageLayoutProps) {
+  const params = await props.params;
+
+  const { children } = props;
+
   const environment = await getEnvironment({
     environmentSlug: params.environmentSlug,
   });

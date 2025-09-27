@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
@@ -12,10 +13,15 @@ const Menu = dynamic(() => import('@/components/Onboarding/Menu'), {
   ssr: false,
 });
 
-export default function Layout({
-  children,
-  params: { environmentSlug: envSlug, step },
-}: React.PropsWithChildren<{ params: { environmentSlug: string; step: string } }>) {
+export default function Layout(
+  props: React.PropsWithChildren<{ params: { environmentSlug: string; step: string } }>
+) {
+  const params = use(props.params);
+
+  const { environmentSlug: envSlug, step } = params;
+
+  const { children } = props;
+
   const router = useRouter();
   if (!isValidStep(step)) {
     router.push(pathCreator.onboarding());

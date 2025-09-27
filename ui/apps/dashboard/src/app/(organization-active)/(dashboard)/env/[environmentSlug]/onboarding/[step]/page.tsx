@@ -1,12 +1,18 @@
 'use client';
 
+import { use } from 'react';
+
 import CreateApp from '@/components/Onboarding/CreateApp';
 import DeployApp from '@/components/Onboarding/DeployApp';
 import InvokeFn from '@/components/Onboarding/InvokeFn';
 import SyncApp from '@/components/Onboarding/SyncApp';
 import { OnboardingSteps } from '@/components/Onboarding/types';
 
-export default function OnboardingStep({ params: { step } }: { params: { step: string } }) {
+export default function OnboardingStep(props: { params: Promise<{ step: string }> }) {
+  const params = use(props.params);
+
+  const { step } = params;
+
   if (step === OnboardingSteps.CreateApp) {
     return <CreateApp />;
   } else if (step === OnboardingSteps.DeployApp) {

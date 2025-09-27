@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { StatusCell } from '@inngest/components/Table/Cell';
@@ -9,12 +10,13 @@ import { formatMilliseconds } from '@inngest/components/utils/date';
 import { useGetReplay } from '@/components/Replay/useGetReplay';
 
 type Props = {
-  params: {
+  params: Promise<{
     replayID: string;
-  };
+  }>;
 };
 
-export default function Page({ params }: Props) {
+export default function Page(props: Props) {
+  const params = use(props.params);
   const replayID = decodeURIComponent(params.replayID);
   const { data: replay, isLoading, error } = useGetReplay(replayID);
   if (!replay && !isLoading) {

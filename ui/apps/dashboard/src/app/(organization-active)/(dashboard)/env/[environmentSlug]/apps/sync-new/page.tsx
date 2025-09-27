@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
@@ -13,12 +14,16 @@ import { setSkipCacheSearchParam } from '@/utils/urls';
 import ManualSync from './ManualSync';
 
 type Props = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
-  };
+  }>;
 };
 
-export default function Page({ params: { environmentSlug } }: Props) {
+export default function Page(props: Props) {
+  const params = use(props.params);
+
+  const { environmentSlug } = params;
+
   const router = useRouter();
   const APPS_URL = setSkipCacheSearchParam(`/env/${environmentSlug}/apps`) as Route;
 

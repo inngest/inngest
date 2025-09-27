@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { FunctionsTable } from '@inngest/components/Functions/FunctionsTable';
@@ -11,11 +11,11 @@ import { FunctionInfo } from '@/components/Functions/FunctionInfo';
 import { useFunctionVolume, useFunctions } from '@/components/Functions/useFunctions';
 import { pathCreator } from '@/utils/urls';
 
-export default function FunctionPage({
-  params: { environmentSlug: envSlug },
-}: {
-  params: { environmentSlug: string };
-}) {
+export default function FunctionPage(props: { params: Promise<{ environmentSlug: string }> }) {
+  const params = use(props.params);
+
+  const { environmentSlug: envSlug } = params;
+
   const router = useRouter();
   const internalPathCreator = useMemo(() => {
     return {

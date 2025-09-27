@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Button } from '@inngest/components/Button/Button';
@@ -17,13 +18,17 @@ import { pathCreator } from '@/utils/urls';
 import { useApp } from './useApp';
 
 type Props = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
     externalID: string;
-  };
+  }>;
 };
 
-export default function Page({ params: { environmentSlug, externalID } }: Props) {
+export default function Page(props: Props) {
+  const params = use(props.params);
+
+  const { environmentSlug, externalID } = params;
+
   const getWorkerCount = useWorkersCount();
   externalID = decodeURIComponent(externalID);
   const env = useEnvironment();

@@ -10,9 +10,9 @@ import Toaster from '@/components/Toaster';
 import type { Environment } from '@/utils/environments';
 
 type RootLayoutProps = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
-  };
+  }>;
   children: ReactNode;
 };
 
@@ -32,10 +32,13 @@ const Env = ({ env, children }: { env?: Environment; children: ReactNode }) =>
     <NotFound />
   );
 
-export default async function RootLayout({
-  params: { environmentSlug },
-  children,
-}: RootLayoutProps) {
+export default async function RootLayout(props: RootLayoutProps) {
+  const params = await props.params;
+
+  const { environmentSlug } = params;
+
+  const { children } = props;
+
   const env = await getEnv(environmentSlug);
 
   return (
