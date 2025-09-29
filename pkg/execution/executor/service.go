@@ -484,11 +484,9 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
-// handleCancel handles eager bulk cancellation
+// handleCancel handles eager cancellation
 //
 // TODO: halt work if a user decides to cancel this cancellation
-//
-// NOTE: this currently doesn't work since there are no CancellationReadWriter in OSS initialized
 func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
@@ -501,10 +499,13 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	case enums.CancellationKindFinishTimeout:
 		return s.handleEagerCancelFinishTimeout(ctx, c, item)
 	case enums.CancellationKindRun:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelRun(ctx, c)
 	case enums.CancellationKindBulkRun:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBulkRun(ctx, c)
 	case enums.CancellationKindBacklog:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBacklog(ctx, c)
 	default:
 		return fmt.Errorf("unhandled cancellation kind: %s", c.Kind)
@@ -578,6 +579,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 		return nil
 	}
 	requeueAt := jobStarteddAt.Add(*timeout)
+	// Note that since we do not set EnqueueOpts.PassthroughJobId here, item will be enqueued as a different job with a new JobID and the current item will be dequeued upon successful processing of this current item.
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
@@ -655,6 +657,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		return nil
 	}
 	requeueAt := jobEnqueuedAt.Add(*timeout)
+	// Note that since we do not set EnqueueOpts.PassthroughJobId here, item will be enqueued as a different job with a new JobID and the current item will be dequeued upon successful processing of this current item.
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
