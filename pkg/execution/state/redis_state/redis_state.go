@@ -1,7 +1,6 @@
 package redis_state
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -437,22 +436,6 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	return nil
 }
 
-func (m shardedMgr) IsComplete(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IsComplete"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-
-	val, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hget().Key(fnRunState.kg.RunMetadata(ctx, isSharded, runID)).Field("status").Build()
-	}).AsBytes()
-	if err != nil {
-		return false, err
-	}
-	return !bytes.Equal(val, []byte("0")), nil
-}
-
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Exists"), redis_telemetry.ScopeFnRunState)
 
@@ -549,24 +532,17 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
 		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, fnID, runID)).Build()
 	}).AsBytes()
-	if err == nil {
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
-		return events, nil
-	}
-
-	// Pre-batch days for backcompat.
-	byt, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, fnID, runID)).Build()
-	}).AsBytes()
 	if err != nil {
 		if err == rueidis.Nil {
 			return nil, state.ErrEventNotFound
 		}
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
-	return []json.RawMessage{byt}, nil
+
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+	}
+	return events, nil
 }
 
 func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (map[string]json.RawMessage, error) {
@@ -688,36 +664,18 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	// Load events.
 	events := []map[string]any{}
-	switch metadata.Version {
-	case 0: // pre-batch days
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if err == rueidis.Nil {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get event; %w", err)
+
+	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
+	}).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, state.ErrEventNotFound
 		}
-		event := map[string]any{}
-		if err := json.Unmarshal(byt, &event); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event; %w", err)
-		}
-		events = []map[string]any{event}
-	default: // current default is 1
-		// Load the batch of events
-		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
-		}).AsBytes()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil, state.ErrEventNotFound
-			}
-			return nil, fmt.Errorf("failed to get batch; %w", err)
-		}
-		if err := json.Unmarshal(byt, &events); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
-		}
+		return nil, fmt.Errorf("failed to get batch; %w", err)
+	}
+	if err := json.Unmarshal(byt, &events); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
 	}
 
 	actions := []state.MemoizedStep{}
@@ -786,29 +744,6 @@ func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.U
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 	return stack, nil
-}
-
-func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, stepID string) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StackIndex"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-
-	r, isSharded := fnRunState.Client(ctx, accountId, runID)
-	stack, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.Stack(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
-	}).AsStrSlice()
-	if err != nil {
-		return 0, err
-	}
-	if len(stack) == 0 {
-		return 0, nil
-	}
-	for n, i := range stack {
-		if i == stepID {
-			return n + 1, nil
-		}
-	}
-	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 
 func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID, marshalledOuptut string) (bool, error) {
@@ -1075,11 +1010,6 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
-
-		// XXX: remove these in a state store refactor.
-		fnRunState.kg.Event(ctx, isSharded, i.WorkflowID, i.RunID),
-		fnRunState.kg.History(ctx, isSharded, i.RunID),
-		fnRunState.kg.Errors(ctx, isSharded, i),
 	}
 
 	performedDeletion := false
@@ -1667,6 +1597,12 @@ func (i *scanIter) fetch(ctx context.Context) error {
 
 		if len(i.vals.Elements) > 0 {
 			return nil
+		}
+
+		// Prevent starting a new iteration, otherwise we risk an infinite loop if the data isn't changing
+		// and we get an empty scan with a 0 cursor which is actually possible in Redis.
+		if i.cursor == 0 {
+			return errScanDone
 		}
 	}
 
