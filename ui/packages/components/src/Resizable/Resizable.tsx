@@ -46,7 +46,7 @@ export function Resizable({
         <div
           className={cn(
             buildPaneMinClass(orientation),
-            'basis-[var(--inngest-resizable-split, 50%)] shrink-0 grow-0'
+            'shrink-0 grow-0 basis-[var(--inngest-resizable-split,50%)]'
           )}
         >
           {first}
