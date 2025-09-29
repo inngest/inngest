@@ -109,6 +109,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: {
       ...commonQueryVars,
       functionRunCursor: null,
+      preview: tracePreviewEnabled,
     },
   });
 
@@ -119,6 +120,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
+      preview: tracePreviewEnabled,
     },
   });
 
