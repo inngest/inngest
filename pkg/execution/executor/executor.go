@@ -3642,7 +3642,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	}
 
 	switch result.Status {
-	case enums.BatchAppend:
+	case enums.BatchAppend, enums.BatchItemExists:
 		// noop
 	case enums.BatchNew:
 		dur, err := time.ParseDuration(fn.EventBatch.Timeout)
