@@ -1668,6 +1668,12 @@ func (i *scanIter) fetch(ctx context.Context) error {
 		if len(i.vals.Elements) > 0 {
 			return nil
 		}
+
+		// Prevent starting a new iteration, otherwise we risk an infinite loop if the data isn't changing
+		// and we get an empty scan with a 0 cursor which is actually possible in Redis.
+		if i.cursor == 0 {
+			return errScanDone
+		}
 	}
 
 	return fmt.Errorf("Scanned max times without finding pause values")
