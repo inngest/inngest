@@ -1,5 +1,5 @@
 schema:
- - "pkg/coreapi/*.graphql"
+  - "pkg/coreapi/*.graphql"
 
 exec:
   filename: pkg/coreapi/generated/generated.go
@@ -53,8 +53,8 @@ models:
         resolver: true
       runs:
         resolver: true
-#      source:
-#        resolver: true
+  #      source:
+  #        resolver: true
   Function:
     fields:
       app:
@@ -103,6 +103,8 @@ models:
     fields:
       totalCount:
         resolver: true
+  RunTraceSpan:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunTraceSpan
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
   HistoryStepType:
