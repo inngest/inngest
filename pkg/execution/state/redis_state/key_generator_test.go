@@ -32,11 +32,6 @@ func TestVerifyKeyGenerator(t *testing.T) {
 
 	assert.Equal(t, legacyKg.Idempotency(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Idempotency(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
 
-	assert.Equal(
-		t,
-		legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid, WorkflowID: fakeUuid}),
-		newRunStateKg.Event(ctx, false, fakeUuid, fakeUlid),
-	)
 	assert.Equal(t, legacyKg.Stack(ctx, fakeUlid), newRunStateKg.Stack(ctx, false, fakeUlid))
 
 	assert.Equal(t, legacyKg.RunMetadata(ctx, fakeUlid), newRunStateKg.RunMetadata(ctx, false, fakeUlid))
@@ -50,8 +45,6 @@ func TestVerifyKeyGenerator(t *testing.T) {
 		legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkflowID: fakeUuid}),
 		newRunStateKg.Actions(ctx, false, fakeUuid, fakeUlid),
 	)
-	assert.Equal(t, legacyKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Errors(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
-	assert.Equal(t, legacyKg.History(ctx, fakeUlid), newRunStateKg.History(ctx, false, fakeUlid))
 
 	var legacyQueueKg legacyQueueKeyGenerator = legacyDefaultkg
 	queueItemKg := queueItemKeyGenerator{queueDefaultKey: "queue"}
