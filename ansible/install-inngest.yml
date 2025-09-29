@@ -1,0 +1,109 @@
+---
+- name: Install and Configure App
+  hosts: all
+  become: true
+  vars:
+    repo_path: "/opt/{{ github_repo }}"
+    git_credentials_path: "/root/.git-credentials"
+  
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install initial dependencies
+      apt:
+        name: 
+          - ca-certificates
+          - curl
+          - python3-pip
+        state: present
+        update_cache: yes
+      when: docker_check.rc != 0
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      when: docker_check.rc != 0
+
+    - name: Add Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+      when: docker_check.rc != 0
+
+    - name: Add Docker repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      when: docker_check.rc != 0
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      when: docker_check.rc != 0
+
+    - name: Check if repository exists
+      stat:
+        path: "{{ repo_path }}"
+      register: repo_check
+
+    - name: Configure Git global settings
+      git_config:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        scope: global
+      loop:
+        - { name: 'credential.helper', value: 'store' }
+        - { name: 'user.name', value: '{{ github_user }}' }
+        - { name: 'user.email', value: '{{ github_email }}' }
+      when: not repo_check.stat.exists
+      environment:
+        HOME: /root
+
+    - name: Setup Git credentials
+      copy:
+        content: "https://{{ github_token }}:x-oauth-basic@github.com"
+        dest: "{{ git_credentials_path }}"
+        mode: '0600'
+      when: not repo_check.stat.exists
+
+    - name: Clone repository
+      git:
+        repo: "https://github.com/{{ github_org }}/{{ github_repo }}.git"
+        dest: "{{ repo_path }}"
+      when: not repo_check.stat.exists
+      environment:
+        HOME: /root
+
+    - name: Copy .env file
+      copy:
+        src: "{{ repo_path }}/.env.example"
+        dest: "{{ repo_path }}/.env"
+        remote_src: yes
+      when: not repo_check.stat.exists
+
+    - name: Install Python Docker module
+      pip:
+        name: docker>=5.0.0
+        state: present
+
+    - name: Start with Docker Compose
+      shell: cd {{ repo_path }} && docker compose up -d
+      when: not repo_check.stat.exists
+
+    - name: Print completion message
+      debug:
+        msg: "Configuração finalizada"
+      when: not repo_check.stat.exists

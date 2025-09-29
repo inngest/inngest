@@ -1,0 +1,7 @@
+---
+# GitHub Configuration
+github_token: "github_pat_"  # Preencher com o token do GitHub
+github_user: "nestiq-negocios-digitais"   # Preencher com o usuário do GitHub
+github_email: "jedyspiti@gmail.com"  # Preencher com o email do GitHub
+github_org: "nestiq-negocios-digitais"    # Preencher com a organização do GitHub
+github_repo: "infra-inngest"   # Preencher com o nome do repositório

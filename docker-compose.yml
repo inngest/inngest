@@ -1,0 +1,67 @@
+services:
+  inngest:
+    build:
+      dockerfile: Dockerfile
+    command: "inngest start"
+    ports:
+      - "8288:8288"
+      - "8289:8289"
+    environment:
+      - INNGEST_EVENT_KEY
+      - INNGEST_SIGNING_KEY
+      - INNGEST_POSTGRES_URI
+      - INNGEST_REDIS_URI
+      - INNGEST_DEV_DASHBOARD_PASSWORD
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - inngest-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8288/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:17
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - inngest-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inngest -d inngest"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - inngest-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  inngest-network:
+    driver: bridge

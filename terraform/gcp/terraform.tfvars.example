@@ -1,0 +1,9 @@
+project_id = "shared-services-1234"
+service_account = "1234-compute@developer.gserviceaccount.com"
+region = "us-central1"
+zone = "us-central1-a"
+
+# Configurações SSH
+ssh_user = "jedy"
+ssh_private_key_path = "~/.ssh/id_rsa_ansible"
+ssh_public_key_path = "~/.ssh/id_rsa_ansible.pub"

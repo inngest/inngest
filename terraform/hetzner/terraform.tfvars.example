@@ -1,0 +1,5 @@
+hcloud_token = "your-hcloud-token"
+server_name = "cx32-server"
+server_location = "fsn1"
+server_image = "ubuntu-22.04"
+ssh_key_path = "~/.ssh/id_rsa_ansible.pub"
