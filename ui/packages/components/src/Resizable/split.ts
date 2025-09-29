@@ -9,7 +9,7 @@ import type { Orientation } from './types';
  * - Stored split is persisted (in localStorage) when interaction ends so layouts are restored later.
  */
 
-export const SPLIT_CSS_VAR = '--split';
+export const SPLIT_CSS_VAR = '--inngest-resizable-split';
 
 export type OnMoveOptions = {
   maxSplitPercentage: number;

@@ -43,7 +43,12 @@ export function Resizable({
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       <div className={cn('flex h-full w-full', buildDirectionClass(orientation))}>
-        <div className={cn(buildPaneMinClass(orientation), 'shrink-0 grow-0 basis-[var(--split)]')}>
+        <div
+          className={cn(
+            buildPaneMinClass(orientation),
+            'basis-[var(--inngest-resizable-split, 50%)] shrink-0 grow-0'
+          )}
+        >
           {first}
         </div>
         <div className={cn(buildPaneMinClass(orientation), 'flex-1')}>{second}</div>

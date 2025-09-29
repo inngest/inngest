@@ -93,6 +93,6 @@ function buildHandleStripeClasses(orientation: Orientation): string {
 
 function buildTrackClasses(orientation: Orientation): string {
   return orientation === 'vertical'
-    ? 'left-0 right-0 top-[var(--split)] -translate-y-1/2 cursor-row-resize'
-    : 'top-0 bottom-0 left-[var(--split)] -translate-x-1/2 cursor-col-resize';
+    ? 'left-0 right-0 top-[var(--inngest-resizable-split, 50%)] -translate-y-1/2 cursor-row-resize'
+    : 'top-0 bottom-0 left-[var(--inngest-resizable-split, 50%)] -translate-x-1/2 cursor-col-resize';
 }
