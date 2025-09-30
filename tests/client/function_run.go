@@ -263,7 +263,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		if !a.NotNil(run) {
 			return
 		}
-		if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+		if opts.Status != "" && !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
 			return
 		}
 
