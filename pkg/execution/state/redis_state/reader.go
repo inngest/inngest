@@ -340,11 +340,22 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 		l = l.With("shadow_partition", spt)
 
-		for {
-			var iterated int
+		// Iterate through backlogs efficiently by:
+		// 1. Loading backlogs in batches based on their earliest item score
+		// 2. For each batch of backlogs, fetch items up to a limit
+		// 3. Advance through time across all relevant backlogs
+		//
+		// This approach ensures we:
+		// - Don't load all backlogs into memory at once (bounded by backlogBatchSize)
+		// - Process items roughly in time order across backlogs
+		// - Eventually cover all backlogs and items within the time range
+		// - Avoid infinite loops by advancing through time and loading new batches
+		const backlogBatchSize = 100 // Load this many backlogs at a time
+		const itemsPerBacklogBatch = 50 // Fetch this many items per backlog per iteration
 
-			// TODO: maybe provide a different limit?
-			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs,
+		for {
+			// Load a batch of backlogs that have items with earliest score >= backlogFrom
+			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, backlogFrom, until, backlogBatchSize,
 				WithPeekOptQueueShard(&shard),
 			)
 			if err != nil {
@@ -355,76 +366,114 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			}
 
 			if len(backlogs) == 0 {
-				l.Warn("no more backlogs to iterate")
+				l.Trace("no more backlogs to iterate")
 				return
 			}
 
-			latestTimes := []time.Time{}
-			for _, backlog := range backlogs {
-				errTags := map[string]string{
-					"backlog_id": backlog.BacklogID,
-				}
+			l.Trace("loaded backlogs for iteration", "count", len(backlogs), "from", backlogFrom.Format(time.StampMilli))
 
-				var last time.Time
-				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize,
-					WithPeekOptQueueShard(&shard),
-				)
-				if err != nil {
-					l.ReportError(err, "error retrieving queue items from backlog",
-						logger.WithErrorReportTags(errTags),
+			// For this batch of backlogs, iterate through items
+			// We'll fetch a small batch from each backlog and advance time
+			backlogIteration := backlogFrom
+			var totalIteratedInBatch int
+
+			for {
+				var iteratedInRound int
+				var minNextTime time.Time
+
+				// Fetch items from each backlog in this batch
+				for _, backlog := range backlogs {
+					errTags := map[string]string{
+						"backlog_id": backlog.BacklogID,
+					}
+
+					items, _, err := q.backlogPeek(ctx, backlog, backlogIteration, until, itemsPerBacklogBatch,
+						WithPeekOptQueueShard(&shard),
 					)
-					return
+					if err != nil {
+						l.ReportError(err, "error retrieving queue items from backlog",
+							logger.WithErrorReportTags(errTags),
+						)
+						continue // Skip this backlog but continue with others
+					}
+
+					var lastTime time.Time
+					for _, qi := range items {
+						if qi == nil {
+							continue
+						}
+
+						if !yield(qi) {
+							return
+						}
+						iteratedInRound++
+						totalIteratedInBatch++
+
+						at := time.UnixMilli(qi.AtMS)
+						lastTime = at
+					}
+
+					// Track the minimum next time across all backlogs
+					// This ensures we advance based on the earliest item we saw
+					if !lastTime.IsZero() {
+						if minNextTime.IsZero() || lastTime.Before(minNextTime) {
+							minNextTime = lastTime
+						}
+					}
 				}
 
-				var start, end time.Time
-				for _, qi := range items {
-					if qi == nil {
-						continue
-					}
-
-					if !yield(qi) {
-						return
-					}
-					iterated++
-
-					at := time.UnixMilli(qi.AtMS)
-					if start.IsZero() {
-						start = at
-					}
-					end = at
-					last = at
-				}
-
-				l.Debug("iterated items in backlog",
-					"count", iterated,
-					"start", start.Format(time.StampMilli),
-					"end", end.Format(time.StampMilli),
+				l.Trace("iterated items in backlog batch",
+					"count", iteratedInRound,
+					"total_in_batch", totalIteratedInBatch,
+					"iteration_time", backlogIteration.Format(time.StampMilli),
 				)
-				latestTimes = append(latestTimes, last)
 
-				// didn't process anything, meaning there's nothing left to do
-				// exit loop
-				if iterated == 0 {
+				// If we didn't iterate anything in this round, we're done with this batch
+				if iteratedInRound == 0 {
+					l.Trace("no more items in current backlog batch")
+					break
+				}
+
+				// Advance time to just after the earliest last item we saw
+				if opt.enableMillisecondIncrease && !minNextTime.IsZero() {
+					// NOTE: this could skip items on the same millisecond, which is acceptable
+					backlogIteration = minNextTime.Add(time.Millisecond)
+				} else if !minNextTime.IsZero() {
+					backlogIteration = minNextTime
+				} else {
+					// No progress made, exit this batch
+					break
+				}
+
+				// If we've advanced past the until time, we're done with this batch
+				if backlogIteration.After(until) {
+					l.Trace("advanced past until time in batch")
+					break
+				}
+
+				// Wait before the next iteration
+				<-time.After(opt.interval)
+			}
+
+			// After processing this batch of backlogs, advance to load the next batch
+			// Set backlogFrom to where we left off so we can get the next set of backlogs
+			if opt.enableMillisecondIncrease {
+				backlogFrom = backlogIteration
+			} else {
+				// If we can't advance, we must exit to avoid infinite loop
+				if totalIteratedInBatch == 0 {
 					return
 				}
+				backlogFrom = backlogIteration
 			}
 
-			// find the earliest time within the last item timestamp of the previously processed backlogs
-			var earliest time.Time
-			for _, t := range latestTimes {
-				if earliest.IsZero() || t.Before(earliest) {
-					earliest = t
-				}
+			// If we've moved past the until time, we're completely done
+			if backlogFrom.After(until) {
+				l.Trace("backlog iteration complete, reached until time")
+				return
 			}
 
-			if opt.enableMillisecondIncrease {
-				// shift the starting point 1ms so it doesn't try to grab the same stuff again
-				// NOTE: this could result skipping items if the previous batch of items are all on
-				// the same millisecond
-				backlogFrom = earliest.Add(time.Millisecond)
-			}
-
-			// wait a little before proceeding
+			// Wait before loading the next batch of backlogs
 			<-time.After(opt.interval)
 		}
 	}, nil

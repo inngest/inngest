@@ -251,7 +251,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	// Pick a random backlog offset every time
 	sequential := false
 
-	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, refillUntil, limit)
+	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, time.Time{}, refillUntil, limit)
 	if err != nil {
 		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
 	}
@@ -843,7 +843,7 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
+func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
 	}
@@ -861,15 +861,14 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 	shadowPartitionSet := rc.kg.ShadowPartitionSet(sp.PartitionID)
 
 	p := peeker[QueueBacklog]{
-		q:               q,
-		opName:          "ShadowPartitionPeek",
-		keyMetadataHash: rc.kg.BacklogMeta(),
-		max:             ShadowPartitionPeekMaxBacklogs,
-		maker: func() *QueueBacklog {
-			return &QueueBacklog{}
-		},
+		q:                      q,
+		opName:                 "ShadowPartitionPeek",
+		keyMetadataHash:        rc.kg.BacklogMeta(),
+		max:                    ShadowPartitionPeekMaxBacklogs,
+		maker:                  func() *QueueBacklog { return &QueueBacklog{} },
 		handleMissingItems:     CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp)),
 		isMillisecondPrecision: true,
+		fromTime:               &from,
 	}
 
 	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit, opts...)
