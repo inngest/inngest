@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -205,7 +206,8 @@ func TestItemsByPartitionWithBacklogs(t *testing.T) {
 	var batchSize int64 = 5
 	expected := 10
 	numBacklogs := 10
-	for i := range 100 {
+	numItems := 100
+	for i := range numItems {
 		at := clock.Now().Add(time.Duration(i) * interval)
 
 		throttleKey := util.XXHash(fmt.Sprintf("backlog:%d", i%numBacklogs))
@@ -241,10 +243,17 @@ func TestItemsByPartitionWithBacklogs(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, backlogs, numBacklogs)
 
-	items, err := q.ItemsByPartition(ctx, defaultShard, fnID.String(), from, to,
+	iterateCtx, cancelIterate := context.WithCancel(context.Background())
+	items, err := q.ItemsByPartition(iterateCtx, defaultShard, fnID.String(), from, to,
 		WithQueueItemIterBatchSize(batchSize),
 	)
 	require.NoError(t, err)
+
+	go func() {
+		<-time.After(20 * time.Second)
+		assert.Fail(t, "iteration went on for too long")
+		cancelIterate()
+	}()
 
 	var count int
 	for range items {
@@ -252,6 +261,7 @@ func TestItemsByPartitionWithBacklogs(t *testing.T) {
 		count++
 	}
 
+	require.Less(t, count, numItems)
 	require.Equal(t, expected, count)
 }
 
