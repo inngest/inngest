@@ -1,6 +1,6 @@
 import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/types';
 
-import { SUPPORTED_FUNCTIONS } from './functions';
+import { SUPPORTED_FUNCTIONS } from './functions/functions';
 
 const KEYWORDS = [
   'AND',
