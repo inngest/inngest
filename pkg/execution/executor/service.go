@@ -579,7 +579,15 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 		return nil
 	}
 	requeueAt := jobStarteddAt.Add(*timeout)
-	// Note that since we do not set EnqueueOpts.PassthroughJobId here, item will be enqueued as a different job with a new JobID and the current item will be dequeued upon successful processing of this current item.
+	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
+	jobID := ""
+	if item.JobID == nil {
+		l.Error("item has no jobID", "item", item)
+	} else {
+		jobID = *item.JobID
+	}
+	jobID = fmt.Sprintf("%s:%s", "timeout-extended", jobID)
+	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
@@ -657,7 +665,15 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		return nil
 	}
 	requeueAt := jobEnqueuedAt.Add(*timeout)
-	// Note that since we do not set EnqueueOpts.PassthroughJobId here, item will be enqueued as a different job with a new JobID and the current item will be dequeued upon successful processing of this current item.
+	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
+	jobID := ""
+	if item.JobID == nil {
+		l.Error("item has no jobID", "item", item)
+	} else {
+		jobID = *item.JobID
+	}
+	jobID = fmt.Sprintf("%s:%s", "timeout-extended", jobID)
+	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
 	if err != nil && err != redis_state.ErrQueueItemExists {
