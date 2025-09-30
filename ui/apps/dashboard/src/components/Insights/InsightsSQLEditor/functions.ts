@@ -19,7 +19,7 @@ const AGGREGATE_FUNCTIONS: FunctionDescriptor[] = [
 
 const ARITHMETIC_FUNCTIONS: FunctionDescriptor[] = [
   { name: 'abs', signature: 'abs(${1:val})' },
-  { name: 'byteswap', signature: 'byteswap(${1:val})' },
+  { name: 'byteSwap', signature: 'byteSwap(${1:val})' },
   { name: 'divide', signature: 'divide(${1:a}, ${2:b})' },
   // { name: 'divideDecimal', signature: 'divideDecimal(${1:a}, ${2:b})' }, error
   //{ name: 'divideOrNull', signature: 'divideOrNull(${1:a}, ${2:b})' }, base 16
@@ -42,7 +42,7 @@ const ARITHMETIC_FUNCTIONS: FunctionDescriptor[] = [
   // { name: 'multiplyDecimal', signature: 'multiplyDecimal(${1:a}, ${2:b})' }, error
   { name: 'negate', signature: 'negate(${1:val})' },
   { name: 'plus', signature: 'plus(${1:a}, ${2:b})' },
-  { name: 'positivemodulo', signature: 'positivemodulo(${1:a}, ${2:b})' },
+  { name: 'positiveModulo', signature: 'positiveModulo(${1:a}, ${2:b})' },
   // { name: 'positivemoduloornull', signature: 'positivemoduloornull(${1:a}, ${2:b})' }, base 16
 ];
 
