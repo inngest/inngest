@@ -1,6 +1,7 @@
 import { AGGREGATE_FUNCTIONS } from './aggregate';
 import { ARITHMETIC_FUNCTIONS } from './arithmetic';
 import { COMPARISON_FUNCTIONS } from './comparison';
+import { NULLABLE_FUNCTIONS } from './nullable';
 import { ROUNDING_FUNCTIONS } from './rounding';
 import type { FunctionDescriptor } from './types';
 
@@ -9,6 +10,7 @@ export const SUPPORTED_FUNCTIONS = sortByName([
   ...ARITHMETIC_FUNCTIONS,
   ...COMPARISON_FUNCTIONS,
   ...ROUNDING_FUNCTIONS,
+  ...NULLABLE_FUNCTIONS,
 ]);
 
 function sortByName(fns: FunctionDescriptor[]): FunctionDescriptor[] {
