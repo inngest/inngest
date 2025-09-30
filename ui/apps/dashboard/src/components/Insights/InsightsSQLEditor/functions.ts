@@ -17,7 +17,16 @@ const AGGREGATE_FUNCTIONS: FunctionDescriptor[] = [
   { name: 'var_samp', signature: 'var_samp(${1:expr})' },
 ];
 
-export const SUPPORTED_FUNCTIONS = sortByName([...AGGREGATE_FUNCTIONS]);
+const COMPARISON_FUNCTIONS: FunctionDescriptor[] = [
+  { name: 'equals', signature: 'equals(${1:a}, ${2:b})' },
+  { name: 'greater', signature: 'greater(${1:a}, ${2:b})' },
+  { name: 'greaterOrEquals', signature: 'greaterOrEquals(${1:a}, ${2:b})' },
+  { name: 'less', signature: 'less(${1:a}, ${2:b})' },
+  { name: 'lessOrEquals', signature: 'lessOrEquals(${1:a}, ${2:b})' },
+  { name: 'notEquals', signature: 'notEquals(${1:a}, ${2:b})' },
+];
+
+export const SUPPORTED_FUNCTIONS = sortByName([...AGGREGATE_FUNCTIONS, ...COMPARISON_FUNCTIONS]);
 
 function sortByName(fns: FunctionDescriptor[]): FunctionDescriptor[] {
   return fns.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
