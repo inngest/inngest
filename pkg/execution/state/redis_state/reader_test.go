@@ -168,7 +168,7 @@ func TestItemsByPartition(t *testing.T) {
 	}
 }
 
-func TestItemsByPartitionWithBacklogs(t *testing.T) {
+func TestItemsByPartitionWithMultipleBacklogs(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
@@ -210,6 +210,7 @@ func TestItemsByPartitionWithBacklogs(t *testing.T) {
 	for i := range numItems {
 		at := clock.Now().Add(time.Duration(i) * interval)
 
+		// Distribute items across multiple backlogs by generating a "dynamic" throttle key
 		throttleKey := util.XXHash(fmt.Sprintf("backlog:%d", i%numBacklogs))
 
 		item := osqueue.QueueItem{
@@ -239,6 +240,7 @@ func TestItemsByPartitionWithBacklogs(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// Expect items to be distributed across multiple backlogs
 	backlogs, err := r.ZMembers(kg.ShadowPartitionSet(fnID.String()))
 	require.NoError(t, err)
 	require.Len(t, backlogs, numBacklogs)
