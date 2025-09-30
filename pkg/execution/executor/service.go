@@ -586,7 +586,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	} else {
 		jobID = *item.JobID
 	}
-	jobID = fmt.Sprintf("%s:%s", "timeout-extended", jobID)
+	jobID = fmt.Sprintf("%s:%s", "finish-timeout-extended", jobID)
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
@@ -672,7 +672,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	} else {
 		jobID = *item.JobID
 	}
-	jobID = fmt.Sprintf("%s:%s", "timeout-extended", jobID)
+	jobID = fmt.Sprintf("%s:%s", "start-timeout-extended", jobID)
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
