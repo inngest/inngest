@@ -8,7 +8,6 @@ import { BillingBanner } from '@/components/BillingBanner';
 import { ExecutionOverageBanner } from '@/components/ExecutionOverage';
 import { getProfileDisplay } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
-import ScrollControl from './ScrollControl';
 import SideBar from './SideBar';
 
 type LayoutProps = {
@@ -40,7 +39,6 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
 
         {children}
       </div>
-      <ScrollControl containerId="layout-scroll-container" />
     </div>
   );
 }
