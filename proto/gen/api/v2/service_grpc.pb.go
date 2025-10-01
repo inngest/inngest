@@ -23,6 +23,8 @@ const (
 	V2_XSchemaOnly_FullMethodName             = "/api.v2.V2/_SchemaOnly"
 	V2_CreatePartnerAccount_FullMethodName    = "/api.v2.V2/CreatePartnerAccount"
 	V2_CreateEnv_FullMethodName               = "/api.v2.V2/CreateEnv"
+	V2_UnarchiveEnv_FullMethodName            = "/api.v2.V2/UnarchiveEnv"
+	V2_ArchiveEnv_FullMethodName              = "/api.v2.V2/ArchiveEnv"
 	V2_FetchPartnerAccounts_FullMethodName    = "/api.v2.V2/FetchPartnerAccounts"
 	V2_FetchAccount_FullMethodName            = "/api.v2.V2/FetchAccount"
 	V2_FetchAccountEnvs_FullMethodName        = "/api.v2.V2/FetchAccountEnvs"
@@ -41,6 +43,8 @@ type V2Client interface {
 	XSchemaOnly(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
 	CreatePartnerAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
+	UnarchiveEnv(ctx context.Context, in *ArchiveEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
+	ArchiveEnv(ctx context.Context, in *ArchiveEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
@@ -92,6 +96,26 @@ func (c *v2Client) CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateEnvResponse)
 	err := c.cc.Invoke(ctx, V2_CreateEnv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) UnarchiveEnv(ctx context.Context, in *ArchiveEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateEnvResponse)
+	err := c.cc.Invoke(ctx, V2_UnarchiveEnv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ArchiveEnv(ctx context.Context, in *ArchiveEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateEnvResponse)
+	err := c.cc.Invoke(ctx, V2_ArchiveEnv_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +201,8 @@ type V2Server interface {
 	XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error)
 	CreatePartnerAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
+	UnarchiveEnv(context.Context, *ArchiveEnvRequest) (*CreateEnvResponse, error)
+	ArchiveEnv(context.Context, *ArchiveEnvRequest) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
@@ -205,6 +231,12 @@ func (UnimplementedV2Server) CreatePartnerAccount(context.Context, *CreateAccoun
 }
 func (UnimplementedV2Server) CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateEnv not implemented")
+}
+func (UnimplementedV2Server) UnarchiveEnv(context.Context, *ArchiveEnvRequest) (*CreateEnvResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnarchiveEnv not implemented")
+}
+func (UnimplementedV2Server) ArchiveEnv(context.Context, *ArchiveEnvRequest) (*CreateEnvResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveEnv not implemented")
 }
 func (UnimplementedV2Server) FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchPartnerAccounts not implemented")
@@ -316,6 +348,42 @@ func _V2_CreateEnv_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).CreateEnv(ctx, req.(*CreateEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_UnarchiveEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).UnarchiveEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_UnarchiveEnv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).UnarchiveEnv(ctx, req.(*ArchiveEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ArchiveEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ArchiveEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ArchiveEnv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ArchiveEnv(ctx, req.(*ArchiveEnvRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -468,6 +536,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateEnv",
 			Handler:    _V2_CreateEnv_Handler,
+		},
+		{
+			MethodName: "UnarchiveEnv",
+			Handler:    _V2_UnarchiveEnv_Handler,
+		},
+		{
+			MethodName: "ArchiveEnv",
+			Handler:    _V2_ArchiveEnv_Handler,
 		},
 		{
 			MethodName: "FetchPartnerAccounts",

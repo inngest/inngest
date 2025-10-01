@@ -43,6 +43,16 @@ func (s *Service) CreateEnv(ctx context.Context, req *apiv2.CreateEnvRequest) (*
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
 }
 
+func (s *Service) ArchiveEnv(ctx context.Context, req *apiv2.ArchiveEnvRequest) (*apiv2.CreateEnvResponse, error) {
+	// For now, return not implemented since this is OSS
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
+}
+
+func (s *Service) UnarchiveEnv(ctx context.Context, req *apiv2.ArchiveEnvRequest) (*apiv2.CreateEnvResponse, error) {
+	// For now, return not implemented since this is OSS
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
+}
+
 func (s *Service) FetchPartnerAccounts(ctx context.Context, req *apiv2.FetchAccountsRequest) (*apiv2.FetchAccountsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Accounts not implemented in OSS")
 }

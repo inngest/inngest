@@ -41,6 +41,10 @@ const (
 	V2CreatePartnerAccountProcedure = "/api.v2.V2/CreatePartnerAccount"
 	// V2CreateEnvProcedure is the fully-qualified name of the V2's CreateEnv RPC.
 	V2CreateEnvProcedure = "/api.v2.V2/CreateEnv"
+	// V2UnarchiveEnvProcedure is the fully-qualified name of the V2's UnarchiveEnv RPC.
+	V2UnarchiveEnvProcedure = "/api.v2.V2/UnarchiveEnv"
+	// V2ArchiveEnvProcedure is the fully-qualified name of the V2's ArchiveEnv RPC.
+	V2ArchiveEnvProcedure = "/api.v2.V2/ArchiveEnv"
 	// V2FetchPartnerAccountsProcedure is the fully-qualified name of the V2's FetchPartnerAccounts RPC.
 	V2FetchPartnerAccountsProcedure = "/api.v2.V2/FetchPartnerAccounts"
 	// V2FetchAccountProcedure is the fully-qualified name of the V2's FetchAccount RPC.
@@ -66,6 +70,8 @@ type V2Client interface {
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	UnarchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	ArchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
@@ -108,6 +114,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2CreateEnvProcedure,
 			connect.WithSchema(v2Methods.ByName("CreateEnv")),
+			connect.WithClientOptions(opts...),
+		),
+		unarchiveEnv: connect.NewClient[v2.ArchiveEnvRequest, v2.CreateEnvResponse](
+			httpClient,
+			baseURL+V2UnarchiveEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("UnarchiveEnv")),
+			connect.WithClientOptions(opts...),
+		),
+		archiveEnv: connect.NewClient[v2.ArchiveEnvRequest, v2.CreateEnvResponse](
+			httpClient,
+			baseURL+V2ArchiveEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("ArchiveEnv")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchPartnerAccounts: connect.NewClient[v2.FetchAccountsRequest, v2.FetchAccountsResponse](
@@ -161,6 +179,8 @@ type v2Client struct {
 	xSchemaOnly             *connect.Client[v2.HealthRequest, v2.ErrorResponse]
 	createPartnerAccount    *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
 	createEnv               *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
+	unarchiveEnv            *connect.Client[v2.ArchiveEnvRequest, v2.CreateEnvResponse]
+	archiveEnv              *connect.Client[v2.ArchiveEnvRequest, v2.CreateEnvResponse]
 	fetchPartnerAccounts    *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
 	fetchAccount            *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
 	fetchAccountEnvs        *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
@@ -188,6 +208,16 @@ func (c *v2Client) CreatePartnerAccount(ctx context.Context, req *connect.Reques
 // CreateEnv calls api.v2.V2.CreateEnv.
 func (c *v2Client) CreateEnv(ctx context.Context, req *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
 	return c.createEnv.CallUnary(ctx, req)
+}
+
+// UnarchiveEnv calls api.v2.V2.UnarchiveEnv.
+func (c *v2Client) UnarchiveEnv(ctx context.Context, req *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return c.unarchiveEnv.CallUnary(ctx, req)
+}
+
+// ArchiveEnv calls api.v2.V2.ArchiveEnv.
+func (c *v2Client) ArchiveEnv(ctx context.Context, req *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return c.archiveEnv.CallUnary(ctx, req)
 }
 
 // FetchPartnerAccounts calls api.v2.V2.FetchPartnerAccounts.
@@ -232,6 +262,8 @@ type V2Handler interface {
 	XSchemaOnly(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.ErrorResponse], error)
 	CreatePartnerAccount(context.Context, *connect.Request[v2.CreateAccountRequest]) (*connect.Response[v2.CreateAccountResponse], error)
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	UnarchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
+	ArchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
@@ -270,6 +302,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2CreateEnvProcedure,
 		svc.CreateEnv,
 		connect.WithSchema(v2Methods.ByName("CreateEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2UnarchiveEnvHandler := connect.NewUnaryHandler(
+		V2UnarchiveEnvProcedure,
+		svc.UnarchiveEnv,
+		connect.WithSchema(v2Methods.ByName("UnarchiveEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ArchiveEnvHandler := connect.NewUnaryHandler(
+		V2ArchiveEnvProcedure,
+		svc.ArchiveEnv,
+		connect.WithSchema(v2Methods.ByName("ArchiveEnv")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchPartnerAccountsHandler := connect.NewUnaryHandler(
@@ -324,6 +368,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreatePartnerAccountHandler.ServeHTTP(w, r)
 		case V2CreateEnvProcedure:
 			v2CreateEnvHandler.ServeHTTP(w, r)
+		case V2UnarchiveEnvProcedure:
+			v2UnarchiveEnvHandler.ServeHTTP(w, r)
+		case V2ArchiveEnvProcedure:
+			v2ArchiveEnvHandler.ServeHTTP(w, r)
 		case V2FetchPartnerAccountsProcedure:
 			v2FetchPartnerAccountsHandler.ServeHTTP(w, r)
 		case V2FetchAccountProcedure:
@@ -361,6 +409,14 @@ func (UnimplementedV2Handler) CreatePartnerAccount(context.Context, *connect.Req
 
 func (UnimplementedV2Handler) CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) UnarchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.UnarchiveEnv is not implemented"))
+}
+
+func (UnimplementedV2Handler) ArchiveEnv(context.Context, *connect.Request[v2.ArchiveEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ArchiveEnv is not implemented"))
 }
 
 func (UnimplementedV2Handler) FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error) {
