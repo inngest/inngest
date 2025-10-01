@@ -4,8 +4,8 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
-  useState,
   type HTMLAttributes,
   type KeyboardEventHandler,
 } from 'react';
@@ -20,7 +20,7 @@ export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
     className={cn(
-      'border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-md border pt-4',
+      'border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-lg border pt-3',
       className
     )}
     {...props}
@@ -56,7 +56,7 @@ export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTe
         rows={rows}
         onKeyDown={handleKeyDown}
         className={cn(
-          'bg-surfaceBase placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
+          'bg-surfaceBase text-basis placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
           className
         )}
         {...props}
@@ -83,90 +83,50 @@ export const ResponsivePromptInput = ({
   disabled?: boolean;
   className?: string;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const checkExpansion = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    if (value.includes('\n')) {
-      if (!isExpanded) setIsExpanded(true);
-      return;
-    }
-    const tempSpan = document.createElement('span');
-    tempSpan.style.position = 'absolute';
-    tempSpan.style.visibility = 'hidden';
-    tempSpan.style.whiteSpace = 'nowrap';
-    if (typeof window !== 'undefined') {
-      const style = window.getComputedStyle(textarea);
-      tempSpan.style.fontSize = style.fontSize;
-      tempSpan.style.fontFamily = style.fontFamily;
-      tempSpan.style.fontWeight = style.fontWeight;
-      tempSpan.style.letterSpacing = style.letterSpacing;
-    }
-    tempSpan.textContent = value || textarea.placeholder;
-    document.body.appendChild(tempSpan);
-    const textWidth = tempSpan.getBoundingClientRect().width;
-    document.body.removeChild(tempSpan);
-    const availableWidth = textarea.getBoundingClientRect().width - 48;
-    const shouldExpand = textWidth >= availableWidth;
-    if (shouldExpand && !isExpanded) {
-      setIsExpanded(true);
-    } else if (!value.trim() && isExpanded) {
-      setIsExpanded(false);
-    }
-  }, [value, isExpanded]);
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // Compute vertical chrome to include in height clamping
+    const style = window.getComputedStyle(el);
+    const lineHeight = parseFloat(style.lineHeight || '0');
+    const paddingY = parseFloat(style.paddingTop || '0') + parseFloat(style.paddingBottom || '0');
+    const borderY =
+      parseFloat(style.borderTopWidth || '0') + parseFloat(style.borderBottomWidth || '0');
+
+    // Define min/max rows similar to `prompt-input.tsx` usage
+    const minRows = 1; // start compact; grows smoothly
+    const maxRows = 10; // ~ `max-h-[30lh]`
+
+    const minHeight = Math.max(0, lineHeight * minRows + paddingY + borderY);
+    const maxHeight = Math.max(minHeight, lineHeight * maxRows + paddingY + borderY);
+
+    // Measure content height
+    el.style.height = 'auto';
+    const contentHeight = el.scrollHeight;
+
+    const next = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+    // Set explicit pixel height for animating height
+    el.style.height = `${next}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [value, resizeTextarea]);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      checkExpansion();
-    }, 0);
-    return () => clearTimeout(timeoutId);
-  }, [checkExpansion]);
-
-  useEffect(() => {
-    if (isExpanded && textareaRef.current) {
-      const textarea = textareaRef.current;
-      setTimeout(() => {
-        textarea.focus();
-        const length = textarea.value.length;
-        textarea.setSelectionRange(length, length);
-      }, 0);
-    }
-  }, [isExpanded]);
-
-  if (isExpanded) {
-    return (
-      <PromptInput onSubmit={onSubmit} className={className}>
-        <div className="flex flex-col">
-          <div className="relative mb-2 w-full">
-            <PromptInputTextarea
-              ref={textareaRef}
-              rows={5}
-              value={value}
-              onChange={onChange}
-              placeholder={placeholder}
-              disabled={disabled}
-              className="max-h-[30lh] min-h-[3lh] w-full resize-none px-4 py-0 pt-0 leading-6 placeholder:text-base"
-            />
-            <div className="from-surfaceBase pointer-events-none absolute left-0 right-0 top-0 h-3 bg-gradient-to-b to-transparent" />
-            {/* Bottom gradient overlay */}
-            <div className="from-surfaceBase pointer-events-none absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-t to-transparent" />
-          </div>
-          <div className="flex items-center justify-end px-3 pb-3">
-            <div className="flex items-center gap-2">
-              <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
-            </div>
-          </div>
-        </div>
-      </PromptInput>
-    );
-  }
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => resizeTextarea());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [resizeTextarea]);
 
   return (
     <PromptInput onSubmit={onSubmit} className={className}>
-      <div className="flex h-14 items-center gap-2 px-0 pb-0">
-        {/* Plus button removed */}
+      <div className="flex items-end gap-2 px-0 pb-0">
         <div className="flex-1">
           <PromptInputTextarea
             ref={textareaRef}
@@ -174,11 +134,12 @@ export const ResponsivePromptInput = ({
             onChange={onChange}
             placeholder={placeholder}
             disabled={disabled}
-            className="w-full resize-none px-4 py-0 pt-3 leading-6"
+            rows={2}
+            className="max-h-[30lh] w-full resize-none overflow-y-auto px-4 pb-2 pt-0 leading-6 transition-[height] duration-200 ease-out placeholder:text-base"
           />
         </div>
-        <div className="relative top-1 flex items-center justify-end px-3 pb-0">
-          <div className="flex items-center gap-2 pr-0.5">
+        <div className="flex items-center justify-end px-3 pb-3">
+          <div className="flex items-center gap-2">
             <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
           </div>
         </div>
