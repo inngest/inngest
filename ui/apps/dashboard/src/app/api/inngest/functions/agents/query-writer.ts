@@ -218,7 +218,7 @@ export const queryWriterAgent = createAgent<InsightsState>({
       '- Do NOT under any circumstances prefix table names or column names with "events_"',
     ].join('\n');
   },
-  model: openai({ model: 'gpt-5-nano-2025-08-07' }),
+  model: openai({ model: 'gpt-4.1-2025-04-14' }),
   tools: [generateSqlTool],
   tool_choice: 'generate_sql',
 });

@@ -20,5 +20,5 @@ export const summarizerAgent = createAgent<InsightsState>({
       .filter(Boolean)
       .join('\n');
   },
-  model: openai({ model: 'gpt-5-nano-2025-08-07' }),
+  model: openai({ model: 'gpt-4.1-2025-04-14' }),
 });

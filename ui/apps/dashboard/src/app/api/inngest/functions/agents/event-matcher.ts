@@ -72,7 +72,7 @@ export const eventMatcherAgent = createAgent<InsightsState>({
         : 'No event list is available. Ask the user to clarify which events they are interested in.',
     ].join('\n');
   },
-  model: openai({ model: 'gpt-5-nano-2025-08-07' }),
+  model: openai({ model: 'gpt-4.1-2025-04-14' }),
   tools: [selectEventsTool],
   tool_choice: 'select_events',
 });
