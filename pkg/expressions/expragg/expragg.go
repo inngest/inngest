@@ -208,57 +208,74 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 		lock = a.locks[key]
 	}
 	a.mapLock.Unlock()
-	// lock this key to prevent a possible race where multiple goroutines could see that
-	// the bookkeeper is missing from the cache and try to create it at the same time,
-	// meaning we would drop one of those bookkeepers:
-	lock.Lock()
-	defer lock.Unlock()
 
 	var bk *bookkeeper
 
 	val := a.records.Get(key)
 	if val == nil {
-		bk = &bookkeeper{
-			wsID:  wsID,
-			event: eventName,
-			ae: expr.NewAggregateEvaluator(expr.AggregateEvaluatorOpts[*state.Pause]{
-				Parser:      a.parser,
-				Eval:        a.evaluator,
-				Concurrency: a.concurrency,
-				KV:          a.kv,
-			}),
-			// updatedAt is a zero time.
-		}
+		lock.Lock()
 
-		// The time doesn't matter as ccache is an LRU which does not autoamtically GC expired
-		// content;  it always serves stale content and only deletes when the cache is full.
-		a.records.Set(key, bk, time.Hour*3)
+		// Check again in case another process created the bookkeeper by the time we acquired the lock.
+		val := a.records.Get(key)
+		if val == nil {
+			bk = &bookkeeper{
+				wsID:  wsID,
+				event: eventName,
+				ae: expr.NewAggregateEvaluator(expr.AggregateEvaluatorOpts[*state.Pause]{
+					Parser:      a.parser,
+					Eval:        a.evaluator,
+					Concurrency: a.concurrency,
+					KV:          a.kv,
+				}),
+				// updatedAt is a zero time.
+			}
+
+			// The time doesn't matter as ccache is an LRU which does not autoamtically GC expired
+			// content;  it always serves stale content and only deletes when the cache is full.
+			a.records.Set(key, bk, time.Hour*3)
+		} else {
+			bk = val.Value().(*bookkeeper)
+		}
+		lock.Unlock()
 	} else {
 		bk = val.Value().(*bookkeeper)
 		val.Extend(time.Hour * 3)
 	}
 
-	if bk.updatedAt.After(eventTS) {
-		// We can use a stale executor here, as the pauses were updated after the event
-		// was received.  This prevents spinning on locks.
-		return bk.ae, nil
-	}
-
-	if err := bk.update(ctx, a.loader); err != nil {
-		if bk.updatedAt.IsZero() {
-			return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
+	// We don't have locks at this point which means we will allow all events that happened prior to the last bookkeeper
+	// update to just return and use the evaluator as is instead of waiting for a full bookkeeper load to finish.
+	bk.updatedAtLock.RLock()
+	{
+		if bk.updatedAt.After(eventTS) {
+			bk.updatedAtLock.RUnlock()
+			// We can use a stale executor here, as the pauses were updated after the event
+			// was received.  This prevents spinning on locks.
+			return bk.ae, nil
 		}
-		// This means we had an error updating the aggregate evaluator with latest events;
-		// matching will be stale.
-		a.log.Warn(
-			"using stale evaluator",
-			"error", err,
-			"age_ms", time.Since(bk.updatedAt).Milliseconds(),
-			"workspace_id", wsID,
-			"event", eventName,
-		)
-		return bk.ae, nil
 	}
+	bk.updatedAtLock.RUnlock()
+
+	lock.Lock()
+	{
+		// It's safe to read updatedAt without a read lock in this block because only one instance
+		// will ever be executing this block AND `bk.update` is the only method that can mutate it.
+		if err := bk.update(ctx, a.loader); err != nil {
+			if bk.updatedAt.IsZero() {
+				return nil, fmt.Errorf("could not load evaluables for aggregate evaluator")
+			}
+			// This means we had an error updating the aggregate evaluator with latest events;
+			// matching will be stale.
+			a.log.Warn(
+				"using stale evaluator",
+				"error", err,
+				"age_ms", time.Since(bk.updatedAt).Milliseconds(),
+				"workspace_id", wsID,
+				"event", eventName,
+			)
+			return bk.ae, nil
+		}
+	}
+	lock.Unlock()
 
 	return bk.ae, nil
 }
@@ -291,10 +308,11 @@ func (a *aggregator) RemovePause(ctx context.Context, pause EventEvaluable) erro
 // was last updated.  This allows us to fetch pauses stored since the last update time for
 // a given workspace event.
 type bookkeeper struct {
-	wsID      uuid.UUID
-	event     string
-	ae        expr.AggregateEvaluator[*state.Pause]
-	updatedAt time.Time
+	wsID          uuid.UUID
+	event         string
+	ae            expr.AggregateEvaluator[*state.Pause]
+	updatedAt     time.Time
+	updatedAtLock sync.RWMutex
 }
 
 func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
@@ -325,10 +343,13 @@ func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 		"delta_ms", at.Sub(b.updatedAt).Milliseconds(),
 		"count", count,
 		"error", err,
+		"duration", time.Since(at).Milliseconds(),
 	)
 
 	if err == nil {
+		b.updatedAtLock.Lock()
 		b.updatedAt = at
+		b.updatedAtLock.Unlock()
 	}
 	return err
 }
