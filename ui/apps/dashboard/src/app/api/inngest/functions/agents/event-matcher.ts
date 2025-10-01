@@ -26,7 +26,11 @@ export const selectEventsTool = createTool({
   handler: (args: z.infer<typeof SelectEventsParams>, { network }) => {
     const { events } = args;
     if (!Array.isArray(events) || events.length === 0) {
-      throw new Error('The model must select at least one event.');
+      return {
+        selected: [],
+        reason: 'No events selected.',
+        totalCandidates: network.state.data.eventTypes?.length || 0,
+      };
     }
 
     const selected = events.map((event) => {
