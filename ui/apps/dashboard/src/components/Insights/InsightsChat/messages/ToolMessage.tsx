@@ -23,6 +23,7 @@ function GenerateSqlToolUI({
   const data = part.output?.data;
   const title = data?.title;
   const sql = data?.sql;
+  // TODO: (ted): update ToolPartFor to include proper errorMessage type; casting here for now...
   const errorMessage = part.error ? (part.error as Error).message : null;
 
   if (data === undefined || sql === undefined) {
