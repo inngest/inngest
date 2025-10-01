@@ -18,7 +18,7 @@ const userMessageSchema = z.object({
 const chatRequestSchema = z.object({
   userMessage: userMessageSchema,
   threadId: z.string().uuid().optional(),
-  userId: z.string().optional(),
+  userId: z.string(),
   channelKey: z.string().optional(),
   history: z.array(z.any()).optional(), // TODO: define a more specific schema for history items
 });
@@ -52,9 +52,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // For anonymous sessions, use channelKey as userId for data ownership
-    const effectiveUserId = userId || channelKey!; // Non-null assertion safe due to validation above
-
     // If the client didn't provide a threadId, omit generation here.
     // AgentKit will create one during initializeThread; the canonical ID will
     // be returned in the response from this route.
@@ -67,7 +64,7 @@ export async function POST(req: NextRequest) {
         threadId: threadId ?? undefined,
         history,
         userMessage,
-        userId: effectiveUserId, // For data ownership (userId or channelKey for anonymous)
+        userId, // For data ownership (userId or channelKey for anonymous)
         channelKey, // For flexible subscriptions (optional)
       },
     });
