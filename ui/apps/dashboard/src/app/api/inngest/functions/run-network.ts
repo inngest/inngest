@@ -1,4 +1,4 @@
-import { createState, type AgentMessageChunk, type Message } from '@inngest/agent-kit';
+import { createState, type AgentMessageChunk } from '@inngest/agent-kit';
 import type { GetFunctionInput } from 'inngest';
 import { v4 as uuidv4 } from 'uuid';
 
