@@ -1,7 +1,7 @@
 import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
-import type { GenerateSqlResult, InsightsAgentState as InsightsState } from './types';
+import type { InsightsAgentState } from './types';
 
 const queryGrammar = `
   QueryAST = "SELECT" SelectClause "FROM" From ("WHERE" Expression)? ("GROUP" "BY" GroupBy)? ("ORDER" "BY" OrderBy)? ("LIMIT" <number>)? ("OFFSET" <number>)? ";"? .
@@ -196,11 +196,11 @@ export const generateSqlTool = createTool({
       sql,
       title,
       reasoning,
-    } as GenerateSqlResult;
+    };
   },
 });
 
-export const queryWriterAgent = createAgent<InsightsState>({
+export const queryWriterAgent = createAgent<InsightsAgentState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }) => {

@@ -1,7 +1,7 @@
 import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
-import type { InsightsAgentState as InsightsState, SelectEventsResult } from './types';
+import type { InsightsAgentState } from './types';
 
 const SelectEventsParams = z.object({
   events: z
@@ -46,12 +46,12 @@ export const selectEventsTool = createTool({
       selected,
       reason,
       totalCandidates: network.state.data.eventTypes?.length || 0,
-    } as SelectEventsResult;
+    };
     return result;
   },
 });
 
-export const eventMatcherAgent = createAgent<InsightsState>({
+export const eventMatcherAgent = createAgent<InsightsAgentState>({
   name: 'Insights Event Matcher',
   description: "Analyzes available events and selects 1-5 that best match the user's intent.",
   system: async ({ network }): Promise<string> => {
@@ -76,5 +76,3 @@ export const eventMatcherAgent = createAgent<InsightsState>({
   tools: [selectEventsTool],
   tool_choice: 'select_events',
 });
-
-export type { InsightsState as InsightsAgentState };

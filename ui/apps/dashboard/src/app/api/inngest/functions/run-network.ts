@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
 import { createChannel } from '../realtime';
-import type { InsightsAgentState } from './agents/event-matcher';
 import { createInsightsNetwork } from './agents/network';
+import type { InsightsAgentState } from './agents/types';
 
 export const runAgentNetwork = inngest.createFunction(
   {
