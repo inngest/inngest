@@ -19,7 +19,7 @@ export const useStickToBottom = () => {
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
       // A little bit of tolerance
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 1;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
       setIsAtBottom(isAtBottom);
     };
 
