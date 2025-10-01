@@ -56,7 +56,7 @@ export const eventMatcherAgent = createAgent<InsightsState>({
   description: "Analyzes available events and selects 1-5 that best match the user's intent.",
   system: async ({ network }): Promise<string> => {
     const events = network?.state.data.eventTypes || [];
-    const sample = events.slice(0, 50); // avoid overly long prompts
+    const sample = events.slice(0, 500); // avoid overly long prompts
     return [
       'You are an event selection specialist.',
       "Your job is to analyze the user's request and the list of available event names, then choose the 1-5 most relevant events.",
@@ -68,7 +68,7 @@ export const eventMatcherAgent = createAgent<InsightsState>({
       '- Do not guess event names; only use names from the provided list.',
       '',
       sample.length
-        ? `Available events (${events.length} total, showing up to 50):\n${sample.join('\n')}`
+        ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
         : 'No event list is available. Ask the user to clarify which events they are interested in.',
     ].join('\n');
   },
