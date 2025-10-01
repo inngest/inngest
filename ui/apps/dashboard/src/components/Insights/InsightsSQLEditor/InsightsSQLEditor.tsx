@@ -11,11 +11,13 @@ export function InsightsSQLEditor() {
   const { onMount } = useInsightsSQLEditorOnMountCallback();
 
   return (
-    <SQLEditor
-      completionConfig={SQL_COMPLETION_CONFIG}
-      content={query}
-      onChange={onChange}
-      onMount={onMount}
-    />
+    <div className="h-full min-h-0 overflow-hidden">
+      <SQLEditor
+        completionConfig={SQL_COMPLETION_CONFIG}
+        content={query}
+        onChange={onChange}
+        onMount={onMount}
+      />
+    </div>
   );
 }
