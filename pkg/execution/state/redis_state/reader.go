@@ -341,139 +341,114 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		l = l.With("shadow_partition", spt)
 
 		// Iterate through backlogs efficiently by:
-		// 1. Loading backlogs in batches based on their earliest item score
-		// 2. For each batch of backlogs, fetch items up to a limit
-		// 3. Advance through time across all relevant backlogs
+		// 1. Loading all backlogs once (bounded by ShadowPartitionPeekMaxBacklogs)
+		// 2. Iterate through time, fetching small batches from each backlog
+		// 3. Advance through time based on the earliest items seen across all backlogs
 		//
 		// This approach ensures we:
-		// - Don't load all backlogs into memory at once (bounded by backlogBatchSize)
-		// - Process items roughly in time order across backlogs
-		// - Eventually cover all backlogs and items within the time range
-		// - Avoid infinite loops by advancing through time and loading new batches
-		const backlogBatchSize = 100 // Load this many backlogs at a time
+		// - Process items in roughly chronological order across all backlogs
+		// - Don't load too many items from any single backlog at once
+		// - Eventually cover all items within the time range without duplicates
+		// - Avoid infinite loops by tracking progress through time
+
+		// Load all backlogs for this partition once
+		// Note: The number of backlogs is bounded by ShadowPartitionPeekMaxBacklogs
+		backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, time.Time{}, until, ShadowPartitionPeekMaxBacklogs,
+			WithPeekOptQueueShard(&shard),
+		)
+		if err != nil {
+			if !errors.Is(err, context.Canceled) {
+				l.ReportError(err, "error peeking backlogs for partition")
+			}
+			return
+		}
+
+		if len(backlogs) == 0 {
+			l.Trace("no backlogs to iterate")
+			return
+		}
+
+		l.Trace("loaded backlogs for iteration", "count", len(backlogs))
+
+		// Iterate through time, fetching small batches from each backlog
 		const itemsPerBacklogBatch = 50 // Fetch this many items per backlog per iteration
+		var totalIterated int
 
 		for {
-			// Load a batch of backlogs that have items with earliest score >= backlogFrom
-			backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, backlogFrom, until, backlogBatchSize,
-				WithPeekOptQueueShard(&shard),
-			)
-			if err != nil {
-				if !errors.Is(err, context.Canceled) {
-					l.ReportError(err, "error peeking backlogs for partition")
-				}
-				return
-			}
+			var iteratedInRound int
+			var minNextTime time.Time
 
-			if len(backlogs) == 0 {
-				l.Trace("no more backlogs to iterate")
-				return
-			}
-
-			l.Trace("loaded backlogs for iteration", "count", len(backlogs), "from", backlogFrom.Format(time.StampMilli))
-
-			// For this batch of backlogs, iterate through items
-			// We'll fetch a small batch from each backlog and advance time
-			backlogIteration := backlogFrom
-			var totalIteratedInBatch int
-
-			for {
-				var iteratedInRound int
-				var minNextTime time.Time
-
-				// Fetch items from each backlog in this batch
-				for _, backlog := range backlogs {
-					errTags := map[string]string{
-						"backlog_id": backlog.BacklogID,
-					}
-
-					items, _, err := q.backlogPeek(ctx, backlog, backlogIteration, until, itemsPerBacklogBatch,
-						WithPeekOptQueueShard(&shard),
-					)
-					if err != nil {
-						l.ReportError(err, "error retrieving queue items from backlog",
-							logger.WithErrorReportTags(errTags),
-						)
-						continue // Skip this backlog but continue with others
-					}
-
-					var lastTime time.Time
-					for _, qi := range items {
-						if qi == nil {
-							continue
-						}
-
-						if !yield(qi) {
-							return
-						}
-						iteratedInRound++
-						totalIteratedInBatch++
-
-						at := time.UnixMilli(qi.AtMS)
-						lastTime = at
-					}
-
-					// Track the minimum next time across all backlogs
-					// This ensures we advance based on the earliest item we saw
-					if !lastTime.IsZero() {
-						if minNextTime.IsZero() || lastTime.Before(minNextTime) {
-							minNextTime = lastTime
-						}
-					}
+			// Fetch a batch of items from each backlog
+			for _, backlog := range backlogs {
+				errTags := map[string]string{
+					"backlog_id": backlog.BacklogID,
 				}
 
-				l.Trace("iterated items in backlog batch",
-					"count", iteratedInRound,
-					"total_in_batch", totalIteratedInBatch,
-					"iteration_time", backlogIteration.Format(time.StampMilli),
+				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, itemsPerBacklogBatch,
+					WithPeekOptQueueShard(&shard),
 				)
-
-				// If we didn't iterate anything in this round, we're done with this batch
-				if iteratedInRound == 0 {
-					l.Trace("no more items in current backlog batch")
-					break
+				if err != nil {
+					l.ReportError(err, "error retrieving queue items from backlog",
+						logger.WithErrorReportTags(errTags),
+					)
+					continue // Skip this backlog but continue with others
 				}
 
-				// Advance time to just after the earliest last item we saw
-				if opt.enableMillisecondIncrease && !minNextTime.IsZero() {
-					// NOTE: this could skip items on the same millisecond, which is acceptable
-					backlogIteration = minNextTime.Add(time.Millisecond)
-				} else if !minNextTime.IsZero() {
-					backlogIteration = minNextTime
-				} else {
-					// No progress made, exit this batch
-					break
+				var lastTime time.Time
+				for _, qi := range items {
+					if qi == nil {
+						continue
+					}
+
+					if !yield(qi) {
+						return
+					}
+					iteratedInRound++
+					totalIterated++
+
+					at := time.UnixMilli(qi.AtMS)
+					lastTime = at
 				}
 
-				// If we've advanced past the until time, we're done with this batch
-				if backlogIteration.After(until) {
-					l.Trace("advanced past until time in batch")
-					break
+				// Track the minimum next time across all backlogs
+				// This ensures we advance time based on the earliest item we saw
+				if !lastTime.IsZero() {
+					if minNextTime.IsZero() || lastTime.Before(minNextTime) {
+						minNextTime = lastTime
+					}
 				}
-
-				// Wait before the next iteration
-				<-time.After(opt.interval)
 			}
 
-			// After processing this batch of backlogs, advance to load the next batch
-			// Set backlogFrom to where we left off so we can get the next set of backlogs
-			if opt.enableMillisecondIncrease {
-				backlogFrom = backlogIteration
+			l.Trace("iterated items across all backlogs",
+				"count", iteratedInRound,
+				"total", totalIterated,
+				"from", backlogFrom.Format(time.StampMilli),
+			)
+
+			// If we didn't iterate anything in this round, we're done
+			if iteratedInRound == 0 {
+				l.Trace("no more items to iterate in any backlog")
+				return
+			}
+
+			// Advance time to just after the earliest last item we saw across all backlogs
+			if opt.enableMillisecondIncrease && !minNextTime.IsZero() {
+				// NOTE: this could skip items on the same millisecond, which is acceptable
+				backlogFrom = minNextTime.Add(time.Millisecond)
+			} else if !minNextTime.IsZero() {
+				backlogFrom = minNextTime
 			} else {
-				// If we can't advance, we must exit to avoid infinite loop
-				if totalIteratedInBatch == 0 {
-					return
-				}
-				backlogFrom = backlogIteration
+				// No progress made, we must exit to avoid infinite loop
+				return
 			}
 
-			// If we've moved past the until time, we're completely done
+			// If we've advanced past the until time, we're done
 			if backlogFrom.After(until) {
 				l.Trace("backlog iteration complete, reached until time")
 				return
 			}
 
-			// Wait before loading the next batch of backlogs
+			// Wait before the next iteration
 			<-time.After(opt.interval)
 		}
 	}, nil

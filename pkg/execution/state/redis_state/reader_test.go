@@ -258,8 +258,8 @@ func TestItemsByPartitionWithMultipleBacklogs(t *testing.T) {
 	}()
 
 	var count int
-	for range items {
-		fmt.Println(count)
+	for item := range items {
+		fmt.Printf("%d: %s at %v\n", count, item.ID, time.UnixMilli(item.AtMS))
 		count++
 	}
 
