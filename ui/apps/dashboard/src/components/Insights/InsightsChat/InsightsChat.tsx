@@ -157,7 +157,7 @@ export function InsightsChat({
 
   return (
     <div
-      className={`border-subtle flex h-full w-[420px] shrink-0 flex-col border-l bg-white ${
+      className={`border-subtle flex h-full w-full shrink-0 flex-col border-l bg-white ${
         className ?? ''
       }`}
     >
