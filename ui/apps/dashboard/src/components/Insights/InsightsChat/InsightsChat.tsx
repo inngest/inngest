@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AgentStatus } from '@inngest/use-agent';
 
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
 import { EmptyState } from './EmptyState';
@@ -14,11 +13,6 @@ import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
 import { UserMessage } from './messages/UserMessage';
-
-// Types for derived event data
-type Schemas = Record<string, unknown>;
-type EventTypes = string[];
-type AllEventType = { id: string; name: string; latestSchema: string };
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -46,11 +40,11 @@ function getLoadingMessage(flags: {
 }
 
 export function InsightsChat({
-  threadId,
+  agentThreadId,
   onToggleChat,
   className,
 }: {
-  threadId: string;
+  agentThreadId: string;
   onToggleChat: () => void;
   className?: string;
 }) {
@@ -65,35 +59,6 @@ export function InsightsChat({
   // State for the chat's input value
   const [inputValue, setInputValue] = useState('');
 
-  // Load event types and schemas via GraphQL-backed hook
-  const fetchAllEventTypes = useAllEventTypes();
-  const [schemas, setSchemas] = useState<Schemas | null>(null);
-  const [eventTypes, setEventTypes] = useState<EventTypes>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const events: AllEventType[] = await fetchAllEventTypes();
-        const names: EventTypes = events.map((e) => e.name);
-        const schemaMap: Schemas = {};
-        for (const e of events) {
-          const raw = e.latestSchema.trim();
-          if (!raw) continue;
-          try {
-            schemaMap[e.name] = JSON.parse(raw);
-          } catch {
-            schemaMap[e.name] = raw;
-          }
-        }
-        setEventTypes(names);
-        setSchemas(schemaMap);
-      } catch {
-        setEventTypes([]);
-        setSchemas(null);
-      }
-    })();
-  }, [fetchAllEventTypes]);
-
   // Provider-backed agent state and actions
   const {
     messages,
@@ -107,22 +72,24 @@ export function InsightsChat({
     popPendingAutoRun,
     pendingSqlVersion,
     setThreadClientState,
+    eventTypes,
+    schemas,
   } = useInsightsChatProvider();
 
   // Derive loading flags for this thread from provider
   const { networkActive, textStreaming, textCompleted, currentToolName } = useMemo(
-    () => getThreadFlags(threadId),
-    [getThreadFlags, threadId]
+    () => getThreadFlags(agentThreadId),
+    [getThreadFlags, agentThreadId]
   );
 
   // Keep per-tab thread isolated and stable
   useEffect(() => {
-    if (currentThreadId !== threadId) setCurrentThreadId(threadId);
-  }, [currentThreadId, setCurrentThreadId, threadId]);
+    if (currentThreadId !== agentThreadId) setCurrentThreadId(agentThreadId);
+  }, [currentThreadId, setCurrentThreadId, agentThreadId]);
 
   // Keep provider's per-thread client state up to date
   useEffect(() => {
-    setThreadClientState(threadId, {
+    setThreadClientState(agentThreadId, {
       sqlQuery: currentSql,
       eventTypes,
       schemas,
@@ -131,19 +98,19 @@ export function InsightsChat({
       mode: 'insights_sql_playground',
       timestamp: Date.now(),
     });
-  }, [setThreadClientState, threadId, currentSql, eventTypes, schemas, tabTitle]);
+  }, [setThreadClientState, agentThreadId, currentSql, eventTypes, schemas, tabTitle]);
 
   // Apply pending SQL from background tool-output when becoming active, then optionally auto-run
   const lastAppliedSqlRef = useRef<string | null>(null);
   useEffect(() => {
     // Only act for this thread when it's the active one
-    if (currentThreadId !== threadId) return;
-    const sql = readAndClearPendingSql(threadId);
+    if (currentThreadId !== agentThreadId) return;
+    const sql = readAndClearPendingSql(agentThreadId);
     if (typeof sql === 'string' && sql.length > 0) {
       lastAppliedSqlRef.current = sql;
       onSqlChange(sql.trim());
     }
-    if (popPendingAutoRun(threadId)) {
+    if (popPendingAutoRun(agentThreadId)) {
       // Defer run slightly to allow onSqlChange to commit
       setTimeout(() => {
         runQuery();
@@ -152,7 +119,7 @@ export function InsightsChat({
     // Re-run when provider reports new pending SQL ingress
   }, [
     currentThreadId,
-    threadId,
+    agentThreadId,
     readAndClearPendingSql,
     popPendingAutoRun,
     onSqlChange,
@@ -167,19 +134,23 @@ export function InsightsChat({
       if (!message || status !== 'ready') return;
       // Clear input immediately for snappier UX
       setInputValue('');
-      await sendMessageToThread(threadId, message);
+      await sendMessageToThread(agentThreadId, message);
     },
-    [inputValue, status, sendMessageToThread, threadId]
+    [inputValue, status, sendMessageToThread, agentThreadId]
   );
 
   const handleClearThread = useCallback(() => {
     if (messages.length === 0 || status !== 'ready') return;
-    clearThreadMessages(threadId);
-  }, [messages.length, status, clearThreadMessages, threadId]);
+    clearThreadMessages(agentThreadId);
+  }, [messages.length, status, clearThreadMessages, agentThreadId]);
 
-  const handleToggleChat = useCallback(() => {
-    onToggleChat();
-  }, [onToggleChat]);
+  const loadingText = getLoadingMessage({
+    networkActive,
+    textStreaming,
+    textCompleted,
+    toolName: currentToolName,
+    status,
+  });
 
   return (
     <div
@@ -188,7 +159,7 @@ export function InsightsChat({
       }`}
     >
       <div className="bg-surfaceBase flex h-full w-full flex-col">
-        <ChatHeader onClearThread={handleClearThread} onToggleChat={handleToggleChat} />
+        <ChatHeader onClearThread={handleClearThread} onToggleChat={onToggleChat} />
 
         <Conversation>
           <ConversationContent>
@@ -212,29 +183,24 @@ export function InsightsChat({
                             return <AssistantMessage key={i} part={part} />;
                           }
                           if (part.type === 'tool-call') {
-                            return (
-                              <ToolMessage
-                                key={i}
-                                part={part}
-                                onSqlChange={onSqlChange}
-                                runQuery={runQuery}
-                              />
-                            );
+                            if (part.toolName === 'generate_sql') {
+                              return (
+                                <ToolMessage
+                                  key={i}
+                                  part={part}
+                                  onSqlChange={onSqlChange}
+                                  runQuery={runQuery}
+                                />
+                              );
+                            }
+                            // Ignore other tool-call parts here
+                            return null;
                           }
                           return null;
                         })}
                   </div>
                 ))}
-                {(() => {
-                  const text = getLoadingMessage({
-                    networkActive,
-                    textStreaming,
-                    textCompleted,
-                    toolName: currentToolName,
-                    status,
-                  });
-                  return text ? <LoadingIndicator text={text} /> : null;
-                })()}
+                {loadingText && <LoadingIndicator text={loadingText} />}
               </div>
             )}
           </ConversationContent>

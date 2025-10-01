@@ -55,12 +55,13 @@ export function useInsightsTabManager(
 
   const effectiveChatPanelVisible = isInsightsAgentEnabled.value && isChatPanelVisible;
 
-  const threadIdMapRef = useRef<Record<string, string>>({});
-  const getThreadIdForTab = useCallback((tabId: string): string => {
-    const existing = threadIdMapRef.current[tabId];
+  // Map each UI tab to a stable agent thread id
+  const agentThreadIdByTabRef = useRef<Record<string, string>>({});
+  const getAgentThreadIdForTab = useCallback((tabId: string): string => {
+    const existing = agentThreadIdByTabRef.current[tabId];
     if (existing) return existing;
     const id = uuidv4();
-    threadIdMapRef.current[tabId] = id;
+    agentThreadIdByTabRef.current[tabId] = id;
     return id;
   }, []);
 
@@ -120,8 +121,8 @@ export function useInsightsTabManager(
       },
       focusTab: setActiveTabId,
       openTemplatesTab: () => {
-        const existingTab = findTabWithId(TEMPLATES_TAB.id, tabs);
-        if (existingTab === undefined) {
+        const hasTemplatesTab = tabs.some((tab) => tab.id === TEMPLATES_TAB.id);
+        if (!hasTemplatesTab) {
           createTabBase(TEMPLATES_TAB);
         } else {
           setActiveTabId(TEMPLATES_TAB.id);
@@ -140,7 +141,7 @@ export function useInsightsTabManager(
         actions={actions}
         activeTabId={activeTabId}
         tabs={tabs}
-        getThreadIdForTab={getThreadIdForTab}
+        getAgentThreadIdForTab={getAgentThreadIdForTab}
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
@@ -153,7 +154,7 @@ export function useInsightsTabManager(
       actions,
       activeTabId,
       tabs,
-      getThreadIdForTab,
+      getAgentThreadIdForTab,
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
@@ -169,7 +170,7 @@ export function useInsightsTabManager(
 interface InsightsTabManagerInternalProps {
   actions: TabManagerActions;
   activeTabId: string;
-  getThreadIdForTab: (tabId: string) => string;
+  getAgentThreadIdForTab: (tabId: string) => string;
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
@@ -183,7 +184,7 @@ function InsightsTabManagerInternal({
   tabs,
   activeTabId,
   actions,
-  getThreadIdForTab,
+  getAgentThreadIdForTab,
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
@@ -197,10 +198,6 @@ function InsightsTabManagerInternal({
     () => (isInsightsAgentEnabled ? createInMemorySessionTransport() : undefined),
     [isInsightsAgentEnabled]
   );
-  const channelKey = user?.id ? `insights:${user.id}` : undefined;
-
-  // Type shim to avoid cross-package ReactNode incompatibilities during local linking
-  const AnyAgentProvider = AgentProvider as unknown as React.FC<any>;
 
   const providerChildren: ReactNode = (
     <div className="h-full w-full">
@@ -215,9 +212,7 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div
-            className={
-              tab.id === activeTabId ? 'flex h-full w-full' : 'invisible h-0 w-full overflow-hidden'
-            }
+            className={tab.id === activeTabId ? 'flex h-full w-full' : 'h-0 w-full overflow-hidden'}
           >
             <div className="min-w-0 flex-1 overflow-hidden">
               <InsightsTabPanel
@@ -235,7 +230,7 @@ function InsightsTabManagerInternal({
               tab.id !== TEMPLATES_TAB.id &&
               isChatPanelVisible && (
                 <InsightsChat
-                  threadId={getThreadIdForTab(tab.id)}
+                  agentThreadId={getAgentThreadIdForTab(tab.id)}
                   onToggleChat={onToggleChatPanelVisibility}
                 />
               )}
@@ -254,14 +249,14 @@ function InsightsTabManagerInternal({
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
         {isInsightsAgentEnabled ? (
-          <AnyAgentProvider
+          <AgentProvider
             userId={user?.id || undefined}
-            channelKey={channelKey}
+            channelKey={user?.id ? `insights:${user.id}` : undefined}
             transport={transport}
             debug={false}
           >
             <InsightsChatProvider>{providerChildren}</InsightsChatProvider>
-          </AnyAgentProvider>
+          </AgentProvider>
         ) : (
           providerChildren
         )}
@@ -286,10 +281,6 @@ function getNewActiveTabAfterClose(
   const newlySelectedTabId =
     remainingTabs[closingTabIndex]?.id ?? remainingTabs[closingTabIndex - 1]?.id;
   return newlySelectedTabId;
-}
-
-function findTabWithId(id: string, tabs: Tab[]): string | undefined {
-  return tabs.find((tab) => tab.id === id)?.id;
 }
 
 export function hasDiffWithSavedQuery(

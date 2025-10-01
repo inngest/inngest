@@ -10,7 +10,9 @@ import React, {
   type ReactNode,
 } from 'react';
 import type { AgentStatus, ToolOutputOf } from '@inngest/use-agent';
+import { useQuery } from '@tanstack/react-query';
 
+import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import {
   useInsightsAgent,
   type ClientState,
@@ -43,6 +45,10 @@ type ContextValue = {
 
   // Client-state per thread for use in the state() function
   setThreadClientState: (threadId: string, state: ClientState) => void;
+
+  // Event metadata for the agent
+  eventTypes: string[];
+  schemas: Record<string, unknown> | null;
 };
 
 const defaultFlags: ThreadFlags = {
@@ -187,6 +193,24 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  // Fetch event types and schemas once; keep it simple (no caching beyond query instance)
+  // TODO: seAllEventTypes has an implicit limit of 40, need to update this to fetch more than 40 events
+  const fetchAllEventTypes = useAllEventTypes();
+  const { data: eventsData } = useQuery({
+    queryKey: ['insights', 'all-event-types'],
+    queryFn: async () => {
+      const events = await fetchAllEventTypes();
+      const names: string[] = events.map((e) => e.name);
+      const schemaMap: Record<string, string> = {};
+      for (const e of events) {
+        const raw = (e.latestSchema || '').trim();
+        if (!raw) continue;
+        schemaMap[e.name] = raw;
+      }
+      return { names, schemaMap };
+    },
+  });
+
   const {
     messages,
     status,
@@ -205,8 +229,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       // Fallback minimal state
       return {
         sqlQuery: '',
-        eventTypes: [],
-        schemas: null,
+        eventTypes: eventsData?.names ?? [],
+        schemas: eventsData?.schemaMap ?? null,
         currentQuery: '',
         tabTitle: '',
         mode: 'insights_sql_playground',
@@ -241,6 +265,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       popPendingAutoRun,
       pendingSqlVersion,
       setThreadClientState,
+      eventTypes: eventsData?.names ?? [],
+      schemas: eventsData?.schemaMap ?? null,
     }),
     [
       messages,
@@ -254,6 +280,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       popPendingAutoRun,
       pendingSqlVersion,
       setThreadClientState,
+      eventsData?.names,
+      eventsData?.schemaMap,
     ]
   );
 
