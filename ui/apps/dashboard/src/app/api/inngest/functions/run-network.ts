@@ -1,5 +1,5 @@
 import { createState, type AgentMessageChunk, type Message } from '@inngest/agent-kit';
-import type { ChatRequestEvent } from '@inngest/use-agent';
+import type { GetFunctionInput } from 'inngest';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
@@ -13,14 +13,12 @@ export const runAgentNetwork = inngest.createFunction(
     name: 'Insights SQL Agent',
   },
   { event: 'insights-agent/chat.requested' },
-  async ({ event, publish, step }) => {
-    const {
-      threadId: providedThreadId,
-      userMessage,
-      userId,
-      channelKey,
-      history,
-    } = event.data as ChatRequestEvent;
+  async ({
+    event,
+    publish,
+    step,
+  }: GetFunctionInput<typeof inngest, 'insights-agent/chat.requested'>) => {
+    const { threadId: providedThreadId, userMessage, userId, channelKey, history } = event.data;
 
     // Validate required userId
     if (!userId) {
@@ -47,7 +45,7 @@ export const runAgentNetwork = inngest.createFunction(
             ...clientState,
           },
           {
-            messages: history as Message[] | undefined,
+            messages: history,
             threadId,
           }
         )
