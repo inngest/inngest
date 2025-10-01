@@ -28,149 +28,166 @@ const queryGrammar = `
   OrderExpression = Expression ("ASC" | "DESC")? .
 `;
 
-const queryRules = `
+const insightsDocs = `
+# Insights
+
 Inngest Insights allows you to query and analyze your event data using SQL directly within the Inngest platform. Every event sent to Inngest contains valuable information, and Insights gives you the power to extract meaningful patterns and analytics from that data.
 
-Overview
+<Info>
+  Insights support is currently in Public Beta. Some details including SQL syntax and feature availability are still subject to change during this period. Read more about the [Public Beta release phase here](/docs/release-phases#public-beta) and the [roadmap here](#roadmap).
+</Info>
+
+## Overview
+
 Insights provides an in-app SQL editor and query interface where you can:
+- Query event data using familiar SQL syntax
+- Save and reuse common queries
+- Analyze patterns in your event triggers
+- Extract business intelligence from your workflows
 
-Query event data using familiar SQL syntax
-Save and reuse common queries
-Analyze patterns in your event streams
-Extract business intelligence from your workflows
-Currently, you can query events only. Support for querying function runs will be added in future releases.
+Currently, you can **only query events**. Support for querying function runs will be added in future releases.
 
-Getting Started
-Available Columns
+## Getting Started
+
+Access Insights through the Inngest dashboard by clicking on the "Insights" tab in the left navigation. 
+
+![Getting Started Dashboard View](/assets/docs/platform/monitor/insights/insights_dashboard_view.png)
+
+We have several pre-built query templates to help you get started exploring your data.
+
+![Getting Started Templates View](/assets/docs/platform/monitor/insights/insights_template_view.png)
+
+## SQL Editor
+
+The Insights interface includes a full-featured SQL editor where you can:
+
+- Write and execute SQL queries against your event data
+- Save frequently used queries for later access
+- View query results in an organized table format
+- Access query history and templates from the sidebar
+
+![Sql Editor View](/assets/docs/platform/monitor/insights/insights_sql_editor.png)
+
+### Available Columns
+
 When querying events, you have access to the following columns:
 
-Column	Type	Description
-id	String	Unique identifier for the event
-name	String	The name/type of the event
-data	JSON	The event payload data - users can send any JSON structure here
-ts	DateTime	Timestamp when the event occurred
-v	String	Event format version
-For more details on the event format, see the Inngest Event Format documentation.
+| Column | Type | Description |
+|--------|------|-------------|
+| id | String | Unique identifier for the event |
+| name | String | The name/type of the event |
+| **data** | **JSON** | **The event payload data - users can send any JSON structure here** |
+| ts | Unix timestamp (ms) | Unix timestamp in milliseconds when the event occurred - [reference](https://www.unixtimestamp.com/) |
+| v | String | Event format version |
 
-Data Retention
-You can query events from up to 30 days in the past. Older events are not available through Insights.
+For more details on the event format, see the [Inngest Event Format documentation](/docs/features/events-triggers/event-format).
 
-Result Limits
-Current page limit: 1000 rows
-Future updates will support larger result sets through async data exports
-Pagination support is planned for future releases
-SQL Support
+### Data Retention
+
+Refer to [pricing plans](/pricing) for data retention limits.
+
+### Result Limits
+
+- Current page limit: **1000 rows**
+- Future updates will support larger result sets through async data exports
+
+## SQL Support
+
 Insights is built on ClickHouse, which provides powerful SQL capabilities with some differences from traditional SQL databases.
 
-Supported Functions
-Arithmetic Functions
-Basic mathematical operations and calculations. View ClickHouse arithmetic functions documentation
+![Sql Editor View](/assets/docs/platform/monitor/insights/insights_query_results.png)
 
-String Functions
+### Supported Functions
+
+#### Arithmetic Functions
+Basic mathematical operations and calculations.
+[View ClickHouse arithmetic functions documentation](https://clickhouse.com/docs/sql-reference/functions/arithmetic-functions)
+
+#### String Functions
 String manipulation and search capabilities.
+- [String search functions](https://clickhouse.com/docs/sql-reference/functions/string-search-functions)
+- [String manipulation functions](https://clickhouse.com/docs/sql-reference/functions/string-functions)
 
-String search functions
-String manipulation functions
-JSON Functions
-Essential for working with data payloads. View ClickHouse JSON functions documentation
+#### JSON Functions
+Essential for working with events.data payloads.
+[View ClickHouse JSON functions documentation](https://clickhouse.com/docs/sql-reference/functions/json-functions)
 
-Date/Time Functions
-For analyzing event timing and patterns. View ClickHouse date/time functions documentation
+#### Date/Time Functions
+For analyzing event timing and patterns.
+[View ClickHouse date/time functions documentation](https://clickhouse.com/docs/sql-reference/functions/date-time-functions)
 
-Other Supported Function Categories
-Logical functions
-Rounding functions
-Type conversion functions
-Functions for nulls
-ULID functions
-Aggregate Functions
+#### Other Supported Function Categories
+- [Logical functions](https://clickhouse.com/docs/sql-reference/functions/logical-functions)
+- [Rounding functions](https://clickhouse.com/docs/sql-reference/functions/rounding-functions)
+- [Type conversion functions](https://clickhouse.com/docs/sql-reference/functions/type-conversion-functions)
+- [Functions for nulls](https://clickhouse.com/docs/sql-reference/functions/functions-for-nulls)
+- [ULID functions](https://clickhouse.com/docs/sql-reference/functions/ulid-functions)
+
+### Aggregate Functions
+
 The following aggregate functions are supported:
 
-Function	Description
-ARRAY_AGG()	Aggregates values into an array*
-AVG()	Calculates average
-COUNT()	Counts rows
-MAX()	Finds maximum value
-MIN()	Finds minimum value
-STDDEV_POP()	Population standard deviation
-STDDEV_SAMP()	Sample standard deviation
-SUM()	Calculates sum
-VAR_POP()	Population variance
-VAR_SAMP()	Sample variance
-median()	Finds median value
-*Note on ARRAY_AGG: Due to a current serialization bug, you need to convert arrays to strings using toString(ARRAY_AGG(column_name)).
+| Function | Description |
+|----------|-------------|
+| ARRAY_AGG() | [Aggregates values into an array](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/grouparray)  * |
+| AVG() | [Calculates average](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/avg) |
+| COUNT() | [Counts rows](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/count) |
+| MAX() | [Finds maximum value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/max) |
+| MIN() | [Finds minimum value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/min) |
+| STDDEV_POP() | [Population standard deviation](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/stddevpop) |
+| STDDEV_SAMP() | [Sample standard deviation](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/stddevsamp) |
+| SUM() | [Calculates sum](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/sum) |
+| VAR_POP() | [Population variance](https://clickhouse.com/docs/en/sql-reference/aggregate-functions/reference/varPop) |
+| VAR_SAMP() | [Sample variance](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/varSamp) |
+| median() | [Finds median value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/median) |
 
-View complete ClickHouse aggregate functions documentation
 
-SQL Syntax Limitations
+
+### SQL Syntax Limitations
+
 Some SQL features are not yet supported but are planned for future releases:
 
-CTEs (Common Table Expressions) using WITH
-IS operator
-NOT operator
-Working with Event Data
-Common Schema vs Event-Specific Schema
-Common Schema: These columns are available for every user and every event:
+- **CTEs (Common Table Expressions)** using WITH
+- **IS operator**
+- **NOT operator**
 
-id
-name
-ts
-v
-data
-Event-Specific Schema: Within data, users can send any JSON they want, so the structure and available fields will be specific to their payloads. You can use ClickHouse's JSON functions to extract and query specific fields within your event data.
 
-Example Queries
-Basic Event Filtering
+## Working with Event Data
 
-Copy
-Copied
+### Event-Specific Schema
+
+Within **events.data**, users can send any JSON they want, so the structure and available fields will be specific to their payloads. You can use ClickHouse's JSON functions to extract and query specific fields within your event data.
+
+### Example Queries
+
+#### Basic Event Filtering
+
 SELECT count(*)
 FROM events
 WHERE name = 'inngest/function.failed'
 AND simpleJSONExtractString(data, 'function_id') = 'generate-report'
 AND ts > toUnixTimestamp(addHours(now(), -1)) * 1000;
-Extracting JSON Data and Aggregating
 
-Copy
-Copied
+
+#### Extracting JSON Data and Aggregating
+
 SELECT simpleJSONExtractString(data, 'user_id') as user_id, count(*) 
 FROM events
 WHERE name = 'order.created'
 GROUP BY user_id
 ORDER BY count(*) DESC
 LIMIT 10;
-Saved Queries
-You can save frequently used queries for quick access. Currently, saved queries are stored in your browser's local storage.
 
-Note: Saved queries are only available on the device and browser where you created them. Cloud synchronization of saved queries is planned for a future release.
+## Saved Queries
 
-Common Errors and Troubleshooting
-Array Serialization Issues
-When using ARRAY_AGG(), you must convert the result to a string:
+You can save frequently used queries for quick access. Queries are only saved private for you to use; they are not shared across your Inngest organization.
 
-Correct:
+## Need Help?
 
-
-Copy
-Copied
-SELECT toString(ARRAY_AGG(id)) as ids FROM events
-Incorrect:
-
-
-Copy
-Copied
-SELECT ARRAY_AGG(id) as ids FROM events  -- This will cause serialization errors
-Roadmap
-Coming Soon
-Query support for function runs
-received_at column for tracking event receipt time
-Pagination for large result sets
-Async data exports for results larger than 1000 rows
-Future Enhancements
-Support for CTEs (Common Table Expressions)
-IS and NOT operators
-Cloud synchronization for saved queries
-Advanced visualization capabilities
+If you encounter issues or have questions about Insights:
+1. Check this documentation for common solutions
+2. Review the [ClickHouse SQL reference](https://clickhouse.com/docs/sql-reference/) for advanced function usage
+3. Contact support through the Inngest platform
 
 `;
 
@@ -207,7 +224,7 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
     const selected = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
     return [
       'You write ClickHouse-compatible SQL for analytics.',
-      `You MUST follow these rules ${queryRules}`,
+      `You MUST follow these rules ${insightsDocs}`,
       `You MUST follow this grammar ${queryGrammar}`,
       selected.length
         ? `Target the following events if relevant: ${selected.join(', ')}`
