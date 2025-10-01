@@ -134,5 +134,10 @@ export function initializeSplitFromStorage(
 }
 
 function clamp(n: number, min: number, max: number): number {
+  if (!Number.isFinite(n)) {
+    if (n === Infinity) return max;
+    if (n === -Infinity) return min;
+    return min;
+  }
   return Math.max(min, Math.min(max, n));
 }
