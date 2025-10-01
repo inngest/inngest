@@ -28,7 +28,7 @@ function GenerateSqlToolUI({
   }
 
   return (
-    <div className="text-basis border-muted rounded-md border bg-transparent px-3 py-2 text-sm">
+    <div className="text-basis border-muted rounded-lg border bg-transparent px-3 py-2 text-sm">
       <Disclosure>
         {() => (
           <>
@@ -38,7 +38,7 @@ function GenerateSqlToolUI({
                   <div
                     className={cn(
                       'flex h-4 w-4 items-center justify-center rounded-full',
-                      errorMessage ? 'bg-error' : 'bg-primary-subtle'
+                      errorMessage ? 'bg-error' : 'bg-btnPrimary'
                     )}
                   >
                     {errorMessage ? (
@@ -61,7 +61,7 @@ function GenerateSqlToolUI({
                   /> */}
                   <OptionalTooltip tooltip="Run this query" side="bottom">
                     <Button
-                      icon={<RiPlayLine className="text-muted size-8 scale-110" />}
+                      icon={<RiPlayLine className="text-subtle size-8 scale-110" />}
                       appearance="ghost"
                       size="small"
                       onClick={() => {
