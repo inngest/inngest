@@ -11,7 +11,6 @@ import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
 import { type EntityLookup } from './Dashboard';
-import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -291,10 +290,6 @@ export const MetricsVolume = ({
                 isMarketplace={isMarketplace}
               />
             </div>
-            <div className="col-span-2 flex flex-row flex-wrap items-center justify-center gap-2 overflow-hidden md:flex-nowrap">
-              <Feedback />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
           </div>
         </>
       )}

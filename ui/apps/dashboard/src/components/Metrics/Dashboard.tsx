@@ -184,7 +184,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
         )}
       </div>
       {error && <Error message="There was an error fetching metrics filter data." />}
-      <div className="bg-canvasSubtle px-6">
+      <div className="bg-canvasBase px-4">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}
@@ -196,7 +196,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           scope={envLookup ? MetricsScope.App : MetricsScope.Fn}
         />
       </div>
-      <div className="bg-canvasSubtle px-6 pb-6">
+      <div className="bg-canvasBase px-4 pb-6">
         <MetricsVolume
           from={getFrom(parsedStart, parsedDuration)}
           until={parsedEnd}
