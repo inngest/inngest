@@ -40,10 +40,14 @@ type PromptInputTextareaProps = {
 };
 
 export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTextareaProps>(
-  ({ onChange, className, rows = 3, onKeyDown, ...props }, ref) => {
+  ({ onChange, className, rows = 3, onKeyDown, disabled, ...props }, ref) => {
     const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
       if (onKeyDown) onKeyDown(e);
       if (!e.defaultPrevented && e.key === 'Enter' && !e.shiftKey) {
+        if (disabled) {
+          // When submission is disabled, allow Enter to insert a newline instead of submitting
+          return;
+        }
         e.preventDefault();
         e.currentTarget.form?.requestSubmit();
       }
