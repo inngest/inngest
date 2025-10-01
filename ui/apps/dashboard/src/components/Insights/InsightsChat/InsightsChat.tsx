@@ -68,9 +68,8 @@ export function InsightsChat({
     clearThreadMessages,
     sendMessageToThread,
     getThreadFlags,
-    readAndClearPendingSql,
-    popPendingAutoRun,
-    pendingSqlVersion,
+    getLatestGeneratedSql,
+    latestSqlVersion,
     setThreadClientState,
     eventTypes,
     schemas,
@@ -82,49 +81,32 @@ export function InsightsChat({
     [getThreadFlags, agentThreadId]
   );
 
-  // Keep per-tab thread isolated and stable
-  useEffect(() => {
-    if (currentThreadId !== agentThreadId) setCurrentThreadId(agentThreadId);
-  }, [currentThreadId, setCurrentThreadId, agentThreadId]);
+  // Thread switching is handled by ActiveThreadBridge at the TabManager level
 
-  // Keep provider's per-thread client state up to date
-  useEffect(() => {
-    setThreadClientState(agentThreadId, {
-      sqlQuery: currentSql,
-      eventTypes,
-      schemas,
-      currentQuery: currentSql,
-      tabTitle,
-      mode: 'insights_sql_playground',
-      timestamp: Date.now(),
-    });
-  }, [setThreadClientState, agentThreadId, currentSql, eventTypes, schemas, tabTitle]);
+  // Client state is captured at send-time; avoid continuous effects here
 
-  // Apply pending SQL from background tool-output when becoming active, then optionally auto-run
+  // When active, auto-apply latest generated SQL if newer
   const lastAppliedSqlRef = useRef<string | null>(null);
   useEffect(() => {
-    // Only act for this thread when it's the active one
     if (currentThreadId !== agentThreadId) return;
-    const sql = readAndClearPendingSql(agentThreadId);
-    if (typeof sql === 'string' && sql.length > 0) {
-      lastAppliedSqlRef.current = sql;
-      onSqlChange(sql.trim());
-    }
-    if (popPendingAutoRun(agentThreadId)) {
-      // Defer run slightly to allow onSqlChange to commit
-      setTimeout(() => {
+    const latest = getLatestGeneratedSql(agentThreadId);
+    if (!latest) return;
+    if (lastAppliedSqlRef.current === latest) return;
+    lastAppliedSqlRef.current = latest;
+    onSqlChange(latest.trim());
+    // Auto-run for snappy UX
+    setTimeout(() => {
+      try {
         runQuery();
-      }, 0);
-    }
-    // Re-run when provider reports new pending SQL ingress
+      } catch {}
+    }, 0);
   }, [
     currentThreadId,
     agentThreadId,
-    readAndClearPendingSql,
-    popPendingAutoRun,
+    getLatestGeneratedSql,
+    latestSqlVersion,
     onSqlChange,
     runQuery,
-    pendingSqlVersion,
   ]);
 
   const handleSubmit = useCallback(
@@ -134,9 +116,31 @@ export function InsightsChat({
       if (!message || status !== 'ready') return;
       // Clear input immediately for snappier UX
       setInputValue('');
+      // Capture client state snapshot at send-time
+      try {
+        setThreadClientState(agentThreadId, {
+          sqlQuery: currentSql,
+          eventTypes,
+          schemas,
+          currentQuery: currentSql,
+          tabTitle,
+          mode: 'insights_sql_playground',
+          timestamp: Date.now(),
+        });
+      } catch {}
       await sendMessageToThread(agentThreadId, message);
     },
-    [inputValue, status, sendMessageToThread, agentThreadId]
+    [
+      inputValue,
+      status,
+      sendMessageToThread,
+      agentThreadId,
+      setThreadClientState,
+      currentSql,
+      eventTypes,
+      schemas,
+      tabTitle,
+    ]
   );
 
   const handleClearThread = useCallback(() => {

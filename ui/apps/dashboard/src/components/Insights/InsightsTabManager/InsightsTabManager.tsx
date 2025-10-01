@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agent';
 import { ulid } from 'ulid';
@@ -11,7 +11,10 @@ import { InsightsStateMachineContextProvider } from '@/components/Insights/Insig
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { InsightsChat } from '../InsightsChat/InsightsChat';
-import { InsightsChatProvider } from '../InsightsChat/InsightsChatProvider';
+import {
+  InsightsChatProvider,
+  useInsightsChatProvider,
+} from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
@@ -255,7 +258,13 @@ function InsightsTabManagerInternal({
             transport={transport}
             debug={false}
           >
-            <InsightsChatProvider>{providerChildren}</InsightsChatProvider>
+            <InsightsChatProvider>
+              <ActiveThreadBridge
+                activeTabId={activeTabId}
+                getAgentThreadIdForTab={getAgentThreadIdForTab}
+              />
+              {providerChildren}
+            </InsightsChatProvider>
           </AgentProvider>
         ) : (
           providerChildren
@@ -307,4 +316,28 @@ export function getIsSavedQuery(tab: Tab): boolean {
 
 function makeEmptyUnsavedTab(): Tab {
   return { id: ulid(), name: UNTITLED_QUERY, query: '' };
+}
+
+function ActiveThreadBridge({
+  activeTabId,
+  getAgentThreadIdForTab,
+}: {
+  activeTabId: string;
+  getAgentThreadIdForTab: (tabId: string) => string;
+}) {
+  const { currentThreadId, setCurrentThreadId } = useInsightsChatProvider();
+  const targetThreadId = useMemo(
+    () => getAgentThreadIdForTab(activeTabId),
+    [activeTabId, getAgentThreadIdForTab]
+  );
+
+  useEffect(() => {
+    if (currentThreadId !== targetThreadId) {
+      try {
+        setCurrentThreadId(targetThreadId);
+      } catch {}
+    }
+  }, [currentThreadId, targetThreadId, setCurrentThreadId]);
+
+  return null;
 }

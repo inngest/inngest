@@ -37,11 +37,10 @@ type ContextValue = {
   // Wrapped send to associate per-thread client state
   sendMessageToThread: (threadId: string, content: string) => Promise<void>;
 
-  // Per-thread UI flags and pending SQL handoff
+  // Per-thread UI flags and derived SQL
   getThreadFlags: (threadId: string) => ThreadFlags;
-  readAndClearPendingSql: (threadId: string) => string | undefined;
-  popPendingAutoRun: (threadId: string) => boolean;
-  pendingSqlVersion: number; // Bumped when new SQL arrives to notify consumers
+  getLatestGeneratedSql: (threadId: string) => string | undefined;
+  latestSqlVersion: number; // Bumped when new SQL arrives to notify consumers
 
   // Client-state per thread for use in the state() function
   setThreadClientState: (threadId: string, state: ClientState) => void;
@@ -63,10 +62,9 @@ const InsightsChatContext = createContext<ContextValue | undefined>(undefined);
 export function InsightsChatProvider({ children }: { children: ReactNode }) {
   // Per-thread UI flags in React state for rerenders
   const [threadFlags, setThreadFlags] = useState<Record<string, ThreadFlags>>({});
-  // Pending SQL and auto-run signals held in refs
-  const pendingSqlByThreadRef = useRef<Map<string, string>>(new Map());
-  const pendingAutoRunRef = useRef<Set<string>>(new Set());
-  const [pendingSqlVersion, setPendingSqlVersion] = useState(0);
+  // Latest generated SQL per thread
+  const latestSqlByThreadRef = useRef<Map<string, string>>(new Map());
+  const [latestSqlVersion, setLatestSqlVersion] = useState(0);
 
   // Per-thread client state map used by the state() function
   const threadClientStateRef = useRef<Map<string, ClientState>>(new Map());
@@ -82,18 +80,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     [threadFlags]
   );
 
-  const readAndClearPendingSql = useCallback((threadId: string): string | undefined => {
-    const sql = pendingSqlByThreadRef.current.get(threadId);
-    if (sql !== undefined) {
-      pendingSqlByThreadRef.current.delete(threadId);
-    }
-    return sql;
-  }, []);
-
-  const popPendingAutoRun = useCallback((threadId: string): boolean => {
-    const has = pendingAutoRunRef.current.has(threadId);
-    if (has) pendingAutoRunRef.current.delete(threadId);
-    return has;
+  const getLatestGeneratedSql = useCallback((threadId: string): string | undefined => {
+    return latestSqlByThreadRef.current.get(threadId);
   }, []);
 
   const onEvent = useCallback((evt: InsightsAgentEvent) => {
@@ -164,9 +152,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
                 | undefined;
               const sql = output?.data.sql;
               if (sql && sql.length > 0) {
-                pendingSqlByThreadRef.current.set(tid, sql);
-                pendingAutoRunRef.current.add(tid);
-                setPendingSqlVersion((v) => v + 1);
+                latestSqlByThreadRef.current.set(tid, sql);
+                setLatestSqlVersion((v) => v + 1);
               }
             }
 
@@ -261,9 +248,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       clearThreadMessages,
       sendMessageToThread,
       getThreadFlags: getFlags,
-      readAndClearPendingSql,
-      popPendingAutoRun,
-      pendingSqlVersion,
+      getLatestGeneratedSql,
+      latestSqlVersion,
       setThreadClientState,
       eventTypes: eventsData?.names ?? [],
       schemas: eventsData?.schemaMap ?? null,
@@ -276,9 +262,8 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       clearThreadMessages,
       sendMessageToThread,
       getFlags,
-      readAndClearPendingSql,
-      popPendingAutoRun,
-      pendingSqlVersion,
+      getLatestGeneratedSql,
+      latestSqlVersion,
       setThreadClientState,
       eventsData?.names,
       eventsData?.schemaMap,
