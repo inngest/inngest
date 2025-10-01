@@ -20,6 +20,7 @@ export function EmptyState() {
                 className="text-link inline-flex text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/insights"
                 target="_blank"
+                rel="noopener"
               >
                 Learn more
               </Link>
