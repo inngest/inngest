@@ -9,11 +9,10 @@ type SendButtonProps = {
 const SendButton = ({ onClick, disabled }: SendButtonProps) => {
   return (
     <Button
-      kind="secondary"
+      kind="primary"
       size="small"
       icon={<RiArrowUpLine className="text-white" />}
       onClick={onClick}
-      className={`${disabled ? 'cursor-not-allowed bg-[#9ADAB3] opacity-50' : ''} bg-[#007A48]`}
       disabled={disabled}
     />
   );
