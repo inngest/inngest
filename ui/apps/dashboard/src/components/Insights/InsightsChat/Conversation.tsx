@@ -26,7 +26,7 @@ export const Conversation = ({ className, ...props }: ComponentProps<'div'>) => 
 };
 
 export const ConversationContent = ({ className, ...props }: ComponentProps<'div'>) => (
-  <div className={cn('mx-4 pb-1 pt-4', className)} {...props} />
+  <div className={cn('mx-4 flex h-full flex-col pb-1 pt-4', className)} {...props} />
 );
 
 export const ConversationScrollButton = ({

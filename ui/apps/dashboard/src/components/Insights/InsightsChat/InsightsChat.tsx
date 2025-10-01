@@ -6,6 +6,7 @@ import { type AgentStatus } from '@inngest/use-agent';
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Conversation, ConversationContent } from './Conversation';
+import { EmptyState } from './EmptyState';
 import { useInsightsChatProvider } from './InsightsChatProvider';
 import { LoadingIndicator } from './LoadingIndicator';
 import { ChatHeader } from './header/ChatHeader';
@@ -191,49 +192,55 @@ export function InsightsChat({
 
         <Conversation>
           <ConversationContent>
-            <div className="flex-1 space-y-4 p-3">
-              {messages.map((m) => (
-                <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                  {m.role === 'user'
-                    ? m.parts.map((part, i) => {
-                        if (part.type === 'text') {
-                          return <UserMessage key={i} part={part} />;
-                        }
-                        return null;
-                      })
-                    : m.parts.map((part, i) => {
-                        if (part.type === 'text') {
-                          return <AssistantMessage key={i} part={part} />;
-                        }
-                        if (part.type === 'tool-call') {
-                          return (
-                            <ToolMessage
-                              key={i}
-                              part={part}
-                              onSqlChange={onSqlChange}
-                              runQuery={runQuery}
-                            />
-                          );
-                        }
-                        return null;
-                      })}
-                </div>
-              ))}
-              {(() => {
-                const text = getLoadingMessage({
-                  networkActive,
-                  textStreaming,
-                  textCompleted,
-                  toolName: currentToolName,
-                  status,
-                });
-                return text ? <LoadingIndicator text={text} /> : null;
-              })()}
-            </div>
+            {messages.length === 0 ? (
+              <div className="flex-1 p-3">
+                <EmptyState />
+              </div>
+            ) : (
+              <div className="flex-1 space-y-4 p-3">
+                {messages.map((m) => (
+                  <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
+                    {m.role === 'user'
+                      ? m.parts.map((part, i) => {
+                          if (part.type === 'text') {
+                            return <UserMessage key={i} part={part} />;
+                          }
+                          return null;
+                        })
+                      : m.parts.map((part, i) => {
+                          if (part.type === 'text') {
+                            return <AssistantMessage key={i} part={part} />;
+                          }
+                          if (part.type === 'tool-call') {
+                            return (
+                              <ToolMessage
+                                key={i}
+                                part={part}
+                                onSqlChange={onSqlChange}
+                                runQuery={runQuery}
+                              />
+                            );
+                          }
+                          return null;
+                        })}
+                  </div>
+                ))}
+                {(() => {
+                  const text = getLoadingMessage({
+                    networkActive,
+                    textStreaming,
+                    textCompleted,
+                    toolName: currentToolName,
+                    status,
+                  });
+                  return text ? <LoadingIndicator text={text} /> : null;
+                })()}
+              </div>
+            )}
           </ConversationContent>
         </Conversation>
 
-        <div className="p-2">
+        <div className="p-2 px-4 pb-5">
           <ResponsivePromptInput
             value={inputValue}
             onChange={setInputValue}
