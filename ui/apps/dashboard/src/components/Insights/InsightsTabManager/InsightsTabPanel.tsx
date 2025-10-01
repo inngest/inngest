@@ -1,18 +1,19 @@
 'use client';
 
 import { Link } from '@inngest/components/Link/Link';
+import { Resizable } from '@inngest/components/Resizable/Resizable';
 
-import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/InsightsDataTable';
-import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
-import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
-import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
-import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryTitle';
-import { InsightsSQLEditorResultsTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorResultsTitle';
-import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
-import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import { Section } from '@/components/Insights/Section';
 import type { Tab } from '@/components/Insights/types';
 import { MaximizeChatButton } from '../InsightsChat/header/MaximizeChatButton';
+import { InsightsDataTable } from '../InsightsDataTable/InsightsDataTable';
+import { InsightsSQLEditor } from '../InsightsSQLEditor/InsightsSQLEditor';
+import { InsightsSQLEditorDownloadCSVButton } from '../InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
+import { InsightsSQLEditorQueryButton } from '../InsightsSQLEditor/InsightsSQLEditorQueryButton';
+import { InsightsSQLEditorQueryTitle } from '../InsightsSQLEditor/InsightsSQLEditorQueryTitle';
+import { InsightsSQLEditorResultsTitle } from '../InsightsSQLEditor/InsightsSQLEditorResultsTitle';
+import { InsightsSQLEditorSaveQueryButton } from '../InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
+import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { Section } from '../Section';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
@@ -44,40 +45,51 @@ export function InsightsTabPanel({
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
-    <div className="grid h-full w-full grid-rows-[3fr_5fr] gap-0 overflow-hidden">
-      <Section
-        actions={
-          <>
-            <InsightsSQLEditorSaveQueryButton tab={tab} />
-            <InsightsSQLEditorQueryButton />
-            {isInsightsAgentEnabled && !isChatPanelVisible && (
+    <div className="flex h-full min-h-0 flex-col">
+      <Resizable
+        defaultSplitPercentage={37.5}
+        minSplitPercentage={20}
+        maxSplitPercentage={80}
+        first={
+          <Section
+            actions={
               <>
-                <VerticalDivider />
-                <MaximizeChatButton onClick={onToggleChatPanelVisibility} />
+                <InsightsSQLEditorSaveQueryButton tab={tab} />
+                <InsightsSQLEditorQueryButton />
+                {isInsightsAgentEnabled && !isChatPanelVisible && (
+                  <>
+                    <VerticalDivider />
+                    <MaximizeChatButton onClick={onToggleChatPanelVisibility} />
+                  </>
+                )}
               </>
-            )}
-          </>
+            }
+            className="h-full"
+            title={<InsightsSQLEditorQueryTitle tab={tab} />}
+          >
+            <InsightsSQLEditor />
+          </Section>
         }
-        className="min-h-[255px]"
-        title={<InsightsSQLEditorQueryTitle tab={tab} />}
-      >
-        <InsightsSQLEditor />
-      </Section>
-      <Section
-        actions={
-          <>
-            <InsightsSQLEditorDownloadCSVButton temporarilyHide />
-            {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-            <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
-              Send us feedback
-            </Link>
-          </>
+        orientation="vertical"
+        second={
+          <Section
+            actions={
+              <>
+                <InsightsSQLEditorDownloadCSVButton temporarilyHide />
+                {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+                <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
+                  Send us feedback
+                </Link>
+              </>
+            }
+            className="border-subtle h-full border-t"
+            title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
+          >
+            <InsightsDataTable />
+          </Section>
         }
-        className="border-subtle border-t"
-        title={<InsightsSQLEditorResultsTitle historyWindow={historyWindow} />}
-      >
-        <InsightsDataTable />
-      </Section>
+        splitKey="insights-tab-panel-split-vertical"
+      />
     </div>
   );
 }

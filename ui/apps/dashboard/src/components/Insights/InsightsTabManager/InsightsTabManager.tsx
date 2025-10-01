@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { Resizable } from '@inngest/components/Resizable/Resizable';
 import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agent';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
@@ -214,29 +215,50 @@ function InsightsTabManagerInternal({
           renderChildren={tab.id === activeTabId}
           tabId={tab.id}
         >
-          <div
-            className={tab.id === activeTabId ? 'flex h-full w-full' : 'h-0 w-full overflow-hidden'}
-          >
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <InsightsTabPanel
-                isHomeTab={tab.id === HOME_TAB.id}
-                isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                tab={tab}
-                historyWindow={historyWindow}
-                isChatPanelVisible={isChatPanelVisible}
-                onToggleChatPanelVisibility={onToggleChatPanelVisibility}
-                isInsightsAgentEnabled={isInsightsAgentEnabled}
-              />
-            </div>
+          <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
             {isInsightsAgentEnabled &&
-              tab.id !== HOME_TAB.id &&
-              tab.id !== TEMPLATES_TAB.id &&
-              isChatPanelVisible && (
-                <InsightsChat
-                  agentThreadId={getAgentThreadIdForTab(tab.id)}
-                  onToggleChat={onToggleChatPanelVisibility}
+            tab.id !== HOME_TAB.id &&
+            tab.id !== TEMPLATES_TAB.id &&
+            isChatPanelVisible ? (
+              <Resizable
+                defaultSplitPercentage={75}
+                minSplitPercentage={20}
+                maxSplitPercentage={85}
+                orientation="horizontal"
+                splitKey={`insights-chat-split-${tab.id}`}
+                first={
+                  <div className="h-full min-w-0 overflow-hidden">
+                    <InsightsTabPanel
+                      isHomeTab={tab.id === HOME_TAB.id}
+                      isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                      tab={tab}
+                      historyWindow={historyWindow}
+                      isChatPanelVisible={isChatPanelVisible}
+                      onToggleChatPanelVisibility={onToggleChatPanelVisibility}
+                      isInsightsAgentEnabled={isInsightsAgentEnabled}
+                    />
+                  </div>
+                }
+                second={
+                  <InsightsChat
+                    agentThreadId={getAgentThreadIdForTab(tab.id)}
+                    onToggleChat={onToggleChatPanelVisibility}
+                  />
+                }
+              />
+            ) : (
+              <div className="h-full min-w-0 overflow-hidden">
+                <InsightsTabPanel
+                  isHomeTab={tab.id === HOME_TAB.id}
+                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                  tab={tab}
+                  historyWindow={historyWindow}
+                  isChatPanelVisible={isChatPanelVisible}
+                  onToggleChatPanelVisibility={onToggleChatPanelVisibility}
+                  isInsightsAgentEnabled={isInsightsAgentEnabled}
                 />
-              )}
+              </div>
+            )}
           </div>
         </InsightsStateMachineContextProvider>
       ))}
