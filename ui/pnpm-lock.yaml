@@ -111,8 +111,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0(express@5.1.0)(next@14.2.32)(react@18.2.0)(typescript@5.1.3)
       '@inngest/use-agent':
-        specifier: 0.2.0
-        version: 0.2.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0)
+        specifier: ^0.4.0
+        version: 0.4.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0)
       '@launchdarkly/node-server-sdk':
         specifier: ^9.0.3
         version: 9.0.3
@@ -5442,8 +5442,8 @@ packages:
       - typescript
     dev: false
 
-  /@inngest/use-agent@0.2.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0):
-    resolution: {integrity: sha512-oT6yCzwIhlePXpn8rxyJwzBwZFOnr4MpjBsytohULvC3kjKdS0Qz0j/EtY6JZcZ86TJwbhggeMLFbFIe62LI1w==}
+  /@inngest/use-agent@0.4.0(express@5.1.0)(next@14.2.32)(react-dom@18.2.0)(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0):
+    resolution: {integrity: sha512-59U8q8TotWdSuDLNWMfjxeNVPvw400/iNKxfoNZBXkNvxwyjF9xtOJyZzm8d46NcMrARdb/ErJzfTf16iPwbdw==}
     peerDependencies:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
