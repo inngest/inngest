@@ -10,7 +10,7 @@ const userMessageSchema = z.object({
   content: z.string().min(1, 'Message content is required'),
   role: z.literal('user'),
   state: z.record(z.unknown()).optional(),
-  clientTimestamp: z.coerce.date().optional(),
+  clientTimestamp: z.string().optional(),
   systemPrompt: z.string().optional(),
 });
 
