@@ -512,6 +512,70 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 	return nil
 }
 
+// enqueue a system job in the future for eager cancellation of timed out jobs.
+func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since time.Time, timeout *time.Duration, cancellationKind enums.CancellationKind, id state.Identifier) error {
+	l := logger.StdlibLogger(context.Background()).With("run_id", id.RunID, "kind", cancellationKind)
+
+	// no timeout or invalid timeout, nothing to do
+	if timeout == nil || *timeout <= 0 {
+		l.Warn("attempting to create eager cancellation system jobs with empty or invalid timeout")
+		return nil
+	}
+
+	var systemJobPrefix string
+	switch cancellationKind {
+	case enums.CancellationKindFinishTimeout:
+		systemJobPrefix = "eager-cancel-finish-timeout"
+	case enums.CancellationKindStartTimeout:
+		systemJobPrefix = "eager-cancel-start-timeout"
+	default:
+		return fmt.Errorf("invalid cancellation kind: %s", cancellationKind)
+	}
+
+	// enqueue a system job for the finish timeout to eagerly cancel this run and all pending queue items for this function that are delayed beyond the timeout.
+	enqueueAt := since.Add(*timeout)
+	eagerCancelJobID := fmt.Sprintf("%s-%s:%s", systemJobPrefix, id.WorkflowID, id.IdempotencyKey())
+	queueName := queue.KindCancel
+	maxAttempts := consts.MaxRetries + 1
+
+	l = l.With("systemJobId", eagerCancelJobID, "enqueueAt", enqueueAt)
+
+	// Schedule for async functons (the default)
+	c := cqrs.Cancellation{
+		ID:          ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:   id.AccountID,
+		WorkspaceID: id.WorkspaceID,
+		FunctionID:  id.WorkflowID,
+		Kind:        cancellationKind,
+		Type:        enums.CancellationTypeEvent,
+		TargetID:    id.RunID.String(),
+	}
+	err := e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &eagerCancelJobID,
+		GroupID:     uuid.New().String(),
+		WorkspaceID: id.WorkspaceID,
+		Kind:        queue.KindCancel,
+		Identifier: state.Identifier{
+			AccountID:   id.AccountID,
+			WorkspaceID: id.WorkspaceID,
+			AppID:       id.AppID,
+			WorkflowID:  id.WorkflowID,
+			Key:         eagerCancelJobID,
+		},
+		MaxAttempts: &maxAttempts,
+		Payload:     c,
+		QueueName:   &queueName,
+	}, enqueueAt, queue.EnqueueOpts{})
+
+	if err != nil && err != redis_state.ErrQueueItemExists {
+		l.Trace("Error enqueueing system job", "error", err.Error())
+		return err
+	}
+	l.Trace("Enqueued system job for eager cancellation of timed out job")
+
+	return nil
+}
+
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 //
@@ -803,6 +867,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				return &metadata, err
 			}
 		}
+
+		// Add a system job to eager-cancel this function run on timeouts, only if this is a non-batch event.
+		if req.Function.Timeouts != nil && req.Function.Timeouts.Start != nil {
+			enqueuedAt := ulid.Time(runID.Time())
+			if err := e.createEagerCancellationForTimeout(ctx, enqueuedAt, req.Function.Timeouts.StartDuration(), enums.CancellationKindStartTimeout, stv1ID); err != nil {
+				return &metadata, err
+			}
+		}
 	}
 
 	at := time.Now()
@@ -1026,6 +1098,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	if md.Config.StartedAt.IsZero() {
 		md.Config.StartedAt = start
+
+		// Add a system job to eager-cancel this function run on timeouts
+		if ef.Function.Timeouts != nil && ef.Function.Timeouts.Finish != nil {
+			if err := e.createEagerCancellationForTimeout(ctx, start, ef.Function.Timeouts.FinishDuration(), enums.CancellationKindFinishTimeout, id); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if v.stopWithoutRetry {
@@ -3642,7 +3721,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	}
 
 	switch result.Status {
-	case enums.BatchAppend:
+	case enums.BatchAppend, enums.BatchItemExists:
 		// noop
 	case enums.BatchNew:
 		dur, err := time.ParseDuration(fn.EventBatch.Timeout)

@@ -542,6 +542,7 @@ func (x *CreateAccountResponse) GetMetadata() *ResponseMetadata {
 type CreateEnvRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Id            *string                `protobuf:"bytes,2,opt,name=id,proto3,oneof" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -579,6 +580,13 @@ func (*CreateEnvRequest) Descriptor() ([]byte, []int) {
 func (x *CreateEnvRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateEnvRequest) GetId() string {
+	if x != nil && x.Id != nil {
+		return *x.Id
 	}
 	return ""
 }
@@ -1995,9 +2003,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x05_name\"|\n" +
 	"\x15CreateAccountResponse\x12-\n" +
 	"\x04data\x18\x01 \x01(\v2\x19.api.v2.CreateAccountDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"&\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"B\n" +
 	"\x10CreateEnvRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"j\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x13\n" +
+	"\x02id\x18\x02 \x01(\tH\x00R\x02id\x88\x01\x01B\x05\n" +
+	"\x03_id\"j\n" +
 	"\x11CreateEnvResponse\x12\x1f\n" +
 	"\x04data\x18\x01 \x01(\v2\v.api.v2.EnvR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x88\x01\n" +
@@ -2465,6 +2475,7 @@ func file_api_v2_service_proto_init() {
 	}
 	file_api_v2_options_proto_init()
 	file_api_v2_service_proto_msgTypes[7].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[9].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[13].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[17].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[18].OneofWrappers = []any{}
