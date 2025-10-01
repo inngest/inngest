@@ -1,6 +1,6 @@
 import { Link } from '@inngest/components/Link/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
-import { type AppKind } from '@inngest/components/types/app';
+import { methodTypes, type AppKind } from '@inngest/components/types/app';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
@@ -9,7 +9,12 @@ import { pathCreator } from '@/utils/urls';
 
 const getAppCardContent = ({ app, envSlug }: { app: FlattenedApp; envSlug: string }) => {
   const statusKey = app.status ?? 'default';
-  const appKind: AppKind = app.isArchived ? 'default' : syncKind[statusKey] ?? 'default';
+  const appKind: AppKind = app.isArchived
+    ? 'default'
+    : // API apps don't currently have sync status, consider them green for now
+    app.method === methodTypes.Api
+    ? 'primary'
+    : syncKind[statusKey] ?? 'default';
 
   const status = app.isArchived ? 'Archived' : syncStatusText[statusKey] ?? null;
 
