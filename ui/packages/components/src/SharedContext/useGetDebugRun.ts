@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import type { Trace } from '../RunDetailsV3/types';
 import { useShared } from './SharedContext';
 
 export type GetDebugRunPayload = {
@@ -9,42 +10,14 @@ export type GetDebugRunPayload = {
   runID?: string;
 };
 
-export type RunStep = {
-  stepID: string | null;
-  name: string;
-  stepOp?: string | null;
-};
-
-export type RunTraceSpan = {
-  runID: string;
-  spanID: string;
-  traceID: string;
-  name: string;
-  status: string;
-  attempts?: number | null;
-  duration?: number | null;
-  queuedAt: string;
-  startedAt?: string;
-  endedAt?: string;
-  stepID?: string | null;
-  stepOp?: string | null;
-  isRoot: boolean;
-  parentSpanID?: string | null;
-  isUserland: boolean;
-  debugRunID?: string | null;
-  debugSessionID?: string | null;
-  childrenSpans?: RunTraceSpan[] | null;
-};
-
 export type DebugRunData = {
-  debugRun: RunTraceSpan | null;
-  runSteps?: RunStep[] | null;
+  debugTraces: Trace[];
 };
 
 export type DebugRunResult = {
   error?: Error;
   loading: boolean;
-  data?: DebugRunData | null;
+  data?: DebugRunData;
 };
 
 type UseGetDebugRunOptions = {

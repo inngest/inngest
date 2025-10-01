@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/graph-gophers/dataloader"
@@ -26,24 +27,34 @@ func (tr *traceReader) GetDebugRunTrace(ctx context.Context, keys dataloader.Key
 				return
 			}
 
-			rootSpan, err := tr.reader.GetSpansByDebugRunID(ctx, req.DebugRunID)
+			debugRuns, err := tr.reader.GetSpansByDebugRunID(ctx, req.DebugRunID)
 			if err != nil {
 				res.Error = fmt.Errorf("error retrieving debug run trace: %w", err)
 				return
 			}
 
-			if rootSpan == nil {
-				res.Data = nil
-				return
+			gqlRoots := make([]*models.RunTraceSpan, 0, len(debugRuns))
+			for _, rootSpan := range debugRuns {
+				gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+				if err != nil {
+					res.Error = fmt.Errorf("error converting debug run span to GQL, skipping: %w", err)
+					continue
+				}
+
+				if gqlRoot != nil {
+					gqlRoots = append(gqlRoots, gqlRoot)
+				}
 			}
 
-			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
-			if err != nil {
-				res.Error = fmt.Errorf("error converting debug run root to GQL: %w", err)
-				return
-			}
+			sort.Slice(gqlRoots, func(i, j int) bool {
+				a, b := gqlRoots[i].StartedAt, gqlRoots[j].StartedAt
+				if a == nil || b == nil {
+					return a == nil && b != nil
+				}
+				return a.Before(*b)
+			})
 
-			res.Data = gqlRoot
+			res.Data = gqlRoots
 		}(ctx, results[i], key)
 	}
 
@@ -68,23 +79,54 @@ func (tr *traceReader) GetDebugSessionTrace(ctx context.Context, keys dataloader
 				return
 			}
 
-			rootSpans, err := tr.reader.GetSpansByDebugSessionID(ctx, req.DebugSessionID)
+			debugRuns, err := tr.reader.GetSpansByDebugSessionID(ctx, req.DebugSessionID)
 			if err != nil {
-				res.Error = fmt.Errorf("error retrieving debug session traces: %w", err)
+				res.Error = fmt.Errorf("error retrieving debug traces by session id: %w", err)
 				return
 			}
 
-			var gqlSpans []*models.RunTraceSpan
-			for _, rootSpan := range rootSpans {
-				gqlSpan, err := tr.convertRunSpanToGQL(ctx, rootSpan)
-				if err != nil {
-					res.Error = fmt.Errorf("error converting debug session span to GQL: %w", err)
-					return
+			var debugSessionRuns []*models.DebugSessionRun
+			for _, runSpans := range debugRuns {
+				converted := make([]*models.RunTraceSpan, 0, len(runSpans))
+				for _, span := range runSpans {
+					gqlSpan, err := tr.convertRunSpanToGQL(ctx, span)
+					if err != nil {
+						res.Error = fmt.Errorf("error converting debug run span to GQL for debug session, skipping: %w", err)
+						continue
+					}
+					if gqlSpan != nil {
+						converted = append(converted, gqlSpan)
+					}
 				}
-				gqlSpans = append(gqlSpans, gqlSpan)
+
+				if len(converted) == 0 {
+					continue
+				}
+
+				sort.Slice(converted, func(i, j int) bool {
+					a, b := converted[i].StartedAt, converted[j].StartedAt
+					if a == nil || b == nil {
+						return a == nil && b != nil
+					}
+					return a.Before(*b)
+				})
+
+				last := converted[len(converted)-1]
+				debugSessionRuns = append(debugSessionRuns, &models.DebugSessionRun{
+					Status:     last.Status,
+					QueuedAt:   last.QueuedAt,
+					StartedAt:  last.StartedAt,
+					EndedAt:    last.EndedAt,
+					DebugRunID: last.DebugRunID,
+					// TODO: add tags and versions
+					Tags:     []string{},
+					Versions: []string{},
+				})
 			}
 
-			res.Data = gqlSpans
+			res.Data = &models.DebugSession{
+				DebugRuns: debugSessionRuns,
+			}
 		}(ctx, results[i], key)
 	}
 

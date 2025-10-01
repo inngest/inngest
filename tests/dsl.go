@@ -183,6 +183,7 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			er.Event.Timestamp = ts
 			er.Event.ID = evtID
+			er.Ctx.MaxAttempts = 0
 
 			for _, m := range modifiers {
 				m(&t.requestCtx)

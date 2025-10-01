@@ -8,7 +8,7 @@ type Reply struct {
 	Modified bool       `json:"modified"`
 	Message  *string    `json:"message,omitempty"`
 	Error    *string    `json:"error,omitempty"`
-	SyncID   *uuid.UUID `json:"sync_id.omitempty"`
+	SyncID   *uuid.UUID `json:"sync_id,omitempty"`
 	AppID    *uuid.UUID `json:"app_id,omitempty"`
 }
 

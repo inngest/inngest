@@ -227,7 +227,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             <div className="bg-canvasBase h-full overflow-y-auto">
               <FunctionConfiguration
                 inngestFunction={function_}
-                deployCreatedAt={function_.current?.deploy?.createdAt}
+                deployCreatedAt={function_.app.latestSync?.lastSyncedAt}
                 getAppLink={() => appRoute}
                 getBillingUrl={() => billingUrl}
                 getEventLink={(eventName) =>

@@ -863,6 +863,7 @@ message CreateAccountResponse {
 
 message CreateEnvRequest {
   string name = 1;
+  optional string id = 2;
 }
 
 message CreateEnvResponse {

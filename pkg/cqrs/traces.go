@@ -407,9 +407,9 @@ type TraceReader interface {
 	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
 	// GetSpansByDebugRunID retrieves all spans related to the specified debug run
-	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*OtelSpan, error)
+	GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*OtelSpan, error)
 	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
-	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*OtelSpan, error)
+	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
@@ -480,6 +480,10 @@ type SpanIdentifier struct {
 
 	// Whether the output should direct to the tracing preview stores
 	Preview *bool `json:"preview,omitempty,omitzero"`
+
+	// InputSpanID is the span ID of the span that produced the input for the
+	// span.
+	InputSpanID *string `json:"in_sid,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {

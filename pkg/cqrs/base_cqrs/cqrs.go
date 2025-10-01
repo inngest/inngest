@@ -106,8 +106,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) (*cqrs.OtelSpan, error) {
-
+func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
@@ -118,10 +117,10 @@ func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID)
 		return nil, nil
 	}
 
-	return mapRootSpansFromRows(ctx, spans)
+	return buildDebugRunSpan(ctx, spans)
 }
 
-func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([]*cqrs.OtelSpan, error) {
+func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
@@ -132,24 +131,29 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 		return nil, nil
 	}
 
-	spansByDebugRun := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
+	spansByDebugSession := make(map[string][]*sqlc.GetSpansByDebugSessionIDRow)
 	for _, span := range spans {
 		if span.DebugRunID.Valid {
-			spansByDebugRun[span.DebugRunID.String] = append(spansByDebugRun[span.DebugRunID.String], span)
+			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
 		}
 	}
 
-	var allRoots []*cqrs.OtelSpan
+	var allDebugRuns [][]*cqrs.OtelSpan
 
-	for _, runSpans := range spansByDebugRun {
-		rootSpan, err := mapRootSpansFromRows(ctx, runSpans)
+	for _, runSpans := range spansByDebugSession {
+		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
 		if err != nil {
 			return nil, err
 		}
-		allRoots = append(allRoots, rootSpan)
+		allDebugRuns = append(allDebugRuns, debugRunSpans)
 	}
 
-	return allRoots, nil
+	return allDebugRuns, nil
+}
+
+type IODynamicRef struct {
+	OutputRef string
+	InputRef  string
 }
 
 // Uses generics to accept slices of any type that implements normalizedSpan interface
@@ -157,8 +161,9 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
-	// A map of dynamic span IDs to the specific span ID that contains an output
-	outputDynamicRefs := make(map[string]string)
+	// A map of dynamic span IDs to the specific span ID that contains I/O
+	dynamicRefs := make(map[string]*IODynamicRef)
+
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 
@@ -212,8 +217,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			MarkedAsDropped: false,
 		}
 
-		var outputSpanID *string
-		var fragments []map[string]interface{}
+		var (
+			outputSpanID *string
+			inputSpanID  *string
+			fragments    []map[string]interface{}
+		)
 		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
@@ -235,7 +243,20 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
-					outputDynamicRefs[dynamicSpanID.String] = outputRef
+					if io, ok := dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+						io.OutputRef = outputRef
+					} else {
+						dynamicRefs[dynamicSpanID.String] = &IODynamicRef{OutputRef: outputRef}
+					}
+				}
+
+				if inputRef, ok := fragment["input_span_id"].(string); ok {
+					inputSpanID = &inputRef
+					if io, ok := dynamicRefs[dynamicSpanID.String]; ok && io != nil {
+						io.InputRef = inputRef
+					} else {
+						dynamicRefs[dynamicSpanID.String] = &IODynamicRef{InputRef: inputRef}
+					}
 				}
 			}
 		}
@@ -282,8 +303,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 
 		// If this span has finished, set a preliminary output ID.
-		if outputSpanID != nil && *outputSpanID != "" {
-			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
+		if (outputSpanID != nil && *outputSpanID != "") || (inputSpanID != nil && *inputSpanID != "") {
+			newSpan.OutputID, err = encodeSpanOutputID(outputSpanID, inputSpanID)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
 				return nil, err
@@ -294,22 +315,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	}
 
 	for _, span := range spanMap.AllFromFront() {
-		// If we have an output reference for this span, set the appropriate
-		// target span ID here
-		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
-			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
-				// We've found the span ID that we need to target for
-				// this span. So let's use it!
-				var err error
-				span.OutputID, err = encodeSpanOutputID(targetSpanID)
-				if err != nil {
-					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-					return nil, err
-				}
-			}
-
-		}
-
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
@@ -343,12 +348,17 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-func encodeSpanOutputID(spanID string) (*string, error) {
+func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {
 	p := true
+	osid := ""
+	if outputSpanID != nil {
+		osid = *outputSpanID
+	}
 
 	id := &cqrs.SpanIdentifier{
-		SpanID:  spanID,
-		Preview: &p,
+		SpanID:      osid,
+		InputSpanID: inputSpanID,
+		Preview:     &p,
 	}
 
 	encoded, err := id.Encode()
@@ -357,6 +367,36 @@ func encodeSpanOutputID(spanID string) (*string, error) {
 	}
 
 	return &encoded, nil
+}
+
+// group by run id, sort by started at, let the frontend handle overlay.
+func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+
+	spansByRunID := make(map[string][]T)
+	for _, span := range spans {
+		runID := span.GetRunID()
+		spansByRunID[runID] = append(spansByRunID[runID], span)
+	}
+
+	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
+	for _, runSpansGroup := range spansByRunID {
+		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
+		if err != nil {
+			return nil, err
+		}
+		if runSpan != nil {
+			runSpans = append(runSpans, runSpan)
+		}
+	}
+
+	if len(runSpans) == 0 {
+		return nil, nil
+	}
+
+	return runSpans, nil
 }
 
 func sorter(span *cqrs.OtelSpan) {
@@ -1508,29 +1548,47 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve output")
+	ids := []string{}
+	if opts.SpanID != "" {
+		ids = append(ids, opts.SpanID)
+	}
+	if opts.InputSpanID != nil && *opts.InputSpanID != "" {
+		ids = append(ids, *opts.InputSpanID)
 	}
 
-	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}
 
 	so := &cqrs.SpanOutput{}
-	var m map[string]any
 
-	so.Data = []byte(fmt.Append(nil, s.Output))
-	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-		if errData, ok := m["error"]; ok {
-			so.IsError = true
-			so.Data, _ = json.Marshal(errData)
-		} else if successData, ok := m["data"]; ok {
-			so.Data, _ = json.Marshal(successData)
-		} else {
-			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+	for _, row := range rows {
+		if row.Input != nil {
+			so.Input = []byte(fmt.Append(nil, row.Input))
+		}
+
+		if row.Output != nil {
+			var m map[string]any
+
+			so.Data = []byte(fmt.Append(nil, row.Output))
+			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+				if errData, ok := m["error"]; ok {
+					so.IsError = true
+					so.Data, _ = json.Marshal(errData)
+				} else if successData, ok := m["data"]; ok {
+					so.Data, _ = json.Marshal(successData)
+				} else {
+					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+
+					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+				}
+			}
 		}
 	}
 
@@ -2535,6 +2593,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			"links",
 			"output",
 			"event_ids",
+			"input",
 		).
 		Where(sq.C("dynamic_span_id").In(
 			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
@@ -2568,6 +2627,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		Links         *string
 		Output        *string
 		EventIDs      *string
+		Input         *string
 	}
 
 	// Group spans by run_id and dynamic_span_id
@@ -2590,6 +2650,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			&span.Links,
 			&span.Output,
 			&span.EventIDs,
+			&span.Input,
 		)
 		if err != nil {
 			return nil, err
@@ -2787,6 +2848,9 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 	// filters
 	filter := []sq.Expression{}
+	//
+	// debug runs are a special kind of run that should not be included in the main runs list
+	filter = append(filter, sq.C("debug_run_id").IsNull())
 	if len(opt.Filter.AppID) > 0 {
 		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
 	}

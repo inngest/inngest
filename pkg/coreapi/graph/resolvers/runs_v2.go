@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -235,6 +236,26 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 	}
 
 	return &res, nil
+}
+
+func (qr *queryResolver) RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error) {
+	runid, err := ulid.Parse(runID)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing runID: %w", err)
+	}
+
+	span, err := loader.LoadOne[models.RunTraceSpan](
+		ctx,
+		loader.FromCtx(ctx).RunTraceLoader,
+		&loader.TraceRequestKey{TraceRunIdentifier: &cqrs.TraceRunIdentifier{RunID: runid}},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if span == nil {
+		return nil, fmt.Errorf("run trace not found")
+	}
+	return span, nil
 }
 
 func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {

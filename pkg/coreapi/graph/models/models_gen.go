@@ -114,8 +114,7 @@ type DebounceConfiguration struct {
 }
 
 type DebugRun struct {
-	DebugRun *RunTraceSpan `json:"debugRun,omitempty"`
-	RunSteps []*RunStep    `json:"runSteps,omitempty"`
+	DebugTraces []*RunTraceSpan `json:"debugTraces,omitempty"`
 }
 
 type DebugRunQuery struct {
@@ -125,11 +124,25 @@ type DebugRunQuery struct {
 	RunID        *string `json:"runID,omitempty"`
 }
 
+type DebugSession struct {
+	DebugRuns []*DebugSessionRun `json:"debugRuns,omitempty"`
+}
+
 type DebugSessionQuery struct {
 	WorkspaceID    string  `json:"workspaceId"`
 	FunctionSlug   string  `json:"functionSlug"`
 	DebugSessionID *string `json:"debugSessionID,omitempty"`
 	RunID          *string `json:"runID,omitempty"`
+}
+
+type DebugSessionRun struct {
+	Status     RunTraceSpanStatus `json:"status"`
+	QueuedAt   time.Time          `json:"queuedAt"`
+	StartedAt  *time.Time         `json:"startedAt,omitempty"`
+	EndedAt    *time.Time         `json:"endedAt,omitempty"`
+	DebugRunID *ulid.ULID         `json:"debugRunID,omitempty"`
+	Tags       []string           `json:"tags,omitempty"`
+	Versions   []string           `json:"versions,omitempty"`
 }
 
 type Event struct {
@@ -357,35 +370,6 @@ type RunStepInfo struct {
 }
 
 func (RunStepInfo) IsStepInfo() {}
-
-type RunTraceSpan struct {
-	AppID          uuid.UUID          `json:"appID"`
-	FunctionID     uuid.UUID          `json:"functionID"`
-	RunID          ulid.ULID          `json:"runID"`
-	Run            *FunctionRun       `json:"run"`
-	SpanID         string             `json:"spanID"`
-	TraceID        string             `json:"traceID"`
-	Name           string             `json:"name"`
-	Status         RunTraceSpanStatus `json:"status"`
-	Attempts       *int               `json:"attempts,omitempty"`
-	Duration       *int               `json:"duration,omitempty"`
-	OutputID       *string            `json:"outputID,omitempty"`
-	QueuedAt       time.Time          `json:"queuedAt"`
-	StartedAt      *time.Time         `json:"startedAt,omitempty"`
-	EndedAt        *time.Time         `json:"endedAt,omitempty"`
-	ChildrenSpans  []*RunTraceSpan    `json:"childrenSpans"`
-	StepOp         *StepOp            `json:"stepOp,omitempty"`
-	StepID         *string            `json:"stepID,omitempty"`
-	StepInfo       StepInfo           `json:"stepInfo,omitempty"`
-	StepType       string             `json:"stepType"`
-	IsRoot         bool               `json:"isRoot"`
-	ParentSpanID   *string            `json:"parentSpanID,omitempty"`
-	ParentSpan     *RunTraceSpan      `json:"parentSpan,omitempty"`
-	IsUserland     bool               `json:"isUserland"`
-	UserlandSpan   *UserlandSpan      `json:"userlandSpan,omitempty"`
-	DebugRunID     *ulid.ULID         `json:"debugRunID,omitempty"`
-	DebugSessionID *ulid.ULID         `json:"debugSessionID,omitempty"`
-}
 
 type RunTraceSpanOutput struct {
 	Input *string    `json:"input,omitempty"`

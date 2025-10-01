@@ -5,7 +5,7 @@ import { InlineSpans } from './InlineSpans';
 import { StepType } from './StepType';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { FINAL_SPAN_DISPLAY, FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
+import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
 
 type Props = {
   depth: number;
@@ -19,7 +19,7 @@ const INDENT_WIDTH = 40;
 
 export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
-  const { selectStep, selectedStep } = useStepSelection(runID);
+  const { selectStep, selectedStep } = useStepSelection({ runID });
   const expanderRef = useRef<HTMLDivElement>(null);
 
   //
@@ -45,7 +45,9 @@ export function Trace({ depth, maxTime, minTime, trace, runID }: Props) {
               ? 'bg-secondary-3xSubtle'
               : 'hover:bg-canvasSubtle hover:bg-opacity-60'
           } `}
-          onClick={() => selectStep({ trace, runID })}
+          onClick={() => {
+            selectStep({ trace, runID });
+          }}
         >
           <div
             className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"

@@ -75,12 +75,6 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
       ...res,
       data: {
         ...app,
-        functions: app.functions.map((fn) => {
-          return {
-            ...fn,
-            triggers: fn.triggers,
-          };
-        }),
         latestSync,
       },
     };

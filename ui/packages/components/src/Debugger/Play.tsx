@@ -1,38 +1,76 @@
+import { useRouter } from 'next/navigation';
 import { RiPlayLine } from '@remixicon/react';
+import { toast } from 'sonner';
+import { ulid } from 'ulid';
 
 import { useStepSelection } from '../RunDetailsV3/utils';
+import { usePathCreator } from '../SharedContext/usePathCreator';
+import { useRerun } from '../SharedContext/useRerun';
 import { useRerunFromStep } from '../SharedContext/useRerunFromStep';
 
-export const Play = ({
-  runID,
-  debugRunID,
-  debugSessionID,
-}: {
+type PlayProps = {
+  functionSlug: string;
   runID?: string;
   debugRunID?: string;
   debugSessionID?: string;
-}) => {
-  const { selectedStep } = useStepSelection(runID);
-  const { rerun } = useRerunFromStep();
+};
+
+export const Play = ({ functionSlug, runID, debugRunID, debugSessionID }: PlayProps) => {
+  const { pathCreator } = usePathCreator();
+  const router = useRouter();
+  const { selectedStep } = useStepSelection({
+    debugRunID,
+    runID,
+  });
+  const { rerun: rerunFromStep } = useRerunFromStep();
+  const { rerun } = useRerun();
+  const newDebugRunID = ulid();
 
   const handleRerun = async () => {
-    if (selectedStep?.trace.stepID && runID) {
-      const result = await rerun({
-        runID,
-        fromStep: {
-          stepID: selectedStep.trace.stepID,
-          input: '[{}]',
-        },
-        debugRunID,
-        debugSessionID,
-      });
-      console.debug('play result', result);
+    if (!runID) {
+      console.error('runID is currently required');
+      return;
+    }
+
+    const result = selectedStep?.trace.stepID
+      ? await rerunFromStep({
+          runID,
+          fromStep: {
+            stepID: selectedStep.trace.stepID,
+            input: '[{}]',
+          },
+          debugRunID: debugRunID ?? newDebugRunID,
+          debugSessionID,
+        })
+      : await rerun({
+          runID,
+          debugSessionID,
+          debugRunID: ulid(),
+        });
+
+    if (result.error) {
+      console.error('error running debugger', result.error);
+      toast.error(`Error running debugger, see console for more details.`);
+      return;
+    }
+
+    //
+    // if this is our first debug run, send them there
+    if (!debugRunID) {
+      router.push(
+        pathCreator.debugger({
+          functionSlug,
+          runID,
+          debugRunID: newDebugRunID,
+          debugSessionID,
+        })
+      );
     }
   };
 
   return (
     <RiPlayLine
-      className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1"
+      className="text-subtle hover:bg-canvasSubtle h-8 w-8 cursor-pointer rounded-md p-1"
       onClick={handleRerun}
     />
   );

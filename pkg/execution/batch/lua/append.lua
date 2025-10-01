@@ -5,13 +5,17 @@
 local batchPointerKey = KEYS[1]      -- key to the batch pointer
 
 local batchLimit = tonumber(ARGV[1]) -- max size configured for this batch
-local event = ARGV[2]                -- event to be appended to the batch
-local newULID = ARGV[3]              -- ULID to update the pointer with, either if the batch is full or doesn't exist
-local prefix = ARGV[4]               -- the prefix used for redis
+local eventID = ARGV[2]
+local event = ARGV[3]                -- event to be appended to the batch
+local newULID = ARGV[4]              -- ULID to update the pointer with, either if the batch is full or doesn't exist
+local prefix = ARGV[5]               -- the prefix used for redis
 
-local batchStatusAppending = ARGV[5]
-local batchStatusStarted = ARGV[6]
-local batchSizeLimit = tonumber(ARGV[7])
+local batchStatusAppending = ARGV[6]
+local batchStatusStarted = ARGV[7]
+local batchSizeLimit = tonumber(ARGV[8])
+
+local nowUnixSeconds = tonumber(ARGV[9])
+local idempotenceSetTTL = tonumber(ARGV[10])
 
 -- helper functions
 -- $include(helpers.lua)
@@ -37,13 +41,24 @@ local resp = { status = "append", batchID = batchID, batchPointerKey = batchPoin
 --   * Batch
 --   * BatchMetadata
 local keyfmt = "%s:batches:%s"
+local idempotenceKeyFmt = "%s:batch_idempotence"
 local batchKey = string.format(keyfmt, prefix, batchID)
+local batchIdempotenceKey = string.format(idempotenceKeyFmt, prefix)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
 -- set the batch status if it doesn't exist but don't overwrite
 -- this is necessary for functions that never enabled batch before
 if is_status_empty(batchMetadataKey) then
   set_batch_status(batchMetadataKey, batchStatusAppending)
+end
+
+-- check if event has already been appended to this batch
+-- return early with status=exists if this event was already appended.
+local newEvent = redis.call("ZADD", batchIdempotenceKey, nowUnixSeconds, eventID)
+redis.call("EXPIRE", batchIdempotenceKey, idempotenceSetTTL)
+if newEvent == 0 then
+  resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
+  return cjson.encode(resp)
 end
 
 -- append event to batch

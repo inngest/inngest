@@ -43,6 +43,7 @@ type ExtractedValues struct {
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
+	StepInput *string
 	StepOutput *string
 	StepOutputRef *string
 	StepHasOutput *bool

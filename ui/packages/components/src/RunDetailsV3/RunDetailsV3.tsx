@@ -73,7 +73,7 @@ export const RunDetailsV3 = ({
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
-  const { selectedStep } = useStepSelection(runID);
+  const { selectedStep } = useStepSelection({ runID });
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);

@@ -313,7 +313,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
-		if resp != nil && !resp.Retryable() {
+		//
+		// If the error did not come from the response (which is likely the case here)
+		// and is likely a system error we should skip checking if the response is
+		// retryable and always retry.
+		if resp != nil && resp.Err != nil && !resp.Retryable() {
 			return false, nil
 		}
 
@@ -480,30 +484,79 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
-// handleCancel handles eager bulk cancellation
+// handleCancel handles eager cancellation
 //
 // TODO: halt work if a user decides to cancel this cancellation
-//
-// NOTE: this currently doesn't work since there are no CancellationReadWriter in OSS initialized
 func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
 		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
 	}
 
+	switch c.Kind {
+	case enums.CancellationKindStartTimeout:
+		return s.handleEagerCancelStartTimeout(ctx, c, item)
+	case enums.CancellationKindFinishTimeout:
+		return s.handleEagerCancelFinishTimeout(ctx, c, item)
+	case enums.CancellationKindRun:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
+		return s.handleEagerCancelRun(ctx, c)
+	case enums.CancellationKindBulkRun:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
+		return s.handleEagerCancelBulkRun(ctx, c)
+	case enums.CancellationKindBacklog:
+		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
+		return s.handleEagerCancelBacklog(ctx, c)
+	default:
+		return fmt.Errorf("unhandled cancellation kind: %s", c.Kind)
+	}
+}
+
+func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
-	)
+		"target_run_id", c.TargetID)
 
-	switch c.Kind {
-	case enums.CancellationKindRun:
-		runID, err := ulid.Parse(c.TargetID)
-		if err != nil {
-			l.Error("invalid runID provided for cancellation", "error", err)
-			return fmt.Errorf("error parsing runID provided: %w", err)
-		}
+	runID, err := ulid.Parse(c.TargetID)
+	if err != nil {
+		l.Error("invalid runID provided for cancellation", "error", err)
+		return fmt.Errorf("error parsing runID: %w", err)
+	}
 
+	// Get the most recent function state
+	fn, err := s.findFunctionByID(ctx, c.FunctionID)
+	if err != nil {
+		l.Error("error finding most recent function state", "error", err.Error())
+		return err
+	}
+
+	if fn.Timeouts == nil || fn.Timeouts.Finish == nil {
+		// timeout was removed. do nothing
+		return nil
+	}
+
+	timeout := fn.Timeouts.FinishDuration()
+	if timeout == nil || *timeout <= 0 {
+		// timeout was removed. do nothing
+		return nil
+	}
+
+	// Get the metadata to check if the run has started.
+	metadata, err := s.state.Metadata(ctx, consts.DevServerAccountID, runID)
+	if err != nil && (errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound)) {
+		// already gone, do nothing
+		return nil
+	}
+	if err != nil {
+		l.Error("error loading metadata for eager cancellation of finish timeout", "error", err.Error())
+		return fmt.Errorf("error loading metadata for cancellation: %w", err)
+	}
+
+	jobStarteddAt := metadata.StartedAt
+	timeSinceStart := time.Since(jobStarteddAt)
+	if timeSinceStart > *timeout {
+		// cancel the run
 		id := sv2.ID{
 			RunID:      runID,
 			FunctionID: c.FunctionID,
@@ -513,39 +566,160 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 				AppID:     c.AppID,
 			},
 		}
-
+		l.Trace("Running eager cancellation for finish timeout")
 		return s.exec.Cancel(ctx, id, execution.CancelRequest{
 			CancellationID: &c.ID,
 		})
-	case enums.CancellationKindBulkRun:
-		var from time.Time
-		if c.StartedAfter != nil {
-			from = *c.StartedAfter
+	}
+
+	// timeout was extended, requeue eager cancellation.
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Error("queue does not conform to queue manager")
+		return nil
+	}
+	requeueAt := jobStarteddAt.Add(*timeout)
+	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
+	jobID := ""
+	if item.JobID == nil {
+		l.Error("item has no jobID", "item", item)
+	} else {
+		jobID = *item.JobID
+	}
+	jobID = fmt.Sprintf("%s:%s", "finish-timeout-extended", jobID)
+	item.JobID = &jobID
+	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	// Ignore if the system job was already requeued.
+	if err != nil && err != redis_state.ErrQueueItemExists {
+		return err
+	}
+	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
+	return nil
+}
+
+func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+		"target_run_id", c.TargetID)
+
+	runID, err := ulid.Parse(c.TargetID)
+	if err != nil {
+		l.Error("invalid runID provided for cancellation", "error", err)
+		return fmt.Errorf("error parsing runID: %w", err)
+	}
+	// Get the most recent function state
+	fn, err := s.findFunctionByID(ctx, c.FunctionID)
+	if err != nil {
+		l.Error("error finding most recent function state", "error", err.Error())
+		return err
+	}
+
+	if fn.Timeouts == nil || fn.Timeouts.Start == nil {
+		// timeout was removed. do nothing.
+		return nil
+	}
+
+	timeout := fn.Timeouts.StartDuration()
+	if timeout == nil || *timeout <= 0 {
+		// timeout was removed. do nothing.
+		return nil
+	}
+
+	// Get the metadata to check if the run has started.
+	metadata, err := s.state.Metadata(ctx, consts.DevServerAccountID, runID)
+	if err != nil && (errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound)) {
+		// already gone.
+		return nil
+	}
+	if err != nil {
+		l.Error("error loading metadata for eager cancellation of start timeout", "error", err.Error())
+		return fmt.Errorf("error loading metadata for cancellation: %w", err)
+	}
+
+	// start timeout does not affect already started runs.
+	if !metadata.StartedAt.IsZero() {
+		return nil
+	}
+	jobEnqueuedAt := ulid.Time(runID.Time())
+	timeSinceEnqueue := time.Since(jobEnqueuedAt)
+	if timeSinceEnqueue > *timeout {
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.FunctionID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
+		}
+		l.Trace("Running eager cancellation for start timeout")
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	}
+	// timeout was extended, requeue eager cancellation.
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Error("queue does not conform to queue manager")
+		return nil
+	}
+	requeueAt := jobEnqueuedAt.Add(*timeout)
+	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
+	jobID := ""
+	if item.JobID == nil {
+		l.Error("item has no jobID", "item", item)
+	} else {
+		jobID = *item.JobID
+	}
+	jobID = fmt.Sprintf("%s:%s", "start-timeout-extended", jobID)
+	item.JobID = &jobID
+	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	// Ignore if the system job was already requeued.
+	if err != nil && err != redis_state.ErrQueueItemExists {
+		return err
+	}
+	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)
+	return nil
+}
+
+func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
+
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
+	var from time.Time
+	if c.StartedAfter != nil {
+		from = *c.StartedAfter
+	}
+
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		return fmt.Errorf("expected queue manager for cancellation")
+	}
+
+	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	if err != nil {
+		return fmt.Errorf("error selecting shard for cancellation: %w", err)
+	}
+
+	items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+	if err != nil {
+		return fmt.Errorf("error retrieving backlog iterator: %w", err)
+	}
+
+	// iterate over queue items
+	for qi := range items {
+		if qi == nil {
+			// NOTE: this shouldn't happen, but also is fine to ignore
+			l.Warn("nil queue item in backlog item iterator")
+			continue
 		}
 
-		qm, ok := s.queue.(redis_state.QueueManager)
-		if !ok {
-			return fmt.Errorf("expected queue manager for cancellation")
-		}
-
-		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
-		if err != nil {
-			return fmt.Errorf("error selecting shard for cancellation: %w", err)
-		}
-
-		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID.String(), from, c.StartedBefore)
-		if err != nil {
-			return fmt.Errorf("error retrieving partition items: %w", err)
-		}
-
-		// Iterate over queue items
-		for qi := range items {
-			if qi == nil {
-				// NOTE: this shouldn't happen but is fine to ignore.
-				l.Warn("nil queue item in partition item iterator")
-				continue
-			}
-
+		// Check if it's a run
+		if !qi.Data.Identifier.RunID.IsZero() {
 			if c.If != nil {
 				st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
 				if err != nil {
@@ -572,75 +746,108 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			}); err != nil {
 				return err
 			}
-		}
-	case enums.CancellationKindBacklog:
-		var from time.Time
-		if c.StartedAfter != nil {
-			from = *c.StartedAfter
+
+			continue
 		}
 
-		qm, ok := s.queue.(redis_state.QueueManager)
-		if !ok {
-			return fmt.Errorf("expected queue manager for cancellation")
-		}
-
-		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
-		if err != nil {
-			return fmt.Errorf("error selecting shard for cancellation: %w", err)
-		}
-
-		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
-		if err != nil {
-			return fmt.Errorf("error retrieving backlog iterator: %w", err)
-		}
-
-		// iterate over queue items
-		for qi := range items {
-			if qi == nil {
-				// NOTE: this shouldn't happen, but also is fine to ignore
-				l.Warn("nil queue item in backlog item iterator")
-				continue
-			}
-
-			// Check if it's a run
-			if !qi.Data.Identifier.RunID.IsZero() {
-				if c.If != nil {
-					st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
-					if err != nil {
-						l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
-						return fmt.Errorf("error loading state for cancellation: %w", err)
-					}
-
-					event := st.Event()
-					ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
-					if err != nil {
-						// NOTE: log but don't exit here, since we want to conitnue
-						l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
-						continue
-					}
-
-					// this queue item shouldn't be cancelled
-					if !ok {
-						continue
-					}
-				}
-
-				if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
-					CancellationID: &c.ID,
-				}); err != nil {
-					return err
-				}
-
-				continue
-			}
-
-			// dequeue the item
-			if err := qm.Dequeue(ctx, shard, *qi); err != nil {
-				return err
-			}
+		// dequeue the item
+		if err := qm.Dequeue(ctx, shard, *qi); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) error {
+
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
+	runID, err := ulid.Parse(c.TargetID)
+	if err != nil {
+		l.Error("invalid runID provided for cancellation", "error", err)
+		return fmt.Errorf("error parsing runID provided: %w", err)
+	}
+
+	id := sv2.ID{
+		RunID:      runID,
+		FunctionID: c.FunctionID,
+		Tenant: sv2.Tenant{
+			AccountID: c.AccountID,
+			EnvID:     c.WorkspaceID,
+			AppID:     c.AppID,
+		},
+	}
+
+	return s.exec.Cancel(ctx, id, execution.CancelRequest{
+		CancellationID: &c.ID,
+	})
+}
+
+func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation) error {
+
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
+	var from time.Time
+	if c.StartedAfter != nil {
+		from = *c.StartedAfter
+	}
+
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		return fmt.Errorf("expected queue manager for cancellation")
+	}
+
+	shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+	if err != nil {
+		return fmt.Errorf("error selecting shard for cancellation: %w", err)
+	}
+
+	items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID.String(), from, c.StartedBefore)
+	if err != nil {
+		return fmt.Errorf("error retrieving partition items: %w", err)
+	}
+
+	// Iterate over queue items
+	for qi := range items {
+		if qi == nil {
+			// NOTE: this shouldn't happen but is fine to ignore.
+			l.Warn("nil queue item in partition item iterator")
+			continue
+		}
+
+		if c.If != nil {
+			st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+			if err != nil {
+				l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+				return fmt.Errorf("error loading state for cancellation: %w", err)
+			}
+
+			event := st.Event()
+			ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+			if err != nil {
+				// NOTE: log but don't exit here, since we want to conitnue
+				l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
+				continue
+			}
+
+			// this queue item shouldn't be cancelled
+			if !ok {
+				continue
+			}
+		}
+
+		if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+			CancellationID: &c.ID,
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
