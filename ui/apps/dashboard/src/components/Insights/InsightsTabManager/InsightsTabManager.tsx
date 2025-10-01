@@ -225,7 +225,7 @@ function InsightsTabManagerInternal({
                 minSplitPercentage={20}
                 maxSplitPercentage={85}
                 orientation="horizontal"
-                splitKey={`insights-chat-split-${tab.id}`}
+                splitKey="insights-chat-split"
                 first={
                   <div className="h-full min-w-0 overflow-hidden">
                     <InsightsTabPanel
