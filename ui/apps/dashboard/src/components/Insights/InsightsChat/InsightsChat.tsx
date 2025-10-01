@@ -64,7 +64,6 @@ export function InsightsChat({
     messages,
     status,
     currentThreadId,
-    setCurrentThreadId,
     clearThreadMessages,
     sendMessageToThread,
     getThreadFlags,
