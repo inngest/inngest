@@ -5,7 +5,7 @@ import type { InsightsAgentState } from './types';
 
 const queryGrammar = `
   QueryAST = "SELECT" SelectClause "FROM" From ("WHERE" Expression)? ("GROUP" "BY" GroupBy)? ("ORDER" "BY" OrderBy)? ("LIMIT" <number>)? ("OFFSET" <number>)? ";"? .
-  SelectClause = "*" | (AliasedColumnExpression ("," AliasedColumnExpression)*) .
+  SelectClause = "DISTINCT"? ("*" | (AliasedColumnExpression ("," AliasedColumnExpression)*)) .
   AliasedColumnExpression = (FunctionCall | ColumnReference) ("AS" <ident>)? .
   FunctionCall = <ident> "(" (FunctionArgument ("," FunctionArgument)*)? ")" .
   FunctionArgument = FunctionCall | Operand .
