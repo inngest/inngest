@@ -95,11 +95,14 @@ func TestLeaseRenewal(t *testing.T) {
 	}
 
 	// Simulate gRPC delivery by directly sending to the connection
-	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	rawConn, ok := res.svc.wsConnections.Load(res.connID.String())
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
+	wsConn, ok := rawConn.(wsConnection)
+	require.True(t, ok)
+
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		wsConn.msgChan <- expectedPayload
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -173,11 +176,14 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	}
 
 	// Simulate gRPC delivery by directly sending to the connection
-	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	rawConn, ok := res.svc.wsConnections.Load(res.connID.String())
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
+	wsConn, ok := rawConn.(wsConnection)
+	require.True(t, ok)
+
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		wsConn.msgChan <- expectedPayload
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -278,11 +284,14 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 	}
 
 	// Simulate gRPC delivery by directly sending to the connection
-	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	rawConn, ok := res.svc.wsConnections.Load(res.connID.String())
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
+	wsConn, ok := rawConn.(wsConnection)
+	require.True(t, ok)
+
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		wsConn.msgChan <- expectedPayload
 	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
@@ -386,11 +395,14 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 	}
 
 	// Simulate gRPC delivery by directly sending to the connection
-	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	rawConn, ok := res.svc.wsConnections.Load(res.connID.String())
 	require.True(t, ok, "connection should be registered for gRPC delivery")
 
+	wsConn, ok := rawConn.(wsConnection)
+	require.True(t, ok)
+
 	go func() {
-		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+		wsConn.msgChan <- expectedPayload
 	}()
 
 	// Expect message to be received by gateway and forwarded over WS
@@ -1049,7 +1061,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 				},
 			},
 			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
+				"step": {
 					ID:   "step",
 					Name: fnName,
 					Runtime: map[string]any{
@@ -1229,6 +1241,3 @@ func freePort() int {
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
 }
-
-
-
