@@ -3343,22 +3343,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		ParallelMode: gen.ParallelMode(),
 	}
 
-	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
-	if err == state.ErrSignalConflict {
-		return state.WrapInStandardError(
-			err,
-			"Error",
-			"Signal conflict; signal wait already exists for another run",
-			"",
-		)
-	}
-	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
-	}
-
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               runCtx.GroupID(),
@@ -3371,13 +3358,58 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
-	}, expires, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+			StartTime:   now,
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// WaitForSignal: %w", err)
+		e.log.Debug("error creating span for next step after WaitForSignal", "error", err)
+	}
+
+	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	if err == state.ErrSignalConflict {
+		// Write and update the span with the failure
+		_ = span.Send()
+
+		return state.WrapInStandardError(
+			err,
+			"Error",
+			"Signal conflict; signal wait already exists for another run",
+			"",
+		)
+	}
+	if err != nil {
+		if err == state.ErrPauseAlreadyExists {
+			span.Drop()
+		} else {
+			return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
+		}
+	}
+
+	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		span.Drop()
+		return nil
+	}
+
+	_ = span.Send()
+
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
 			context.WithoutCancel(ctx),
