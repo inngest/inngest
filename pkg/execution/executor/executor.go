@@ -3494,23 +3494,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		},
 		ParallelMode: gen.ParallelMode(),
 	}
-	_, err = e.pm.Write(
-		ctx,
-		pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName},
-		&pause,
-	)
-
-	// A pause may already exist if the write succeeded but we timed out before
-	// returning (MDB i/o timeouts). In that case, we ignore the
-	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
-	// to avoid duplicate invokes instead.
-	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-		return err
-	}
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
 		// Use the same group ID, allowing us to track the cancellation of
@@ -3525,9 +3512,47 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
-	}, expires, queue.EnqueueOpts{})
+	}
+
+	lifecycleItem := runCtx.LifecycleItem()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			StartTime:   now,
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorInvokeFunction"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// InvokeFunction: %w", err)
+		e.log.Debug("error creating span for next step after InvokeFunction", "error", err)
+	}
+
+	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName}
+	_, err = e.pm.Write(ctx, idx, &pause)
+	// A pause may already exist if the write succeeded but we timed out before
+	// returning (MDB i/o timeouts). In that case, we ignore the
+	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
+	// to avoid duplicate invokes instead.
+	if err != nil {
+		if errors.Is(err, state.ErrPauseAlreadyExists) {
+			span.Drop()
+		} else {
+			return err
+		}
+	}
+
+	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
+		span.Drop()
 		return nil
 	} else if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -3538,8 +3563,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		)
 	}
 
+	_ = span.Send()
+
 	// Send the event.
-	lifecycleItem := runCtx.LifecycleItem()
 	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
 	if err != nil {
 		// TODO Cancel pause/timeout?
