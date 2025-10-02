@@ -3423,12 +3423,37 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		// Write and update the span with the failure
 		_ = span.Send()
 
-		return state.WrapInStandardError(
+		stdErr := state.WrapInStandardError(
 			err,
 			"Error",
 			"Signal conflict; signal wait already exists for another run",
 			"",
 		)
+
+		attrs := meta.NewAttrSet()
+
+		byt, err := json.Marshal(stdErr)
+		if err != nil {
+			attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", err))
+		} else {
+			output := string(byt)
+			hasOutput := true
+
+			meta.AddAttr(attrs, meta.Attrs.StepOutput, &output)
+			meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
+		}
+
+		err = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			EndTime:    time.Now(),
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
+			Status:     enums.StepStatusFailed,
+			TargetSpan: span.Ref,
+			Attributes: attrs,
+			Metadata:   runCtx.Metadata(),
+			QueueItem:  &nextItem,
+		})
+
+		return stdErr
 	}
 	if err != nil {
 		if err == state.ErrPauseAlreadyExists {
