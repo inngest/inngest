@@ -62,6 +62,11 @@ type ConnectEntitlementRetriever interface {
 	AppsPerConnection(ctx context.Context, accountId uuid.UUID) (int, error)
 }
 
+type wsConnection struct {
+	ctx     context.Context
+	msgChan chan *pb.GatewayExecutorRequestData
+}
+
 type connectGatewaySvc struct {
 	pb.ConnectGatewayServer
 

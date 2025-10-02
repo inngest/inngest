@@ -890,7 +890,10 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 	messageChan := make(chan *connectpb.GatewayExecutorRequestData)
 
 	connectionID := c.conn.ConnectionId.String()
-	c.svc.wsConnections.Store(connectionID, messageChan)
+	c.svc.wsConnections.Store(connectionID, wsConnection{
+		ctx,
+		messageChan,
+	})
 
 	// Ensure cleanup when function exits
 	defer func() {
