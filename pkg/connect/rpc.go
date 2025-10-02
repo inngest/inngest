@@ -19,21 +19,19 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 			return &pb.ForwardResponse{Success: false}, nil
 		}
 
-		if conn.ctx.Err() != nil {
-			// Already closed
-			return &pb.ForwardResponse{Success: false}, nil
-		}
-
 		l.Debug("found ws connection by connectionID")
 
 		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-conn.ctx.Done():
+			// Already closed
+			return &pb.ForwardResponse{Success: false}, nil
 		case conn.msgChan <- req.Data:
 			// XXX: Should we ack after the ws write or it's fine to ack just
 			// after the message is consumed.
 
 			return &pb.ForwardResponse{Success: true}, nil
-		case <-ctx.Done():
-			return nil, ctx.Err()
 		case <-time.After(5 * time.Second):
 			l.Error("timeout sending message to ws channel after 5 seconds")
 			return &pb.ForwardResponse{Success: false}, nil
