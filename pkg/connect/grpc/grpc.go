@@ -34,6 +34,11 @@ type GatewayGRPCManager interface {
 	GatewayGRPCReceiver
 }
 
+type cancellableChannel[data any] struct {
+	msgChan chan data
+	ctx     context.Context
+}
+
 type gatewayGRPCManager struct {
 	gatewayManager state.GatewayManager
 	logger         logger.Logger
@@ -117,11 +122,20 @@ func (i *gatewayGRPCManager) gRPCServerListen(ctx context.Context) {
 }
 
 func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequest) (*connectpb.ReplyResponse, error) {
-	if ch, ok := i.inFlightRequests.Load(req.Data.RequestId); ok {
-		replyChan := ch.(chan *connectpb.SDKResponse)
+	if v, ok := i.inFlightRequests.Load(req.Data.RequestId); ok {
+		cancellableChannel, ok := v.(cancellableChannel[*connectpb.SDKResponse])
+		if !ok {
+			// Invalid type
+			return &connectpb.ReplyResponse{Success: false}, nil
+		}
+
+		if cancellableChannel.ctx.Err() != nil {
+			// Already closed
+			return &connectpb.ReplyResponse{Success: false}, nil
+		}
 
 		select {
-		case replyChan <- req.Data:
+		case cancellableChannel.msgChan <- req.Data:
 			return &connectpb.ReplyResponse{Success: true}, nil
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -136,11 +150,20 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 }
 
 func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	if ch, ok := i.inFlightAcks.Load(req.RequestId); ok {
-		ackChan := ch.(chan *connectpb.AckMessage)
+	if v, ok := i.inFlightAcks.Load(req.RequestId); ok {
+		cancellableChannel, ok := v.(cancellableChannel[*connectpb.AckMessage])
+		if !ok {
+			// Invalid type
+			return &connectpb.AckResponse{Success: false}, nil
+		}
+
+		if cancellableChannel.ctx.Err() != nil {
+			// Already closed
+			return &connectpb.AckResponse{Success: false}, nil
+		}
 
 		select {
-		case ackChan <- req:
+		case cancellableChannel.msgChan <- req:
 			return &connectpb.AckResponse{Success: true}, nil
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -153,35 +176,40 @@ func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage)
 	i.logger.Error("ack channel has likely unsubscribed before getting an ack")
 	return &connectpb.AckResponse{Success: false}, nil
 }
+
 func (i *gatewayGRPCManager) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }
 
 func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse {
 	channel := make(chan *connectpb.SDKResponse)
-	i.inFlightRequests.Store(requestID, channel)
+	i.inFlightRequests.Store(requestID, cancellableChannel[*connectpb.SDKResponse]{channel, ctx})
 	return channel
 }
 
 func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
 	channel := make(chan *connectpb.AckMessage)
-	i.inFlightAcks.Store(requestID, channel)
+	i.inFlightAcks.Store(requestID, cancellableChannel[*connectpb.AckMessage]{channel, ctx})
 	return channel
 }
 
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightRequests.LoadAndDelete(requestID)
+	v, loaded := i.inFlightRequests.LoadAndDelete(requestID)
 	if loaded {
-		replyChan := ch.(chan *connectpb.SDKResponse)
-		close(replyChan)
+		v, ok := v.(cancellableChannel[*connectpb.SDKResponse])
+		if ok && v.ctx.Err() == nil {
+			close(v.msgChan)
+		}
 	}
 }
 
 func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightAcks.LoadAndDelete(requestID)
+	v, loaded := i.inFlightAcks.LoadAndDelete(requestID)
 	if loaded {
-		replyChan := ch.(chan *connectpb.AckMessage)
-		close(replyChan)
+		v, ok := v.(cancellableChannel[*connectpb.AckMessage])
+		if ok && v.ctx.Err() == nil {
+			close(v.msgChan)
+		}
 	}
 }
 
