@@ -2099,12 +2099,20 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
+	pauseSpan := tracing.SpanRefFromPause(&pause)
+	_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		EndTime:    time.Now(),
+		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+		Status:     enums.StepStatusTimedOut,
+		TargetSpan: pauseSpan,
+		Attributes: tracing.ResumeAttrs(&pause, &r),
+	})
+
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
-
-		err = e.queue.Enqueue(ctx, queue.Item{
+		nextItem := queue.Item{
 			JobID: &jobID,
 			// Add a new group ID for the child;  this will be a new step.
 			GroupID:               uuid.New().String(),
@@ -2120,10 +2128,38 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 					Incoming: "step",
 				},
 			},
-		}, time.Now(), queue.EnqueueOpts{})
-		if err != nil && err != redis_state.ErrQueueItemExists {
-			return fmt.Errorf("error enqueueing after pause: %w", err)
+			Metadata: make(map[string]any),
 		}
+
+		nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: pauseSpan,
+				Debug:       &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+				Metadata:    &md,
+				Parent:      tracing.RunSpanRefFromMetadata(&md),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			// return fmt.Errorf("error creating span for next step after
+			// resume timeout: %w", err)
+			e.log.Error("error creating span for next step after resume timeout", "error", err)
+		}
+
+		err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
+		if err != nil {
+			if errors.Is(err, redis_state.ErrQueueItemExists) {
+				nextStepSpan.Drop()
+			} else {
+				_ = nextStepSpan.Send()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+
+			}
+		}
+
+		_ = nextStepSpan.Send()
 	}
 
 	// Only run lifecycles if we consumed the pause and enqueued next step.
