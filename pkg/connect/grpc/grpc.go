@@ -153,6 +153,7 @@ func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage)
 	i.logger.Error("ack channel has likely unsubscribed before getting an ack")
 	return &connectpb.AckResponse{Success: false}, nil
 }
+
 func (i *gatewayGRPCManager) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }
@@ -170,19 +171,17 @@ func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID s
 }
 
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightRequests.LoadAndDelete(requestID)
-	if loaded {
-		replyChan := ch.(chan *connectpb.SDKResponse)
-		close(replyChan)
-	}
+	i.inFlightRequests.Delete(requestID)
+
+	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
+	// and instead let the gc reclaim it once no more goroutine is sending to it
 }
 
 func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	ch, loaded := i.inFlightAcks.LoadAndDelete(requestID)
-	if loaded {
-		replyChan := ch.(chan *connectpb.AckMessage)
-		close(replyChan)
-	}
+	i.inFlightAcks.Delete(requestID)
+
+	// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
+	// and instead let the gc reclaim it once no more goroutine is sending to it
 }
 
 // ConnectToGateways connects to all gateways through gRPC
