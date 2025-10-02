@@ -19,12 +19,11 @@ func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest)
 			return &pb.ForwardResponse{Success: false}, nil
 		}
 
-		if conn.ctx.Err() != nil {
-			// Already closed
-			return &pb.ForwardResponse{Success: false}, nil
-		}
-
 		l.Debug("found ws connection by connectionID")
+
+		// Acquire lock to send message, this is to prevent a concurrent channel close on the WebSocket handler to cause a panic
+		conn.lock.RLock()
+		defer conn.lock.RUnlock()
 
 		select {
 		case conn.msgChan <- req.Data:

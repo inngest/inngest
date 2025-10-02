@@ -63,7 +63,7 @@ type ConnectEntitlementRetriever interface {
 }
 
 type wsConnection struct {
-	ctx     context.Context
+	lock    *sync.RWMutex
 	msgChan chan *pb.GatewayExecutorRequestData
 }
 

@@ -888,16 +888,23 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 	additionalMetricsTags := c.svc.metricsTags()
 
 	messageChan := make(chan *connectpb.GatewayExecutorRequestData)
+	lock := &sync.RWMutex{}
 
 	connectionID := c.conn.ConnectionId.String()
 	c.svc.wsConnections.Store(connectionID, wsConnection{
-		ctx,
+		lock,
 		messageChan,
 	})
 
 	// Ensure cleanup when function exits
 	defer func() {
+		// Prevent racing requests from sending to closed channel
+		lock.Lock()
+		defer lock.Unlock()
+
+		// Atomically remove from map
 		c.svc.wsConnections.Delete(connectionID)
+
 		close(messageChan)
 	}()
 
