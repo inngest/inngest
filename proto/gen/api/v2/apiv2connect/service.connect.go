@@ -57,6 +57,8 @@ const (
 	V2CreateWebhookProcedure = "/api.v2.V2/CreateWebhook"
 	// V2ListWebhooksProcedure is the fully-qualified name of the V2's ListWebhooks RPC.
 	V2ListWebhooksProcedure = "/api.v2.V2/ListWebhooks"
+	// V2PatchEnvProcedure is the fully-qualified name of the V2's PatchEnv RPC.
+	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -73,6 +75,7 @@ type V2Client interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -152,6 +155,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 			connect.WithClientOptions(opts...),
 		),
+		patchEnv: connect.NewClient[v2.PatchEnvRequest, v2.PatchEnvsResponse](
+			httpClient,
+			baseURL+V2PatchEnvProcedure,
+			connect.WithSchema(v2Methods.ByName("PatchEnv")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -168,6 +177,7 @@ type v2Client struct {
 	fetchAccountSigningKeys *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
 	createWebhook           *connect.Client[v2.CreateWebhookRequest, v2.CreateWebhookResponse]
 	listWebhooks            *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
+	patchEnv                *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -225,6 +235,11 @@ func (c *v2Client) ListWebhooks(ctx context.Context, req *connect.Request[v2.Lis
 	return c.listWebhooks.CallUnary(ctx, req)
 }
 
+// PatchEnv calls api.v2.V2.PatchEnv.
+func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
+	return c.patchEnv.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -239,6 +254,7 @@ type V2Handler interface {
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
 	CreateWebhook(context.Context, *connect.Request[v2.CreateWebhookRequest]) (*connect.Response[v2.CreateWebhookResponse], error)
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
+	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -314,6 +330,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ListWebhooks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2PatchEnvHandler := connect.NewUnaryHandler(
+		V2PatchEnvProcedure,
+		svc.PatchEnv,
+		connect.WithSchema(v2Methods.ByName("PatchEnv")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -338,6 +360,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateWebhookHandler.ServeHTTP(w, r)
 		case V2ListWebhooksProcedure:
 			v2ListWebhooksHandler.ServeHTTP(w, r)
+		case V2PatchEnvProcedure:
+			v2PatchEnvHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -389,4 +413,8 @@ func (UnimplementedV2Handler) CreateWebhook(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListWebhooks is not implemented"))
+}
+
+func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PatchEnv is not implemented"))
 }

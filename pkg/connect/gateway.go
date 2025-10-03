@@ -895,7 +895,8 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 	// Ensure cleanup when function exits
 	defer func() {
 		c.svc.wsConnections.Delete(connectionID)
-		close(messageChan)
+		// NOTE: To avoid panics due to sending on a closed channel, we do not close the message channel
+		// and instead let the gc reclaim it once no more goroutine is sending to it
 	}()
 
 	close(onSubscribed)
