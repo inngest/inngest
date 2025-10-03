@@ -11,7 +11,6 @@ import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
 import { type EntityLookup } from './Dashboard';
-import { Feedback } from './Feedback';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -275,26 +274,19 @@ export const MetricsVolume = ({
           <div className="relative grid w-full auto-cols-max grid-cols-1 gap-2 overflow-hidden md:grid-cols-2">
             <RunsThrougput workspace={data?.workspace} entities={entities} />
             <StepsThroughput workspace={data?.workspace} entities={entities} />
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <SdkThroughput workspace={data?.workspace} />
-              <Backlog workspace={data?.workspace} entities={entities} />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap">
-              <Concurrency
-                workspace={data?.workspace}
-                entities={entities}
-                isMarketplace={isMarketplace}
-              />
-              <AccountConcurrency
-                data={data?.accountConcurrency}
-                limit={concurrencyLimit}
-                isMarketplace={isMarketplace}
-              />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap items-center justify-center gap-2 overflow-hidden md:flex-nowrap">
-              <Feedback />
-            </div>
-            <div className="col-span-2 flex flex-row flex-wrap gap-2 overflow-hidden md:flex-nowrap"></div>
+            <SdkThroughput workspace={data?.workspace} />
+            <Backlog workspace={data?.workspace} entities={entities} />
+
+            <Concurrency
+              workspace={data?.workspace}
+              entities={entities}
+              isMarketplace={isMarketplace}
+            />
+            <AccountConcurrency
+              data={data?.accountConcurrency}
+              limit={concurrencyLimit}
+              isMarketplace={isMarketplace}
+            />
           </div>
         </>
       )}
