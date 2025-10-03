@@ -8,6 +8,12 @@ type Model = NonNullable<ReturnType<Editor['getModel']>>;
 type Marker = Parameters<Monaco['editor']['setModelMarkers']>[2][number];
 
 const OWNER = 'template-vars' as const;
+
+// Matches "{{ <content> }}" where:
+// - at least one space follows the opening braces
+// - <content> contains at least one letter (A–Z or a–z)
+// - at least one space precedes the closing braces
+// This keeps markers limited to meaningful template variables and avoids noisy matches.
 const PATTERN = /\{\{\s+(?=[^}]*[A-Za-z])[^}]*\s+\}\}/g;
 
 const NOOP = () => {};
@@ -46,9 +52,12 @@ function identifyTemplateVars(text: string) {
   const results: TemplateVarMatch[] = [];
 
   for (const match of text.matchAll(PATTERN)) {
+    const idx = match.index;
+    if (typeof idx !== 'number') continue;
+
     results.push({
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
+      startIndex: idx,
+      endIndex: idx + match[0].length,
     });
   }
 
