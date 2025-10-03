@@ -17,6 +17,7 @@ const (
 	SpanNameExecution        = "executor.execution"
 	SpanNameStepFailed       = "executor.failed"
 	SpanNameDynamicExtension = "EXTEND"
+	SpanNameUserland         = "userland"
 
 	// Link attributes
 	LinkAttributeType            = "_inngest.link.type"
