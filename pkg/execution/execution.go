@@ -202,9 +202,6 @@ type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Even
 // item.
 type HandleSendingEvent func(context.Context, event.Event, queue.Item) error
 
-// PreDeleteStateSizeReporter reports the state size before deleting state
-type PreDeleteStateSizeReporter func(context.Context, sv2.Metadata)
-
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function
