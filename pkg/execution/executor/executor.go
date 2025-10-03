@@ -3420,9 +3420,6 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
 	if err == state.ErrSignalConflict {
-		// Write and update the span with the failure
-		_ = span.Send()
-
 		stdErr := state.WrapInStandardError(
 			err,
 			"Error",
@@ -3430,36 +3427,43 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			"",
 		)
 
-		attrs := meta.NewAttrSet()
+		if span != nil {
+			// Write and update the span with the failure
+			_ = span.Send()
 
-		byt, marshalErr := json.Marshal(stdErr)
-		if marshalErr != nil {
-			attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", marshalErr))
-		} else {
-			output := string(byt)
-			hasOutput := true
+			attrs := meta.NewAttrSet()
 
-			meta.AddAttr(attrs, meta.Attrs.StepOutput, &output)
-			meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
-		}
+			byt, marshalErr := json.Marshal(stdErr)
+			if marshalErr != nil {
+				attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", marshalErr))
+			} else {
+				output := string(byt)
+				hasOutput := true
 
-		if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-			EndTime:    time.Now(),
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
-			Status:     enums.StepStatusFailed,
-			TargetSpan: span.Ref,
-			Attributes: attrs,
-			Metadata:   runCtx.Metadata(),
-			QueueItem:  &nextItem,
-		}); updateSpanErr != nil {
-			e.log.Debug("error updating span for conflicting WaitForSignal during handleGeneratorWaitForSignal", "error", updateSpanErr)
+				meta.AddAttr(attrs, meta.Attrs.StepOutput, &output)
+				meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
+			}
+
+			if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+				EndTime:    time.Now(),
+				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
+				Status:     enums.StepStatusFailed,
+				TargetSpan: span.Ref,
+				Attributes: attrs,
+				Metadata:   runCtx.Metadata(),
+				QueueItem:  &nextItem,
+			}); updateSpanErr != nil {
+				e.log.Debug("error updating span for conflicting WaitForSignal during handleGeneratorWaitForSignal", "error", updateSpanErr)
+			}
 		}
 
 		return stdErr
 	}
 	if err != nil {
 		if errors.Is(err, state.ErrPauseAlreadyExists) {
-			span.Drop()
+			if span != nil {
+				span.Drop()
+			}
 		} else {
 			return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
 		}
@@ -3467,11 +3471,16 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		span.Drop()
+		if span != nil {
+			span.Drop()
+		}
+
 		return nil
 	}
 
-	_ = span.Send()
+	if span != nil {
+		_ = span.Send()
+	}
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
@@ -3617,7 +3626,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		span.Drop()
+		if span != nil {
+			span.Drop()
+		}
+
 		return nil
 	} else if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -3628,7 +3640,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		)
 	}
 
-	_ = span.Send()
+	if span != nil {
+		_ = span.Send()
+	}
 
 	// Send the event.
 	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
