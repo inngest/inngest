@@ -218,6 +218,14 @@ export default {
             transform: 'translateX(100%)',
           },
         },
+        'shimmer-text': {
+          '0%': {
+            backgroundPosition: '100% 0',
+          },
+          '100%': {
+            backgroundPosition: '0 0',
+          },
+        },
         'slide-down-and-fade': {
           '0%': { opacity: '0', transform: 'translateY(-3px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
@@ -244,6 +252,7 @@ export default {
         'slide-up-and-fade': 'slide-up-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-right-and-fade': 'slide-right-and-fade 400ms cubic-bezier(0.16, 1, 0.3, 1)',
         underline: 'underline 2s linear infinite',
+        'shimmer-text': 'shimmer-text 1.25s linear infinite',
       },
       spacing: {
         'cmdk-margin': 'calc((100vh - (84.5px + 330px)) / 2)',
