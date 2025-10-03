@@ -3432,9 +3432,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 		attrs := meta.NewAttrSet()
 
-		byt, err := json.Marshal(stdErr)
-		if err != nil {
-			attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", err))
+		byt, marshalErr := json.Marshal(stdErr)
+		if marshalErr != nil {
+			attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", marshalErr))
 		} else {
 			output := string(byt)
 			hasOutput := true
@@ -3443,7 +3443,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
 		}
 
-		err = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
 			Status:     enums.StepStatusFailed,
@@ -3451,12 +3451,14 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			Attributes: attrs,
 			Metadata:   runCtx.Metadata(),
 			QueueItem:  &nextItem,
-		})
+		}); updateSpanErr != nil {
+			e.log.Debug("error updating span for conflicting WaitForSignal during handleGeneratorWaitForSignal", "error", updateSpanErr)
+		}
 
 		return stdErr
 	}
 	if err != nil {
-		if err == state.ErrPauseAlreadyExists {
+		if errors.Is(err, state.ErrPauseAlreadyExists) {
 			span.Drop()
 		} else {
 			return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
@@ -3605,7 +3607,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	// to avoid duplicate invokes instead.
 	if err != nil {
 		if errors.Is(err, state.ErrPauseAlreadyExists) {
-			span.Drop()
+			if span != nil {
+				span.Drop()
+			}
 		} else {
 			return err
 		}
