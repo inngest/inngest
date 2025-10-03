@@ -35,7 +35,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const [debugSessionID] = useSearchParam('debugSessionID');
   const [runDone, setRunDone] = useState(false);
   const { selectedStep } = useStepSelection({
-    debugRunID,
+    // TODO: add debug run id
     runID,
   });
 

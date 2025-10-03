@@ -19,7 +19,7 @@ export const Play = ({ functionSlug, runID, debugRunID, debugSessionID }: PlayPr
   const { pathCreator } = usePathCreator();
   const router = useRouter();
   const { selectedStep } = useStepSelection({
-    debugRunID,
+    // TODO: add debug run id
     runID,
   });
   const { rerun: rerunFromStep } = useRerunFromStep();
