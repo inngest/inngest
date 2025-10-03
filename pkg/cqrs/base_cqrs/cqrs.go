@@ -2548,6 +2548,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // logic as GetTraceRuns but working against the spans table with executor.run +
 // EXTEND span grouping
 func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	fmt.Println("GetSpanRuns")
 	l := logger.StdlibLogger(ctx)
 
 	// use evtIDs as post query filter
@@ -2596,7 +2597,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			"input",
 		).
 		Where(sq.C("dynamic_span_id").In(
-			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+			sq.Dialect(w.dialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
 		)).
 		Where(filter...).
 		Order(order...).
