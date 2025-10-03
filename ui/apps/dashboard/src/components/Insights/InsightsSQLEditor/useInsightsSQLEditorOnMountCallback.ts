@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import type { MutableRefObject } from 'react';
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useLatest, useLatestCallback } from './useLatestCallback';
 import { getCanRunQuery } from './utils';
 
 // This hook makes use of the useLatest and useLatestCallback hooks to get around the fact that
@@ -21,14 +22,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const isRunningRef = useLatest(status === 'loading');
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const disposable = editor.onKeyDown((e) => {
-      if (e.keyCode === monaco.KeyCode.Enter && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
-      }
-    });
+    const disposable = handleShortcuts(editor, monaco, latestQueryRef, isRunningRef, runQuery);
 
     return () => {
       disposable.dispose();
@@ -38,23 +32,19 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   return { onMount };
 }
 
-// Uses a ref to ensure that the latest value is always available.
-function useLatest<T>(value: T) {
-  const r = useRef(value);
+function handleShortcuts(
+  editor: Parameters<SQLEditorMountCallback>[0],
+  monaco: Parameters<SQLEditorMountCallback>[1],
+  latestQueryRef: MutableRefObject<string>,
+  isRunningRef: MutableRefObject<boolean>,
+  runQuery: () => void
+) {
+  return editor.onKeyDown((e) => {
+    if (e.keyCode === monaco.KeyCode.Enter && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      e.stopPropagation();
 
-  useLayoutEffect(() => {
-    r.current = value;
-  }, [value]);
-
-  return r;
-}
-
-// Extends useLatest to generate an always up-to-date callback.
-function useLatestCallback<A extends unknown[], R>(cb: (...args: A) => R) {
-  const latest = useLatest(cb);
-
-  return useCallback((...args: A) => {
-    return latest.current(...args);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
+    }
+  });
 }
