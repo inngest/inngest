@@ -4,6 +4,7 @@ import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEd
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 import { handleShortcuts } from '../actions/handleShortcuts';
+import { markTemplateVars } from '../actions/markTemplateVars';
 import { useLatest, useLatestCallback } from './useLatestCallback';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
@@ -17,10 +18,19 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const isRunningRef = useLatest(status === 'loading');
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const disposable = handleShortcuts(editor, monaco, latestQueryRef, isRunningRef, runQuery);
+    const shortcutsDisposable = handleShortcuts(
+      editor,
+      monaco,
+      latestQueryRef,
+      isRunningRef,
+      runQuery
+    );
+
+    const markersDisposable = markTemplateVars(editor, monaco);
 
     return () => {
-      disposable.dispose();
+      shortcutsDisposable.dispose();
+      markersDisposable.dispose();
     };
   });
 
