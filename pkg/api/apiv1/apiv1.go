@@ -131,12 +131,18 @@ func (a *router) setup() {
 
 			r.Use(headers.ContentTypeJsonResponse())
 
-			// Add the HTTP-based checkpointing API
-			r.Route(CheckpointRoutePrefix, func(sub chi.Router) {
-				sub.Mount("/", NewCheckpointAPI(a.opts, CheckpointAPIOpts{
+			// Add the HTTP-based checkpointing API.  Note that for backcompat,
+			// this exists at two URLs.
+			{
+				api := NewCheckpointAPI(a.opts, CheckpointAPIOpts{
 					RunClaimsSecret: a.opts.RunJWTSecret,
-				}))
-			})
+				})
+				for _, prefix := range CheckpointRoutePrefixes {
+					r.Route(prefix, func(sub chi.Router) {
+						sub.Mount("/", api)
+					})
+				}
+			}
 
 			r.Post("/signals", a.receiveSignal)
 
