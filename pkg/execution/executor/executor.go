@@ -44,6 +44,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -2495,6 +2496,21 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
+	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1) which contained
+	// a step.run.  However, with checkpointing we can batch step.run outputs into one single response.
+	//
+	// When this happens, we ALWAYS need to create a trace for each step.
+	//
+	// We pass this down in context, unfortunately.
+	if len(resp.Generator) > 1 {
+		for _, op := range resp.Generator {
+			if op.Op == enums.OpcodeStepRun {
+				ctx = setTraceSteps(ctx)
+				break
+			}
+		}
+	}
+
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -2599,6 +2615,37 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+	}
+
+	// Again, we ONLY create new traces if the steps were batched in checkpointing, then returned
+	// by the SDK in an async response due to overly permissive checkpointing (ie. after 10s)
+	// which was never called.
+	//
+	// In this case, we MUST retroactively record spans for each past step.
+	if traceSteps(ctx) {
+		attrs := tracing.GeneratorAttrs(&gen)
+		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
+		_, err := e.tracerProvider.CreateSpan(
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Parent:    runCtx.Metadata().Config.NewFunctionTrace(),
+				StartTime: gen.Timing.Start(),
+				EndTime:   gen.Timing.End(),
+				Attributes: attrs.Merge(
+					meta.NewAttrSet(
+						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(gen.UserDefinedName())),
+						meta.Attr(meta.Attrs.RunID, &runCtx.Metadata().ID.RunID),
+						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
+					),
+				),
+			},
+		)
+		if err != nil {
+			// We should never hit a blocker creating a span.  If so, warn loudly.
+			logger.StdlibLogger(ctx).Error("error saving span for checkpoint op", "error", err)
+		}
 	}
 
 	// Save the response to the state store.
@@ -4247,4 +4294,13 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, item queue.Item, s
 // step enqueued
 func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool {
 	return !hasPendingSteps || mode == enums.ParallelModeRace
+}
+
+func setTraceSteps(ctx context.Context) context.Context {
+	return context.WithValue(ctx, "trace-steps", true)
+}
+
+func traceSteps(ctx context.Context) bool {
+	ok, _ := ctx.Value("trace-steps").(bool)
+	return ok
 }
