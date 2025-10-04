@@ -3,11 +3,17 @@ package connect
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+}
 
 type ConnectExecutor struct {
 	GRPCIP   net.IP
