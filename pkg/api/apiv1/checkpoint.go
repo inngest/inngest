@@ -35,9 +35,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const (
-	CheckpointRoutePrefix = "/http/runs"
-)
+var CheckpointRoutePrefixes = []string{
+	"/http/runs",  // old prefix in private beta
+	"/checkpoint", // public prefix
+}
 
 var (
 	CheckpointOutputWaitMax = time.Minute * 5
@@ -51,9 +52,16 @@ type CheckpointAPI interface {
 	// http.Handler allows the checkpoint API to be mounted.
 	http.Handler
 
+	// CheckpointNewRun attempts to start a new run, including any steps that may have already
+	// been ran in the sync based function.
 	CheckpointNewRun(w http.ResponseWriter, r *http.Request)
+	// CheckpointSteps checkpoints steps to an already existing sync run.
 	CheckpointSteps(w http.ResponseWriter, r *http.Request)
-	CheckpointResponse(w http.ResponseWriter, r *http.Request)
+	// CheckpointAsyncSteps checkpoints steps to an already existing async run.  This allows async
+	// functions to continue execution immediately after steps.
+	CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request)
+	// Output returns run output given a JWT which has access to the given {env, runID} claimset.
+	Output(w http.ResponseWriter, r *http.Request)
 }
 
 // RunOutputReader represents any implementation that fetches run outputs.
@@ -80,8 +88,6 @@ type CheckpointAPIOpts struct {
 	Opts
 
 	RunClaimsSecret []byte
-
-	RunOutputReader RunOutputReader
 }
 
 func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
@@ -95,7 +101,7 @@ func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
 
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
-	api.Post("/{runID}/response", api.CheckpointResponse)
+	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
 
 	return api
@@ -166,7 +172,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	var jwt string
 	if len(input.Steps) > 0 {
-		jwt = a.checkpoint(ctx, checkpointSteps{
+		jwt = a.checkpointSyncSteps(ctx, checkpointSyncSteps{
 			RunID:     input.RunID,
 			FnID:      fn.ID,
 			AppID:     appID,
@@ -211,19 +217,20 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// checkpoint those steps by writing to state.
-	input := checkpointSteps{}
-	input.AccountID = auth.AccountID()
-	input.EnvID = auth.WorkspaceID()
+	input := checkpointSyncSteps{}
 
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
 
-	a.checkpoint(ctx, input, w)
+	input.AccountID = auth.AccountID()
+	input.EnvID = auth.WorkspaceID()
+
+	a.checkpointSyncSteps(ctx, input, w)
 }
 
-// checkpoint handles the checkpointing of new steps.
+// checkpointSyncSteps handles the checkpointing of new steps.
 //
 // this accepts all opcodes in the current request, then handles trace pipelines and optional
 // state updates in the state store for resumability.
@@ -232,7 +239,7 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 // the first checkpoint.  If so, we produce a token which allows arbitrary users to request
 // access to the run's output;  this token is used when redirecting in the sync fns that started
 // the checkpoint.
-func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w http.ResponseWriter) string {
+func (a checkpointAPI) checkpointSyncSteps(ctx context.Context, input checkpointSyncSteps, w http.ResponseWriter) string {
 	var jwt string
 
 	if input.md == nil {
@@ -430,18 +437,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 	return jwt
 }
 
-// CheckpointResponse is called from the SDK when the API responds to the user. This indicates
-// that the API-based function has finished computing.
-//
-// Note that some steps may be deferred to the background via a future `step.defer` API call.
-// This implies that the API handler has finished but the function has NOT yet finished, if
-// thre are hybrid async and sync steps running.
-//
-// The following is true:
-//
-// - If the run mode is Sync, this means that the function has finished
-// - If the run mode is Async, we only finish the function once all pending steps have finished
-func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request) {
+func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.AuthFinder(ctx)
 	if err != nil {
@@ -449,26 +445,27 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	input := struct {
-		RunID  ulid.ULID `json:"run_id"`
-		FnID   uuid.UUID `json:"fn_id"`
-		AppID  uuid.UUID `json:"app_id"`
-		Result APIResult `json:"result"`
-	}{}
-
-	// Load the state from the state store.
+	// checkpoint those steps by writing to state.
+	input := checkpointAsyncSteps{}
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid request body"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
+	input.AccountID = auth.AccountID()
+	input.EnvID = auth.WorkspaceID()
 
-	md, err := a.State.LoadMetadata(r.Context(), sv2.ID{
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", input.RunID,
+		"account_id", input.AccountID,
+		"env_id", input.EnvID,
+	)
+
+	md, err := a.State.LoadMetadata(ctx, sv2.ID{
 		RunID:      input.RunID,
 		FunctionID: input.FnID,
 		Tenant: sv2.Tenant{
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
-			AppID:     input.AppID,
+			AccountID: input.AccountID,
+			EnvID:     input.EnvID,
 		},
 	})
 	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
@@ -477,21 +474,78 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"error loading state in sync fn finalize",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-		)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading state"))
+		l.Error("error loading state for background checkpoint steps", "error", err)
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
 		return
 	}
 
-	if err := a.finalize(ctx, md, input.Result); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error finalizing run"))
-		return
+	// NOTE: This should never contain async steps, because checkpointing is only used
+	// when sync steps are found.  Here, though, we check to see if there are async steps
+	// and track warnings if so.  It could still *technically* work, but is not the paved path
+	// that we want, and so is unimplemented.
+	async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
+		return enums.OpcodeIsAsync(s.Op)
+	})
+	if async {
+		l.Error("found async steps in async checkpoint")
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "cannot checkpoint async steps"))
 	}
+
+	for _, op := range input.Steps {
+		attrs := tracing.GeneratorAttrs(&op)
+		tracing.AddMetadataTenantAttrs(attrs, md.ID)
+
+		switch op.Op {
+		case enums.OpcodeStepRun, enums.OpcodeStep:
+			// Checkpointing is also always used while runs are in progress.  These must always
+			// be stored in the state store.
+			output, err := op.Output()
+			if err != nil {
+				l.Error("error fetching checkpoint step output", "error", err)
+			}
+
+			_, err = a.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
+			if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+				// Ignore.
+				l.Warn("duplicate checkpoint step", "id", md.ID)
+				continue
+			}
+			if err != nil {
+				l.Error("error saving checkpointed step state", "error", err)
+			}
+
+			_, err = a.TracerProvider.CreateSpan(
+				meta.SpanNameStep,
+				&tracing.CreateSpanOptions{
+					Parent:    md.Config.NewFunctionTrace(),
+					StartTime: op.Timing.Start(),
+					EndTime:   op.Timing.End(),
+					Attributes: attrs.Merge(
+						meta.NewAttrSet(
+							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
+							meta.Attr(meta.Attrs.RunID, &input.RunID),
+							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
+							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+						),
+					),
+				},
+			)
+			if err != nil {
+				// We should never hit a blocker creating a span.  If so, warn loudly.
+				l.Error("error saving span for checkpoint op", "error", err)
+			}
+		default:
+			// Return an error
+			l.Error("unimplemented checkpoint op", "op", op.Op)
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "cannot checkpoint opcode: %s", op.Op))
+		}
+	}
+
+	// TODO: Reset the queue item!!!
 }
 
+// Output returns run output given a JWT which has access to the given {env, runID} claimset.
 func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 	// Assert that we have a checkpoint JWT in the query param.
 	token := r.URL.Query().Get("token")
