@@ -2628,6 +2628,11 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// This is fine.
+		return nil
+	}
+
 	if err != nil {
 		return err
 	}
