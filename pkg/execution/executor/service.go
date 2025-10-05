@@ -944,7 +944,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{
-			"cron": conf.ScheduleExpression(),
+			"cron": ci.Expression,
 		},
 		Timestamp: time.Now().UnixMilli(),
 	}, nil)
@@ -978,7 +978,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
 			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
 			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
-			attribute.String(consts.OtelSysCronExpr, conf.ScheduleExpression()),
+			attribute.String(consts.OtelSysCronExpr, ci.Expression),
 			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
 		),
 	)

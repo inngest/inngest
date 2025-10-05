@@ -370,7 +370,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
-			if fn.IsScheduled() {
+			cronExprs := fn.ScheduleExpressions()
+			for _, cronExpr := range cronExprs {
 				crons = append(crons, cron.CronItem{
 					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 					AccountID:       consts.DevServerAccountID,
@@ -378,10 +379,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 					AppID:           appID,
 					FunctionID:      fn.ID,
 					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
-					Expression:      fn.ScheduleExpression(),
+					Expression:      cronExpr,
 					Op:              enums.CronOpUpdate,
 				})
 			}
+
 			continue
 		}
 
@@ -398,7 +400,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
 
-		if fn.IsScheduled() {
+		cronExprs := fn.ScheduleExpressions()
+		for _, cronExpr := range cronExprs {
 			crons = append(crons, cron.CronItem{
 				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 				AccountID:       consts.DevServerAccountID,
@@ -406,9 +409,10 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				AppID:           appID,
 				FunctionID:      fn.ID,
 				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
-				Expression:      fn.ScheduleExpression(),
+				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
+
 		}
 	}
 
