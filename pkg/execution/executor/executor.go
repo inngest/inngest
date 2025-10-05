@@ -2617,6 +2617,21 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
+	// Save the response to the state store.
+	output, err := gen.Output()
+	if err != nil {
+		return err
+	}
+
+	if err := e.validateStateSize(len(output), *runCtx.Metadata()); err != nil {
+		return err
+	}
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if err != nil {
+		return err
+	}
+
 	// Again, we ONLY create new traces if the steps were batched in checkpointing, then returned
 	// by the SDK in an async response due to overly permissive checkpointing (ie. after 10s)
 	// which was never called.
@@ -2646,21 +2661,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 			// We should never hit a blocker creating a span.  If so, warn loudly.
 			logger.StdlibLogger(ctx).Error("error saving span for checkpoint op", "error", err)
 		}
-	}
-
-	// Save the response to the state store.
-	output, err := gen.Output()
-	if err != nil {
-		return err
-	}
-
-	if err := e.validateStateSize(len(output), *runCtx.Metadata()); err != nil {
-		return err
-	}
-
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if err != nil {
-		return err
 	}
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
