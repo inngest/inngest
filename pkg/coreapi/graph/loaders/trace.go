@@ -209,6 +209,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		DebugRunID:     debugRunID,
 		DebugSessionID: debugSessionID,
 
+		SpanTypeName: span.Name,
+
 		// IsUserland: , TODO
 		// UserlandSpan: , TODO
 	}
@@ -306,6 +308,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
 		lastStepQueueTime := &gqlSpan.QueuedAt
 		isFirstChild := true
+		haveSetRunStartTime := span.Name != meta.SpanNameRun
 
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
@@ -316,6 +319,19 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			// We could also not have a child, for example if we're
 			// intentionally skipping it
 			if child == nil {
+				continue
+			}
+
+			if child.Omit {
+				// We're skipping this child, but we may still want to use
+				// its data for timings.
+				if child.SpanTypeName == meta.SpanNameStepDiscovery && !haveSetRunStartTime {
+					// Discovery spans can be used to set the start time of
+					// the step if it's the first child.
+					gqlSpan.StartedAt = child.StartedAt
+					haveSetRunStartTime = true
+				}
+
 				continue
 			}
 
@@ -334,7 +350,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 						}
 
 						hasFinalizationChild = true
-
 					}
 				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
@@ -390,8 +405,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 		// For the run span, the start is the first child span's start
 		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
-			gqlSpan.StartedAt = &gqlSpan.ChildrenSpans[0].QueuedAt
-			if gqlSpan.EndedAt != nil {
+			if (gqlSpan.StartedAt == nil || !haveSetRunStartTime) && gqlSpan.ChildrenSpans[0].StartedAt != nil {
+				gqlSpan.StartedAt = gqlSpan.ChildrenSpans[0].StartedAt
+			}
+
+			if gqlSpan.EndedAt != nil && gqlSpan.StartedAt != nil {
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
 			}
@@ -430,7 +448,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	}
 
 	if !showSpan {
-		return nil, nil
+		gqlSpan.Omit = true
 	}
 
 	if gqlSpan.Name == FinalizationSpanName {

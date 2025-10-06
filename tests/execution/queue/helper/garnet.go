@@ -515,7 +515,7 @@ func WithImage(image string) GarnetOption {
 func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 	// Apply options
 	config := &garnetConfig{
-		image: "ghcr.io/microsoft/garnet:1.0.83", // Default image
+		image: "ghcr.io/microsoft/garnet:1.0.84", // Default image
 	}
 	for _, opt := range opts {
 		opt(config)

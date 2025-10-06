@@ -43,7 +43,7 @@ func TestLuaCompatibility(t *testing.T) {
 			Name:       "Basic Garnet",
 			ServerType: "garnet",
 			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage("ghcr.io/microsoft/garnet:1.0.83"),
+				helper.WithImage("ghcr.io/microsoft/garnet:1.0.84"),
 				helper.WithConfiguration(&helper.GarnetConfiguration{
 					EnableLua: true,
 				}),

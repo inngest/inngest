@@ -60,7 +60,7 @@ func TestCustomImage(t *testing.T) {
 	ctx := t.Context()
 
 	// Test with a custom image (using the same image for testing purposes)
-	customImage := "ghcr.io/microsoft/garnet:1.0.83"
+	customImage := "ghcr.io/microsoft/garnet:1.0.84"
 	gc, err := StartGarnet(t, WithImage(customImage))
 	require.NoError(t, err)
 
