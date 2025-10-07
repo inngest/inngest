@@ -2,7 +2,11 @@
 const { withSentryConfig } = require('@sentry/nextjs');
 
 const CSP_HEADER = `
-  default-src 'self';
+  base-uri 'none';
+  form-action 'self';
+  frame-ancestors 'none';
+  manifest-src 'self';
+  object-src 'none';
 `.replace(/\n/g, '');
 
 /** @type {import('next').NextConfig} */
