@@ -3,6 +3,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 
 const CSP_HEADER = `
   base-uri 'none';
+  default-src 'self';
   font-src 'self' https://fonts-cdn.inngest.com;
   form-action 'self';
   frame-ancestors 'none';
