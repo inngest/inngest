@@ -1,6 +1,10 @@
 // @ts-check
 const { withSentryConfig } = require('@sentry/nextjs');
 
+const CSP_HEADER = `
+  default-src 'self';
+`.replace(/\n/g, '');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   productionBrowserSourceMaps: true,
@@ -16,6 +20,19 @@ const nextConfig = {
     ],
   },
   transpilePackages: ['@inngest/components'],
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: CSP_HEADER,
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {
