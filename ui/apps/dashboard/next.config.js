@@ -6,6 +6,7 @@ const CSP_HEADER = `
   font-src 'self' https://fonts-cdn.inngest.com;
   form-action 'self';
   frame-ancestors 'none';
+  img-src 'self' https://img.clerk.com;
   manifest-src 'self';
   object-src 'none';
 `.replace(/\n/g, '');
