@@ -6,6 +6,7 @@ const CSP_HEADER = `
   font-src 'self' https://fonts-cdn.inngest.com;
   form-action 'self';
   frame-ancestors 'none';
+  frame-src 'self' https://js.stripe.com;
   img-src 'self' https://img.clerk.com;
   manifest-src 'self';
   object-src 'none';
