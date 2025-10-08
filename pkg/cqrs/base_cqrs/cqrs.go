@@ -2843,7 +2843,7 @@ func StepStatusToRunStatus(stepStatus enums.StepStatus) enums.RunStatus {
 	case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
 		return enums.RunStatusRunning // These are all "in progress" states
 	default:
-		return enums.RunStatusRunning // default to the zero value of enums.RunStatus
+		return enums.RunStatusUnknown // default to unknown
 	}
 }
 
