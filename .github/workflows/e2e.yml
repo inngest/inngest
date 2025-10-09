@@ -51,7 +51,7 @@ jobs:
       - name: Run E2E tests
         run: |
           cd ./tests/js
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --prod
           pnpm dev &
           sleep 5
           cd ../../

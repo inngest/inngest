@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "20"
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prod
         working-directory: ui/apps/dev-server-ui
       - name: Type check
         run: pnpm type-check

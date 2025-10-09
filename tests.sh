@@ -42,7 +42,7 @@ trap cleanup SIGINT SIGTERM
 # Accept optional test pattern argument
 TEST_PATTERN="${1:-}"
 
-sh -c 'cd ./tests/js && pnpm install --frozen-lockfile > /dev/null 2> /dev/null'
+sh -c 'cd ./tests/js && pnpm install --frozen-lockfile --prod > /dev/null 2> /dev/null'
 sh -c 'cd ./tests/js && pnpm dev > /dev/null 2> /dev/null' &
 pids+=($!)
 
