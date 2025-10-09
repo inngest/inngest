@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
@@ -168,7 +168,7 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 				_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
 				return
 			}
-			run.Status = base_cqrs.StepStatusToRunStatus(rootSpan.Status)
+			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
 		}
 	}
 
