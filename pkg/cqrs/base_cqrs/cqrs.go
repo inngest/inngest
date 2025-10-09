@@ -2753,20 +2753,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			if span.Status != nil && *span.Status != "" {
 				// Convert StepStatus string to RunStatus enum
 				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
-					switch stepStatus {
-					case enums.StepStatusCompleted:
-						status = enums.RunStatusCompleted
-					case enums.StepStatusFailed, enums.StepStatusErrored:
-						status = enums.RunStatusFailed
-					case enums.StepStatusRunning:
-						status = enums.RunStatusRunning
-					case enums.StepStatusCancelled:
-						status = enums.RunStatusCancelled
-					case enums.StepStatusTimedOut:
-						status = enums.RunStatusCancelled // Map timeout to cancelled
-					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
-						status = enums.RunStatusRunning // These are all "in progress" states
-					}
+					status = StepStatusToRunStatus(stepStatus)
 				}
 			}
 
@@ -2839,6 +2826,25 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	}
 
 	return res, nil
+}
+
+func StepStatusToRunStatus(stepStatus enums.StepStatus) enums.RunStatus {
+	switch stepStatus {
+	case enums.StepStatusCompleted:
+		return enums.RunStatusCompleted
+	case enums.StepStatusFailed, enums.StepStatusErrored:
+		return enums.RunStatusFailed
+	case enums.StepStatusRunning:
+		return enums.RunStatusRunning
+	case enums.StepStatusCancelled:
+		return enums.RunStatusCancelled
+	case enums.StepStatusTimedOut:
+		return enums.RunStatusCancelled // Map timeout to cancelled
+	case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
+		return enums.RunStatusRunning // These are all "in progress" states
+	default:
+		return enums.RunStatusUnknown // default to unknown
+	}
 }
 
 // newSpanRunsQueryBuilder creates a query builder for span-based runs Similar
