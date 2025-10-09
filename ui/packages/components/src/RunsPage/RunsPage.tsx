@@ -62,6 +62,7 @@ type Props = {
   scope: ViewScope;
   totalCount: number | undefined;
   searchError?: Error;
+  error?: Error | null;
   infiniteScrollTrigger?: React.ReactNode;
 };
 
@@ -82,6 +83,7 @@ export function RunsPage({
   scope,
   totalCount,
   searchError,
+  error,
   infiniteScrollTrigger,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -375,6 +377,8 @@ export function RunsPage({
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}
+          error={error}
+          onRefresh={onRefresh}
           renderSubComponent={renderSubComponent}
           getRowCanExpand={() => true}
           visibleColumns={columnVisibility}
@@ -392,7 +396,7 @@ export function RunsPage({
             />
           </div>
         )}
-        {onRefresh && (
+        {onRefresh && !error && (
           <div className="flex flex-col items-center pt-2">
             <Button
               kind="secondary"
