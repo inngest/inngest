@@ -131,6 +131,9 @@ type Executor interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+
+	// NOTE: Temporary for manually resuming pauses, you likely shouldn't use this
+	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error)
 }
 
 // RunContext provides the context needed for HandleGenerator execution without
