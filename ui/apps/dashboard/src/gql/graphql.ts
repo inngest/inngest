@@ -435,6 +435,7 @@ export enum ConnectV1WorkerConnectionsOrderByField {
 
 export type CreateCancellationInput = {
   envID: Scalars['UUID'];
+  expression?: InputMaybe<Scalars['String']>;
   functionSlug: Scalars['String'];
   name?: InputMaybe<Scalars['String']>;
   queuedAtMax: Scalars['Time'];
@@ -1912,6 +1913,7 @@ export type RunTraceSpan = {
   duration: Maybe<Scalars['Int']>;
   endedAt: Maybe<Scalars['Time']>;
   functionID: Scalars['UUID'];
+  isPreview: Maybe<Scalars['Boolean']>;
   isRoot: Scalars['Boolean'];
   isUserland: Scalars['Boolean'];
   name: Scalars['String'];
