@@ -3,10 +3,15 @@ package cqrs
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/inngest"
+)
+
+var (
+	ErrFunctionNotFound = fmt.Errorf("function not found")
 )
 
 type Function struct {

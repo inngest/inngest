@@ -11,9 +11,11 @@ const (
 	KindScheduleBatch   = "schedule-batch"
 	KindEdgeError       = "edge-error" // KindEdgeError is used to indicate a final step error attempting a graceful save.
 	KindQueueMigrate    = "queue-migrate"
-	KindPauseBlockFlush = "pbf"    // Flushes pauses from the buffer to blocks.
-	KindJobPromote      = "jps"    // job promotion service
-	KindCancel          = "cancel" // cancel signals eager cancellation of queue items
-	KindFunctionPause   = "fp"     // pause function
-	KindFunctionUnpause = "fup"    // unpause function
+	KindPauseBlockFlush = "pbf"       // Flushes pauses from the buffer to blocks.
+	KindJobPromote      = "jps"       // job promotion service
+	KindCancel          = "cancel"    // cancel signals eager cancellation of queue items
+	KindFunctionPause   = "fp"        // pause function
+	KindFunctionUnpause = "fup"       // unpause function
+	KindCronSync        = "cron-sync" // updates sync schedules
+	KindCron            = "cron"      // handles the actual cron workloads
 )

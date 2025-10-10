@@ -609,6 +609,23 @@ func (u debounceKeyGenerator) DebounceMigrating(ctx context.Context) string {
 	return fmt.Sprintf("{%s}:debounce-migrating", u.queueDefaultKey)
 }
 
+type CronKeyGenerator interface {
+	// Schedule returns the key for the hash containing function to scheduled item mapping
+	Schedule() string
+	// QueueItem returns the key for the hash containing all items within a
+	// queue for a function.
+	QueueItem() string
+}
+
+type cronKeyGenerator struct {
+	queueDefaultKey string
+	queueItemKeyGenerator
+}
+
+func (c cronKeyGenerator) Schedule() string {
+	return fmt.Sprintf("{%s}:cron:schedule", c.queueDefaultKey)
+}
+
 type PauseKeyGenerator interface {
 	// Pause returns the key used to store an individual pause from its ID.
 	Pause(ctx context.Context, pauseID uuid.UUID) string
