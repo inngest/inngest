@@ -7,12 +7,16 @@ import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
 import { Dashboard } from '@/components/Metrics/Dashboard';
 
 type MetricsProps = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
-  };
+  }>;
 };
 
-export default async function MetricsPage({ params: { environmentSlug: envSlug } }: MetricsProps) {
+export default async function MetricsPage(props: MetricsProps) {
+  const params = await props.params;
+
+  const { environmentSlug: envSlug } = params;
+
   return (
     <>
       <Header

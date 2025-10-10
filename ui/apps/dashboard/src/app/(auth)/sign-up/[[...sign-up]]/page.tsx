@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SignUpPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const anonymousIDCookie = cookieStore.get('inngest_anonymous_id');
 
   return (

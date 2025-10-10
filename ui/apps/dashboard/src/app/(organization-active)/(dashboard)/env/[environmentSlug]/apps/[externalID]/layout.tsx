@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Header } from '@inngest/components/Header/Header';
@@ -38,7 +38,13 @@ const Error = ({ error, externalID }: { error: Error; externalID: string }) => {
   }
 };
 
-export default function Layout({ children, params: { externalID } }: Props) {
+export default function Layout(props: Props) {
+  const params = use(props.params);
+
+  const { externalID } = params;
+
+  const { children } = props;
+
   const [showArchive, setShowArchive] = useState(false);
   const [showValidate, setShowValidate] = useState(false);
   const pathname = usePathname();
