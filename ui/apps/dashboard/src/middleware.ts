@@ -149,6 +149,7 @@ function makeCSPHeader() {
   return csp;
 }
 
+// TODO: Remove -Report-Only once we're confident CSP is working as expected.
 function withCSPResponseHeaderReportOnly(response: NextResponse) {
   response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader());
   return response;
