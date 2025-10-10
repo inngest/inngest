@@ -221,6 +221,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
+      error={nextPageRes.error || firstPageRes.error}
       infiniteScrollTrigger={
         <InfiniteScrollTrigger
           onIntersect={loadMore}
