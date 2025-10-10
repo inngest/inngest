@@ -1,18 +1,6 @@
 // @ts-check
 const { withSentryConfig } = require('@sentry/nextjs');
 
-const CSP_HEADER = `
-  base-uri 'none';
-  default-src 'self';
-  font-src 'self' https://fonts-cdn.inngest.com;
-  form-action 'self';
-  frame-ancestors 'none';
-  frame-src 'self' https://js.stripe.com;
-  img-src 'self' https://img.clerk.com;
-  manifest-src 'self';
-  object-src 'none';
-`.replace(/\n/g, '');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   productionBrowserSourceMaps: true,
@@ -28,19 +16,6 @@ const nextConfig = {
     ],
   },
   transpilePackages: ['@inngest/components'],
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: CSP_HEADER,
-          },
-        ],
-      },
-    ];
-  },
   async redirects() {
     return [
       {
