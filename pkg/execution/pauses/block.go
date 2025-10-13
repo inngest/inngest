@@ -3,6 +3,7 @@ package pauses
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"strconv"
@@ -443,6 +444,14 @@ func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block)
 	latest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[len(block.Pauses)-1])
 	if err != nil {
 		return nil, fmt.Errorf("error fetching latest pause time: %w", err)
+	}
+
+	if earliest == latest {
+		// This should never normally occur. Since we use Unix seconds for pause index scores,
+		// there's an upper limit on how many pauses can be added within a single second.
+		// Exceeding that limit (blockSize) could trigger this condition.
+		// If this happens in practice, consider increasing the block size to accommodate more pauses per second.
+		return nil, errors.New("block boundaries should never be the same, consider increasing the block size")
 	}
 
 	// Block indexes are a zset of blocks stored by last pause timestamp,
