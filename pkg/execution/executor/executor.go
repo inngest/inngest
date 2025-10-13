@@ -284,13 +284,6 @@ func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
 	}
 }
 
-func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).preDeleteStateSizeReporter = f
-		return nil
-	}
-}
-
 func WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).assignedQueueShard = shard
@@ -380,8 +373,6 @@ type executor struct {
 
 	// stateSizeLimit finds state size limits for a given run
 	stateSizeLimit func(sv2.ID) int
-
-	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
@@ -1110,9 +1101,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if v.stopWithoutRetry {
-		if e.preDeleteStateSizeReporter != nil {
-			e.preDeleteStateSizeReporter(ctx, md)
-		}
 
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
@@ -2099,12 +2087,20 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
+	pauseSpan := tracing.SpanRefFromPause(&pause)
+	_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		EndTime:    time.Now(),
+		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+		Status:     enums.StepStatusTimedOut,
+		TargetSpan: pauseSpan,
+		Attributes: tracing.ResumeAttrs(&pause, &r),
+	})
+
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
-
-		err = e.queue.Enqueue(ctx, queue.Item{
+		nextItem := queue.Item{
 			JobID: &jobID,
 			// Add a new group ID for the child;  this will be a new step.
 			GroupID:               uuid.New().String(),
@@ -2120,10 +2116,38 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 					Incoming: "step",
 				},
 			},
-		}, time.Now(), queue.EnqueueOpts{})
-		if err != nil && err != redis_state.ErrQueueItemExists {
-			return fmt.Errorf("error enqueueing after pause: %w", err)
+			Metadata: make(map[string]any),
 		}
+
+		nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: pauseSpan,
+				Debug:       &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+				Metadata:    &md,
+				Parent:      tracing.RunSpanRefFromMetadata(&md),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			// return fmt.Errorf("error creating span for next step after
+			// resume timeout: %w", err)
+			e.log.Error("error creating span for next step after resume timeout", "error", err)
+		}
+
+		err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
+		if err != nil {
+			if errors.Is(err, redis_state.ErrQueueItemExists) {
+				nextStepSpan.Drop()
+			} else {
+				_ = nextStepSpan.Send()
+				return fmt.Errorf("error enqueueing after pause: %w", err)
+
+			}
+		}
+
+		_ = nextStepSpan.Send()
 	}
 
 	// Only run lifecycles if we consumed the pause and enqueued next step.
@@ -3343,22 +3367,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		ParallelMode: gen.ParallelMode(),
 	}
 
-	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
-	if err == state.ErrSignalConflict {
-		return state.WrapInStandardError(
-			err,
-			"Error",
-			"Signal conflict; signal wait already exists for another run",
-			"",
-		)
-	}
-	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
-	}
-
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
 		GroupID:               runCtx.GroupID(),
@@ -3371,13 +3382,94 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
-	}, expires, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+			StartTime:   now,
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// WaitForSignal: %w", err)
+		e.log.Debug("error creating span for next step after WaitForSignal", "error", err)
+	}
+
+	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
+	if err == state.ErrSignalConflict {
+		stdErr := state.WrapInStandardError(
+			err,
+			"Error",
+			"Signal conflict; signal wait already exists for another run",
+			"",
+		)
+
+		if span != nil {
+			// Write and update the span with the failure
+			_ = span.Send()
+
+			attrs := meta.NewAttrSet()
+
+			byt, marshalErr := json.Marshal(stdErr)
+			if marshalErr != nil {
+				attrs.AddErr(fmt.Errorf("error marshalling standard error: %w", marshalErr))
+			} else {
+				output := string(byt)
+				hasOutput := true
+
+				meta.AddAttr(attrs, meta.Attrs.StepOutput, &output)
+				meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
+			}
+
+			if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+				EndTime:    time.Now(),
+				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
+				Status:     enums.StepStatusFailed,
+				TargetSpan: span.Ref,
+				Attributes: attrs,
+				Metadata:   runCtx.Metadata(),
+				QueueItem:  &nextItem,
+			}); updateSpanErr != nil {
+				e.log.Debug("error updating span for conflicting WaitForSignal during handleGeneratorWaitForSignal", "error", updateSpanErr)
+			}
+		}
+
+		return stdErr
+	}
+	if err != nil {
+		if errors.Is(err, state.ErrPauseAlreadyExists) {
+			if span != nil {
+				span.Drop()
+			}
+		} else {
+			return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
+		}
+	}
+
+	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		if span != nil {
+			span.Drop()
+		}
+
+		return nil
+	}
+
+	if span != nil {
+		_ = span.Send()
+	}
+
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
 			context.WithoutCancel(ctx),
@@ -3462,23 +3554,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		},
 		ParallelMode: gen.ParallelMode(),
 	}
-	_, err = e.pm.Write(
-		ctx,
-		pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName},
-		&pause,
-	)
-
-	// A pause may already exist if the write succeeded but we timed out before
-	// returning (MDB i/o timeouts). In that case, we ignore the
-	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
-	// to avoid duplicate invokes instead.
-	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-		return err
-	}
 
 	// Enqueue a job that will timeout the pause.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
 		// Use the same group ID, allowing us to track the cancellation of
@@ -3493,9 +3572,52 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
-	}, expires, queue.EnqueueOpts{})
+	}
+
+	lifecycleItem := runCtx.LifecycleItem()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
+			StartTime:   now,
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorInvokeFunction"},
+			Metadata:    runCtx.Metadata(),
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Attributes:  tracing.GeneratorAttrs(&gen),
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// InvokeFunction: %w", err)
+		e.log.Debug("error creating span for next step after InvokeFunction", "error", err)
+	}
+
+	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName}
+	_, err = e.pm.Write(ctx, idx, &pause)
+	// A pause may already exist if the write succeeded but we timed out before
+	// returning (MDB i/o timeouts). In that case, we ignore the
+	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
+	// to avoid duplicate invokes instead.
+	if err != nil {
+		if errors.Is(err, state.ErrPauseAlreadyExists) {
+			if span != nil {
+				span.Drop()
+			}
+		} else {
+			return err
+		}
+	}
+
+	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
+		if span != nil {
+			span.Drop()
+		}
+
 		return nil
 	} else if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -3506,8 +3628,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		)
 	}
 
+	if span != nil {
+		_ = span.Send()
+	}
+
 	// Send the event.
-	lifecycleItem := runCtx.LifecycleItem()
 	err = e.handleSendingEvent(ctx, evt, lifecycleItem)
 	if err != nil {
 		// TODO Cancel pause/timeout?
@@ -3874,6 +3999,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	return nil
+}
+
+func (e *executor) GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error) {
+	return e.traceReader.GetEvent(ctx, id, accountID, workspaceID)
 }
 
 func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {

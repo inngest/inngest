@@ -146,6 +146,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
 		}
 	}
+	if !opts.StartTime.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &opts.StartTime)
+	}
 	if !opts.EndTime.IsZero() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &opts.EndTime)
 	}
