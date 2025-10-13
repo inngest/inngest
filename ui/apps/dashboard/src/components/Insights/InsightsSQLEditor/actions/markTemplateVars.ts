@@ -83,7 +83,7 @@ function getTemplateVarsRanges(model: Model, matches: TemplateVarMatch[]) {
 function assignTemplateVarsMarkers(monaco: Monaco, model: Model, ranges: MarkerRange[]) {
   const markers: Marker[] = ranges.map((range) => ({
     ...range,
-    message: 'Provide a value for this template variable.',
+    message: 'A specific value is required for this template variable.',
     severity: monaco.MarkerSeverity.Info,
   }));
 
