@@ -284,13 +284,6 @@ func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
 	}
 }
 
-func WithPreDeleteStateSizeReporter(f execution.PreDeleteStateSizeReporter) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).preDeleteStateSizeReporter = f
-		return nil
-	}
-}
-
 func WithAssignedQueueShard(shard redis_state.QueueShard) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).assignedQueueShard = shard
@@ -380,8 +373,6 @@ type executor struct {
 
 	// stateSizeLimit finds state size limits for a given run
 	stateSizeLimit func(sv2.ID) int
-
-	preDeleteStateSizeReporter execution.PreDeleteStateSizeReporter
 
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
@@ -1110,9 +1101,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if v.stopWithoutRetry {
-		if e.preDeleteStateSizeReporter != nil {
-			e.preDeleteStateSizeReporter(ctx, md)
-		}
 
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
@@ -4011,6 +3999,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	return nil
+}
+
+func (e *executor) GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error) {
+	return e.traceReader.GetEvent(ctx, id, accountID, workspaceID)
 }
 
 func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {
