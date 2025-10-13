@@ -422,6 +422,9 @@ type FinalizeOptional struct {
 
 func (f FinalizeOpts) Status() enums.StepStatus {
 	if f.Response.Error() != "" {
+		if f.Response.Error() == state.ErrFunctionCancelled.Error() {
+			return enums.StepStatusCancelled
+		}
 		return enums.StepStatusFailed
 	}
 	return enums.StepStatusCompleted
