@@ -50,6 +50,7 @@ protobuf:
 	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
 	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
 	buf generate --path proto/state/v2 --template proto/state/v2/buf.gen.yaml
+	buf generate --path proto/constraintapi/v1 --template proto/constraintapi/v1/buf.gen.yaml
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
