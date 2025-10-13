@@ -4001,6 +4001,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	return nil
 }
 
+func (e *executor) GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error) {
+	return e.traceReader.GetEvent(ctx, id, accountID, workspaceID)
+}
+
 func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {
 	name := inngest.Driver(fn)
 	if d, ok := e.driverv1[name]; ok {
