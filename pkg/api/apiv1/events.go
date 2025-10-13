@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
@@ -158,5 +159,18 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
+
+	// allow user to pass a flag and get the same run status as trace previews
+	if r.URL.Query().Get("trace_preview") == "true" {
+		for _, run := range runs {
+			rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
+			if err != nil {
+				_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
+				return
+			}
+			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
+		}
+	}
+
 	_ = WriteCachedResponse(w, runs, 15*time.Second)
 }

@@ -43,11 +43,6 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	// Report the status of the size.
-	if e.preDeleteStateSizeReporter != nil {
-		e.preDeleteStateSizeReporter(ctx, opts.Metadata)
-	}
-
 	// If there are no input events, fetch them.
 	if len(opts.Optional.InputEvents) == 0 {
 		opts.Optional.InputEvents, err = e.smv2.LoadEvents(ctx, opts.Metadata.ID)

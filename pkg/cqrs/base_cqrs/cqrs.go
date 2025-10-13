@@ -2596,7 +2596,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			"input",
 		).
 		Where(sq.C("dynamic_span_id").In(
-			sq.Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
+			sq.Dialect(w.dialect()).Select("dynamic_span_id").Distinct().From("spans").Where(sq.C("name").Eq(meta.SpanNameRun)),
 		)).
 		Where(filter...).
 		Order(order...).
@@ -2753,20 +2753,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 			if span.Status != nil && *span.Status != "" {
 				// Convert StepStatus string to RunStatus enum
 				if stepStatus, err := enums.StepStatusString(*span.Status); err == nil {
-					switch stepStatus {
-					case enums.StepStatusCompleted:
-						status = enums.RunStatusCompleted
-					case enums.StepStatusFailed, enums.StepStatusErrored:
-						status = enums.RunStatusFailed
-					case enums.StepStatusRunning:
-						status = enums.RunStatusRunning
-					case enums.StepStatusCancelled:
-						status = enums.RunStatusCancelled
-					case enums.StepStatusTimedOut:
-						status = enums.RunStatusCancelled // Map timeout to cancelled
-					case enums.StepStatusScheduled, enums.StepStatusWaiting, enums.StepStatusSleeping, enums.StepStatusInvoking:
-						status = enums.RunStatusRunning // These are all "in progress" states
-					}
+					status = enums.StepStatusToRunStatus(stepStatus)
 				}
 			}
 
