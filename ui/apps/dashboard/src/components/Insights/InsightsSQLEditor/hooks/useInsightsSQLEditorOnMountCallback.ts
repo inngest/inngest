@@ -28,6 +28,11 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
 
     const markersDisposable = markTemplateVars(editor, monaco);
 
+    // TODO: This code is not currently running. It turns out that actually doing so would
+    // require messy exterior code. This is here to demonstrate roughly the pattern that would
+    // be needed if any of these "actions" truly needed to run disposable functions. As for now,
+    // neither of them do anything truly global, so all necessary cleanup should happen just as
+    // a result of the monaco editor unmounting.
     return () => {
       shortcutsDisposable.dispose();
       markersDisposable.dispose();
