@@ -75,6 +75,7 @@ function createChartOption({
       itemStyle: {
         color: resolveColor(lineColors[1]?.[0]!, dark, lineColors[1]?.[1]),
       },
+      name: 'Concurrently running steps',
     },
   ];
 
