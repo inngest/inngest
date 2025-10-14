@@ -22,7 +22,7 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@9.15.9",
+  "packageManager": "pnpm@10.18.2",
   "private": true,
   "pnpm": {
     "overrides": {
