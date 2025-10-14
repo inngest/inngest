@@ -61,7 +61,7 @@ export const RunDetailsV3 = ({
     'polling-disabled',
     false
   );
-  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', false);
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', false, true);
 
   const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);

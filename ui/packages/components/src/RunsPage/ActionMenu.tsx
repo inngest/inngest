@@ -14,6 +14,7 @@ import { Switch } from '../Switch';
 
 export type RunsActionMenuProps = {
   setAutoRefresh: () => void;
+  setPreview: () => void;
   autoRefresh?: boolean;
   intervalSeconds?: number;
 };
@@ -21,6 +22,7 @@ export type RunsActionMenuProps = {
 export const RunsActionMenu = ({
   autoRefresh,
   setAutoRefresh,
+  setPreview,
   intervalSeconds = 5,
 }: RunsActionMenuProps) => {
   return (
@@ -60,7 +62,11 @@ export const RunsActionMenu = ({
               <div className="text-basis text-xs">Use a new Developer Preview mode of traces</div>
             </div>
             <div className="flex-1" />
-            <FeatureToggle defaultEnabled={false} featureFlagName="traces-preview" />
+            <FeatureToggle
+              defaultEnabled={false}
+              featureFlagName="traces-preview"
+              toggle={setPreview}
+            />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

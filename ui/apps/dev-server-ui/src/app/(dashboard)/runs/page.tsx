@@ -188,6 +188,7 @@ export default function Page() {
             />
             <RunsActionMenu
               setAutoRefresh={() => setAutoRefresh((v) => !v)}
+              setPreview={() => setPreview((p) => !p)}
               autoRefresh={autoRefresh}
               intervalSeconds={pollInterval / 1000}
             />

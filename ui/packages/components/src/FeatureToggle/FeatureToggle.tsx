@@ -8,12 +8,14 @@ type featureToggleProps = {
   featureFlagName: string;
   defaultEnabled?: boolean;
   className?: string;
+  toggle?: () => void;
 };
 
 export const FeatureToggle = ({
   featureFlagName,
   defaultEnabled = false,
   className,
+  toggle,
 }: featureToggleProps) => {
   const storageKey = `${FEATURE_FLAG_NAMESPACE}${featureFlagName}`;
   const rawFlag = typeof window === 'undefined' ? null : window.localStorage.getItem(storageKey);
@@ -43,6 +45,7 @@ export const FeatureToggle = ({
         e.stopPropagation();
         localStorage.setItem(storageKey, JSON.stringify(!enabled));
         setEnabled(!enabled);
+        toggle?.();
       }}
     />
   );
