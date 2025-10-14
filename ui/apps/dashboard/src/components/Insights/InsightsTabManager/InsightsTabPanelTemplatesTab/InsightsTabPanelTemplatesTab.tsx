@@ -40,7 +40,7 @@ export function InsightsTabPanelTemplatesTab() {
         </div>
         <InsightsTabPanelTemplatesTabGrid />
       </div>
-      <div className="flex w-[360px] flex-shrink-0 flex-col">
+      <div className="flex w-[270px] flex-shrink-0 flex-col">
         <div className="flex flex-col gap-4">
           <h3 className="text-muted text-xs font-medium">RESOURCES</h3>
           <div className="flex flex-col gap-3">
