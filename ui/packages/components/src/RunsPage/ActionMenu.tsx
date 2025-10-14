@@ -9,23 +9,21 @@ import {
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { RiSettingsLine } from '@remixicon/react';
 
+import { FeatureToggle } from '../FeatureToggle/FeatureToggle';
 import { Switch } from '../Switch';
 
 export type RunsActionMenuProps = {
   setAutoRefresh: () => void;
+  setPreview: () => void;
   autoRefresh?: boolean;
   intervalSeconds?: number;
-
-  toggleTracesPreview: () => void;
-  tracesPreviewEnabled?: boolean;
 };
 
 export const RunsActionMenu = ({
   autoRefresh,
   setAutoRefresh,
+  setPreview,
   intervalSeconds = 5,
-  tracesPreviewEnabled,
-  toggleTracesPreview,
 }: RunsActionMenuProps) => {
   return (
     <div>
@@ -64,13 +62,10 @@ export const RunsActionMenu = ({
               <div className="text-basis text-xs">Use a new Developer Preview mode of traces</div>
             </div>
             <div className="flex-1" />
-            <Switch
-              checked={tracesPreviewEnabled}
-              className="data-[state=checked]:bg-primary-moderate"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleTracesPreview();
-              }}
+            <FeatureToggle
+              defaultEnabled={false}
+              featureFlagName="traces-preview"
+              toggle={setPreview}
             />
           </DropdownMenuItem>
         </DropdownMenuContent>
