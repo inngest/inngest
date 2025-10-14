@@ -237,7 +237,6 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
-            tracesPreviewEnabled={features.tracesPreview ?? false}
           />
         </div>
       );

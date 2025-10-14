@@ -41,9 +41,15 @@ export default function Page() {
     'polling-disabled',
     false
   );
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } = booleanFlag(
+    'traces-preview',
+    false,
+    true
+  );
 
-  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [preview, setPreview] = useState(false);
+
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -64,6 +70,10 @@ export default function Page() {
     }
   }, [pollingDisabled, pollingFlagReady]);
 
+  useEffect(() => {
+    setPreview(tracesPreviewEnabled);
+  }, [tracesPreviewEnabled, tracesPreviewFlagReady]);
+
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
@@ -74,7 +84,7 @@ export default function Page() {
         status: filteredStatus,
         timeField,
         celQuery: search,
-        preview: tracesPreviewEnabled,
+        preview,
       });
 
       const edges = data.runs.edges.map((edge) => {
@@ -95,12 +105,24 @@ export default function Page() {
         edges,
       };
     },
-    [filterApp, filteredStatus, calculatedStartTime, timeField, search, tracesPreviewEnabled]
+    [filterApp, filteredStatus, calculatedStartTime, timeField, search, preview]
   );
 
   const { data, error, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
-    queryKey: ['runs'],
+    queryKey: [
+      'runs',
+      {
+        filterApp,
+        filteredStatus,
+        calculatedStartTime,
+        endTime,
+        timeField,
+        search,
+        preview,
+      },
+    ],
     queryFn,
+    enabled: tracesPreviewFlagReady,
     refetchInterval: autoRefresh ? pollInterval : false,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
@@ -168,8 +190,6 @@ export default function Page() {
               setAutoRefresh={() => setAutoRefresh((v) => !v)}
               autoRefresh={autoRefresh}
               intervalSeconds={pollInterval / 1000}
-              toggleTracesPreview={() => setTracesPreviewEnabled((v) => !v)}
-              tracesPreviewEnabled={tracesPreviewEnabled}
             />
           </div>
         }
