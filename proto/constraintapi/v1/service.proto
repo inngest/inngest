@@ -1,0 +1,151 @@
+syntax = "proto3";
+package constraintapi.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/constraintapi/v1;constraintapi";
+
+// Enums with CONSTRAINT_API_ prefix for global uniqueness
+enum ConstraintApiRateLimitScope {
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ENV = 2;
+  CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyScope {
+  CONSTRAINT_API_CONCURRENCY_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ENV = 2;
+  CONSTRAINT_API_CONCURRENCY_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiThrottleScope {
+  CONSTRAINT_API_THROTTLE_SCOPE_UNSPECIFIED = 0;
+  CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION = 1;
+  CONSTRAINT_API_THROTTLE_SCOPE_ENV = 2;
+  CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT = 3;
+}
+
+enum ConstraintApiConcurrencyMode {
+  CONSTRAINT_API_CONCURRENCY_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONCURRENCY_MODE_STEP = 1;
+  CONSTRAINT_API_CONCURRENCY_MODE_RUN = 2;
+}
+
+enum ConstraintApiConstraintKind {
+  CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED = 0;
+  CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT = 1;
+  CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY = 2;
+  CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE = 3;
+}
+
+// Message definitions
+message RateLimitConfig {
+  ConstraintApiRateLimitScope scope = 1;
+  int32 limit = 2;
+  string period = 3;
+  string key_expression_hash = 4;
+}
+
+message CustomConcurrencyLimit {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  int32 limit = 3;
+  string key_expression_hash = 4;
+}
+
+message ConcurrencyConfig {
+  int32 account_concurrency = 1;
+  int32 function_concurrency = 2;
+  int32 account_run_concurrency = 3;
+  int32 function_run_concurrency = 4;
+  repeated CustomConcurrencyLimit custom_concurrency_keys = 5;
+}
+
+message ThrottleConfig {
+  ConstraintApiThrottleScope scope = 1;
+  string throttle_key_expression_hash = 2;
+  int32 limit = 3;
+  int32 burst = 4;
+  int32 period = 5;
+}
+
+message ConstraintConfig {
+  int32 function_version = 1;
+  repeated RateLimitConfig rate_limit = 2;
+  ConcurrencyConfig concurrency = 3;
+  repeated ThrottleConfig throttle = 4;
+}
+
+message ConstraintCapacityItem {
+  ConstraintApiConstraintKind kind = 1;
+  int32 amount = 2;
+}
+
+// Request/Response messages
+message CapacityCheckRequest {
+  string account_id = 1;
+}
+
+message CapacityCheckResponse {
+}
+
+message CapacityLeaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string function_id = 4;
+  ConstraintConfig configuration = 5;
+  repeated ConstraintCapacityItem requested_capacity = 6;
+  google.protobuf.Timestamp current_time = 7;
+  google.protobuf.Duration duration = 8;
+  google.protobuf.Duration maximum_lifetime = 9;
+  google.protobuf.Duration blocking_threshold = 10;
+}
+
+message CapacityLeaseResponse {
+  optional string lease_id = 1;
+  repeated ConstraintCapacityItem reserved_capacity = 2;
+  repeated ConstraintCapacityItem insufficient_capacity = 3;
+  google.protobuf.Timestamp retry_after = 4;
+}
+
+message CapacityExtendLeaseRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+  google.protobuf.Duration duration = 4;
+}
+
+message CapacityExtendLeaseResponse {
+  optional string lease_id = 1;
+}
+
+message CapacityCommitRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+}
+
+message CapacityCommitResponse {
+}
+
+message CapacityRollbackRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string lease_id = 3;
+}
+
+message CapacityRollbackResponse {
+}
+
+service ConstraintAPI {
+  rpc Check(CapacityCheckRequest) returns (CapacityCheckResponse);
+  rpc Lease(CapacityLeaseRequest) returns (CapacityLeaseResponse);
+  rpc ExtendLease(CapacityExtendLeaseRequest) returns (CapacityExtendLeaseResponse);
+  rpc Commit(CapacityCommitRequest) returns (CapacityCommitResponse);
+  rpc Rollback(CapacityRollbackRequest) returns (CapacityRollbackResponse);
+}
+

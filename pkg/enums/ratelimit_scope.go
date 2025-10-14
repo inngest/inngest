@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=RateLimitScope -type=T -json -text -gqlgen
+//go:generate go run github.com/dmarkham/enumer -trimprefix=RateLimitScope -type=RateLimitScope -json -text -gqlgen
 
 package enums
 
