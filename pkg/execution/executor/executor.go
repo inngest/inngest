@@ -734,7 +734,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// no-op
 
 		if runSpanRef != nil {
-			runSpanRef.Drop()
 			err := runSpanRef.Send()
 			if err != nil {
 				l.Error(
