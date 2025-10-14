@@ -734,11 +734,26 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// no-op
 
 		if runSpanRef != nil {
-			runSpanRef.Send()
+			runSpanRef.Drop()
+			err := runSpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending run span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
 		}
 
 		if discoverySpanRef != nil {
-			discoverySpanRef.Send()
+			err := discoverySpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending discovery span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
 		}
 	}()
 
