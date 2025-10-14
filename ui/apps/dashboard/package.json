@@ -97,7 +97,7 @@
   },
   "engines": {
     "node": "20.x",
-    "pnpm": "9.x"
+    "pnpm": "10.x"
   },
   "packageManager": "pnpm@10.18.2",
   "private": true,
