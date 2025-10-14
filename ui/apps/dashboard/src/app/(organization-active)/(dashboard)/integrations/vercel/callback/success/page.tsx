@@ -4,13 +4,14 @@ import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiCheckLine, RiInformationLine } from '@remixicon/react';
 
 type SuccessProps = {
-  searchParams: {
+  searchParams: Promise<{
     onSuccessRedirectURL: string;
     source?: string;
-  };
+  }>;
 };
 
-export default async function SuccessPage({ searchParams }: SuccessProps) {
+export default async function SuccessPage(props: SuccessProps) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto mt-8 flex w-[800px] flex-col p-8">
       <div className="bg-contrast mb-7 flex h-12 w-12 items-center justify-center rounded">

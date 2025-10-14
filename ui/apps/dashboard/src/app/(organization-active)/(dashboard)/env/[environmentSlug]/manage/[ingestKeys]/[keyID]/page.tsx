@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -46,16 +46,20 @@ const GetKeyDocument = graphql(`
 `);
 
 type KeyDetailsProps = {
-  params: {
+  params: Promise<{
     environmentSlug: string;
     ingestKeys: string;
     keyID: string;
-  };
+  }>;
 };
 
 const SOURCE_INTEGRATION = 'integration';
 
-export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps) {
+export default function Keys(props: KeyDetailsProps) {
+  const params = use(props.params);
+
+  const { ingestKeys, keyID } = params;
+
   const [isDeleteKeyModalVisible, setIsDeleteKeyModalVisible] = useState(false);
   const [isEditKeyNameModalVisible, setIsEditKeyNameModalVisible] = useState(false);
 

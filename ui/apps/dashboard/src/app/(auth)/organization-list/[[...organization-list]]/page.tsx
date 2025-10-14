@@ -6,10 +6,11 @@ import { OrganizationList } from '@clerk/nextjs';
 import SplitView from '@/app/(auth)/SplitView';
 
 type OrganizationListPageProps = {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function OrganizationListPage({ searchParams }: OrganizationListPageProps) {
+export default async function OrganizationListPage(props: OrganizationListPageProps) {
+  const searchParams = await props.searchParams;
   // We run revalidatePath to clear Next.js cache so that the user doesn't get stale data from a
   // previous organization if they switch organizations.
   revalidatePath('/', 'layout');

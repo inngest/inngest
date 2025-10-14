@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -8,12 +9,13 @@ import { SyncList } from './SyncList';
 import { useSyncs } from './useSyncs';
 
 type Props = {
-  params: {
+  params: Promise<{
     externalID: string;
-  };
+  }>;
 };
 
-export default function Page({ params }: Props) {
+export default function Page(props: Props) {
+  const params = use(props.params);
   const externalAppID = decodeURIComponent(params.externalID);
   const env = useEnvironment();
   const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');

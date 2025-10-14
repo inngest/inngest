@@ -6,7 +6,7 @@ import VercelConnect from './connect';
 import createVercelIntegration from './createVercelIntegration';
 
 export type VercelCallbackProps = {
-  searchParams: {
+  searchParams: Promise<{
     // OAuth 2.0 authorization code issued by Vercel’s authorization server. This code is valid for
     // 30 minutes and can be only exchanged once for a long-lived access token.
     code: string;
@@ -19,10 +19,11 @@ export type VercelCallbackProps = {
     next: string;
     // Source defines where the integration was installed from.
     source: string;
-  };
+  }>;
 };
 
-export default async function VercelCallbackPage({ searchParams }: VercelCallbackProps) {
+export default async function VercelCallbackPage(props: VercelCallbackProps) {
+  const searchParams = await props.searchParams;
   if (!searchParams.code) {
     throw new Error('Missing Vercel authorization code');
   }

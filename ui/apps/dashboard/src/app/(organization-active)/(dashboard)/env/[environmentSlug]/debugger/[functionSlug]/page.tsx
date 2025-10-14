@@ -1,9 +1,11 @@
 'use client';
 
+import { use } from 'react';
 import { Debugger } from '@inngest/components/Debugger/Debugger';
 import { Header } from '@inngest/components/Header/Header';
 
-export default function Page({ params }: { params: { functionSlug: string } }) {
+export default function Page(props: { params: Promise<{ functionSlug: string }> }) {
+  const params = use(props.params);
   const functionSlug = decodeURIComponent(params.functionSlug);
 
   return (

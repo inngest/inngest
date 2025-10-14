@@ -6,7 +6,7 @@ import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from '
 import 'server-only';
 
 const requestMiddleware: RequestMiddleware = async (request) => {
-  const { getToken } = auth();
+  const { getToken } = await auth();
   const sessionToken = await getToken();
 
   let headers = request.headers;
@@ -18,7 +18,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
   } else {
     // Need to forward the `Cookie` header for non-Clerk users.
 
-    const allCookies = cookies()
+    const allCookies = (await cookies())
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');

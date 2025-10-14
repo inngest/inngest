@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import NextLink from 'next/link';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
@@ -47,11 +47,11 @@ const options = [
   },
 ] as const satisfies Readonly<Period[]>;
 
-export default function Billing({
-  searchParams: { previous },
-}: {
-  searchParams: { previous: boolean };
-}) {
+export default function Billing(props: { searchParams: Promise<{ previous: boolean }> }) {
+  const searchParams = use(props.searchParams);
+
+  const { previous } = searchParams;
+
   const [{ data, fetching }] = useQuery({
     query: GetBillingInfoDocument,
   });
