@@ -3,7 +3,7 @@
 
 # 
 # detect any global precommit hooks and run those before running ours
-GLOBAL_HOOKS_PATH=$(git config --global core.hooksPath)
+GLOBAL_HOOKS_PATH=$(git config --global core.hooksPath 2>/dev/null || echo "")
 
 if [ -n "$GLOBAL_HOOKS_PATH" ]; then
   GLOBAL_PRECOMMIT="$GLOBAL_HOOKS_PATH/pre-commit"
