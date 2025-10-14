@@ -66,6 +66,7 @@ const documents = {
     "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
+    "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n": types.SubmitChurnSurveyDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
     "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableRunsDocument,
     "\n  query GetBillableExecutions($month: Int!, $year: Int!) {\n    usage: executionTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableExecutionsDocument,
@@ -377,6 +378,10 @@ export function graphql(source: "\n  mutation CreateStripeSubscription($input: S
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n"): (typeof documents)["\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
