@@ -57,7 +57,7 @@ func TestBatchEvents(t *testing.T) {
 	registerFuncs()
 
 	t.Run("trigger batch", func(t *testing.T) {
-		for range 8 {
+		for i := 0; i < 8; i++ {
 			_, err := inngestClient.Send(ctx, BatchEvent{
 				Name: "test/batch",
 				Data: BatchEventData{Time: time.Now()},
