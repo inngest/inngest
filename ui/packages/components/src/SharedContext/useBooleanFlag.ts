@@ -23,7 +23,7 @@ export const useBooleanFlag = () => {
     defaultValue: boolean = false,
     userOverrideable: boolean = false
   ): BooleanFlag => {
-    if (userOverrideable) {
+    if (userOverrideable && typeof window !== 'undefined') {
       const localStorageEnabled = localStorage.getItem(`${FEATURE_FLAG_NAMESPACE}${flag}`);
       if (localStorageEnabled !== null) {
         return { isReady: true, value: localStorageEnabled === 'true' };
