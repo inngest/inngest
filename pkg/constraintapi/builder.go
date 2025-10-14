@@ -32,8 +32,8 @@ func (b *leaseRequestBuilder) FunctionID(functionID uuid.UUID) *leaseRequestBuil
 	return b
 }
 
-func (b *leaseRequestBuilder) LatestFunctionVersion(latestFunctionVersion int) *leaseRequestBuilder {
-	b.req.LatestFunctionVersion = latestFunctionVersion
+func (b *leaseRequestBuilder) Configuration(config ConstraintConfig) *leaseRequestBuilder {
+	b.req.Configuration = config
 	return b
 }
 

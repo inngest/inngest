@@ -5,62 +5,23 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
+
+type CapacityManager interface {
+	Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError)
+	Lease(ctx context.Context, req *CapacityLeaseRequest) (*CapacityLeaseResponse, errs.UserError, errs.InternalError)
+	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.UserError, errs.InternalError)
+	Commit(ctx context.Context, req *CapacityCommitRequest) (*CapacityCommitResponse, errs.UserError, errs.InternalError)
+	Rollback(ctx context.Context, req *CapacityRollbackRequest) (*CapacityRollbackResponse, errs.UserError, errs.InternalError)
+}
 
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 }
 
 type CapacityCheckResponse struct{}
-
-type ConstraintKind string
-
-const (
-	CapacityKindRateLimit   ConstraintKind = "rate_limit"
-	CapacityKindConcurrency ConstraintKind = "concurrency"
-	CapacityKindThrottle    ConstraintKind = "throttle"
-)
-
-type RateLimitCapacity struct {
-	Scope enums.RateLimitScope
-
-	KeyExpressionHash string
-
-	EvaluatedKeyHash string
-}
-
-type ConcurrencyCapacity struct {
-	// Mode specifies whether concurrency is applied to step (default) or function run level
-	Mode enums.ConcurrencyMode
-
-	// Scope specifies the concurrency scope, defaults to function
-	Scope enums.ConcurrencyScope
-
-	// KeyExpressionHash is the hashed key expression. If this is set, this refers to a custom concurrency key.
-	KeyExpressionHash string
-	EvaluatedKeyHash  string
-}
-
-type ThrottleCapacity struct {
-	Scope enums.ThrottleScope
-
-	KeyExpressionHash string
-	EvaluatedKeyHash  string
-}
-
-type ConstraintCapacityItem struct {
-	Kind *ConstraintKind
-
-	// Amount specifies the number of units for a constraint.
-	//
-	// Examples:
-	// 3 units of step-level concurrency allows to run 3 steps (~queue items).
-	// 1 unit of rate limit capacity allows to start 1 run. Rejecting causes event to be skipped.
-	// 1 unit of throttle capacity allows to start 1 run. Rejecting causes queue to wait and retry.
-	Amount int
-}
 
 type CapacityLeaseRequest struct {
 	// IdempotencyKey prevents performing the same lease request multiple times.
@@ -75,10 +36,12 @@ type CapacityLeaseRequest struct {
 	// FunctionID is used for identifying the function.
 	FunctionID uuid.UUID
 
-	// LatestFunctionVersion specifies the latest known function version.
-	// If the version on the manager is newer, it will be used.
-	// If the version on the manager is outdated (e.g. stale cache), the latest version will be fetched.
-	LatestFunctionVersion int
+	// Configuration represents the latest known constraint configuration (a subset of the function config).
+	//
+	// The server _may_ reject calls if it has recently seen a newer configuration. This is expected for a short
+	// period after updating the configuration (as executors independently refresh the in-memory cache), but old
+	// configurations should not be used for an extended time.
+	Configuration ConstraintConfig
 
 	// RequestedCapacity describes the constraints that should be checked for a request.
 	//
@@ -93,6 +56,8 @@ type CapacityLeaseRequest struct {
 
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
+	//
+	// This is a cheap check to prevent clock skew. We instrument the skew and will set a reasonable threshold over time.
 	CurrentTime time.Time
 
 	// Duration specifies the lease duration. This may be capped by the manager.
@@ -149,11 +114,3 @@ type CapacityRollbackRequest struct {
 }
 
 type CapacityRollbackResponse struct{}
-
-type CapacityManager interface {
-	Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, error)
-	Lease(ctx context.Context, req *CapacityLeaseRequest) (*CapacityLeaseResponse, error)
-	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, error)
-	Commit(ctx context.Context, req *CapacityCommitRequest) (*CapacityCommitResponse, error)
-	Rollback(ctx context.Context, req *CapacityRollbackRequest) (*CapacityRollbackResponse, error)
-}

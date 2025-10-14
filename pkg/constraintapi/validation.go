@@ -26,8 +26,8 @@ func (r *CapacityLeaseRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing functionID"))
 	}
 
-	if r.LatestFunctionVersion == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("missing latest workflow version"))
+	if r.Configuration.FunctionVersion == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("missing constraint config workflow version"))
 	}
 
 	if r.CurrentTime.IsZero() {
