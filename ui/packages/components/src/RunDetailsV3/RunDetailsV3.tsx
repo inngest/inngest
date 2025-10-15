@@ -30,7 +30,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  tracesPreviewEnabled: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -54,7 +53,6 @@ export const RunDetailsV3 = ({
   getTrigger,
   runID,
   standalone,
-  tracesPreviewEnabled,
   pollInterval: initialPollInterval,
   initialRunData,
 }: Props) => {
@@ -63,6 +61,8 @@ export const RunDetailsV3 = ({
     'polling-disabled',
     false
   );
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', false, true);
+
   const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
