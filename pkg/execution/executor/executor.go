@@ -58,10 +58,6 @@ import (
 
 const (
 	pkgName = "executor.execution.inngest"
-
-	// ScheduleLeaseDuration determines the duration for holding on to the constraint capacity before it is rolled back.
-	// This should cover the happy path without requiring lots of extensions while being as short as possible.
-	ScheduleLeaseDuration = 5 * time.Second
 )
 
 var (
@@ -651,389 +647,411 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
-	metadata, err := WithConstraints(ctx, e.capacityManager, e.useConstraintAPI, req, func(ctx context.Context) (*sv2.Metadata, bool, error) {
-		if req.Function.Debounce != nil && !req.PreventDebounce {
-			err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
-				AccountID:        req.AccountID,
-				WorkspaceID:      req.WorkspaceID,
-				AppID:            req.AppID,
-				FunctionID:       req.Function.ID,
-				FunctionVersion:  req.Function.FunctionVersion,
-				EventID:          req.Events[0].GetInternalID(),
-				Event:            req.Events[0].GetEvent(),
-				FunctionPausedAt: req.FunctionPausedAt,
-			}, req.Function)
-			if err != nil {
-				return nil, err
-			}
-			return nil, ErrFunctionDebounced
-		}
-
-		// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-		// When running a cancellation, functions are cancelled at scheduling time based off of
-		// this run ID.
-		var runID ulid.ULID
-
-		if req.RunID == nil {
-			runID = ulid.MustNew(ulid.Now(), rand.Reader)
-		} else {
-			runID = *req.RunID
-		}
-
-		key := idempotencyKey(req, runID)
-
-		if req.Context == nil {
-			req.Context = map[string]any{}
-		}
-
-		// Normalization
-		eventIDs := []ulid.ULID{}
-		for _, e := range req.Events {
-			id := e.GetInternalID()
-			eventIDs = append(eventIDs, id)
-		}
-
-		var eventName *string
-
-		evts := make([]json.RawMessage, len(req.Events))
-		for n, item := range req.Events {
-			evt := item.GetEvent()
-			if eventName == nil {
-				name := evt.Name
-				eventName = &name
+	// Check constraints and acquire lease
+	return WithConstraints(
+		ctx,
+		e.capacityManager,
+		e.useConstraintAPI,
+		req,
+		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, ConstraintAction, error) {
+			if performChecks {
+				// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
+				_ = fallbackIdempotencyKey
 			}
 
-			// serialize this data to the span at the same time
-			byt, err := json.Marshal(evt)
-			if err != nil {
-				return nil, fmt.Errorf("error marshalling event: %w", err)
-			}
-			evts[n] = byt
-		}
+			// NOTE: From this point, we are guaranteed to operate within user constraints.
+			// We can decide whether to commit (persist) or rollback the reserved capacity
+			// for individual return statements. Rollbacks should be used for transient errors.
 
-		// Evaluate the run priority based off of the input event data.
-		evtMap := req.Events[0].GetEvent().Map()
-		factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
-		// function run spanID
-		spanID := run.NewSpanID(ctx)
-
-		config := *sv2.InitConfig(&sv2.Config{
-			FunctionVersion: req.Function.FunctionVersion,
-			SpanID:          spanID.String(),
-			EventIDs:        eventIDs,
-			Idempotency:     key,
-			ReplayID:        req.ReplayID,
-			OriginalRunID:   req.OriginalRunID,
-			PriorityFactor:  &factor,
-			BatchID:         req.BatchID,
-			Context:         req.Context,
-		})
-
-		// Grab the cron schedule for function config.  This is necessary for fast
-		// lookups, trace info, etc.
-		if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
-			if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
-				config.SetCronSchedule(cron)
-			}
-		}
-
-		// FunctionSlug is not stored in V1 format, so needs to be stored in Context
-		config.SetFunctionSlug(req.Function.GetSlug())
-		config.SetDebounceFlag(req.PreventDebounce)
-		config.SetEventIDMapping(req.Events)
-
-		if req.DebugSessionID != nil {
-			config.SetDebugSessionID(*req.DebugSessionID)
-		}
-		if req.DebugRunID != nil {
-			config.SetDebugRunID(*req.DebugRunID)
-		}
-
-		carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
-		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
-		config.SetFunctionTrace(carrier)
-
-		metadata := sv2.Metadata{
-			ID: sv2.ID{
-				RunID:      runID,
-				FunctionID: req.Function.ID,
-				Tenant: sv2.Tenant{
-					AppID:     req.AppID,
-					EnvID:     req.WorkspaceID,
-					AccountID: req.AccountID,
-				},
-			},
-			Config: config,
-		}
-
-		bytEvts, err := json.Marshal(evts)
-		if err != nil {
-			return nil, fmt.Errorf("error marshalling events: %w", err)
-		}
-
-		strEvts := string(bytEvts)
-
-		// XXX: If this is a sync run, always add the start time to the span.  We do this
-		// because sync runs have already started by the time we call Schedule;  theyre
-		// in-process, and Schedule gets called via an API endpoint when the run starts.
-		runSpanOpts := &tracing.CreateSpanOptions{
-			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Metadata: &metadata,
-			Attributes: meta.NewAttrSet(
-				meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-				meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-				meta.Attr(meta.Attrs.EventsInput, &strEvts),
-				meta.Attr(meta.Attrs.TriggeringEventName, eventName),
-			),
-		}
-		if req.RunMode == enums.RunModeSync {
-			runSpanOpts.StartTime = runID.Timestamp()
-		}
-		// Always the root span.
-		runSpanRef, err := e.tracerProvider.CreateSpan(
-			meta.SpanNameRun,
-			runSpanOpts,
-		)
-		if err != nil {
-			// return nil, fmt.Errorf("error creating run span: %w", err)
-			l.Debug("error creating run span", "error", err)
-		}
-
-		config.NewSetFunctionTrace(runSpanRef)
-
-		// If this is paused, immediately end just before creating state.
-		if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-			return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
-		}
-
-		mapped := make([]map[string]any, len(req.Events))
-		for n, item := range req.Events {
-			mapped[n] = item.GetEvent().Map()
-		}
-
-		// Evaluate concurrency keys to use initially
-		if req.Function.Concurrency != nil {
-			metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
-		}
-
-		//
-		// Create throttle information prior to creating state.  This is used in the queue.
-		//
-		throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
-
-		//
-		// Create singleton information and try to handle it prior to creating state.
-		//
-		var singletonConfig *queue.Singleton
-		data := req.Events[0].GetEvent().Map()
-
-		if req.Function.Singleton != nil {
-			singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
-			switch {
-			case err == nil:
-				// Attempt to early handle function singletons when in skip mode. Function runs may still
-				// fail to enqueue later when attempting to atomically acquire the function mutex.
-				//
-				// In cancel mode, this call releases the singleton mutex and atomically returns the
-				// current run holding the lock, which will be cancelled further down. After releasing,
-				// the lock becomes available to any competing run. If a faster run acquires it before
-				// this one tries to, it will fail to acquire the lock and be skipped; Effectively
-				// behaving as if the singleton mode were set to skip.
-				singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
+			if req.Function.Debounce != nil && !req.PreventDebounce {
+				err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+					AccountID:        req.AccountID,
+					WorkspaceID:      req.WorkspaceID,
+					AppID:            req.AppID,
+					FunctionID:       req.Function.ID,
+					FunctionVersion:  req.Function.FunctionVersion,
+					EventID:          req.Events[0].GetInternalID(),
+					Event:            req.Events[0].GetEvent(),
+					FunctionPausedAt: req.FunctionPausedAt,
+				}, req.Function)
 				if err != nil {
-					return nil, err
+					return nil, ConstraintRollback, err
+				}
+				return nil, ConstraintCommit, ErrFunctionDebounced
+			}
+
+			// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+			// When running a cancellation, functions are cancelled at scheduling time based off of
+			// this run ID.
+			var runID ulid.ULID
+
+			if req.RunID == nil {
+				runID = ulid.MustNew(ulid.Now(), rand.Reader)
+			} else {
+				runID = *req.RunID
+			}
+
+			key := idempotencyKey(req, runID)
+
+			if req.Context == nil {
+				req.Context = map[string]any{}
+			}
+
+			// Normalization
+			eventIDs := []ulid.ULID{}
+			for _, e := range req.Events {
+				id := e.GetInternalID()
+				eventIDs = append(eventIDs, id)
+			}
+
+			var eventName *string
+
+			evts := make([]json.RawMessage, len(req.Events))
+			for n, item := range req.Events {
+				evt := item.GetEvent()
+				if eventName == nil {
+					name := evt.Name
+					eventName = &name
 				}
 
-				eventID := req.Events[0].GetInternalID()
+				// serialize this data to the span at the same time
+				byt, err := json.Marshal(evt)
+				if err != nil {
+					return nil, ConstraintRollback, fmt.Errorf("error marshalling event: %w", err)
+				}
+				evts[n] = byt
+			}
 
-				if singletonRunID != nil {
-					switch req.Function.Singleton.Mode {
-					case enums.SingletonModeCancel:
-						runID := sv2.ID{
-							RunID:      *singletonRunID,
-							FunctionID: req.Function.ID,
-							Tenant: sv2.Tenant{
-								AccountID: req.AccountID,
-								EnvID:     req.WorkspaceID,
-							},
+			// Evaluate the run priority based off of the input event data.
+			evtMap := req.Events[0].GetEvent().Map()
+			factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
+			// function run spanID
+			spanID := run.NewSpanID(ctx)
+
+			config := *sv2.InitConfig(&sv2.Config{
+				FunctionVersion: req.Function.FunctionVersion,
+				SpanID:          spanID.String(),
+				EventIDs:        eventIDs,
+				Idempotency:     key,
+				ReplayID:        req.ReplayID,
+				OriginalRunID:   req.OriginalRunID,
+				PriorityFactor:  &factor,
+				BatchID:         req.BatchID,
+				Context:         req.Context,
+			})
+
+			// Grab the cron schedule for function config.  This is necessary for fast
+			// lookups, trace info, etc.
+			if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
+				if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
+					config.SetCronSchedule(cron)
+				}
+			}
+
+			// FunctionSlug is not stored in V1 format, so needs to be stored in Context
+			config.SetFunctionSlug(req.Function.GetSlug())
+			config.SetDebounceFlag(req.PreventDebounce)
+			config.SetEventIDMapping(req.Events)
+
+			if req.DebugSessionID != nil {
+				config.SetDebugSessionID(*req.DebugSessionID)
+			}
+			if req.DebugRunID != nil {
+				config.SetDebugRunID(*req.DebugRunID)
+			}
+
+			carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
+			itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+			config.SetFunctionTrace(carrier)
+
+			metadata := sv2.Metadata{
+				ID: sv2.ID{
+					RunID:      runID,
+					FunctionID: req.Function.ID,
+					Tenant: sv2.Tenant{
+						AppID:     req.AppID,
+						EnvID:     req.WorkspaceID,
+						AccountID: req.AccountID,
+					},
+				},
+				Config: config,
+			}
+
+			bytEvts, err := json.Marshal(evts)
+			if err != nil {
+				return nil, ConstraintRollback, fmt.Errorf("error marshalling events: %w", err)
+			}
+
+			strEvts := string(bytEvts)
+
+			// XXX: If this is a sync run, always add the start time to the span.  We do this
+			// because sync runs have already started by the time we call Schedule;  theyre
+			// in-process, and Schedule gets called via an API endpoint when the run starts.
+			runSpanOpts := &tracing.CreateSpanOptions{
+				Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+				Metadata: &metadata,
+				Attributes: meta.NewAttrSet(
+					meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+					meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+					meta.Attr(meta.Attrs.EventsInput, &strEvts),
+					meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+				),
+			}
+			if req.RunMode == enums.RunModeSync {
+				runSpanOpts.StartTime = runID.Timestamp()
+			}
+			// Always the root span.
+			runSpanRef, err := e.tracerProvider.CreateSpan(
+				meta.SpanNameRun,
+				runSpanOpts,
+			)
+			if err != nil {
+				// return nil, fmt.Errorf("error creating run span: %w", err)
+				l.Debug("error creating run span", "error", err)
+			}
+
+			config.NewSetFunctionTrace(runSpanRef)
+
+			// If this is paused, immediately end just before creating state.
+			if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+				md, err := e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+				// TODO: Should we rollback constraints here?
+				return md, ConstraintCommit, err
+			}
+
+			mapped := make([]map[string]any, len(req.Events))
+			for n, item := range req.Events {
+				mapped[n] = item.GetEvent().Map()
+			}
+
+			// Evaluate concurrency keys to use initially
+			if req.Function.Concurrency != nil {
+				metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
+			}
+
+			//
+			// Create throttle information prior to creating state.  This is used in the queue.
+			//
+			throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
+
+			//
+			// Create singleton information and try to handle it prior to creating state.
+			//
+			var singletonConfig *queue.Singleton
+			data := req.Events[0].GetEvent().Map()
+
+			if req.Function.Singleton != nil {
+				singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
+				switch {
+				case err == nil:
+					// Attempt to early handle function singletons when in skip mode. Function runs may still
+					// fail to enqueue later when attempting to atomically acquire the function mutex.
+					//
+					// In cancel mode, this call releases the singleton mutex and atomically returns the
+					// current run holding the lock, which will be cancelled further down. After releasing,
+					// the lock becomes available to any competing run. If a faster run acquires it before
+					// this one tries to, it will fail to acquire the lock and be skipped; Effectively
+					// behaving as if the singleton mode were set to skip.
+					singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
+					if err != nil {
+						// TODO: Should we rollback constraints here?
+						return nil, ConstraintCommit, err
+					}
+
+					eventID := req.Events[0].GetInternalID()
+
+					if singletonRunID != nil {
+						switch req.Function.Singleton.Mode {
+						case enums.SingletonModeCancel:
+							runID := sv2.ID{
+								RunID:      *singletonRunID,
+								FunctionID: req.Function.ID,
+								Tenant: sv2.Tenant{
+									AccountID: req.AccountID,
+									EnvID:     req.WorkspaceID,
+								},
+							}
+							err = e.Cancel(ctx, runID, execution.CancelRequest{
+								EventID: &eventID,
+							})
+							if err != nil {
+								l.ReportError(err, "error canceling singleton run")
+							}
+						default:
+							// Immediately end before creating state
+							// TODO: Should we rollback constraints here?
+							return nil, ConstraintCommit, ErrFunctionSkipped
 						}
-						err = e.Cancel(ctx, runID, execution.CancelRequest{
-							EventID: &eventID,
-						})
-						if err != nil {
-							l.ReportError(err, "error canceling singleton run")
-						}
-					default:
-						// Immediately end before creating state
-						return nil, ErrFunctionSkipped
+					}
+					singletonConfig = &queue.Singleton{Key: singletonKey}
+				case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
+					// Ignore singleton expressions if we cannot evaluate them
+					l.Warn("error evaluating singleton expression", "error", err)
+				case errors.Is(err, singleton.ErrNotASingleton):
+					// We no-op, and we run the function normally not as a singleton
+				default:
+					return nil, ConstraintRollback, err
+				}
+			}
+
+			//
+			// Create the run state.
+			//
+
+			newState := sv2.CreateState{
+				Events:   evts,
+				Metadata: metadata,
+				Steps:    []state.MemoizedStep{},
+			}
+
+			if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+				if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
+					return nil, ConstraintRollback, fmt.Errorf("error reconstructing input state: %w", err)
+				}
+			}
+
+			st, err := e.smv2.Create(ctx, newState)
+			switch {
+			case err == nil: // no-op
+			case errors.Is(err, state.ErrIdentifierExists): // no-op
+			case errors.Is(err, state.ErrIdentifierTomestone):
+				// TODO Should we rollback constraints here?
+				return nil, ConstraintCommit, ErrFunctionSkippedIdempotency
+			default:
+				return nil, ConstraintRollback, fmt.Errorf("error creating run state: %w", err)
+			}
+
+			stv1ID := sv2.V1FromMetadata(st.Metadata)
+
+			// NOTE: if the runID mismatches, it means there's already a state available
+			// and we need to override the one we already have to make sure we're using
+			// the correct metedata values
+			if metadata.ID.RunID != stv1ID.RunID {
+				id := sv2.IDFromV1(stv1ID)
+				metadata, err = e.smv2.LoadMetadata(ctx, id)
+				if err != nil {
+					return nil, ConstraintRollback, err
+				}
+			}
+
+			if req.BatchID == nil {
+
+				// Create cancellation pauses immediately, only if this is a non-batch event.
+				if len(req.Function.Cancel) > 0 {
+					if err := e.createCancellationPauses(ctx, l, key, evtMap, metadata.ID, req); err != nil {
+						return &metadata, ConstraintRollback, err
 					}
 				}
-				singletonConfig = &queue.Singleton{Key: singletonKey}
-			case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
-				// Ignore singleton expressions if we cannot evaluate them
-				l.Warn("error evaluating singleton expression", "error", err)
-			case errors.Is(err, singleton.ErrNotASingleton):
-				// We no-op, and we run the function normally not as a singleton
-			default:
-				return nil, err
+
+				// Add a system job to eager-cancel this function run on timeouts, only if this is a non-batch event.
+				if req.Function.Timeouts != nil && req.Function.Timeouts.Start != nil {
+					enqueuedAt := ulid.Time(runID.Time())
+					if err := e.createEagerCancellationForTimeout(ctx, enqueuedAt, req.Function.Timeouts.StartDuration(), enums.CancellationKindStartTimeout, stv1ID); err != nil {
+						return &metadata, ConstraintRollback, err
+					}
+				}
 			}
-		}
 
-		//
-		// Create the run state.
-		//
-
-		newState := sv2.CreateState{
-			Events:   evts,
-			Metadata: metadata,
-			Steps:    []state.MemoizedStep{},
-		}
-
-		if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-			if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
-				return nil, fmt.Errorf("error reconstructing input state: %w", err)
+			at := time.Now()
+			if req.BatchID == nil {
+				evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
+				if evtTs.After(at) {
+					// Schedule functions in the future if there's a future
+					// event `ts` field.
+					at = evtTs
+				}
 			}
-		}
+			if req.At != nil {
+				at = *req.At
+			}
 
-		st, err := e.smv2.Create(ctx, newState)
-		switch {
-		case err == nil: // no-op
-		case errors.Is(err, state.ErrIdentifierExists): // no-op
-		case errors.Is(err, state.ErrIdentifierTomestone):
-			return nil, ErrFunctionSkippedIdempotency
-		default:
-			return nil, fmt.Errorf("error creating run state: %w", err)
-		}
+			// Prefix the workflow to the job ID so that no invocation can accidentally
+			// cause idempotency issues across users/functions.
+			//
+			// This enures that we only ever enqueue the start job for this function once.
+			queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
+			maxAttempts := consts.MaxRetries + 1
+			item := queue.Item{
+				JobID:                 &queueKey,
+				GroupID:               uuid.New().String(),
+				WorkspaceID:           stv1ID.WorkspaceID,
+				Kind:                  queue.KindStart,
+				Identifier:            stv1ID,
+				CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
+				PriorityFactor:        metadata.Config.PriorityFactor,
+				Attempt:               0,
+				MaxAttempts:           &maxAttempts,
+				Payload: queue.PayloadEdge{
+					Edge: inngest.SourceEdge,
+				},
+				Throttle:  throttle,
+				Metadata:  map[string]any{},
+				Singleton: singletonConfig,
+			}
 
-		stv1ID := sv2.V1FromMetadata(st.Metadata)
-
-		// NOTE: if the runID mismatches, it means there's already a state available
-		// and we need to override the one we already have to make sure we're using
-		// the correct metedata values
-		if metadata.ID.RunID != stv1ID.RunID {
-			id := sv2.IDFromV1(stv1ID)
-			metadata, err = e.smv2.LoadMetadata(ctx, id)
+			// We also create the first discovery step right now, as then every single
+			// queue item has a span to reference.
+			//
+			// Initially, this helps combat a situation whereby erroring calls within
+			// the very first discovery step of a function are difficult to attribute
+			// to the same step span across retries.
+			//
+			// In the future, this also means that we can remove some magic around
+			// where to find the latest span and just always fetch it from the queue
+			// item.
+			_, err = e.tracerProvider.CreateSpan(
+				meta.SpanNameStepDiscovery,
+				&tracing.CreateSpanOptions{
+					Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+					Parent:    runSpanRef,
+					Metadata:  &metadata,
+					QueueItem: &item,
+					Carriers:  []map[string]any{item.Metadata},
+				},
+			)
 			if err != nil {
-				return nil, err
+				l.Debug("error creating initial step span", "error", err)
 			}
-		}
 
-		if req.BatchID == nil {
-
-			// Create cancellation pauses immediately, only if this is a non-batch event.
-			if len(req.Function.Cancel) > 0 {
-				if err := e.createCancellationPauses(ctx, l, key, evtMap, metadata.ID, req); err != nil {
-					return &metadata, err
+			// If this is run mode sync, we do NOT need to create a queue item, as the
+			// Inngest SDK is checkpointing and the execution is happening in a single
+			// external API request.
+			if req.RunMode == enums.RunModeSync {
+				for _, e := range e.lifecycles {
+					go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 				}
+				// NOTE: For sync runs, we commit the constraint to persist rate limit state
+				return &metadata, ConstraintCommit, nil
 			}
 
-			// Add a system job to eager-cancel this function run on timeouts, only if this is a non-batch event.
-			if req.Function.Timeouts != nil && req.Function.Timeouts.Start != nil {
-				enqueuedAt := ulid.Time(runID.Time())
-				if err := e.createEagerCancellationForTimeout(ctx, enqueuedAt, req.Function.Timeouts.StartDuration(), enums.CancellationKindStartTimeout, stv1ID); err != nil {
-					return &metadata, err
+			// Schedule for async functons (the default)
+			err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+
+			switch err {
+			case nil:
+				// no-op
+			case redis_state.ErrQueueItemExists:
+				// TODO: Should we commit the constraint?
+				return nil, ConstraintRollback, state.ErrIdentifierExists
+
+			case redis_state.ErrQueueItemSingletonExists:
+				_, err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
+				if err != nil {
+					l.ReportError(err, "error deleting function state")
 				}
+				// TODO: Should we rollback this constraint?
+				return nil, ConstraintCommit, ErrFunctionSkipped
+
+			default:
+				return nil, ConstraintRollback, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 			}
-		}
 
-		at := time.Now()
-		if req.BatchID == nil {
-			evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
-			if evtTs.After(at) {
-				// Schedule functions in the future if there's a future
-				// event `ts` field.
-				at = evtTs
-			}
-		}
-		if req.At != nil {
-			at = *req.At
-		}
-
-		// Prefix the workflow to the job ID so that no invocation can accidentally
-		// cause idempotency issues across users/functions.
-		//
-		// This enures that we only ever enqueue the start job for this function once.
-		queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
-		maxAttempts := consts.MaxRetries + 1
-		item := queue.Item{
-			JobID:                 &queueKey,
-			GroupID:               uuid.New().String(),
-			WorkspaceID:           stv1ID.WorkspaceID,
-			Kind:                  queue.KindStart,
-			Identifier:            stv1ID,
-			CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
-			PriorityFactor:        metadata.Config.PriorityFactor,
-			Attempt:               0,
-			MaxAttempts:           &maxAttempts,
-			Payload: queue.PayloadEdge{
-				Edge: inngest.SourceEdge,
-			},
-			Throttle:  throttle,
-			Metadata:  map[string]any{},
-			Singleton: singletonConfig,
-		}
-
-		// We also create the first discovery step right now, as then every single
-		// queue item has a span to reference.
-		//
-		// Initially, this helps combat a situation whereby erroring calls within
-		// the very first discovery step of a function are difficult to attribute
-		// to the same step span across retries.
-		//
-		// In the future, this also means that we can remove some magic around
-		// where to find the latest span and just always fetch it from the queue
-		// item.
-		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
-			ctx,
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
-				Parent:    runSpanRef,
-				Metadata:  &metadata,
-				QueueItem: &item,
-				Carriers:  []map[string]any{item.Metadata},
-			},
-		)
-		if err != nil {
-			l.Debug("error creating initial step span", "error", err)
-		}
-
-		// If this is run mode sync, we do NOT need to create a queue item, as the
-		// Inngest SDK is checkpointing and the execution is happening in a single
-		// external API request.
-		if req.RunMode == enums.RunModeSync {
 			for _, e := range e.lifecycles {
 				go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 			}
-			return &metadata, nil
-		}
 
-		// Schedule for async functons (the default)
-		err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
-
-		switch err {
-		case nil:
-			// no-op
-		case redis_state.ErrQueueItemExists:
-			return nil, state.ErrIdentifierExists
-
-		case redis_state.ErrQueueItemSingletonExists:
-			_, err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
-			if err != nil {
-				l.ReportError(err, "error deleting function state")
-			}
-			return nil, ErrFunctionSkipped
-
-		default:
-			return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
-		}
-
-		for _, e := range e.lifecycles {
-			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
-		}
-
-		return &metadata, nil
-	})
+			return &metadata, ConstraintCommit, nil
+		})
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
