@@ -421,6 +421,10 @@ type FinalizeOptional struct {
 }
 
 func (f FinalizeOpts) Status() enums.StepStatus {
+	if f.Optional.Reason == "cancel" {
+		return enums.StepStatusCancelled
+	}
+
 	if f.Response.Error() != "" {
 		return enums.StepStatusFailed
 	}
