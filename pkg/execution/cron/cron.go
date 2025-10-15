@@ -38,6 +38,9 @@ type CronManager interface {
 	// ScheduleNext handles the scheduling of the next cron job
 	// TODO(kasinath) comments
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
+
+	// TODO(kasinath) comments
+	NextScheduledItemForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error)
 }
 
 // CronItem represent an item that can be scheduled via the cron expression

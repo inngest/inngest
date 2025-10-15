@@ -133,6 +133,32 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 }
 
+// NextScheduledItemForFunction returns the next scheduled cron item for a given function
+func (c *redisCronManager) NextScheduledItemForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error) {
+	// Get current time as the starting point
+	from := time.Now()
+
+	// Get the next schedule time based on the cron expression
+	next, err := Next(expr, from)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cron expression %q: %w", expr, err)
+	}
+
+	// Generate the job ID for this scheduled item
+	jobID := c.CronProcessJobID(next, expr, functionID, fnVersion)
+
+	// Construct the cron item with ID and JobID populated
+	item := &CronItem{
+		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
+		FunctionID:      functionID,
+		FunctionVersion: fnVersion,
+		Expression:      expr,
+		JobID:           jobID,
+	}
+
+	return item, nil
+}
+
 // TODO(kasinath) comments
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "fnID", ci.FunctionID, "fnVersion", ci.FunctionVersion, "cronExpr", ci.Expression)
