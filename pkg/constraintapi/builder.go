@@ -37,6 +37,11 @@ func (b *leaseRequestBuilder) Configuration(config ConstraintConfig) *leaseReque
 	return b
 }
 
+func (b *leaseRequestBuilder) RequestedCapacity(requestedCapacity []ConstraintCapacityItem) *leaseRequestBuilder {
+	b.req.RequestedCapacity = requestedCapacity
+	return b
+}
+
 func (b *leaseRequestBuilder) CurrentTime(currentTime time.Time) *leaseRequestBuilder {
 	b.req.CurrentTime = currentTime
 	return b
