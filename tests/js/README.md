@@ -41,4 +41,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 ### PNPM
 
-This project uses `pnpm`. Additionally, `.npmrc` defines the [minimum-release-age](https://pnpm.io/settings#minimumreleaseage) setting to limit how recently an installed package is allowed to have been published. In case this must be overriden for a particular package, [`minimum-release-age-exclude`](https://pnpm.io/settings#minimumreleaseageexclude) can be used.
+This project uses `pnpm`. Additionally, `.npmrc` defines the [`minimum-release-age`](https://pnpm.io/settings#minimumreleaseage) setting to limit how recently an installed package is allowed to have been published. In case this must be overriden for a particular package, [`minimum-release-age-exclude`](https://pnpm.io/settings#minimumreleaseageexclude) can be used.
