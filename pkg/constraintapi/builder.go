@@ -57,6 +57,11 @@ func (b *leaseRequestBuilder) BlockingThreshold(blockingThreshold time.Duration)
 	return b
 }
 
+func (b *leaseRequestBuilder) Source(source LeaseSource) *leaseRequestBuilder {
+	b.req.Source = source
+	return b
+}
+
 func (b *leaseRequestBuilder) Valid() error {
 	var errs error
 

@@ -34,15 +34,31 @@ func (r *CapacityLeaseRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing current time"))
 	}
 
-	if r.Duration == 0 {
+	if r.Duration <= 0 {
 		errs = multierror.Append(errs, fmt.Errorf("missing duration"))
 	}
 
 	// NOTE: We do not verify blocking threshold.
 
-	if r.MaximumLifetime == 0 {
+	if r.MaximumLifetime <= 0 {
 		errs = multierror.Append(errs, fmt.Errorf("missing maximum lifetime"))
 	}
+
+	if r.Source.Service == ServiceUnknown {
+		errs = multierror.Append(errs, fmt.Errorf("missing source service"))
+	}
+
+	if r.Source.Location == LeaseLocationUnknown {
+		errs = multierror.Append(errs, fmt.Errorf("missing source location"))
+	}
+
+	// TODO: Validate configuration
+
+	if len(r.RequestedCapacity) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("must request capacity"))
+	}
+
+	// TODO: Validate requested capacity
 
 	return errs
 }

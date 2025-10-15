@@ -163,6 +163,8 @@ func RunProcessingModeFromProto(mode pb.ConstraintApiRunProcessingMode) RunProce
 
 func LeaseLocationToProto(location LeaseLocation) pb.ConstraintApiLeaseLocation {
 	switch location {
+	case LeaseLocationUnknown:
+		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED
 	case LeaseLocationScheduleRun:
 		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN
 	case LeaseLocationPartitionLease:
@@ -176,6 +178,8 @@ func LeaseLocationToProto(location LeaseLocation) pb.ConstraintApiLeaseLocation 
 
 func LeaseLocationFromProto(location pb.ConstraintApiLeaseLocation) LeaseLocation {
 	switch location {
+	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED:
+		return LeaseLocationUnknown
 	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN:
 		return LeaseLocationScheduleRun
 	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE:
@@ -183,12 +187,14 @@ func LeaseLocationFromProto(location pb.ConstraintApiLeaseLocation) LeaseLocatio
 	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE:
 		return LeaseLocationItemLease
 	default:
-		return LeaseLocationScheduleRun
+		return LeaseLocationUnknown
 	}
 }
 
 func LeaseServiceToProto(service LeaseService) pb.ConstraintApiLeaseService {
 	switch service {
+	case ServiceUnknown:
+		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED
 	case ServiceNewRuns:
 		return pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS
 	case ServiceExecutor:
@@ -202,6 +208,8 @@ func LeaseServiceToProto(service LeaseService) pb.ConstraintApiLeaseService {
 
 func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 	switch service {
+	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED:
+		return ServiceUnknown
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS:
 		return ServiceNewRuns
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR:
@@ -209,7 +217,7 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 	case pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API:
 		return ServiceAPI
 	default:
-		return ServiceNewRuns
+		return ServiceUnknown
 	}
 }
 
@@ -262,11 +270,11 @@ func ConcurrencyConfigToProto(config ConcurrencyConfig) *pb.ConcurrencyConfig {
 	}
 
 	return &pb.ConcurrencyConfig{
-		AccountConcurrency:       int32(config.AccountConcurrency),
-		FunctionConcurrency:      int32(config.FunctionConcurrency),
-		AccountRunConcurrency:    int32(config.AccountRunConcurrency),
-		FunctionRunConcurrency:   int32(config.FunctionRunConcurrency),
-		CustomConcurrencyKeys:    customKeys,
+		AccountConcurrency:     int32(config.AccountConcurrency),
+		FunctionConcurrency:    int32(config.FunctionConcurrency),
+		AccountRunConcurrency:  int32(config.AccountRunConcurrency),
+		FunctionRunConcurrency: int32(config.FunctionRunConcurrency),
+		CustomConcurrencyKeys:  customKeys,
 	}
 }
 
@@ -281,11 +289,11 @@ func ConcurrencyConfigFromProto(pbConfig *pb.ConcurrencyConfig) ConcurrencyConfi
 	}
 
 	return ConcurrencyConfig{
-		AccountConcurrency:       int(pbConfig.AccountConcurrency),
-		FunctionConcurrency:      int(pbConfig.FunctionConcurrency),
-		AccountRunConcurrency:    int(pbConfig.AccountRunConcurrency),
-		FunctionRunConcurrency:   int(pbConfig.FunctionRunConcurrency),
-		CustomConcurrencyKeys:    customKeys,
+		AccountConcurrency:     int(pbConfig.AccountConcurrency),
+		FunctionConcurrency:    int(pbConfig.FunctionConcurrency),
+		AccountRunConcurrency:  int(pbConfig.AccountRunConcurrency),
+		FunctionRunConcurrency: int(pbConfig.FunctionRunConcurrency),
+		CustomConcurrencyKeys:  customKeys,
 	}
 }
 
@@ -387,8 +395,8 @@ func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) Constrai
 
 func LeaseSourceToProto(source LeaseSource) *pb.LeaseSource {
 	return &pb.LeaseSource{
-		Service:            LeaseServiceToProto(source.Service),
-		Location:           LeaseLocationToProto(source.Location),
+		Service:           LeaseServiceToProto(source.Service),
+		Location:          LeaseLocationToProto(source.Location),
 		RunProcessingMode: RunProcessingModeToProto(source.RunProcessingMode),
 	}
 }
@@ -398,8 +406,8 @@ func LeaseSourceFromProto(pbSource *pb.LeaseSource) LeaseSource {
 		return LeaseSource{}
 	}
 	return LeaseSource{
-		Service:            LeaseServiceFromProto(pbSource.Service),
-		Location:           LeaseLocationFromProto(pbSource.Location),
+		Service:           LeaseServiceFromProto(pbSource.Service),
+		Location:          LeaseLocationFromProto(pbSource.Location),
 		RunProcessingMode: RunProcessingModeFromProto(pbSource.RunProcessingMode),
 	}
 }

@@ -229,6 +229,11 @@ func TestLeaseLocationConversion(t *testing.T) {
 		expected pb.ConstraintApiLeaseLocation
 	}{
 		{
+			name:     "unknown location",
+			input:    LeaseLocationUnknown,
+			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
+		},
+		{
 			name:     "schedule run",
 			input:    LeaseLocationScheduleRun,
 			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN,
@@ -243,6 +248,11 @@ func TestLeaseLocationConversion(t *testing.T) {
 			input:    LeaseLocationItemLease,
 			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
 		},
+		{
+			name:     "invalid location (fallback to unspecified)",
+			input:    LeaseLocation(999),
+			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
+		},
 	}
 
 	for _, tt := range tests {
@@ -252,7 +262,9 @@ func TestLeaseLocationConversion(t *testing.T) {
 
 			// Test round trip
 			backConverted := LeaseLocationFromProto(result)
-			assert.Equal(t, tt.input, backConverted)
+			if tt.input != LeaseLocation(999) { // Skip round trip for invalid input
+				assert.Equal(t, tt.input, backConverted)
+			}
 		})
 	}
 }
@@ -263,6 +275,11 @@ func TestLeaseServiceConversion(t *testing.T) {
 		input    LeaseService
 		expected pb.ConstraintApiLeaseService
 	}{
+		{
+			name:     "unknown service",
+			input:    ServiceUnknown,
+			expected: pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+		},
 		{
 			name:     "new runs service",
 			input:    ServiceNewRuns,
@@ -278,6 +295,11 @@ func TestLeaseServiceConversion(t *testing.T) {
 			input:    ServiceAPI,
 			expected: pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_API,
 		},
+		{
+			name:     "invalid service (fallback to unspecified)",
+			input:    LeaseService(999),
+			expected: pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+		},
 	}
 
 	for _, tt := range tests {
@@ -287,7 +309,9 @@ func TestLeaseServiceConversion(t *testing.T) {
 
 			// Test round trip
 			backConverted := LeaseServiceFromProto(result)
-			assert.Equal(t, tt.input, backConverted)
+			if tt.input != LeaseService(999) { // Skip round trip for invalid input
+				assert.Equal(t, tt.input, backConverted)
+			}
 		})
 	}
 }
@@ -424,16 +448,16 @@ func TestConcurrencyConfigConversion(t *testing.T) {
 		{
 			name: "complete config",
 			input: ConcurrencyConfig{
-				AccountConcurrency:    100,
-				FunctionConcurrency:   50,
-				AccountRunConcurrency: 20,
+				AccountConcurrency:     100,
+				FunctionConcurrency:    50,
+				AccountRunConcurrency:  20,
 				FunctionRunConcurrency: 10,
-				CustomConcurrencyKeys: customKeys,
+				CustomConcurrencyKeys:  customKeys,
 			},
 			expected: &pb.ConcurrencyConfig{
-				AccountConcurrency:    100,
-				FunctionConcurrency:   50,
-				AccountRunConcurrency: 20,
+				AccountConcurrency:     100,
+				FunctionConcurrency:    50,
+				AccountRunConcurrency:  20,
 				FunctionRunConcurrency: 10,
 				CustomConcurrencyKeys: []*pb.CustomConcurrencyLimit{
 					{
@@ -457,11 +481,11 @@ func TestConcurrencyConfigConversion(t *testing.T) {
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{},
 			},
 			expected: &pb.ConcurrencyConfig{
-				AccountConcurrency:       0,
-				FunctionConcurrency:      0,
-				AccountRunConcurrency:    0,
-				FunctionRunConcurrency:   0,
-				CustomConcurrencyKeys:    []*pb.CustomConcurrencyLimit{},
+				AccountConcurrency:     0,
+				FunctionConcurrency:    0,
+				AccountRunConcurrency:  0,
+				FunctionRunConcurrency: 0,
+				CustomConcurrencyKeys:  []*pb.CustomConcurrencyLimit{},
 			},
 		},
 	}
@@ -996,10 +1020,10 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 		{
 			name: "minimal request",
 			input: &CapacityLeaseRequest{
-				IdempotencyKey:    "minimal",
-				AccountID:         accountID,
-				EnvID:             envID,
-				FunctionID:        functionID,
+				IdempotencyKey: "minimal",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
 				Configuration: ConstraintConfig{
 					RateLimit: []RateLimitConfig{},
 					Concurrency: ConcurrencyConfig{
@@ -1028,8 +1052,8 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 				MaximumLifetime:   durationpb.New(0),
 				BlockingThreshold: durationpb.New(0),
 				Source: &pb.LeaseSource{
-					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS,
-					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN,
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
 			},
@@ -1168,13 +1192,13 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := CapacityLeaseResponseToProto(tt.input)
-			
+
 			// Special handling for the lease ID string pointer comparison
 			if tt.expected != nil && tt.expected.LeaseId != nil {
 				leaseIDStr := leaseID.String()
 				tt.expected.LeaseId = &leaseIDStr
 			}
-			
+
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip
@@ -1482,9 +1506,9 @@ func TestRoundTripConversions(t *testing.T) {
 				},
 			},
 			Concurrency: ConcurrencyConfig{
-				AccountConcurrency:    50,
-				FunctionConcurrency:   25,
-				AccountRunConcurrency: 10,
+				AccountConcurrency:     50,
+				FunctionConcurrency:    25,
+				AccountRunConcurrency:  10,
 				FunctionRunConcurrency: 5,
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
@@ -1527,7 +1551,7 @@ func TestRoundTripConversions(t *testing.T) {
 			FunctionID:     functionID,
 			Configuration: ConstraintConfig{
 				FunctionVersion: 1,
-				RateLimit: []RateLimitConfig{},
+				RateLimit:       []RateLimitConfig{},
 				Concurrency: ConcurrencyConfig{
 					CustomConcurrencyKeys: []CustomConcurrencyLimit{},
 				},
@@ -1557,7 +1581,7 @@ func TestRoundTripConversions(t *testing.T) {
 
 		// Note: protobuf timestamp precision may be different, so we compare the Unix timestamp
 		assert.Equal(t, original.CurrentTime.Unix(), result.CurrentTime.Unix())
-		
+
 		// Reset the time for exact comparison
 		original.CurrentTime = result.CurrentTime
 		assert.Equal(t, original, result)
@@ -1599,7 +1623,7 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("max duration values", func(t *testing.T) {
 		maxDuration := time.Duration(1<<63 - 1) // max int64
-		
+
 		req := &CapacityExtendLeaseRequest{
 			IdempotencyKey: "max-test",
 			AccountID:      uuid.New(),

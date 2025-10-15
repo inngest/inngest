@@ -130,8 +130,10 @@ const (
 type LeaseLocation int
 
 const (
+	LeaseLocationUnknown LeaseLocation = iota
+
 	// LeaseLocationScheduleRun is hit before scheduling a run
-	LeaseLocationScheduleRun LeaseLocation = iota
+	LeaseLocationScheduleRun
 
 	// LeaseLocationPartitionLease is hit before leasing a partition
 	LeaseLocationPartitionLease
@@ -143,7 +145,8 @@ const (
 type LeaseService int
 
 const (
-	ServiceNewRuns LeaseService = iota
+	ServiceUnknown LeaseService = iota
+	ServiceNewRuns
 	ServiceExecutor
 	ServiceAPI
 )
