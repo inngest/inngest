@@ -35,10 +35,44 @@ func WithConstraints[T any](
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// If capacity manager / feature flag are not passed, execute Schedule code
+	// with existing constraint checks
+	if capacityManager == nil || useConstraintAPI == nil {
+		res, _, err := fn(ctx, false, "")
+		return res, err
+	}
+
+	// Read feature flag
+	enable, fallback := useConstraintAPI(ctx, req.AccountID)
+	if !enable {
+		// If feature flag is disabled, execute Schedule code with existing constraint checks
+
+		res, _, err := fn(ctx, false, "")
+		return res, err
+	}
+
+	constraints, err := getScheduleConstraints(ctx, req)
+	if err != nil {
+		return zero, fmt.Errorf("could not get schedule constraints: %w", err)
+	}
+
 	// Perform constraint check to acquire lease
-	checkResult, err := CheckConstraints(ctx, capacityManager, useConstraintAPI, req)
+	checkResult, err := CheckConstraints(
+		ctx,
+		capacityManager,
+		useConstraintAPI,
+		req,
+		fallback,
+		constraints,
+	)
 	if err != nil {
 		return zero, fmt.Errorf("failed to check constraints: %w", err)
+	}
+
+	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
+	if checkResult.mustCheck {
+		res, _, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
+		return res, err
 	}
 
 	// If the current action is not allowed, return
@@ -47,12 +81,6 @@ func WithConstraints[T any](
 
 		// TODO : should we record this?
 		return zero, nil
-	}
-
-	// If the Constraint API wasn't used, call the user function and indicate checks should run
-	if checkResult.mustCheck {
-		res, _, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
-		return res, err
 	}
 
 	userCtx, cancel := context.WithCancel(ctx)
@@ -109,8 +137,6 @@ func WithConstraints[T any](
 			leaseIDLock.Unlock()
 		}
 	}()
-
-	// NOTE: How do we properly handle rollbacks/commits?
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
@@ -180,59 +206,11 @@ type checkResult struct {
 	fallbackIdempotencyKey string
 }
 
-func CheckConstraints(
-	ctx context.Context,
-	capacityManager constraintapi.CapacityManager,
-	useConstraintAPI constraintapi.UseConstraintAPIFn,
-	req execution.ScheduleRequest,
-) (checkResult, error) {
-	if capacityManager == nil {
-		return checkResult{
-			mustCheck: true,
-		}, nil
-	}
-
-	if useConstraintAPI == nil {
-		return checkResult{
-			mustCheck: true,
-		}, nil
-	}
-
-	// Read feature flag
-	enable, fallback := useConstraintAPI(ctx, req.AccountID)
-	if !enable {
-		return checkResult{
-			mustCheck: true,
-		}, nil
-	}
-
-	var idempotencyKey string
-	if req.IdempotencyKey != nil {
-		idempotencyKey = *req.IdempotencyKey
-	}
-
-	// TODO: Handle missing idempotency key
-
-	// TODO: Fetch account concurrency
-	var accountConcurrency int
-
-	// NOTE: Schedule may be called from within new-runs or the API
-	// In case of the API, we want to ensure the source is properly reflected in constraint checks
-	// to enforce fairness between callers
-	source := constraintapi.LeaseSource{
-		Service:           constraintapi.ServiceExecutor,
-		RunProcessingMode: constraintapi.RunProcessingModeBackground,
-		Location:          constraintapi.LeaseLocationScheduleRun,
-	}
-	if req.RunMode == enums.RunModeSync {
-		source.Service = constraintapi.ServiceAPI
-		source.RunProcessingMode = constraintapi.RunProcessingModeSync
-		source.Location = constraintapi.LeaseLocationCheckpoint
-	}
-
+func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintCapacityItem, error) {
 	var requests []constraintapi.ConstraintCapacityItem
 
-	// The only constraint we care about in run scheduling is rate limiting. Throttle + concurrency constraints are checked in the queue.
+	// The only constraint we care about in run scheduling is rate limiting.
+	// Throttle + concurrency constraints are checked in the queue.
 	if req.Function.RateLimit != nil {
 		var rateLimitKeyExpr string
 		var rateLimitKey string
@@ -256,7 +234,43 @@ func CheckConstraints(
 		})
 	}
 
-	// TODO: If no constraints defined, do not call up constraint API
+	return requests, nil
+}
+
+func CheckConstraints(
+	ctx context.Context,
+	capacityManager constraintapi.CapacityManager,
+	useConstraintAPI constraintapi.UseConstraintAPIFn,
+	req execution.ScheduleRequest,
+	fallback bool,
+	constraints []constraintapi.ConstraintCapacityItem,
+) (checkResult, error) {
+	// Retrieve idempotency key to acquire lease
+	// NOTE: To allow for retries between multiple executors, this should be
+	// consistent between calls to CheckConstraints
+	var idempotencyKey string
+	if req.IdempotencyKey != nil {
+		idempotencyKey = *req.IdempotencyKey
+	}
+
+	// TODO: Handle missing idempotency key
+
+	// NOTE: Schedule may be called from within new-runs or the API
+	// In case of the API, we want to ensure the source is properly reflected in constraint checks
+	// to enforce fairness between callers
+	source := constraintapi.LeaseSource{
+		Service:           constraintapi.ServiceExecutor,
+		RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		Location:          constraintapi.LeaseLocationScheduleRun,
+	}
+	if req.RunMode == enums.RunModeSync {
+		source.Service = constraintapi.ServiceAPI
+		source.RunProcessingMode = constraintapi.RunProcessingModeSync
+		source.Location = constraintapi.LeaseLocationCheckpoint
+	}
+
+	// TODO: Fetch account concurrency
+	var accountConcurrency int
 
 	res, userErr, internalErr := capacityManager.Lease(ctx, &constraintapi.CapacityLeaseRequest{
 		AccountID:         req.AccountID,
@@ -264,7 +278,7 @@ func CheckConstraints(
 		EnvID:             req.WorkspaceID,
 		FunctionID:        req.Function.ID,
 		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
-		RequestedCapacity: requests,
+		RequestedCapacity: constraints,
 		CurrentTime:       time.Now(),
 		Duration:          ScheduleLeaseDuration,
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
@@ -273,16 +287,22 @@ func CheckConstraints(
 	})
 	if internalErr != nil {
 		if fallback {
-			// TODO: Handle fallback and supply res.FallbackIdempotencyKey
-			return checkResult{}, fmt.Errorf("fallback not implemented")
+			// TODO: Log error
+			return checkResult{
+				mustCheck:              true,
+				fallbackIdempotencyKey: res.FallbackIdempotencyKey,
+			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
 	}
 
 	if userErr != nil {
 		if fallback {
-			// TODO: Handle fallback and supply res.FallbackIdempotencyKey
-			return checkResult{}, fmt.Errorf("fallback not implemented")
+			// TODO: Log error
+			return checkResult{
+				mustCheck:              true,
+				fallbackIdempotencyKey: res.FallbackIdempotencyKey,
+			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", userErr)
 	}
