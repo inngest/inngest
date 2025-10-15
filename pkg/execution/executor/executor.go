@@ -15,6 +15,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -27,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -56,6 +58,10 @@ import (
 
 const (
 	pkgName = "executor.execution.inngest"
+
+	// ScheduleLeaseDuration determines the duration for holding on to the constraint capacity before it is rolled back.
+	// This should cover the happy path without requiring lots of extensions while being as short as possible.
+	ScheduleLeaseDuration = 5 * time.Second
 )
 
 var (
@@ -243,6 +249,20 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).capacityManager = cm
+		return nil
+	}
+}
+
+func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).useConstraintAPI = uca
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -346,10 +366,14 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
-	queue               queue.Queue
-	debouncer           debounce.Debouncer
-	batcher             batch.BatchManager
-	singletonMgr        singleton.Singleton
+	queue        queue.Queue
+	debouncer    debounce.Debouncer
+	batcher      batch.BatchManager
+	singletonMgr singleton.Singleton
+
+	capacityManager  constraintapi.CapacityManager
+	useConstraintAPI constraintapi.UseConstraintAPIFn
+
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler       execution.FinalizePublisher
@@ -585,6 +609,29 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
 	)
+
+	// TODO: This can be either sync or async, handle that difference!
+	checkResult, err := e.CheckConstraints(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check constraints: %w", err)
+	}
+
+	if !checkResult.allowed {
+		// TODO: Figure out which constraint was lacking (we only check rate limits so we can assume that)
+
+		// TODO : should we record this?
+		return nil, nil
+	}
+
+	if checkResult.mustCheck {
+		// TODO : check rate limits here
+	}
+
+	if checkResult.leaseID != nil {
+		// TODO: Extend lease while we're processing this function (until we return or commit/rollback)
+	}
+
+	// NOTE: How do we properly handle rollbacks/commits?
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
@@ -966,6 +1013,135 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	return &metadata, nil
+}
+
+type checkResult struct {
+	// allowed determines whether a run can be scheduled
+	allowed bool
+
+	// leaseID is the current capacity lease which MUST be committed once done or rolled back on error
+	leaseID *ulid.ULID
+
+	// mustCheck instructs the caller to perform constraint checks (rate limit)
+	mustCheck bool
+
+	// fallbackIdempotencyKey is the idempotency key that MUST be provided to further constraint checks in case of fallbacks
+	fallbackIdempotencyKey string
+}
+
+func (e *executor) CheckConstraints(ctx context.Context, req execution.ScheduleRequest) (checkResult, error) {
+	if e.capacityManager == nil {
+		return checkResult{
+			mustCheck: true,
+		}, nil
+	}
+
+	if e.useConstraintAPI == nil {
+		return checkResult{
+			mustCheck: true,
+		}, nil
+	}
+
+	// Read feature flag
+	enable, fallback := e.useConstraintAPI(ctx, req.AccountID)
+	if !enable {
+		return checkResult{
+			mustCheck: true,
+		}, nil
+	}
+
+	var idempotencyKey string
+	if req.IdempotencyKey != nil {
+		idempotencyKey = *req.IdempotencyKey
+	}
+	// TODO: Handle missing idempotency key
+
+	// TODO: Fetch account concurrency
+	var accountConcurrency int
+
+	// NOTE: Schedule may be called from within new-runs or the API
+	// In case of the API, we want to ensure the source is properly reflected in constraint checks
+	// to enforce fairness between callers
+	source := constraintapi.LeaseSource{
+		Service:           constraintapi.ServiceExecutor,
+		RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		Location:          constraintapi.LeaseLocationScheduleRun,
+	}
+	if req.RunMode == enums.RunModeSync {
+		source.Service = constraintapi.ServiceAPI
+		source.RunProcessingMode = constraintapi.RunProcessingModeSync
+		source.Location = constraintapi.LeaseLocationCheckpoint
+	}
+
+	var requests []constraintapi.ConstraintCapacityItem
+
+	// The only constraint we care about in run scheduling is rate limiting. Throttle + concurrency constraints are checked in the queue.
+	if req.Function.RateLimit != nil {
+		var rateLimitKeyExpr string
+		var rateLimitKey string
+		if req.Function.RateLimit.Key != nil {
+			rateLimitKeyExpr = *req.Function.RateLimit.Key
+			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
+			if err != nil {
+				// TODO: Handle error
+			}
+			rateLimitKey = key
+		}
+
+		requests = append(requests, constraintapi.ConstraintCapacityItem{
+			Kind: constraintapi.CapacityKindRateLimit,
+			RateLimit: &constraintapi.RateLimitCapacity{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: util.XXHash(rateLimitKeyExpr),
+				EvaluatedKeyHash:  rateLimitKey,
+			},
+			Amount: 1,
+		})
+	}
+
+	// TODO: If no constraints defined, do not call up constraint API
+
+	res, userErr, internalErr := e.capacityManager.Lease(ctx, &constraintapi.CapacityLeaseRequest{
+		AccountID:         req.AccountID,
+		IdempotencyKey:    idempotencyKey,
+		EnvID:             req.WorkspaceID,
+		FunctionID:        req.Function.ID,
+		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
+		RequestedCapacity: requests,
+		CurrentTime:       time.Now(),
+		Duration:          ScheduleLeaseDuration,
+		MaximumLifetime:   5 * time.Minute, // This lease should be short!
+		Source:            source,
+		BlockingThreshold: 0, // Disable this for now
+	})
+	if internalErr != nil {
+		if fallback {
+			// TODO: Handle fallback and supply res.FallbackIdempotencyKey
+			return checkResult{}, fmt.Errorf("fallback not implemented")
+		}
+		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
+	}
+
+	if userErr != nil {
+		if fallback {
+			// TODO: Handle fallback and supply res.FallbackIdempotencyKey
+			return checkResult{}, fmt.Errorf("fallback not implemented")
+		}
+		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", userErr)
+	}
+
+	// TODO: Do we need to add more fine-grained checks here?
+	allowed := len(res.InsufficientCapacity) == 0
+
+	return checkResult{
+		allowed: allowed,
+
+		leaseID:                res.LeaseID,
+		fallbackIdempotencyKey: res.FallbackIdempotencyKey,
+
+		// We already checked constraints
+		mustCheck: false,
+	}, nil
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {

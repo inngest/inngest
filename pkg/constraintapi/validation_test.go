@@ -33,7 +33,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -59,7 +59,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -86,7 +86,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -113,7 +113,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -140,7 +140,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -167,7 +167,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -194,7 +194,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -221,7 +221,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -248,7 +248,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -275,7 +275,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -302,7 +302,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -385,7 +385,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -443,7 +443,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -469,7 +469,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -495,7 +495,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -522,7 +522,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -549,7 +549,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -575,7 +575,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -601,7 +601,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -627,7 +627,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -653,7 +653,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -710,7 +710,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -736,7 +736,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -762,7 +762,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -788,7 +788,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -814,7 +814,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -840,7 +840,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -917,7 +917,7 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -943,7 +943,7 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 1,
 					},
 				},
@@ -974,3 +974,4 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 		})
 	}
 }
+

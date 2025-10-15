@@ -135,7 +135,7 @@ func ConstraintKindFromProto(kind pb.ConstraintApiConstraintKind) ConstraintKind
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE:
 		return CapacityKindThrottle
 	default:
-		return CapacityKindRateLimit
+		return ConstraintKind("")
 	}
 }
 
@@ -363,12 +363,7 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 }
 
 func ConstraintCapacityItemToProto(item ConstraintCapacityItem) *pb.ConstraintCapacityItem {
-	var kind pb.ConstraintApiConstraintKind
-	if item.Kind != nil {
-		kind = ConstraintKindToProto(*item.Kind)
-	} else {
-		kind = pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED
-	}
+	kind := ConstraintKindToProto(item.Kind)
 
 	return &pb.ConstraintCapacityItem{
 		Kind:   kind,
@@ -381,14 +376,8 @@ func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) Constrai
 		return ConstraintCapacityItem{}
 	}
 
-	var kind *ConstraintKind
-	if pbItem.Kind != pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED {
-		k := ConstraintKindFromProto(pbItem.Kind)
-		kind = &k
-	}
-
 	return ConstraintCapacityItem{
-		Kind:   kind,
+		Kind:   ConstraintKindFromProto(pbItem.Kind),
 		Amount: int(pbItem.Amount),
 	}
 }

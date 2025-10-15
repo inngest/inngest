@@ -80,6 +80,12 @@ type CapacityLeaseRequest struct {
 type CapacityLeaseResponse struct {
 	LeaseID *ulid.ULID
 
+	// FallbackIdempotencyKey represents an idempotency key to prevent double-spending capacity after
+	// the initial Lease operation succeeded but then failed before reaching the client due to a transient error.
+	//
+	// This idempotency key MUST be used by downstream constraint checks during fallbacks.
+	FallbackIdempotencyKey string
+
 	ReservedCapacity []ConstraintCapacityItem
 
 	InsufficientCapacity []ConstraintCapacityItem
@@ -140,6 +146,8 @@ const (
 
 	// LeaseLocationItemLease is hit before leasing a queue item
 	LeaseLocationItemLease
+
+	LeaseLocationCheckpoint
 )
 
 type LeaseService int
@@ -160,3 +168,5 @@ type LeaseSource struct {
 
 	RunProcessingMode RunProcessingMode
 }
+
+type UseConstraintAPIFn func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool)

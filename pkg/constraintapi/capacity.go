@@ -38,7 +38,11 @@ type ThrottleCapacity struct {
 }
 
 type ConstraintCapacityItem struct {
-	Kind *ConstraintKind
+	Kind ConstraintKind
+
+	Concurrency *ConcurrencyCapacity
+	Throttle    *ThrottleCapacity
+	RateLimit   *RateLimitCapacity
 
 	// Amount specifies the number of units for a constraint.
 	//

@@ -691,7 +691,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		{
 			name: "rate limit capacity",
 			input: ConstraintCapacityItem{
-				Kind:   &kindRateLimit,
+				Kind:   kindRateLimit,
 				Amount: 5,
 			},
 			expected: &pb.ConstraintCapacityItem{
@@ -702,7 +702,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		{
 			name: "concurrency capacity",
 			input: ConstraintCapacityItem{
-				Kind:   &kindConcurrency,
+				Kind:   kindConcurrency,
 				Amount: 10,
 			},
 			expected: &pb.ConstraintCapacityItem{
@@ -713,7 +713,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		{
 			name: "throttle capacity",
 			input: ConstraintCapacityItem{
-				Kind:   &kindThrottle,
+				Kind:   kindThrottle,
 				Amount: 100,
 			},
 			expected: &pb.ConstraintCapacityItem{
@@ -722,20 +722,9 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "nil kind",
-			input: ConstraintCapacityItem{
-				Kind:   nil,
-				Amount: 1,
-			},
-			expected: &pb.ConstraintCapacityItem{
-				Kind:   pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED,
-				Amount: 1,
-			},
-		},
-		{
 			name: "zero amount",
 			input: ConstraintCapacityItem{
-				Kind:   &kindRateLimit,
+				Kind:   kindRateLimit,
 				Amount: 0,
 			},
 			expected: &pb.ConstraintCapacityItem{
@@ -750,11 +739,9 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 			result := ConstraintCapacityItemToProto(tt.input)
 			assert.Equal(t, tt.expected, result)
 
-			// Test round trip (but skip nil kind since it becomes unspecified and doesn't round trip exactly)
-			if tt.input.Kind != nil {
-				backConverted := ConstraintCapacityItemFromProto(result)
-				assert.Equal(t, tt.input, backConverted)
-			}
+			// Test round trip
+			backConverted := ConstraintCapacityItemFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
 		})
 	}
 
@@ -772,7 +759,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		}
 		result := ConstraintCapacityItemFromProto(pbItem)
 		expected := ConstraintCapacityItem{
-			Kind:   nil,
+			Kind:   ConstraintKind(""),
 			Amount: 5,
 		}
 		assert.Equal(t, expected, result)
@@ -966,7 +953,7 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 3,
 					},
 				},
@@ -1138,13 +1125,13 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 				LeaseID: &leaseID,
 				ReservedCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindConcurrency,
+						Kind:   kindConcurrency,
 						Amount: 3,
 					},
 				},
 				InsufficientCapacity: []ConstraintCapacityItem{
 					{
-						Kind:   &kindRateLimit,
+						Kind:   kindRateLimit,
 						Amount: 1,
 					},
 				},
@@ -1559,7 +1546,7 @@ func TestRoundTripConversions(t *testing.T) {
 			},
 			RequestedCapacity: []ConstraintCapacityItem{
 				{
-					Kind:   &kindConcurrency,
+					Kind:   kindConcurrency,
 					Amount: 3,
 				},
 			},
@@ -1607,7 +1594,7 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("zero values", func(t *testing.T) {
 		item := ConstraintCapacityItem{
-			Kind:   nil,
+			Kind:   ConstraintKind(""),
 			Amount: 0,
 		}
 
@@ -1617,7 +1604,7 @@ func TestEdgeCases(t *testing.T) {
 
 		// From protobuf unspecified becomes nil
 		result := ConstraintCapacityItemFromProto(pbItem)
-		assert.Nil(t, result.Kind)
+		assert.Empty(t, result.Kind)
 		assert.Equal(t, 0, result.Amount)
 	})
 
