@@ -432,7 +432,6 @@ func TestRedisCronManager(t *testing.T) {
 			testOps := []enums.CronOp{
 				enums.CronOpNew,
 				enums.CronOpUpdate,
-				enums.CronOpArchive,
 				enums.CronOpPause,
 				enums.CronOpUnpause,
 				enums.CronOpProcess,
@@ -533,7 +532,6 @@ func TestRedisCronManager(t *testing.T) {
 			testOps := []enums.CronOp{
 				enums.CronOpNew,
 				enums.CronOpUpdate,
-				enums.CronOpArchive,
 				enums.CronOpPause,
 				enums.CronOpUnpause,
 				enums.CronOpProcess,
@@ -601,7 +599,6 @@ func TestRedisCronManager(t *testing.T) {
 				enums.CronOpUpdate,
 				enums.CronOpPause,
 				enums.CronOpUnpause,
-				enums.CronOpArchive,
 				enums.CronInit,
 			}
 
