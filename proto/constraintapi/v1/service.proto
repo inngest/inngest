@@ -52,6 +52,7 @@ enum ConstraintApiLeaseLocation {
   CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN = 1;
   CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE = 2;
   CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE = 3;
+  CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT = 4;
 }
 
 enum ConstraintApiLeaseService {
@@ -99,9 +100,31 @@ message ConstraintConfig {
   repeated ThrottleConfig throttle = 4;
 }
 
+message RateLimitCapacity {
+  ConstraintApiRateLimitScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
+message ConcurrencyCapacity {
+  ConstraintApiConcurrencyMode mode = 1;
+  ConstraintApiConcurrencyScope scope = 2;
+  string key_expression_hash = 3;
+  string evaluated_key_hash = 4;
+}
+
+message ThrottleCapacity {
+  ConstraintApiThrottleScope scope = 1;
+  string key_expression_hash = 2;
+  string evaluated_key_hash = 3;
+}
+
 message ConstraintCapacityItem {
   ConstraintApiConstraintKind kind = 1;
-  int32 amount = 2;
+  optional ConcurrencyCapacity concurrency = 2;
+  optional ThrottleCapacity throttle = 3;
+  optional RateLimitCapacity rate_limit = 4;
+  int32 amount = 5;
 }
 
 message LeaseSource {
