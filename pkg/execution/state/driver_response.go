@@ -386,28 +386,27 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		return nil, fmt.Errorf("function result has no output")
 	}
 
-	var keyedOutput *string
 	if isWrappedError([]byte(*output)) {
 		// Error is already wrapped, return as-is.
-		keyedOutput = output
-	} else {
-
-		// Now we have the output, we make sure it's keyed the same as regular step
-		// outputs are, either under `data` or `error`.
-		key := "data"
-		if r.Error() != "" {
-			key = "error"
-		}
-
-		keyedByt, err := json.Marshal(map[string]json.RawMessage{
-			key: json.RawMessage(*output),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal output as data: %w", err)
-		}
-		s := string(keyedByt)
-		keyedOutput = &s
+		return output, nil
 	}
+
+	// Now we have the output, we make sure it's keyed the same as regular step
+	// outputs are, either under `data` or `error`.
+	key := "data"
+	if r.Error() != "" {
+		key = "error"
+	}
+
+	var keyedOutput *string
+	keyedByt, err := json.Marshal(map[string]json.RawMessage{
+		key: json.RawMessage(*output),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
+	}
+	s := string(keyedByt)
+	keyedOutput = &s
 
 	return keyedOutput, nil
 }
