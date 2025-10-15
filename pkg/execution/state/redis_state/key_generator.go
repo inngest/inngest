@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -615,6 +616,9 @@ type CronKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.
 	QueueItem() string
+
+	// Job IDs for CronItems being enqueued to "cron" system queue.
+	CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string
 }
 
 type cronKeyGenerator struct {
@@ -624,6 +628,10 @@ type cronKeyGenerator struct {
 
 func (c cronKeyGenerator) Schedule() string {
 	return fmt.Sprintf("{%s}:cron:schedule", c.queueDefaultKey)
+}
+
+func (c cronKeyGenerator) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
+	return fmt.Sprintf("{%s}:{%s}:{%s}:{%s}:{%d}:cron:schedule", c.queueDefaultKey, schedule, expr, fnID, fnVersion)
 }
 
 type PauseKeyGenerator interface {

@@ -314,7 +314,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		// handle cron sync to system queue
 		for _, ci := range crons {
 			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
-				l.Error("error on cron sync", "error", err)
+				l.Error("error on triggering cron-sync", "functionID", ci.FunctionID, "cronExpr", ci.Expression, "functionVersion", ci.FunctionVersion, "error", err)
 			}
 		}
 	}()
@@ -378,7 +378,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 					WorkspaceID:     consts.DevServerEnvID,
 					AppID:           appID,
 					FunctionID:      fn.ID,
-					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+					FunctionVersion: fn.FunctionVersion,
 					Expression:      cronExpr,
 					Op:              enums.CronOpUpdate,
 				})
@@ -408,7 +408,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 				WorkspaceID:     consts.DevServerEnvID,
 				AppID:           appID,
 				FunctionID:      fn.ID,
-				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+				FunctionVersion: fn.FunctionVersion,
 				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})

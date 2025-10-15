@@ -883,7 +883,7 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	l.Trace("cron sync", "item", ci)
 
 	// handle the schedule update
-	if err := s.croner.UpdateSchedule(ctx, ci); err != nil {
+	if _, err := s.croner.ScheduleNext(ctx, ci); err != nil {
 		// TODO does this need special error handling?
 		return fmt.Errorf("error upserting cron schedule: %w", err)
 	}
@@ -905,19 +905,13 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
 
-	l = l.With("cron_item", ci)
+	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion)
 	l.Trace("handling cron")
 
-	// Check if the function can be ran
-	ok, err := s.croner.CanRun(ctx, ci)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		// no action needed
-		return nil
-	}
-
+	// JIT Checks to verify if the function can be ran:
+	//	- function version is current
+	//	- function not archived
+	//	- function not paused
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -935,9 +929,17 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
+	if conf.FunctionVersion > ci.FunctionVersion {
+		return nil
+	}
+
+	// TODO(kasinath) check function paused
 
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
+
+	// TODO(kasinath) this should match Cloud idempotency key
+	// TODO(kasinath) this should be function specific. Two functions cannot use the same idempotency key!!!
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
 	evt := event.NewOSSTrackedEvent(event.Event{
@@ -1005,7 +1007,8 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 
 	// enqueue the next schedule
-	return s.croner.UpdateSchedule(ctx, ci)
+	_, err = s.croner.ScheduleNext(ctx, ci)
+	return err
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

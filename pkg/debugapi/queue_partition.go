@@ -11,7 +11,6 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -49,12 +48,13 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 
 	var cronSchedule *pb.CronSchedule
 	if conf.IsScheduled() {
-		if ci, err := d.croner.NextScheduledItemForFunction(ctx, fn.ID); err == nil {
-			cronSchedule = &pb.CronSchedule{
-				Next:  timestamppb.New(ci.ID.Timestamp()),
-				JobId: ci.JobID,
-			}
-		}
+		// TODO(kasinath) Fix Debug API
+		// if ci, err := d.croner.NextScheduledItemForFunction(ctx, fn.ID); err == nil {
+		// 	cronSchedule = &pb.CronSchedule{
+		// 		Next:  timestamppb.New(ci.ID.Timestamp()),
+		// 		JobId: ci.JobID,
+		// 	}
+		// }
 	}
 
 	return &pb.PartitionResponse{
