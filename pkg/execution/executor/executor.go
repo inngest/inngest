@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -65,6 +66,7 @@ var (
 	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced          = fmt.Errorf("function debounced")
+	ErrFunctionRateLimited        = fmt.Errorf("function rate-limited")
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
@@ -222,6 +224,13 @@ func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rateLimiter = rl
+		return nil
+	}
+}
+
 func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).debouncer = d
@@ -346,6 +355,7 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
+	rateLimiter         ratelimit.RateLimiter
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
@@ -585,6 +595,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
 	)
+
+	// Attempt to rate-limit the incoming function.
+	if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+		evtMap := req.Events[0].GetEvent().Map()
+		key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+		switch err {
+		case nil:
+			limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+			if err != nil {
+				return nil, fmt.Errorf("could not check rate limit: %w", err)
+			}
+
+			if limited {
+				// Do nothing.
+				return nil, ErrFunctionRateLimited
+			}
+		case ratelimit.ErrNotRateLimited:
+			// no-op: proceed with function run as usual
+		default:
+			return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
+		}
+	}
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
