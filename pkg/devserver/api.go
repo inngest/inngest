@@ -340,8 +340,11 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		var currentFn *inngest.Function
 		if cqrsFn, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
 			currentFn, err = cqrsFn.InngestFunction()
-			if err != nil || currentFn == nil {
+			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error unmarshalling function config")
+			}
+			if currentFn == nil {
+				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
 			}
 			fnExists = true
 		}
