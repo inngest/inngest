@@ -17,7 +17,7 @@ var (
 	parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 )
 
-// Next returns the next scheduled time for the cron expression based on the time providedk
+// Next returns the next scheduled time for the cron expression based on the time provided
 func Next(expr string, from time.Time) (time.Time, error) {
 	schedule, err := parser.Parse(expr)
 	if err != nil {
@@ -27,7 +27,7 @@ func Next(expr string, from time.Time) (time.Time, error) {
 }
 
 type CronSyncer interface {
-	// EnqueueSync handles the enqueueing of cron schedule sync jobs
+	// Sync handles the enqueueing of cron schedule sync jobs
 	Sync(ctx context.Context, ci CronItem) error
 }
 
@@ -36,11 +36,11 @@ type CronManager interface {
 	CronSyncer
 
 	// ScheduleNext handles the scheduling of the next cron job
-	// TODO(kasinath) comments
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
 
-	// TODO(kasinath) comments
-	NextScheduledItemForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error)
+	// NextScheduledItemIDForFunction returns identifying information about the next cron schedule that is expected to be scheduled.
+	// Note: It does not guarantee that the schedule actually exists in the system queue.
+	NextScheduledItemIDForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error)
 }
 
 // CronItem represent an item that can be scheduled via the cron expression
@@ -57,7 +57,6 @@ type CronItem struct {
 	FunctionVersion int       `json:"fnV"`
 	// Expression is the actual cron expression being used
 	Expression string `json:"expr"`
-	// TODO(kasinath) comments
 	// JobID stores queue item ID that's supposed to be handling this cron item.
 	// This is only available if it's a process type.
 	//

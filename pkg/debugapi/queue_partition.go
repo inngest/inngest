@@ -50,8 +50,8 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 	var cronSchedules []*pb.CronSchedule
 	if conf.IsScheduled() {
 		for _, cronExpr := range conf.ScheduleExpressions() {
-			if ci, err := d.croner.NextScheduledItemForFunction(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
-				// NextScheduledItemForFunction returns the expected jobID of next schedule
+			if ci, err := d.croner.NextScheduledItemIDForFunction(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+				// NextScheduledItemIDForFunction returns the expected jobID of next schedule
 				// Check if that jobID actually exists in the queue
 				opts := []redis_state.QueueOpOpt{}
 				_, err := d.queue.ItemByID(ctx, ci.JobID, opts...)

@@ -93,7 +93,7 @@ func (c *redisCronManager) CronProcessJobID(schedule time.Time, expr string, fnI
 	return fmt.Sprintf("{%s}:{%s}:{%s}:{%s}:{%d}:cron:schedule", c.c.QueueDefaultKey(), schedule, expr, fnID, fnVersion)
 }
 
-// TODO(kasinath) comments
+// Sync enqueues a system job of kind "cron-sync" to the system queue.
 func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	l := c.log.With("action", "redisCronManager.Sync", "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
 
@@ -133,8 +133,9 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 }
 
-// NextScheduledItemForFunction returns the next scheduled cron item for a given function
-func (c *redisCronManager) NextScheduledItemForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error) {
+// NextScheduledItemIDForFunction returns the expected identifier (ID, JobID) information for the next scheduled system "cron" job.
+// Note that this reconstructs the identifier based on exact logic used by the system job handler and does not verify that the item for the next schedule is actually scheduled.
+func (c *redisCronManager) NextScheduledItemIDForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error) {
 	// Get current time as the starting point
 	from := time.Now()
 
@@ -159,7 +160,8 @@ func (c *redisCronManager) NextScheduledItemForFunction(ctx context.Context, fun
 	return item, nil
 }
 
-// TODO(kasinath) comments
+// ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
+// While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "fnID", ci.FunctionID, "fnVersion", ci.FunctionVersion, "cronExpr", ci.Expression)
 
@@ -173,6 +175,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	next, err := Next(ci.Expression, from)
 	if err != nil {
 		// TODO decide on what to do with this because it likely can't be fixed on retries
+		// This also should never happen as long as this expression is set from an actual function config, which should be validated on function registration.
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 

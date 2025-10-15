@@ -634,7 +634,7 @@ func TestRedisCronManager(t *testing.T) {
 
 	})
 
-	t.Run("NextScheduledItemForFunction", func(t *testing.T) {
+	t.Run("NextScheduledItemIDForFunction", func(t *testing.T) {
 		r.FlushAll()
 
 		t.Run("should return next scheduled item with valid inputs", func(t *testing.T) {
@@ -642,7 +642,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *" // Every hour
 			fnVersion := 1
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			require.NotNil(t, item)
 
@@ -666,7 +666,7 @@ func TestRedisCronManager(t *testing.T) {
 			fnVersion := 1
 
 			beforeCall := time.Now()
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			nextTime := item.ID.Timestamp()
@@ -685,7 +685,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 12 * * *" // Daily at noon
 			fnVersion := 2
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Verify JobID format matches CronProcessJobID format
@@ -777,7 +777,7 @@ func TestRedisCronManager(t *testing.T) {
 					functionID := uuid.New()
 					fnVersion := 1
 
-					item, err := cm.NextScheduledItemForFunction(ctx, functionID, tc.expression, fnVersion)
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, tc.expression, fnVersion)
 					require.NoError(t, err)
 					require.NotNil(t, item)
 
@@ -810,7 +810,7 @@ func TestRedisCronManager(t *testing.T) {
 					functionID := uuid.New()
 					fnVersion := 1
 
-					item, err := cm.NextScheduledItemForFunction(ctx, functionID, tc.expression, fnVersion)
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, tc.expression, fnVersion)
 					assert.Error(t, err)
 					assert.Nil(t, item)
 					assert.Contains(t, err.Error(), "failed to parse cron expression")
@@ -825,7 +825,7 @@ func TestRedisCronManager(t *testing.T) {
 			versions := []int{1, 2, 5, 10, 100}
 			for _, version := range versions {
 				t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
-					item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, version)
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, version)
 					require.NoError(t, err)
 					assert.Equal(t, version, item.FunctionVersion)
 
@@ -842,10 +842,10 @@ func TestRedisCronManager(t *testing.T) {
 			functionID1 := uuid.New()
 			functionID2 := uuid.New()
 
-			item1, err := cm.NextScheduledItemForFunction(ctx, functionID1, expr, fnVersion)
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID1, expr, fnVersion)
 			require.NoError(t, err)
 
-			item2, err := cm.NextScheduledItemForFunction(ctx, functionID2, expr, fnVersion)
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID2, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Different function IDs should generate different job IDs
@@ -858,10 +858,10 @@ func TestRedisCronManager(t *testing.T) {
 			functionID := uuid.New()
 			fnVersion := 1
 
-			item1, err := cm.NextScheduledItemForFunction(ctx, functionID, "0 * * * *", fnVersion)
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID, "0 * * * *", fnVersion)
 			require.NoError(t, err)
 
-			item2, err := cm.NextScheduledItemForFunction(ctx, functionID, "0 0 * * *", fnVersion)
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID, "0 0 * * *", fnVersion)
 			require.NoError(t, err)
 
 			// Different expressions should generate different job IDs
@@ -873,13 +873,13 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			item1, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Small delay to ensure different entropy
 			time.Sleep(1 * time.Millisecond)
 
-			item2, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// IDs should be different due to entropy even if timestamps might be the same
@@ -896,7 +896,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			assert.Equal(t, functionID, item.FunctionID)
 			assert.NotEmpty(t, item.JobID)
@@ -907,7 +907,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 0
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			assert.Equal(t, 0, item.FunctionVersion)
 			assert.Contains(t, item.JobID, ":{0}:")
@@ -918,7 +918,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := -1
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			assert.Equal(t, -1, item.FunctionVersion)
 		})
@@ -928,7 +928,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Verify ULID is valid
@@ -945,7 +945,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// These fields are not populated since they're not provided to the function
@@ -960,7 +960,7 @@ func TestRedisCronManager(t *testing.T) {
 			fnVersion := 1
 
 			// Normal context should work
-			item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			require.NotNil(t, item)
 		})
@@ -978,7 +978,7 @@ func TestRedisCronManager(t *testing.T) {
 			done := make(chan bool)
 			for i := 0; i < numCalls; i++ {
 				go func(index int) {
-					item, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 					results[index] = item
 					errors[index] = err
 					done <- true
@@ -1010,8 +1010,8 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			// Get item from NextScheduledItemForFunction
-			nextItem, err := cm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			// Get item from NextScheduledItemIDForFunction
+			nextItem, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 
 			// Get item from ScheduleNext with equivalent cron item
@@ -1057,7 +1057,7 @@ func TestRedisCronManager(t *testing.T) {
 			expr := "0 * * * *"
 			fnVersion := 1
 
-			item, err := customCm.NextScheduledItemForFunction(ctx, functionID, expr, fnVersion)
+			item, err := customCm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
 			require.NoError(t, err)
 			require.NotNil(t, item)
 
