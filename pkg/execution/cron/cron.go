@@ -11,18 +11,10 @@ import (
 	cron "github.com/robfig/cron/v3"
 )
 
-const (
-	pkgName = "cron.execution.inngest"
-)
-
 var (
 	// parser is a global cron expression parser that supports minute-level precision
 	// and includes descriptive names (e.g., @hourly, @daily)
 	parser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-)
-
-var (
-	errNextScheduleNotFound = fmt.Errorf("next schedule not found")
 )
 
 // Next returns the next scheduled time for the cron expression based on the time providedk

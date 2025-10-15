@@ -89,6 +89,10 @@ type redisCronManager struct {
 	opt redisCronManagerOpt
 }
 
+func (c *redisCronManager) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
+	return fmt.Sprintf("{%s}:{%s}:{%s}:{%s}:{%d}:cron:schedule", c.c.QueueDefaultKey(), schedule, expr, fnID, fnVersion)
+}
+
 // TODO(kasinath) comments
 func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	l := c.log.With("action", "redisCronManager.Sync", "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
@@ -146,7 +150,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 
-	jobID := c.c.KeyGenerator().CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion)
+	jobID := c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion)
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time
 	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)

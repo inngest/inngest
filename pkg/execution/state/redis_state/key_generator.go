@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -608,30 +607,6 @@ func (u debounceKeyGenerator) Debounce(ctx context.Context) string {
 // migrations and timeout execution from racing. This is a hash.
 func (u debounceKeyGenerator) DebounceMigrating(ctx context.Context) string {
 	return fmt.Sprintf("{%s}:debounce-migrating", u.queueDefaultKey)
-}
-
-type CronKeyGenerator interface {
-	// Schedule returns the key for the hash containing function to scheduled item mapping
-	Schedule() string
-	// QueueItem returns the key for the hash containing all items within a
-	// queue for a function.
-	QueueItem() string
-
-	// Job IDs for CronItems being enqueued to "cron" system queue.
-	CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string
-}
-
-type cronKeyGenerator struct {
-	queueDefaultKey string
-	queueItemKeyGenerator
-}
-
-func (c cronKeyGenerator) Schedule() string {
-	return fmt.Sprintf("{%s}:cron:schedule", c.queueDefaultKey)
-}
-
-func (c cronKeyGenerator) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
-	return fmt.Sprintf("{%s}:{%s}:{%s}:{%s}:{%d}:cron:schedule", c.queueDefaultKey, schedule, expr, fnID, fnVersion)
 }
 
 type PauseKeyGenerator interface {
