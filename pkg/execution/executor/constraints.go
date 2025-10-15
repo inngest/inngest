@@ -25,20 +25,20 @@ const (
 
 func WithConstraints[T any](
 	ctx context.Context,
-	idempotencyKey string,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
-	fn func(ctx context.Context) (T, ConstraintAction, error),
-) (*T, error) {
+	fn func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (T, ConstraintAction, error),
+) (T, error) {
+	var zero T
 	// Cancel context on return
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Perform constraint check to acquire lease
-	checkResult, err := CheckConstraints(ctx, capacityManager, useConstraintAPI, req, idempotencyKey)
+	checkResult, err := CheckConstraints(ctx, capacityManager, useConstraintAPI, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check constraints: %w", err)
+		return zero, fmt.Errorf("failed to check constraints: %w", err)
 	}
 
 	// If the current action is not allowed, return
@@ -46,19 +46,22 @@ func WithConstraints[T any](
 		// TODO: Figure out which constraint was lacking (we only check rate limits so we can assume that)
 
 		// TODO : should we record this?
-		return nil, nil
+		return zero, nil
 	}
 
+	// If the Constraint API wasn't used, call the user function and indicate checks should run
 	if checkResult.mustCheck {
-		// TODO : check rate limits here
+		res, _, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
+		return res, err
 	}
 
 	userCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// If no lease was provided, we are not allowed to process
 	if checkResult.leaseID == nil {
 		// TODO: When does this happen?
-		return nil, fmt.Errorf("failed to acquire lease: %w", err)
+		return zero, fmt.Errorf("failed to acquire lease: %w", err)
 	}
 
 	leaseID := checkResult.leaseID
@@ -85,7 +88,8 @@ func WithConstraints[T any](
 			leaseIDLock.Unlock()
 
 			res, _, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-				IdempotencyKey: idempotencyKey, // TODO: Do we need a new idempotency key here?
+				// TODO: Generate idempotency key.
+				IdempotencyKey: "",
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
 			})
@@ -110,16 +114,17 @@ func WithConstraints[T any](
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
-	res, action, err := fn(userCtx)
+	res, action, err := fn(userCtx, false, "")
 
 	if checkResult.leaseID != nil {
 		switch action {
 		case ConstraintRollback:
 
 			_, userErr, internalErr := capacityManager.Rollback(ctx, &constraintapi.CapacityRollbackRequest{
-				AccountID:      req.AccountID,
-				LeaseID:        *checkResult.leaseID,
-				IdempotencyKey: idempotencyKey,
+				AccountID: req.AccountID,
+				LeaseID:   *checkResult.leaseID,
+				// TODO: Generate idempotency key
+				IdempotencyKey: "",
 			})
 			if internalErr != nil {
 				// TODO Handle internal err
@@ -130,9 +135,10 @@ func WithConstraints[T any](
 			}
 		case ConstraintCommit:
 			_, userErr, internalErr := capacityManager.Commit(ctx, &constraintapi.CapacityCommitRequest{
-				AccountID:      req.AccountID,
-				LeaseID:        *checkResult.leaseID,
-				IdempotencyKey: idempotencyKey,
+				AccountID: req.AccountID,
+				LeaseID:   *checkResult.leaseID,
+				// TODO: Generate idempotency key
+				IdempotencyKey: "",
 			})
 			if internalErr != nil {
 				// TODO Handle internal err
@@ -147,10 +153,10 @@ func WithConstraints[T any](
 
 	// TODO Handle error?
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
-	return &res, nil
+	return res, nil
 }
 
 type ConstraintAction int
@@ -179,7 +185,6 @@ func CheckConstraints(
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
-	idempotencyKey string,
 ) (checkResult, error) {
 	if capacityManager == nil {
 		return checkResult{
@@ -199,6 +204,11 @@ func CheckConstraints(
 		return checkResult{
 			mustCheck: true,
 		}, nil
+	}
+
+	var idempotencyKey string
+	if req.IdempotencyKey != nil {
+		idempotencyKey = *req.IdempotencyKey
 	}
 
 	// TODO: Handle missing idempotency key
