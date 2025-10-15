@@ -72,6 +72,9 @@ type CapacityLeaseRequest struct {
 	//
 	// Setting this may reduce roundtrip-time.
 	BlockingThreshold time.Duration
+
+	// Source includes information on the calling service and processing mode for instrumentation purposes and to enforce fairness/avoid starvation.
+	Source LeaseSource
 }
 
 type CapacityLeaseResponse struct {
@@ -114,3 +117,43 @@ type CapacityRollbackRequest struct {
 }
 
 type CapacityRollbackResponse struct{}
+
+type RunProcessingMode int
+
+const (
+	// RunProcessingModeBackground is used for regular (async) run scheduling and execution.
+	RunProcessingModeBackground RunProcessingMode = iota
+	// RunProcessingModeSync is used for requests sent by the Checkpointing API/Project Zero.
+	RunProcessingModeSync
+)
+
+type LeaseLocation int
+
+const (
+	// LeaseLocationScheduleRun is hit before scheduling a run
+	LeaseLocationScheduleRun LeaseLocation = iota
+
+	// LeaseLocationPartitionLease is hit before leasing a partition
+	LeaseLocationPartitionLease
+
+	// LeaseLocationItemLease is hit before leasing a queue item
+	LeaseLocationItemLease
+)
+
+type LeaseService int
+
+const (
+	ServiceNewRuns LeaseService = iota
+	ServiceExecutor
+	ServiceAPI
+)
+
+type LeaseSource struct {
+	// Service refers to the origin service (new-runs, api, executor)
+	Service LeaseService
+
+	// Location refers to the lifecycle step requiring constraint checks
+	Location LeaseLocation
+
+	RunProcessingMode RunProcessingMode
+}

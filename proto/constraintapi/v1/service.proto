@@ -41,6 +41,26 @@ enum ConstraintApiConstraintKind {
   CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE = 3;
 }
 
+enum ConstraintApiRunProcessingMode {
+  CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED = 0;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND = 1;
+  CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC = 2;
+}
+
+enum ConstraintApiLeaseLocation {
+  CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED = 0;
+  CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN = 1;
+  CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE = 2;
+  CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE = 3;
+}
+
+enum ConstraintApiLeaseService {
+  CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED = 0;
+  CONSTRAINT_API_LEASE_SERVICE_NEW_RUNS = 1;
+  CONSTRAINT_API_LEASE_SERVICE_EXECUTOR = 2;
+  CONSTRAINT_API_LEASE_SERVICE_API = 3;
+}
+
 // Message definitions
 message RateLimitConfig {
   ConstraintApiRateLimitScope scope = 1;
@@ -84,6 +104,12 @@ message ConstraintCapacityItem {
   int32 amount = 2;
 }
 
+message LeaseSource {
+  ConstraintApiLeaseService service = 1;
+  ConstraintApiLeaseLocation location = 2;
+  ConstraintApiRunProcessingMode run_processing_mode = 3;
+}
+
 // Request/Response messages
 message CapacityCheckRequest {
   string account_id = 1;
@@ -103,6 +129,7 @@ message CapacityLeaseRequest {
   google.protobuf.Duration duration = 8;
   google.protobuf.Duration maximum_lifetime = 9;
   google.protobuf.Duration blocking_threshold = 10;
+  LeaseSource source = 11;
 }
 
 message CapacityLeaseResponse {
