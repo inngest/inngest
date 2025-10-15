@@ -412,6 +412,10 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 }
 
 func isWrappedError(maybeErr []byte) bool {
+	if len(maybeErr) == 0 || maybeErr[0] != '{' {
+		return false
+	}
+
 	// Unmarshal into a struct to check if it's already wrapped.
 	// We don't care about the full structure, just whether it has
 	// the right fields.
