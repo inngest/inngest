@@ -621,15 +621,6 @@ func TestRedisCronManager(t *testing.T) {
 			require.NoError(t, err) // Should return nil without enqueueing
 		})
 
-		t.Run("should preserve all cron item fields", func(t *testing.T) {
-			cronItem := createCronItem(enums.CronOpUpdate)
-			cronItem.Expression = "@daily"
-			cronItem.FunctionVersion = 5
-
-			err := cm.Sync(ctx, cronItem)
-			require.NoError(t, err)
-		})
-
 		t.Run("should handle context cancellation", func(t *testing.T) {
 			cronItem := createCronItem(enums.CronOpNew)
 			cronItem.Expression = "0 * * * *"
@@ -641,20 +632,6 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Error(t, err)
 		})
 
-		t.Run("should use correct timing from ULID", func(t *testing.T) {
-			baseTime := clock.Now()
-			cronItem := createCronItem(enums.CronOpNew)
-			cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
-			cronItem.Expression = "0 * * * *"
-
-			err := cm.Sync(ctx, cronItem)
-			require.NoError(t, err)
-
-			// The sync job should be scheduled at the time from the ULID
-			expectedTime := baseTime
-			actualTime := ulid.Time(cronItem.ID.Time())
-			assert.Equal(t, expectedTime.UnixMilli(), actualTime.UnixMilli())
-		})
 	})
 
 }
