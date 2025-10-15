@@ -222,13 +222,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       searchError={searchError}
       error={nextPageRes.error || firstPageRes.error}
-      infiniteScrollTrigger={
+      infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
           onIntersect={loadMore}
           hasMore={hasNextPage ?? false}
           isLoading={isLoading}
+          root={containerRef}
         />
-      }
+      )}
     />
   );
 });
