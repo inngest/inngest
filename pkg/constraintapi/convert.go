@@ -481,6 +481,82 @@ func ConstraintUsageToProto(usage ConstraintUsage) *pb.ConstraintUsage {
 		Used:       int32(usage.Used),
 		Limit:      int32(usage.Limit),
 	}
+
+	if pbItem.Concurrency != nil {
+		concurrency := ConcurrencyCapacityFromProto(pbItem.Concurrency)
+		item.Concurrency = &concurrency
+	}
+
+	if pbItem.Throttle != nil {
+		throttle := ThrottleCapacityFromProto(pbItem.Throttle)
+		item.Throttle = &throttle
+	}
+
+	if pbItem.RateLimit != nil {
+		rateLimit := RateLimitCapacityFromProto(pbItem.RateLimit)
+		item.RateLimit = &rateLimit
+	}
+
+	return item
+}
+
+func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity {
+	return &pb.RateLimitCapacity{
+		Scope:             RateLimitScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitCapacity {
+	if pbCapacity == nil {
+		return RateLimitCapacity{}
+	}
+	return RateLimitCapacity{
+		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCapacity {
+	return &pb.ConcurrencyCapacity{
+		Mode:              ConcurrencyModeToProto(capacity.Mode),
+		Scope:             ConcurrencyScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyCapacity {
+	if pbCapacity == nil {
+		return ConcurrencyCapacity{}
+	}
+	return ConcurrencyCapacity{
+		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
+		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
+	return &pb.ThrottleCapacity{
+		Scope:             ThrottleScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleCapacity {
+	if pbCapacity == nil {
+		return ThrottleCapacity{}
+	}
+	return ThrottleCapacity{
+		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+	}
 }
 
 func ConstraintUsageFromProto(pbUsage *pb.ConstraintUsage) ConstraintUsage {
