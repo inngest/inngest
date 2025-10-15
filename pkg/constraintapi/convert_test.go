@@ -249,6 +249,11 @@ func TestLeaseLocationConversion(t *testing.T) {
 			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
 		},
 		{
+			name:     "checkpoint",
+			input:    LeaseLocationCheckpoint,
+			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT,
+		},
+		{
 			name:     "invalid location (fallback to unspecified)",
 			input:    LeaseLocation(999),
 			expected: pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
@@ -719,6 +724,71 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 			expected: &pb.ConstraintCapacityItem{
 				Kind:   pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE,
 				Amount: 100,
+			},
+		},
+		{
+			name: "rate limit capacity with details",
+			input: ConstraintCapacityItem{
+				Kind:   kindRateLimit,
+				Amount: 5,
+				RateLimit: &RateLimitCapacity{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "hash123",
+					EvaluatedKeyHash:  "eval456",
+				},
+			},
+			expected: &pb.ConstraintCapacityItem{
+				Kind:   pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT,
+				Amount: 5,
+				RateLimit: &pb.RateLimitCapacity{
+					Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION,
+					KeyExpressionHash: "hash123",
+					EvaluatedKeyHash:  "eval456",
+				},
+			},
+		},
+		{
+			name: "concurrency capacity with details",
+			input: ConstraintCapacityItem{
+				Kind:   kindConcurrency,
+				Amount: 3,
+				Concurrency: &ConcurrencyCapacity{
+					Mode:              enums.ConcurrencyModeStep,
+					Scope:             enums.ConcurrencyScopeEnv,
+					KeyExpressionHash: "concurrency_hash",
+					EvaluatedKeyHash:  "eval_concurrency",
+				},
+			},
+			expected: &pb.ConstraintCapacityItem{
+				Kind:   pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY,
+				Amount: 3,
+				Concurrency: &pb.ConcurrencyCapacity{
+					Mode:              pb.ConstraintApiConcurrencyMode_CONSTRAINT_API_CONCURRENCY_MODE_STEP,
+					Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_ENV,
+					KeyExpressionHash: "concurrency_hash",
+					EvaluatedKeyHash:  "eval_concurrency",
+				},
+			},
+		},
+		{
+			name: "throttle capacity with details",
+			input: ConstraintCapacityItem{
+				Kind:   kindThrottle,
+				Amount: 50,
+				Throttle: &ThrottleCapacity{
+					Scope:             enums.ThrottleScopeAccount,
+					KeyExpressionHash: "throttle_hash",
+					EvaluatedKeyHash:  "eval_throttle",
+				},
+			},
+			expected: &pb.ConstraintCapacityItem{
+				Kind:   pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE,
+				Amount: 50,
+				Throttle: &pb.ThrottleCapacity{
+					Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT,
+					KeyExpressionHash: "throttle_hash",
+					EvaluatedKeyHash:  "eval_throttle",
+				},
 			},
 		},
 		{
@@ -1623,5 +1693,153 @@ func TestEdgeCases(t *testing.T) {
 		result, err := CapacityExtendLeaseRequestFromProto(pbReq)
 		require.NoError(t, err)
 		assert.Equal(t, req.Duration, result.Duration)
+	})
+}
+
+func TestRateLimitCapacityConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    RateLimitCapacity
+		expected *pb.RateLimitCapacity
+	}{
+		{
+			name: "complete rate limit capacity",
+			input: RateLimitCapacity{
+				Scope:             enums.RateLimitScopeAccount,
+				KeyExpressionHash: "rate_hash_123",
+				EvaluatedKeyHash:  "eval_rate_456",
+			},
+			expected: &pb.RateLimitCapacity{
+				Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT,
+				KeyExpressionHash: "rate_hash_123",
+				EvaluatedKeyHash:  "eval_rate_456",
+			},
+		},
+		{
+			name: "minimal rate limit capacity",
+			input: RateLimitCapacity{
+				Scope: enums.RateLimitScopeFn,
+			},
+			expected: &pb.RateLimitCapacity{
+				Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RateLimitCapacityToProto(tt.input)
+			assert.Equal(t, tt.expected, result)
+
+			backConverted := RateLimitCapacityFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
+		})
+	}
+
+	t.Run("nil protobuf", func(t *testing.T) {
+		result := RateLimitCapacityFromProto(nil)
+		assert.Equal(t, RateLimitCapacity{}, result)
+	})
+}
+
+func TestConcurrencyCapacityConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    ConcurrencyCapacity
+		expected *pb.ConcurrencyCapacity
+	}{
+		{
+			name: "complete concurrency capacity",
+			input: ConcurrencyCapacity{
+				Mode:              enums.ConcurrencyModeRun,
+				Scope:             enums.ConcurrencyScopeEnv,
+				KeyExpressionHash: "concurrency_hash_789",
+				EvaluatedKeyHash:  "eval_concurrency_101",
+			},
+			expected: &pb.ConcurrencyCapacity{
+				Mode:              pb.ConstraintApiConcurrencyMode_CONSTRAINT_API_CONCURRENCY_MODE_RUN,
+				Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_ENV,
+				KeyExpressionHash: "concurrency_hash_789",
+				EvaluatedKeyHash:  "eval_concurrency_101",
+			},
+		},
+		{
+			name: "minimal concurrency capacity",
+			input: ConcurrencyCapacity{
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeFn,
+			},
+			expected: &pb.ConcurrencyCapacity{
+				Mode:              pb.ConstraintApiConcurrencyMode_CONSTRAINT_API_CONCURRENCY_MODE_STEP,
+				Scope:             pb.ConstraintApiConcurrencyScope_CONSTRAINT_API_CONCURRENCY_SCOPE_FUNCTION,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConcurrencyCapacityToProto(tt.input)
+			assert.Equal(t, tt.expected, result)
+
+			backConverted := ConcurrencyCapacityFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
+		})
+	}
+
+	t.Run("nil protobuf", func(t *testing.T) {
+		result := ConcurrencyCapacityFromProto(nil)
+		assert.Equal(t, ConcurrencyCapacity{}, result)
+	})
+}
+
+func TestThrottleCapacityConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    ThrottleCapacity
+		expected *pb.ThrottleCapacity
+	}{
+		{
+			name: "complete throttle capacity",
+			input: ThrottleCapacity{
+				Scope:             enums.ThrottleScopeAccount,
+				KeyExpressionHash: "throttle_hash_abc",
+				EvaluatedKeyHash:  "eval_throttle_def",
+			},
+			expected: &pb.ThrottleCapacity{
+				Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_ACCOUNT,
+				KeyExpressionHash: "throttle_hash_abc",
+				EvaluatedKeyHash:  "eval_throttle_def",
+			},
+		},
+		{
+			name: "minimal throttle capacity",
+			input: ThrottleCapacity{
+				Scope: enums.ThrottleScopeFn,
+			},
+			expected: &pb.ThrottleCapacity{
+				Scope:             pb.ConstraintApiThrottleScope_CONSTRAINT_API_THROTTLE_SCOPE_FUNCTION,
+				KeyExpressionHash: "",
+				EvaluatedKeyHash:  "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ThrottleCapacityToProto(tt.input)
+			assert.Equal(t, tt.expected, result)
+
+			backConverted := ThrottleCapacityFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
+		})
+	}
+
+	t.Run("nil protobuf", func(t *testing.T) {
+		result := ThrottleCapacityFromProto(nil)
+		assert.Equal(t, ThrottleCapacity{}, result)
 	})
 }

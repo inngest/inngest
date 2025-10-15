@@ -171,6 +171,8 @@ func LeaseLocationToProto(location LeaseLocation) pb.ConstraintApiLeaseLocation 
 		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE
 	case LeaseLocationItemLease:
 		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE
+	case LeaseLocationCheckpoint:
+		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT
 	default:
 		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED
 	}
@@ -186,6 +188,8 @@ func LeaseLocationFromProto(location pb.ConstraintApiLeaseLocation) LeaseLocatio
 		return LeaseLocationPartitionLease
 	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE:
 		return LeaseLocationItemLease
+	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT:
+		return LeaseLocationCheckpoint
 	default:
 		return LeaseLocationUnknown
 	}
@@ -365,10 +369,24 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 func ConstraintCapacityItemToProto(item ConstraintCapacityItem) *pb.ConstraintCapacityItem {
 	kind := ConstraintKindToProto(item.Kind)
 
-	return &pb.ConstraintCapacityItem{
+	pbItem := &pb.ConstraintCapacityItem{
 		Kind:   kind,
 		Amount: int32(item.Amount),
 	}
+
+	if item.Concurrency != nil {
+		pbItem.Concurrency = ConcurrencyCapacityToProto(*item.Concurrency)
+	}
+
+	if item.Throttle != nil {
+		pbItem.Throttle = ThrottleCapacityToProto(*item.Throttle)
+	}
+
+	if item.RateLimit != nil {
+		pbItem.RateLimit = RateLimitCapacityToProto(*item.RateLimit)
+	}
+
+	return pbItem
 }
 
 func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) ConstraintCapacityItem {
@@ -376,9 +394,85 @@ func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) Constrai
 		return ConstraintCapacityItem{}
 	}
 
-	return ConstraintCapacityItem{
+	item := ConstraintCapacityItem{
 		Kind:   ConstraintKindFromProto(pbItem.Kind),
 		Amount: int(pbItem.Amount),
+	}
+
+	if pbItem.Concurrency != nil {
+		concurrency := ConcurrencyCapacityFromProto(pbItem.Concurrency)
+		item.Concurrency = &concurrency
+	}
+
+	if pbItem.Throttle != nil {
+		throttle := ThrottleCapacityFromProto(pbItem.Throttle)
+		item.Throttle = &throttle
+	}
+
+	if pbItem.RateLimit != nil {
+		rateLimit := RateLimitCapacityFromProto(pbItem.RateLimit)
+		item.RateLimit = &rateLimit
+	}
+
+	return item
+}
+
+func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity {
+	return &pb.RateLimitCapacity{
+		Scope:             RateLimitScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitCapacity {
+	if pbCapacity == nil {
+		return RateLimitCapacity{}
+	}
+	return RateLimitCapacity{
+		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCapacity {
+	return &pb.ConcurrencyCapacity{
+		Mode:              ConcurrencyModeToProto(capacity.Mode),
+		Scope:             ConcurrencyScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyCapacity {
+	if pbCapacity == nil {
+		return ConcurrencyCapacity{}
+	}
+	return ConcurrencyCapacity{
+		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
+		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
+	return &pb.ThrottleCapacity{
+		Scope:             ThrottleScopeToProto(capacity.Scope),
+		KeyExpressionHash: capacity.KeyExpressionHash,
+		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleCapacity {
+	if pbCapacity == nil {
+		return ThrottleCapacity{}
+	}
+	return ThrottleCapacity{
+		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
+		KeyExpressionHash: pbCapacity.KeyExpressionHash,
+		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
 	}
 }
 
