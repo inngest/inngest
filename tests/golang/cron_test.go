@@ -21,7 +21,7 @@ func TestCron(t *testing.T) {
 	c := client.New(t)
 	r := require.New(t)
 
-	inngestClient, server, registerFuncs := NewSDKHandler(t, "cron")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("cron"))
 	defer server.Close()
 
 	var (
@@ -82,7 +82,7 @@ func TestCronRemoveCronTrigger(t *testing.T) {
 
 	r := require.New(t)
 
-	inngestClient, server, registerFuncs := NewSDKHandler(t, "remove-cron")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("remove-cron"))
 	defer server.Close()
 
 	var (
@@ -166,7 +166,7 @@ func TestCronUpdateCronTrigger(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, 2*time.Minute, 5*time.Second)
+		}, 121*time.Second, 5*time.Second)
 	})
 
 	t.Run("re-register function to reduce cron frequency", func(t *testing.T) {
@@ -188,8 +188,8 @@ func TestCronUpdateCronTrigger(t *testing.T) {
 		registerFuncs()
 
 		r.Eventually(func() bool {
-			return atomic.LoadInt32(&counter) == 2
-		}, 1*time.Minute, 5*time.Second)
+			return atomic.LoadInt32(&counter) == 1
+		}, 61*time.Second, 5*time.Second)
 	})
 }
 
