@@ -446,7 +446,7 @@ func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block)
 		return nil, fmt.Errorf("error fetching latest pause time: %w", err)
 	}
 
-	if earliest == latest {
+	if earliest.Equal(latest) {
 		// This should never normally occur. Since we use Unix seconds for pause index scores,
 		// there's an upper limit on how many pauses can be added within a single second.
 		// Exceeding that limit (blockSize) could trigger this condition.
