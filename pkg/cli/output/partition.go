@@ -51,7 +51,7 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Queue Shard", shard,
 			),
 			"Triggers", fn.Triggers,
-			"CronSchedule", cronSchedules,
+			"CronSchedules", cronSchedules,
 			"Concurrency", OrderedData(
 				"Account", 0,
 				"Function", 0,

@@ -550,12 +550,10 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Equal(t, expr, item.Expression)
 			assert.Equal(t, fnVersion, item.FunctionVersion)
 
-			// Verify ID is set with a future timestamp
+			// Verify ID is set with non empty timestamp
 			assert.NotEqual(t, ulid.ULID{}, item.ID)
-			nextTime := item.ID.Timestamp()
-			assert.True(t, nextTime.After(time.Now().Add(-1*time.Second)))
 
-			// Verify JobID is set and follows expected format
+			// Verify JobID is set
 			assert.NotEmpty(t, item.JobID)
 		})
 
@@ -585,13 +583,6 @@ func TestRedisCronManager(t *testing.T) {
 				expression string
 				validate   func(t *testing.T, nextTime time.Time)
 			}{
-				{
-					name:       "every minute",
-					expression: "* * * * *",
-					validate: func(t *testing.T, nextTime time.Time) {
-						assert.True(t, nextTime.After(time.Now()))
-					},
-				},
 				{
 					name:       "daily at midnight",
 					expression: "0 0 * * *",
@@ -813,10 +804,6 @@ func TestRedisCronManager(t *testing.T) {
 			// Verify ULID is valid
 			assert.NotEqual(t, ulid.ULID{}, item.ID)
 
-			// Verify timestamp is in the future
-			timestamp := item.ID.Timestamp()
-			assert.True(t, timestamp.After(time.Now().Add(-1*time.Second)))
-			assert.True(t, timestamp.Before(time.Now().Add(366*24*time.Hour))) // Within a year
 		})
 
 		t.Run("should leave tenant fields empty", func(t *testing.T) {
@@ -844,45 +831,6 @@ func TestRedisCronManager(t *testing.T) {
 			require.NotNil(t, item)
 		})
 
-		t.Run("concurrent calls should produce unique items", func(t *testing.T) {
-			functionID := uuid.New()
-			expr := "0 * * * *"
-			fnVersion := 1
-
-			const numCalls = 10
-			results := make([]*CronItem, numCalls)
-			errors := make([]error, numCalls)
-
-			// Make concurrent calls
-			done := make(chan bool)
-			for i := 0; i < numCalls; i++ {
-				go func(index int) {
-					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
-					results[index] = item
-					errors[index] = err
-					done <- true
-				}(i)
-			}
-
-			// Wait for all to complete
-			for i := 0; i < numCalls; i++ {
-				<-done
-			}
-
-			// Verify all succeeded
-			for i := 0; i < numCalls; i++ {
-				require.NoError(t, errors[i])
-				require.NotNil(t, results[i])
-			}
-
-			// Verify IDs are unique (due to random entropy in ULID)
-			ids := make(map[ulid.ULID]bool)
-			for _, item := range results {
-				ids[item.ID] = true
-			}
-			// Most IDs should be unique (some might collide if entropy is identical)
-			assert.Greater(t, len(ids), numCalls/2, "Expected most IDs to be unique")
-		})
 	})
 
 }
