@@ -22,11 +22,12 @@ export default function InsightsPage() {
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });
 
-  const activeSavedQueryId = tabs.find((t) => t.id === activeTabId)?.savedQueryId;
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeSavedQueryId = activeTab?.savedQueryId;
 
   return (
     <StoredQueriesProvider tabManagerActions={actions}>
-      <TabManagerProvider actions={actions}>
+      <TabManagerProvider actions={actions} activeTab={activeTab}>
         <SchemasProvider>
           <div className="flex h-full w-full flex-1 overflow-hidden">
             {isQueryHelperPanelVisible && (
