@@ -110,11 +110,6 @@ func (tw *TextWriter) WriteOrdered(data *OrderedMap, opts ...TextOpt) error {
 		fmt.Println()
 	}
 
-	// Handle nil data gracefully
-	if data == nil {
-		return nil
-	}
-
 	indentStr := strings.Repeat(" ", tw.indent)
 	for _, key := range data.Keys() {
 		value, _ := data.Get(key)
