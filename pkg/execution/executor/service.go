@@ -935,8 +935,6 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	// TODO(lkasinathan) check function paused
-
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
 
