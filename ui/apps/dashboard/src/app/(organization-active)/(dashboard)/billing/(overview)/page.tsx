@@ -230,7 +230,7 @@ export default async function Page() {
             <EntitlementListItem
               planName={currentPlan.name}
               title="Connect Workers"
-              description="Maximum number of connect workeres"
+              description="Maximum number of connect workers"
               entitlement={{
                 currentValue: entitlements.connectWorkerConnections.limit,
                 displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
