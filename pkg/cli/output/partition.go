@@ -30,6 +30,16 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 			)
 		}
 
+		cronSchedules := NewOrderedMap()
+		for _, cron := range pt.GetCrons() {
+			cronSchedules.Set(cron.JobId, OrderedData(
+				"JobID", cron.JobId,
+				"Next", cron.Next.AsTime().Format(time.RFC3339),
+				"Expr", cron.Expr,
+				"Scheduled", cron.Scheduled,
+			))
+		}
+
 		if err := w.WriteOrdered(OrderedData(
 			"Type", "Partition",
 			"ID", pt.Id,
@@ -41,6 +51,7 @@ func TextPartition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) er
 				"Queue Shard", shard,
 			),
 			"Triggers", fn.Triggers,
+			"CronSchedules", cronSchedules,
 			"Concurrency", OrderedData(
 				"Account", 0,
 				"Function", 0,

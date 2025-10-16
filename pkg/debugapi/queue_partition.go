@@ -11,6 +11,7 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -41,6 +42,34 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error finding shard: %w", err).Error())
 	}
 
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving function config: %w", err).Error())
+	}
+
+	var cronSchedules []*pb.CronSchedule
+	if conf.IsScheduled() {
+		for _, cronExpr := range conf.ScheduleExpressions() {
+			if ci, err := d.croner.NextScheduledItemIDForFunction(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+				// NextScheduledItemIDForFunction returns the expected jobID of next schedule
+				// Check if that jobID actually exists in the queue
+				opts := []redis_state.QueueOpOpt{}
+				_, err := d.queue.ItemByID(ctx, ci.JobID, opts...)
+				if err != nil && err != redis_state.ErrQueueItemNotFound {
+					return nil, status.Error(codes.Unknown, fmt.Errorf("error finding scheduled cron queue item: %w", err).Error())
+				}
+				cronScheduled := err == nil
+
+				cronSchedules = append(cronSchedules, &pb.CronSchedule{
+					Next:      timestamppb.New(ci.ID.Timestamp()),
+					JobId:     ci.JobID,
+					Expr:      ci.Expression,
+					Scheduled: cronScheduled,
+				})
+			}
+		}
+	}
+
 	return &pb.PartitionResponse{
 		Id:   req.GetId(),
 		Slug: fn.Slug,
@@ -54,6 +83,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 			Name: shard.Name,
 			Kind: shard.Kind,
 		},
+		Crons: cronSchedules,
 	}, nil
 }
 
