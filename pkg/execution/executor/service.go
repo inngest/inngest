@@ -885,6 +885,7 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	// handle the schedule update
 	if _, err := s.croner.ScheduleNext(ctx, ci); err != nil {
 		// TODO does this need special error handling?
+		l.Error("Failed to schedule next cron run", "err", err)
 		return fmt.Errorf("error upserting cron schedule: %w", err)
 	}
 
@@ -905,16 +906,14 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
 
-	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion)
+	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion, "scheduleTime", ci.ID.Timestamp())
 	l.Trace("handling cron")
 
-	// JIT Checks to verify if the function can be ran:
-	//	- function version is current
-	//	- function not archived
-	//	- function not paused
+	// JIT check to verify function exists and is not archived
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			l.Info("Breaking cron cycle, function does not exist")
 			// function doesn't exist, no action needed
 			return nil
 		}
@@ -922,24 +921,25 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 	// function is archived/deleted, so don't do anything
 	if fn.IsArchived() {
+		l.Info("Breaking cron cycle, function is archived")
 		return nil
 	}
 
+	// JIT check to verify function version is current
 	conf, err := fn.InngestFunction()
 	if err != nil {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
 	if conf.FunctionVersion > ci.FunctionVersion {
+		l.Info("Breaking cron cycle, function version was upgraded")
 		return nil
 	}
 
-	// TODO(kasinath) check function paused
+	// TODO(lkasinathan) check function paused
 
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
 
-	// TODO(kasinath) this should match Cloud idempotency key
-	// TODO(kasinath) this should be function specific. Two functions cannot use the same idempotency key!!!
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
 	evt := event.NewOSSTrackedEvent(event.Event{
@@ -1004,6 +1004,9 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			l.ReportError(err, "error scheduling cron function execution")
 			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
+		l.Trace("cron function run already scheduled")
+	} else {
+		l.Trace("cron function run scheduled", "idempotencyKey", idempotencyKey)
 	}
 
 	// enqueue the next schedule

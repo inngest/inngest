@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -213,6 +215,7 @@ func TestRedisCronManager(t *testing.T) {
 			assert.NotEmpty(t, nextItem.ID)
 			assert.NotEqual(t, cronItem.JobID, nextItem.JobID)
 			assert.NotEmpty(t, nextItem.JobID)
+			assert.Equal(t, cronItem.Op, nextItem.Op)
 		})
 
 		t.Run("multiple schedulenext calls should be idempotent for same op", func(t *testing.T) {
@@ -232,13 +235,14 @@ func TestRedisCronManager(t *testing.T) {
 			assert.NotEqual(t, cronItem.JobID, nextItem1.JobID)
 			assert.NotEmpty(t, nextItem1.JobID)
 
+			// calling schedule next again should result in an identical nextItem
 			nextItem2, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
 			require.NotNil(t, nextItem2)
 			CronItemEquals(t, *nextItem1, *nextItem2)
 		})
 
-		t.Run("multiple schedulenext calls with different operations should not create new schedules", func(t *testing.T) {
+		t.Run("multiple schedulenext calls should be idempotent for different ops", func(t *testing.T) {
 			cronItem := createCronItem(enums.CronOpNew)
 			cronItem.Expression = "0 * * * *" // Every hour
 			// current timestamp is 10 minutes past the hour
@@ -255,7 +259,8 @@ func TestRedisCronManager(t *testing.T) {
 			assert.NotEqual(t, cronItem.JobID, nextItem1.JobID)
 			assert.NotEmpty(t, nextItem1.JobID)
 
-			cronItem.Op = enums.CronOpUpdate
+			// call ScheduleNext again for init with same function version etc should result in an identical nextItem
+			cronItem.Op = enums.CronInit
 			nextItem2, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
 			require.NotNil(t, nextItem2)
@@ -289,7 +294,7 @@ func TestRedisCronManager(t *testing.T) {
 			assert.Greater(t, nextItem2.FunctionVersion, nextItem1.FunctionVersion)
 		})
 
-		t.Run("different cron expressions", func(t *testing.T) {
+		t.Run("different valid cron expressions", func(t *testing.T) {
 			testCases := []struct {
 				name       string
 				expression string
@@ -347,57 +352,35 @@ func TestRedisCronManager(t *testing.T) {
 			}
 		})
 
-		t.Run("different operation types", func(t *testing.T) {
-			baseTime := clock.Now()
+		t.Run("all operations should use item timestamp directly", func(t *testing.T) {
+			baseTime := time.Date(2025, 12, 25, 0, 59, 0, 0, time.UTC) // 12:59AM
 
-			t.Run("CronOpProcess should add forward duration", func(t *testing.T) {
-				cronItem := createCronItem(enums.CronOpProcess)
-				cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
-				cronItem.Expression = "0 * * * *"
+			testOps := []enums.CronOp{
+				enums.CronOpNew,
+				enums.CronOpUpdate,
+				enums.CronOpPause,
+				enums.CronOpUnpause,
+				enums.CronOpProcess,
+				enums.CronInit,
+			}
 
-				nextItem, err := cm.ScheduleNext(ctx, cronItem)
-				require.NoError(t, err)
-				require.NotNil(t, nextItem)
+			for _, op := range testOps {
+				t.Run(op.String(), func(t *testing.T) {
+					cronItem := createCronItem(op)
+					cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
+					cronItem.Expression = "0 * * * *"
 
-				nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
+					nextItem, err := cm.ScheduleNext(ctx, cronItem)
+					require.NoError(t, err)
+					require.NotNil(t, nextItem)
 
-				// Should be scheduled for some time in the future after baseTime
-				assert.True(t, nextTime.After(baseTime),
-					"Next time %v should be after base time %v", nextTime, baseTime)
-			})
+					nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
 
-			t.Run("other operations should use item timestamp directly", func(t *testing.T) {
-				cronItem := createCronItem(enums.CronOpNew)
-				cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
-				cronItem.Expression = "0 * * * *"
+					// Should be scheduled for 1AM
+					assert.True(t, nextTime.Equal(time.Date(2025, 12, 25, 1, 0, 0, 0, time.UTC)))
+				})
+			}
 
-				nextItem, err := cm.ScheduleNext(ctx, cronItem)
-				require.NoError(t, err)
-				require.NotNil(t, nextItem)
-
-				nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
-
-				// Should be scheduled for some time in the future after baseTime
-				assert.True(t, nextTime.After(baseTime),
-					"Next time %v should be after base time %v", nextTime, baseTime)
-			})
-		})
-
-		t.Run("ID is set to exact cron schedule timestamp", func(t *testing.T) {
-			cronItem := createCronItem(enums.CronOpProcess)
-			cronItem.Expression = "0 * * * *"
-
-			nextItem, err := cm.ScheduleNext(ctx, cronItem)
-			require.NoError(t, err)
-			require.NotNil(t, nextItem)
-
-			nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
-			baseTimeWithForward := time.UnixMilli(int64(cronItem.ID.Time())).Add(10 * time.Second)
-			expectedTime := baseTimeWithForward.Truncate(time.Hour).Add(time.Hour)
-
-			assert.True(t, nextTime.Equal(expectedTime),
-				"Expected jitter to schedule item before exact cron time. Next: %v, Expected: %v",
-				nextTime, expectedTime)
 		})
 
 		t.Run("should create valid ULID with timestamp", func(t *testing.T) {
@@ -469,6 +452,7 @@ func TestRedisCronManager(t *testing.T) {
 			nextItem, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
 			require.NotNil(t, nextItem)
+			require.Equal(t, nextItem.Op, enums.CronOpProcess)
 		})
 	})
 
@@ -548,4 +532,14 @@ func TestRedisCronManager(t *testing.T) {
 		})
 
 	})
+}
+
+func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	return r, rc
 }

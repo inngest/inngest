@@ -120,6 +120,11 @@ func TestNext(t *testing.T) {
 			cronExpr:    "@invalid",
 			expectError: true,
 		},
+		{
+			name:        "invalid string",
+			cronExpr:    "invalid",
+			expectError: true,
+		},
 	}
 
 	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
@@ -129,6 +134,7 @@ func TestNext(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.True(t, next.IsZero())
+				assert.Contains(t, err.Error(), "error parsing cron expression")
 			} else {
 				assert.NoError(t, err)
 				assert.False(t, next.IsZero())
@@ -196,24 +202,6 @@ func TestNextScheduleCalculation(t *testing.T) {
 			assert.Equal(t, tt.expected, next)
 		})
 	}
-}
-
-func TestNextErrorHandling(t *testing.T) {
-	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
-
-	t.Run("invalid cron expression", func(t *testing.T) {
-		next, err := Next("invalid", from)
-		assert.Error(t, err)
-		assert.True(t, next.IsZero())
-		assert.Contains(t, err.Error(), "error parsing cron expression")
-	})
-
-	t.Run("empty cron expression", func(t *testing.T) {
-		next, err := Next("", from)
-		assert.Error(t, err)
-		assert.True(t, next.IsZero())
-		assert.Contains(t, err.Error(), "error parsing cron expression")
-	})
 }
 
 func TestCronSyncerInterface(t *testing.T) {

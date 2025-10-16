@@ -71,7 +71,7 @@ type redisCronManager struct {
 }
 
 func (c *redisCronManager) CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string {
-	return fmt.Sprintf("{%s}:{%s}:{%s}:{%s}:{%d}:cron:schedule", c.c.QueueDefaultKey(), schedule, expr, fnID, fnVersion)
+	return fmt.Sprintf("{%s}:{%s}:{%s}:{%d}:cron:schedule", schedule, expr, fnID, fnVersion)
 }
 
 // Sync enqueues a system job of kind "cron-sync" to the system queue.
@@ -107,6 +107,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}, at, queue.EnqueueOpts{})
 	switch err {
 	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		l.Trace("cron-sync enqueued", "jobID", jobID)
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing cron sync job")
@@ -135,7 +136,9 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 
+	// We want only one cron loop to exist for a {FnID, FnVersion, CronExpr} combination. This jobID helps achieve that idempotency.
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
+
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time
 	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
@@ -152,8 +155,6 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		JobID:           jobID,
 		Op:              enums.CronOpProcess,
 	}
-
-	l = l.With("next_cron_item", nextItem)
 
 	// enqueue new schedule
 	kind := queue.KindCron
@@ -175,9 +176,14 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		MaxAttempts: &maxAttempts,
 		Payload:     nextItem,
 	}, enqueueAt, queue.EnqueueOpts{PassthroughJobId: true})
+
+	l = l.With("next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
+
 	switch err {
-	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		// no-op
+	case nil:
+		l.Trace("ScheduleNext success")
+	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		l.Trace("ScheduleNext already exists")
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")
 		return nil, fmt.Errorf("error enqueueing cron for next schedule: %w", err)
