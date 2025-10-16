@@ -158,7 +158,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 
-	jobID := c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion)
+	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 	// Add jitter to schedule execution slightly earlier
 	// This ensures execution starts around the desired time
 	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
@@ -197,7 +197,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		QueueName:   &kind,
 		MaxAttempts: &maxAttempts,
 		Payload:     nextItem,
-	}, enqueueAt, queue.EnqueueOpts{})
+	}, enqueueAt, queue.EnqueueOpts{PassthroughJobId: true})
 	switch err {
 	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
 		// no-op
