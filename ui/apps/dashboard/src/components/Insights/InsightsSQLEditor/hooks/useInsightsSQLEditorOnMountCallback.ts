@@ -3,28 +3,48 @@
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useActiveTab, useTabManagerActions } from '../../InsightsTabManager/TabManagerContext';
+import { HOME_TAB, TEMPLATES_TAB } from '../../InsightsTabManager/constants';
+import { useStoredQueries } from '../../QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '../../types';
 import { handleShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
+import { getCanRunQuery } from '../utils';
 import { useLatest, useLatestCallback } from './useLatestCallback';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
   onMount: SQLEditorMountCallback;
 };
 
+export type SQLShortcutActions = {
+  onRun: () => void;
+  onSave: () => void;
+  onNewTab: () => void;
+};
+
 export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMountCallbackReturn {
   const { query, runQuery, status } = useInsightsStateMachineContext();
+  const { saveQuery } = useStoredQueries();
+  const { tabManagerActions } = useTabManagerActions();
+  const { activeTab } = useActiveTab();
 
   const latestQueryRef = useLatest(query);
   const isRunningRef = useLatest(status === 'loading');
+  const activeTabRef = useLatest(activeTab);
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const shortcutsDisposable = handleShortcuts(
-      editor,
-      monaco,
-      latestQueryRef,
-      isRunningRef,
-      runQuery
-    );
+    const shortcutsDisposable = handleShortcuts(editor, monaco, {
+      onRun: () => {
+        if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
+      },
+      onSave: () => {
+        const currentTab = activeTabRef.current;
+        if (currentTab !== undefined && isQueryTab(currentTab)) {
+          saveQuery(currentTab);
+        }
+      },
+      onNewTab: tabManagerActions.createNewTab,
+    });
 
     const markersDisposable = markTemplateVars(editor, monaco);
 
@@ -40,4 +60,8 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   });
 
   return { onMount };
+}
+
+function isQueryTab(tab: Tab): boolean {
+  return tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id;
 }
