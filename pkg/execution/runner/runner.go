@@ -255,6 +255,12 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	for _, f := range fns {
 		fn := f
 
+		cqrsFn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
+		if err != nil {
+			return fmt.Errorf("error fetching appID during cron initialization for fn: %s, err: %w", fn.ID, err)
+		}
+		appID := cqrsFn.AppID
+
 		cronExprs := f.ScheduleExpressions()
 		for _, cronExpr := range cronExprs {
 			// Launch each cron initialization in a separate goroutine to avoid
@@ -270,6 +276,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					AccountID:       consts.DevServerAccountID,
 					WorkspaceID:     consts.DevServerEnvID,
 					FunctionID:      fn.ID,
+					AppID:           appID,
 					FunctionVersion: fn.FunctionVersion,
 					Expression:      cronExpr,
 					Op:              enums.CronInit, // Initialize operation
