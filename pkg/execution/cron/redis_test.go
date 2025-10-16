@@ -101,20 +101,6 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, time.Duration(0), opt.jitterMin)
 		assert.Equal(t, time.Duration(0), opt.jitterMax)
 	})
-
-	t.Run("WithScheduleForwardDuration sets duration correctly", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
-		WithScheduleForwardDuration(30 * time.Second)(&opt)
-
-		assert.Equal(t, 30*time.Second, opt.scheduleForwardDur)
-	})
-
-	t.Run("WithScheduleForwardDuration ignores negative duration", func(t *testing.T) {
-		opt := redisCronManagerOpt{}
-		WithScheduleForwardDuration(-5 * time.Second)(&opt)
-
-		assert.Equal(t, time.Duration(0), opt.scheduleForwardDur)
-	})
 }
 
 func TestJitterEdgeCases(t *testing.T) {
@@ -483,77 +469,6 @@ func TestRedisCronManager(t *testing.T) {
 			nextItem, err := cm.ScheduleNext(ctx, cronItem)
 			require.NoError(t, err)
 			require.NotNil(t, nextItem)
-		})
-
-		t.Run("scheduleForward applied to process item", func(t *testing.T) {
-			scheduleForwardCm := NewRedisCronManager(
-				unshardedClient.Cron(),
-				q,
-				logger.StdlibLogger(ctx),
-				WithScheduleForwardDuration(10*time.Second),
-			)
-
-			// Set a specific base time
-			baseTime := time.Date(2025, 1, 1, 2, 55, 0, 0, time.UTC)
-			cronItem := createCronItem(enums.CronOpProcess)
-			cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
-			cronItem.Expression = "0 * * * *" // Every hour
-
-			nextItem, err := scheduleForwardCm.ScheduleNext(ctx, cronItem)
-			require.NoError(t, err)
-			require.NotNil(t, nextItem)
-
-			nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
-
-			// For CronOpProcess, the forward duration (10s) is added to baseTime before calculating next
-			// So: baseTime (2:55:00) + 10s = 3:05:00, then next hourly = 4:00:00
-			baseTimeWithForward := baseTime.Add(10 * time.Second)
-			expectedNextTime := baseTimeWithForward.Truncate(time.Hour).Add(time.Hour)
-
-			assert.True(t, expectedNextTime.Equal(expectedNextTime), "For CronOpProcess, scheduleForward should be applied. Expected %v, got %v",
-				expectedNextTime, nextTime)
-
-		})
-
-		t.Run("scheduleForward not applied to non-process item", func(t *testing.T) {
-			scheduleForwardCm := NewRedisCronManager(
-				unshardedClient.Cron(),
-				q,
-				logger.StdlibLogger(ctx),
-				WithScheduleForwardDuration(10*time.Second),
-			)
-
-			// Set a specific base time
-			baseTime := time.Date(2024, 1, 1, 2, 55, 0, 0, time.UTC)
-			cronItem := createCronItem(enums.CronOpNew)
-			cronItem.ID = ulid.MustNew(ulid.Timestamp(baseTime), ulid.DefaultEntropy())
-			cronItem.Expression = "0 * * * *" // Every hour
-
-			testOps := []enums.CronOp{
-				enums.CronOpNew,
-				enums.CronOpUpdate,
-				enums.CronOpPause,
-				enums.CronOpUnpause,
-				enums.CronOpProcess,
-				enums.CronInit,
-			}
-
-			for _, op := range testOps {
-				cronItem.Op = op
-				nextItem, err := scheduleForwardCm.ScheduleNext(ctx, cronItem)
-				require.NoError(t, err)
-				require.NotNil(t, nextItem)
-
-				nextTime := time.UnixMilli(int64(nextItem.ID.Time()))
-
-				// For non-CronOpProcess operations, forward duration is NOT added
-				// So: baseTime (2:55:00), then next hourly = 3:00:00
-				expectedNextTime := baseTime.Truncate(time.Hour).Add(time.Hour)
-
-				assert.True(t, expectedNextTime.Equal(expectedNextTime), "For CronOpProcess, scheduleForward should be applied. Expected %v, got %v",
-					expectedNextTime, nextTime)
-			}
-
 		})
 	})
 

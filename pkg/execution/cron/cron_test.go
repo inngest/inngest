@@ -152,6 +152,12 @@ func TestNextScheduleCalculation(t *testing.T) {
 			expected: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
 		},
 		{
+			name:     "daily at noon from noon",
+			cronExpr: "0 12 * * *",
+			from:     time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
+		},
+		{
 			name:     "daily at noon from afternoon",
 			cronExpr: "0 12 * * *",
 			from:     time.Date(2023, 1, 1, 14, 0, 0, 0, time.UTC),
@@ -168,6 +174,12 @@ func TestNextScheduleCalculation(t *testing.T) {
 			cronExpr: "*/5 * * * *",
 			from:     time.Date(2023, 1, 1, 10, 2, 0, 0, time.UTC),
 			expected: time.Date(2023, 1, 1, 10, 5, 0, 0, time.UTC),
+		},
+		{
+			name:     "every minute from top of minute",
+			cronExpr: "* * * * *",
+			from:     time.Date(2023, 1, 1, 10, 5, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 1, 10, 6, 0, 0, time.UTC),
 		},
 		{
 			name:     "weekly on monday",
@@ -200,6 +212,7 @@ func TestNextErrorHandling(t *testing.T) {
 		next, err := Next("", from)
 		assert.Error(t, err)
 		assert.True(t, next.IsZero())
+		assert.Contains(t, err.Error(), "error parsing cron expression")
 	})
 }
 

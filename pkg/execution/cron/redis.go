@@ -16,10 +16,6 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-var (
-	defaultScheduleForwardDur = 10 * time.Second
-)
-
 type RedisCronManagerOpt func(c *redisCronManagerOpt)
 
 type redisCronManagerOpt struct {
@@ -29,12 +25,6 @@ type redisCronManagerOpt struct {
 	// we do this so we can make the actual run start as close as possible to the actual cron schedule.
 	jitterMin time.Duration
 	jitterMax time.Duration
-
-	// we need to move the time upwards on finding the next time due to how we use jitter
-	// to push the time back a little to coordinate the run start timing.
-	//
-	// considering cron's minimum granularity is a minute, the seconds range should work fine. defaults to 10s
-	scheduleForwardDur time.Duration
 }
 
 func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
@@ -48,14 +38,6 @@ func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
 	}
 }
 
-func WithScheduleForwardDuration(dur time.Duration) RedisCronManagerOpt {
-	return func(c *redisCronManagerOpt) {
-		if dur > 0 {
-			c.scheduleForwardDur = dur
-		}
-	}
-}
-
 func NewRedisCronManager(
 	c *redis_state.CronClient,
 	q redis_state.QueueManager,
@@ -63,9 +45,8 @@ func NewRedisCronManager(
 	opts ...RedisCronManagerOpt,
 ) CronManager {
 	opt := redisCronManagerOpt{
-		jitterMin:          0 * time.Millisecond,
-		jitterMax:          20 * time.Millisecond,
-		scheduleForwardDur: defaultScheduleForwardDur,
+		jitterMin: 0 * time.Millisecond,
+		jitterMax: 20 * time.Millisecond,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -145,10 +126,6 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	l := c.log.With("action", "redisCronManager.ScheduleNext", "fnID", ci.FunctionID, "fnVersion", ci.FunctionVersion, "cronExpr", ci.Expression)
 
 	from := ci.ID.Timestamp()
-	switch ci.Op {
-	case enums.CronOpProcess:
-		from = from.Add(c.opt.scheduleForwardDur)
-	}
 
 	// Parse the cron expression and get the next execution time
 	next, err := Next(ci.Expression, from)
