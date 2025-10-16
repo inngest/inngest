@@ -7,6 +7,7 @@ interface InfiniteScrollTriggerProps {
   hasMore: boolean;
   isLoading: boolean;
   rootMargin?: string;
+  root?: Element | Document | null;
 }
 
 export function InfiniteScrollTrigger({
@@ -14,6 +15,7 @@ export function InfiniteScrollTrigger({
   hasMore,
   isLoading,
   rootMargin = '200px',
+  root = null,
 }: InfiniteScrollTriggerProps) {
   const triggerRef = useRef<HTMLDivElement>(null);
 
@@ -29,8 +31,9 @@ export function InfiniteScrollTrigger({
         }
       },
       {
+        root,
         rootMargin,
-        threshold: 1.0,
+        threshold: 0.0,
       }
     );
 
@@ -39,7 +42,7 @@ export function InfiniteScrollTrigger({
     return () => {
       observer.disconnect();
     };
-  }, [onIntersect, hasMore, isLoading, rootMargin]);
+  }, [onIntersect, hasMore, isLoading, rootMargin, root]);
 
   if (!hasMore) return null;
 

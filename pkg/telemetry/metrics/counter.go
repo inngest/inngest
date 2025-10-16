@@ -184,6 +184,15 @@ func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt)
 	})
 }
 
+func IncrSpanBatchProcessorDroppedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_dropped_total",
+		Description: "Total number of spans dropped for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
