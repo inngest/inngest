@@ -532,6 +532,359 @@ func TestRedisCronManager(t *testing.T) {
 		})
 
 	})
+
+	t.Run("NextScheduledItemIDForFunction", func(t *testing.T) {
+		r.FlushAll()
+
+		t.Run("should return next scheduled item with valid inputs", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *" // Every hour
+			fnVersion := 1
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+			require.NotNil(t, item)
+
+			// Verify basic fields are set correctly
+			assert.Equal(t, functionID, item.FunctionID)
+			assert.Equal(t, expr, item.Expression)
+			assert.Equal(t, fnVersion, item.FunctionVersion)
+
+			// Verify ID is set with a future timestamp
+			assert.NotEqual(t, ulid.ULID{}, item.ID)
+			nextTime := item.ID.Timestamp()
+			assert.True(t, nextTime.After(time.Now().Add(-1*time.Second)))
+
+			// Verify JobID is set and follows expected format
+			assert.NotEmpty(t, item.JobID)
+		})
+
+		t.Run("should calculate next time from now", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *" // Every hour
+			fnVersion := 1
+
+			beforeCall := time.Now()
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+
+			nextTime := item.ID.Timestamp()
+
+			// The next scheduled time should be after now
+			assert.True(t, nextTime.After(beforeCall),
+				"Next time %v should be after call time %v", nextTime, beforeCall)
+
+			// For an hourly cron, the next time should be at the top of the next hour
+			assert.Equal(t, 0, nextTime.Minute())
+			assert.Equal(t, 0, nextTime.Second())
+		})
+
+		t.Run("should work with different cron expressions", func(t *testing.T) {
+			testCases := []struct {
+				name       string
+				expression string
+				validate   func(t *testing.T, nextTime time.Time)
+			}{
+				{
+					name:       "every minute",
+					expression: "* * * * *",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.True(t, nextTime.After(time.Now()))
+					},
+				},
+				{
+					name:       "daily at midnight",
+					expression: "0 0 * * *",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, 0, nextTime.Hour())
+						assert.Equal(t, 0, nextTime.Minute())
+					},
+				},
+				{
+					name:       "hourly descriptor",
+					expression: "@hourly",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, 0, nextTime.Minute())
+					},
+				},
+				{
+					name:       "daily descriptor",
+					expression: "@daily",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, 0, nextTime.Hour())
+						assert.Equal(t, 0, nextTime.Minute())
+					},
+				},
+				{
+					name:       "weekly descriptor",
+					expression: "@weekly",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, time.Sunday, nextTime.Weekday())
+						assert.Equal(t, 0, nextTime.Hour())
+					},
+				},
+				{
+					name:       "monthly descriptor",
+					expression: "@monthly",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, 1, nextTime.Day())
+						assert.Equal(t, 0, nextTime.Hour())
+					},
+				},
+				{
+					name:       "yearly descriptor",
+					expression: "@yearly",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, time.January, nextTime.Month())
+						assert.Equal(t, 1, nextTime.Day())
+					},
+				},
+				{
+					name:       "specific weekday",
+					expression: "0 9 * * MON",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Equal(t, time.Monday, nextTime.Weekday())
+						assert.Equal(t, 9, nextTime.Hour())
+					},
+				},
+				{
+					name:       "multiple times per day",
+					expression: "0 6,12,18 * * *",
+					validate: func(t *testing.T, nextTime time.Time) {
+						assert.Contains(t, []int{6, 12, 18}, nextTime.Hour())
+						assert.Equal(t, 0, nextTime.Minute())
+					},
+				},
+			}
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					functionID := uuid.New()
+					fnVersion := 1
+
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, tc.expression, fnVersion)
+					require.NoError(t, err)
+					require.NotNil(t, item)
+
+					assert.Equal(t, tc.expression, item.Expression)
+					nextTime := item.ID.Timestamp()
+					tc.validate(t, nextTime)
+				})
+			}
+		})
+
+		t.Run("should return error for invalid cron expressions", func(t *testing.T) {
+			testCases := []struct {
+				name       string
+				expression string
+			}{
+				{"too few fields", "* *"},
+				{"invalid minute", "60 * * * *"},
+				{"invalid hour", "0 25 * * *"},
+				{"invalid day", "0 0 32 * *"},
+				{"invalid month", "0 0 1 13 *"},
+				{"invalid weekday", "0 0 * * 8"},
+				{"empty expression", ""},
+				{"invalid descriptor", "@invalid"},
+				{"malformed expression", "* * * *"},
+				{"invalid characters", "a b c d e"},
+			}
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					functionID := uuid.New()
+					fnVersion := 1
+
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, tc.expression, fnVersion)
+					assert.Error(t, err)
+					assert.Nil(t, item)
+					assert.Contains(t, err.Error(), "failed to parse cron expression")
+				})
+			}
+		})
+
+		t.Run("should work with different function versions", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+
+			versions := []int{1, 2, 5, 10, 100}
+			for _, version := range versions {
+				t.Run(fmt.Sprintf("version %d", version), func(t *testing.T) {
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, version)
+					require.NoError(t, err)
+					assert.Equal(t, version, item.FunctionVersion)
+				})
+			}
+		})
+
+		t.Run("should generate different JobIDs for different functions", func(t *testing.T) {
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			functionID1 := uuid.New()
+			functionID2 := uuid.New()
+
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID1, expr, fnVersion)
+			require.NoError(t, err)
+
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID2, expr, fnVersion)
+			require.NoError(t, err)
+
+			// Different function IDs should generate different job IDs
+			assert.NotEqual(t, item1.JobID, item2.JobID)
+		})
+
+		t.Run("should generate different JobIDs for different expressions", func(t *testing.T) {
+			functionID := uuid.New()
+			fnVersion := 1
+
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID, "0 * * * *", fnVersion)
+			require.NoError(t, err)
+
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID, "0 0 * * *", fnVersion)
+			require.NoError(t, err)
+
+			// Different expressions should generate different job IDs
+			assert.NotEqual(t, item1.JobID, item2.JobID)
+		})
+
+		t.Run("should generate different IDs on subsequent calls", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			item1, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+
+			// Small delay to ensure different entropy
+			time.Sleep(1 * time.Millisecond)
+
+			item2, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+
+			// IDs should be different due to entropy even if timestamps might be the same
+			// Note: The timestamp might be the same since it's based on the next cron schedule
+			// but the random part of the ULID should differ
+			if item1.ID.Timestamp().Equal(item2.ID.Timestamp()) {
+				// If timestamps are equal, the random portion should differ
+				assert.NotEqual(t, item1.ID, item2.ID, "ULIDs should differ in their random portion")
+			}
+		})
+
+		t.Run("should handle zero function ID", func(t *testing.T) {
+			functionID := uuid.UUID{}
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+			assert.Equal(t, functionID, item.FunctionID)
+			assert.NotEmpty(t, item.JobID)
+		})
+
+		t.Run("should handle zero function version", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 0
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+			assert.Equal(t, 0, item.FunctionVersion)
+		})
+
+		t.Run("should handle negative function version", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := -1
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+			assert.Equal(t, -1, item.FunctionVersion)
+		})
+
+		t.Run("should create valid ULID", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+
+			// Verify ULID is valid
+			assert.NotEqual(t, ulid.ULID{}, item.ID)
+
+			// Verify timestamp is in the future
+			timestamp := item.ID.Timestamp()
+			assert.True(t, timestamp.After(time.Now().Add(-1*time.Second)))
+			assert.True(t, timestamp.Before(time.Now().Add(366*24*time.Hour))) // Within a year
+		})
+
+		t.Run("should leave tenant fields empty", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+
+			// These fields are not populated since they're not provided to the function
+			assert.Equal(t, uuid.UUID{}, item.AccountID)
+			assert.Equal(t, uuid.UUID{}, item.WorkspaceID)
+			assert.Equal(t, uuid.UUID{}, item.AppID)
+		})
+
+		t.Run("should handle context", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			// Normal context should work
+			item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+			require.NoError(t, err)
+			require.NotNil(t, item)
+		})
+
+		t.Run("concurrent calls should produce unique items", func(t *testing.T) {
+			functionID := uuid.New()
+			expr := "0 * * * *"
+			fnVersion := 1
+
+			const numCalls = 10
+			results := make([]*CronItem, numCalls)
+			errors := make([]error, numCalls)
+
+			// Make concurrent calls
+			done := make(chan bool)
+			for i := 0; i < numCalls; i++ {
+				go func(index int) {
+					item, err := cm.NextScheduledItemIDForFunction(ctx, functionID, expr, fnVersion)
+					results[index] = item
+					errors[index] = err
+					done <- true
+				}(i)
+			}
+
+			// Wait for all to complete
+			for i := 0; i < numCalls; i++ {
+				<-done
+			}
+
+			// Verify all succeeded
+			for i := 0; i < numCalls; i++ {
+				require.NoError(t, errors[i])
+				require.NotNil(t, results[i])
+			}
+
+			// Verify IDs are unique (due to random entropy in ULID)
+			ids := make(map[ulid.ULID]bool)
+			for _, item := range results {
+				ids[item.ID] = true
+			}
+			// Most IDs should be unique (some might collide if entropy is identical)
+			assert.Greater(t, len(ids), numCalls/2, "Expected most IDs to be unique")
+		})
+	})
+
 }
 
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
