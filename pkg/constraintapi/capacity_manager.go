@@ -11,10 +11,10 @@ import (
 
 type CapacityManager interface {
 	Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError)
-	Lease(ctx context.Context, req *CapacityLeaseRequest) (*CapacityLeaseResponse, errs.UserError, errs.InternalError)
-	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.UserError, errs.InternalError)
-	Commit(ctx context.Context, req *CapacityCommitRequest) (*CapacityCommitResponse, errs.UserError, errs.InternalError)
-	Rollback(ctx context.Context, req *CapacityRollbackRequest) (*CapacityRollbackResponse, errs.UserError, errs.InternalError)
+	Lease(ctx context.Context, req *CapacityLeaseRequest) (*CapacityLeaseResponse, errs.InternalError)
+	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError)
+	Commit(ctx context.Context, req *CapacityCommitRequest) (*CapacityCommitResponse, errs.InternalError)
+	Rollback(ctx context.Context, req *CapacityRollbackRequest) (*CapacityRollbackResponse, errs.InternalError)
 }
 
 type CapacityCheckRequest struct {
