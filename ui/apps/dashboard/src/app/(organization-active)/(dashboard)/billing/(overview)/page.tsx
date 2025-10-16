@@ -226,6 +226,19 @@ export default async function Page() {
               onChange={refetch}
             />
           </ServerFeatureFlag>
+          <ServerFeatureFlag flag="connect-workers" defaultValue={false}>
+            <EntitlementListItem
+              planName={currentPlan.name}
+              title="Connect Workers"
+              description="Maximum number of connect workeres"
+              entitlement={{
+                currentValue: entitlements.connectWorkerConnections.limit,
+                displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
+              }}
+              addon={addons.connectWorkers}
+              onChange={refetch}
+            />
+          </ServerFeatureFlag>
           <EntitlementListItem
             increaseInHigherPlan={false}
             planName={currentPlan.name}
