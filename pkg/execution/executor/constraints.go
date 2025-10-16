@@ -115,7 +115,7 @@ func WithConstraints[T any](
 			lID := *leaseID
 			leaseIDLock.Unlock()
 
-			res, _, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
 				// TODO: Generate idempotency key.
 				IdempotencyKey: "",
 				AccountID:      req.AccountID,
@@ -146,7 +146,7 @@ func WithConstraints[T any](
 		switch action {
 		case ConstraintRollback:
 
-			_, userErr, internalErr := capacityManager.Rollback(ctx, &constraintapi.CapacityRollbackRequest{
+			_, internalErr := capacityManager.Rollback(ctx, &constraintapi.CapacityRollbackRequest{
 				AccountID: req.AccountID,
 				LeaseID:   *checkResult.leaseID,
 				// TODO: Generate idempotency key
@@ -154,13 +154,11 @@ func WithConstraints[T any](
 			})
 			if internalErr != nil {
 				// TODO Handle internal err
+				_ = internalErr
 			}
 
-			if userErr != nil {
-				// TODO handle user err
-			}
 		case ConstraintCommit:
-			_, userErr, internalErr := capacityManager.Commit(ctx, &constraintapi.CapacityCommitRequest{
+			_, internalErr := capacityManager.Commit(ctx, &constraintapi.CapacityCommitRequest{
 				AccountID: req.AccountID,
 				LeaseID:   *checkResult.leaseID,
 				// TODO: Generate idempotency key
@@ -168,12 +166,8 @@ func WithConstraints[T any](
 			})
 			if internalErr != nil {
 				// TODO Handle internal err
+				_ = internalErr
 			}
-
-			if userErr != nil {
-				// TODO handle user err
-			}
-
 		}
 	}
 
@@ -218,7 +212,7 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 			rateLimitKeyExpr = *req.Function.RateLimit.Key
 			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
 			if err != nil {
-				// TODO: Handle error
+				return nil, fmt.Errorf("could not get rate limit key: %w", err)
 			}
 			rateLimitKey = key
 		}
@@ -272,7 +266,7 @@ func CheckConstraints(
 	// TODO: Fetch account concurrency
 	var accountConcurrency int
 
-	res, userErr, internalErr := capacityManager.Lease(ctx, &constraintapi.CapacityLeaseRequest{
+	res, internalErr := capacityManager.Lease(ctx, &constraintapi.CapacityLeaseRequest{
 		AccountID:         req.AccountID,
 		IdempotencyKey:    idempotencyKey,
 		EnvID:             req.WorkspaceID,
@@ -294,17 +288,6 @@ func CheckConstraints(
 			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
-	}
-
-	if userErr != nil {
-		if fallback {
-			// TODO: Log error
-			return checkResult{
-				mustCheck:              true,
-				fallbackIdempotencyKey: res.FallbackIdempotencyKey,
-			}, nil
-		}
-		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", userErr)
 	}
 
 	// TODO: Do we need to add more fine-grained checks here?
