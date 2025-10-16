@@ -336,12 +336,28 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		// Mark as seen.
 		seen[fn.ID] = struct{}{}
 
+		fnExists := false
+		var currentFn *inngest.Function
+		if cqrsFn, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
+			currentFn, err = cqrsFn.InngestFunction()
+			if err != nil {
+				return nil, publicerr.Wrap(err, 500, "Error unmarshalling function config")
+			}
+			if currentFn == nil {
+				return nil, publicerr.Wrap(fmt.Errorf("function config empty"), 500, "Error unmarshalling function config")
+			}
+			fnExists = true
+		}
+
+		if fnExists {
+			fn.FunctionVersion = currentFn.FunctionVersion + 1
+		}
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
+		if fnExists {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,
@@ -362,7 +378,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			CreatedAt: time.Now(),
 		})
 		if err != nil {
-			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+			err = fmt.Errorf("function %s is invalid: %w", fn.Slug, err)
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
 	}
