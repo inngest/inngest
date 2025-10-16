@@ -1,38 +1,33 @@
 'use client';
 
-import type { MutableRefObject } from 'react';
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
-import { getCanRunQuery } from '../utils';
+type ShortcutActions = {
+  onNewTab: () => void;
+  onRun: () => void;
+  onSave: () => void;
+};
 
 export function handleShortcuts(
   editor: Parameters<SQLEditorMountCallback>[0],
   monaco: Parameters<SQLEditorMountCallback>[1],
-  latestQueryRef: MutableRefObject<string>,
-  isRunningRef: MutableRefObject<boolean>,
-  runQuery: () => void
+  actions: ShortcutActions
 ) {
   return editor.onKeyDown((e) => {
     if (hasKeys(e, ['metaOrCtrl', monaco.KeyCode.Enter])) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
-    }
-
-    if (hasKeys(e, ['metaOrCtrl', monaco.KeyCode.KeyS])) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('Insights: Save query (Cmd/Ctrl+Alt+S)');
-      return;
-    }
-
-    if (hasKeys(e, ['metaOrCtrl', 'alt', monaco.KeyCode.KeyT])) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('Insights: New tab (Cmd/Ctrl+Shift+N)');
-      return;
+      doAction(e, actions.onRun);
+    } else if (hasKeys(e, ['metaOrCtrl', 'alt', monaco.KeyCode.KeyS])) {
+      doAction(e, actions.onSave);
+    } else if (hasKeys(e, ['metaOrCtrl', 'alt', monaco.KeyCode.KeyT])) {
+      doAction(e, actions.onNewTab);
     }
   });
+}
+
+function doAction(e: KeyEvent, action: () => void) {
+  e.preventDefault();
+  e.stopPropagation();
+  action();
 }
 
 type EditorInstance = Parameters<SQLEditorMountCallback>[0];
