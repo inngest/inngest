@@ -768,14 +768,18 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
+	status := enums.StepStatusScheduled
 	if req.SkipReason() != enums.SkipReasonNone {
-		status := enums.StepStatusSkipped
-		meta.AddAttr(
-			runSpanOpts.Attributes,
-			meta.Attrs.DynamicStatus,
-			&status,
-		)
+		status = enums.StepStatusSkipped
 	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameRun,
