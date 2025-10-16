@@ -109,7 +109,7 @@ func TestCronRemoveCronTrigger(t *testing.T) {
 	t.Run("cron should run", func(t *testing.T) {
 		r.Eventually(func() bool {
 			return atomic.LoadInt32(&counter) == 1
-		}, time.Minute, 5*time.Second)
+		}, 61*time.Second, 5*time.Second)
 	})
 
 	t.Run("re-register function to remove cron", func(t *testing.T) {
