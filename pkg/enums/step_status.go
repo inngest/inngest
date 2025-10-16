@@ -15,6 +15,7 @@ const (
 	StepStatusErrored
 	StepStatusCancelled
 	StepStatusTimedOut
+	StepStatusSkipped
 )
 
 func (s StepStatus) IsEnded() bool {
