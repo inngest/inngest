@@ -16,7 +16,7 @@ const LAYOUT_STYLES = 'flex flex-1 h-[40px] items-center relative';
 const SIZING_STYLES = 'max-w-[200px] min-w-[84px]';
 const SPACING_STYLES = 'gap-1.5 px-3';
 
-// TODO: Add overflow tooltip functionality similar to approach from Pill component.
+// TODO: Add overflow tooltip functionality similar to approach from Pill component
 
 export interface TabProps
   extends Omit<React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>, 'children'> {
