@@ -16,13 +16,13 @@
   },
   "engines": {
     "node": "20.x",
-    "pnpm": "8.x"
+    "pnpm": "10.x"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@8.15.8",
+  "packageManager": "pnpm@10.18.2",
   "private": true,
   "pnpm": {
     "overrides": {
@@ -81,6 +81,14 @@
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "3.1.2",
       "nodemon>brace-expansion": "1.1.11"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "@clerk/shared",
+      "core-js-pure"
+    ]
   }
 }
