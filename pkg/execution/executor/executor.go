@@ -4302,11 +4302,15 @@ func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool 
 	return !hasPendingSteps || mode == enums.ParallelModeRace
 }
 
+type traceStepsValT struct{}
+
+var traceStepsVal = traceStepsValT{}
+
 func setTraceSteps(ctx context.Context) context.Context {
-	return context.WithValue(ctx, "trace-steps", true)
+	return context.WithValue(ctx, traceStepsVal, true)
 }
 
 func traceSteps(ctx context.Context) bool {
-	ok, _ := ctx.Value("trace-steps").(bool)
+	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
 }
