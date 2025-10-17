@@ -372,7 +372,7 @@ func StepStatusAttr(key string) attr[*enums.StepStatus] {
 			}
 
 			// NOTE: For legacy reasons, we use StepStatusScheduled,
-			// however this must be represented a 'Queued' in traces.
+			// however this must be represented as 'Queued' in traces.
 			if *v == enums.StepStatusScheduled {
 				return attribute.String(withPrefix(key), enums.StepStatusQueued.String())
 			}
