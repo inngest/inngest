@@ -59,7 +59,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	inProcessFlusher := InMemoryFlushProcessor(blockStore).(*flushInProcess)
 
 	// Create manager with our configured flusher and a short flush delay
-	manager := NewManager(mockBufferer, blockStore, inProcessFlusher).(*manager)
+	manager := NewManager(mockBufferer, blockStore, inProcessFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled)).(*manager)
 	manager.flushDelay = 100 * time.Millisecond // Short delay for tests
 
 	// Create test index
@@ -150,7 +150,7 @@ func TestConsumePause(t *testing.T) {
 	mockBlockStore := &mockBlockStore{}
 	mockFlusher := &mockSimpleFlusher{}
 
-	manager := NewManager(mockBufferer, mockBlockStore, mockFlusher)
+	manager := NewManager(mockBufferer, mockBlockStore, mockFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 
 	ctx := context.Background()
 	eventName := "test.event"
@@ -187,6 +187,10 @@ func createTestPauses(count int) []*state.Pause {
 		}
 	}
 	return pauses
+}
+
+func alwaysEnabled(ctx context.Context, id uuid.UUID) bool {
+	return true
 }
 
 // Mock implementations
