@@ -16,12 +16,6 @@ type UseInsightsSQLEditorOnMountCallbackReturn = {
   onMount: SQLEditorMountCallback;
 };
 
-export type SQLShortcutActions = {
-  onRun: () => void;
-  onSave: () => void;
-  onNewTab: () => void;
-};
-
 export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMountCallbackReturn {
   const { query, runQuery, status } = useInsightsStateMachineContext();
   const { saveQuery } = useStoredQueries();
