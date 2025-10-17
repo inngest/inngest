@@ -533,7 +533,7 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 	return &CapacityCheckResponse{}
 }
 
-func CapacityLeaseRequestToProto(req *CapacityLeaseRequest) *pb.CapacityLeaseRequest {
+func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcquireRequest {
 	if req == nil {
 		return nil
 	}
@@ -543,7 +543,7 @@ func CapacityLeaseRequestToProto(req *CapacityLeaseRequest) *pb.CapacityLeaseReq
 		requestedCapacity[i] = ConstraintCapacityItemToProto(item)
 	}
 
-	return &pb.CapacityLeaseRequest{
+	return &pb.CapacityAcquireRequest{
 		IdempotencyKey:    req.IdempotencyKey,
 		AccountId:         req.AccountID.String(),
 		EnvId:             req.EnvID.String(),
@@ -558,7 +558,7 @@ func CapacityLeaseRequestToProto(req *CapacityLeaseRequest) *pb.CapacityLeaseReq
 	}
 }
 
-func CapacityLeaseRequestFromProto(pbReq *pb.CapacityLeaseRequest) (*CapacityLeaseRequest, error) {
+func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*CapacityAcquireRequest, error) {
 	if pbReq == nil {
 		return nil, nil
 	}
@@ -603,7 +603,7 @@ func CapacityLeaseRequestFromProto(pbReq *pb.CapacityLeaseRequest) (*CapacityLea
 		blockingThreshold = pbReq.BlockingThreshold.AsDuration()
 	}
 
-	return &CapacityLeaseRequest{
+	return &CapacityAcquireRequest{
 		IdempotencyKey:    pbReq.IdempotencyKey,
 		AccountID:         accountID,
 		EnvID:             envID,
@@ -618,7 +618,7 @@ func CapacityLeaseRequestFromProto(pbReq *pb.CapacityLeaseRequest) (*CapacityLea
 	}, nil
 }
 
-func CapacityLeaseResponseToProto(resp *CapacityLeaseResponse) *pb.CapacityLeaseResponse {
+func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityAcquireResponse {
 	if resp == nil {
 		return nil
 	}
@@ -639,7 +639,7 @@ func CapacityLeaseResponseToProto(resp *CapacityLeaseResponse) *pb.CapacityLease
 		leaseID = &s
 	}
 
-	return &pb.CapacityLeaseResponse{
+	return &pb.CapacityAcquireResponse{
 		LeaseId:              leaseID,
 		ReservedCapacity:     reservedCapacity,
 		InsufficientCapacity: insufficientCapacity,
@@ -647,7 +647,7 @@ func CapacityLeaseResponseToProto(resp *CapacityLeaseResponse) *pb.CapacityLease
 	}
 }
 
-func CapacityLeaseResponseFromProto(pbResp *pb.CapacityLeaseResponse) (*CapacityLeaseResponse, error) {
+func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*CapacityAcquireResponse, error) {
 	if pbResp == nil {
 		return nil, nil
 	}
@@ -676,7 +676,7 @@ func CapacityLeaseResponseFromProto(pbResp *pb.CapacityLeaseResponse) (*Capacity
 		retryAfter = pbResp.RetryAfter.AsTime()
 	}
 
-	return &CapacityLeaseResponse{
+	return &CapacityAcquireResponse{
 		LeaseID:              leaseID,
 		ReservedCapacity:     reservedCapacity,
 		InsufficientCapacity: insufficientCapacity,
@@ -759,18 +759,18 @@ func CapacityExtendLeaseResponseFromProto(pbResp *pb.CapacityExtendLeaseResponse
 	}, nil
 }
 
-func CapacityCommitRequestToProto(req *CapacityCommitRequest) *pb.CapacityCommitRequest {
+func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityReleaseRequest {
 	if req == nil {
 		return nil
 	}
-	return &pb.CapacityCommitRequest{
+	return &pb.CapacityReleaseRequest{
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 	}
 }
 
-func CapacityCommitRequestFromProto(pbReq *pb.CapacityCommitRequest) (*CapacityCommitRequest, error) {
+func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*CapacityReleaseRequest, error) {
 	if pbReq == nil {
 		return nil, nil
 	}
@@ -785,70 +785,24 @@ func CapacityCommitRequestFromProto(pbReq *pb.CapacityCommitRequest) (*CapacityC
 		return nil, fmt.Errorf("invalid lease ID: %w", err)
 	}
 
-	return &CapacityCommitRequest{
+	return &CapacityReleaseRequest{
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 	}, nil
 }
 
-func CapacityCommitResponseToProto(resp *CapacityCommitResponse) *pb.CapacityCommitResponse {
+func CapacityReleaseResponseToProto(resp *CapacityReleaseResponse) *pb.CapacityReleaseResponse {
 	if resp == nil {
 		return nil
 	}
-	return &pb.CapacityCommitResponse{}
+	return &pb.CapacityReleaseResponse{}
 }
 
-func CapacityCommitResponseFromProto(pbResp *pb.CapacityCommitResponse) *CapacityCommitResponse {
+func CapacityReleaseResponseFromProto(pbResp *pb.CapacityReleaseResponse) *CapacityReleaseResponse {
 	if pbResp == nil {
 		return nil
 	}
-	return &CapacityCommitResponse{}
+	return &CapacityReleaseResponse{}
 }
 
-func CapacityRollbackRequestToProto(req *CapacityRollbackRequest) *pb.CapacityRollbackRequest {
-	if req == nil {
-		return nil
-	}
-	return &pb.CapacityRollbackRequest{
-		IdempotencyKey: req.IdempotencyKey,
-		AccountId:      req.AccountID.String(),
-		LeaseId:        req.LeaseID.String(),
-	}
-}
-
-func CapacityRollbackRequestFromProto(pbReq *pb.CapacityRollbackRequest) (*CapacityRollbackRequest, error) {
-	if pbReq == nil {
-		return nil, nil
-	}
-
-	accountID, err := uuid.Parse(pbReq.AccountId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid account ID: %w", err)
-	}
-
-	leaseID, err := ulid.Parse(pbReq.LeaseId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid lease ID: %w", err)
-	}
-
-	return &CapacityRollbackRequest{
-		IdempotencyKey: pbReq.IdempotencyKey,
-		AccountID:      accountID,
-		LeaseID:        leaseID,
-	}, nil
-}
-
-func CapacityRollbackResponseToProto(resp *CapacityRollbackResponse) *pb.CapacityRollbackResponse {
-	if resp == nil {
-		return nil
-	}
-	return &pb.CapacityRollbackResponse{}
-}
-
-func CapacityRollbackResponseFromProto(pbResp *pb.CapacityRollbackResponse) *CapacityRollbackResponse {
-	if pbResp == nil {
-		return nil
-	}
-	return &CapacityRollbackResponse{}
-}

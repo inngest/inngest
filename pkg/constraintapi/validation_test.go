@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCapacityLeaseRequestValid(t *testing.T) {
+func TestCapacityAcquireRequestValid(t *testing.T) {
 	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	accountID := uuid.New()
 	envID := uuid.New()
@@ -17,13 +17,13 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request CapacityLeaseRequest
+		request CapacityAcquireRequest
 		wantErr bool
 		errMsgs []string
 	}{
 		{
 			name: "valid request",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -49,7 +49,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -76,7 +76,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing account ID",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      uuid.Nil,
 				EnvID:          envID,
@@ -103,7 +103,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing env ID",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          uuid.Nil,
@@ -130,7 +130,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing function ID",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -157,7 +157,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing constraint config function version",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -184,7 +184,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing current time",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -211,7 +211,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing duration",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -238,7 +238,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing maximum lifetime",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -265,7 +265,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing source service",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -292,7 +292,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing source location",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -319,7 +319,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "missing requested capacity",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -341,7 +341,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "multiple validation errors",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "",
 				AccountID:      uuid.Nil,
 				EnvID:          uuid.Nil,
@@ -375,7 +375,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 		},
 		{
 			name: "valid with blocking threshold (not required)",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -418,7 +418,7 @@ func TestCapacityLeaseRequestValid(t *testing.T) {
 	}
 }
 
-func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
+func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	accountID := uuid.New()
 	envID := uuid.New()
@@ -427,13 +427,13 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request CapacityLeaseRequest
+		request CapacityAcquireRequest
 		wantErr bool
 		errMsgs []string
 	}{
 		{
 			name: "very small positive values are valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -459,7 +459,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "large positive values are valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -485,7 +485,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "negative duration is invalid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -512,7 +512,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "negative maximum lifetime is invalid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -539,7 +539,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "whitespace only idempotency key is invalid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "   ",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -565,7 +565,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "all known service types are valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -591,7 +591,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "all known location types are valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -617,7 +617,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "partition lease location is valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -643,7 +643,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 		},
 		{
 			name: "API service is valid",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -685,7 +685,7 @@ func TestCapacityLeaseRequestValidEdgeCases(t *testing.T) {
 	}
 }
 
-func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
+func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	accountID := uuid.New()
 	envID := uuid.New()
@@ -694,13 +694,13 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request CapacityLeaseRequest
+		request CapacityAcquireRequest
 		wantErr bool
 		errMsgs []string
 	}{
 		{
 			name: "minimum time value",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -726,7 +726,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 		},
 		{
 			name: "maximum duration value",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -752,7 +752,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 		},
 		{
 			name: "far future time",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -778,7 +778,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 		},
 		{
 			name: "very long idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: string(make([]byte, 10000)), // Very long key
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -804,7 +804,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 		},
 		{
 			name: "single character idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "a",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -830,7 +830,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 		},
 		{
 			name: "maximum function version",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -872,7 +872,7 @@ func TestCapacityLeaseRequestValidBoundaryConditions(t *testing.T) {
 	}
 }
 
-func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
+func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	accountID := uuid.New()
 	envID := uuid.New()
@@ -881,13 +881,13 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request CapacityLeaseRequest
+		request CapacityAcquireRequest
 		wantErr bool
 		errMsgs []string
 	}{
 		{
 			name: "unicode characters in idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "测试-key-🚀",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -907,7 +907,7 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 		},
 		{
 			name: "special characters in idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "!@#$%^&*()_+-=[]{}|;':\",./<>?",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -933,7 +933,7 @@ func TestCapacityLeaseRequestValidSpecialCharacters(t *testing.T) {
 		},
 		{
 			name: "newlines and tabs in idempotency key",
-			request: CapacityLeaseRequest{
+			request: CapacityAcquireRequest{
 				IdempotencyKey: "key\nwith\ttabs\rand\nnewlines",
 				AccountID:      accountID,
 				EnvID:          envID,

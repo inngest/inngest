@@ -987,7 +987,7 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 	}
 }
 
-func TestCapacityLeaseRequestConversion(t *testing.T) {
+func TestCapacityAcquireRequestConversion(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
 	functionID := uuid.New()
@@ -996,12 +996,12 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    *CapacityLeaseRequest
-		expected *pb.CapacityLeaseRequest
+		input    *CapacityAcquireRequest
+		expected *pb.CapacityAcquireRequest
 	}{
 		{
 			name: "complete request",
-			input: &CapacityLeaseRequest{
+			input: &CapacityAcquireRequest{
 				IdempotencyKey: "test-key-123",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -1037,7 +1037,7 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 					RunProcessingMode: RunProcessingModeBackground,
 				},
 			},
-			expected: &pb.CapacityLeaseRequest{
+			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "test-key-123",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
@@ -1076,7 +1076,7 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 		},
 		{
 			name: "minimal request",
-			input: &CapacityLeaseRequest{
+			input: &CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
 				AccountID:      accountID,
 				EnvID:          envID,
@@ -1090,7 +1090,7 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 				},
 				RequestedCapacity: []ConstraintCapacityItem{},
 			},
-			expected: &pb.CapacityLeaseRequest{
+			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
 				AccountId:      accountID.String(),
 				EnvId:          envID.String(),
@@ -1124,12 +1124,12 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityLeaseRequestToProto(tt.input)
+			result := CapacityAcquireRequestToProto(tt.input)
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip (but skip minimal test due to enum zero values vs Go defaults)
 			if tt.input != nil && tt.name != "minimal request" {
-				backConverted, err := CapacityLeaseRequestFromProto(result)
+				backConverted, err := CapacityAcquireRequestFromProto(result)
 				require.NoError(t, err)
 				assert.Equal(t, tt.input, backConverted)
 			}
@@ -1138,47 +1138,47 @@ func TestCapacityLeaseRequestConversion(t *testing.T) {
 
 	// Test invalid UUIDs
 	t.Run("invalid account ID", func(t *testing.T) {
-		pbReq := &pb.CapacityLeaseRequest{
+		pbReq := &pb.CapacityAcquireRequest{
 			AccountId:  "invalid-uuid",
 			EnvId:      envID.String(),
 			FunctionId: functionID.String(),
 		}
-		_, err := CapacityLeaseRequestFromProto(pbReq)
+		_, err := CapacityAcquireRequestFromProto(pbReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid account ID")
 	})
 
 	t.Run("invalid env ID", func(t *testing.T) {
-		pbReq := &pb.CapacityLeaseRequest{
+		pbReq := &pb.CapacityAcquireRequest{
 			AccountId:  accountID.String(),
 			EnvId:      "invalid-uuid",
 			FunctionId: functionID.String(),
 		}
-		_, err := CapacityLeaseRequestFromProto(pbReq)
+		_, err := CapacityAcquireRequestFromProto(pbReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid env ID")
 	})
 
 	t.Run("invalid function ID", func(t *testing.T) {
-		pbReq := &pb.CapacityLeaseRequest{
+		pbReq := &pb.CapacityAcquireRequest{
 			AccountId:  accountID.String(),
 			EnvId:      envID.String(),
 			FunctionId: "invalid-uuid",
 		}
-		_, err := CapacityLeaseRequestFromProto(pbReq)
+		_, err := CapacityAcquireRequestFromProto(pbReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid function ID")
 	})
 
 	// Test nil protobuf
 	t.Run("nil protobuf", func(t *testing.T) {
-		result, err := CapacityLeaseRequestFromProto(nil)
+		result, err := CapacityAcquireRequestFromProto(nil)
 		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 }
 
-func TestCapacityLeaseResponseConversion(t *testing.T) {
+func TestCapacityAcquireResponseConversion(t *testing.T) {
 	leaseID := ulid.Make()
 	retryAfter := time.Date(2023, 10, 15, 13, 0, 0, 0, time.UTC)
 	kindRateLimit := CapacityKindRateLimit
@@ -1186,12 +1186,12 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    *CapacityLeaseResponse
-		expected *pb.CapacityLeaseResponse
+		input    *CapacityAcquireResponse
+		expected *pb.CapacityAcquireResponse
 	}{
 		{
 			name: "complete response with lease",
-			input: &CapacityLeaseResponse{
+			input: &CapacityAcquireResponse{
 				LeaseID: &leaseID,
 				ReservedCapacity: []ConstraintCapacityItem{
 					{
@@ -1207,7 +1207,7 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 				},
 				RetryAfter: retryAfter,
 			},
-			expected: &pb.CapacityLeaseResponse{
+			expected: &pb.CapacityAcquireResponse{
 				LeaseId: func() *string { s := leaseID.String(); return &s }(),
 				ReservedCapacity: []*pb.ConstraintCapacityItem{
 					{
@@ -1226,13 +1226,13 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 		},
 		{
 			name: "response without lease",
-			input: &CapacityLeaseResponse{
+			input: &CapacityAcquireResponse{
 				LeaseID:              nil,
 				ReservedCapacity:     []ConstraintCapacityItem{},
 				InsufficientCapacity: []ConstraintCapacityItem{},
 				RetryAfter:           time.Time{},
 			},
-			expected: &pb.CapacityLeaseResponse{
+			expected: &pb.CapacityAcquireResponse{
 				LeaseId:              nil,
 				ReservedCapacity:     []*pb.ConstraintCapacityItem{},
 				InsufficientCapacity: []*pb.ConstraintCapacityItem{},
@@ -1248,7 +1248,7 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityLeaseResponseToProto(tt.input)
+			result := CapacityAcquireResponseToProto(tt.input)
 
 			// Special handling for the lease ID string pointer comparison
 			if tt.expected != nil && tt.expected.LeaseId != nil {
@@ -1260,7 +1260,7 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 
 			// Test round trip
 			if tt.input != nil {
-				backConverted, err := CapacityLeaseResponseFromProto(result)
+				backConverted, err := CapacityAcquireResponseFromProto(result)
 				require.NoError(t, err)
 				assert.Equal(t, tt.input, backConverted)
 			}
@@ -1270,17 +1270,17 @@ func TestCapacityLeaseResponseConversion(t *testing.T) {
 	// Test invalid ULID
 	t.Run("invalid lease ID", func(t *testing.T) {
 		invalidID := "invalid-ulid"
-		pbResp := &pb.CapacityLeaseResponse{
+		pbResp := &pb.CapacityAcquireResponse{
 			LeaseId: &invalidID,
 		}
-		_, err := CapacityLeaseResponseFromProto(pbResp)
+		_, err := CapacityAcquireResponseFromProto(pbResp)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid lease ID")
 	})
 
 	// Test nil protobuf
 	t.Run("nil protobuf", func(t *testing.T) {
-		result, err := CapacityLeaseResponseFromProto(nil)
+		result, err := CapacityAcquireResponseFromProto(nil)
 		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
@@ -1401,23 +1401,23 @@ func TestCapacityExtendLeaseResponseConversion(t *testing.T) {
 	}
 }
 
-func TestCapacityCommitRequestConversion(t *testing.T) {
+func TestCapacityReleaseRequestConversion(t *testing.T) {
 	accountID := uuid.New()
 	leaseID := ulid.Make()
 
 	tests := []struct {
 		name     string
-		input    *CapacityCommitRequest
-		expected *pb.CapacityCommitRequest
+		input    *CapacityReleaseRequest
+		expected *pb.CapacityReleaseRequest
 	}{
 		{
 			name: "valid request",
-			input: &CapacityCommitRequest{
+			input: &CapacityReleaseRequest{
 				IdempotencyKey: "commit-key",
 				AccountID:      accountID,
 				LeaseID:        leaseID,
 			},
-			expected: &pb.CapacityCommitRequest{
+			expected: &pb.CapacityReleaseRequest{
 				IdempotencyKey: "commit-key",
 				AccountId:      accountID.String(),
 				LeaseId:        leaseID.String(),
@@ -1432,12 +1432,12 @@ func TestCapacityCommitRequestConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityCommitRequestToProto(tt.input)
+			result := CapacityReleaseRequestToProto(tt.input)
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip
 			if tt.input != nil {
-				backConverted, err := CapacityCommitRequestFromProto(result)
+				backConverted, err := CapacityReleaseRequestFromProto(result)
 				require.NoError(t, err)
 				assert.Equal(t, tt.input, backConverted)
 			}
@@ -1445,16 +1445,16 @@ func TestCapacityCommitRequestConversion(t *testing.T) {
 	}
 }
 
-func TestCapacityCommitResponseConversion(t *testing.T) {
+func TestCapacityReleaseResponseConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    *CapacityCommitResponse
-		expected *pb.CapacityCommitResponse
+		input    *CapacityReleaseResponse
+		expected *pb.CapacityReleaseResponse
 	}{
 		{
 			name:     "valid response",
-			input:    &CapacityCommitResponse{},
-			expected: &pb.CapacityCommitResponse{},
+			input:    &CapacityReleaseResponse{},
+			expected: &pb.CapacityReleaseResponse{},
 		},
 		{
 			name:     "nil response",
@@ -1465,89 +1465,16 @@ func TestCapacityCommitResponseConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityCommitResponseToProto(tt.input)
+			result := CapacityReleaseResponseToProto(tt.input)
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip
-			backConverted := CapacityCommitResponseFromProto(result)
+			backConverted := CapacityReleaseResponseFromProto(result)
 			assert.Equal(t, tt.input, backConverted)
 		})
 	}
 }
 
-func TestCapacityRollbackRequestConversion(t *testing.T) {
-	accountID := uuid.New()
-	leaseID := ulid.Make()
-
-	tests := []struct {
-		name     string
-		input    *CapacityRollbackRequest
-		expected *pb.CapacityRollbackRequest
-	}{
-		{
-			name: "valid request",
-			input: &CapacityRollbackRequest{
-				IdempotencyKey: "rollback-key",
-				AccountID:      accountID,
-				LeaseID:        leaseID,
-			},
-			expected: &pb.CapacityRollbackRequest{
-				IdempotencyKey: "rollback-key",
-				AccountId:      accountID.String(),
-				LeaseId:        leaseID.String(),
-			},
-		},
-		{
-			name:     "nil request",
-			input:    nil,
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityRollbackRequestToProto(tt.input)
-			assert.Equal(t, tt.expected, result)
-
-			// Test round trip
-			if tt.input != nil {
-				backConverted, err := CapacityRollbackRequestFromProto(result)
-				require.NoError(t, err)
-				assert.Equal(t, tt.input, backConverted)
-			}
-		})
-	}
-}
-
-func TestCapacityRollbackResponseConversion(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    *CapacityRollbackResponse
-		expected *pb.CapacityRollbackResponse
-	}{
-		{
-			name:     "valid response",
-			input:    &CapacityRollbackResponse{},
-			expected: &pb.CapacityRollbackResponse{},
-		},
-		{
-			name:     "nil response",
-			input:    nil,
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CapacityRollbackResponseToProto(tt.input)
-			assert.Equal(t, tt.expected, result)
-
-			// Test round trip
-			backConverted := CapacityRollbackResponseFromProto(result)
-			assert.Equal(t, tt.input, backConverted)
-		})
-	}
-}
 
 // Round-trip tests to ensure no data loss
 func TestRoundTripConversions(t *testing.T) {
@@ -1594,14 +1521,14 @@ func TestRoundTripConversions(t *testing.T) {
 		assert.Equal(t, original, result)
 	})
 
-	t.Run("CapacityLeaseRequest round trip", func(t *testing.T) {
+	t.Run("CapacityAcquireRequest round trip", func(t *testing.T) {
 		accountID := uuid.New()
 		envID := uuid.New()
 		functionID := uuid.New()
 		currentTime := time.Date(2023, 10, 15, 12, 30, 45, 123456789, time.UTC)
 		kindConcurrency := CapacityKindConcurrency
 
-		original := &CapacityLeaseRequest{
+		original := &CapacityAcquireRequest{
 			IdempotencyKey: "test-key-123",
 			AccountID:      accountID,
 			EnvID:          envID,
@@ -1632,8 +1559,8 @@ func TestRoundTripConversions(t *testing.T) {
 		}
 
 		// Convert to protobuf and back
-		pbRequest := CapacityLeaseRequestToProto(original)
-		result, err := CapacityLeaseRequestFromProto(pbRequest)
+		pbRequest := CapacityAcquireRequestToProto(original)
+		result, err := CapacityAcquireRequestFromProto(pbRequest)
 		require.NoError(t, err)
 
 		// Note: protobuf timestamp precision may be different, so we compare the Unix timestamp

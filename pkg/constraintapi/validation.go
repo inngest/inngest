@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-func (r *CapacityLeaseRequest) Valid() error {
+func (r *CapacityAcquireRequest) Valid() error {
 	var errs error
 
 	if r.IdempotencyKey == "" {
