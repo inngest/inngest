@@ -8,6 +8,7 @@ import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import { getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
 import type { Tab } from '../types';
+import { useDocumentShortcuts } from './actions/handleShortcuts';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
   tab: Tab;
@@ -20,6 +21,17 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const isSaved = getIsSavedQuery(tab);
   const disabled = tab.name === '' || tab.query === '' || isSaving;
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
+
+  useDocumentShortcuts({
+    combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
+    handler: () => {
+      if (disabled) return;
+      setIsSaving(true);
+      saveQuery(tab).finally(() => {
+        setIsSaving(false);
+      });
+    },
+  });
 
   return (
     <Button
