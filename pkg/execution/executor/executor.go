@@ -28,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -369,15 +370,11 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
-	queue               queue.Queue
-	debouncer           debounce.Debouncer
-	batcher             batch.BatchManager
-	singletonMgr        singleton.Singleton
-	rateLimiter         ratelimit.RateLimiter
 	queue        queue.Queue
 	debouncer    debounce.Debouncer
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
+	rateLimiter  ratelimit.RateLimiter
 
 	capacityManager  constraintapi.CapacityManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
@@ -628,6 +625,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			if performChecks {
 				// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
 				_ = fallbackIdempotencyKey
+
+				// Attempt to rate-limit the incoming function.
+				if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+					evtMap := req.Events[0].GetEvent().Map()
+					key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+					switch err {
+					case nil:
+						limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+						if err != nil {
+							return nil, ConstraintRollback, fmt.Errorf("could not check rate limit: %w", err)
+						}
+
+						if limited {
+							// Do nothing.
+							return nil, ConstraintRollback, ErrFunctionRateLimited
+						}
+					case ratelimit.ErrNotRateLimited:
+						// no-op: proceed with function run as usual
+					default:
+						return nil, ConstraintRollback, fmt.Errorf("could not evaluate rate limit: %w", err)
+					}
+				}
 			}
 
 			// NOTE: From this point, we are guaranteed to operate within user constraints.
