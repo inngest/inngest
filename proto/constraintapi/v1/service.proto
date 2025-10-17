@@ -141,7 +141,7 @@ message CapacityCheckRequest {
 message CapacityCheckResponse {
 }
 
-message CapacityLeaseRequest {
+message CapacityAcquireRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string env_id = 3;
@@ -155,7 +155,7 @@ message CapacityLeaseRequest {
   LeaseSource source = 11;
 }
 
-message CapacityLeaseResponse {
+message CapacityAcquireResponse {
   optional string lease_id = 1;
   repeated ConstraintCapacityItem reserved_capacity = 2;
   repeated ConstraintCapacityItem insufficient_capacity = 3;
@@ -173,29 +173,20 @@ message CapacityExtendLeaseResponse {
   optional string lease_id = 1;
 }
 
-message CapacityCommitRequest {
+message CapacityReleaseRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string lease_id = 3;
 }
 
-message CapacityCommitResponse {
+message CapacityReleaseResponse {
 }
 
-message CapacityRollbackRequest {
-  string idempotency_key = 1;
-  string account_id = 2;
-  string lease_id = 3;
-}
-
-message CapacityRollbackResponse {
-}
 
 service ConstraintAPI {
   rpc Check(CapacityCheckRequest) returns (CapacityCheckResponse);
-  rpc Lease(CapacityLeaseRequest) returns (CapacityLeaseResponse);
+  rpc Acquire(CapacityAcquireRequest) returns (CapacityAcquireResponse);
   rpc ExtendLease(CapacityExtendLeaseRequest) returns (CapacityExtendLeaseResponse);
-  rpc Commit(CapacityCommitRequest) returns (CapacityCommitResponse);
-  rpc Rollback(CapacityRollbackRequest) returns (CapacityRollbackResponse);
+  rpc Release(CapacityReleaseRequest) returns (CapacityReleaseResponse);
 }
 

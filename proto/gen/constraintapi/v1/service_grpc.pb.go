@@ -20,10 +20,9 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ConstraintAPI_Check_FullMethodName       = "/constraintapi.v1.ConstraintAPI/Check"
-	ConstraintAPI_Lease_FullMethodName       = "/constraintapi.v1.ConstraintAPI/Lease"
+	ConstraintAPI_Acquire_FullMethodName     = "/constraintapi.v1.ConstraintAPI/Acquire"
 	ConstraintAPI_ExtendLease_FullMethodName = "/constraintapi.v1.ConstraintAPI/ExtendLease"
-	ConstraintAPI_Commit_FullMethodName      = "/constraintapi.v1.ConstraintAPI/Commit"
-	ConstraintAPI_Rollback_FullMethodName    = "/constraintapi.v1.ConstraintAPI/Rollback"
+	ConstraintAPI_Release_FullMethodName     = "/constraintapi.v1.ConstraintAPI/Release"
 )
 
 // ConstraintAPIClient is the client API for ConstraintAPI service.
@@ -31,10 +30,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConstraintAPIClient interface {
 	Check(ctx context.Context, in *CapacityCheckRequest, opts ...grpc.CallOption) (*CapacityCheckResponse, error)
-	Lease(ctx context.Context, in *CapacityLeaseRequest, opts ...grpc.CallOption) (*CapacityLeaseResponse, error)
+	Acquire(ctx context.Context, in *CapacityAcquireRequest, opts ...grpc.CallOption) (*CapacityAcquireResponse, error)
 	ExtendLease(ctx context.Context, in *CapacityExtendLeaseRequest, opts ...grpc.CallOption) (*CapacityExtendLeaseResponse, error)
-	Commit(ctx context.Context, in *CapacityCommitRequest, opts ...grpc.CallOption) (*CapacityCommitResponse, error)
-	Rollback(ctx context.Context, in *CapacityRollbackRequest, opts ...grpc.CallOption) (*CapacityRollbackResponse, error)
+	Release(ctx context.Context, in *CapacityReleaseRequest, opts ...grpc.CallOption) (*CapacityReleaseResponse, error)
 }
 
 type constraintAPIClient struct {
@@ -55,10 +53,10 @@ func (c *constraintAPIClient) Check(ctx context.Context, in *CapacityCheckReques
 	return out, nil
 }
 
-func (c *constraintAPIClient) Lease(ctx context.Context, in *CapacityLeaseRequest, opts ...grpc.CallOption) (*CapacityLeaseResponse, error) {
+func (c *constraintAPIClient) Acquire(ctx context.Context, in *CapacityAcquireRequest, opts ...grpc.CallOption) (*CapacityAcquireResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CapacityLeaseResponse)
-	err := c.cc.Invoke(ctx, ConstraintAPI_Lease_FullMethodName, in, out, cOpts...)
+	out := new(CapacityAcquireResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_Acquire_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,20 +73,10 @@ func (c *constraintAPIClient) ExtendLease(ctx context.Context, in *CapacityExten
 	return out, nil
 }
 
-func (c *constraintAPIClient) Commit(ctx context.Context, in *CapacityCommitRequest, opts ...grpc.CallOption) (*CapacityCommitResponse, error) {
+func (c *constraintAPIClient) Release(ctx context.Context, in *CapacityReleaseRequest, opts ...grpc.CallOption) (*CapacityReleaseResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CapacityCommitResponse)
-	err := c.cc.Invoke(ctx, ConstraintAPI_Commit_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *constraintAPIClient) Rollback(ctx context.Context, in *CapacityRollbackRequest, opts ...grpc.CallOption) (*CapacityRollbackResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CapacityRollbackResponse)
-	err := c.cc.Invoke(ctx, ConstraintAPI_Rollback_FullMethodName, in, out, cOpts...)
+	out := new(CapacityReleaseResponse)
+	err := c.cc.Invoke(ctx, ConstraintAPI_Release_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +88,9 @@ func (c *constraintAPIClient) Rollback(ctx context.Context, in *CapacityRollback
 // for forward compatibility.
 type ConstraintAPIServer interface {
 	Check(context.Context, *CapacityCheckRequest) (*CapacityCheckResponse, error)
-	Lease(context.Context, *CapacityLeaseRequest) (*CapacityLeaseResponse, error)
+	Acquire(context.Context, *CapacityAcquireRequest) (*CapacityAcquireResponse, error)
 	ExtendLease(context.Context, *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, error)
-	Commit(context.Context, *CapacityCommitRequest) (*CapacityCommitResponse, error)
-	Rollback(context.Context, *CapacityRollbackRequest) (*CapacityRollbackResponse, error)
+	Release(context.Context, *CapacityReleaseRequest) (*CapacityReleaseResponse, error)
 	mustEmbedUnimplementedConstraintAPIServer()
 }
 
@@ -117,17 +104,14 @@ type UnimplementedConstraintAPIServer struct{}
 func (UnimplementedConstraintAPIServer) Check(context.Context, *CapacityCheckRequest) (*CapacityCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
 }
-func (UnimplementedConstraintAPIServer) Lease(context.Context, *CapacityLeaseRequest) (*CapacityLeaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Lease not implemented")
+func (UnimplementedConstraintAPIServer) Acquire(context.Context, *CapacityAcquireRequest) (*CapacityAcquireResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Acquire not implemented")
 }
 func (UnimplementedConstraintAPIServer) ExtendLease(context.Context, *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExtendLease not implemented")
 }
-func (UnimplementedConstraintAPIServer) Commit(context.Context, *CapacityCommitRequest) (*CapacityCommitResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
-}
-func (UnimplementedConstraintAPIServer) Rollback(context.Context, *CapacityRollbackRequest) (*CapacityRollbackResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Rollback not implemented")
+func (UnimplementedConstraintAPIServer) Release(context.Context, *CapacityReleaseRequest) (*CapacityReleaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Release not implemented")
 }
 func (UnimplementedConstraintAPIServer) mustEmbedUnimplementedConstraintAPIServer() {}
 func (UnimplementedConstraintAPIServer) testEmbeddedByValue()                       {}
@@ -168,20 +152,20 @@ func _ConstraintAPI_Check_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConstraintAPI_Lease_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CapacityLeaseRequest)
+func _ConstraintAPI_Acquire_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CapacityAcquireRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConstraintAPIServer).Lease(ctx, in)
+		return srv.(ConstraintAPIServer).Acquire(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConstraintAPI_Lease_FullMethodName,
+		FullMethod: ConstraintAPI_Acquire_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConstraintAPIServer).Lease(ctx, req.(*CapacityLeaseRequest))
+		return srv.(ConstraintAPIServer).Acquire(ctx, req.(*CapacityAcquireRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -204,38 +188,20 @@ func _ConstraintAPI_ExtendLease_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ConstraintAPI_Commit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CapacityCommitRequest)
+func _ConstraintAPI_Release_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CapacityReleaseRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ConstraintAPIServer).Commit(ctx, in)
+		return srv.(ConstraintAPIServer).Release(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ConstraintAPI_Commit_FullMethodName,
+		FullMethod: ConstraintAPI_Release_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConstraintAPIServer).Commit(ctx, req.(*CapacityCommitRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ConstraintAPI_Rollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CapacityRollbackRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ConstraintAPIServer).Rollback(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ConstraintAPI_Rollback_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ConstraintAPIServer).Rollback(ctx, req.(*CapacityRollbackRequest))
+		return srv.(ConstraintAPIServer).Release(ctx, req.(*CapacityReleaseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -252,20 +218,16 @@ var ConstraintAPI_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ConstraintAPI_Check_Handler,
 		},
 		{
-			MethodName: "Lease",
-			Handler:    _ConstraintAPI_Lease_Handler,
+			MethodName: "Acquire",
+			Handler:    _ConstraintAPI_Acquire_Handler,
 		},
 		{
 			MethodName: "ExtendLease",
 			Handler:    _ConstraintAPI_ExtendLease_Handler,
 		},
 		{
-			MethodName: "Commit",
-			Handler:    _ConstraintAPI_Commit_Handler,
-		},
-		{
-			MethodName: "Rollback",
-			Handler:    _ConstraintAPI_Rollback_Handler,
+			MethodName: "Release",
+			Handler:    _ConstraintAPI_Release_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -35,24 +35,21 @@ const (
 const (
 	// ConstraintAPICheckProcedure is the fully-qualified name of the ConstraintAPI's Check RPC.
 	ConstraintAPICheckProcedure = "/constraintapi.v1.ConstraintAPI/Check"
-	// ConstraintAPILeaseProcedure is the fully-qualified name of the ConstraintAPI's Lease RPC.
-	ConstraintAPILeaseProcedure = "/constraintapi.v1.ConstraintAPI/Lease"
+	// ConstraintAPIAcquireProcedure is the fully-qualified name of the ConstraintAPI's Acquire RPC.
+	ConstraintAPIAcquireProcedure = "/constraintapi.v1.ConstraintAPI/Acquire"
 	// ConstraintAPIExtendLeaseProcedure is the fully-qualified name of the ConstraintAPI's ExtendLease
 	// RPC.
 	ConstraintAPIExtendLeaseProcedure = "/constraintapi.v1.ConstraintAPI/ExtendLease"
-	// ConstraintAPICommitProcedure is the fully-qualified name of the ConstraintAPI's Commit RPC.
-	ConstraintAPICommitProcedure = "/constraintapi.v1.ConstraintAPI/Commit"
-	// ConstraintAPIRollbackProcedure is the fully-qualified name of the ConstraintAPI's Rollback RPC.
-	ConstraintAPIRollbackProcedure = "/constraintapi.v1.ConstraintAPI/Rollback"
+	// ConstraintAPIReleaseProcedure is the fully-qualified name of the ConstraintAPI's Release RPC.
+	ConstraintAPIReleaseProcedure = "/constraintapi.v1.ConstraintAPI/Release"
 )
 
 // ConstraintAPIClient is a client for the constraintapi.v1.ConstraintAPI service.
 type ConstraintAPIClient interface {
 	Check(context.Context, *connect.Request[v1.CapacityCheckRequest]) (*connect.Response[v1.CapacityCheckResponse], error)
-	Lease(context.Context, *connect.Request[v1.CapacityLeaseRequest]) (*connect.Response[v1.CapacityLeaseResponse], error)
+	Acquire(context.Context, *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error)
 	ExtendLease(context.Context, *connect.Request[v1.CapacityExtendLeaseRequest]) (*connect.Response[v1.CapacityExtendLeaseResponse], error)
-	Commit(context.Context, *connect.Request[v1.CapacityCommitRequest]) (*connect.Response[v1.CapacityCommitResponse], error)
-	Rollback(context.Context, *connect.Request[v1.CapacityRollbackRequest]) (*connect.Response[v1.CapacityRollbackResponse], error)
+	Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error)
 }
 
 // NewConstraintAPIClient constructs a client for the constraintapi.v1.ConstraintAPI service. By
@@ -72,10 +69,10 @@ func NewConstraintAPIClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(constraintAPIMethods.ByName("Check")),
 			connect.WithClientOptions(opts...),
 		),
-		lease: connect.NewClient[v1.CapacityLeaseRequest, v1.CapacityLeaseResponse](
+		acquire: connect.NewClient[v1.CapacityAcquireRequest, v1.CapacityAcquireResponse](
 			httpClient,
-			baseURL+ConstraintAPILeaseProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Lease")),
+			baseURL+ConstraintAPIAcquireProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("Acquire")),
 			connect.WithClientOptions(opts...),
 		),
 		extendLease: connect.NewClient[v1.CapacityExtendLeaseRequest, v1.CapacityExtendLeaseResponse](
@@ -84,16 +81,10 @@ func NewConstraintAPIClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(constraintAPIMethods.ByName("ExtendLease")),
 			connect.WithClientOptions(opts...),
 		),
-		commit: connect.NewClient[v1.CapacityCommitRequest, v1.CapacityCommitResponse](
+		release: connect.NewClient[v1.CapacityReleaseRequest, v1.CapacityReleaseResponse](
 			httpClient,
-			baseURL+ConstraintAPICommitProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Commit")),
-			connect.WithClientOptions(opts...),
-		),
-		rollback: connect.NewClient[v1.CapacityRollbackRequest, v1.CapacityRollbackResponse](
-			httpClient,
-			baseURL+ConstraintAPIRollbackProcedure,
-			connect.WithSchema(constraintAPIMethods.ByName("Rollback")),
+			baseURL+ConstraintAPIReleaseProcedure,
+			connect.WithSchema(constraintAPIMethods.ByName("Release")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -102,10 +93,9 @@ func NewConstraintAPIClient(httpClient connect.HTTPClient, baseURL string, opts 
 // constraintAPIClient implements ConstraintAPIClient.
 type constraintAPIClient struct {
 	check       *connect.Client[v1.CapacityCheckRequest, v1.CapacityCheckResponse]
-	lease       *connect.Client[v1.CapacityLeaseRequest, v1.CapacityLeaseResponse]
+	acquire     *connect.Client[v1.CapacityAcquireRequest, v1.CapacityAcquireResponse]
 	extendLease *connect.Client[v1.CapacityExtendLeaseRequest, v1.CapacityExtendLeaseResponse]
-	commit      *connect.Client[v1.CapacityCommitRequest, v1.CapacityCommitResponse]
-	rollback    *connect.Client[v1.CapacityRollbackRequest, v1.CapacityRollbackResponse]
+	release     *connect.Client[v1.CapacityReleaseRequest, v1.CapacityReleaseResponse]
 }
 
 // Check calls constraintapi.v1.ConstraintAPI.Check.
@@ -113,9 +103,9 @@ func (c *constraintAPIClient) Check(ctx context.Context, req *connect.Request[v1
 	return c.check.CallUnary(ctx, req)
 }
 
-// Lease calls constraintapi.v1.ConstraintAPI.Lease.
-func (c *constraintAPIClient) Lease(ctx context.Context, req *connect.Request[v1.CapacityLeaseRequest]) (*connect.Response[v1.CapacityLeaseResponse], error) {
-	return c.lease.CallUnary(ctx, req)
+// Acquire calls constraintapi.v1.ConstraintAPI.Acquire.
+func (c *constraintAPIClient) Acquire(ctx context.Context, req *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error) {
+	return c.acquire.CallUnary(ctx, req)
 }
 
 // ExtendLease calls constraintapi.v1.ConstraintAPI.ExtendLease.
@@ -123,23 +113,17 @@ func (c *constraintAPIClient) ExtendLease(ctx context.Context, req *connect.Requ
 	return c.extendLease.CallUnary(ctx, req)
 }
 
-// Commit calls constraintapi.v1.ConstraintAPI.Commit.
-func (c *constraintAPIClient) Commit(ctx context.Context, req *connect.Request[v1.CapacityCommitRequest]) (*connect.Response[v1.CapacityCommitResponse], error) {
-	return c.commit.CallUnary(ctx, req)
-}
-
-// Rollback calls constraintapi.v1.ConstraintAPI.Rollback.
-func (c *constraintAPIClient) Rollback(ctx context.Context, req *connect.Request[v1.CapacityRollbackRequest]) (*connect.Response[v1.CapacityRollbackResponse], error) {
-	return c.rollback.CallUnary(ctx, req)
+// Release calls constraintapi.v1.ConstraintAPI.Release.
+func (c *constraintAPIClient) Release(ctx context.Context, req *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error) {
+	return c.release.CallUnary(ctx, req)
 }
 
 // ConstraintAPIHandler is an implementation of the constraintapi.v1.ConstraintAPI service.
 type ConstraintAPIHandler interface {
 	Check(context.Context, *connect.Request[v1.CapacityCheckRequest]) (*connect.Response[v1.CapacityCheckResponse], error)
-	Lease(context.Context, *connect.Request[v1.CapacityLeaseRequest]) (*connect.Response[v1.CapacityLeaseResponse], error)
+	Acquire(context.Context, *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error)
 	ExtendLease(context.Context, *connect.Request[v1.CapacityExtendLeaseRequest]) (*connect.Response[v1.CapacityExtendLeaseResponse], error)
-	Commit(context.Context, *connect.Request[v1.CapacityCommitRequest]) (*connect.Response[v1.CapacityCommitResponse], error)
-	Rollback(context.Context, *connect.Request[v1.CapacityRollbackRequest]) (*connect.Response[v1.CapacityRollbackResponse], error)
+	Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error)
 }
 
 // NewConstraintAPIHandler builds an HTTP handler from the service implementation. It returns the
@@ -155,10 +139,10 @@ func NewConstraintAPIHandler(svc ConstraintAPIHandler, opts ...connect.HandlerOp
 		connect.WithSchema(constraintAPIMethods.ByName("Check")),
 		connect.WithHandlerOptions(opts...),
 	)
-	constraintAPILeaseHandler := connect.NewUnaryHandler(
-		ConstraintAPILeaseProcedure,
-		svc.Lease,
-		connect.WithSchema(constraintAPIMethods.ByName("Lease")),
+	constraintAPIAcquireHandler := connect.NewUnaryHandler(
+		ConstraintAPIAcquireProcedure,
+		svc.Acquire,
+		connect.WithSchema(constraintAPIMethods.ByName("Acquire")),
 		connect.WithHandlerOptions(opts...),
 	)
 	constraintAPIExtendLeaseHandler := connect.NewUnaryHandler(
@@ -167,30 +151,22 @@ func NewConstraintAPIHandler(svc ConstraintAPIHandler, opts ...connect.HandlerOp
 		connect.WithSchema(constraintAPIMethods.ByName("ExtendLease")),
 		connect.WithHandlerOptions(opts...),
 	)
-	constraintAPICommitHandler := connect.NewUnaryHandler(
-		ConstraintAPICommitProcedure,
-		svc.Commit,
-		connect.WithSchema(constraintAPIMethods.ByName("Commit")),
-		connect.WithHandlerOptions(opts...),
-	)
-	constraintAPIRollbackHandler := connect.NewUnaryHandler(
-		ConstraintAPIRollbackProcedure,
-		svc.Rollback,
-		connect.WithSchema(constraintAPIMethods.ByName("Rollback")),
+	constraintAPIReleaseHandler := connect.NewUnaryHandler(
+		ConstraintAPIReleaseProcedure,
+		svc.Release,
+		connect.WithSchema(constraintAPIMethods.ByName("Release")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/constraintapi.v1.ConstraintAPI/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ConstraintAPICheckProcedure:
 			constraintAPICheckHandler.ServeHTTP(w, r)
-		case ConstraintAPILeaseProcedure:
-			constraintAPILeaseHandler.ServeHTTP(w, r)
+		case ConstraintAPIAcquireProcedure:
+			constraintAPIAcquireHandler.ServeHTTP(w, r)
 		case ConstraintAPIExtendLeaseProcedure:
 			constraintAPIExtendLeaseHandler.ServeHTTP(w, r)
-		case ConstraintAPICommitProcedure:
-			constraintAPICommitHandler.ServeHTTP(w, r)
-		case ConstraintAPIRollbackProcedure:
-			constraintAPIRollbackHandler.ServeHTTP(w, r)
+		case ConstraintAPIReleaseProcedure:
+			constraintAPIReleaseHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -204,18 +180,14 @@ func (UnimplementedConstraintAPIHandler) Check(context.Context, *connect.Request
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Check is not implemented"))
 }
 
-func (UnimplementedConstraintAPIHandler) Lease(context.Context, *connect.Request[v1.CapacityLeaseRequest]) (*connect.Response[v1.CapacityLeaseResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Lease is not implemented"))
+func (UnimplementedConstraintAPIHandler) Acquire(context.Context, *connect.Request[v1.CapacityAcquireRequest]) (*connect.Response[v1.CapacityAcquireResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Acquire is not implemented"))
 }
 
 func (UnimplementedConstraintAPIHandler) ExtendLease(context.Context, *connect.Request[v1.CapacityExtendLeaseRequest]) (*connect.Response[v1.CapacityExtendLeaseResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.ExtendLease is not implemented"))
 }
 
-func (UnimplementedConstraintAPIHandler) Commit(context.Context, *connect.Request[v1.CapacityCommitRequest]) (*connect.Response[v1.CapacityCommitResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Commit is not implemented"))
-}
-
-func (UnimplementedConstraintAPIHandler) Rollback(context.Context, *connect.Request[v1.CapacityRollbackRequest]) (*connect.Response[v1.CapacityRollbackResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Rollback is not implemented"))
+func (UnimplementedConstraintAPIHandler) Release(context.Context, *connect.Request[v1.CapacityReleaseRequest]) (*connect.Response[v1.CapacityReleaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("constraintapi.v1.ConstraintAPI.Release is not implemented"))
 }
