@@ -20,13 +20,19 @@ import (
 var BlankAttr = attribute.String("", "")
 
 type SerializableAttrs struct {
-	es    *util.ErrSet
-	Attrs []SerializableAttr
+	es     *util.ErrSet
+	Attrs  []SerializableAttr
+	keyMap map[string]int // maps key to index in Attrs slice
 }
 
 func NewAttrSet(attrs ...SerializableAttr) *SerializableAttrs {
+	keyMap := make(map[string]int)
+	for i, attr := range attrs {
+		keyMap[attr.key] = i
+	}
 	return &SerializableAttrs{
-		Attrs: attrs,
+		Attrs:  attrs,
+		keyMap: keyMap,
 	}
 }
 
@@ -36,17 +42,35 @@ type SerializableAttr struct {
 	value     any
 }
 
+// AddAttr adds an attribute to a set.  If the attribute key exists,
+// the value will be replaced.
 func AddAttr[T any](r *SerializableAttrs, attr attr[T], value T) {
-	r.Attrs = append(r.Attrs, Attr(attr, value))
+	if r.keyMap == nil {
+		r.keyMap = make(map[string]int)
+	}
+
+	if idx, exists := r.keyMap[attr.key]; exists {
+		r.Attrs[idx].value = value
+		return
+	}
+
+	newAttr := Attr(attr, value)
+	r.keyMap[attr.key] = len(r.Attrs)
+	r.Attrs = append(r.Attrs, newAttr)
 }
 
 func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
-	for _, attrs := range r.Attrs {
-		if attrs.key == attr.key {
-			return
-		}
+	if r.keyMap == nil {
+		r.keyMap = make(map[string]int)
 	}
-	r.Attrs = append(r.Attrs, Attr(attr, value))
+
+	if _, exists := r.keyMap[attr.key]; exists {
+		return
+	}
+
+	newAttr := Attr(attr, value)
+	r.keyMap[attr.key] = len(r.Attrs)
+	r.Attrs = append(r.Attrs, newAttr)
 }
 
 func (r *SerializableAttrs) AddErr(err error) {
