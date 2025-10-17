@@ -1,5 +1,11 @@
 # inngestgo
 
+## 0.14.0
+
+### Minor Changes
+
+- 097ebf2: Add support for steps in HTTP endpoints
+
 ## 0.13.1
 
 ### Patch Changes

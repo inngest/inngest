@@ -26,6 +26,7 @@ export type GetRunData = {
   id: string;
   trace: Trace;
   hasAI: boolean;
+  status: string;
 };
 
 export type GetRunResult = {
