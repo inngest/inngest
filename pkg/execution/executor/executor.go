@@ -1564,12 +1564,13 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2) (*state.DriverResponse, error) {
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:   *run.Metadata(),
-		Fn:         run.f,
-		SigningKey: []byte{}, // TODO
-		Attempt:    run.AttemptCount(),
-		Index:      run.stackIndex,
-		StepID:     &run.edge.Outgoing,
+		Metadata:    *run.Metadata(),
+		Fn:          run.f,
+		SigningKey:  []byte{}, // TODO
+		Attempt:     run.AttemptCount(),
+		Index:       run.stackIndex,
+		StepID:      &run.edge.Outgoing,
+		QueueItemID: queue.JobIDFromContext(ctx),
 	})
 
 	// TODO: Handle errors appropriately.
