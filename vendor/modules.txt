@@ -756,7 +756,7 @@ github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.13.2-0.20250812183425-c9b78e47b1f9
+# github.com/inngest/inngestgo v0.14.0
 ## explicit; go 1.24
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
@@ -769,8 +769,13 @@ github.com/inngest/inngestgo/internal/fn
 github.com/inngest/inngestgo/internal/middleware
 github.com/inngest/inngestgo/internal/sdkrequest
 github.com/inngest/inngestgo/internal/types
+github.com/inngest/inngestgo/pkg/env
+github.com/inngest/inngestgo/pkg/httputil
+github.com/inngest/inngestgo/pkg/interval
+github.com/inngest/inngestgo/pkg/version
 github.com/inngest/inngestgo/realtime
 github.com/inngest/inngestgo/step
+github.com/inngest/inngestgo/stephttp
 # github.com/jackc/pgpassfile v1.0.0
 ## explicit; go 1.12
 github.com/jackc/pgpassfile
