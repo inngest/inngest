@@ -768,7 +768,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	status := enums.StepStatusScheduled
+	status := enums.StepStatusQueued
 	if req.SkipReason() != enums.SkipReasonNone {
 		status = enums.StepStatusSkipped
 	}
