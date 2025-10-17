@@ -804,8 +804,65 @@ func (e *executor) schedule(
 	if req.RunMode == enums.RunModeSync {
 		runSpanOpts.StartTime = runID.Timestamp()
 	}
+
+	var (
+		runSpanRef       *tracing.DroppableSpan
+		discoverySpanRef *tracing.DroppableSpan
+	)
+	defer func() {
+		// Always attempt to send the spans. They may have already been dropped
+		// (e.g. if the queue item already exists), in which case `Send()` will
+		// no-op
+
+		if runSpanRef != nil {
+			err := runSpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending run span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
+		}
+
+		if discoverySpanRef != nil {
+			err := discoverySpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending discovery span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
+		}
+	}()
+
+	// We may need to drop the spans later, like if the queue item already
+	// exists
+	dropSpans := func() {
+		if runSpanRef != nil {
+			runSpanRef.Drop()
+		}
+
+		if discoverySpanRef != nil {
+			discoverySpanRef.Drop()
+		}
+	}
+
+	status := enums.StepStatusQueued
+	if req.SkipReason() != enums.SkipReasonNone {
+		status = enums.StepStatusSkipped
+	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
 	// Always the root span.
-	runSpanRef, err := e.tracerProvider.CreateSpan(
+	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameRun,
 		runSpanOpts,
 	)
@@ -814,13 +871,13 @@ func (e *executor) schedule(
 		l.Debug("error creating run span", "error", err)
 	}
 
-	config.NewSetFunctionTrace(runSpanRef)
+	if runSpanRef != nil {
+		config.NewSetFunctionTrace(runSpanRef.Ref)
+	}
 
 	// If this is paused, immediately end just before creating state.
 	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-		md, err := e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
-		// TODO: Should we rollback constraints here?
-		return md, err
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
@@ -858,7 +915,6 @@ func (e *executor) schedule(
 			// behaving as if the singleton mode were set to skip.
 			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
 			if err != nil {
-				// TODO: Should we rollback constraints here?
 				return nil, err
 			}
 
@@ -883,7 +939,6 @@ func (e *executor) schedule(
 					}
 				default:
 					// Immediately end before creating state
-					// TODO: Should we rollback constraints here?
 					return nil, ErrFunctionSkipped
 				}
 			}
@@ -919,7 +974,6 @@ func (e *executor) schedule(
 	case err == nil: // no-op
 	case errors.Is(err, state.ErrIdentifierExists): // no-op
 	case errors.Is(err, state.ErrIdentifierTomestone):
-		// TODO Should we rollback constraints here?
 		return nil, ErrFunctionSkippedIdempotency
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
@@ -993,28 +1047,30 @@ func (e *executor) schedule(
 		Singleton: singletonConfig,
 	}
 
-	// We also create the first discovery step right now, as then every single
-	// queue item has a span to reference.
-	//
-	// Initially, this helps combat a situation whereby erroring calls within
-	// the very first discovery step of a function are difficult to attribute
-	// to the same step span across retries.
-	//
-	// In the future, this also means that we can remove some magic around
-	// where to find the latest span and just always fetch it from the queue
-	// item.
-	_, err = e.tracerProvider.CreateSpan(
-		meta.SpanNameStepDiscovery,
-		&tracing.CreateSpanOptions{
-			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Parent:    runSpanRef,
-			Metadata:  &metadata,
-			QueueItem: &item,
-			Carriers:  []map[string]any{item.Metadata},
-		},
-	)
-	if err != nil {
-		l.Debug("error creating initial step span", "error", err)
+	if runSpanRef != nil {
+		// We also create the first discovery step right now, as then every single
+		// queue item has a span to reference.
+		//
+		// Initially, this helps combat a situation whereby erroring calls within
+		// the very first discovery step of a function are difficult to attribute
+		// to the same step span across retries.
+		//
+		// In the future, this also means that we can remove some magic around
+		// where to find the latest span and just always fetch it from the queue
+		// item.
+		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+				Parent:    runSpanRef.Ref,
+				Metadata:  &metadata,
+				QueueItem: &item,
+				Carriers:  []map[string]any{item.Metadata},
+			},
+		)
+		if err != nil {
+			l.Debug("error creating initial step span", "error", err)
+		}
 	}
 
 	// If this is run mode sync, we do NOT need to create a queue item, as the
@@ -1024,7 +1080,6 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		// NOTE: For sync runs, we commit the constraint to persist rate limit state
 		return &metadata, nil
 	}
 
@@ -1035,7 +1090,11 @@ func (e *executor) schedule(
 	case nil:
 		// no-op
 	case redis_state.ErrQueueItemExists:
-		// TODO: Should we commit the constraint?
+		// If the item already exists in the queue, we can safely ignore this
+		// entire schedule request; it's basically a retry and we should not
+		// persist this for the user.
+		dropSpans()
+
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
@@ -1043,7 +1102,6 @@ func (e *executor) schedule(
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
-		// TODO: Should we rollback this constraint?
 		return nil, ErrFunctionSkipped
 
 	default:
