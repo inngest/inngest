@@ -4053,6 +4053,8 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		BatchID:          &payload.BatchID,
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
+		// Batching does not work with rate limiting
+		PreventRateLimit: true,
 	})
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
