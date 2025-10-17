@@ -30,6 +30,8 @@ export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
       return FunctionRunStatusEnum.Paused;
     case 'SKIPPED':
       return FunctionRunStatusEnum.Skipped;
+    case 'UNKNOWN':
+      return FunctionRunStatusEnum.Unknown;
   }
 }
 
