@@ -13,21 +13,28 @@ type ModKeyState = {
   shiftKey?: boolean;
 };
 
-export type KeyCombo =
-  | {
-      alt?: boolean;
-      // DOM: KeyboardEvent.code (e.g. 'KeyS', 'Enter')
-      code: KeyboardEvent['code'];
-      metaOrCtrl?: boolean;
-      shift?: boolean;
-    }
-  | {
-      alt?: boolean;
-      // Monaco: numeric enum keyCode (e.g. monaco.KeyCode.KeyS)
-      keyCode: number;
-      metaOrCtrl?: boolean;
-      shift?: boolean;
-    };
+type NormalizedKeyEvent = ModKeyState & {
+  code?: string;
+  keyCode?: number;
+};
+
+type DomKeyCombo = {
+  alt?: boolean;
+  code: KeyboardEvent['code'];
+  keyCode?: never; // ensure mutual exclusivity at the type level
+  metaOrCtrl?: boolean;
+  shift?: boolean;
+};
+
+type MonacoKeyCombo = {
+  alt?: boolean;
+  code?: never; // ensure mutual exclusivity at the type level
+  keyCode: number;
+  metaOrCtrl?: boolean;
+  shift?: boolean;
+};
+
+export type KeyCombo = DomKeyCombo | MonacoKeyCombo;
 
 export type ShortcutBinding = {
   combo: KeyCombo;
@@ -52,17 +59,34 @@ function modsMatch(e: ModKeyState, c: KeyCombo): boolean {
   return true;
 }
 
+function findMatchingHandler(
+  bindings: ReadonlyArray<ShortcutBinding>,
+  ev: NormalizedKeyEvent
+): (() => void) | undefined {
+  for (const { combo, handler } of bindings) {
+    if (!modsMatch(ev, combo)) continue;
+
+    if ('code' in combo) {
+      if (ev.code !== combo.code) continue;
+      return handler;
+    }
+
+    if ('keyCode' in combo) {
+      if (ev.keyCode !== combo.keyCode) continue;
+      return handler;
+    }
+  }
+
+  return undefined;
+}
+
 export function bindEditorShortcuts(
   editor: EditorInstance,
   bindings: ReadonlyArray<ShortcutBinding>
 ) {
   return editor.onKeyDown((e: MonacoKeyEvent) => {
-    for (const { combo, handler } of bindings) {
-      if (!('keyCode' in combo)) continue;
-      if (!modsMatch(e, combo)) continue;
-      if (e.keyCode !== combo.keyCode) continue;
-      return doAction(e, handler);
-    }
+    const handler = findMatchingHandler(bindings, e);
+    if (handler !== undefined) return doAction(e, handler);
   });
 }
 
@@ -75,12 +99,8 @@ export function useDocumentShortcuts(bindings: ReadonlyArray<ShortcutBinding>) {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      for (const { combo, handler } of latestBindingsRef.current) {
-        if (!('code' in combo)) continue;
-        if (!modsMatch(e, combo)) continue;
-        if (e.code !== combo.code) continue;
-        return doAction(e, handler);
-      }
+      const handler = findMatchingHandler(latestBindingsRef.current, e);
+      if (handler !== undefined) return doAction(e, handler);
     }
 
     document.addEventListener('keydown', onKeyDown);
