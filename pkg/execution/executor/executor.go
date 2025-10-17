@@ -2497,8 +2497,9 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1) which contained
-	// a step.run.  However, with checkpointing we can batch step.run outputs into one single response.
+	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1)
+	// which contained a step.run.  However, with checkpointing we can batch step.run
+	// outputs into one single HTTP response.
 	//
 	// When this happens, we ALWAYS need to create a trace for each step.
 	//
@@ -2506,7 +2507,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	if len(resp.Generator) > 1 {
 		for _, op := range resp.Generator {
 			if op.Op == enums.OpcodeStepRun {
-				ctx = setTraceSteps(ctx)
+				ctx = setEmitCheckpointTraces(ctx)
 				break
 			}
 		}
@@ -2643,7 +2644,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// which was never called.
 	//
 	// In this case, we MUST retroactively record spans for each past step.
-	if traceSteps(ctx) {
+	if emitCheckpointTraces(ctx) {
 		attrs := tracing.GeneratorAttrs(&gen)
 		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
 		_, err := e.tracerProvider.CreateSpan(
@@ -4160,12 +4161,12 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ResumeSignalResult, err error) {
 	if workspaceID == uuid.Nil {
 		err = fmt.Errorf("workspace ID is empty")
-		return
+		return res, err
 	}
 
 	if signalID == "" {
 		err = fmt.Errorf("signal ID is empty")
-		return
+		return res, err
 	}
 
 	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
@@ -4182,14 +4183,14 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
 	if err != nil {
 		err = fmt.Errorf("error getting pause by signal ID: %w", err)
-		return
+		return res, err
 	}
 
 	res = &execution.ResumeSignalResult{}
 
 	if pause == nil {
 		l.Debug("no pause found for signal")
-		return
+		return res, err
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
@@ -4201,7 +4202,7 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
 		}
 
-		return
+		return res, err
 	}
 
 	l.Debug("resuming pause from signal", "pause.DataKey", pause.DataKey)
@@ -4225,13 +4226,13 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			err = nil
 		}
 
-		return
+		return res, err
 	}
 
 	res.MatchedSignal = true
 	res.RunID = &pause.Identifier.RunID
 
-	return
+	return res, err
 }
 
 type execError struct {
@@ -4306,11 +4307,12 @@ type traceStepsValT struct{}
 
 var traceStepsVal = traceStepsValT{}
 
-func setTraceSteps(ctx context.Context) context.Context {
+func setEmitCheckpointTraces(ctx context.Context) context.Context {
 	return context.WithValue(ctx, traceStepsVal, true)
 }
 
-func traceSteps(ctx context.Context) bool {
+func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
+	fmt.Println("YES?", ok)
 	return ok
 }
