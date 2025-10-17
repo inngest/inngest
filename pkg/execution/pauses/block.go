@@ -64,9 +64,9 @@ type BlockstoreOpts struct {
 	CompactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	CompactionSample float64
-	// Delete indicates whether we delete from the backing buffer,
-	// or if deletes are ignored.
-	Delete bool
+	// DeleteAfterFlush is a callback that returns whether we delete from the backing buffer,
+	// or if deletes are ignored for the current workspace.
+	DeleteAfterFlush FeatureCallback
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
@@ -81,6 +81,11 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	}
 	if opts.Leaser == nil {
 		return nil, fmt.Errorf("leaser is required")
+	}
+	if opts.DeleteAfterFlush == nil {
+		opts.DeleteAfterFlush = func(ctx context.Context, workspaceID uuid.UUID) bool {
+			return false
+		}
 	}
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
@@ -100,7 +105,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		buf:              opts.Bufferer,
 		bucket:           opts.Bucket,
 		leaser:           opts.Leaser,
-		delete:           opts.Delete,
+		deleteAfterFlush: opts.DeleteAfterFlush,
 	}, nil
 }
 
@@ -134,8 +139,8 @@ type blockstore struct {
 	// rc is the Redis client used to manage block indexes.
 	rc rueidis.Client
 
-	// delete, if false, prevents deleting items from the backing buffer when flushed.
-	delete bool
+	// deleteAfterFlush, if it returns false, prevents deleting items from the backing buffer when flushed.
+	deleteAfterFlush FeatureCallback
 }
 
 func (b blockstore) BlockSize() int {
@@ -263,7 +268,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// NOTE: This can happen in the background as we pick flushing up from the
 	// last block written.
 	go func() {
-		if b.delete {
+		if b.deleteAfterFlush(ctx, index.WorkspaceID) {
 			start := time.Now()
 			var deleted int64
 
