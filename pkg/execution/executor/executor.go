@@ -603,12 +603,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
-		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, ConstraintAction, error) {
-			md, err := e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
-			if err != nil {
-				return md, ConstraintRollback, err
-			}
-			return md, ConstraintCommit, nil
+		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+			return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
 		})
 }
 
