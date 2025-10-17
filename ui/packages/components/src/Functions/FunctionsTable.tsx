@@ -174,6 +174,7 @@ export function FunctionsTable({
           onIntersect={fetchNextPage}
           hasMore={hasNextPage ?? false}
           isLoading={isFetching || isFetchingNextPage}
+          root={containerRef.current}
         />
         {!hasNextPage && hasFunctionsData && isScrollable && !isFetchingNextPage && !isFetching && (
           <div className="flex flex-col items-center pb-4 pt-8">

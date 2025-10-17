@@ -86,8 +86,6 @@ const columns = [
         );
       }
 
-      // Unreachable
-      console.error(`Unknown trigger for run ${data.id}`);
       return null;
     },
     header: 'Trigger',

@@ -73,7 +73,6 @@ type FunctionOpts struct {
 	RateLimit *RateLimit
 	// BatchEvents represents batching
 	BatchEvents *EventBatchConfig
-
 	// Singleton ensures only one active function run per key.
 	Singleton *Singleton
 }

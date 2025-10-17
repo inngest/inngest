@@ -19,6 +19,14 @@ local requestItem = get_request_lease_item(keyRequestLease)
 
 -- Case 1: Request is actively leased
 if requestItem ~= nil and requestItem ~= false and requestItem.leaseID ~= nil and requestItem.leaseID ~= cjson.null and decode_ulid_time(requestItem.leaseID) > currentTime then
+  -- Maintain same lease ID with current executor IP
+  requestItem = {
+    leaseID = requestItem.leaseID,
+    executorIP = executorIP
+  }
+
+  -- Update request lease key, maintain TTL
+  redis.call("SET", keyRequestLease, cjson.encode(requestItem), "KEEPTTL")
 	return -1
 end
 

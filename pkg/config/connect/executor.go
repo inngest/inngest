@@ -19,12 +19,13 @@ var (
 	executorConfigOnce sync.Once
 )
 
-const ExecutorIPKey = "connect.executor.grpc.ip"
-const ExecutorPortKey = "connect.executor.grpc.port"
+const (
+	ExecutorIPKey   = "connect.executor.grpc.ip"
+	ExecutorPortKey = "connect.executor.grpc.port"
+)
 
 func Executor(ctx context.Context) ConnectExecutor {
 	executorConfigOnce.Do(func() {
-
 		ipStr := getWithDefault(ExecutorIPKey, "127.0.0.1", viper.GetString)
 		port := getWithDefault(ExecutorPortKey, uint32(50053), viper.GetUint32)
 
@@ -39,4 +40,13 @@ func Executor(ctx context.Context) ConnectExecutor {
 		}
 	})
 	return executorConfig
+}
+
+// SetConfig is used for testing
+func SetConfig(ctx context.Context, config ConnectExecutor) {
+	// Make sure to initialize config to avoid overriding it with sync.Once
+	Executor(ctx)
+
+	// Override the config
+	executorConfig = config
 }
