@@ -28,7 +28,7 @@ func WithConstraints[T any](
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
-	fn func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (T, ConstraintAction, error),
+	fn func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (T, error),
 ) (T, error) {
 	var zero T
 	// Cancel context on return
@@ -38,7 +38,7 @@ func WithConstraints[T any](
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
-		res, _, err := fn(ctx, false, "")
+		res, err := fn(ctx, false, "")
 		return res, err
 	}
 
@@ -47,7 +47,7 @@ func WithConstraints[T any](
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 
-		res, _, err := fn(ctx, false, "")
+		res, err := fn(ctx, false, "")
 		return res, err
 	}
 
@@ -71,7 +71,7 @@ func WithConstraints[T any](
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
-		res, _, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
+		res, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
 		return res, err
 	}
 
@@ -140,35 +140,20 @@ func WithConstraints[T any](
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
-	res, action, err := fn(userCtx, false, "")
+	res, err := fn(userCtx, false, "")
 
 	if checkResult.leaseID != nil {
-		switch action {
-		case ConstraintRollback:
-
-			_, internalErr := capacityManager.Rollback(ctx, &constraintapi.CapacityRollbackRequest{
-				AccountID: req.AccountID,
-				LeaseID:   *checkResult.leaseID,
-				// TODO: Generate idempotency key
-				IdempotencyKey: "",
-			})
-			if internalErr != nil {
-				// TODO Handle internal err
-				_ = internalErr
-			}
-
-		case ConstraintCommit:
-			_, internalErr := capacityManager.Commit(ctx, &constraintapi.CapacityCommitRequest{
-				AccountID: req.AccountID,
-				LeaseID:   *checkResult.leaseID,
-				// TODO: Generate idempotency key
-				IdempotencyKey: "",
-			})
-			if internalErr != nil {
-				// TODO Handle internal err
-				_ = internalErr
-			}
+		_, internalErr := capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+			AccountID: req.AccountID,
+			LeaseID:   *checkResult.leaseID,
+			// TODO: Generate idempotency key
+			IdempotencyKey: "",
+		})
+		if internalErr != nil {
+			// TODO Handle internal err
+			_ = internalErr
 		}
+
 	}
 
 	// TODO Handle error?
@@ -178,13 +163,6 @@ func WithConstraints[T any](
 
 	return res, nil
 }
-
-type ConstraintAction int
-
-const (
-	ConstraintRollback ConstraintAction = iota
-	ConstraintCommit
-)
 
 type checkResult struct {
 	// allowed determines whether a run can be scheduled
@@ -266,7 +244,7 @@ func CheckConstraints(
 	// TODO: Fetch account concurrency
 	var accountConcurrency int
 
-	res, internalErr := capacityManager.Lease(ctx, &constraintapi.CapacityLeaseRequest{
+	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:         req.AccountID,
 		IdempotencyKey:    idempotencyKey,
 		EnvID:             req.WorkspaceID,
