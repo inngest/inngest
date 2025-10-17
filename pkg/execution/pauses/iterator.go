@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -31,6 +32,7 @@ func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, b
 		unfetchedBlocks: blockIDs,
 		inflightBlocks:  map[ulid.ULID]struct{}{},
 		l:               &sync.Mutex{},
+		start:           time.Now(),
 	}
 }
 
@@ -72,6 +74,10 @@ type dualIter struct {
 
 	// l represents a lock held when mutating block slices or pauses.
 	l *sync.Mutex
+
+	// start represents the creation time of this iterator, it is used
+	// to measure how long it took for iterate through all pauses. (buffered + in blocks)
+	start time.Time
 }
 
 // Count returns the count of the pause iteration at the time of querying.
@@ -113,6 +119,14 @@ func (d *dualIter) Next(ctx context.Context) bool {
 
 	if quit {
 		// We are done!  There are no pauses downloaded or inflight.
+
+		metrics.HistogramAggregatePausesLoadDuration(ctx, time.Since(d.start).Milliseconds(), metrics.HistogramOpt{
+			PkgName: pkgName,
+			// TODO: tag workspace ID eventually??
+			Tags: map[string]any{
+				"iterator": "dual",
+			},
+		})
 		return false
 	}
 
@@ -224,12 +238,19 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 		// Don't bother to fetch, as we already have an error
 		return
 	}
+	start := time.Now()
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
+	// TODO: Maybe we should retry if it's a retriable error
 	if err != nil && d.err == nil {
 		d.l.Lock()
 		d.err = err
 		d.l.Unlock()
+
+		metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"success": false},
+		})
 		return
 	}
 
@@ -242,4 +263,9 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	delete(d.inflightBlocks, id)
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
+
+	metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"success": true},
+	})
 }
