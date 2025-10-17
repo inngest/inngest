@@ -43,7 +43,7 @@ export default function Page() {
   );
   const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } = booleanFlag(
     'traces-preview',
-    false,
+    true,
     true
   );
 
@@ -213,13 +213,14 @@ export default function Page() {
         scope="env"
         totalCount={totalCount}
         searchError={searchError}
-        infiniteScrollTrigger={
+        infiniteScrollTrigger={(containerRef) => (
           <InfiniteScrollTrigger
             onIntersect={fetchNextPage}
             hasMore={hasNextPage ?? false}
             isLoading={isFetching}
+            root={containerRef}
           />
-        }
+        )}
       />
     </>
   );

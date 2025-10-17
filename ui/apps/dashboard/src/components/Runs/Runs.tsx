@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useSt
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import type { Run } from '@inngest/components/RunsPage/types';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
@@ -12,7 +13,6 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
@@ -64,7 +64,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: { envSlug: env.slug },
   });
 
-  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);
+  const { booleanFlag } = useBooleanFlag();
+
+  const { value: tracePreviewEnabled } = booleanFlag('traces-preview', true, true);
 
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
@@ -222,13 +224,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       searchError={searchError}
       error={nextPageRes.error || firstPageRes.error}
-      infiniteScrollTrigger={
+      infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
           onIntersect={loadMore}
           hasMore={hasNextPage ?? false}
           isLoading={isLoading}
+          root={containerRef}
         />
-      }
+      )}
     />
   );
 });

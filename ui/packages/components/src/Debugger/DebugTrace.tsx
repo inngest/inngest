@@ -5,7 +5,7 @@ import { InlineSpans } from '../RunDetailsV3/InlineSpans';
 import { StepType } from '../RunDetailsV3/StepType';
 import { TimelineHeader } from '../RunDetailsV3/TimelineHeader';
 import { type Trace } from '../RunDetailsV3/types';
-import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from '../RunDetailsV3/utils';
+import { getSpanName, traceHasChildren, useStepSelection } from '../RunDetailsV3/utils';
 import { overlayDebugRuns } from './utils';
 
 type Props = {
@@ -33,16 +33,7 @@ export function DebugTrace({
 
   const runTrace = debugTraces ? overlayDebugRuns(originalTrace, debugTraces) : originalTrace;
 
-  //
-  // Don't show single finalization step for successful runs
-  // unless they have children (e.g. failed attempts)
-  const hasChildren =
-    depth === 0 &&
-    runTrace.childrenSpans?.length === 1 &&
-    runTrace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
-    (runTrace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
-      ? false
-      : (runTrace.childrenSpans?.length ?? 0) > 0;
+  const hasChildren = traceHasChildren(depth, runTrace);
 
   const spanName = runTrace.name === 'Run' ? 'Debug Run' : getSpanName(runTrace.name);
 

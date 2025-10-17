@@ -53,6 +53,12 @@ func WithBatchProcessorConcurrency(c int) BatchSpanProcessorOpt {
 	}
 }
 
+func WithBatchProcessorDropBlockingSpans() BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		b.dropBlockingSpans = true
+	}
+}
+
 type batchSpanProcessor struct {
 	mt                       sync.RWMutex
 	exporter                 trace.SpanExporter
@@ -64,6 +70,7 @@ type batchSpanProcessor struct {
 	pointer                  uuid.UUID
 	in                       chan *trace.ReadOnlySpan
 	out                      chan string
+	dropBlockingSpans        bool
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
@@ -98,8 +105,18 @@ func (b *batchSpanProcessor) OnStart(ctx context.Context, s trace.ReadWriteSpan)
 
 func (b *batchSpanProcessor) OnEnd(s trace.ReadOnlySpan) {
 	// pass span into the channel
-	b.in <- &s
-	metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	if !b.dropBlockingSpans {
+		b.in <- &s
+		metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+		return
+	}
+
+	select {
+	case b.in <- &s:
+		metrics.IncrSpanBatchProcessorEnqueuedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	default:
+		metrics.IncrSpanBatchProcessorDroppedCounter(context.TODO(), metrics.CounterOpt{PkgName: pkgName})
+	}
 }
 
 func (b *batchSpanProcessor) Shutdown(ctx context.Context) error {

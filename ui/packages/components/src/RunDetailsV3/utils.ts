@@ -27,6 +27,27 @@ export const maybeBooleanToString = (value: boolean | null): string | null => {
   return value ? 'True' : 'False';
 };
 
+export function traceHasChildren(depth: number, trace: Trace) {
+  // Don't show single finalization step for successful runs
+  // unless they have children (e.g. failed attempts)
+  //
+  if (
+    depth === 0 &&
+    trace.childrenSpans?.length === 1 &&
+    // TODO: maybe update name here to allow "Finalization" as well as that seems to be present in traces now
+    trace.childrenSpans[0]?.name === FINAL_SPAN_NAME &&
+    (trace.childrenSpans[0]?.childrenSpans?.length ?? 0) == 0
+  ) {
+    return false;
+  }
+
+  if (depth == 1 && trace.childrenSpans?.length === 1) {
+    return false;
+  }
+
+  return (trace.childrenSpans?.length ?? 0) > 0;
+}
+
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
   let beforeWidth = queued - min;
   let queuedWidth = (started ?? max) - queued;

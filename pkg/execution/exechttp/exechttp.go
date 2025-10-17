@@ -28,7 +28,7 @@ const (
 
 var (
 	ErrUnableToReach       = fmt.Errorf("Unable to reach SDK URL")
-	ErrDenied              = fmt.Errorf("Your server blocked the connection") // "connection timed out"
+	ErrDenied              = fmt.Errorf("Your server connection experienced a timeout or was blocked") // "connection timed out"
 	ErrServerClosed        = fmt.Errorf("Your server closed the request before finishing.")
 	ErrConnectionReset     = fmt.Errorf("Your server reset the connection while we were sending the request.")
 	ErrUnexpectedEnd       = fmt.Errorf("Your server reset the connection while we were reading the reply: Unexpected ending response")
