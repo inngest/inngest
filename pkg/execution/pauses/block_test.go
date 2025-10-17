@@ -158,6 +158,54 @@ func TestBlockFlusher(t *testing.T) {
 	require.Equal(t, 0, pausesLen, "pauses should be removed from buffer after flushing")
 }
 
+func TestBlockMetadata_SameTimestamps(t *testing.T) {
+	// Setup miniredis
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	// Setup in-memory blob bucket
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	// Create a mock bufferer that returns the same timestamp for all pauses
+	sameTime := time.Now()
+	mockBufferer := &mockBuffererSameTimestamp{
+		timestamp: sameTime,
+		pauses: []*state.Pause{
+			{ID: uuid.New()},
+			{ID: uuid.New()},
+		},
+	}
+
+	// Create block store
+	store := &blockstore{
+		rc:        rc,
+		buf:       mockBufferer,
+		bucket:    bucket,
+		blocksize: 2,
+	}
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+
+	block := &Block{
+		Index:  index,
+		Pauses: mockBufferer.pauses,
+	}
+
+	// Test that blockMetadata returns an error when earliest == latest
+	_, err = store.blockMetadata(context.Background(), index, block)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "block boundaries should never be the same")
+}
+
 // mockBufferer implements the Bufferer interface for testing
 type mockBufferer struct {
 	mu     sync.RWMutex
@@ -275,4 +323,78 @@ func (m *mockPauseIterator) Error() error {
 
 func (m *mockPauseIterator) Index() int64 {
 	return int64(m.pos)
+}
+
+// mockBuffererSameTimestamp is a special mock that returns the same timestamp for all pauses
+type mockBuffererSameTimestamp struct {
+	mu        sync.RWMutex
+	timestamp time.Time
+	pauses    []*state.Pause
+}
+
+func (m *mockBuffererSameTimestamp) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pauses = append(m.pauses, pauses...)
+	return len(m.pauses), nil
+}
+
+func (m *mockBuffererSameTimestamp) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	return &mockPauseIterator{pauses: pausesCopy}, nil
+}
+
+func (m *mockBuffererSameTimestamp) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
+	// Always return the same timestamp - this is what triggers the error condition
+	return m.timestamp, nil
+}
+
+func (m *mockBuffererSameTimestamp) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("not implemented")
+}
+
+func (m *mockBuffererSameTimestamp) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, p := range m.pauses {
+		if p.ID == pause.ID {
+			m.pauses = append(m.pauses[:i], m.pauses[i+1:]...)
+			return nil
+		}
+	}
+	return ErrNotInBuffer
+}
+
+func (m *mockBuffererSameTimestamp) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error) {
+	return nil, fmt.Errorf("not implemented in mock")
+}
+
+func (m *mockBuffererSameTimestamp) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, signalID string) (*state.Pause, error) {
+	return nil, fmt.Errorf("not implemented in mock")
+}
+
+func (m *mockBuffererSameTimestamp) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, p := range m.pauses {
+		if p.ID == pauseID {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("pause not found")
+}
+
+func (m *mockBuffererSameTimestamp) BufferLen(ctx context.Context, i Index) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return int64(len(m.pauses)), nil
+}
+
+func (m *mockBuffererSameTimestamp) IndexExists(ctx context.Context, i Index) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.pauses) > 0, nil
 }
