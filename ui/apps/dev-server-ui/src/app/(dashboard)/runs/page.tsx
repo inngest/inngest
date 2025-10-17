@@ -47,8 +47,6 @@ export default function Page() {
     true
   );
 
-  console.log('tracesPreviewEnabled', tracesPreviewEnabled);
-
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [preview, setPreview] = useState(false);
 
