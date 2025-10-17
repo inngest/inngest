@@ -28,8 +28,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const saveTabRef = useLatest(saveTab);
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const shortcutsDisposable = bindEditorShortcuts(
-      editor,
+    const shortcutsDisposable = bindEditorShortcuts(editor, [
       {
         combo: { keyCode: monaco.KeyCode.Enter, metaOrCtrl: true },
         handler: () => {
@@ -46,8 +45,8 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
       {
         combo: { alt: true, keyCode: monaco.KeyCode.KeyT, metaOrCtrl: true },
         handler: tabManagerActions.createNewTab,
-      }
-    );
+      },
+    ]);
 
     const markersDisposable = markTemplateVars(editor, monaco);
 
@@ -63,8 +62,4 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   });
 
   return { onMount };
-}
-
-function isQueryTab(tab: Tab): boolean {
-  return tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id;
 }
