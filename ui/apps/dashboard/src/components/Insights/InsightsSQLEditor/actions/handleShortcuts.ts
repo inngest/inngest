@@ -54,7 +54,7 @@ function modsMatch(e: ModKeyState, c: KeyCombo): boolean {
 
 export function bindEditorShortcuts(
   editor: EditorInstance,
-  ...bindings: ReadonlyArray<ShortcutBinding>
+  bindings: ReadonlyArray<ShortcutBinding>
 ) {
   return editor.onKeyDown((e: MonacoKeyEvent) => {
     for (const { combo, handler } of bindings) {
