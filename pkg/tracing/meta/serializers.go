@@ -347,6 +347,12 @@ func StepStatusAttr(key string) attr[*enums.StepStatus] {
 				return BlankAttr
 			}
 
+			// NOTE: For legacy reasons, we use StepStatusScheduled,
+			// however this must be represented a 'Queued' in traces.
+			if *v == enums.StepStatusScheduled {
+				return attribute.String(withPrefix(key), enums.StepStatusQueued.String())
+			}
+
 			return attribute.String(withPrefix(key), v.String())
 		},
 		deserialize: func(v any) (*enums.StepStatus, bool) {
