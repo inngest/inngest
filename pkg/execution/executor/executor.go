@@ -370,11 +370,11 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
+	rateLimiter  ratelimit.RateLimiter
 	queue        queue.Queue
 	debouncer    debounce.Debouncer
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
-	rateLimiter  ratelimit.RateLimiter
 
 	capacityManager  constraintapi.CapacityManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
