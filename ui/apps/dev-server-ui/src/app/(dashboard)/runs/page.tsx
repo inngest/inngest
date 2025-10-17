@@ -43,9 +43,11 @@ export default function Page() {
   );
   const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } = booleanFlag(
     'traces-preview',
-    false,
+    true,
     true
   );
+
+  console.log('tracesPreviewEnabled', tracesPreviewEnabled);
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [preview, setPreview] = useState(false);
