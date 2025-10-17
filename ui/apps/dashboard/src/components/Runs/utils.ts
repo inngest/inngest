@@ -45,8 +45,6 @@ export function toRunStatuses(statuses: string[]): FunctionRunStatusEnum[] {
   for (const status of statuses) {
     if (isFunctionRunStatus(status)) {
       newValue.push(toRunStatus(status));
-    } else {
-      console.error(`unexpected status: ${status}`);
     }
   }
 
