@@ -43,7 +43,7 @@ export default function Page() {
   );
   const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } = booleanFlag(
     'traces-preview',
-    false,
+    true,
     true
   );
 

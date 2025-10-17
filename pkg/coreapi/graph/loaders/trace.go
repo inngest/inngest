@@ -156,7 +156,7 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	case enums.StepStatusCancelled:
 		s := models.RunTraceSpanStatusCancelled
 		return &s
-	case enums.StepStatusScheduled:
+	case enums.StepStatusScheduled, enums.StepStatusQueued:
 		s := models.RunTraceSpanStatusQueued
 		return &s
 	case enums.StepStatusSleeping, enums.StepStatusWaiting:

@@ -28,11 +28,15 @@ type middlewareManagerCtxKeyType struct{}
 
 var middlewareManagerCtxKey = middlewareManagerCtxKeyType{}
 
-func ContextWithMiddlewareManager(ctx context.Context, mgr *middleware.MiddlewareManager) context.Context {
+func ContextWithMiddleware(ctx context.Context, mgr middleware.Middleware) context.Context {
 	return context.WithValue(ctx, middlewareManagerCtxKey, mgr)
 }
 
-func MiddlewareManagerFromContext(ctx context.Context) (*middleware.MiddlewareManager, bool) {
-	mgr, ok := ctx.Value(middlewareManagerCtxKey).(*middleware.MiddlewareManager)
-	return mgr, ok
+func MiddlewareFromContext(ctx context.Context) middleware.Middleware {
+	mgr, ok := ctx.Value(middlewareManagerCtxKey).(middleware.Middleware)
+	if !ok {
+		// Return noop middleware.
+		return &middleware.BaseMiddleware{}
+	}
+	return mgr
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -97,12 +96,6 @@ func WithBatchManager(b batch.BatchManager) func(s *svc) {
 	}
 }
 
-func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
-	return func(s *svc) {
-		s.rl = rl
-	}
-}
-
 func WithPublisher(p pubsub.Publisher) func(s *svc) {
 	return func(s *svc) {
 		s.publisher = p
@@ -143,8 +136,6 @@ type svc struct {
 	queue queue.Queue
 	// batcher handles batch operations
 	batcher batch.BatchManager
-	// rl rate-limits functions.
-	rl ratelimit.RateLimiter
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
 
@@ -657,40 +648,6 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		}
 	}
 
-	// Attempt to rate-limit the incoming function.
-	if s.rl != nil && fn.RateLimit != nil {
-		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
-		switch err {
-		case nil:
-			limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
-			if err != nil {
-				return err
-			}
-			if limited {
-				if evt.GetEvent().IsInvokeEvent() {
-					// This function was invoked by another function, so we need to
-					// ensure that the invoker fails. If we don't do this, it'll
-					// hang forever
-					if err := s.executor.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
-						OriginalEvent: evt,
-						Err: map[string]any{
-							"name":    "Error",
-							"message": "invoked function is rate limited",
-						},
-					}); err != nil {
-						l.Error("error handling invoke rate limit", "error", err)
-					}
-				}
-				// Do nothing.
-				return nil
-			}
-		case ratelimit.ErrNotRateLimited:
-			// no-op: proceed with function run as usual
-		default:
-			return err
-		}
-	}
-
 	l.Info("initializing fn")
 	_, err := Initialize(ctx, InitOpts{
 		appID: appID,
@@ -722,6 +679,7 @@ type InitOpts struct {
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
 func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
+	l := logger.StdlibLogger(ctx)
 	zero := uuid.UUID{}
 	tracked := opts.evt
 	wsID := tracked.GetWorkspaceID()
@@ -760,6 +718,23 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	})
 
 	switch err {
+	case executor.ErrFunctionRateLimited:
+		if opts.evt.GetEvent().IsInvokeEvent() {
+			// This function was invoked by another function, so we need to
+			// ensure that the invoker fails. If we don't do this, it'll
+			// hang forever
+			if err := opts.exec.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
+				OriginalEvent: opts.evt,
+				Err: map[string]any{
+					"name":    "Error",
+					"message": "invoked function is rate limited",
+				},
+			}); err != nil {
+				l.Error("error handling invoke rate limit", "error", err)
+			}
+		}
+
+		return nil, nil
 	case executor.ErrFunctionDebounced,
 		executor.ErrFunctionSkipped,
 		executor.ErrFunctionSkippedIdempotency,

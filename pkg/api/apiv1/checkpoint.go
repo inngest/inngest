@@ -188,10 +188,13 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	case state.ErrIdentifierExists:
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(409, "Run already exists"))
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(http.StatusConflict, "Run already exists"))
+		return
+	case executor.ErrFunctionRateLimited:
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusTooManyRequests, "Rate limits exceeded"))
 		return
 	default:
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Failed to schedule run"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Failed to schedule run"))
 		return
 	}
 }

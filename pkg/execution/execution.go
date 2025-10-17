@@ -243,6 +243,9 @@ type ScheduleRequest struct {
 	// execution.  This is used after the debounce has finished to force execution
 	// of the function, instead of debouncing again.
 	PreventDebounce bool
+	// PreventRateLimit allows ignoring rate limit checks in case the check was
+	// previously handled and scheduling was allowed.
+	PreventRateLimit bool
 	// FunctionPausedAt indicates whether the function is paused.
 	FunctionPausedAt *time.Time
 	// RunMode represents how this function runs.  Async functions are, by nature,

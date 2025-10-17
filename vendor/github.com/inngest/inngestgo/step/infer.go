@@ -30,8 +30,8 @@ func Infer[InputT any, OutputT any](
 	in InferOpts[InputT],
 ) (out OutputT, err error) {
 	targetID := getTargetStepID(ctx)
-	mgr := preflight(ctx)
-	op := mgr.NewOp(enums.OpcodeAIGateway, id, nil)
+	mgr := preflight(ctx, enums.OpcodeAIGateway)
+	op := mgr.NewOp(enums.OpcodeAIGateway, id)
 	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(ctx, op); ok {
@@ -43,7 +43,7 @@ func Infer[InputT any, OutputT any](
 				err := errors.StepError{}
 				if err := json.Unmarshal(unwrapped.Error, &err); err != nil {
 					mgr.SetErr(fmt.Errorf("error unmarshalling error for step '%s': %w", id, err))
-					panic(ControlHijack{})
+					panic(sdkrequest.ControlHijack{})
 				}
 
 				// See if we have any data for multiple returns in the error type.
@@ -93,13 +93,13 @@ func Infer[InputT any, OutputT any](
 	reqBytes, err := json.Marshal(in.Body)
 	if err != nil {
 		mgr.SetErr(fmt.Errorf("error unmarshalling state for step '%s': %w", id, err))
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
 	if targetID != nil && *targetID != hashedID {
 		// Don't report this step since targeting is happening and it isn't
 		// targeted
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
@@ -115,9 +115,8 @@ func Infer[InputT any, OutputT any](
 		},
 		Data: reqBytes,
 	}
-	plannedOp.SetParallelMode(parallelMode(ctx))
-	mgr.AppendOp(plannedOp)
-	panic(ControlHijack{})
+	mgr.AppendOp(ctx, plannedOp)
+	panic(sdkrequest.ControlHijack{})
 }
 
 type inferOpcodeOpts struct {

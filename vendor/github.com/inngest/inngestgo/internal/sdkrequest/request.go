@@ -4,11 +4,19 @@ import "encoding/json"
 
 // Request represents an incoming invoke request used to call functions from Inngest.
 type Request struct {
-	Event   json.RawMessage            `json:"event"`
-	Events  []json.RawMessage          `json:"events"`
-	Steps   map[string]json.RawMessage `json:"steps"`
-	CallCtx CallCtx                    `json:"ctx"`
-	UseAPI  bool                       `json:"use_api"`
+	// Event represents the input event.  If the input is a batch of events, this
+	// represents the first event in the batch (for backwards compatibility).
+	Event json.RawMessage `json:"event"`
+	// Events represents the array of input events, if the function run is for
+	// a batch of events.
+	Events []json.RawMessage `json:"events"`
+	// Steps indicates the current step state for the function run.
+	Steps map[string]json.RawMessage `json:"steps"`
+	// CallCtx represents call context - metadata around the current function run.
+	CallCtx CallCtx `json:"ctx"`
+	// UseAPI indicates whether the input request is too large (> 4MB) to be pushed
+	// to each function run, and should instead be fetched from the API on run.
+	UseAPI bool `json:"use_api"`
 }
 
 // CallCtx represents context for individual function calls.  This logs the function ID, the
