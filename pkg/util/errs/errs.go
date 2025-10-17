@@ -1,6 +1,9 @@
 package errs
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // InternalError represents an internal error that isn't from the user's servers.
 type InternalError interface {
@@ -37,6 +40,16 @@ type UserError interface {
 	Raw() []byte
 }
 
+type InternalRetriableError interface {
+	InternalError
+	RetryAfter() time.Duration
+}
+
+type UserRetriableError interface {
+	UserError
+	RetryAfter() time.Duration
+}
+
 // Wrap always wraps an error as an InternalError type.
 func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
 	return &internal{
@@ -46,12 +59,31 @@ func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
 	}
 }
 
+// Wrap always wraps an error as an InternalRetriableError type.
+func WrapAfter(code int, retryAfter time.Duration, msg string, a ...any) InternalError {
+	return &internal{
+		error:      fmt.Errorf(msg, a...),
+		code:       code,
+		retryable:  true,
+		retryAfter: retryAfter,
+	}
+}
+
 // WrapUser always wraps an error as an InternalError type.
 func WrapUser(code int, retryable bool, msg string, a ...any) UserError {
 	return &user{
 		error:     fmt.Errorf(msg, a...),
 		code:      code,
 		retryable: retryable,
+	}
+}
+
+func WrapAfterUser(code int, retryAfter time.Duration, msg string, a ...any) UserError {
+	return &user{
+		error:      fmt.Errorf(msg, a...),
+		code:       code,
+		retryable:  true,
+		retryAfter: retryAfter,
 	}
 }
 
@@ -68,28 +100,32 @@ func WrapResponseAsUser(code int, retryable bool, raw []byte, msg string, a ...a
 
 type internal struct {
 	error
-	retryable bool
-	code      int
+	retryable  bool
+	code       int
+	retryAfter time.Duration
 }
 
 // Unwrap allows us to use errors.Is to determine the proper
 // cause of errors.
-func (i *internal) Unwrap() error   { return i.error }
-func (i *internal) ErrorCode() int  { return i.code }
-func (i *internal) Retryable() bool { return i.retryable }
-func (*internal) InternalError()    {}
+func (i *internal) Unwrap() error             { return i.error }
+func (i *internal) ErrorCode() int            { return i.code }
+func (i *internal) Retryable() bool           { return i.retryable }
+func (i *internal) RetryAfter() time.Duration { return i.retryAfter }
+func (*internal) InternalError()              {}
 
 type user struct {
 	error
-	retryable bool
-	code      int
-	raw       []byte
+	retryable  bool
+	code       int
+	raw        []byte
+	retryAfter time.Duration
 }
 
 // Unwrap allows us to use errors.Is to determine the proper
 // cause of errors.
-func (u *user) Unwrap() error   { return u.error }
-func (u *user) ErrorCode() int  { return u.code }
-func (u *user) Retryable() bool { return u.retryable }
-func (u *user) Raw() []byte     { return u.raw }
-func (*user) UserError()        {}
+func (u *user) Unwrap() error             { return u.error }
+func (u *user) ErrorCode() int            { return u.code }
+func (u *user) Retryable() bool           { return u.retryable }
+func (u *user) RetryAfter() time.Duration { return u.retryAfter }
+func (u *user) Raw() []byte               { return u.raw }
+func (*user) UserError()                  {}
