@@ -15,6 +15,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -252,6 +253,20 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).capacityManager = cm
+		return nil
+	}
+}
+
+func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).useConstraintAPI = uca
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -355,11 +370,15 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
-	rateLimiter         ratelimit.RateLimiter
-	queue               queue.Queue
-	debouncer           debounce.Debouncer
-	batcher             batch.BatchManager
-	singletonMgr        singleton.Singleton
+	rateLimiter  ratelimit.RateLimiter
+	queue        queue.Queue
+	debouncer    debounce.Debouncer
+	batcher      batch.BatchManager
+	singletonMgr singleton.Singleton
+
+	capacityManager  constraintapi.CapacityManager
+	useConstraintAPI constraintapi.UseConstraintAPIFn
+
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler       execution.FinalizePublisher
@@ -577,12 +596,29 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	return nil
 }
 
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	// Check constraints and acquire lease
+	return WithConstraints(
+		ctx,
+		e.capacityManager,
+		e.useConstraintAPI,
+		req,
+		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+			return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+		})
+}
+
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 //
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
-func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+func (e *executor) schedule(
+	ctx context.Context,
+	req execution.ScheduleRequest,
+	performChecks bool,
+	fallbackIdempotencyKey string,
+) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
 	}
@@ -596,27 +632,36 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
-	// Attempt to rate-limit the incoming function.
-	if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
-		evtMap := req.Events[0].GetEvent().Map()
-		key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
-		switch err {
-		case nil:
-			limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
-			if err != nil {
-				return nil, fmt.Errorf("could not check rate limit: %w", err)
-			}
+	if performChecks {
+		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
+		_ = fallbackIdempotencyKey
 
-			if limited {
-				// Do nothing.
-				return nil, ErrFunctionRateLimited
+		// Attempt to rate-limit the incoming function.
+		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+			evtMap := req.Events[0].GetEvent().Map()
+			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+			switch err {
+			case nil:
+				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+				if err != nil {
+					return nil, fmt.Errorf("could not check rate limit: %w", err)
+				}
+
+				if limited {
+					// Do nothing.
+					return nil, ErrFunctionRateLimited
+				}
+			case ratelimit.ErrNotRateLimited:
+				// no-op: proceed with function run as usual
+			default:
+				return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
 			}
-		case ratelimit.ErrNotRateLimited:
-			// no-op: proceed with function run as usual
-		default:
-			return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
 		}
 	}
+
+	// NOTE: From this point, we are guaranteed to operate within user constraints.
+	// We can decide whether to commit (persist) or rollback the reserved capacity
+	// for individual return statements. Rollbacks should be used for transient errors.
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{

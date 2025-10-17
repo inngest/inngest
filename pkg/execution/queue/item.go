@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -652,4 +653,61 @@ func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency 
 	}
 
 	return keys
+}
+
+func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) constraintapi.ConstraintConfig {
+	var rateLimit []constraintapi.RateLimitConfig
+	if fn.RateLimit != nil {
+		var rateLimitKey string
+		if fn.RateLimit.Key != nil {
+			rateLimitKey = *fn.RateLimit.Key
+		}
+
+		rateLimit = append(rateLimit, constraintapi.RateLimitConfig{
+			Scope:             enums.RateLimitScopeFn,
+			Limit:             int(fn.RateLimit.Limit),
+			KeyExpressionHash: util.XXHash(rateLimitKey),
+		})
+	}
+
+	var customConcurrency []constraintapi.CustomConcurrencyLimit
+	for _, c := range fn.Concurrency.Limits {
+		if !c.IsCustomLimit() {
+			continue
+		}
+
+		customConcurrency = append(customConcurrency, constraintapi.CustomConcurrencyLimit{
+			Mode:              enums.ConcurrencyModeStep,
+			Scope:             c.Scope,
+			Limit:             c.Limit,
+			KeyExpressionHash: c.Hash,
+		})
+	}
+
+	var throttles []constraintapi.ThrottleConfig
+	if fn.Throttle != nil {
+		var throttleKey string
+		if fn.Throttle.Key != nil {
+			throttleKey = *fn.Throttle.Key
+		}
+
+		throttles = append(throttles, constraintapi.ThrottleConfig{
+			Limit:                     int(fn.Throttle.Limit),
+			Burst:                     int(fn.Throttle.Burst),
+			Period:                    int(fn.Throttle.Period.Seconds()),
+			Scope:                     enums.ThrottleScopeFn,
+			ThrottleKeyExpressionHash: util.XXHash(throttleKey),
+		})
+	}
+
+	return constraintapi.ConstraintConfig{
+		FunctionVersion: fn.FunctionVersion,
+		RateLimit:       rateLimit,
+		Concurrency: constraintapi.ConcurrencyConfig{
+			AccountConcurrency:    accountConcurrency,
+			FunctionConcurrency:   fn.Concurrency.PartitionConcurrency(),
+			CustomConcurrencyKeys: customConcurrency,
+		},
+		Throttle: throttles,
+	}
 }
