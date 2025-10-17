@@ -118,7 +118,7 @@ func TestBlockFlusher(t *testing.T) {
 		BlockSize:        1, // Small block size for testing
 		CompactionLimit:  1,
 		CompactionSample: 0.1,
-		Delete:           true,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
