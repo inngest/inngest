@@ -23,10 +23,12 @@ export default function InsightsPage() {
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });
 
-  useDocumentShortcuts({
-    combo: { code: 'KeyT', metaOrCtrl: true, alt: true },
-    handler: actions.createNewTab,
-  });
+  useDocumentShortcuts([
+    {
+      combo: { alt: true, code: 'KeyT', metaOrCtrl: true },
+      handler: actions.createNewTab,
+    },
+  ]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeSavedQueryId = activeTab?.savedQueryId;

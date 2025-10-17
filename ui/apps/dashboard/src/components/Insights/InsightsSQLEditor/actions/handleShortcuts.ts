@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 type EditorInstance = Parameters<SQLEditorMountCallback>[0];
@@ -66,10 +66,16 @@ export function bindEditorShortcuts(
   });
 }
 
-export function useDocumentShortcuts(...bindings: ReadonlyArray<ShortcutBinding>) {
+export function useDocumentShortcuts(bindings: ReadonlyArray<ShortcutBinding>) {
+  const latestBindingsRef = useRef<ReadonlyArray<ShortcutBinding>>(bindings);
+
+  useEffect(() => {
+    latestBindingsRef.current = bindings;
+  }, [bindings]);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      for (const { combo, handler } of bindings) {
+      for (const { combo, handler } of latestBindingsRef.current) {
         if (!('code' in combo)) continue;
         if (!modsMatch(e, combo)) continue;
         if (e.code !== combo.code) continue;
@@ -80,5 +86,5 @@ export function useDocumentShortcuts(...bindings: ReadonlyArray<ShortcutBinding>
     document.addEventListener('keydown', onKeyDown);
 
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [bindings]);
+  }, []);
 }

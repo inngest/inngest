@@ -22,16 +22,18 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const disabled = tab.name === '' || tab.query === '' || isSaving;
   const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
-  useDocumentShortcuts({
-    combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
-    handler: () => {
-      if (disabled) return;
-      setIsSaving(true);
-      saveQuery(tab).finally(() => {
-        setIsSaving(false);
-      });
+  useDocumentShortcuts([
+    {
+      combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
+      handler: () => {
+        if (disabled) return;
+        setIsSaving(true);
+        saveQuery(tab).finally(() => {
+          setIsSaving(false);
+        });
+      },
     },
-  });
+  ]);
 
   return (
     <Button

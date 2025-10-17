@@ -32,12 +32,14 @@ export function InsightsSQLEditorQueryButton() {
   const isRunning = status === 'loading';
   const canRunQuery = getCanRunQuery(query, isRunning);
 
-  useDocumentShortcuts({
-    combo: { code: 'Enter', metaOrCtrl: true },
-    handler: () => {
-      if (canRunQuery) runQuery();
+  useDocumentShortcuts([
+    {
+      combo: { code: 'Enter', metaOrCtrl: true },
+      handler: () => {
+        if (canRunQuery) runQuery();
+      },
     },
-  });
+  ]);
 
   return (
     <Button
