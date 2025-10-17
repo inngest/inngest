@@ -11,10 +11,9 @@ import (
 
 type CapacityManager interface {
 	Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError)
-	Lease(ctx context.Context, req *CapacityLeaseRequest) (*CapacityLeaseResponse, errs.InternalError)
+	Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError)
 	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError)
-	Commit(ctx context.Context, req *CapacityCommitRequest) (*CapacityCommitResponse, errs.InternalError)
-	Rollback(ctx context.Context, req *CapacityRollbackRequest) (*CapacityRollbackResponse, errs.InternalError)
+	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
 }
 
 type CapacityCheckRequest struct {
@@ -23,7 +22,7 @@ type CapacityCheckRequest struct {
 
 type CapacityCheckResponse struct{}
 
-type CapacityLeaseRequest struct {
+type CapacityAcquireRequest struct {
 	// IdempotencyKey prevents performing the same lease request multiple times.
 	// If a previous lease request was granted within the lease lifetime, the same lease will be returned.
 	IdempotencyKey string
@@ -77,7 +76,7 @@ type CapacityLeaseRequest struct {
 	Source LeaseSource
 }
 
-type CapacityLeaseResponse struct {
+type CapacityAcquireResponse struct {
 	LeaseID *ulid.ULID
 
 	// FallbackIdempotencyKey represents an idempotency key to prevent double-spending capacity after
@@ -106,23 +105,15 @@ type CapacityExtendLeaseResponse struct {
 	LeaseID *ulid.ULID
 }
 
-type CapacityCommitRequest struct {
+type CapacityReleaseRequest struct {
 	IdempotencyKey string
 
 	AccountID uuid.UUID
 	LeaseID   ulid.ULID
 }
 
-type CapacityCommitResponse struct{}
+type CapacityReleaseResponse struct{}
 
-type CapacityRollbackRequest struct {
-	IdempotencyKey string
-
-	AccountID uuid.UUID
-	LeaseID   ulid.ULID
-}
-
-type CapacityRollbackResponse struct{}
 
 type RunProcessingMode int
 
