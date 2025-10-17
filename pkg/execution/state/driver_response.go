@@ -386,14 +386,19 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		return nil, fmt.Errorf("function result has no output")
 	}
 
+	if isWrappedError([]byte(*output)) {
+		// Error is already wrapped, return as-is.
+		return output, nil
+	}
+
 	// Now we have the output, we make sure it's keyed the same as regular step
 	// outputs are, either under `data` or `error`.
-	var keyedOutput *string
 	key := "data"
 	if r.Error() != "" {
 		key = "error"
 	}
 
+	var keyedOutput *string
 	keyedByt, err := json.Marshal(map[string]json.RawMessage{
 		key: json.RawMessage(*output),
 	})
@@ -404,6 +409,27 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 	keyedOutput = &s
 
 	return keyedOutput, nil
+}
+
+func isWrappedError(maybeErr []byte) bool {
+	if len(maybeErr) == 0 || maybeErr[0] != '{' {
+		return false
+	}
+
+	// Unmarshal into a struct to check if it's already wrapped.
+	// We don't care about the full structure, just whether it has
+	// the right fields.
+	var wrappedError struct {
+		Error *struct {
+			Message *string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(maybeErr, &wrappedError); err != nil {
+		return false
+	}
+
+	return wrappedError.Error != nil && wrappedError.Error.Message != nil
 }
 
 type WrappedStandardError struct {
