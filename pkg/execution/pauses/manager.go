@@ -17,10 +17,28 @@ var defaultFlushDelay = 10 * time.Second
 
 type ManagerOpt func(m Manager)
 
+type FeatureCallback func(ctx context.Context, workspaceID uuid.UUID) bool
+
 func WithFlushDelay(delay time.Duration) ManagerOpt {
 	return func(m Manager) {
 		if mgr, ok := m.(*manager); ok {
 			mgr.flushDelay = delay
+		}
+	}
+}
+
+func WithBlockFlushEnabled(cb FeatureCallback) ManagerOpt {
+	return func(m Manager) {
+		if mgr, ok := m.(*manager); ok {
+			mgr.blockFlushEnabled = cb
+		}
+	}
+}
+
+func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
+	return func(m Manager) {
+		if mgr, ok := m.(*manager); ok {
+			mgr.blockStoreEnabled = cb
 		}
 	}
 }
@@ -32,10 +50,12 @@ func WithFlushDelay(delay time.Duration) ManagerOpt {
 // This prevents eg. executors and new-runs from retaining blocks in-memory.
 func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ...ManagerOpt) Manager {
 	mgr := &manager{
-		buf:        buf,
-		bs:         bs,
-		flusher:    flusher,
-		flushDelay: defaultFlushDelay,
+		buf:               buf,
+		bs:                bs,
+		flusher:           flusher,
+		flushDelay:        defaultFlushDelay,
+		blockFlushEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
+		blockStoreEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
 	}
 
 	for _, o := range opts {
@@ -59,6 +79,13 @@ type manager struct {
 	bs         BlockStore
 	flusher    BlockFlushEnqueuer
 	flushDelay time.Duration
+
+	// blockFlushEnabled enables flushing pauses to blocks, uploading them to the block
+	// store and updating the metadata.
+	blockFlushEnabled FeatureCallback
+	// blockStoreEnabled enables reading from the block store for a specific workspace,
+	// and also marking pauses as deleted (metadata update, not actual deletion of blocks)
+	blockStoreEnabled FeatureCallback
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
@@ -87,7 +114,7 @@ func (m manager) Aggregated(ctx context.Context, idx Index, minLen int64) (bool,
 	if n > minLen {
 		return true, nil
 	}
-	if m.bs == nil {
+	if m.bs == nil || !m.blockStoreEnabled(ctx, idx.WorkspaceID) {
 		return false, nil
 	}
 	// If we've written a blob, aggregate, assuming there are always many pauses for this index.
@@ -96,7 +123,7 @@ func (m manager) Aggregated(ctx context.Context, idx Index, minLen int64) (bool,
 
 func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 	ok, err := m.buf.IndexExists(ctx, i)
-	if err != nil || ok || m.bs == nil {
+	if err != nil || ok || m.bs == nil || !m.blockStoreEnabled(ctx, i.WorkspaceID) {
 		// It exists in the buffer, so no need to check blobstore.
 		return ok, err
 	}
@@ -177,7 +204,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 		return n, err
 	}
 
-	if m.bs == nil || SkipFlushing(index, pauses) {
+	if m.bs == nil || SkipFlushing(index, pauses) || !m.blockFlushEnabled(ctx, index.WorkspaceID) {
 		// Don't bother flushing, as this needs to be kept in the buffer.
 		return n, nil
 	}
@@ -218,7 +245,7 @@ func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) 
 		return pause, err
 	}
 
-	if m.bs != nil {
+	if m.bs != nil && m.blockStoreEnabled(ctx, index.WorkspaceID) {
 		// We couldn't load from the buffer, so fall back.
 		return m.bs.PauseByID(ctx, index, pauseID)
 	}
@@ -238,7 +265,7 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 		return nil, err
 	}
 
-	if m.bs == nil {
+	if m.bs == nil || !m.blockStoreEnabled(ctx, index.WorkspaceID) {
 		return bufIter, nil
 	}
 
@@ -295,7 +322,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 		return err
 	}
 
-	if m.bs == nil {
+	if m.bs == nil || !m.blockStoreEnabled(ctx, pause.WorkspaceID) {
 		return nil
 	}
 
