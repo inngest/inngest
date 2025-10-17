@@ -7,7 +7,7 @@ import { useActiveTab, useTabManagerActions } from '../../InsightsTabManager/Tab
 import { HOME_TAB, TEMPLATES_TAB } from '../../InsightsTabManager/constants';
 import { useStoredQueries } from '../../QueryHelperPanel/StoredQueriesContext';
 import type { Tab } from '../../types';
-import { handleShortcuts } from '../actions/handleShortcuts';
+import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
 import { getCanRunQuery } from '../utils';
 import { useLatest, useLatestCallback } from './useLatestCallback';
@@ -33,18 +33,28 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const activeTabRef = useLatest(activeTab);
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const shortcutsDisposable = handleShortcuts(editor, monaco, {
-      onRun: () => {
-        if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
+    const shortcutsDisposable = bindEditorShortcuts(
+      editor,
+      {
+        combo: { keyCode: monaco.KeyCode.Enter, metaOrCtrl: true },
+        handler: () => {
+          if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
+        },
       },
-      onSave: () => {
-        const currentTab = activeTabRef.current;
-        if (currentTab !== undefined && isQueryTab(currentTab)) {
-          saveQuery(currentTab);
-        }
+      {
+        combo: { alt: true, keyCode: monaco.KeyCode.KeyS, metaOrCtrl: true },
+        handler: () => {
+          const currentTab = activeTabRef.current;
+          if (currentTab !== undefined && isQueryTab(currentTab)) {
+            saveQuery(currentTab);
+          }
+        },
       },
-      onNewTab: tabManagerActions.createNewTab,
-    });
+      {
+        combo: { alt: true, keyCode: monaco.KeyCode.KeyT, metaOrCtrl: true },
+        handler: tabManagerActions.createNewTab,
+      }
+    );
 
     const markersDisposable = markTemplateVars(editor, monaco);
 

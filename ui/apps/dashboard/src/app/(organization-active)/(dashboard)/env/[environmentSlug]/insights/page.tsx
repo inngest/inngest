@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from 'urql';
 
+import { useDocumentShortcuts } from '@/components/Insights/InsightsSQLEditor/actions/handleShortcuts';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
@@ -20,6 +21,11 @@ export default function InsightsPage() {
     historyWindow,
     isQueryHelperPanelVisible,
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
+  });
+
+  useDocumentShortcuts({
+    combo: { code: 'KeyT', metaOrCtrl: true, alt: true },
+    handler: actions.createNewTab,
   });
 
   const activeTab = tabs.find((t) => t.id === activeTabId);

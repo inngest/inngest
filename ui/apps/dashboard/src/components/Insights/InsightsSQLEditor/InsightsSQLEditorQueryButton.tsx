@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
 import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiCommandLine, RiCornerDownLeftFill } from '@remixicon/react';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useDocumentShortcuts } from './actions/handleShortcuts';
 import { getCanRunQuery } from './utils';
 
 function QueryButtonLabel({ disabled, isRunning }: { disabled: boolean; isRunning: boolean }) {
@@ -32,21 +32,12 @@ export function InsightsSQLEditorQueryButton() {
   const isRunning = status === 'loading';
   const canRunQuery = getCanRunQuery(query, isRunning);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && canRunQuery) {
-        event.preventDefault();
-        event.stopPropagation();
-        runQuery();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [canRunQuery, runQuery]);
+  useDocumentShortcuts({
+    combo: { code: 'Enter', metaOrCtrl: true },
+    handler: () => {
+      if (canRunQuery) runQuery();
+    },
+  });
 
   return (
     <Button
