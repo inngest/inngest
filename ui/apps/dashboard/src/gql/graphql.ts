@@ -950,7 +950,8 @@ export enum FunctionRunStatus {
   /** The function run is currently running. */
   Running = 'RUNNING',
   /** The function run was skipped */
-  Skipped = 'SKIPPED'
+  Skipped = 'SKIPPED',
+  Unknown = 'UNKNOWN'
 }
 
 export enum FunctionRunTimeField {
