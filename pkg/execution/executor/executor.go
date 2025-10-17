@@ -889,6 +889,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
+					// If the event is being rejected because there is another singleton run already in progress,
+					//  we can safely ignore the span for this schedule request
+					dropSpans()
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
 				}
