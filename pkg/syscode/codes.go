@@ -33,4 +33,5 @@ const (
 	CodeConnectTooManyAppsPerConnection               = "connect_too_many_apps_per_connection"
 	CodeConnectWorkerRequestExtendLeaseInvalidPayload = "connect_worker_request_extend_lease_invalid_payload"
 	CodeConnectWorkerStoppedResponding                = "connect_worker_stopped_responding"
+	CodeConnectWorkerAtCapacity                       = "connect_worker_at_capacity"
 )
