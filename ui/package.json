@@ -1,6 +1,8 @@
 {
   "name": "inngest-ui",
   "scripts": {
+    "dev:new-dashboard": "pnpm run --filter @inngest/new-dashboard dev",
+    "dev:new-dev-server-ui": "pnpm run --filter @inngest/new-dev-server-ui dev",
     "format": "prettier . --write",
     "preinstall": "npx only-allow pnpm",
     "prepare": "cd .. && husky install ./ui/.husky"
@@ -16,13 +18,13 @@
   },
   "engines": {
     "node": "20.x",
-    "pnpm": "8.x"
+    "pnpm": "10.x"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@8.15.8",
+  "packageManager": "pnpm@10.18.2",
   "private": true,
   "pnpm": {
     "overrides": {
