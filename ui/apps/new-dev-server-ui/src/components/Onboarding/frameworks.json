@@ -1,0 +1,264 @@
+[
+  {
+    "framework": "Astro",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/astro-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/astro-light.svg"
+    },
+    "version_supported": "v3.8.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-astro"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "AWS Lambda",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/aws-lambda-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/aws-lambda-light.svg"
+    },
+    "version_supported": "v1.5.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-aws-lambda"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Bun",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/bun.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/bun.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#bun-serve"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Cloudflare Pages",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/cloudflare-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/cloudflare-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-cloudflare-pages-functions"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Cloudflare Workers",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/cloudflare-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/cloudflare-light.svg"
+    },
+    "version_supported": "v3.19.15+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-cloudflare-workers"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "DigitalOcean Functions",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/digital-ocean-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/digital-ocean-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-digital-ocean-functions"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Express",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/express-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/express-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-express"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "FastAPI",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/fast-api-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fast-api-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python&ref=dev-server#serving-inngest-functions"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Fastify",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/fastify-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/fastify-light.svg"
+    },
+    "version_supported": "v2.6.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-fastify"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Flask",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/flask.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/flask.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=python&ref=dev-server#serving-inngest-functions"
+    },
+    "language": "Python"
+  },
+  {
+    "framework": "Fresh (Deno)",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/deno-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/deno-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-fresh-deno"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Google Cloud Run Functions",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/google-cloud-functions.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-google-cloud-run-functions"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Firebase Cloud Functions",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/firebase-cloud-functions.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/firebase-cloud-functions.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-firebase-cloud-functions"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "H3",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/h3.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/h3.svg"
+    },
+    "version_supported": "v2.7.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-h3"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Hono",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/hono.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/hono.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-hono"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Koa",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/koa-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/koa-light.svg"
+    },
+    "version_supported": "v3.6.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-koa"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "NestJS",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/nest-js.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nest-js.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-nest-js"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Next.js",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/nextjs-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nextjs-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-next-js"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nitro",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/nitro.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nitro.svg"
+    },
+    "version_supported": "v3.24.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-nitro"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Nuxt",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/nuxt-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/nuxt-light.svg"
+    },
+    "version_supported": "v0.9.2+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-nuxt"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Redwood",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/redwood-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/redwood-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-redwood"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "Remix",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/remix-dark.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/remix-light.svg"
+    },
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-remix"
+    },
+    "language": "TypeScript"
+  },
+  {
+    "framework": "SvelteKit",
+    "logo": {
+      "dark": "https://cdn.inngest.com/logos/frameworks/svelte.svg",
+      "light": "https://cdn.inngest.com/logos/frameworks/svelte.svg"
+    },
+    "version_supported": "v3.5.0+",
+    "link": {
+      "url": "https://www.inngest.com/docs/learn/serving-inngest-functions?guide=typescript&ref=dev-server#framework-svelte-kit"
+    },
+    "language": "TypeScript"
+  }
+]

@@ -9,7 +9,8 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 
-import appCss from '../styles.css?url'
+import globalsCss from '@inngest/components/AppRoot/globals.css?url'
+import fontsCss from '@inngest/components/AppRoot/fonts.css?url'
 import { fetchClerkAuth } from '@/data/clerk'
 
 export const Route = createRootRoute({
@@ -29,16 +30,20 @@ export const Route = createRootRoute({
     links: [
       {
         rel: 'stylesheet',
-        href: appCss,
+        href: globalsCss,
+      },
+      {
+        rel: 'stylesheet',
+        href: fontsCss,
       },
     ],
   }),
   beforeLoad: async () => {
-    // const { userId, token } = await fetchClerkAuth()
-    // return {
-    //   userId,
-    //   token,
-    // }
+    const { userId, token } = await fetchClerkAuth()
+    return {
+      userId,
+      token,
+    }
   },
   component: RootComponent,
 })

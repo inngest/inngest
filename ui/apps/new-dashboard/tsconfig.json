@@ -29,7 +29,9 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@inngest/components": ["../../packages/components/src"],
+      "@inngest/components/*": ["../../packages/components/src/*"]
     }
   }
 }

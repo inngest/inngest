@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import * as React from 'react'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { ClerkProvider } from '@clerk/tanstack-react-start'
+
 import {
   HeadContent,
   Outlet,
@@ -9,8 +9,8 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 
-import appCss from '../styles.css?url'
-import { fetchClerkAuth } from '@/data/clerk'
+import globalsCss from '@inngest/components/AppRoot/globals.css?url'
+import fontsCss from '@inngest/components/AppRoot/fonts.css?url'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -29,17 +29,14 @@ export const Route = createRootRoute({
     links: [
       {
         rel: 'stylesheet',
-        href: appCss,
+        href: globalsCss,
+      },
+      {
+        rel: 'stylesheet',
+        href: fontsCss,
       },
     ],
   }),
-  beforeLoad: async () => {
-    // const { userId, token } = await fetchClerkAuth()
-    // return {
-    //   userId,
-    //   token,
-    // }
-  },
   component: RootComponent,
 })
 
@@ -53,17 +50,17 @@ function RootComponent() {
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
-      <html>
-        <head>
-          <HeadContent />
-        </head>
-        <body>
-          {children}
-          <TanStackRouterDevtools position="bottom-right" />
-          <Scripts />
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body className="bg-canvasBase text-basis h-full overflow-auto overscroll-none">
+        <div id="app" />
+        <div id="modals" />
+        {children}
+        <TanStackRouterDevtools position="bottom-right" />
+        <Scripts />
+      </body>
+    </html>
   )
 }
