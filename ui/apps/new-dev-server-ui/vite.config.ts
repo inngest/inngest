@@ -13,6 +13,9 @@ export default defineConfig({
       ),
     },
   },
+  ssr: {
+    noExternal: ['@reduxjs/toolkit', '@rtk-query/graphql-request-base-query'],
+  },
   plugins: [
     tsConfigPaths({
       projects: ['./tsconfig.json'],

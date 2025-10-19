@@ -1,6 +1,4 @@
-import pkg from '@reduxjs/toolkit/query/react'
-const { createApi, fetchBaseQuery } = pkg
-
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { z } from 'zod'
 
 import { api } from './generated'
@@ -62,7 +60,7 @@ export const devApi = createApi({
         method: 'POST',
         body: event,
       }),
-      onQueryStarted(event, { dispatch, queryFulfilled }) {
+      onQueryStarted(event, { dispatch }) {
         // Don't optimistically update if this is a function invocation, as the
         // shape of the payload will be different when sending vs receiving.
         if (event.functionId) {
