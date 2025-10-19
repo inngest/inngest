@@ -23,7 +23,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Inngest Dashboard',
+        title: 'Inngest Development Server',
       },
     ],
     links: [

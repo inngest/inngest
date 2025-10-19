@@ -13,7 +13,7 @@ export const getRouter = () => {
     defaultPreload: 'intent',
     defaultErrorComponent: (err) => <p>{err.error.stack}</p>,
     defaultNotFoundComponent: () => <p>not found</p>,
-    Wrap: (props: { children: React.ReactNode }) => (
+    Wrap: (props: { children: React.JSX.Element }) => (
       <QueryClientProvider client={queryClient}>
         {props.children}
       </QueryClientProvider>
