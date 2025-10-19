@@ -1,4 +1,6 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import pkg from '@reduxjs/toolkit/query/react'
+const { createApi, fetchBaseQuery } = pkg
+
 import { z } from 'zod'
 
 import { api } from './generated'

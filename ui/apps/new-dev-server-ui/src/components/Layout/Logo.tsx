@@ -1,12 +1,10 @@
-'use client'
-
-import NextLink from 'next/link'
 import { Button } from '@inngest/components/Button'
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo'
 import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall'
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react'
 
 import { useInfoQuery } from '@/store/devApi'
+import { Link } from '@tanstack/react-router'
 
 type LogoProps = {
   collapsed: boolean
@@ -59,9 +57,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
           </div>
         ) : (
           <div className="flex flex-row items-center justify-start">
-            <NextLink href="/">
+            <Link to="/">
               <InngestLogo className="text-basis mr-1.5" width={96} />
-            </NextLink>
+            </Link>
             {isDevServer ? (
               <span className="text-primary-intense text-[11px] font-medium leading-none">
                 DEV SERVER

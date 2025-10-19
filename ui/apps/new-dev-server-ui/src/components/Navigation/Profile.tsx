@@ -1,5 +1,3 @@
-'use client'
-
 import { RiCodeSSlashLine } from '@remixicon/react'
 
 import { ProfileMenu } from './ProfileMenu'

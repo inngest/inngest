@@ -1,4 +1,5 @@
-import { configureStore } from '@reduxjs/toolkit'
+import pkg from '@reduxjs/toolkit'
+const { configureStore } = pkg
 
 import devApi from './devApi'
 import { api } from './generated'

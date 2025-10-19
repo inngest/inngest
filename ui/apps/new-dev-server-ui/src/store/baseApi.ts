@@ -1,4 +1,5 @@
-import { createApi } from '@reduxjs/toolkit/query/react'
+import pkg from '@reduxjs/toolkit/query/react'
+const { createApi } = pkg
 import { graphqlRequestBaseQuery } from '@rtk-query/graphql-request-base-query'
 import { GraphQLClient } from 'graphql-request'
 

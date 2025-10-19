@@ -11,6 +11,7 @@ import {
 
 import globalsCss from '@inngest/components/AppRoot/globals.css?url'
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url'
+import StoreProvider from '@/components/StoreProvider'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -26,6 +27,18 @@ export const Route = createRootRoute({
         title: 'Inngest Development Server',
       },
     ],
+    icons: {
+      icon: [
+        {
+          url: '/favicon-june-2025.svg',
+          media: '(prefers-color-scheme: light)',
+        },
+        {
+          url: '/favicon-june-2025.svg',
+          media: '(prefers-color-scheme: dark)',
+        },
+      ],
+    },
     links: [
       {
         rel: 'stylesheet',
@@ -57,7 +70,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="bg-canvasBase text-basis h-full overflow-auto overscroll-none">
         <div id="app" />
         <div id="modals" />
-        {children}
+        <StoreProvider>{children}</StoreProvider>
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />
       </body>

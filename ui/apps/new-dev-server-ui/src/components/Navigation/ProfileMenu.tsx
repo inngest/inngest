@@ -1,20 +1,11 @@
-'use client'
-
-import dynamic from 'next/dynamic'
 import { Listbox } from '@headlessui/react'
-
-const ModeSwitch = dynamic(
-  () => import('@inngest/components/ThemeMode/ModeSwitch'),
-  {
-    ssr: false,
-  },
-)
+import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch'
 
 export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">
-        {children}
+        {children as JSX.Element}
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">

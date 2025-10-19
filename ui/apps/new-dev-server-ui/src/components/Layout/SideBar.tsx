@@ -1,7 +1,3 @@
-'use client'
-
-import React from 'react'
-
 import { EnvironmentMenu } from '../Navigation/Environments'
 import { Help } from '../Navigation/Help'
 import Manage from '../Navigation/Manage'
