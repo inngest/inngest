@@ -66,20 +66,26 @@ type RunOutputReader interface {
 type CheckpointAPIOpts struct {
 	// CheckpointMetrics records metrics for checkpoints.
 	CheckpointMetrics CheckpointMetricsProvider
+	// RunOutputReader is the reader used to fetch run outputs for checkpoint APIs.
+	RunOutputReader RunOutputReader
+	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
+	// to redirect to an API endpoint that fetches outputs for a specific run.
+	RunJWTSecret []byte
 }
 
-func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
-	if opts.CheckpointMetrics == nil {
-		opts.CheckpointMetrics = nilCheckpointMetrics{}
+func NewCheckpointAPI(o Opts) CheckpointAPI {
+	metrics := o.CheckpointOpts.CheckpointMetrics
+	if metrics == nil {
+		metrics = nilCheckpointMetrics{}
 	}
 
 	api := checkpointAPI{
 		Router:          chi.NewRouter(),
 		Opts:            o,
 		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
-		runClaimsSecret: o.RunJWTSecret,
-		outputReader:    o.RunOutputReader,
-		m:               opts.CheckpointMetrics,
+		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
+		outputReader:    o.CheckpointOpts.RunOutputReader,
+		m:               metrics,
 	}
 
 	api.Post("/", api.CheckpointNewRun)
