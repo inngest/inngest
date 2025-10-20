@@ -138,8 +138,8 @@ function makeCSPHeader() {
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
       isDev
-    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(isDev)}`,
-    `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
+    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} ${getAllowUnsafeEval(isDev)}`,
+    `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL}`,
     `worker-src 'self' blob:`,
   ]
     .map((line) => line.trim())
