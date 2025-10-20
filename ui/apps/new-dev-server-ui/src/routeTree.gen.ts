@@ -8,10 +8,20 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
+import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
+import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
+import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
+import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
+import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
+import { Route as DashboardAppsOnboardingChooseFrameworkRouteImport } from './routes/_dashboard/apps/_onboarding/choose-framework'
+
+const DashboardAppsRouteImport = createFileRoute('/_dashboard/apps')()
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/_dashboard',
@@ -22,32 +32,113 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardAppsRoute = DashboardAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
   id: '/runs/',
   path: '/runs/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardRunIndexRoute = DashboardRunIndexRouteImport.update({
+  id: '/run/',
+  path: '/run/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAppsIndexRoute = DashboardAppsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardAppsRoute,
+} as any)
+const DashboardAppsOnboardingRouteRoute =
+  DashboardAppsOnboardingRouteRouteImport.update({
+    id: '/_onboarding',
+    getParentRoute: () => DashboardAppsRoute,
+  } as any)
+const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
+  id: '/app/',
+  path: '/app/',
+  getParentRoute: () => DashboardAppsRoute,
+} as any)
+const DashboardAppsOnboardingChooseTemplateRoute =
+  DashboardAppsOnboardingChooseTemplateRouteImport.update({
+    id: '/choose-template',
+    path: '/choose-template',
+    getParentRoute: () => DashboardAppsOnboardingRouteRoute,
+  } as any)
+const DashboardAppsOnboardingChooseFrameworkRoute =
+  DashboardAppsOnboardingChooseFrameworkRouteImport.update({
+    id: '/choose-framework',
+    path: '/choose-framework',
+    getParentRoute: () => DashboardAppsOnboardingRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/apps': typeof DashboardAppsOnboardingRouteRouteWithChildren
+  '/apps/': typeof DashboardAppsIndexRoute
+  '/run': typeof DashboardRunIndexRoute
   '/runs': typeof DashboardRunsIndexRoute
+  '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
+  '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
+  '/apps/app': typeof DashboardAppsAppIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/apps': typeof DashboardAppsIndexRoute
+  '/run': typeof DashboardRunIndexRoute
   '/runs': typeof DashboardRunsIndexRoute
+  '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
+  '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
+  '/apps/app': typeof DashboardAppsAppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteWithChildren
+  '/_dashboard/apps': typeof DashboardAppsRouteWithChildren
+  '/_dashboard/apps/_onboarding': typeof DashboardAppsOnboardingRouteRouteWithChildren
+  '/_dashboard/apps/': typeof DashboardAppsIndexRoute
+  '/_dashboard/run/': typeof DashboardRunIndexRoute
   '/_dashboard/runs/': typeof DashboardRunsIndexRoute
+  '/_dashboard/apps/_onboarding/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
+  '/_dashboard/apps/_onboarding/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
+  '/_dashboard/apps/app/': typeof DashboardAppsAppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/runs'
+  fullPaths:
+    | '/'
+    | '/apps'
+    | '/apps/'
+    | '/run'
+    | '/runs'
+    | '/apps/choose-framework'
+    | '/apps/choose-template'
+    | '/apps/app'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/runs'
-  id: '__root__' | '/' | '/_dashboard' | '/_dashboard/runs/'
+  to:
+    | '/'
+    | '/apps'
+    | '/run'
+    | '/runs'
+    | '/apps/choose-framework'
+    | '/apps/choose-template'
+    | '/apps/app'
+  id:
+    | '__root__'
+    | '/'
+    | '/_dashboard'
+    | '/_dashboard/apps'
+    | '/_dashboard/apps/_onboarding'
+    | '/_dashboard/apps/'
+    | '/_dashboard/run/'
+    | '/_dashboard/runs/'
+    | '/_dashboard/apps/_onboarding/choose-framework'
+    | '/_dashboard/apps/_onboarding/choose-template'
+    | '/_dashboard/apps/app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -71,6 +162,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/apps': {
+      id: '/_dashboard/apps'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof DashboardAppsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/runs/': {
       id: '/_dashboard/runs/'
       path: '/runs'
@@ -78,14 +176,95 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRunsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/run/': {
+      id: '/_dashboard/run/'
+      path: '/run'
+      fullPath: '/run'
+      preLoaderRoute: typeof DashboardRunIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/apps/': {
+      id: '/_dashboard/apps/'
+      path: '/'
+      fullPath: '/apps/'
+      preLoaderRoute: typeof DashboardAppsIndexRouteImport
+      parentRoute: typeof DashboardAppsRoute
+    }
+    '/_dashboard/apps/_onboarding': {
+      id: '/_dashboard/apps/_onboarding'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof DashboardAppsOnboardingRouteRouteImport
+      parentRoute: typeof DashboardAppsRoute
+    }
+    '/_dashboard/apps/app/': {
+      id: '/_dashboard/apps/app/'
+      path: '/app'
+      fullPath: '/apps/app'
+      preLoaderRoute: typeof DashboardAppsAppIndexRouteImport
+      parentRoute: typeof DashboardAppsRoute
+    }
+    '/_dashboard/apps/_onboarding/choose-template': {
+      id: '/_dashboard/apps/_onboarding/choose-template'
+      path: '/choose-template'
+      fullPath: '/apps/choose-template'
+      preLoaderRoute: typeof DashboardAppsOnboardingChooseTemplateRouteImport
+      parentRoute: typeof DashboardAppsOnboardingRouteRoute
+    }
+    '/_dashboard/apps/_onboarding/choose-framework': {
+      id: '/_dashboard/apps/_onboarding/choose-framework'
+      path: '/choose-framework'
+      fullPath: '/apps/choose-framework'
+      preLoaderRoute: typeof DashboardAppsOnboardingChooseFrameworkRouteImport
+      parentRoute: typeof DashboardAppsOnboardingRouteRoute
+    }
   }
 }
 
+interface DashboardAppsOnboardingRouteRouteChildren {
+  DashboardAppsOnboardingChooseFrameworkRoute: typeof DashboardAppsOnboardingChooseFrameworkRoute
+  DashboardAppsOnboardingChooseTemplateRoute: typeof DashboardAppsOnboardingChooseTemplateRoute
+}
+
+const DashboardAppsOnboardingRouteRouteChildren: DashboardAppsOnboardingRouteRouteChildren =
+  {
+    DashboardAppsOnboardingChooseFrameworkRoute:
+      DashboardAppsOnboardingChooseFrameworkRoute,
+    DashboardAppsOnboardingChooseTemplateRoute:
+      DashboardAppsOnboardingChooseTemplateRoute,
+  }
+
+const DashboardAppsOnboardingRouteRouteWithChildren =
+  DashboardAppsOnboardingRouteRoute._addFileChildren(
+    DashboardAppsOnboardingRouteRouteChildren,
+  )
+
+interface DashboardAppsRouteChildren {
+  DashboardAppsOnboardingRouteRoute: typeof DashboardAppsOnboardingRouteRouteWithChildren
+  DashboardAppsIndexRoute: typeof DashboardAppsIndexRoute
+  DashboardAppsAppIndexRoute: typeof DashboardAppsAppIndexRoute
+}
+
+const DashboardAppsRouteChildren: DashboardAppsRouteChildren = {
+  DashboardAppsOnboardingRouteRoute:
+    DashboardAppsOnboardingRouteRouteWithChildren,
+  DashboardAppsIndexRoute: DashboardAppsIndexRoute,
+  DashboardAppsAppIndexRoute: DashboardAppsAppIndexRoute,
+}
+
+const DashboardAppsRouteWithChildren = DashboardAppsRoute._addFileChildren(
+  DashboardAppsRouteChildren,
+)
+
 interface DashboardRouteChildren {
+  DashboardAppsRoute: typeof DashboardAppsRouteWithChildren
+  DashboardRunIndexRoute: typeof DashboardRunIndexRoute
   DashboardRunsIndexRoute: typeof DashboardRunsIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAppsRoute: DashboardAppsRouteWithChildren,
+  DashboardRunIndexRoute: DashboardRunIndexRoute,
   DashboardRunsIndexRoute: DashboardRunsIndexRoute,
 }
 

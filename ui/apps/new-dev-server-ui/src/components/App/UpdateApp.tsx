@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Input } from '@inngest/components/Forms/Input'
-import { Link } from '@inngest/components/Link/Link'
+import { Link } from '@inngest/components/Link/NewLink'
 import useDebounce from '@inngest/components/hooks/useDebounce'
 import { IconSpinner } from '@inngest/components/icons/Spinner'
 import { cn } from '@inngest/components/utils/classNames'

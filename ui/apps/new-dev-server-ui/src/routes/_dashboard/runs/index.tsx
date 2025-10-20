@@ -34,10 +34,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 const pollInterval = 400
 
 export const Route = createFileRoute('/_dashboard/runs/')({
-  component: DashboardComponent,
+  component: RunsComponent,
 })
 
-function DashboardComponent() {
+function RunsComponent() {
   const { booleanFlag } = useBooleanFlag()
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
     'polling-disabled',

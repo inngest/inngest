@@ -1,6 +1,5 @@
 import type { UrlObject } from 'url';
 import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import type { Route } from 'next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { Link, type LinkComponentProps } from '@tanstack/react-router';
@@ -45,14 +44,7 @@ type LinkWrapperProps = {
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, target, prefetch = false, scroll = true, ...props }, ref) =>
     href ? (
-      <Link
-        href={href as Route}
-        target={target}
-        preload={prefetch}
-        resetScroll={scroll}
-        ref={ref}
-        {...props}
-      >
+      <Link to={href} target={target} preload={prefetch} resetScroll={scroll} ref={ref} {...props}>
         {children}
       </Link>
     ) : (
