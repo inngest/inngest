@@ -59,6 +59,9 @@ local marshaledConstraints    = ARGV[11]
 local checkConstraints    = tonumber(ARGV[12])
 local refilledFromBacklog = tonumber(ARGV[13])
 
+-- constraint API rollout
+local fallbackIdempotencyKey = ARGV[14]
+
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
 -- $include(check_concurrency.lua)
@@ -90,6 +93,11 @@ item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
 -- NOTE: we can probably skip this entire section if item comes from backlog?
 if checkConstraints == 1 then
+  -- TODO: If Constraint API already approved lease, we do not want to double-spend capacity!
+  if fallbackIdempotencyKey ~= "" then
+    -- TODO: Check if idempotency key is set
+  end
+
   local constraints = cjson.decode(marshaledConstraints)
 
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
