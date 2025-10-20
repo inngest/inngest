@@ -21,6 +21,7 @@ import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/eve
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
 import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
+import { Route as DashboardDebuggerFunctionIndexRouteImport } from './routes/_dashboard/debugger/function/index'
 import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
 import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
 import { Route as DashboardAppsOnboardingChooseFrameworkRouteImport } from './routes/_dashboard/apps/_onboarding/choose-framework'
@@ -82,6 +83,12 @@ const DashboardFunctionsConfigIndexRoute =
     path: '/config/',
     getParentRoute: () => DashboardFunctionsRouteRoute,
   } as any)
+const DashboardDebuggerFunctionIndexRoute =
+  DashboardDebuggerFunctionIndexRouteImport.update({
+    id: '/debugger/function/',
+    path: '/debugger/function/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
   id: '/app/',
   path: '/app/',
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/apps/app': typeof DashboardAppsAppIndexRoute
+  '/debugger/function': typeof DashboardDebuggerFunctionIndexRoute
   '/functions/config': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +133,7 @@ export interface FileRoutesByTo {
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/apps/app': typeof DashboardAppsAppIndexRoute
+  '/debugger/function': typeof DashboardDebuggerFunctionIndexRoute
   '/functions/config': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRoutesById {
@@ -142,6 +151,7 @@ export interface FileRoutesById {
   '/_dashboard/apps/_onboarding/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/_dashboard/apps/_onboarding/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/_dashboard/apps/app/': typeof DashboardAppsAppIndexRoute
+  '/_dashboard/debugger/function/': typeof DashboardDebuggerFunctionIndexRoute
   '/_dashboard/functions/config/': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRouteTypes {
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/apps/app'
+    | '/debugger/function'
     | '/functions/config'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/apps/app'
+    | '/debugger/function'
     | '/functions/config'
   id:
     | '__root__'
@@ -187,6 +199,7 @@ export interface FileRouteTypes {
     | '/_dashboard/apps/_onboarding/choose-framework'
     | '/_dashboard/apps/_onboarding/choose-template'
     | '/_dashboard/apps/app/'
+    | '/_dashboard/debugger/function/'
     | '/_dashboard/functions/config/'
   fileRoutesById: FileRoutesById
 }
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFunctionsConfigIndexRouteImport
       parentRoute: typeof DashboardFunctionsRouteRoute
     }
+    '/_dashboard/debugger/function/': {
+      id: '/_dashboard/debugger/function/'
+      path: '/debugger/function'
+      fullPath: '/debugger/function'
+      preLoaderRoute: typeof DashboardDebuggerFunctionIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/apps/app/': {
       id: '/_dashboard/apps/app/'
       path: '/app'
@@ -354,6 +374,7 @@ interface DashboardRouteChildren {
   DashboardEventsIndexRoute: typeof DashboardEventsIndexRoute
   DashboardRunIndexRoute: typeof DashboardRunIndexRoute
   DashboardRunsIndexRoute: typeof DashboardRunsIndexRoute
+  DashboardDebuggerFunctionIndexRoute: typeof DashboardDebuggerFunctionIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -363,6 +384,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardEventsIndexRoute: DashboardEventsIndexRoute,
   DashboardRunIndexRoute: DashboardRunIndexRoute,
   DashboardRunsIndexRoute: DashboardRunsIndexRoute,
+  DashboardDebuggerFunctionIndexRoute: DashboardDebuggerFunctionIndexRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
