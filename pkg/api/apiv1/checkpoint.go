@@ -62,6 +62,41 @@ type RunOutputReader interface {
 	RunOutput(ctx context.Context, envID uuid.UUID, runID ulid.ULID) ([]byte, error)
 }
 
+// CheckpointAPIOpts represents options for the checkpoint API.
+type CheckpointAPIOpts struct {
+	// CheckpointMetrics records metrics for checkpoints.
+	CheckpointMetrics CheckpointMetricsProvider
+	// RunOutputReader is the reader used to fetch run outputs for checkpoint APIs.
+	RunOutputReader RunOutputReader
+	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
+	// to redirect to an API endpoint that fetches outputs for a specific run.
+	RunJWTSecret []byte
+}
+
+func NewCheckpointAPI(o Opts) CheckpointAPI {
+	metrics := o.CheckpointOpts.CheckpointMetrics
+	if metrics == nil {
+		metrics = nilCheckpointMetrics{}
+	}
+
+	api := checkpointAPI{
+		Router:          chi.NewRouter(),
+		Opts:            o,
+		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
+		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
+		outputReader:    o.CheckpointOpts.RunOutputReader,
+		m:               metrics,
+	}
+
+	api.Post("/", api.CheckpointNewRun)
+	api.Post("/{runID}/steps", api.CheckpointSteps)
+	api.Post("/{runID}/response", api.CheckpointResponse)
+	api.HandleFunc("/{runID}/output", api.Output)
+
+	return api
+}
+
+// checkpointAPI is the base implementation.
 type checkpointAPI struct {
 	Opts
 
@@ -74,31 +109,7 @@ type checkpointAPI struct {
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
 	outputReader RunOutputReader
-}
-
-type CheckpointAPIOpts struct {
-	Opts
-
-	RunClaimsSecret []byte
-
-	RunOutputReader RunOutputReader
-}
-
-func NewCheckpointAPI(o Opts, opts CheckpointAPIOpts) CheckpointAPI {
-	api := checkpointAPI{
-		Router:          chi.NewRouter(),
-		Opts:            o,
-		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
-		runClaimsSecret: o.RunJWTSecret,
-		outputReader:    o.RunOutputReader,
-	}
-
-	api.Post("/", api.CheckpointNewRun)
-	api.Post("/{runID}/steps", api.CheckpointSteps)
-	api.Post("/{runID}/response", api.CheckpointResponse)
-	api.HandleFunc("/{runID}/output", api.Output)
-
-	return api
+	m            CheckpointMetricsProvider
 }
 
 // CheckpointNewRun creates new runs from API-based functions.  These functions do NOT
@@ -164,22 +175,30 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		Events:      []event.TrackedEvent{evt},
 	})
 
-	var jwt string
-	if len(input.Steps) > 0 {
-		jwt = a.checkpoint(ctx, checkpointSteps{
-			RunID:     input.RunID,
-			FnID:      fn.ID,
-			AppID:     appID,
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
-			Steps:     input.Steps,
-
-			md: md,
-		}, w)
-	}
-
 	switch err {
 	case nil:
+
+		go a.m.OnFnScheduled(ctx, CheckpointMetrics{
+			AccountID: auth.AccountID(),
+			EnvID:     auth.WorkspaceID(),
+			AppID:     appID,
+			FnID:      fn.ID,
+		})
+
+		var jwt string
+		if len(input.Steps) > 0 {
+			jwt = a.checkpoint(ctx, checkpointSteps{
+				RunID:     input.RunID,
+				FnID:      fn.ID,
+				AppID:     appID,
+				AccountID: auth.AccountID(),
+				EnvID:     auth.WorkspaceID(),
+				Steps:     input.Steps,
+
+				md: md,
+			}, w)
+		}
+
 		_ = WriteResponse(w, CheckpointNewRunResponse{
 			RunID: md.ID.RunID.String(),
 			FnID:  fn.ID,
@@ -188,10 +207,13 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	case state.ErrIdentifierExists:
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(409, "Run already exists"))
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(http.StatusConflict, "Run already exists"))
+		return
+	case executor.ErrFunctionRateLimited:
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusTooManyRequests, "Rate limits exceeded"))
 		return
 	default:
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Failed to schedule run"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Failed to schedule run"))
 		return
 	}
 }
@@ -348,6 +370,13 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				l.Error("error saving span for checkpoint op", "error", err)
 			}
 
+			go a.m.OnStepFinished(ctx, CheckpointMetrics{
+				AccountID: input.AccountID,
+				EnvID:     input.EnvID,
+				AppID:     input.AppID,
+				FnID:      input.FnID,
+			}, enums.StepStatusCompleted)
+
 		case enums.OpcodeStepError, enums.OpcodeStepFailed:
 			// StepErrors are unique.  Firstly, we must always store traces.  However, if
 			// we retry the step, we move from sync -> async, requiring jobs to be scheduled.
@@ -413,6 +442,13 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
 			}
+
+			go a.m.OnFnFinished(ctx, CheckpointMetrics{
+				AccountID: input.AccountID,
+				EnvID:     input.EnvID,
+				AppID:     input.AppID,
+				FnID:      input.FnID,
+			}, enums.RunStatusCompleted)
 
 			// Call finalize and process the entire op.
 			if err := a.finalize(ctx, *input.md, result.Data); err != nil {

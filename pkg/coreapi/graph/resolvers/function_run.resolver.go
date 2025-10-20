@@ -266,7 +266,6 @@ func (r *mutationResolver) Rerun(
 	debugSessionID *ulid.ULID,
 	debugRunID *ulid.ULID,
 ) (ulid.ULID, error) {
-
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
 
@@ -348,6 +347,8 @@ func (r *mutationResolver) Rerun(
 		WorkspaceID:    consts.DevServerEnvID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
+		// NOTE: Bypass rate limits for reruns, as the user explicitly expects this to trigger
+		PreventRateLimit: true,
 	})
 	if err != nil {
 		return ulid.Zero, err

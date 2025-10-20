@@ -30,6 +30,8 @@ export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
       return FunctionRunStatusEnum.Paused;
     case 'SKIPPED':
       return FunctionRunStatusEnum.Skipped;
+    case 'UNKNOWN':
+      return FunctionRunStatusEnum.Unknown;
   }
 }
 
@@ -43,8 +45,6 @@ export function toRunStatuses(statuses: string[]): FunctionRunStatusEnum[] {
   for (const status of statuses) {
     if (isFunctionRunStatus(status)) {
       newValue.push(toRunStatus(status));
-    } else {
-      console.error(`unexpected status: ${status}`);
     }
   }
 
