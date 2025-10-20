@@ -73,6 +73,9 @@ var Attrs = struct {
 	// attributes, in place of the output itself.
 	StepHasOutput attr[*bool]
 
+	StepUserlandID    attr[*string]
+	StepUserlandIndex attr[*int]
+
 	// step.run attributes
 	StepRunType attr[*string]
 
@@ -165,6 +168,8 @@ var Attrs = struct {
 	StepRunType:               StringAttr("step.run.type"),
 	StepSignalName:            StringAttr("step.signal.name"),
 	StepSleepDuration:         DurationAttr("step.sleep.duration"),
+	StepUserlandID:            StringAttr("step.userland.id"),
+	StepUserlandIndex:         IntAttr("step.userland.index"),
 	StepWaitExpired:           BoolAttr("step.wait.expired"),
 	StepWaitExpiry:            TimeAttr("step.wait.expiry"),
 	StepWaitForEventIf:        StringAttr("step.wait_for_event.if"),
