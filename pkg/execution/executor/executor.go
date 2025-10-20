@@ -759,45 +759,45 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	var (
 		runSpanRef       *tracing.DroppableSpan
 		discoverySpanRef *tracing.DroppableSpan
-
-		// Whether we should send the spans to the history store (ClickHouse).
-		// If false, we'll drop the spans and not send them. There's a variety
-		// of scenarios where the run ends up not scheduling so we don't want to
-		// add it to the history store. Some scenarios are happy path (e.g.
-		// queue idempotency) and some are sad path (e.g. Executor borked)
-		sendSpans bool
 	)
 
-	// Handle span-sending
-	defer func() {
+	// Send spans to the history store (ClickHouse). If not called, we'll drop
+	// the spans and not send them. There's a variety of scenarios where the run
+	// ends up not scheduling so we don't want to add it to the history store.
+	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
+	// path (e.g. Executor borked)
+	sendSpans := func() {
 		if runSpanRef != nil {
-			if sendSpans {
-				err := runSpanRef.Send()
-				if err != nil {
-					l.Error(
-						"error sending run span",
-						"error", err,
-						"run_id", runID,
-					)
-				}
-			} else {
-				runSpanRef.Drop()
+			err := runSpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending run span",
+					"error", err,
+					"run_id", runID,
+				)
 			}
 		}
 
 		if discoverySpanRef != nil {
-			if sendSpans {
-				err := discoverySpanRef.Send()
-				if err != nil {
-					l.Error(
-						"error sending discovery span",
-						"error", err,
-						"run_id", runID,
-					)
-				}
-			} else {
-				discoverySpanRef.Drop()
+			err := discoverySpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending discovery span",
+					"error", err,
+					"run_id", runID,
+				)
 			}
+		}
+	}
+
+	// Handle span dropping. The drops will be noops if the spans were sent
+	defer func() {
+		if runSpanRef != nil {
+			runSpanRef.Drop()
+		}
+
+		if discoverySpanRef != nil {
+			discoverySpanRef.Drop()
 		}
 	}()
 
@@ -829,7 +829,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// If this is paused, immediately end just before creating state.
 	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-		sendSpans = true
+		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
 	}
 
@@ -1060,7 +1060,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		sendSpans = true
+		sendSpans()
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 
