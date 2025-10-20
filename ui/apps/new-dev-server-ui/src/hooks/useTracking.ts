@@ -27,7 +27,7 @@ export function useTracking() {
 }
 
 function createDevServerURL(path: string) {
-  const host = process.env.NEXT_PUBLIC_API_BASE_URL
+  const host = process.env.VITE_PUBLIC_API_BASE_URL
   if (!host) {
     return path
   }

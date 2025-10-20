@@ -3,8 +3,8 @@ import { z } from 'zod'
 
 import { api } from './generated'
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL)
+const baseURL = import.meta.env.VITE_PUBLIC_API_BASE_URL
+  ? new URL('/', import.meta.env.VITE_PUBLIC_API_BASE_URL)
   : '/'
 
 export interface EventPayload {

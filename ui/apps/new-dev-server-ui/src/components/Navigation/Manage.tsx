@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { MenuItem } from '@inngest/components/Menu/MenuItem'
+
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag'
 import { AppsIcon } from '@inngest/components/icons/sections/Apps'
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions'
 
 import { useGetAppsQuery } from '@/store/generated'
+import { MenuItem } from '@inngest/components/Menu/NewMenuItem'
 
 export default function Mange({ collapsed }: { collapsed: boolean }) {
   const [pollingInterval, setPollingInterval] = useState(1500)
