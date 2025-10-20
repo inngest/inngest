@@ -129,3 +129,23 @@ func (u *user) Retryable() bool           { return u.retryable }
 func (u *user) RetryAfter() time.Duration { return u.retryAfter }
 func (u *user) Raw() []byte               { return u.raw }
 func (*user) UserError()                  {}
+
+func NewError(
+	isUser bool,
+	code int,
+	retryable bool,
+	retryAfter time.Duration,
+	msg string,
+	a ...any,
+) error {
+	switch {
+	case isUser && retryable:
+		return WrapAfterUser(code, retryAfter, msg, a...)
+	case isUser && !retryable:
+		return WrapUser(code, false, msg, a...)
+	case !isUser && retryable:
+		return WrapAfter(code, retryAfter, msg, a...)
+	default:
+		return Wrap(code, false, msg, a...)
+	}
+}
