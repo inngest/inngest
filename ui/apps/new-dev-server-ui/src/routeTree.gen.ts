@@ -13,10 +13,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardFunctionsRouteRouteImport } from './routes/_dashboard/functions/route'
 import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
 import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
+import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
 import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
 import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
 import { Route as DashboardAppsOnboardingChooseFrameworkRouteImport } from './routes/_dashboard/apps/_onboarding/choose-framework'
@@ -35,6 +37,11 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardAppsRoute = DashboardAppsRouteImport.update({
   id: '/apps',
   path: '/apps',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardFunctionsRouteRoute = DashboardFunctionsRouteRouteImport.update({
+  id: '/functions',
+  path: '/functions',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
@@ -57,6 +64,12 @@ const DashboardAppsOnboardingRouteRoute =
     id: '/_onboarding',
     getParentRoute: () => DashboardAppsRoute,
   } as any)
+const DashboardFunctionsConfigIndexRoute =
+  DashboardFunctionsConfigIndexRouteImport.update({
+    id: '/config/',
+    path: '/config/',
+    getParentRoute: () => DashboardFunctionsRouteRoute,
+  } as any)
 const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
   id: '/app/',
   path: '/app/',
@@ -77,6 +90,7 @@ const DashboardAppsOnboardingChooseFrameworkRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/apps': typeof DashboardAppsOnboardingRouteRouteWithChildren
   '/apps/': typeof DashboardAppsIndexRoute
   '/run': typeof DashboardRunIndexRoute
@@ -84,20 +98,24 @@ export interface FileRoutesByFullPath {
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/apps/app': typeof DashboardAppsAppIndexRoute
+  '/functions/config': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/apps': typeof DashboardAppsIndexRoute
   '/run': typeof DashboardRunIndexRoute
   '/runs': typeof DashboardRunsIndexRoute
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/apps/app': typeof DashboardAppsAppIndexRoute
+  '/functions/config': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteWithChildren
+  '/_dashboard/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/_dashboard/apps': typeof DashboardAppsRouteWithChildren
   '/_dashboard/apps/_onboarding': typeof DashboardAppsOnboardingRouteRouteWithChildren
   '/_dashboard/apps/': typeof DashboardAppsIndexRoute
@@ -106,11 +124,13 @@ export interface FileRoutesById {
   '/_dashboard/apps/_onboarding/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/_dashboard/apps/_onboarding/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/_dashboard/apps/app/': typeof DashboardAppsAppIndexRoute
+  '/_dashboard/functions/config/': typeof DashboardFunctionsConfigIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/functions'
     | '/apps'
     | '/apps/'
     | '/run'
@@ -118,19 +138,23 @@ export interface FileRouteTypes {
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/apps/app'
+    | '/functions/config'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/functions'
     | '/apps'
     | '/run'
     | '/runs'
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/apps/app'
+    | '/functions/config'
   id:
     | '__root__'
     | '/'
     | '/_dashboard'
+    | '/_dashboard/functions'
     | '/_dashboard/apps'
     | '/_dashboard/apps/_onboarding'
     | '/_dashboard/apps/'
@@ -139,6 +163,7 @@ export interface FileRouteTypes {
     | '/_dashboard/apps/_onboarding/choose-framework'
     | '/_dashboard/apps/_onboarding/choose-template'
     | '/_dashboard/apps/app/'
+    | '/_dashboard/functions/config/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -169,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAppsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/functions': {
+      id: '/_dashboard/functions'
+      path: '/functions'
+      fullPath: '/functions'
+      preLoaderRoute: typeof DashboardFunctionsRouteRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/runs/': {
       id: '/_dashboard/runs/'
       path: '/runs'
@@ -197,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAppsOnboardingRouteRouteImport
       parentRoute: typeof DashboardAppsRoute
     }
+    '/_dashboard/functions/config/': {
+      id: '/_dashboard/functions/config/'
+      path: '/config'
+      fullPath: '/functions/config'
+      preLoaderRoute: typeof DashboardFunctionsConfigIndexRouteImport
+      parentRoute: typeof DashboardFunctionsRouteRoute
+    }
     '/_dashboard/apps/app/': {
       id: '/_dashboard/apps/app/'
       path: '/app'
@@ -220,6 +259,20 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface DashboardFunctionsRouteRouteChildren {
+  DashboardFunctionsConfigIndexRoute: typeof DashboardFunctionsConfigIndexRoute
+}
+
+const DashboardFunctionsRouteRouteChildren: DashboardFunctionsRouteRouteChildren =
+  {
+    DashboardFunctionsConfigIndexRoute: DashboardFunctionsConfigIndexRoute,
+  }
+
+const DashboardFunctionsRouteRouteWithChildren =
+  DashboardFunctionsRouteRoute._addFileChildren(
+    DashboardFunctionsRouteRouteChildren,
+  )
 
 interface DashboardAppsOnboardingRouteRouteChildren {
   DashboardAppsOnboardingChooseFrameworkRoute: typeof DashboardAppsOnboardingChooseFrameworkRoute
@@ -257,12 +310,14 @@ const DashboardAppsRouteWithChildren = DashboardAppsRoute._addFileChildren(
 )
 
 interface DashboardRouteChildren {
+  DashboardFunctionsRouteRoute: typeof DashboardFunctionsRouteRouteWithChildren
   DashboardAppsRoute: typeof DashboardAppsRouteWithChildren
   DashboardRunIndexRoute: typeof DashboardRunIndexRoute
   DashboardRunsIndexRoute: typeof DashboardRunsIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardFunctionsRouteRoute: DashboardFunctionsRouteRouteWithChildren,
   DashboardAppsRoute: DashboardAppsRouteWithChildren,
   DashboardRunIndexRoute: DashboardRunIndexRoute,
   DashboardRunsIndexRoute: DashboardRunsIndexRoute,
