@@ -40,16 +40,6 @@ type UserError interface {
 	Raw() []byte
 }
 
-type InternalRetriableError interface {
-	InternalError
-	RetryAfter() time.Duration
-}
-
-type UserRetriableError interface {
-	UserError
-	RetryAfter() time.Duration
-}
-
 // Wrap always wraps an error as an InternalError type.
 func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
 	return &internal{
