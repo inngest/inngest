@@ -13,7 +13,10 @@ const {
 const defaultColor = '#f6f6f6'; // carbon 50
 
 // Transform css variables into format that monaco can read
-export function resolveColor(colorValue: string, isDark: boolean): string {
+export function resolveColor(colorValue: any, isDark: boolean): string {
+  if (!colorValue || typeof colorValue !== 'string') {
+    return defaultColor;
+  }
   return resolver(colorValue, isDark, defaultColor);
 }
 

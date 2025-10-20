@@ -12,6 +12,7 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { nullishToLazy } from '../utils/lazyLoad';
+import { RunInfo as NewRunInfo } from './NewRunInfo';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
@@ -30,6 +31,7 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
+  newStack?: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -55,6 +57,7 @@ export const RunDetailsV3 = ({
   standalone,
   pollInterval: initialPollInterval,
   initialRunData,
+  newStack = false,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -205,14 +208,25 @@ export const RunDetailsV3 = ({
       <div ref={containerRef} className="flex flex-row">
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div ref={runInfoRef} className="px-4">
-            <RunInfo
-              className="mb-4"
-              initialRunData={initialRunData}
-              run={nullishToLazy(runData)}
-              runID={runID}
-              standalone={standalone}
-              result={resultData}
-            />
+            {newStack ? (
+              <NewRunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            ) : (
+              <RunInfo
+                className="mb-4"
+                initialRunData={initialRunData}
+                run={nullishToLazy(runData)}
+                runID={runID}
+                standalone={standalone}
+                result={resultData}
+              />
+            )}
             {showError && (
               <ErrorCard
                 error={runError || resultError}

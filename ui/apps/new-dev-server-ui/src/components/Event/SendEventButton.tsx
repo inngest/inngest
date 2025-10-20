@@ -25,13 +25,13 @@ export default function SendEventButton({
         appearance={appearance}
         onClick={() => setSendEventModalVisible(true)}
       />
-      {/* {isSendEventModalVisible && (
+      {isSendEventModalVisible && (
         <SendEventModal
           data={data}
           isOpen={isSendEventModalVisible}
           onClose={() => setSendEventModalVisible(false)}
         />
-      )} */}
+      )}
     </>
   )
 }

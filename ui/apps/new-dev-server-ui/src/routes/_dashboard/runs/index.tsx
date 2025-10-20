@@ -17,8 +17,8 @@ import {
   useSearchParam,
 } from '@inngest/components/hooks/useNewSearchParams'
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger'
-import { RunsActionMenu } from '@inngest/components/RunsPage/ActionMenu'
-import { RunsPage } from '@inngest/components/RunsPage/RunsPage'
+import { RunsActionMenu } from '@inngest/components/RunsPage/NewActionMenu'
+import { RunsPage } from '@inngest/components/RunsPage/NewRunsPage'
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag'
 import {
   isFunctionRunStatus,
@@ -195,16 +195,16 @@ function DashboardComponent() {
                 user: {},
               })}
             />
-            {/* <RunsActionMenu
+            <RunsActionMenu
               setAutoRefresh={() => setAutoRefresh((v) => !v)}
               setPreview={() => setPreview((p) => !p)}
               autoRefresh={autoRefresh}
               intervalSeconds={pollInterval / 1000}
-            /> */}
+            />
           </div>
         }
       />
-      {/* <RunsPage
+      <RunsPage
         apps={appsRes.data?.apps || []}
         data={runs ?? []}
         defaultVisibleColumns={[
@@ -237,7 +237,7 @@ function DashboardComponent() {
             root={containerRef}
           />
         )}
-      /> */}
+      />
     </>
   )
 }
