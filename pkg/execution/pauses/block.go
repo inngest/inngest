@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -20,6 +21,7 @@ import (
 )
 
 const (
+	pkgName = "pauses.execution.inngest"
 	// DefaultPausesPerBlock is the number of pauses to store in a single block.
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default.
 	DefaultPausesPerBlock = 10_000
@@ -177,6 +179,8 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return nil
 	}
 
+	start := time.Now()
+
 	// Firstly, we need to find the last block written for the current buffer.
 	// This lets us know where to read from, so that we can ignore any previous
 	// buffer flushes that may not have had corresponding deletes (as deletes)
@@ -260,16 +264,46 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// last block written.
 	go func() {
 		if b.delete {
+			start := time.Now()
+			var deleted int64
+
 			for _, p := range block.Pauses {
 				if err := b.buf.Delete(ctx, index, *p); err != nil {
 					logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+				} else {
+					deleted = deleted + 1
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
+			metrics.HistogramPauseDeleteLatencyAfterBlockFlush(ctx, time.Since(start), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{},
+			})
+
+			metrics.IncrPausesDeletedAfterBlockFlush(ctx, deleted, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{},
+			})
+
 		}
 		// XXX: We should add an N% chance of loading all pauses from 0 -> wm.Epoch
 		// in case any deletions in a previous flush failed.
 	}()
+
+	metrics.HistogramPauseBlockFlushLatency(ctx, time.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
+
+	metrics.IncrPausesFlushedToBlocks(ctx, int64(len(block.Pauses)), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
+
+	metrics.IncrPausesBlocksCreated(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
 
 	return nil
 }
