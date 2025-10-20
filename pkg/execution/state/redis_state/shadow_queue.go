@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -436,40 +437,62 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		return nil, false, nil
 	}
 
-	refillLimit := q.backlogRefillLimit
-	if refillLimit > BacklogRefillHardLimit {
-		refillLimit = BacklogRefillHardLimit
-	}
-	if refillLimit <= 0 {
-		refillLimit = BacklogRefillHardLimit
-	}
+	var refillOptions []backlogRefillOptionFn
 
-	// Peek items (scheduled to run within the next 2s) to be refilled.
-	//
-	// Peek will delete missing items at the time of peeking.
-	//
-	// NOTE: We are guaranteed to be the only refilling process for this backlog.
-	// There may be concurrent backlog modifications in the data store:
-	// - Items may be added to the backlog (earlier or later than peeked items)
-	// - Items may be removed from the backlog (dequeued by a cancellation, etc.)
-	// - Items may be requeued within the backlog (changing the score to an earlier or later time)
-	//
-	// Missing items are gracefully handled by BacklogRefill.
-	//
-	// Items that were added between backlogPeek and BacklogRefill will be considered in the next refill.
-	// Items that were moved between backlogPeek and BacklogRefill will still be refilled.
-	items, _, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not peek backlog items for refill: %w", err)
-	}
+	// TODO: Extract this
+	var capacityLeaseID ulid.ULID
+	if shadowPart.AccountID != nil &&
+		shadowPart.EnvID != nil &&
+		shadowPart.FunctionID != nil &&
+		q.capacityManager != nil &&
+		q.useConstraintAPI != nil {
+		useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
 
-	if len(items) == 0 {
-		return nil, false, nil
-	}
+		if useAPI {
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
-		itemIDs[i] = item.ID
+			// TODO: Figure out idempotency key
+			idempotencyKey := ""
+
+			res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+				AccountID:      *shadowPart.AccountID,
+				EnvID:          *shadowPart.EnvID,
+				IdempotencyKey: idempotencyKey,
+				FunctionID:     *shadowPart.FunctionID,
+				CurrentTime:    q.clock.Now(),
+				Duration:       QueueLeaseDuration,
+				// TODO: Build config
+				Configuration: constraintapi.ConstraintConfig{},
+				// TODO: Supply capacity
+				RequestedCapacity: []constraintapi.ConstraintCapacityItem{},
+				MaximumLifetime:   consts.MaxFunctionTimeout + 30*time.Minute,
+				Source: constraintapi.LeaseSource{
+					Service:           constraintapi.ServiceExecutor,
+					Location:          constraintapi.LeaseLocationItemLease,
+					RunProcessingMode: constraintapi.RunProcessingModeBackground,
+				},
+			})
+			if err != nil {
+				if !fallback {
+					return nil, false, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
+				}
+
+				// Fallback to Lease (with idempotency)
+				refillOptions = append(refillOptions, WithBacklogRefillFallbackIdempotencyKey(res.FallbackIdempotencyKey))
+			}
+
+			if len(res.InsufficientCapacity) > 0 {
+				// TODO: Handle missing capacity properly
+			}
+
+			if res.LeaseID != nil {
+				// TODO: Extend lease, etc.
+				capacityLeaseID = *res.LeaseID
+
+				// Disable constraint checks in backlogRefill and only allow to refill as many items as allowed!
+				// TODO: Support partial capacity leases: Ensure only allowed capacity is used!
+				// leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
+			}
+		}
 	}
 
 	res, err := durationWithTags(

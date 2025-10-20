@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -204,7 +205,7 @@ type QueueManager interface {
 type QueueProcessor interface {
 	EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error)
-	Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error)
+	Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies, options ...leaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error)
 	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
@@ -782,6 +783,18 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
+func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
+	return func(q *queue) {
+		q.capacityManager = capacityManager
+	}
+}
+
+func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
+	return func(q *queue) {
+		q.useConstraintAPI = uca
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -940,6 +953,9 @@ type queue struct {
 	refreshItemThrottle                       RefreshItemThrottleFn
 
 	enableJobPromotion bool
+
+	capacityManager  constraintapi.CapacityManager
+	useConstraintAPI constraintapi.UseConstraintAPIFn
 }
 
 type QueueRunMode struct {
@@ -1010,6 +1026,8 @@ type processItem struct {
 
 	// PCtr represents the number of times the partition has been continued.
 	PCtr uint
+
+	capacityLeaseID ulid.ULID
 }
 
 // FnMetadata is stored within the queue for retrieving
@@ -2027,12 +2045,43 @@ func (q *queue) itemDisableLeaseChecks(ctx context.Context, item osqueue.QueueIt
 	return false
 }
 
+type leaseOptions struct {
+	disableConstraintChecks bool
+	fallbackIdempotencyKey  string
+}
+
+func LeaseOptionDisableConstraintChecks(disableChecks bool) leaseOptionFn {
+	return func(o *leaseOptions) {
+		o.disableConstraintChecks = disableChecks
+	}
+}
+
+func LeaseOptionFallbackIdempotencyKey(fallbackIdempotencyKey string) leaseOptionFn {
+	return func(o *leaseOptions) {
+		o.fallbackIdempotencyKey = fallbackIdempotencyKey
+	}
+}
+
+type leaseOptionFn func(o *leaseOptions)
+
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing
 // other workers from working on this queue item at the same time.
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies) (*ulid.ULID, error) {
+func (q *queue) Lease(
+	ctx context.Context,
+	item osqueue.QueueItem,
+	leaseDuration time.Duration,
+	now time.Time,
+	denies *leaseDenies,
+	options ...leaseOptionFn,
+) (*ulid.ULID, error) {
+	o := &leaseOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Lease"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -2046,6 +2095,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
 	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
+	if o.disableConstraintChecks {
+		checkConstraints = false
+	}
 
 	if checkConstraints {
 		if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
@@ -2167,6 +2219,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		// Key queues v2
 		checkConstraintsVal,
 		refilledFromBacklogVal,
+
+		// Constraint API rollout
+		o.fallbackIdempotencyKey,
 	})
 	if err != nil {
 		return nil, err
