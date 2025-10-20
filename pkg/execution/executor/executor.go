@@ -1059,8 +1059,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
+	sendSpans()
 	for _, e := range e.lifecycles {
-		sendSpans()
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 
