@@ -294,6 +294,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			if err != nil {
 				ch.log.ReportError(err, "error deleting connection from state")
 			}
+			// Do not remove worker capacity after the connection. That will be cleaned by a background process.
 
 			for _, lifecycle := range c.lifecycles {
 				lifecycle.OnDisconnected(context.Background(), conn, closeReason)
@@ -1168,6 +1169,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		for _, l := range c.svc.lifecycles {
 			go l.OnConnected(context.Background(), &conn)
 		}
+	}
+
+	// Register worker capacity if maxConcurrency is specified
+	// If it's not specified, no limit is enforced
+	if err := c.svc.stateManager.SetWorkerCapacity(context.Background(), initialMessageData.InstanceId, initialMessageData.MaxConcurrentWorkerLeases); err != nil {
+		c.log.ReportError(err, "failed to register worker capacity")
+		// Continue anyway - capacity tracking is optional
 	}
 
 	c.conn = &conn
