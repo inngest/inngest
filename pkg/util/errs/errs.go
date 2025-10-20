@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// InternalError represents an internal error that isn't from the user's servers.
-type InternalError interface {
+type Error interface {
 	error
 
 	// ErrorCode returns the error code for this error.
@@ -14,6 +13,13 @@ type InternalError interface {
 
 	// Retryable indicates whether this is retryable.
 	Retryable() bool
+
+	RetryAfter() time.Duration
+}
+
+// InternalError represents an internal error that isn't from the user's servers.
+type InternalError interface {
+	Error
 
 	// InternalError indicates that this is a user error.  This is a noop and allows
 	// implementations of error classes to assert that they're a user error specifically.
@@ -23,13 +29,7 @@ type InternalError interface {
 // UserError represents an error from the user's server, either as a 500 or because of
 // some other error **directly out of our control**.
 type UserError interface {
-	error
-
-	// ErrorCode returns the error code for this error.
-	ErrorCode() int
-
-	// Retryable indicates whether this is retryable.
-	Retryable() bool
+	Error
 
 	// UserError indicates that this is a user error.  This is a noop and allows
 	// implementations of error classes to assert that they're a user error specifically.
@@ -38,16 +38,6 @@ type UserError interface {
 	// Raw returns the raw data for the error.  This may be the raw HTTP response,
 	// the raw error string, and so on.
 	Raw() []byte
-}
-
-type InternalRetriableError interface {
-	InternalError
-	RetryAfter() time.Duration
-}
-
-type UserRetriableError interface {
-	UserError
-	RetryAfter() time.Duration
 }
 
 // Wrap always wraps an error as an InternalError type.
@@ -59,7 +49,7 @@ func Wrap(code int, retryable bool, msg string, a ...any) InternalError {
 	}
 }
 
-// Wrap always wraps an error as an InternalRetriableError type.
+// WrapAfter always wraps an error as an InternalError type.
 func WrapAfter(code int, retryAfter time.Duration, msg string, a ...any) InternalError {
 	return &internal{
 		error:      fmt.Errorf(msg, a...),
