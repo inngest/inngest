@@ -59,7 +59,7 @@ export function useInsightsTabManager(
 
   const effectiveChatPanelVisible = isInsightsAgentEnabled.value && isChatPanelVisible;
 
-  // Map each UI tab to a stable agent thread id
+  // Map each UI tab to a stable agent thread id.
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
   const getAgentThreadIdForTab = useCallback((tabId: string): string => {
     const existing = agentThreadIdByTabRef.current[tabId];
