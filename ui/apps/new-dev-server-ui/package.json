@@ -13,7 +13,8 @@
   "type": "module",
   "scripts": {
     "codegen": "graphql-codegen --config codegen.ts",
-    "dev": "vite dev",
+    "dev": "pnpm i && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
+    "dev:vite": "vite dev",
     "dev:codegen": "nodemon -w ../pkg/coreapi -e graphql -x 'pnpm codegen'",
     "build": "vite build && tsc --noEmit",
     "start": "vite start",
@@ -65,6 +66,7 @@
     "@typescript-eslint/parser": "^8.37.0",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^7.6.0",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "eslint": "^9.31.0",
