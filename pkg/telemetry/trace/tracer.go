@@ -72,6 +72,10 @@ type TracerOpts struct {
 	TraceURLPath             string
 	TraceMaxPayloadSizeBytes int
 
+	// DropBlockingSpans specifies whether in-flight spans are dropped
+	// on a full buffer, instead of blocking span sending.
+	DropBlockingSpans bool
+
 	NATS  []exporters.NatsExporterOpts
 	Kafka []exporters.KafkaSpansExporterOpts
 }
@@ -564,6 +568,10 @@ func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error)
 				bopts = append(bopts, exporters.WithBatchProcessorConcurrency(c))
 			}
 		}
+	}
+
+	if opts.DropBlockingSpans {
+		bopts = append(bopts, exporters.WithBatchProcessorDropBlockingSpans())
 	}
 
 	sp := exporters.NewBatchSpanProcessor(ctx, exp, bopts...)

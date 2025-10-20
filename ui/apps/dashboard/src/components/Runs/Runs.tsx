@@ -1,9 +1,9 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import type { Run } from '@inngest/components/RunsPage/types';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
@@ -12,12 +12,12 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { AppFilterDocument, CountRunsDocument, GetRunsDocument } from './queries';
-import { parseRunsData, toRunStatuses, toTimeField } from './utils';
+import { AppFilterDocument, CountRunsDocument } from './queries';
+import { useRunsPagination } from './useRunsPagination';
+import { toRunStatuses, toTimeField } from './utils';
 
 export const DEFAULT_POLL_INTERVAL = 1000;
 
@@ -64,7 +64,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: { envSlug: env.slug },
   });
 
-  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);
+  const { booleanFlag } = useBooleanFlag();
+
+  const { value: tracePreviewEnabled } = booleanFlag('traces-preview', true, true);
 
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
@@ -78,9 +80,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   /* The start date comes from either the absolute start time or the relative time */
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
-  const [cursor, setCursor] = useState('');
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [isScrollRequest, setIsScrollRequest] = useState(false);
 
   const getTrigger = useGetTrigger();
   const features = useAccountFeatures();
@@ -91,56 +90,50 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const environment = useEnvironment();
 
-  const commonQueryVars = {
-    appIDs: appIDs ?? null,
-    environmentID: environment.id,
-    functionSlug: functionSlug ?? null,
-    startTime: calculatedStartTime.toISOString(),
-    endTime: endTime ?? null,
-    status: filteredStatus.length > 0 ? filteredStatus : null,
-    timeField,
-    celQuery: search,
-  };
+  const commonQueryVars = useMemo(
+    () => ({
+      appIDs: appIDs ?? null,
+      environmentID: environment.id,
+      functionSlug: functionSlug ?? null,
+      startTime: calculatedStartTime.toISOString(),
+      endTime: endTime ?? null,
+      status: filteredStatus.length > 0 ? filteredStatus : null,
+      timeField,
+      celQuery: search,
+    }),
+    [
+      appIDs,
+      environment.id,
+      functionSlug,
+      calculatedStartTime,
+      endTime,
+      filteredStatus,
+      timeField,
+      search,
+    ]
+  );
 
-  const [firstPageRes, fetchFirstPage] = useQuery({
-    query: GetRunsDocument,
-    pause: isScrollRequest,
-    requestPolicy: 'network-only',
-    variables: {
-      ...commonQueryVars,
-      functionRunCursor: null,
-      preview: tracePreviewEnabled,
-    },
-  });
-
-  const [nextPageRes] = useQuery({
-    query: GetRunsDocument,
-    pause: !isScrollRequest,
-    requestPolicy: 'network-only',
-    variables: {
-      ...commonQueryVars,
-      functionRunCursor: cursor,
-      preview: tracePreviewEnabled,
-    },
+  // Use the new hook to manage pagination
+  const {
+    runs,
+    isLoadingInitial,
+    isLoadingMore,
+    hasNextPage,
+    loadMore,
+    reset,
+    error: paginationError,
+  } = useRunsPagination({
+    commonQueryVars,
+    tracePreviewEnabled,
   });
 
   const [countRes] = useQuery({
     query: CountRunsDocument,
-    pause: isScrollRequest,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
   });
 
-  const searchError = parseCelSearchError(
-    firstPageRes.error || nextPageRes.error || countRes.error
-  );
-
-  const firstPageRunsData = firstPageRes.data?.environment.runs.edges;
-  const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
-  const firstPageInfo = firstPageRes.data?.environment.runs.pageInfo;
-  const nextPageInfo = nextPageRes.data?.environment.runs.pageInfo;
-  const hasNextPage = isScrollRequest ? nextPageInfo?.hasNextPage : firstPageInfo?.hasNextPage;
-  const isLoading = firstPageRes.fetching || nextPageRes.fetching;
+  const searchError = parseCelSearchError(paginationError || countRes.error);
 
   let totalCount = undefined;
   if (!countRes.fetching) {
@@ -149,50 +142,13 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     totalCount = countRes.data?.environment.runs.totalCount;
   }
 
-  if (functionSlug && !firstPageRunsData && !firstPageRes.fetching) {
-    throw new Error('missing run');
-  }
-
-  const firstPageRuns = useMemo(() => {
-    return parseRunsData(firstPageRunsData);
-  }, [firstPageRunsData]);
-
-  const nextPageRuns = useMemo(() => {
-    return parseRunsData(nextPageRunsData);
-  }, [nextPageRunsData]);
-
-  useEffect(() => {
-    if (!isScrollRequest) {
-      setRuns(firstPageRuns);
-    }
-  }, [firstPageRuns, isScrollRequest]);
-
-  useEffect(() => {
-    if (isScrollRequest && nextPageRuns.length > 0) {
-      setRuns((prevRuns) => [...prevRuns, ...nextPageRuns]);
-    }
-  }, [nextPageRuns, isScrollRequest]);
-
-  const loadMore = useCallback(() => {
-    if (runs.length > 0 && !isLoading && hasNextPage) {
-      const lastCursor = nextPageInfo?.endCursor || firstPageInfo?.endCursor;
-      if (lastCursor) {
-        setIsScrollRequest(true);
-        setCursor(lastCursor);
-      }
-    }
-  }, [isLoading, hasNextPage, runs, nextPageInfo, firstPageInfo]);
-
   const onScrollToTop = useCallback(() => {
-    setIsScrollRequest(false);
+    // Not needed with new hook, but keeping for compatibility
   }, []);
 
   const onRefresh = useCallback(() => {
-    onScrollToTop();
-    setCursor('');
-    setRuns([]);
-    fetchFirstPage();
-  }, [fetchFirstPage, onScrollToTop]);
+    reset();
+  }, [reset]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -211,9 +167,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         history: features.data?.history ?? 7,
         tracesPreview: tracePreviewEnabled,
       }}
-      hasMore={hasNextPage ?? false}
-      isLoadingInitial={firstPageRes.fetching}
-      isLoadingMore={nextPageRes.fetching}
+      hasMore={hasNextPage}
+      isLoadingInitial={isLoadingInitial}
+      isLoadingMore={isLoadingMore}
       onRefresh={onRefresh}
       onScrollToTop={onScrollToTop}
       getTrigger={getTrigger}
@@ -221,14 +177,15 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
-      error={nextPageRes.error || firstPageRes.error}
-      infiniteScrollTrigger={
+      error={paginationError}
+      infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
           onIntersect={loadMore}
-          hasMore={hasNextPage ?? false}
-          isLoading={isLoading}
+          hasMore={hasNextPage}
+          isLoading={isLoadingInitial || isLoadingMore}
+          root={containerRef}
         />
-      }
+      )}
     />
   );
 });

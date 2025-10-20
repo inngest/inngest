@@ -184,6 +184,15 @@ func IncrSpanBatchProcessorEnqueuedCounter(ctx context.Context, opts CounterOpt)
 	})
 }
 
+func IncrSpanBatchProcessorDroppedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_batch_processor_dropped_total",
+		Description: "Total number of spans dropped for batch processing",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrSpanBatchProcessorAttemptCounter(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -605,6 +614,33 @@ func IncrQueueThrottleKeyExpressionMismatchCounter(ctx context.Context, opts Cou
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_throttle_key_expr_mismatch",
 		Description: "The total number of times a throttle key expression mismatch was detected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesFlushedToBlocks(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_flushed_to_blocks_total",
+		Description: "Total number of pauses flushed to blocks",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesBlocksCreated(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_blocks_created_total",
+		Description: "Total number of pause blocks created",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrPausesDeletedAfterBlockFlush(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_deleted_after_flush_total",
+		Description: "Total number of pauses deleted after flushing them to blocks",
 		Tags:        opts.Tags,
 	})
 }

@@ -751,8 +751,6 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 			return &QueueShadowPartition{}
 		},
 		handleMissingItems: func(pointers []string) error {
-			q.log.Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
-
 			return nil
 		},
 		isMillisecondPrecision: true,

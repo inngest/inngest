@@ -419,8 +419,9 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
 		// Steps are in logical order because disabling optimized parallelism causes
-		// the parallel groups to race
-		r.Equal([]string{"a1", "a2", "b1", "b2", "end"}, stepOrder)
+		// the parallel groups to race.  This also schedules another "end" lookup,
+		// as each parallel function schedules another job.
+		r.Equal([]string{"a1", "a2", "b1", "b2", "end", "end"}, stepOrder)
 	})
 
 	t.Run("all step kinds", func(t *testing.T) {
@@ -654,7 +655,7 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 						return nil, fmt.Errorf("step b failed")
 					})
 				},
-				)
+			)
 
 			// Check if any parallel step failed and propagate error to trigger onFailure
 			if err := res.AnyError(); err != nil {
@@ -663,7 +664,7 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 
 			return res, nil
 		},
-		)
+	)
 	require.NoError(t, err)
 
 	// onFailure equivalent function
@@ -679,7 +680,7 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 		inngestgo.EventTrigger(
 			"inngest/function.failed",
 			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", expectedFunctionID)),
-			),
+		),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			atomic.AddInt32(&failureCount, 1)
 
@@ -688,7 +689,7 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 
 			return "handled", nil
 		},
-		)
+	)
 	require.NoError(t, err)
 
 	registerFuncs()

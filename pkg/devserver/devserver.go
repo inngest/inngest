@@ -422,6 +422,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
+		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
@@ -496,7 +497,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
-		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
@@ -557,15 +557,17 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tracer,
-			State:           smv2,
-			RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
-
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tracer,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
-			RunJWTSecret:      consts.DevServerRunJWTSecret,
+
+			CheckpointOpts: apiv1.CheckpointAPIOpts{
+				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
+				RunJWTSecret:    consts.DevServerRunJWTSecret,
+			},
 		})
 	})
 

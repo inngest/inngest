@@ -30,7 +30,6 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  tracesPreviewEnabled: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -54,7 +53,6 @@ export const RunDetailsV3 = ({
   getTrigger,
   runID,
   standalone,
-  tracesPreviewEnabled,
   pollInterval: initialPollInterval,
   initialRunData,
 }: Props) => {
@@ -63,6 +61,8 @@ export const RunDetailsV3 = ({
     'polling-disabled',
     false
   );
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+
   const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -184,11 +184,7 @@ export const RunDetailsV3 = ({
     }, RESIDUAL_POLL_INTERVAL);
   }
 
-  const waiting = isWaiting(
-    initialRunData?.status || runData?.trace?.status,
-    runError,
-    resultError
-  );
+  const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
   const showError = waiting ? false : runError || resultError;
 
   //
@@ -200,7 +196,7 @@ export const RunDetailsV3 = ({
       {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
-            <StatusCell status={runData.trace.status} />
+            <StatusCell status={runData.status} />
             <p className="text-basis text-2xl font-medium">{runData.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>

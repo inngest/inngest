@@ -83,6 +83,7 @@ export const createColors = (isDark: boolean) => ({
   'editorLineNumber.activeForeground': resolveColor(textColor.basis, isDark),
   'editorWidget.background': resolveColor(backgroundColor.codeEditor, isDark),
   'editorWidget.border': resolveColor(borderColor.subtle, isDark),
+  'editorSuggestWidget.background': resolveColor(backgroundColor.modalBase, isDark),
   'editorBracketHighlight.foreground1': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground2': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground3': resolveColor(textColor.codeDelimiterBracketJson, isDark),

@@ -51,7 +51,7 @@ export default function SideBar({
         window.removeEventListener('resize', autoCollapse);
       };
     }
-  }, []);
+  }, [serverCollapsed]);
 
   return (
     <nav

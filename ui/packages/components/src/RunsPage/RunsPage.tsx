@@ -63,7 +63,7 @@ type Props = {
   totalCount: number | undefined;
   searchError?: Error;
   error?: Error | null;
-  infiniteScrollTrigger?: React.ReactNode;
+  infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
 };
 
 export function RunsPage({
@@ -237,7 +237,6 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
-            tracesPreviewEnabled={features.tracesPreview ?? false}
           />
         </div>
       );
@@ -384,7 +383,7 @@ export function RunsPage({
           visibleColumns={columnVisibility}
           scope={scope}
         />
-        {infiniteScrollTrigger}
+        {infiniteScrollTrigger?.(containerRef.current)}
         {!hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>

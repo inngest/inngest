@@ -466,6 +466,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				AppID:            di.AppID,
 				Events:           []event.TrackedEvent{di},
 				PreventDebounce:  true,
+				PreventRateLimit: true, // Rate limit was already enforced for this
 				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
@@ -684,7 +685,6 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 }
 
 func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -759,7 +759,6 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 }
 
 func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -787,7 +786,6 @@ func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) err
 }
 
 func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,

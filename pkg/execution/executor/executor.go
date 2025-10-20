@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -65,6 +66,7 @@ var (
 	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced          = fmt.Errorf("function debounced")
+	ErrFunctionRateLimited        = fmt.Errorf("function rate-limited")
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
@@ -222,6 +224,13 @@ func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rateLimiter = rl
+		return nil
+	}
+}
+
 func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).debouncer = d
@@ -346,6 +355,7 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
+	rateLimiter         ratelimit.RateLimiter
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
@@ -586,6 +596,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
+	// Attempt to rate-limit the incoming function.
+	if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+		evtMap := req.Events[0].GetEvent().Map()
+		key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+		switch err {
+		case nil:
+			limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+			if err != nil {
+				return nil, fmt.Errorf("could not check rate limit: %w", err)
+			}
+
+			if limited {
+				// Do nothing.
+				return nil, ErrFunctionRateLimited
+			}
+		case ratelimit.ErrNotRateLimited:
+			// no-op: proceed with function run as usual
+		default:
+			return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
+		}
+	}
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
@@ -723,8 +755,65 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.RunMode == enums.RunModeSync {
 		runSpanOpts.StartTime = runID.Timestamp()
 	}
+
+	var (
+		runSpanRef       *tracing.DroppableSpan
+		discoverySpanRef *tracing.DroppableSpan
+	)
+	defer func() {
+		// Always attempt to send the spans. They may have already been dropped
+		// (e.g. if the queue item already exists), in which case `Send()` will
+		// no-op
+
+		if runSpanRef != nil {
+			err := runSpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending run span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
+		}
+
+		if discoverySpanRef != nil {
+			err := discoverySpanRef.Send()
+			if err != nil {
+				l.Error(
+					"error sending discovery span",
+					"error", err,
+					"run_id", runID,
+				)
+			}
+		}
+	}()
+
+	// We may need to drop the spans later, like if the queue item already
+	// exists
+	dropSpans := func() {
+		if runSpanRef != nil {
+			runSpanRef.Drop()
+		}
+
+		if discoverySpanRef != nil {
+			discoverySpanRef.Drop()
+		}
+	}
+
+	status := enums.StepStatusQueued
+	if req.SkipReason() != enums.SkipReasonNone {
+		status = enums.StepStatusSkipped
+	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
 	// Always the root span.
-	runSpanRef, err := e.tracerProvider.CreateSpan(
+	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameRun,
 		runSpanOpts,
 	)
@@ -733,7 +822,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		l.Debug("error creating run span", "error", err)
 	}
 
-	config.NewSetFunctionTrace(runSpanRef)
+	if runSpanRef != nil {
+		config.NewSetFunctionTrace(runSpanRef.Ref)
+	}
 
 	// If this is paused, immediately end just before creating state.
 	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
@@ -798,6 +889,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
+					// If the event is being rejected because there is another singleton run already in progress,
+					//  we can safely ignore the span for this schedule request
+					dropSpans()
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
 				}
@@ -907,28 +1001,30 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
-	// We also create the first discovery step right now, as then every single
-	// queue item has a span to reference.
-	//
-	// Initially, this helps combat a situation whereby erroring calls within
-	// the very first discovery step of a function are difficult to attribute
-	// to the same step span across retries.
-	//
-	// In the future, this also means that we can remove some magic around
-	// where to find the latest span and just always fetch it from the queue
-	// item.
-	_, err = e.tracerProvider.CreateSpan(
-		meta.SpanNameStepDiscovery,
-		&tracing.CreateSpanOptions{
-			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Parent:    runSpanRef,
-			Metadata:  &metadata,
-			QueueItem: &item,
-			Carriers:  []map[string]any{item.Metadata},
-		},
-	)
-	if err != nil {
-		l.Debug("error creating initial step span", "error", err)
+	if runSpanRef != nil {
+		// We also create the first discovery step right now, as then every single
+		// queue item has a span to reference.
+		//
+		// Initially, this helps combat a situation whereby erroring calls within
+		// the very first discovery step of a function are difficult to attribute
+		// to the same step span across retries.
+		//
+		// In the future, this also means that we can remove some magic around
+		// where to find the latest span and just always fetch it from the queue
+		// item.
+		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+				Parent:    runSpanRef.Ref,
+				Metadata:  &metadata,
+				QueueItem: &item,
+				Carriers:  []map[string]any{item.Metadata},
+			},
+		)
+		if err != nil {
+			l.Debug("error creating initial step span", "error", err)
+		}
 	}
 
 	// If this is run mode sync, we do NOT need to create a queue item, as the
@@ -948,6 +1044,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	case nil:
 		// no-op
 	case redis_state.ErrQueueItemExists:
+		// If the item already exists in the queue, we can safely ignore this
+		// entire schedule request; it's basically a retry and we should not
+		// persist this for the user.
+		dropSpans()
+
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
@@ -955,6 +1056,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
+		// If the event is being rejected because there is another singleton run already in progress,
+		// we can safely ignore the span for this schedule request
+		dropSpans()
 		return nil, ErrFunctionSkipped
 
 	default:
@@ -3955,6 +4059,8 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		BatchID:          &payload.BatchID,
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
+		// Batching does not work with rate limiting
+		PreventRateLimit: true,
 	})
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
@@ -3999,6 +4105,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	return nil
+}
+
+func (e *executor) GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (any, error) {
+	return e.traceReader.GetEvent(ctx, id, accountID, workspaceID)
 }
 
 func (e *executor) fnDriver(ctx context.Context, fn inngest.Function) any {
