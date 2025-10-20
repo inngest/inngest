@@ -107,8 +107,6 @@ const LAUNCHDARKLY_URLS = [
   makeLaunchDarklySubdomainURL('events'),
 ];
 
-const LOCAL_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:9999'];
-
 const MONACO_EDITOR_CDN_URL = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0/min/vs';
 const MONACO_EDITOR_CDN_SCRIPT_URLS = [
   `${MONACO_EDITOR_CDN_URL}/base/common/worker/simpleWorker.nls.js`,
@@ -129,7 +127,7 @@ function makeCSPHeader() {
     `base-uri 'self'`,
     `connect-src 'self' ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
       isDev
-    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(LOCAL_URLS)}`,
+    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(getAllowLocalURLs(isDev))}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
@@ -168,4 +166,10 @@ function getClerkURL(isDev: boolean): string {
 
 function getAllowUnsafeEval(isDev: boolean): string {
   return isDev ? "'unsafe-eval'" : '';
+}
+
+const LOCAL_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:9999'];
+function getAllowLocalURLs(isDev: boolean): string[] {
+  if (isDev) return LOCAL_URLS;
+  return [];
 }
