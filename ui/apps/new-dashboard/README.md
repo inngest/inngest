@@ -1,30 +1,3 @@
-<p align="center">
-  <a href="https://clerk.com?utm_source=DevRel&utm_medium=docs&utm_campaign=templates&utm_content=08-05-2023&utm_term=clerk-tanstack-start-quickstart" target="_blank" rel="noopener noreferrer">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./public/light-logo.png">
-      <img alt="Clerk Logo for light background" src="./public/dark-logo.png" height="64">
-    </picture>
-  </a>
-  <br />
-</p>
-<div align="center">
-  <h1>
-    Clerk and TanStack Start Quickstart
-  </h1>
-  <a href="https://www.npmjs.com/package/@clerk/clerk-react">
-    <img alt="Downloads" src="https://img.shields.io/npm/dm/@clerk/clerk-react" />
-  </a>
-  <a href="https://discord.com/invite/b5rXHjAg7A">
-    <img alt="Discord" src="https://img.shields.io/discord/856971667393609759?color=7389D8&label&logo=discord&logoColor=ffffff" />
-  </a>
-  <a href="https://twitter.com/clerkdev">
-    <img alt="Twitter" src="https://img.shields.io/twitter/url.svg?label=%40clerkdev&style=social&url=https%3A%2F%2Ftwitter.com%2Fclerkdev" />
-  </a>
-  <br />
-  <br />
-  <img alt="Clerk Hero Image" src="./public/hero.png">
-</div>
-
 ## Introduction
 
 Clerk is a developer-first authentication and user management solution. It provides pre-built components and hooks for sign-in, sign-up, user profile, and organization management. Clerk is designed to be easy to use and customize, and can be integrated into any TanStack Start application.
