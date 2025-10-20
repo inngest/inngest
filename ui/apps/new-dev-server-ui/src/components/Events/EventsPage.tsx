@@ -1,12 +1,9 @@
-'use client'
-
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@inngest/components/Button/Button'
-import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu'
-import { EventsTable } from '@inngest/components/Events/EventsTable'
+import { Button } from '@inngest/components/Button/NewButton'
+import { EventsActionMenu } from '@inngest/components/Events/NewEventsActionMenu'
+import { EventsTable } from '@inngest/components/Events/NewEventsTable'
 import { useReplayModal } from '@inngest/components/Events/useReplayModal'
-import { Header } from '@inngest/components/Header/Header'
+import { Header } from '@inngest/components/Header/NewHeader'
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag'
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react'
 
@@ -19,6 +16,7 @@ import {
   useEventPayload,
   useEvents,
 } from '@/components/Events/useEvents'
+import { useNavigate } from '@tanstack/react-router'
 
 const pollInterval = 400
 
@@ -34,7 +32,7 @@ export default function EventsPage({
     'polling-disabled',
     false,
   )
-  const router = useRouter()
+  const navigate = useNavigate()
   const [autoRefresh, setAutoRefresh] = useState(true)
   const { isModalVisible, selectedEvent, openModal, closeModal } =
     useReplayModal()
@@ -90,7 +88,7 @@ export default function EventsPage({
             <Button
               appearance="outlined"
               label="Refresh"
-              onClick={() => router.refresh()}
+              onClick={() => navigate({ to: '/events' })}
               icon={<RiRefreshLine />}
               iconSide="left"
             />

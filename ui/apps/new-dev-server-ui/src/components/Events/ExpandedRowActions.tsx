@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/Button'
+import { Button } from '@inngest/components/Button/NewButton'
 
 type ExpandedRowProps = {
   eventName?: string
