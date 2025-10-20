@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,33 @@ import (
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
+
+// CheckpointMetrics represents base IDs used within checkpoint metrics.
+type CheckpointMetrics struct {
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
+	AppID     uuid.UUID
+	FnID      uuid.UUID
+}
+
+// CheckpointMetricsProvider represents an interface for recording metrics
+// on checkpoint APIs.
+type CheckpointMetricsProvider interface {
+	OnFnScheduled(ctx context.Context, m CheckpointMetrics)
+	OnStepFinished(ctx context.Context, m CheckpointMetrics, status enums.StepStatus)
+	OnFnFinished(ctx context.Context, m CheckpointMetrics, status enums.RunStatus)
+}
+
+type nilCheckpointMetrics struct{}
+
+func (nilCheckpointMetrics) OnFnScheduled(ctx context.Context, m CheckpointMetrics) {
+}
+
+func (nilCheckpointMetrics) OnStepFinished(ctx context.Context, m CheckpointMetrics, status enums.StepStatus) {
+}
+
+func (nilCheckpointMetrics) OnFnFinished(ctx context.Context, m CheckpointMetrics, status enums.RunStatus) {
+}
 
 // NewAPIRunData represents event data stored and used to create new API-based
 // runs.  This is wrapped via CheckpointNewRunRequestr

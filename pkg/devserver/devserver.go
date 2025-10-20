@@ -557,15 +557,17 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tracer,
-			State:           smv2,
-			RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
-
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tracer,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
-			RunJWTSecret:      consts.DevServerRunJWTSecret,
+
+			CheckpointOpts: apiv1.CheckpointAPIOpts{
+				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
+				RunJWTSecret:    consts.DevServerRunJWTSecret,
+			},
 		})
 	})
 
