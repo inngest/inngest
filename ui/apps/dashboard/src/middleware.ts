@@ -131,7 +131,7 @@ function makeCSPHeader() {
       LAUNCHDARKLY_URLS
     )} ${getClerkURL(isProdEnvironment)} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
       getAllowLocalURLs(isDevBuild)
-    )}`,
+    )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
@@ -187,4 +187,14 @@ function getAllowVercelLiveURL(isProdEnvironment: boolean, isDevBuild: boolean):
 
   // Preview builds + staging.
   return VERCEL_LIVE_URL;
+}
+
+const PREVIEW_ENV_INN_GS_URL = 'https://stage.inn.gs';
+const PROD_INN_GS_URL = 'https://inn.gs';
+function getAllowInnGSURL(isProdEnvironment: boolean, isDevBuild: boolean): string {
+  if (isProdEnvironment) return PROD_INN_GS_URL;
+  if (isDevBuild) return '';
+
+  // Preview builds + staging.
+  return PREVIEW_ENV_INN_GS_URL;
 }
