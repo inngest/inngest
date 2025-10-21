@@ -132,7 +132,7 @@ function makeCSPHeader() {
 
   const csp = [
     `base-uri 'self'`,
-    `connect-src 'self' ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
+    `connect-src 'self' data: ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
       isProdEnvironment
     )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
       getAllowLocalURLs(isDevBuild)
