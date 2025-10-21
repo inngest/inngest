@@ -95,7 +95,9 @@ export const config = {
 // Used in onboarding flow.
 const LOCAL_DEV_SERVER_URL = 'http://localhost:8288';
 
+const CLERK_API_URL = 'https://api.clerk.com';
 const CLERK_IMG_CDN_URL = 'https://img.clerk.com';
+const GOOGLE_TAG_MANAGER_URL = 'https://www.googletagmanager.com';
 const INNGEST_FONT_CDN_URL = 'https://fonts-cdn.inngest.com';
 const INNGEST_STATUS_URL = 'https://status.inngest.com';
 const INNGEST_UNPKG_CDN_URL = 'https://unpkg.com/@inngest/browser/inngest.min.js';
@@ -138,7 +140,9 @@ function makeCSPHeader() {
     `base-uri 'self'`,
     `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${combineCSPURLs(
       LAUNCHDARKLY_URLS
-    )} ${getClerkURL(isProdEnvironment)} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
+    )} ${getClerkURL(
+      isProdEnvironment
+    )} ${CLERK_API_URL} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
       getAllowLocalURLs(isDevBuild)
     )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)} ${
       process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -153,7 +157,7 @@ function makeCSPHeader() {
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
       isProdEnvironment
-    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'wasm-unsafe-eval' 'unsafe-inline' ${getAllowUnsafeEval(
+    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} ${STRIPE_JS_URL} ${GOOGLE_TAG_MANAGER_URL} 'wasm-unsafe-eval' 'unsafe-inline' ${getAllowUnsafeEval(
       isDevBuild
     )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
