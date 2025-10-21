@@ -567,7 +567,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			EventPublisher:  runner,
 			TracerProvider:  tp,
 			State:           smv2,
-			RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
