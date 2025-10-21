@@ -121,13 +121,13 @@ const MONACO_EDITOR_CDN_STYLE_URL = `${MONACO_EDITOR_CDN_URL}/editor/editor.main
 
 // TODO: Add nonce, and remove unsafe-* usages, but that would require dynamic rendering of all pages.
 function makeCSPHeader() {
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDevBuild = process.env.NODE_ENV === 'development';
 
   const csp = [
     `base-uri 'self'`,
     `connect-src 'self' ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
-      isDev
-    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(getAllowLocalURLs(isDev))}`,
+      isDevBuild
+    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(getAllowLocalURLs(isDevBuild))}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
@@ -137,8 +137,10 @@ function makeCSPHeader() {
     `manifest-src 'self'`,
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
-      isDev
-    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(isDev)}`,
+      isDevBuild
+    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(
+      isDevBuild
+    )}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
     `worker-src 'self' blob:`,
   ]
@@ -160,16 +162,16 @@ function combineCSPURLs(urls: string[]): string {
 
 const NON_PROD_CLERK_URL = 'https://saving-seasnail-84.clerk.accounts.dev';
 const PROD_CLERK_URL = 'https://clerk.inngest.com';
-function getClerkURL(isDev: boolean): string {
-  return isDev ? NON_PROD_CLERK_URL : PROD_CLERK_URL;
+function getClerkURL(isDevBuild: boolean): string {
+  return isDevBuild ? NON_PROD_CLERK_URL : PROD_CLERK_URL;
 }
 
-function getAllowUnsafeEval(isDev: boolean): string {
-  return isDev ? "'unsafe-eval'" : '';
+function getAllowUnsafeEval(isDevBuild: boolean): string {
+  return isDevBuild ? "'unsafe-eval'" : '';
 }
 
 const LOCAL_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:9999'];
-function getAllowLocalURLs(isDev: boolean): string[] {
-  if (isDev) return LOCAL_URLS;
+function getAllowLocalURLs(isDevBuild: boolean): string[] {
+  if (isDevBuild) return LOCAL_URLS;
   return [];
 }
