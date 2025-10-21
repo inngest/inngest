@@ -149,7 +149,7 @@ function makeCSPHeader() {
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
       isProdEnvironment
-    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(
+    )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'wasm-unsafe-eval' 'unsafe-inline' ${getAllowUnsafeEval(
       isDevBuild
     )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
