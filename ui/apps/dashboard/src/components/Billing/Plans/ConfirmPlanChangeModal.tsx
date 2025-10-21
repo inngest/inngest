@@ -202,13 +202,11 @@ export default function ConfirmPlanChangeModal({
                   />
                 </div>
               </div>
-              <div className="mt-6 rounded-md border border-yellow-200 bg-yellow-50 p-4">
-                <p className="text-sm text-yellow-800">
-                  <b>Note:</b> After submitting, your{' '}
-                  {isCancellation ? 'cancellation' : 'downgrade'} will be processed immediately and
-                  you will lose access to your current plan features.
-                </p>
-              </div>
+              <Alert severity="warning" className="mt-6">
+                <b>Note:</b> After submitting, your {isCancellation ? 'cancellation' : 'downgrade'}{' '}
+                will be processed immediately and you will lose access to your current plan
+                features.
+              </Alert>
             </>
           ) : (
             <>
