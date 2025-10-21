@@ -1172,7 +1172,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	// Register worker capacity if maxConcurrency is specified
 	// If it's not specified, no limit is enforced
-	if err := c.svc.stateManager.SetCapacity(context.Background(), c.conn.EnvID, initialMessageData.InstanceId, initialMessageData.MaxConcurrentWorkerLeases); err != nil {
+	if err := c.svc.stateManager.SetWorkerCapacity(context.Background(), c.conn.EnvID, initialMessageData.InstanceId, initialMessageData.MaxConcurrentWorkerLeases); err != nil {
 		c.log.ReportError(err, "failed to register worker capacity")
 		// Continue anyway - capacity tracking is optional - when it's forced, it will be best effort
 	}

@@ -90,17 +90,17 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 		stateManager:       opts.StateManager,
 		rnd:                util.NewFrandRNG(),
 	}
-	
+
 	// Apply functional options
 	for _, option := range options {
 		option(connector)
 	}
-	
+
 	// Create default gateway manager if not provided via options
 	if connector.gatewayGRPCManager == nil {
 		connector.gatewayGRPCManager = newGatewayGRPCManager(ctx, opts.StateManager, WithGatewayLogger(connector.logger))
 	}
-	
+
 	return connector
 }
 
@@ -359,6 +359,9 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 	}()
 
+	// Track connection info for cleanup
+	var workerInstanceID string
+
 	// Forward message to the gateway if the request wasn't already running
 	if leaseID != nil {
 		// Determine the most suitable connection
@@ -374,8 +377,18 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				}
 			}
 
+			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectWorkerAtCapacity,
+					Message: "Worker is at capacity",
+				}
+			}
+
 			return nil, fmt.Errorf("failed to route message: %w", err)
 		}
+
+		// Get worker ID info for cleanup later
+		workerInstanceID = route.InstanceID
 
 		transport := "grpc"
 
@@ -441,6 +454,15 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		if err != nil {
 			span.RecordError(err)
 			l.ReportError(err, "could not delete response")
+		}
+
+		// Clean up capacity claim if we held a lease
+		if leaseID != nil && workerInstanceID != "" {
+			// Even if we can't claim capacity, we should remove it still
+			if err := i.stateManager.RemoveRequestLeaseFromWorker(ctx, opts.EnvID, workerInstanceID, opts.Data.RequestId); err != nil {
+				l.ReportError(err, "failed to remove request lease")
+				return reply, nil
+			}
 		}
 
 		l.Debug("returning reply", "status", reply.Status)
