@@ -276,6 +276,7 @@ export const RunDetailsV3 = ({
               selectedStep={selectedStep}
               pollInterval={pollInterval}
               tracesPreviewEnabled={tracesPreviewEnabled}
+              newStack={newStack}
             />
           ) : (
             <TopInfo
