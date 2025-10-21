@@ -398,6 +398,11 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		key: json.RawMessage(*output),
 	})
 	if err != nil {
+		if v, ok := r.Output.(string); ok {
+			// Reach here when output isn't valid JSON. For example, when we get
+			// a 502 HTML page
+			return &v, nil
+		}
 		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
 	}
 	s := string(keyedByt)
