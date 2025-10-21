@@ -165,17 +165,17 @@ func TestConstraintKindConversion(t *testing.T) {
 	}{
 		{
 			name:     "rate limit",
-			input:    CapacityKindRateLimit,
+			input:    ConstraintKindRateLimit,
 			expected: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT,
 		},
 		{
 			name:     "concurrency",
-			input:    CapacityKindConcurrency,
+			input:    ConstraintKindConcurrency,
 			expected: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY,
 		},
 		{
 			name:     "throttle",
-			input:    CapacityKindThrottle,
+			input:    ConstraintKindThrottle,
 			expected: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE,
 		},
 	}
@@ -684,18 +684,18 @@ func TestConstraintConfigConversion(t *testing.T) {
 }
 
 func TestConstraintCapacityItemConversion(t *testing.T) {
-	kindRateLimit := CapacityKindRateLimit
-	kindConcurrency := CapacityKindConcurrency
-	kindThrottle := CapacityKindThrottle
+	kindRateLimit := ConstraintKindRateLimit
+	kindConcurrency := ConstraintKindConcurrency
+	kindThrottle := ConstraintKindThrottle
 
 	tests := []struct {
 		name     string
-		input    ConstraintCapacityItem
+		input    ConstraintItem
 		expected *pb.ConstraintCapacityItem
 	}{
 		{
 			name: "rate limit capacity",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindRateLimit,
 				Amount: 5,
 			},
@@ -706,7 +706,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "concurrency capacity",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindConcurrency,
 				Amount: 10,
 			},
@@ -717,7 +717,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "throttle capacity",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindThrottle,
 				Amount: 100,
 			},
@@ -728,10 +728,10 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "rate limit capacity with details",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindRateLimit,
 				Amount: 5,
-				RateLimit: &RateLimitCapacity{
+				RateLimit: &RateLimitConstraint{
 					Scope:             enums.RateLimitScopeFn,
 					KeyExpressionHash: "hash123",
 					EvaluatedKeyHash:  "eval456",
@@ -749,10 +749,10 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "concurrency capacity with details",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindConcurrency,
 				Amount: 3,
-				Concurrency: &ConcurrencyCapacity{
+				Concurrency: &ConcurrencyConstraint{
 					Mode:              enums.ConcurrencyModeStep,
 					Scope:             enums.ConcurrencyScopeEnv,
 					KeyExpressionHash: "concurrency_hash",
@@ -772,10 +772,10 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "throttle capacity with details",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindThrottle,
 				Amount: 50,
-				Throttle: &ThrottleCapacity{
+				Throttle: &ThrottleConstraint{
 					Scope:             enums.ThrottleScopeAccount,
 					KeyExpressionHash: "throttle_hash",
 					EvaluatedKeyHash:  "eval_throttle",
@@ -793,7 +793,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 		},
 		{
 			name: "zero amount",
-			input: ConstraintCapacityItem{
+			input: ConstraintItem{
 				Kind:   kindRateLimit,
 				Amount: 0,
 			},
@@ -818,7 +818,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 	// Test nil protobuf handling
 	t.Run("nil protobuf", func(t *testing.T) {
 		result := ConstraintCapacityItemFromProto(nil)
-		assert.Equal(t, ConstraintCapacityItem{}, result)
+		assert.Equal(t, ConstraintItem{}, result)
 	})
 
 	// Test unspecified kind handling
@@ -828,7 +828,7 @@ func TestConstraintCapacityItemConversion(t *testing.T) {
 			Amount: 5,
 		}
 		result := ConstraintCapacityItemFromProto(pbItem)
-		expected := ConstraintCapacityItem{
+		expected := ConstraintItem{
 			Kind:   ConstraintKind(""),
 			Amount: 5,
 		}
@@ -992,7 +992,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 	envID := uuid.New()
 	functionID := uuid.New()
 	currentTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
-	kindConcurrency := CapacityKindConcurrency
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name     string
@@ -1021,7 +1021,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					},
 					Throttle: []ThrottleConfig{},
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 3,
@@ -1088,7 +1088,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					},
 					Throttle: []ThrottleConfig{},
 				},
-				RequestedCapacity: []ConstraintCapacityItem{},
+				RequestedCapacity: []ConstraintItem{},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
@@ -1181,8 +1181,8 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 func TestCapacityAcquireResponseConversion(t *testing.T) {
 	leaseID := ulid.Make()
 	retryAfter := time.Date(2023, 10, 15, 13, 0, 0, 0, time.UTC)
-	kindRateLimit := CapacityKindRateLimit
-	kindConcurrency := CapacityKindConcurrency
+	kindRateLimit := ConstraintKindRateLimit
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name     string
@@ -1193,13 +1193,13 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 			name: "complete response with lease",
 			input: &CapacityAcquireResponse{
 				LeaseID: &leaseID,
-				ReservedCapacity: []ConstraintCapacityItem{
+				ReservedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 3,
 					},
 				},
-				InsufficientCapacity: []ConstraintCapacityItem{
+				InsufficientCapacity: []ConstraintItem{
 					{
 						Kind:   kindRateLimit,
 						Amount: 1,
@@ -1228,8 +1228,8 @@ func TestCapacityAcquireResponseConversion(t *testing.T) {
 			name: "response without lease",
 			input: &CapacityAcquireResponse{
 				LeaseID:              nil,
-				ReservedCapacity:     []ConstraintCapacityItem{},
-				InsufficientCapacity: []ConstraintCapacityItem{},
+				ReservedCapacity:     []ConstraintItem{},
+				InsufficientCapacity: []ConstraintItem{},
 				RetryAfter:           time.Time{},
 			},
 			expected: &pb.CapacityAcquireResponse{
@@ -1475,7 +1475,6 @@ func TestCapacityReleaseResponseConversion(t *testing.T) {
 	}
 }
 
-
 // Round-trip tests to ensure no data loss
 func TestRoundTripConversions(t *testing.T) {
 	t.Run("ConstraintConfig round trip", func(t *testing.T) {
@@ -1526,7 +1525,7 @@ func TestRoundTripConversions(t *testing.T) {
 		envID := uuid.New()
 		functionID := uuid.New()
 		currentTime := time.Date(2023, 10, 15, 12, 30, 45, 123456789, time.UTC)
-		kindConcurrency := CapacityKindConcurrency
+		kindConcurrency := ConstraintKindConcurrency
 
 		original := &CapacityAcquireRequest{
 			IdempotencyKey: "test-key-123",
@@ -1541,7 +1540,7 @@ func TestRoundTripConversions(t *testing.T) {
 				},
 				Throttle: []ThrottleConfig{},
 			},
-			RequestedCapacity: []ConstraintCapacityItem{
+			RequestedCapacity: []ConstraintItem{
 				{
 					Kind:   kindConcurrency,
 					Amount: 3,
@@ -1590,7 +1589,7 @@ func TestEdgeCases(t *testing.T) {
 	})
 
 	t.Run("zero values", func(t *testing.T) {
-		item := ConstraintCapacityItem{
+		item := ConstraintItem{
 			Kind:   ConstraintKind(""),
 			Amount: 0,
 		}
@@ -1626,12 +1625,12 @@ func TestEdgeCases(t *testing.T) {
 func TestRateLimitCapacityConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    RateLimitCapacity
+		input    RateLimitConstraint
 		expected *pb.RateLimitCapacity
 	}{
 		{
 			name: "complete rate limit capacity",
-			input: RateLimitCapacity{
+			input: RateLimitConstraint{
 				Scope:             enums.RateLimitScopeAccount,
 				KeyExpressionHash: "rate_hash_123",
 				EvaluatedKeyHash:  "eval_rate_456",
@@ -1644,7 +1643,7 @@ func TestRateLimitCapacityConversion(t *testing.T) {
 		},
 		{
 			name: "minimal rate limit capacity",
-			input: RateLimitCapacity{
+			input: RateLimitConstraint{
 				Scope: enums.RateLimitScopeFn,
 			},
 			expected: &pb.RateLimitCapacity{
@@ -1667,19 +1666,19 @@ func TestRateLimitCapacityConversion(t *testing.T) {
 
 	t.Run("nil protobuf", func(t *testing.T) {
 		result := RateLimitCapacityFromProto(nil)
-		assert.Equal(t, RateLimitCapacity{}, result)
+		assert.Equal(t, RateLimitConstraint{}, result)
 	})
 }
 
 func TestConcurrencyCapacityConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    ConcurrencyCapacity
+		input    ConcurrencyConstraint
 		expected *pb.ConcurrencyCapacity
 	}{
 		{
 			name: "complete concurrency capacity",
-			input: ConcurrencyCapacity{
+			input: ConcurrencyConstraint{
 				Mode:              enums.ConcurrencyModeRun,
 				Scope:             enums.ConcurrencyScopeEnv,
 				KeyExpressionHash: "concurrency_hash_789",
@@ -1694,7 +1693,7 @@ func TestConcurrencyCapacityConversion(t *testing.T) {
 		},
 		{
 			name: "minimal concurrency capacity",
-			input: ConcurrencyCapacity{
+			input: ConcurrencyConstraint{
 				Mode:  enums.ConcurrencyModeStep,
 				Scope: enums.ConcurrencyScopeFn,
 			},
@@ -1719,19 +1718,19 @@ func TestConcurrencyCapacityConversion(t *testing.T) {
 
 	t.Run("nil protobuf", func(t *testing.T) {
 		result := ConcurrencyCapacityFromProto(nil)
-		assert.Equal(t, ConcurrencyCapacity{}, result)
+		assert.Equal(t, ConcurrencyConstraint{}, result)
 	})
 }
 
 func TestThrottleCapacityConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    ThrottleCapacity
+		input    ThrottleConstraint
 		expected *pb.ThrottleCapacity
 	}{
 		{
 			name: "complete throttle capacity",
-			input: ThrottleCapacity{
+			input: ThrottleConstraint{
 				Scope:             enums.ThrottleScopeAccount,
 				KeyExpressionHash: "throttle_hash_abc",
 				EvaluatedKeyHash:  "eval_throttle_def",
@@ -1744,7 +1743,7 @@ func TestThrottleCapacityConversion(t *testing.T) {
 		},
 		{
 			name: "minimal throttle capacity",
-			input: ThrottleCapacity{
+			input: ThrottleConstraint{
 				Scope: enums.ThrottleScopeFn,
 			},
 			expected: &pb.ThrottleCapacity{
@@ -1767,6 +1766,6 @@ func TestThrottleCapacityConversion(t *testing.T) {
 
 	t.Run("nil protobuf", func(t *testing.T) {
 		result := ThrottleCapacityFromProto(nil)
-		assert.Equal(t, ThrottleCapacity{}, result)
+		assert.Equal(t, ThrottleConstraint{}, result)
 	})
 }

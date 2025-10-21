@@ -13,7 +13,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
 	functionID := uuid.New()
-	kindConcurrency := CapacityKindConcurrency
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name    string
@@ -31,7 +31,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -57,7 +57,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -84,7 +84,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -111,7 +111,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -138,7 +138,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -165,7 +165,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 0,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -192,7 +192,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -219,7 +219,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -246,7 +246,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -273,7 +273,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -300,7 +300,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -327,7 +327,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{}, // Empty slice
+				RequestedCapacity: []ConstraintItem{}, // Empty slice
 				CurrentTime:       baseTime,
 				Duration:          5 * time.Minute,
 				MaximumLifetime:   30 * time.Minute,
@@ -349,7 +349,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 0,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{}, // Empty slice
+				RequestedCapacity: []ConstraintItem{}, // Empty slice
 				CurrentTime:       time.Time{},
 				Duration:          0,
 				MaximumLifetime:   0,
@@ -383,7 +383,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -423,7 +423,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
 	functionID := uuid.New()
-	kindConcurrency := CapacityKindConcurrency
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name    string
@@ -441,7 +441,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -467,7 +467,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 999999,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -493,7 +493,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -520,7 +520,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -547,7 +547,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -573,7 +573,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -599,7 +599,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -625,7 +625,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -651,7 +651,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -690,7 +690,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
 	functionID := uuid.New()
-	kindConcurrency := CapacityKindConcurrency
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name    string
@@ -708,7 +708,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -734,7 +734,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -760,7 +760,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -786,7 +786,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -812,7 +812,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -838,7 +838,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1<<63 - 1, // Max int64
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -877,7 +877,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 	accountID := uuid.New()
 	envID := uuid.New()
 	functionID := uuid.New()
-	kindConcurrency := CapacityKindConcurrency
+	kindConcurrency := ConstraintKindConcurrency
 
 	tests := []struct {
 		name    string
@@ -915,7 +915,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -941,7 +941,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintCapacityItem{
+				RequestedCapacity: []ConstraintItem{
 					{
 						Kind:   kindConcurrency,
 						Amount: 1,
@@ -974,4 +974,3 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 		})
 	}
 }
-

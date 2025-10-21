@@ -18,13 +18,46 @@ type CapacityManager interface {
 
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
+
+	// EnvID is used for identifying the function.
+	EnvID uuid.UUID
+
+	// FunctionID is used for identifying the function.
+	FunctionID uuid.UUID
+
+	// Configuration represents the latest known constraint configuration (a subset of the function config).
+	//
+	// The server _may_ reject calls if it has recently seen a newer configuration. This is expected for a short
+	// period after updating the configuration (as executors independently refresh the in-memory cache), but old
+	// configurations should not be used for an extended time.
+	Configuration ConstraintConfig
+
+	// Constraints describes the constraints that should be checked for a request.
+	//
+	// This should include _all_ constraints that need to be checked to perform an operation.
+	//
+	// For example:
+	// - To process a queue item, we need to check account, function, and optionally custom concurrency. If throttle is set,
+	//   the request should also include throttle capacity.
+	//
+	// This design assumes that the other side _knows_ the current constraint.
+	Constraints []ConstraintItem
 }
 
-type CapacityCheckResponse struct{}
+type CapacityCheckResponse struct {
+	// AvailableCapacity for given constraints and configuration
+	AvailableCapacity int
+
+	// LimitingConstraints contains constraints that
+	// ended up reducing the number of leases from the expected Amount.
+	LimitingConstraints []ConstraintItem
+
+	// Detailed constraint usage for requested constraints
+	Usage []ConstraintUsage
+}
 
 type CapacityAcquireRequest struct {
 	// IdempotencyKey prevents performing the same lease request multiple times.
-	// If a previous lease request was granted within the lease lifetime, the same lease will be returned.
 	IdempotencyKey string
 
 	AccountID uuid.UUID
@@ -42,7 +75,7 @@ type CapacityAcquireRequest struct {
 	// configurations should not be used for an extended time.
 	Configuration ConstraintConfig
 
-	// RequestedCapacity describes the constraints that should be checked for a request.
+	// Constraints describes the constraints that should be checked for a request.
 	//
 	// This should include _all_ constraints that need to be checked to perform an operation.
 	//
@@ -51,7 +84,23 @@ type CapacityAcquireRequest struct {
 	//   the request should also include throttle capacity.
 	//
 	// This design assumes that the other side _knows_ the current constraint.
-	RequestedCapacity []ConstraintCapacityItem
+	Constraints []ConstraintItem
+
+	// Amount specifies upper bound of requested capacity
+	//
+	// The Constraint API will check the provided constraints and calculate the
+	// allowed capacity. This determines the number of created leases.
+	Amount int
+
+	// ExistingLeaseID checks whether an existing lease can be used (still valid),
+	// and will otherwise attempt to create a new lease, if constraint capacity allows.
+	//
+	// - If the lease is still valid
+	// - If the lease is not valid anymore
+	//
+	// This is used by leases generated in advance (e.g. for key queues) to avoid clock skew,
+	// handle idempotency for GCRA constraints, and ensure a valid lease state.
+	ExistingLeaseID *ulid.ULID
 
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
@@ -77,17 +126,21 @@ type CapacityAcquireRequest struct {
 }
 
 type CapacityAcquireResponse struct {
-	LeaseID *ulid.ULID
+	// LeaseIDs may contain anywhere between 0 and Amount IDs.
+	//
+	// Depending on the available constraint capacity, there may be
+	// fewer leases than requested.
+	LeaseIDs []ulid.ULID
+
+	// LimitingConstraints contains constraints that
+	// ended up reducing the number of leases from the expected Amount.
+	LimitingConstraints []ConstraintItem
 
 	// FallbackIdempotencyKey represents an idempotency key to prevent double-spending capacity after
 	// the initial Lease operation succeeded but then failed before reaching the client due to a transient error.
 	//
 	// This idempotency key MUST be used by downstream constraint checks during fallbacks.
 	FallbackIdempotencyKey string
-
-	ReservedCapacity []ConstraintCapacityItem
-
-	InsufficientCapacity []ConstraintCapacityItem
 
 	RetryAfter time.Time
 }
@@ -113,7 +166,6 @@ type CapacityReleaseRequest struct {
 }
 
 type CapacityReleaseResponse struct{}
-
 
 type RunProcessingMode int
 

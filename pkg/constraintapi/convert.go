@@ -115,11 +115,11 @@ func ConcurrencyModeFromProto(mode pb.ConstraintApiConcurrencyMode) enums.Concur
 
 func ConstraintKindToProto(kind ConstraintKind) pb.ConstraintApiConstraintKind {
 	switch kind {
-	case CapacityKindRateLimit:
+	case ConstraintKindRateLimit:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT
-	case CapacityKindConcurrency:
+	case ConstraintKindConcurrency:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY
-	case CapacityKindThrottle:
+	case ConstraintKindThrottle:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE
 	default:
 		return pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_UNSPECIFIED
@@ -129,11 +129,11 @@ func ConstraintKindToProto(kind ConstraintKind) pb.ConstraintApiConstraintKind {
 func ConstraintKindFromProto(kind pb.ConstraintApiConstraintKind) ConstraintKind {
 	switch kind {
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_RATE_LIMIT:
-		return CapacityKindRateLimit
+		return ConstraintKindRateLimit
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY:
-		return CapacityKindConcurrency
+		return ConstraintKindConcurrency
 	case pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_THROTTLE:
-		return CapacityKindThrottle
+		return ConstraintKindThrottle
 	default:
 		return ConstraintKind("")
 	}
@@ -366,7 +366,7 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 	}
 }
 
-func ConstraintCapacityItemToProto(item ConstraintCapacityItem) *pb.ConstraintCapacityItem {
+func ConstraintCapacityItemToProto(item ConstraintItem) *pb.ConstraintCapacityItem {
 	kind := ConstraintKindToProto(item.Kind)
 
 	pbItem := &pb.ConstraintCapacityItem{
@@ -389,12 +389,12 @@ func ConstraintCapacityItemToProto(item ConstraintCapacityItem) *pb.ConstraintCa
 	return pbItem
 }
 
-func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) ConstraintCapacityItem {
+func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) ConstraintItem {
 	if pbItem == nil {
-		return ConstraintCapacityItem{}
+		return ConstraintItem{}
 	}
 
-	item := ConstraintCapacityItem{
+	item := ConstraintItem{
 		Kind:   ConstraintKindFromProto(pbItem.Kind),
 		Amount: int(pbItem.Amount),
 	}
@@ -417,7 +417,7 @@ func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) Constrai
 	return item
 }
 
-func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity {
+func RateLimitCapacityToProto(capacity RateLimitConstraint) *pb.RateLimitCapacity {
 	return &pb.RateLimitCapacity{
 		Scope:             RateLimitScopeToProto(capacity.Scope),
 		KeyExpressionHash: capacity.KeyExpressionHash,
@@ -425,18 +425,18 @@ func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity 
 	}
 }
 
-func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitCapacity {
+func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitConstraint {
 	if pbCapacity == nil {
-		return RateLimitCapacity{}
+		return RateLimitConstraint{}
 	}
-	return RateLimitCapacity{
+	return RateLimitConstraint{
 		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
 		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
 	}
 }
 
-func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCapacity {
+func ConcurrencyCapacityToProto(capacity ConcurrencyConstraint) *pb.ConcurrencyCapacity {
 	return &pb.ConcurrencyCapacity{
 		Mode:              ConcurrencyModeToProto(capacity.Mode),
 		Scope:             ConcurrencyScopeToProto(capacity.Scope),
@@ -445,11 +445,11 @@ func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCap
 	}
 }
 
-func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyCapacity {
+func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyConstraint {
 	if pbCapacity == nil {
-		return ConcurrencyCapacity{}
+		return ConcurrencyConstraint{}
 	}
-	return ConcurrencyCapacity{
+	return ConcurrencyConstraint{
 		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
 		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
@@ -457,7 +457,7 @@ func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) Concurrenc
 	}
 }
 
-func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
+func ThrottleCapacityToProto(capacity ThrottleConstraint) *pb.ThrottleCapacity {
 	return &pb.ThrottleCapacity{
 		Scope:             ThrottleScopeToProto(capacity.Scope),
 		KeyExpressionHash: capacity.KeyExpressionHash,
@@ -465,11 +465,11 @@ func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
 	}
 }
 
-func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleCapacity {
+func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleConstraint {
 	if pbCapacity == nil {
-		return ThrottleCapacity{}
+		return ThrottleConstraint{}
 	}
-	return ThrottleCapacity{
+	return ThrottleConstraint{
 		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
 		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
@@ -578,7 +578,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		return nil, fmt.Errorf("invalid function ID: %w", err)
 	}
 
-	requestedCapacity := make([]ConstraintCapacityItem, len(pbReq.RequestedCapacity))
+	requestedCapacity := make([]ConstraintItem, len(pbReq.RequestedCapacity))
 	for i, item := range pbReq.RequestedCapacity {
 		requestedCapacity[i] = ConstraintCapacityItemFromProto(item)
 	}
@@ -652,12 +652,12 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		return nil, nil
 	}
 
-	reservedCapacity := make([]ConstraintCapacityItem, len(pbResp.ReservedCapacity))
+	reservedCapacity := make([]ConstraintItem, len(pbResp.ReservedCapacity))
 	for i, item := range pbResp.ReservedCapacity {
 		reservedCapacity[i] = ConstraintCapacityItemFromProto(item)
 	}
 
-	insufficientCapacity := make([]ConstraintCapacityItem, len(pbResp.InsufficientCapacity))
+	insufficientCapacity := make([]ConstraintItem, len(pbResp.InsufficientCapacity))
 	for i, item := range pbResp.InsufficientCapacity {
 		insufficientCapacity[i] = ConstraintCapacityItemFromProto(item)
 	}
@@ -805,4 +805,3 @@ func CapacityReleaseResponseFromProto(pbResp *pb.CapacityReleaseResponse) *Capac
 	}
 	return &CapacityReleaseResponse{}
 }
-
