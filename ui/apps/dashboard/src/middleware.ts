@@ -111,9 +111,13 @@ const MONACO_EDITOR_CDN_URL = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.43.0
 const MONACO_EDITOR_CDN_SCRIPT_URLS = [
   `${MONACO_EDITOR_CDN_URL}/base/common/worker/simpleWorker.nls.js`,
   `${MONACO_EDITOR_CDN_URL}/base/worker/workerMain.js`,
+  `${MONACO_EDITOR_CDN_URL}/basic-languages/javascript/javascript.js`,
   `${MONACO_EDITOR_CDN_URL}/basic-languages/sql/sql.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.nls.js`,
+  `${MONACO_EDITOR_CDN_URL}/language/typescript/tsMode.js`,
+  `${MONACO_EDITOR_CDN_URL}/language/typescript/tsWorker.js `,
+  `${MONACO_EDITOR_CDN_URL}/language/json/jsonWorker.js `,
   `${MONACO_EDITOR_CDN_URL}/loader.js`,
 ];
 const MONACO_EDITOR_CDN_FONT_URL = `${MONACO_EDITOR_CDN_URL}/base/browser/ui/codicons/codicon/codicon.ttf`;
