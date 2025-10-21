@@ -90,36 +90,35 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 
 	// Only register static file serving if UI is enabled
 	if !a.disableUI {
-		// Go embeds files relative to the current source, which embeds
-		// all under ./static.  We remove the ./static
-		// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
-		staticFS, _ := fs.Sub(static, "static")
+		//
+		// Create filesystem rooted at static/client for Tanstack assets
+		staticFS, _ := fs.Sub(static, "static/client")
 		a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-
 		a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
 		a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
 		a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
 		a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
 		a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
-		// Everything else loads the UI.
+		//
+		// Everything else loads the UI (SPA fallback)
 		a.NotFound(a.UI)
 	}
 
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	// If there's a file that exists within `static` for this particular route,
-	// return it as a static asset.
+	//
+	// If there's a file that exists within static/client for this route, serve it as a static asset
 	path := r.URL.Path
-	if f, err := static.Open("static" + path); err == nil {
+	if f, err := static.Open("static/client" + path); err == nil {
 		if stat, err := f.Stat(); err == nil && !stat.IsDir() {
 			_, _ = io.Copy(w, f)
 			return
 		}
 	}
 
-	// If there's a trailing slash, redirect to non-trailing slashes.
+	//
+	// If there's a trailing slash, redirect to non-trailing slashes
 	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
 		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
 		http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
@@ -130,7 +129,7 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
 	tel.SendMetadata(r.Context(), m)
 
-	byt := parsedRoutes.serve(r.Context(), r.URL.Path)
+	byt := serve(r.Context(), r.URL.Path)
 	_, _ = w.Write(byt)
 }
 
