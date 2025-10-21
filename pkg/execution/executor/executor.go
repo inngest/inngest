@@ -790,11 +790,13 @@ func (e *executor) schedule(
 		runSpanRef       *tracing.DroppableSpan
 		discoverySpanRef *tracing.DroppableSpan
 	)
-	defer func() {
-		// Always attempt to send the spans. They may have already been dropped
-		// (e.g. if the queue item already exists), in which case `Send()` will
-		// no-op
 
+	// Send spans to the history store (ClickHouse). If not called, we'll drop
+	// the spans and not send them. There's a variety of scenarios where the run
+	// ends up not scheduling so we don't want to add it to the history store.
+	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
+	// path (e.g. Executor borked)
+	sendSpans := func() {
 		if runSpanRef != nil {
 			err := runSpanRef.Send()
 			if err != nil {
@@ -816,11 +818,10 @@ func (e *executor) schedule(
 				)
 			}
 		}
-	}()
+	}
 
-	// We may need to drop the spans later, like if the queue item already
-	// exists
-	dropSpans := func() {
+	// Handle span dropping. The drops will be noops if the spans were sent
+	defer func() {
 		if runSpanRef != nil {
 			runSpanRef.Drop()
 		}
@@ -828,7 +829,7 @@ func (e *executor) schedule(
 		if discoverySpanRef != nil {
 			discoverySpanRef.Drop()
 		}
-	}
+	}()
 
 	status := enums.StepStatusQueued
 	if req.SkipReason() != enums.SkipReasonNone {
@@ -858,6 +859,7 @@ func (e *executor) schedule(
 
 	// If this is paused, immediately end just before creating state.
 	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+		sendSpans()
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
 	}
 
@@ -919,10 +921,6 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// If the event is being rejected because there is another singleton run already in progress,
-					//  we can safely ignore the span for this schedule request
-					dropSpans()
-
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
 				}
@@ -1078,8 +1076,6 @@ func (e *executor) schedule(
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
-		dropSpans()
-
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
@@ -1093,6 +1089,7 @@ func (e *executor) schedule(
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
+	sendSpans()
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
