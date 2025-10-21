@@ -1,25 +1,12 @@
-import { Link } from '@tanstack/react-router'
+import { RiErrorWarningLine } from '@remixicon/react'
 
-export function NotFound({ children }: { children?: any }) {
+export function NotFound() {
   return (
-    <div className="space-y-2 p-2">
-      <div className="text-gray-600 dark:text-gray-400">
-        {children || <p>The page you are looking for does not exist.</p>}
+    <div className="flex h-full w-full flex-col items-center justify-center">
+      <div className="flex flex-row items-center gap-2">
+        <RiErrorWarningLine className="h-6 w-6 text-subtle" />
+        <h1 className="text-subtle text-lg">404 Page not found</h1>
       </div>
-      <p className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => window.history.back()}
-          className="bg-emerald-500 text-white px-2 py-1 rounded uppercase font-black text-sm"
-        >
-          Go back
-        </button>
-        <Link
-          to="/"
-          className="bg-cyan-600 text-white px-2 py-1 rounded uppercase font-black text-sm"
-        >
-          Start Over
-        </Link>
-      </p>
     </div>
   )
 }
