@@ -33,6 +33,19 @@ jobs:
           version: v2.2.1
           args: --verbose
 
+  gen:
+    name: 'git state after "make gen protobuf"'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: nicknovitski/nix-develop@v1.2.1
+      - name: 'Check for dirty Git state after running "make gen protobuf"'
+        run: |
+          make gen protobuf
+          git diff
+          git diff --name-only --exit-code
+
   test-linux-race:
     strategy:
       fail-fast: false
