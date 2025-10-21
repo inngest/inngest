@@ -127,11 +127,13 @@ function makeCSPHeader() {
 
   const csp = [
     `base-uri 'self'`,
-    `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL} ${combineCSPURLs(
-      LAUNCHDARKLY_URLS
-    )} ${getClerkURL(isProdEnvironment)} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
+    `connect-src 'self' ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
+      isProdEnvironment
+    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
       getAllowLocalURLs(isDevBuild)
-    )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)}`,
+    )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)} ${
+      process.env.NEXT_PUBLIC_API_URL ?? ''
+    } ${convertUrlToWebSocketURL(process.env.NEXT_PUBLIC_API_URL)}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
@@ -197,4 +199,17 @@ function getAllowInnGSURL(isProdEnvironment: boolean, isDevBuild: boolean): stri
 
   // Preview builds + staging.
   return PREVIEW_ENV_INN_GS_URL;
+}
+
+// TODO: Replace with direct env variable.
+function convertUrlToWebSocketURL(url: undefined | string): string {
+  if (url === undefined) return '';
+
+  try {
+    const newUrl = new URL(url);
+    newUrl.protocol = newUrl.protocol === 'http:' ? 'ws:' : 'wss:';
+    return newUrl.toString();
+  } catch (_) {
+    return '';
+  }
 }
