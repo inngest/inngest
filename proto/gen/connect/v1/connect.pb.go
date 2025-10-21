@@ -445,7 +445,7 @@ type WorkerConnectRequestData struct {
 	SdkVersion                string                 `protobuf:"bytes,11,opt,name=sdk_version,json=sdkVersion,proto3" json:"sdk_version,omitempty"`
 	SdkLanguage               string                 `protobuf:"bytes,12,opt,name=sdk_language,json=sdkLanguage,proto3" json:"sdk_language,omitempty"`
 	StartedAt                 *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	MaxConcurrentWorkerLeases *int32                 `protobuf:"varint,14,opt,name=max_concurrent_worker_leases,json=maxConcurrentWorkerLeases,proto3,oneof" json:"max_concurrent_worker_leases,omitempty"`
+	MaxConcurrentWorkerLeases *int64                 `protobuf:"varint,14,opt,name=max_concurrent_worker_leases,json=maxConcurrentWorkerLeases,proto3,oneof" json:"max_concurrent_worker_leases,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -571,7 +571,7 @@ func (x *WorkerConnectRequestData) GetStartedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *WorkerConnectRequestData) GetMaxConcurrentWorkerLeases() int32 {
+func (x *WorkerConnectRequestData) GetMaxConcurrentWorkerLeases() int64 {
 	if x != nil && x.MaxConcurrentWorkerLeases != nil {
 		return *x.MaxConcurrentWorkerLeases
 	}
@@ -1852,7 +1852,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\fsdk_language\x18\f \x01(\tR\vsdkLanguage\x129\n" +
 	"\n" +
 	"started_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12D\n" +
-	"\x1cmax_concurrent_worker_leases\x18\x0e \x01(\x05H\x02R\x19maxConcurrentWorkerLeases\x88\x01\x01B\x0e\n" +
+	"\x1cmax_concurrent_worker_leases\x18\x0e \x01(\x03H\x02R\x19maxConcurrentWorkerLeases\x88\x01\x01B\x0e\n" +
 	"\f_environmentB\v\n" +
 	"\t_platformB\x1f\n" +
 	"\x1d_max_concurrent_worker_leases\"\x7f\n" +

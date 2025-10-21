@@ -6,10 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/jonboulle/clockwork"
-	"github.com/oklog/ulid/v2"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
 	"regexp"
 	"slices"
@@ -17,9 +13,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 //go:embed lua/*
@@ -823,4 +823,131 @@ func (r *redisConnectionStateManager) GetAllGatewayIDs(ctx context.Context) ([]s
 		return nil, fmt.Errorf("could not get gateway IDs: %w", err)
 	}
 	return gatewayIDs, nil
+}
+
+// WorkerCapacityManager implementation for Redis
+
+// SetCapacity registers a worker instance with its maximum concurrency limit.
+// If maxConcurrentLeases is nil, 0, or negative, no limit is enforced for this worker.
+func (r *redisConnectionStateManager) SetCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int32) error {
+	key := r.workerCapacityKey(envID, instanceID)
+
+	// TODO: check for the case of crashed worker and coming back online for the first time.
+	// TODO: check for the case of multiple parallel workers coming online at the same time with different configurations.
+	// TODO: Do we really need to have a transaction here?
+
+	// If maxConcurrentLeases is nil or <= 0, delete any existing capacity limit
+	if maxConcurrentLeases == nil || *maxConcurrentLeases <= 0 {
+		err := r.client.Do(ctx, r.client.B().Del().Key(key).Build()).Error()
+		if err != nil {
+			return fmt.Errorf("failed to delete worker capacity: %w", err)
+		}
+		return nil
+	}
+
+	// TODO: change this value and make it closer to heartbeat TTL.
+	// Set the capacity limit with a long TTL (24 hours) that should be refreshed on heartbeat
+	// This long TTL ensures that in case the worker is not heartbeating, the capacity limit will still be enforced.
+	ttl := 24 * time.Hour
+	err := r.client.Do(ctx, r.client.B().Set().Key(key).Value(fmt.Sprintf("%d", *maxConcurrentLeases)).Ex(ttl).Build()).Error()
+	if err != nil {
+		return fmt.Errorf("failed to set worker capacity: %w", err)
+	}
+
+	return nil
+}
+
+// GetCapacity returns the current capacity limit for a worker instance.
+// Returns 0 if no limit is set.
+func (r *redisConnectionStateManager) GetCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int, error) {
+	key := r.workerCapacityKey(envID, instanceID)
+
+	capacity, err := r.client.Do(ctx, r.client.B().Get().Key(key).Build()).AsInt64()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return 0, nil // No limit set
+		}
+		return 0, fmt.Errorf("failed to get worker capacity: %w", err)
+	}
+
+	return int(capacity), nil
+}
+
+// GetActiveLeases returns all the request IDs currently leased by a worker instance.
+func (r *redisConnectionStateManager) GetActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error) {
+	key := r.workerLeasesKey(envID, instanceID)
+
+	// TODO: remove the leases that are stale
+
+	members, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active leases: %w", err)
+	}
+
+	return members, nil
+}
+
+// AddRequestLease adds a lease for a request to a worker instance.
+// Returns an error if the worker is at capacity.
+func (r *redisConnectionStateManager) AddRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
+
+	// TODO: implement this function
+
+	return nil
+}
+
+// RemoveRequestLease removes a lease for a request from a worker instance.
+func (r *redisConnectionStateManager) RemoveRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
+	key := r.workerLeasesKey(envID, instanceID)
+
+	err := r.client.Do(ctx, r.client.B().Srem().Key(key).Member(requestID).Build()).Error()
+	if err != nil {
+		return fmt.Errorf("failed to remove request lease: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveStaleLeases removes all leases for a worker instance that have expired.
+// This is called when checking request lease status - if a request lease has expired,
+// we should clean it up from the worker's active leases.
+func (r *redisConnectionStateManager) RemoveStaleLeases(ctx context.Context, envID uuid.UUID, instanceID string) error {
+	leasesKey := r.workerLeasesKey(envID, instanceID)
+
+	// Get all active leases
+	leases, err := r.GetActiveLeases(ctx, envID, instanceID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: This is an O(n) operation and O(n) calls. We should use a more efficient way to do this.
+	// TODO: Add worker information as part of the request lease key as well.
+	// Check each lease to see if it's still valid
+	for requestID := range leases {
+		isLeased, err := r.IsRequestLeased(ctx, envID, requestID)
+		if err != nil {
+			r.logger.Error("failed to check request lease status", "request_id", requestID, "error", err)
+			continue
+		}
+
+		// If the request is no longer leased, remove it from the worker's active leases
+		if !isLeased {
+			err := r.client.Do(ctx, r.client.B().Srem().Key(leasesKey).Member(requestID).Build()).Error()
+			if err != nil {
+				r.logger.Error("failed to remove stale lease", "request_id", requestID, "error", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// workerCapacityKey returns the Redis key for storing a worker's capacity limit
+func (r *redisConnectionStateManager) workerCapacityKey(envID uuid.UUID, instanceID string) string {
+	return fmt.Sprintf("{%s}:worker_capacity:%s", envID.String(), instanceID)
+}
+
+// workerLeasesKey returns the Redis key for storing a worker's active leases
+func (r *redisConnectionStateManager) workerLeasesKey(envID uuid.UUID, instanceID string) string {
+	return fmt.Sprintf("{%s}:worker_leases:%s", envID.String(), instanceID)
 }

@@ -37,7 +37,7 @@ type StateManager interface {
 	WorkerGroupManager
 	GatewayManager
 	RequestStateManager
-	WorkerConcurrencyManager
+	WorkerCapacityManager
 }
 
 type ConnectionManager interface {
@@ -92,28 +92,28 @@ type RequestStateManager interface {
 	DeleteResponse(ctx context.Context, envID uuid.UUID, requestID string) error
 }
 
-// WorkerConcurrencyManager tracks concurrency limits per worker instance.
+// WorkerCapacityManager tracks concurrency limits per worker instance.
 // This allows enforcement of maxConcurrentLeases settings per worker regardless
 // of how many apps or functions the worker serves.
-type WorkerConcurrencyManager interface {
+type WorkerCapacityManager interface {
 	// SetWorkerCapacity registers a worker instance with its maximum concurrency limit.
 	// If maxConcurrentLeases is 0 or negative or nil no limit is enforced for this worker.
-	SetWorkerCapacity(ctx context.Context, instanceID string, maxConcurrentLeases *int32) error
+	SetCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int64) error
 
 	// GetWorkerCapacity returns the current capacity info for a worker instance.
-	GetWorkerCapacity(ctx context.Context, instanceID string) (int32, error)
+	GetCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error)
 
 	// GetActiveLeases returns all the leases for a worker instance.
-	GetActiveLeases(ctx context.Context, instanceID string) ([]string, error)
+	GetActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error)
 
 	// AddRequestLease adds a lease for a request to a worker instance.
-	AddRequestLease(ctx context.Context, instanceID string, requestID string) error
+	AddRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
 	// RemoveRequestLease removes a lease for a request from a worker instance.
-	RemoveRequestLease(ctx context.Context, instanceID string, requestID string) error
+	RemoveRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
 	// RemoveStaleLeases removes all leases for a worker instance that have expired.
-	RemoveStaleLeases(ctx context.Context, instanceID string) error
+	RemoveStaleLeases(ctx context.Context, envID uuid.UUID, instanceID string) error
 }
 
 type AuthContext struct {
