@@ -92,6 +92,9 @@ export const config = {
   ],
 };
 
+// Used in onboarding flow.
+const LOCAL_DEV_SERVER_URL = 'http://localhost:8288';
+
 const CLERK_IMG_CDN_URL = 'https://img.clerk.com';
 const INNGEST_FONT_CDN_URL = 'https://fonts-cdn.inngest.com';
 const INNGEST_STATUS_URL = 'https://status.inngest.com';
@@ -133,9 +136,9 @@ function makeCSPHeader() {
 
   const csp = [
     `base-uri 'self'`,
-    `connect-src 'self' data: ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
-      isProdEnvironment
-    )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
+    `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${combineCSPURLs(
+      LAUNCHDARKLY_URLS
+    )} ${getClerkURL(isProdEnvironment)} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
       getAllowLocalURLs(isDevBuild)
     )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)} ${
       process.env.NEXT_PUBLIC_API_URL ?? ''
