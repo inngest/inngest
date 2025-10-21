@@ -47,6 +47,8 @@ type ExtractedValues struct {
 	StepOutput *string
 	StepOutputRef *string
 	StepHasOutput *bool
+	StepUserlandID *string
+	StepUserlandIndex *int
 	StepRunType *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
