@@ -168,7 +168,7 @@ export default function ConfirmPlanChangeModal({
                     {isCancellation
                       ? 'Primary reason for canceling'
                       : 'Primary reason for downgrading'}{' '}
-                    <span className="text-red-500">*</span>
+                    <span className="text-error">*</span>
                   </label>
                   <div className="w-full">
                     <Select
