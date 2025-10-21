@@ -500,7 +500,7 @@ func ConstraintUsageToProto(usage ConstraintUsage) *pb.ConstraintUsage {
 	return item
 }
 
-func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity {
+func RateLimitCapacityToProto(capacity RateLimitConstraint) *pb.RateLimitCapacity {
 	return &pb.RateLimitCapacity{
 		Scope:             RateLimitScopeToProto(capacity.Scope),
 		KeyExpressionHash: capacity.KeyExpressionHash,
@@ -508,18 +508,18 @@ func RateLimitCapacityToProto(capacity RateLimitCapacity) *pb.RateLimitCapacity 
 	}
 }
 
-func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitCapacity {
+func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitConstraint {
 	if pbCapacity == nil {
-		return RateLimitCapacity{}
+		return RateLimitConstraint{}
 	}
-	return RateLimitCapacity{
+	return RateLimitConstraint{
 		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
 		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
 	}
 }
 
-func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCapacity {
+func ConcurrencyCapacityToProto(capacity ConcurrencyConstraint) *pb.ConcurrencyCapacity {
 	return &pb.ConcurrencyCapacity{
 		Mode:              ConcurrencyModeToProto(capacity.Mode),
 		Scope:             ConcurrencyScopeToProto(capacity.Scope),
@@ -528,11 +528,11 @@ func ConcurrencyCapacityToProto(capacity ConcurrencyCapacity) *pb.ConcurrencyCap
 	}
 }
 
-func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyCapacity {
+func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyConstraint {
 	if pbCapacity == nil {
-		return ConcurrencyCapacity{}
+		return ConcurrencyConstraint{}
 	}
-	return ConcurrencyCapacity{
+	return ConcurrencyConstraint{
 		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
 		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
@@ -540,7 +540,7 @@ func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) Concurrenc
 	}
 }
 
-func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
+func ThrottleCapacityToProto(capacity ThrottleConstraint) *pb.ThrottleCapacity {
 	return &pb.ThrottleCapacity{
 		Scope:             ThrottleScopeToProto(capacity.Scope),
 		KeyExpressionHash: capacity.KeyExpressionHash,
@@ -548,11 +548,11 @@ func ThrottleCapacityToProto(capacity ThrottleCapacity) *pb.ThrottleCapacity {
 	}
 }
 
-func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleCapacity {
+func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleConstraint {
 	if pbCapacity == nil {
-		return ThrottleCapacity{}
+		return ThrottleConstraint{}
 	}
-	return ThrottleCapacity{
+	return ThrottleConstraint{
 		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
 		KeyExpressionHash: pbCapacity.KeyExpressionHash,
 		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
