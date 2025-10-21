@@ -1,7 +1,7 @@
 import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { Link, type LinkComponentProps, type ToPathOption } from '@tanstack/react-router';
+import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 import { cn } from '../utils/classNames';
 import {
@@ -22,7 +22,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   //
   // TODO: move to tanstack "to" to get properly typed routes
-  href?: ToPathOption<any, any, any> | string;
+  href?: string;
   target?: string;
   tooltip?: ReactNode;
   label?: ReactNode;
@@ -38,7 +38,7 @@ type LinkWrapperProps = {
   children: ReactNode;
   //
   // TODO: move to tanstack "to" to get properly typed routes
-  href: ToPathOption<any, any, any> | string;
+  href?: string;
   target?: string;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   scroll?: boolean;

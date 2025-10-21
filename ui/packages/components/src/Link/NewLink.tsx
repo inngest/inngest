@@ -1,10 +1,6 @@
 import type { HTMLAttributeAnchorTarget } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
-import {
-  Link as TanstackLink,
-  type LinkComponentProps,
-  type ToPathOption,
-} from '@tanstack/react-router';
+import { Link as TanstackLink, type LinkComponentProps } from '@tanstack/react-router';
 
 export const defaultLinkStyles =
   'text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300';
@@ -16,9 +12,6 @@ type CustomLinkProps = {
   iconAfter?: React.ReactNode;
   target?: HTMLAttributeAnchorTarget | undefined;
   rel?: string;
-  //
-  // TODO: move to tanstack "to" to get properly typed routes
-  href: ToPathOption<any, any, any> | string;
 };
 
 export type LinkProps = CustomLinkProps & LinkComponentProps;
@@ -41,7 +34,7 @@ export function Link({
         size === 'medium' && 'text-base',
         className
       )}
-      to={href}
+      href={href}
       {...props}
     >
       {iconBefore}

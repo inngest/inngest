@@ -33,6 +33,9 @@ import {
 } from '@/store/generated'
 import { HorizontalPillList } from '@inngest/components/Pill/HorizontalPillList'
 
+export const Route = createFileRoute('/_dashboard/functions')({
+  component: FunctionListComponent,
+})
 const columnHelper = createColumnHelper<Function>()
 const columns = [
   columnHelper.accessor('name', {
@@ -122,10 +125,6 @@ const columns = [
     enableGlobalFilter: false,
   }),
 ]
-
-export const Route = createFileRoute('/_dashboard/functions')({
-  component: FunctionListComponent,
-})
 
 function FunctionListComponent() {
   const tableContainerRef = useRef<HTMLDivElement>(null)
