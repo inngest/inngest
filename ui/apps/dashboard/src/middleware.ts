@@ -115,9 +115,10 @@ const MONACO_EDITOR_CDN_SCRIPT_URLS = [
   `${MONACO_EDITOR_CDN_URL}/basic-languages/sql/sql.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.nls.js`,
+  `${MONACO_EDITOR_CDN_URL}/language/json/jsonMode.js`,
+  `${MONACO_EDITOR_CDN_URL}/language/json/jsonWorker.js`,
   `${MONACO_EDITOR_CDN_URL}/language/typescript/tsMode.js`,
-  `${MONACO_EDITOR_CDN_URL}/language/typescript/tsWorker.js `,
-  `${MONACO_EDITOR_CDN_URL}/language/json/jsonWorker.js `,
+  `${MONACO_EDITOR_CDN_URL}/language/typescript/tsWorker.js`,
   `${MONACO_EDITOR_CDN_URL}/loader.js`,
 ];
 const MONACO_EDITOR_CDN_FONT_URL = `${MONACO_EDITOR_CDN_URL}/base/browser/ui/codicons/codicon/codicon.ttf`;
