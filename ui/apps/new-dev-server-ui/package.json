@@ -6,7 +6,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/inngest/inngest.git",
-    "directory": "ui/apps/dev-server-ui"
+    "directory": "ui/apps/new-dev-server-ui"
   },
   "author": "Inngest Inc. <info@inngest.com> (https://inngest.com/)",
   "main": "n/a",

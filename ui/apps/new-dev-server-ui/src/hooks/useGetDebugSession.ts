@@ -1,12 +1,10 @@
-import { useCallback } from 'react'
 import type { GetDebugSessionPayload } from '@inngest/components/SharedContext/useGetDebugSession'
+import { useCallback } from 'react'
 
 import { client } from '@/store/baseApi'
 import {
   GetDebugSessionDocument,
-  GetTraceResultDocument,
   type GetDebugSessionQuery,
-  type GetTraceResultQuery,
 } from '@/store/generated'
 
 export function useGetDebugSession() {

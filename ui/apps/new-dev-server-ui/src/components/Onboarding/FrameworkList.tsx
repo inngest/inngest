@@ -1,13 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import NextLink from 'next/link'
 import { Search } from '@inngest/components/Forms/Search'
 import { ThemeImage } from '@inngest/components/Image/Image'
-import { Pill } from '@inngest/components/Pill/Pill'
+import { Pill } from '@inngest/components/Pill/NewPill'
 import { Select, type Option } from '@inngest/components/Select/Select'
 
 import { useTracking } from '@/hooks/useTracking'
+import { Link } from '@tanstack/react-router'
 
 type Framework = {
   framework: string
@@ -135,7 +135,7 @@ export default function FrameworkList({
               key={framework.framework}
               className="border-subtle rounded-sm border"
             >
-              <NextLink
+              <Link
                 onClick={() =>
                   trackEvent('cli/onboarding.action', {
                     type: 'btn-click',
@@ -143,7 +143,7 @@ export default function FrameworkList({
                     framework: framework.framework,
                   })
                 }
-                href={framework.link.url}
+                to={framework.link.url}
                 target="_blank"
                 className="hover:bg-canvasSubtle flex items-center justify-between p-3"
               >
@@ -171,7 +171,7 @@ export default function FrameworkList({
                 >
                   {framework.language}
                 </Pill>
-              </NextLink>
+              </Link>
             </li>
           ))
         ) : (
