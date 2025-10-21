@@ -92,16 +92,6 @@ type CapacityAcquireRequest struct {
 	// allowed capacity. This determines the number of created leases.
 	Amount int
 
-	// ExistingLeaseID checks whether an existing lease can be used (still valid),
-	// and will otherwise attempt to create a new lease, if constraint capacity allows.
-	//
-	// - If the lease is still valid
-	// - If the lease is not valid anymore
-	//
-	// This is used by leases generated in advance (e.g. for key queues) to avoid clock skew,
-	// handle idempotency for GCRA constraints, and ensure a valid lease state.
-	ExistingLeaseID *ulid.ULID
-
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
 	//
