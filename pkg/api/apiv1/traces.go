@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
@@ -144,24 +143,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 		for _, ss := range rs.ScopeSpans {
 			for _, s := range ss.Spans {
 
-				wg.Add(2)
-
-				go func() {
-					defer wg.Done()
-					defer func() {
-						if r := recover(); r != nil {
-							l.Error("failed to commit legacy span with", "panic", r)
-							errs.Add(1)
-						}
-					}()
-
-					err := a.commitLegacySpan(ctx, auth, res, ss.Scope.GetName(), s)
-					if err != nil {
-						l.Error("failed to commit legacy span with", "error", err)
-						errs.Add(1)
-						return
-					}
-				}()
+				wg.Add(1)
 
 				go func() {
 					defer wg.Done()
@@ -267,83 +249,6 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	if err != nil {
 		return fmt.Errorf("failed to create span: %w", err)
 	}
-
-	return nil
-}
-
-func (a router) commitLegacySpan(ctx context.Context, auth apiv1auth.V1Auth, res *resource.Resource, scope string, s *tracev1.Span) error {
-	// To be valid, each span must have an "inngest.traceparent" attribute
-	tp, err := getInngestTraceparent(s)
-	if err != nil {
-		// If we can't find the traceparent, we can't create a span. So let's
-		// skip it.
-		return fmt.Errorf("failed to get traceparent: %w", err)
-	}
-
-	opts := []run.SpanOpt{
-		run.WithTraceID(tp.TraceID),
-		run.WithSpanID(trace.SpanID(s.SpanId)),
-		run.WithName(s.Name),
-		run.WithSpanKind(trace.SpanKind(s.Kind)),
-		run.WithScope(scope),
-		run.WithLinks(convertLinks(s.Links)...),
-		run.WithTimestamp(time.Unix(0, int64(s.StartTimeUnixNano))),
-	}
-
-	attrs := convertAttributes(s.Attributes)
-
-	if err := hasRequiredAttributes(s.Attributes, []string{
-		consts.OtelSysAppID,
-		consts.OtelAttrSDKRunID,
-		consts.OtelSysFunctionID,
-	}); err != nil {
-		logger.StdlibLogger(ctx).Error("missing required attributes, skipping ingestion", "error", err)
-		return fmt.Errorf("missing required attributes: %w", err)
-	}
-
-	// Add the run ID to attrs so we can query for it later
-	attrs = append(attrs,
-		attribute.KeyValue{
-			Key:   attribute.Key(consts.OtelSysAccountID),
-			Value: attribute.StringValue(auth.AccountID().String()),
-		},
-		attribute.KeyValue{
-			Key:   attribute.Key(consts.OtelSysWorkspaceID),
-			Value: attribute.StringValue(auth.WorkspaceID().String()),
-		},
-	)
-
-	// Always mark the span as userland
-	attrs = append(attrs, attribute.KeyValue{
-		Key:   attribute.Key(consts.OtelScopeUserland),
-		Value: attribute.BoolValue(true),
-	})
-
-	opts = append(opts, run.WithSpanAttributes(attrs...))
-
-	if scope == "inngest" && s.Name == "inngest.execution" {
-		// This is the "root" span created by an SDK, so let's set its parent
-		// to our span ID
-		opts = append(opts, run.WithParentSpanID(trace.SpanID(tp.SpanID)))
-	} else if len(s.ParentSpanId) == 12 {
-		opts = append(opts, run.WithParentSpanID(trace.SpanID(s.ParentSpanId)))
-	}
-
-	if res != nil {
-		opts = append(opts, run.WithServiceName(resourceServiceName(res)))
-	}
-
-	_, span := run.NewSpan(ctx, opts...)
-
-	for _, e := range convertEvents(s.Events) {
-		span.AddEvent(e.Name, trace.WithTimestamp(e.Time), trace.WithAttributes(e.Attributes...))
-	}
-
-	if s.Status != nil {
-		span.SetStatus(traceStatusCode(s.Status.Code), s.Status.Message)
-	}
-
-	span.End(trace.WithTimestamp(time.Unix(0, int64(s.EndTimeUnixNano))))
 
 	return nil
 }

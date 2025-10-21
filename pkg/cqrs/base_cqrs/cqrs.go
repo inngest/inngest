@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -353,6 +354,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			item, _ := spanMap.Get(span.SpanID)
 			parent.Children = append(parent.Children, item)
 		} else {
+			spew.Dump(span)
+
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
 				"spanID", span.SpanID,
@@ -1022,7 +1025,6 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		Order(order...).
 		Limit(uint(opts.Limit)).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +1125,6 @@ func (w wrapper) GetEventsIDbound(
 	limit int,
 	includeInternal bool,
 ) ([]*cqrs.Event, error) {
-
 	if ids.Before == nil {
 		ids.Before = &endULID
 	}
@@ -1520,7 +1521,6 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
-
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
@@ -2761,7 +2761,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		// Find min start_time and max end_time across all spans in this group
 		startTime := spans[0].StartTime
 		var endTime *time.Time
-		var status = enums.RunStatusRunning
+		status := enums.RunStatusRunning
 		var triggerIDs []string
 
 		for _, span := range spans {
