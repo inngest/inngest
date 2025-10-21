@@ -112,6 +112,7 @@ const MONACO_EDITOR_CDN_SCRIPT_URLS = [
   `${MONACO_EDITOR_CDN_URL}/base/common/worker/simpleWorker.nls.js`,
   `${MONACO_EDITOR_CDN_URL}/base/worker/workerMain.js`,
   `${MONACO_EDITOR_CDN_URL}/basic-languages/javascript/javascript.js`,
+  `${MONACO_EDITOR_CDN_URL}/basic-languages/shell/shell.js`,
   `${MONACO_EDITOR_CDN_URL}/basic-languages/sql/sql.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.nls.js`,
