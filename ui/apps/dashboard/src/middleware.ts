@@ -139,7 +139,7 @@ function makeCSPHeader() {
     `form-action 'self'`,
     `frame-ancestors 'none'`,
     `frame-src 'self' ${STRIPE_JS_URL} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
-    `img-src 'self' ${CLERK_IMG_CDN_URL}`,
+    `img-src 'self' data: ${CLERK_IMG_CDN_URL}`,
     `manifest-src 'self'`,
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
