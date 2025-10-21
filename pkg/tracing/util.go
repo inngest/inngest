@@ -161,6 +161,11 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		rawAttrs.AddErr(fmt.Errorf("failed to get step input: %w", err))
 	}
 
+	if op.Userland != nil {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandID, &op.Userland.ID)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandIndex, &op.Userland.Index)
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
