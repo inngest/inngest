@@ -119,14 +119,17 @@ const MONACO_EDITOR_CDN_SCRIPT_URLS = [
 const MONACO_EDITOR_CDN_FONT_URL = `${MONACO_EDITOR_CDN_URL}/base/browser/ui/codicons/codicon/codicon.ttf`;
 const MONACO_EDITOR_CDN_STYLE_URL = `${MONACO_EDITOR_CDN_URL}/editor/editor.main.css`;
 
+const PROD_URL = 'https://app.inngest.com';
+
 // TODO: Add nonce, and remove unsafe-* usages, but that would require dynamic rendering of all pages.
 function makeCSPHeader() {
   const isDevBuild = process.env.NODE_ENV === 'development';
+  const isProdEnvironment = process.env.NEXT_PUBLIC_APP_URL === PROD_URL;
 
   const csp = [
     `base-uri 'self'`,
     `connect-src 'self' ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
-      isDevBuild
+      isProdEnvironment
     )} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(getAllowLocalURLs(isDevBuild))}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
@@ -137,7 +140,7 @@ function makeCSPHeader() {
     `manifest-src 'self'`,
     `object-src 'none'`,
     `script-src 'self' ${combineCSPURLs(MONACO_EDITOR_CDN_SCRIPT_URLS)} ${getClerkURL(
-      isDevBuild
+      isProdEnvironment
     )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(
       isDevBuild
     )}`,
@@ -162,8 +165,8 @@ function combineCSPURLs(urls: string[]): string {
 
 const NON_PROD_CLERK_URL = 'https://saving-seasnail-84.clerk.accounts.dev';
 const PROD_CLERK_URL = 'https://clerk.inngest.com';
-function getClerkURL(isDevBuild: boolean): string {
-  return isDevBuild ? NON_PROD_CLERK_URL : PROD_CLERK_URL;
+function getClerkURL(isProdEnvironment: boolean): string {
+  return isProdEnvironment ? PROD_CLERK_URL : NON_PROD_CLERK_URL;
 }
 
 function getAllowUnsafeEval(isDevBuild: boolean): string {
