@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import * as React from 'react'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { ThemeProvider } from 'next-themes'
 
 import {
   HeadContent,
@@ -70,7 +71,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="bg-canvasBase text-basis h-full overflow-auto overscroll-none">
         <div id="app" />
         <div id="modals" />
-        <StoreProvider>{children}</StoreProvider>
+        <StoreProvider>
+          <ThemeProvider attribute="class" defaultTheme="system">
+            {children}
+          </ThemeProvider>
+        </StoreProvider>
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />
       </body>

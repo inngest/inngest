@@ -569,6 +569,9 @@ importers:
       monaco-editor:
         specifier: ^0.52.2
         version: 0.52.2
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -10422,7 +10425,7 @@ packages:
   vitefu@1.1.1:
     resolution: {integrity: sha512-B/Fegf3i8zh0yFbpzZ21amWzHmuNlLlmJT6n7bu5e+pCHUKQIfXSYokrqOBGEMMe9UG2sostKQF9mml/vYaWJQ==}
     peerDependencies:
-      vite: '>=4.5.11'
+      vite: '>=5.4.16'
     peerDependenciesMeta:
       vite:
         optional: true
