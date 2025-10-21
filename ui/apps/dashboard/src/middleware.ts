@@ -120,7 +120,6 @@ const MONACO_EDITOR_CDN_FONT_URL = `${MONACO_EDITOR_CDN_URL}/base/browser/ui/cod
 const MONACO_EDITOR_CDN_STYLE_URL = `${MONACO_EDITOR_CDN_URL}/editor/editor.main.css`;
 
 const PROD_URL = 'https://app.inngest.com';
-
 // TODO: Add nonce, and remove unsafe-* usages, but that would require dynamic rendering of all pages.
 function makeCSPHeader() {
   const isDevBuild = process.env.NODE_ENV === 'development';
@@ -135,7 +134,7 @@ function makeCSPHeader() {
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
     `frame-ancestors 'none'`,
-    `frame-src 'self' ${STRIPE_JS_URL}`,
+    `frame-src 'self' ${STRIPE_JS_URL} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `img-src 'self' ${CLERK_IMG_CDN_URL}`,
     `manifest-src 'self'`,
     `object-src 'none'`,
@@ -143,7 +142,7 @@ function makeCSPHeader() {
       isProdEnvironment
     )} ${MAZE_SNIPPET_URL} ${INNGEST_UNPKG_CDN_URL} 'unsafe-inline' ${getAllowUnsafeEval(
       isDevBuild
-    )}`,
+    )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
     `worker-src 'self' blob:`,
   ]
@@ -177,4 +176,13 @@ const LOCAL_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:9999'];
 function getAllowLocalURLs(isDevBuild: boolean): string[] {
   if (isDevBuild) return LOCAL_URLS;
   return [];
+}
+
+const VERCEL_LIVE_URL = 'https://vercel.live';
+function getAllowVercelLiveURL(isProdEnvironment: boolean, isDevBuild: boolean): string {
+  if (isProdEnvironment) return '';
+  if (isDevBuild) return '';
+
+  // Preview builds + staging.
+  return VERCEL_LIVE_URL;
 }
