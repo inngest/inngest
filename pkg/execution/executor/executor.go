@@ -2647,7 +2647,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	qi := runCtx.LifecycleItem()
 	updateOpts := &tracing.UpdateSpanOptions{
 		TargetSpan: runCtx.ExecutionSpan(),
-		Debug:      &tracing.SpanDebugData{Location: "handleGeneratorStep"},
+		Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorStep"},
 		Metadata:   runCtx.Metadata(),
 		QueueItem:  &qi,
 		Attributes: meta.NewAttrSet(),
