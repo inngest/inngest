@@ -2664,7 +2664,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 
 	endTimer := updateOpts.Attributes.TimedAttr(meta.Attrs.StateSaveDuration, time.Now())
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	endTimer()
+	updateOpts.Attributes = endTimer()
 	if err != nil {
 		return err
 	}
@@ -2714,7 +2714,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 
 		endTimer = updateOpts.Attributes.TimedAttr(meta.Attrs.EnqueueDuration, time.Now())
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		endTimer()
+		updateOpts.Attributes = endTimer()
 		if err != nil {
 			span.Drop()
 
