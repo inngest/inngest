@@ -1,123 +1,142 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Modal } from '@inngest/components/Modal';
-import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
-import { isDark } from '@inngest/components/utils/theme';
-import Editor, { useMonaco } from '@monaco-editor/react';
-import { toast } from 'sonner';
-import { ulid } from 'ulid';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
+import { Button } from '@inngest/components/Button/NewButton'
+import { Modal } from '@inngest/components/Modal'
+import {
+  FONT,
+  LINE_HEIGHT,
+  createColors,
+  createRules,
+} from '@inngest/components/utils/monaco'
+import { isDark } from '@inngest/components/utils/theme'
+import Editor, { useMonaco } from '@monaco-editor/react'
+import { toast } from 'sonner'
+import { ulid } from 'ulid'
 
-import useModifierKey from '@/hooks/useModifierKey';
-import { usePortal } from '../../hooks/usePortal';
-import { useSendEventMutation } from '../../store/devApi';
-import { genericiseEvent } from '../../utils/events';
+import useModifierKey from '@/hooks/useModifierKey'
+import { usePortal } from '../../hooks/usePortal'
+import { useSendEventMutation } from '../../store/devApi'
+import { genericiseEvent } from '../../utils/events'
 
 type SendEventModalProps = {
-  data?: string | null;
-  isOpen: boolean;
-  onClose: () => void;
-};
+  data?: string | null
+  isOpen: boolean
+  onClose: () => void
+}
 
-export default function SendEventModal({ data, isOpen, onClose }: SendEventModalProps) {
-  const [dark, setDark] = useState(isDark());
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [_sendEvent, sendEventState] = useSendEventMutation();
-  const portal = usePortal();
-  const eventDataStr = data;
+export default function SendEventModal({
+  data,
+  isOpen,
+  onClose,
+}: SendEventModalProps) {
+  const [dark, setDark] = useState(isDark())
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [_sendEvent, sendEventState] = useSendEventMutation()
+  const portal = usePortal()
+  const eventDataStr = data
 
   // Define the keydown event handler
   const handleGlobalKeyDown = (event: KeyboardEvent) => {
     // Check if Ctrl or Cmd key is pressed (depending on the user's OS)
-    const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
+    const isCtrlCmdPressed = event.ctrlKey || event.metaKey
 
     if (isCtrlCmdPressed && event.key === 'Enter') {
       // Trigger the sendEvent function
-      sendEventRef.current();
+      sendEventRef.current()
     }
-  };
+  }
 
   useEffect(() => {
     //@ts-ignore
-    document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('keydown', handleGlobalKeyDown)
 
     // Detach the event listener when the component unmounts
     return () => {
       //@ts-ignore
-      document.removeEventListener('keydown', handleGlobalKeyDown);
-    };
-  }, []);
+      document.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [])
 
-  const snippedData = useMemo(() => genericiseEvent(eventDataStr), [eventDataStr]);
+  const snippedData = useMemo(
+    () => genericiseEvent(eventDataStr),
+    [eventDataStr],
+  )
 
-  const [input, setInput] = useState(snippedData);
+  const [input, setInput] = useState(snippedData)
   useEffect(() => {
-    setInput(genericiseEvent(snippedData));
-  }, [eventDataStr, isOpen]);
+    setInput(genericiseEvent(snippedData))
+  }, [eventDataStr, isOpen])
 
   const pushToast = (message: string) => {
-    alert(message);
-  };
+    alert(message)
+  }
 
   const sendEvent = useCallback<() => void>(() => {
-    let data: any;
+    let data: any
 
     try {
-      data = JSON.parse(input || '');
+      data = JSON.parse(input || '')
 
       if (typeof data.id !== 'string') {
-        data.id = ulid();
+        data.id = ulid()
       }
 
       if (!data.ts || typeof data.ts !== 'number') {
-        data.ts = Date.now();
+        data.ts = Date.now()
       }
     } catch (err) {
-      return pushToast('Event payload could not be parsed as JSON.');
+      return pushToast('Event payload could not be parsed as JSON.')
     }
 
     if (!data.name) {
-      return pushToast('Event payload must contain a name.');
+      return pushToast('Event payload must contain a name.')
     }
 
     if (typeof data.name !== 'string') {
       return pushToast(
-        "Event payload name must be a string, ideally in the format 'scope/subject.verb'."
-      );
+        "Event payload name must be a string, ideally in the format 'scope/subject.verb'.",
+      )
     }
 
     if (data.data && typeof data.data !== 'object') {
-      return pushToast('Event payload data must be an object if defined.');
+      return pushToast('Event payload data must be an object if defined.')
     }
 
     if (data.user && typeof data.user !== 'object') {
-      return pushToast('Event payload user must be an object if defined.');
+      return pushToast('Event payload user must be an object if defined.')
     }
 
     _sendEvent(data)
       .unwrap()
       .then(() => {
-        toast.success('The event was successfully added.');
-        onClose();
-      });
-  }, [_sendEvent, input]);
+        toast.success('The event was successfully added.')
+        onClose()
+      })
+  }, [_sendEvent, input])
 
-  const monaco = useMonaco();
+  const monaco = useMonaco()
 
-  const sendEventRef = useRef(sendEvent);
+  const sendEventRef = useRef(sendEvent)
   useEffect(() => {
-    sendEventRef.current = sendEvent;
-  }, [sendEvent]);
+    sendEventRef.current = sendEvent
+  }, [sendEvent])
 
   useEffect(() => {
     // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
     if (wrapperRef.current) {
-      setDark(isDark(wrapperRef.current));
+      setDark(isDark(wrapperRef.current))
     }
-  });
+  })
 
   useEffect(() => {
     if (!monaco) {
-      return;
+      return
     }
 
     monaco.editor.defineTheme('inngest-theme', {
@@ -125,7 +144,7 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
       inherit: true,
       rules: dark ? createRules(true) : createRules(false),
       colors: dark ? createColors(true) : createColors(false),
-    });
+    })
 
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
@@ -164,8 +183,8 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
           },
         },
       ],
-    });
-  }, [monaco, dark]);
+    })
+  }, [monaco, dark])
 
   return portal(
     <Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-5xl">
@@ -193,9 +212,9 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
                   keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
                   contextMenuGroupId: '2_execution',
                   run: () => {
-                    sendEventRef.current();
+                    sendEventRef.current()
                   },
-                });
+                })
               }}
               options={{
                 minimap: {
@@ -223,7 +242,12 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
         </div>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
+        <Button
+          kind="secondary"
+          label="Cancel"
+          appearance="outlined"
+          onClick={onClose}
+        />
         <Button
           kind="primary"
           disabled={sendEventState.isLoading}
@@ -232,6 +256,6 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
           keys={[useModifierKey(), '↵']}
         />
       </Modal.Footer>
-    </Modal>
-  );
+    </Modal>,
+  )
 }

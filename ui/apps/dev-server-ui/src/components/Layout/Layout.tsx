@@ -1,19 +1,18 @@
-'use client';
+import { useEffect, useState, type ReactNode } from 'react'
 
-import { useEffect, useState, type ReactNode } from 'react';
-
-import SideBar from './SideBar';
+import SideBar from './SideBar'
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState<boolean | undefined>(undefined);
+  const [collapsed, setCollapsed] = useState<boolean | undefined>(undefined)
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem('navCollapsed') === 'true');
-  });
+    setCollapsed(localStorage.getItem('navCollapsed') === 'true')
+  })
 
   useEffect(() => {
-    collapsed !== undefined && localStorage.setItem('navCollapsed', JSON.stringify(collapsed));
-  }, [collapsed]);
+    collapsed !== undefined &&
+      localStorage.setItem('navCollapsed', JSON.stringify(collapsed))
+  }, [collapsed])
 
   //
   // don't render until we have the nav collapsed state to avoid jank
@@ -22,9 +21,11 @@ export default function Layout({ children }: { children: ReactNode }) {
       {collapsed === undefined ? null : (
         <>
           <SideBar collapsed={collapsed} setCollapsed={setCollapsed} />
-          <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">{children}</div>
+          <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
+            {children}
+          </div>
         </>
       )}
     </div>
-  );
+  )
 }

@@ -1,8 +1,6 @@
-'use client';
+import { RiCodeSSlashLine } from '@remixicon/react'
 
-import { RiCodeSSlashLine } from '@remixicon/react';
-
-import { ProfileMenu } from './ProfileMenu';
+import { ProfileMenu } from './ProfileMenu'
 
 const Profile = ({ collapsed }: { collapsed: boolean }) => {
   return (
@@ -21,14 +19,18 @@ const Profile = ({ collapsed }: { collapsed: boolean }) => {
 
           {!collapsed && (
             <div className="ml-2 flex flex-col items-start justify-start overflow-hidden">
-              <div className="text-subtle leading-1 max-w-full text-sm">Settings</div>
-              <div className="text-muted max-w-full text-xs leading-4">Dev Server</div>
+              <div className="text-subtle leading-1 max-w-full text-sm">
+                Settings
+              </div>
+              <div className="text-muted max-w-full text-xs leading-4">
+                Dev Server
+              </div>
             </div>
           )}
         </div>
       </div>
     </ProfileMenu>
-  );
-};
+  )
+}
 
-export default Profile;
+export default Profile

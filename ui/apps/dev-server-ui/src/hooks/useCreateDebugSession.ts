@@ -1,16 +1,16 @@
 import type {
   CreateDebugSessionPayload,
   CreateDebugSessionResult,
-} from '@inngest/components/SharedContext/useCreateDebugSession';
+} from '@inngest/components/SharedContext/useCreateDebugSession'
 
-import { convertError } from '@/store/error';
-import { useCreateDebugSessionMutation } from '@/store/generated';
+import { convertError } from '@/store/error'
+import { useCreateDebugSessionMutation } from '@/store/generated'
 
 export const useCreateDebugSession = (): ((
-  payload: CreateDebugSessionPayload
+  payload: CreateDebugSessionPayload,
 ) => Promise<CreateDebugSessionResult>) => {
   const [createDebugSession, { isLoading, error, isSuccess, isError }] =
-    useCreateDebugSessionMutation();
+    useCreateDebugSessionMutation()
 
   return async ({ functionSlug, runID }: CreateDebugSessionPayload) => {
     const result = await createDebugSession({
@@ -18,18 +18,20 @@ export const useCreateDebugSession = (): ((
         functionSlug,
         runID,
       },
-    });
+    })
 
     if ('error' in result) {
-      throw result.error;
+      throw result.error
     }
 
     return {
       data: result.data?.createDebugSession,
       loading: isLoading,
-      error: error ? convertError('Failed to create debug session', error) : undefined,
+      error: error
+        ? convertError('Failed to create debug session', error)
+        : undefined,
       isSuccess,
       isError,
-    };
-  };
-};
+    }
+  }
+}

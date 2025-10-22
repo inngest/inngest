@@ -1,12 +1,16 @@
-import { Link } from '@inngest/components/Link/Link';
-import { type AppKind } from '@inngest/components/types/app';
-import { RiExternalLinkLine } from '@remixicon/react';
+import { Link } from '@inngest/components/Link/NewLink'
+import { type AppKind } from '@inngest/components/types/app'
+import { RiExternalLinkLine } from '@remixicon/react'
 
-import { AppMethod, type GetAppsQuery } from '@/store/generated';
-import UpdateApp from './UpdateApp';
+import { AppMethod, type GetAppsQuery } from '@/store/generated'
+import UpdateApp from './UpdateApp'
 
 const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
-  const appKind: AppKind = !app.connected ? 'error' : app.functionCount > 0 ? 'primary' : 'warning';
+  const appKind: AppKind = !app.connected
+    ? 'error'
+    : app.functionCount > 0
+    ? 'primary'
+    : 'warning'
 
   const status =
     app.method === AppMethod.Connect
@@ -15,7 +19,7 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
       ? 'Not Synced'
       : app.functionCount === 0
       ? 'No functions found'
-      : null;
+      : null
 
   const footerHeaderTitle = !app.connected ? (
     app.error === 'unreachable' ? (
@@ -27,29 +31,32 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
     'There are currently no functions registered at this URL.'
   ) : (
     <>
-      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'} found
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'}{' '}
+      found
     </>
-  );
+  )
 
   const footerHeaderSecondaryCTA =
     !app.error && app.functionCount > 0 ? (
       <Link size="small" href="/functions">
         View functions
       </Link>
-    ) : null;
+    ) : null
 
   const footerContent = !app.connected ? (
     <>
       <p className="text-subtle pb-4">
-        Ensure your full URL is correct, including the port. Inngest automatically scans{' '}
-        <span className="text-basis">multiple ports</span> by default.
+        Ensure your full URL is correct, including the port. Inngest
+        automatically scans <span className="text-basis">multiple ports</span>{' '}
+        by default.
       </p>
       <UpdateApp app={app} />
     </>
   ) : app.functionCount === 0 ? (
     <>
       <p className="text-subtle pb-4">
-        Ensure you have created a function and are exporting it correctly from your serve() command.
+        Ensure you have created a function and are exporting it correctly from
+        your serve() command.
       </p>
       <Link
         size="small"
@@ -69,12 +76,18 @@ const getAppCardContent = ({ app }: { app: GetAppsQuery['apps'][number] }) => {
             <li key={func.id} className="text-subtle py-2">
               {func.name}
             </li>
-          );
+          )
         })}
     </ul>
-  );
+  )
 
-  return { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent };
-};
+  return {
+    appKind,
+    status,
+    footerHeaderTitle,
+    footerHeaderSecondaryCTA,
+    footerContent,
+  }
+}
 
-export default getAppCardContent;
+export default getAppCardContent

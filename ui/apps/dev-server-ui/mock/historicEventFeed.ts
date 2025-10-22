@@ -76,4 +76,4 @@ export const historicEvents = [
     badge: 1,
     id: '01GGG522ZATDGVQBCND4ZEAS6Z',
   },
-];
+]

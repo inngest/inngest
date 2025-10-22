@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { RiAddLine } from '@remixicon/react';
+import { useState } from 'react'
+import { Button } from '@inngest/components/Button/NewButton'
+import { RiAddLine } from '@remixicon/react'
 
-import AddAppModal from '@/components/App/AddAppModal';
+import AddAppModal from '@/components/App/AddAppModal'
 
 export default function AddAppButton({ secondary }: { secondary?: boolean }) {
-  const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
+  const [isAddAppModalVisible, setAddAppModalVisible] = useState(false)
 
   return (
     <>
@@ -19,8 +19,11 @@ export default function AddAppButton({ secondary }: { secondary?: boolean }) {
       />
 
       {isAddAppModalVisible && (
-        <AddAppModal isOpen={isAddAppModalVisible} onClose={() => setAddAppModalVisible(false)} />
+        <AddAppModal
+          isOpen={isAddAppModalVisible}
+          onClose={() => setAddAppModalVisible(false)}
+        />
       )}
     </>
-  );
+  )
 }

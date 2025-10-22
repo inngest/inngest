@@ -1,24 +1,24 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { z } from 'zod';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { z } from 'zod'
 
-import { api } from './generated';
+import { api } from './generated'
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL)
-  : '/';
+const baseURL = import.meta.env.VITE_PUBLIC_API_BASE_URL
+  ? new URL('/', import.meta.env.VITE_PUBLIC_API_BASE_URL)
+  : '/'
 
 export interface EventPayload {
-  name: string;
+  name: string
 }
 
 const serverInfoSchema = z.object({
   version: z.string().optional(),
   isSingleNodeService: z.boolean().optional(),
   startOpts: z.record(z.unknown()).optional(),
-});
+})
 
 export interface ServerInfo extends z.output<typeof serverInfoSchema> {
-  isDiscoveryEnabled?: boolean;
+  isDiscoveryEnabled?: boolean
 }
 
 export const devApi = createApi({
@@ -30,32 +30,41 @@ export const devApi = createApi({
         return {
           url: '/dev',
           method: 'GET',
-        };
+        }
       },
       transformResponse(baseQueryReturnValue) {
-        const info: ServerInfo = serverInfoSchema.parse(baseQueryReturnValue);
+        const info: ServerInfo = serverInfoSchema.parse(baseQueryReturnValue)
 
         if (info.startOpts) {
-          info.isDiscoveryEnabled = Boolean(info.startOpts.autodiscover);
+          info.isDiscoveryEnabled = Boolean(info.startOpts.autodiscover)
         }
 
-        return info;
+        return info
       },
     }),
     sendEvent: builder.mutation<
       void,
-      { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
+      {
+        id: string
+        name: string
+        ts: number
+        data?: object
+        user?: object
+        functionId?: string
+      }
     >({
       query: ({ functionId, ...event }) => ({
-        url: functionId ? `/invoke/${encodeURIComponent(functionId)}` : '/e/dev_key',
+        url: functionId
+          ? `/invoke/${encodeURIComponent(functionId)}`
+          : '/e/dev_key',
         method: 'POST',
         body: event,
       }),
-      onQueryStarted(event, { dispatch, queryFulfilled }) {
+      onQueryStarted(event, { dispatch }) {
         // Don't optimistically update if this is a function invocation, as the
         // shape of the payload will be different when sending vs receiving.
         if (event.functionId) {
-          return;
+          return
         }
 
         // Optimistically add the event to the `GetEventQuery` cache so that it shows up in the UI
@@ -76,13 +85,13 @@ export const devApi = createApi({
                 createdAt: event.ts,
                 status: null,
               },
-            }
-          )
-        );
+            },
+          ),
+        )
       },
     }),
   }),
-});
+})
 
-export const { useSendEventMutation, useInfoQuery } = devApi;
-export default devApi;
+export const { useSendEventMutation, useInfoQuery } = devApi
+export default devApi

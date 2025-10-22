@@ -2,7 +2,7 @@
   "name": "inngest-ui",
   "scripts": {
     "dev:new-dashboard": "pnpm run --filter @inngest/new-dashboard dev",
-    "dev:new-dev-server-ui": "pnpm run --filter @inngest/new-dev-server-ui dev",
+    "dev:dev-server-ui": "pnpm run --filter @inngest/dev-server-ui dev",
     "format": "prettier . --write",
     "preinstall": "npx only-allow pnpm",
     "prepare": "cd .. && husky install ./ui/.husky"

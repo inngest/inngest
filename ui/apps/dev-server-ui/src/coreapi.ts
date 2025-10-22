@@ -1,4 +1,4 @@
-import { gql } from 'graphql-request';
+import { gql } from 'graphql-request'
 
 export const EVENT = gql`
   query GetEvent($id: ID!) {
@@ -26,7 +26,7 @@ export const EVENT = gql`
       }
     }
   }
-`;
+`
 
 export const FUNCTIONS = gql`
   query GetFunctions {
@@ -44,7 +44,7 @@ export const FUNCTIONS = gql`
       url
     }
   }
-`;
+`
 
 export const FUNCTION = gql`
   query GetFunction($functionSlug: String!) {
@@ -112,7 +112,7 @@ export const FUNCTION = gql`
       url
     }
   }
-`;
+`
 
 export const APPS = gql`
   query GetApps {
@@ -139,7 +139,7 @@ export const APPS = gql`
       }
     }
   }
-`;
+`
 
 export const GET_APP = gql`
   query GetApp($id: UUID!) {
@@ -170,7 +170,7 @@ export const GET_APP = gql`
       }
     }
   }
-`;
+`
 
 export const ADD_APP = gql`
   mutation CreateApp($input: CreateAppInput!) {
@@ -178,7 +178,7 @@ export const ADD_APP = gql`
       url
     }
   }
-`;
+`
 
 export const UPDATE_APP = gql`
   mutation UpdateApp($input: UpdateAppInput!) {
@@ -187,13 +187,13 @@ export const UPDATE_APP = gql`
       id
     }
   }
-`;
+`
 
 export const DELETE_APP = gql`
   mutation DeleteApp($id: String!) {
     deleteApp(id: $id)
   }
-`;
+`
 
 export const INVOKE_FUNCTION = gql`
   mutation InvokeFunction(
@@ -211,7 +211,7 @@ export const INVOKE_FUNCTION = gql`
       debugRunID: $debugRunID
     )
   }
-`;
+`
 
 export const CANCEL_RUN = gql`
   mutation CancelRun($runID: ULID!) {
@@ -219,13 +219,21 @@ export const CANCEL_RUN = gql`
       id
     }
   }
-`;
+`
 
 export const RERUN = gql`
-  mutation Rerun($runID: ULID!, $debugRunID: ULID = null, $debugSessionID: ULID = null) {
-    rerun(runID: $runID, debugRunID: $debugRunID, debugSessionID: $debugSessionID)
+  mutation Rerun(
+    $runID: ULID!
+    $debugRunID: ULID = null
+    $debugSessionID: ULID = null
+  ) {
+    rerun(
+      runID: $runID
+      debugRunID: $debugRunID
+      debugSessionID: $debugSessionID
+    )
   }
-`;
+`
 
 export const RERUN_FROM_STEP = gql`
   mutation RerunFromStep(
@@ -241,7 +249,7 @@ export const RERUN_FROM_STEP = gql`
       debugSessionID: $debugSessionID
     )
   }
-`;
+`
 
 export const GET_RUNS = gql`
   query GetRuns(
@@ -294,7 +302,7 @@ export const GET_RUNS = gql`
       }
     }
   }
-`;
+`
 
 export const COUNT_RUNS = gql`
   query CountRuns(
@@ -311,7 +319,7 @@ export const COUNT_RUNS = gql`
       totalCount(preview: $preview)
     }
   }
-`;
+`
 
 export const TRACE_DETAILS_FRAGMENT = gql`
   fragment TraceDetails on RunTraceSpan {
@@ -369,7 +377,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       }
     }
   }
-`;
+`
 
 export const GET_RUN = gql`
   query GetRun($runID: String!, $preview: Boolean) {
@@ -401,7 +409,7 @@ export const GET_RUN = gql`
       hasAI
     }
   }
-`;
+`
 
 export const GET_RUN_TRACE = gql`
   query GetRunTrace($runID: String!) {
@@ -421,7 +429,7 @@ export const GET_RUN_TRACE = gql`
       }
     }
   }
-`;
+`
 
 export const GET_TRACE_RESULT = gql`
   query GetTraceResult($traceID: String!) {
@@ -436,7 +444,7 @@ export const GET_TRACE_RESULT = gql`
       }
     }
   }
-`;
+`
 
 export const GET_TRIGGER = gql`
   query GetTrigger($runID: String!) {
@@ -450,7 +458,7 @@ export const GET_TRIGGER = gql`
       cron
     }
   }
-`;
+`
 
 export const GET_WORKER_CONNECTIONS = gql`
   query GetWorkerConnections(
@@ -464,7 +472,12 @@ export const GET_WORKER_CONNECTIONS = gql`
   ) {
     workerConnections(
       first: $first
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: $timeField
+      }
       orderBy: $orderBy
       after: $cursor
     ) {
@@ -503,7 +516,7 @@ export const GET_WORKER_CONNECTIONS = gql`
       totalCount
     }
   }
-`;
+`
 
 export const COUNT_WORKER_CONNECTIONS = gql`
   query CountWorkerConnections(
@@ -512,13 +525,18 @@ export const COUNT_WORKER_CONNECTIONS = gql`
     $status: [ConnectV1ConnectionStatus!]
   ) {
     workerConnections(
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: CONNECTED_AT }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: CONNECTED_AT
+      }
       orderBy: [{ field: CONNECTED_AT, direction: DESC }]
     ) {
       totalCount
     }
   }
-`;
+`
 
 export const GET_EVENTS = gql`
   query GetEventsV2(
@@ -566,7 +584,7 @@ export const GET_EVENTS = gql`
       }
     }
   }
-`;
+`
 
 export const GET_EVENT = gql`
   query GetEventV2($eventID: ULID!) {
@@ -582,14 +600,14 @@ export const GET_EVENT = gql`
       }
     }
   }
-`;
+`
 export const GET_EVENT_PAYLOAD = gql`
   query GetEventV2Payload($eventID: ULID!) {
     eventV2(id: $eventID) {
       raw
     }
   }
-`;
+`
 
 export const GET_EVENT_RUNS = gql`
   query GetEventV2Runs($eventID: ULID!) {
@@ -607,7 +625,7 @@ export const GET_EVENT_RUNS = gql`
       }
     }
   }
-`;
+`
 
 export const CREATE_DEBUG_SESSION = gql`
   mutation CreateDebugSession($input: CreateDebugSessionInput!) {
@@ -616,7 +634,7 @@ export const CREATE_DEBUG_SESSION = gql`
       debugRunID
     }
   }
-`;
+`
 
 export const DEBUG_RUN = gql`
   query GetDebugRun($query: DebugRunQuery!) {
@@ -635,7 +653,7 @@ export const DEBUG_RUN = gql`
       }
     }
   }
-`;
+`
 
 export const DEBUG_SESSION = gql`
   query GetDebugSession($query: DebugSessionQuery!) {
@@ -651,4 +669,4 @@ export const DEBUG_SESSION = gql`
       }
     }
   }
-`;
+`
