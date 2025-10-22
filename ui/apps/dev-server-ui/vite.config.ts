@@ -11,10 +11,6 @@ export default defineConfig({
         __dirname,
         '../../packages/components/src',
       ),
-      '@tanstack/react-query': path.resolve(
-        __dirname,
-        './node_modules/@tanstack/react-query',
-      ),
     },
     dedupe: ['next-themes', '@tanstack/react-query', 'react', 'react-dom'],
   },
