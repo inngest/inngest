@@ -1,8 +1,7 @@
-import headlessui from '@headlessui/tailwindcss';
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
-const config: Config = {
+export default {
   content: ['./src/**/*.{ts,tsx,mdx}'],
   darkMode: 'class',
   theme: {
@@ -260,7 +259,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [headlessui],
-};
-
-export default config;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  plugins: [require('@headlessui/tailwindcss')],
+} satisfies Config;
