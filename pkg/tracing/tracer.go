@@ -84,11 +84,7 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 
 func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 	tracerOnce.Do(func() {
-		base := sdktrace.NewBatchSpanProcessor(tp.exp,
-			sdktrace.BatchSpanProcessorOption(
-				sdktrace.WithBatchTimeout(tp.bt),
-			),
-		)
+		base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
 		otelTP := sdktrace.NewTracerProvider(
 			sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
