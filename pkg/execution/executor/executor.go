@@ -2121,6 +2121,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run: %w", err)
 	}
 
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier: md.ID,
+		Attempt:    0,
+	})
+
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if err != nil {
