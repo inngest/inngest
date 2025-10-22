@@ -57,7 +57,11 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <StoreProvider>
+        <ThemeProvider attribute="class" defaultTheme="system">
+          <Outlet />
+        </ThemeProvider>
+      </StoreProvider>
     </RootDocument>
   );
 }
@@ -71,11 +75,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="bg-canvasBase text-basis h-full overflow-auto overscroll-none">
         <div id="app" />
         <div id="modals" />
-        <StoreProvider>
-          <ThemeProvider attribute="class" defaultTheme="system">
-            {children}
-          </ThemeProvider>
-        </StoreProvider>
+        {children}
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />
       </body>

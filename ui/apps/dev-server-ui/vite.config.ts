@@ -11,7 +11,12 @@ export default defineConfig({
         __dirname,
         '../../packages/components/src',
       ),
+      '@tanstack/react-query': path.resolve(
+        __dirname,
+        './node_modules/@tanstack/react-query',
+      ),
     },
+    dedupe: ['@tanstack/react-query', 'react', 'react-dom'],
   },
   ssr: {
     noExternal: ['@reduxjs/toolkit', '@rtk-query/graphql-request-base-query'],
