@@ -118,7 +118,8 @@ const MONACO_EDITOR_CDN_SCRIPT_URLS = [
   `${MONACO_EDITOR_CDN_URL}/base/worker/workerMain.js`,
   `${MONACO_EDITOR_CDN_URL}/basic-languages/javascript/javascript.js`,
   `${MONACO_EDITOR_CDN_URL}/basic-languages/shell/shell.js`,
-  `${MONACO_EDITOR_CDN_URL}/basic-languages/sql/sql.js`,
+  // TODO: Add back, this is just for testing.
+  // `${MONACO_EDITOR_CDN_URL}/basic-languages/sql/sql.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.js`,
   `${MONACO_EDITOR_CDN_URL}/editor/editor.main.nls.js`,
   `${MONACO_EDITOR_CDN_URL}/language/json/jsonMode.js`,
@@ -131,10 +132,13 @@ const MONACO_EDITOR_CDN_FONT_URL = `${MONACO_EDITOR_CDN_URL}/base/browser/ui/cod
 const MONACO_EDITOR_CDN_STYLE_URL = `${MONACO_EDITOR_CDN_URL}/editor/editor.main.css`;
 
 const PROD_URL = 'https://app.inngest.com';
+
+const CSP_REPORT_GROUP = 'csp-endpoint';
+
 // TODO: Add nonce, and remove unsafe-* usages, but that would require dynamic rendering of all pages.
-function makeCSPHeader() {
+function makeCSPHeader(appURL: string, cspReportURL: string) {
   const isDevBuild = process.env.NODE_ENV === 'development';
-  const isProdEnvironment = process.env.NEXT_PUBLIC_APP_URL === PROD_URL;
+  const isProdEnvironment = appURL === PROD_URL;
 
   const csp = [
     `base-uri 'self'`,
@@ -163,6 +167,8 @@ function makeCSPHeader() {
     )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
     `worker-src 'self' blob:`,
+    `report-to ${CSP_REPORT_GROUP}`,
+    `report-uri ${cspReportURL}`,
   ]
     .map((line) => line.trim())
     .join('; ');
@@ -170,9 +176,23 @@ function makeCSPHeader() {
   return csp;
 }
 
+const CSP_REPORT_PATH = '/api/csp-report';
+
 // TODO: Remove -Report-Only once we're confident CSP is working as expected.
 function withCSPResponseHeaderReportOnly(response: NextResponse) {
-  response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader());
+  const appURL = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appURL) return response;
+
+  let cspReportURL: string | null = null;
+  try {
+    cspReportURL = new URL(CSP_REPORT_PATH, appURL).toString();
+  } catch (_) {
+    return response;
+  }
+
+  response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL, cspReportURL));
+  response.headers.set('Reporting-Endpoints', `${CSP_REPORT_GROUP}="${cspReportURL}"`);
+
   return response;
 }
 
