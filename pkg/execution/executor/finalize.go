@@ -25,7 +25,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	ctx = context.WithoutCancel(ctx)
 	l := logger.StdlibLogger(ctx)
 
-	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:   &opts.Metadata,

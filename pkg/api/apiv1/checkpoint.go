@@ -349,6 +349,11 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			}
 
 			_, err = a.TracerProvider.CreateSpan(
+				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+					Identifier:  runCtx.LifecycleItem().Identifier,
+					Attempt:     runCtx.AttemptCount(),
+					MaxAttempts: fn.MaxAttempts(),
+				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Parent:    input.md.Config.NewFunctionTrace(),
@@ -385,6 +390,11 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			// step errors and continues
 			status := enums.StepStatusErrored
 			_, err = a.TracerProvider.CreateSpan(
+				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+					Identifier:  runCtx.LifecycleItem().Identifier,
+					Attempt:     runCtx.AttemptCount(),
+					MaxAttempts: fn.MaxAttempts(),
+				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Parent:    input.md.Config.NewFunctionTrace(),

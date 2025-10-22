@@ -815,6 +815,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameRun,
 		runSpanOpts,
 	)
@@ -1012,6 +1013,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// where to find the latest span and just always fetch it from the queue
 		// item.
 		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
@@ -1081,6 +1083,14 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  id,
+		Attempt:     item.Attempt,
+		MaxAttempts: *item.MaxAttempts,
+		QueueKind:   item.Kind,
+	})
+
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
@@ -1099,7 +1109,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for `tools.sleep` within generator functions.
 	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
 	if isSleepResume {
-		err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
 			QueueItem:  &item,
@@ -1260,7 +1270,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			// Set some run span details to be explicit that this has been
 			// kicked off
-			if err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
 				QueueItem:  &item,
 				Metadata:   &md,
@@ -1297,6 +1307,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// If we're resuming a sleep here, we're also starting a new discovery
 		// step here.
 		execParent, err = e.tracerProvider.CreateSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				FollowsFrom: parentRef,
@@ -1319,6 +1330,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
+		ctx,
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
@@ -1358,7 +1370,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			updateOpts.Status = status
 		}
 
-		_ = e.tracerProvider.UpdateSpan(updateOpts)
+		_ = e.tracerProvider.UpdateSpan(ctx, updateOpts)
 
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
@@ -2187,7 +2199,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	pauseSpan := tracing.SpanRefFromPause(&pause)
-	_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
 		Status:     enums.StepStatusTimedOut,
@@ -2219,6 +2231,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		}
 
 		nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2342,7 +2355,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			status = enums.StepStatusTimedOut
 		}
 		pauseSpan := tracing.SpanRefFromPause(&pause)
-		_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
@@ -2377,6 +2390,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+				ctx,
 				meta.SpanNameStepDiscovery,
 				&tracing.CreateSpanOptions{
 					Carriers:    []map[string]any{nextItem.Metadata},
@@ -2676,6 +2690,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2830,6 +2845,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2907,6 +2923,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
@@ -2983,6 +3000,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
@@ -3048,7 +3066,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
@@ -3100,7 +3118,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
@@ -3153,6 +3171,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -3250,7 +3269,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
@@ -3315,7 +3334,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, rawBody),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
@@ -3373,6 +3392,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -3487,6 +3507,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -3531,7 +3552,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 				meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
 			}
 
-			if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			if updateSpanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 				EndTime:    time.Now(),
 				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
 				Status:     enums.StepStatusFailed,
@@ -3677,6 +3698,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -3883,6 +3905,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -4142,12 +4165,12 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ResumeSignalResult, err error) {
 	if workspaceID == uuid.Nil {
 		err = fmt.Errorf("workspace ID is empty")
-		return
+		return res, err
 	}
 
 	if signalID == "" {
 		err = fmt.Errorf("signal ID is empty")
-		return
+		return res, err
 	}
 
 	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
@@ -4164,14 +4187,14 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
 	if err != nil {
 		err = fmt.Errorf("error getting pause by signal ID: %w", err)
-		return
+		return res, err
 	}
 
 	res = &execution.ResumeSignalResult{}
 
 	if pause == nil {
 		l.Debug("no pause found for signal")
-		return
+		return res, err
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
@@ -4183,7 +4206,7 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
 		}
 
-		return
+		return res, err
 	}
 
 	l.Debug("resuming pause from signal", "pause.DataKey", pause.DataKey)
@@ -4207,13 +4230,13 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 			err = nil
 		}
 
-		return
+		return res, err
 	}
 
 	res.MatchedSignal = true
 	res.RunID = &pause.Identifier.RunID
 
-	return
+	return res, err
 }
 
 type execError struct {
