@@ -20,7 +20,7 @@ var _spanCtxKeyV _spanCtxKeyT
 type ExecutionContext struct {
 	Identifier  state.ID
 	Attempt     int
-	MaxAttempts int
+	MaxAttempts *int
 	// QueueKind is the queue kind string, eg. "sleep" - the type of job enqueued in our system.
 	QueueKind string
 }
@@ -134,7 +134,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if ec != nil {
-				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, &ec.MaxAttempts)
+				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 
 				// Some steps "start" as soon as they are queued

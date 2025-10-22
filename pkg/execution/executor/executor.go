@@ -1087,7 +1087,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  sv2.IDFromV1(id),
 		Attempt:     item.Attempt,
-		MaxAttempts: *item.MaxAttempts,
+		MaxAttempts: item.MaxAttempts,
 		QueueKind:   item.Kind,
 	})
 
@@ -2184,7 +2184,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  md.ID,
 		Attempt:     0,
-		MaxAttempts: *pause.MaxAttempts,
+		MaxAttempts: pause.MaxAttempts,
 	})
 
 	data, err := json.Marshal(r.With)
@@ -2313,7 +2313,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  sv2id,
 		Attempt:     0,
-		MaxAttempts: *pause.MaxAttempts,
+		MaxAttempts: pause.MaxAttempts,
 	})
 
 	md, err := e.smv2.LoadMetadata(ctx, sv2id)
