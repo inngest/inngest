@@ -38,7 +38,7 @@ export const Standalone = ({ runID }: NavProps) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem>
-          /* TODO: after migration move this to tanstack "to" to get properly typed routes */
+          {/* TODO: after migration move this to tanstack "to" to get properly typed routes */}
           <Link href={pathCreator.runPopout({ runID })} className="flex items-center gap-2">
             <RiShareForward2Line className="h-4 w-4" />
             Open in new tab
