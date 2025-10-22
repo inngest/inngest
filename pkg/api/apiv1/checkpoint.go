@@ -348,11 +348,12 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				}
 			}
 
+			max := fn.MaxAttempts()
 			_, err = a.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.md.ID,
 					Attempt:     runCtx.AttemptCount(),
-					MaxAttempts: fn.MaxAttempts(),
+					MaxAttempts: &max,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
@@ -389,11 +390,12 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			// If steps only have one attempt, however, we can assume that the SDK handles
 			// step errors and continues
 			status := enums.StepStatusErrored
+			max := fn.MaxAttempts()
 			_, err = a.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier:  input.md.ID,
 					Attempt:     runCtx.AttemptCount(),
-					MaxAttempts: fn.MaxAttempts(),
+					MaxAttempts: &max,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
