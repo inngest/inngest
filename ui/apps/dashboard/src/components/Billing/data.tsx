@@ -57,6 +57,15 @@ export const entitlementUsageDocument = graphql(`
           purchaseCount
           quantityPer
         }
+        connectWorkers {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
       }
       entitlements {
         runCount {
@@ -97,6 +106,9 @@ export const entitlementUsageDocument = graphql(`
         }
         slackChannel {
           enabled
+        }
+        connectWorkerConnections {
+          limit
         }
       }
       plan {
@@ -169,6 +181,12 @@ export const currentPlanDocument = graphql(`
             quantityPer
           }
           slackChannel {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+          connectWorkers {
             available
             price
             purchaseCount
