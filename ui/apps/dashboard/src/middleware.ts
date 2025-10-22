@@ -138,14 +138,14 @@ function makeCSPHeader() {
 
   const csp = [
     `base-uri 'self'`,
-    `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${combineCSPURLs(
-      LAUNCHDARKLY_URLS
-    )} ${getClerkURL(
+    `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${
+      process.env.NEXT_PUBLIC_API_URL ?? ''
+    } ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
       isProdEnvironment
     )} ${CLERK_API_URL} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${getAllowInnGSURL(
       isProdEnvironment,
       isDevBuild
-    )} ${process.env.NEXT_PUBLIC_API_URL ?? ''} ${convertUrlToWebSocketURL(
+    )} ${getAllowClerkTelemetryURL(isProdEnvironment)} ${convertUrlToWebSocketURL(
       process.env.NEXT_PUBLIC_API_URL
     )}`,
     `default-src 'self'`,
@@ -221,4 +221,9 @@ function convertUrlToWebSocketURL(url: undefined | string): string {
   } catch (_) {
     return '';
   }
+}
+
+const CLERK_TELEMETRY_URL = 'https://clerk-telemetry.com';
+function getAllowClerkTelemetryURL(isProdEnvironment: boolean): string {
+  return isProdEnvironment ? '' : CLERK_TELEMETRY_URL;
 }
