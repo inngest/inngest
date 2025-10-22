@@ -235,7 +235,9 @@ func stop(ctx context.Context, s Service) error {
 			return
 		}
 		// Wait for everything in the global waitgroup.
-		wg.Wait()
+		if recovered := wg.WaitAndRecover(); recovered != nil {
+			l.Error("global goroutine panic waiting for service to stop", "error", recovered.Value, "stack", recovered.Stack)
+		}
 		stopCh <- nil
 	}()
 
