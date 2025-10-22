@@ -222,6 +222,12 @@ func stop(ctx context.Context, s Service) error {
 	l := logger.StdlibLogger(ctx).With("service", s.Name())
 	stopCh := make(chan error)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				l.Error("panic waiting for service to stop", "error", r)
+			}
+		}()
+
 		l.Info("service cleaning up")
 		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
