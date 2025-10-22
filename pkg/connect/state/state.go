@@ -66,7 +66,7 @@ type GatewayManager interface {
 
 type RequestStateManager interface {
 	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (leaseID *ulid.ULID, err error)
+	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, duration time.Duration) (leaseID *ulid.ULID, err error)
 
 	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 	// the current lease does not match the passed leaseID (ErrRequestLeased).
@@ -80,6 +80,9 @@ type RequestStateManager interface {
 
 	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
 	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
+
+	// GetExecutorInstanceID retrieves the instance ID of the executor that owns the request's lease.
+	GetExecutorInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
 
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
@@ -98,22 +101,15 @@ type RequestStateManager interface {
 type WorkerCapacityManager interface {
 	// SetWorkerCapacity registers a worker instance with its maximum concurrency limit.
 	// If maxConcurrentLeases is 0 or negative or nil no limit is enforced for this worker.
-	SetWorkerCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int64) error
+	SetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int64) error
 
 	// GetWorkerCapacity returns the current capacity info for a worker instance.
-	GetWorkerCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error)
+	GetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error)
 
-	// GetActiveLeases returns all the leases for a worker instance.
-	GetActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error)
+	GetWorkerAvailableCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error)
 
-	// AddRequestLeaseToWorker adds a lease for a request to a worker instance.
-	AddRequestLeaseToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
-
-	// RemoveRequestLeaseFromWorker removes a lease for a request from a worker instance.
-	RemoveRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
-
-	// RemoveStaleLeasesFromWorker removes all leases for a worker instance that have expired.
-	RemoveStaleLeasesFromWorker(ctx context.Context, envID uuid.UUID, instanceID string) error
+	// GetWorkerActiveLeases returns all the leases for a worker instance
+	GetWorkerActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error)
 }
 
 type AuthContext struct {

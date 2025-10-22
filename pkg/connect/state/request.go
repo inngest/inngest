@@ -30,6 +30,7 @@ var (
 type Lease struct {
 	LeaseID    ulid.ULID `json:"leaseID"`
 	ExecutorIP net.IP    `json:"executorIP"`
+	InstanceID string    `json:"instanceID"`
 }
 
 // keyRequestLease points to the key storing the request lease
@@ -43,7 +44,7 @@ func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, reque
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -66,6 +67,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 		// Mapping the request to the current executor
 		connectConfig.Executor(ctx).GRPCIP.String(),
+		instanceID,
 	}
 
 	status, err := scripts["lease"].Exec(
@@ -90,7 +92,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -111,6 +113,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
+		instanceID,
 	}
 
 	status, err := scripts["extend_lease"].Exec(
@@ -175,6 +178,8 @@ func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID
 func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error {
 	cmd := r.client.B().Del().Key(r.keyRequestLease(envID, requestID)).Build()
 
+	// TODO: Delete Instance ID information
+
 	err := r.client.Do(ctx, cmd).Error()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		return fmt.Errorf("could not delete lease: %w", err)
@@ -198,6 +203,23 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	}
 
 	return lease.ExecutorIP, nil
+}
+
+// GetExecutorInstanceID retrieves the instance ID of the executor that owns the request's lease.
+func (r *redisConnectionStateManager) GetExecutorInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+	cmd := r.client.B().Get().Key(r.keyRequestLease(envID, requestID)).Build()
+
+	reply, err := r.client.Do(ctx, cmd).ToString()
+	if errors.Is(err, rueidis.Nil) {
+		return "", ErrExecutorNotFound
+	}
+
+	lease := Lease{}
+	if err := json.Unmarshal([]byte(reply), &lease); err != nil {
+		return "", err
+	}
+
+	return lease.InstanceID, nil
 }
 
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up

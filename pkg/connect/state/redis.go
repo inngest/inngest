@@ -829,9 +829,9 @@ func (r *redisConnectionStateManager) GetAllGatewayIDs(ctx context.Context) ([]s
 
 // WorkerCapacityManager implementation for Redis
 
-// SetWorkerCapacity registers a worker instance with its maximum concurrency limit.
+// SetWorkerTotalCapacity registers a worker instance with its maximum concurrency limit.
 // If maxConcurrentLeases is nil, 0, or negative, no limit is enforced for this worker.
-func (r *redisConnectionStateManager) SetWorkerCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int64) error {
+func (r *redisConnectionStateManager) SetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases *int64) error {
 	key := r.workerCapacityKey(envID, instanceID)
 
 	// TODO: check for the case of crashed worker and coming back online for the first time.
@@ -859,9 +859,9 @@ func (r *redisConnectionStateManager) SetWorkerCapacity(ctx context.Context, env
 	return nil
 }
 
-// GetCapacity returns the current capacity limit for a worker instance.
+// GetWorkerTotalCapacity returns the current capacity limit for a worker instance.
 // Returns 0 if no limit is set.
-func (r *redisConnectionStateManager) GetWorkerCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error) {
+func (r *redisConnectionStateManager) GetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error) {
 	key := r.workerCapacityKey(envID, instanceID)
 
 	capacity, err := r.client.Do(ctx, r.client.B().Get().Key(key).Build()).AsInt64()
@@ -875,10 +875,38 @@ func (r *redisConnectionStateManager) GetWorkerCapacity(ctx context.Context, env
 	return capacity, nil
 }
 
-// GetActiveLeases returns all the request IDs currently leased by a worker instance.
-func (r *redisConnectionStateManager) GetActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error) {
+// GetWorkerAvailableCapacity returns the available capacity for a worker instance.
+// Returns total capacity - active leases. Returns 0 if no limit is set.
+func (r *redisConnectionStateManager) GetWorkerAvailableCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error) {
+
+	totalCapacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
+	if err != nil {
+		return 0, err
+	}
+
+	// If no limit is set, return 0 (unlimited)
+	if totalCapacity == 0 {
+		return 0, nil
+	}
+
+	activeLeases, err := r.GetWorkerActiveLeases(ctx, envID, instanceID)
+	if err != nil {
+		return 0, err
+	}
+
+	availableCapacity := totalCapacity - int64(len(activeLeases))
+	if availableCapacity < 0 {
+		availableCapacity = 0
+	}
+
+	return availableCapacity, nil
+}
+
+// GetWorkerActiveLeases returns all the request IDs currently leased by a worker instance.
+func (r *redisConnectionStateManager) GetWorkerActiveLeases(ctx context.Context, envID uuid.UUID, instanceID string) (map[string]string, error) {
 	key := r.workerLeasesKey(envID, instanceID)
 
+	// TODO: This function is not production ready since we need a way to delete the leases. Don't use just yet.
 	// TODO: remove the leases that are stale
 
 	members, err := r.client.Do(ctx, r.client.B().Smembers().Key(key).Build()).AsStrMap()
@@ -899,7 +927,7 @@ func (r *redisConnectionStateManager) AddRequestLeaseToWorker(ctx context.Contex
 	// TODO: Discuss, if we should convert these to Lua scripts instead for atomicity.
 
 	// Check if there's a capacity limit
-	capacity, err := r.GetWorkerCapacity(ctx, envID, instanceID)
+	capacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
 	if err != nil {
 		return err
 	}
@@ -950,7 +978,7 @@ func (r *redisConnectionStateManager) RemoveStaleLeasesFromWorker(ctx context.Co
 	leasesKey := r.workerLeasesKey(envID, instanceID)
 
 	// Get all active leases
-	leases, err := r.GetActiveLeases(ctx, envID, instanceID)
+	leases, err := r.GetWorkerActiveLeases(ctx, envID, instanceID)
 	if err != nil {
 		return err
 	}
