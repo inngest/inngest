@@ -36,6 +36,8 @@ type ExtractedValues struct {
 	DynamicTraceID *string
 	InternalLocation *string
 	internalError *string
+	StateSaveDuration *time.Duration
+	EnqueueDuration *time.Duration
 	IsFunctionOutput *bool
 	StepID *string
 	StepName *string
