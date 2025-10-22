@@ -6,7 +6,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state/v2"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel/attribute"
@@ -18,7 +17,7 @@ type _spanCtxKeyT struct{}
 var _spanCtxKeyV _spanCtxKeyT
 
 type ExecutionContext struct {
-	Identifier  state.ID
+	Identifier  statev2.ID
 	Attempt     int
 	MaxAttempts *int
 	// QueueKind is the queue kind string, eg. "sleep" - the type of job enqueued in our system.
