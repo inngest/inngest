@@ -83,6 +83,14 @@
       "nodemon": ">=3.0.0",
       "nodemon>minimatch": "3.1.2",
       "nodemon>brace-expansion": "1.1.11"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "@clerk/shared",
+      "core-js-pure"
+    ]
   }
 }

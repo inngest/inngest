@@ -94,6 +94,12 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 	kclopts := []kgo.Opt{
 		kgo.SeedBrokers(conf.addrs...),
 		kgo.DefaultProduceTopic(conf.topic),
+		kgo.ProducerBatchCompression(
+			kgo.ZstdCompression(),
+			kgo.Lz4Compression(),
+			kgo.GzipCompression(),
+			kgo.NoCompression(),
+		),
 		kgo.RequiredAcks(kgo.AllISRAcks()), // Most durable with some perf hits
 
 		kgo.ProducerBatchMaxBytes(int32(conf.maxProduceMB * 1024 * 1024)),

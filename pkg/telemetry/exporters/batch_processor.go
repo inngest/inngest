@@ -237,7 +237,16 @@ func (b *batchSpanProcessor) send(ctx context.Context, id string) error {
 func (b *batchSpanProcessor) flush(ctx context.Context) error {
 	var errs error
 
+	b.mt.Lock()
+	ids := make([]string, len(b.buffer))
+	var i int
 	for id := range b.buffer {
+		ids[i] = id
+		i++
+	}
+	b.mt.Unlock()
+
+	for _, id := range ids {
 		if err := b.send(ctx, id); err != nil {
 			errs = multierror.Append(err, errs)
 		}

@@ -61,14 +61,11 @@ type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
 
-	// RunOutputReader is the reader used to fetch run outputs for checkpoint APIs.
-	RunOutputReader RunOutputReader
-
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
-	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
-	// to redirect to an API endpoint that fetches outputs for a specific run.
-	RunJWTSecret []byte
+
+	// CheckpointOpts represents required opts for the checkpoint API
+	CheckpointOpts CheckpointAPIOpts
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -133,9 +130,7 @@ func (a *router) setup() {
 
 			// Add the HTTP-based checkpointing API
 			r.Route(CheckpointRoutePrefix, func(sub chi.Router) {
-				sub.Mount("/", NewCheckpointAPI(a.opts, CheckpointAPIOpts{
-					RunClaimsSecret: a.opts.RunJWTSecret,
-				}))
+				sub.Mount("/", NewCheckpointAPI(a.opts))
 			})
 
 			r.Post("/signals", a.receiveSignal)
