@@ -1,10 +1,8 @@
-import type { Config } from 'tailwindcss';
-
-import sharedConfig from '../../packages/components/tailwind.config';
-
+/** @type {import('tailwindcss').Config} */
 export default {
-  ...sharedConfig,
-  content: ['./src/**/*.{ts,tsx}', '../../packages/components/src/**/*.{ts,tsx}'],
-  darkMode: 'class',
-  plugins: [require('@headlessui/tailwindcss')],
-} satisfies Config;
+  content: [
+    './src/**/*.{js,jsx,ts,tsx}',
+    '../../packages/components/src/**/*.{ts,tsx}',
+  ],
+  presets: [require('../../packages/components/tailwind.config.ts')],
+};

@@ -1,6 +1,0 @@
-**/build
-**/public
-pnpm-lock.yaml
-routeTree.gen.ts
-dist
-generated.ts
