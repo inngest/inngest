@@ -1,51 +1,48 @@
-import { useEffect, useState } from 'react'
-import { Button } from '@inngest/components/Button/NewButton'
-import { EventsActionMenu } from '@inngest/components/Events/NewEventsActionMenu'
-import { EventsTable } from '@inngest/components/Events/NewEventsTable'
-import { useReplayModal } from '@inngest/components/Events/useReplayModal'
-import { Header } from '@inngest/components/Header/NewHeader'
-import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag'
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react'
+'use client';
 
-import SendEventButton from '@/components/Event/SendEventButton'
-import SendEventModal from '@/components/Event/SendEventModal'
-import { EventInfo } from '@/components/Events/EventInfo'
-import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions'
-import {
-  useEventDetails,
-  useEventPayload,
-  useEvents,
-} from '@/components/Events/useEvents'
-import { useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
+import { EventsTable } from '@inngest/components/Events/EventsTable';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
+import { Header } from '@inngest/components/Header/Header';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-const pollInterval = 400
+import SendEventButton from '@/components/Event/SendEventButton';
+import SendEventModal from '@/components/Event/SendEventModal';
+import { EventInfo } from '@/components/Events/EventInfo';
+import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
+import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+
+const pollInterval = 400;
 
 export default function EventsPage({
   eventTypeNames,
   showHeader = true,
 }: {
-  eventTypeNames?: string[]
-  showHeader?: boolean
+  eventTypeNames?: string[];
+  showHeader?: boolean;
 }) {
-  const { booleanFlag } = useBooleanFlag()
+  const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
     'polling-disabled',
-    false,
-  )
-  const navigate = useNavigate()
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const { isModalVisible, selectedEvent, openModal, closeModal } =
-    useReplayModal()
+    false
+  );
+  const router = useRouter();
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   useEffect(() => {
     if (pollingFlagReady && pollingDisabled) {
-      setAutoRefresh(false)
+      setAutoRefresh(false);
     }
-  }, [pollingDisabled, pollingFlagReady])
+  }, [pollingDisabled, pollingFlagReady]);
 
-  const getEvents = useEvents()
-  const getEventDetails = useEventDetails()
-  const getEventPayload = useEventPayload()
+  const getEvents = useEvents();
+  const getEventDetails = useEventDetails();
+  const getEventPayload = useEventPayload();
 
   return (
     <>
@@ -88,7 +85,7 @@ export default function EventsPage({
             <Button
               appearance="outlined"
               label="Refresh"
-              onClick={() => navigate({ to: '/events' })}
+              onClick={() => router.refresh()}
               icon={<RiRefreshLine />}
               iconSide="left"
             />
@@ -108,21 +105,17 @@ export default function EventsPage({
               payload={payload}
               onReplay={() => {
                 if (!eventName || !payload) {
-                  return
+                  return;
                 }
-                openModal(eventName, payload)
+                openModal(eventName, payload);
               }}
             />
-          )
+          );
         }}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          onClose={closeModal}
-          data={selectedEvent.data}
-        />
+        <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />
       )}
     </>
-  )
+  );
 }

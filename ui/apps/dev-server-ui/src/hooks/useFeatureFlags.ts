@@ -1,35 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 interface FeatureFlags {
-  FEATURE_CEL_SEARCH?: boolean
-  FEATURE_EVENTS?: boolean
+  FEATURE_CEL_SEARCH?: boolean;
+  FEATURE_EVENTS?: boolean;
 }
 
 export function useFeatureFlags() {
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     async function fetchFeatureFlags() {
       try {
-        const response = await fetch(createDevServerURL('/dev'))
+        const response = await fetch(createDevServerURL('/dev'));
         if (!response.ok) {
-          throw new Error('Failed to fetch feature flags')
+          throw new Error('Failed to fetch feature flags');
         }
-        const data = await response.json()
-        setFeatureFlags(data.features || {})
+        const data = await response.json();
+        setFeatureFlags(data.features || {});
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('An error occurred'))
+        setError(err instanceof Error ? err : new Error('An error occurred'));
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchFeatureFlags()
-  }, [])
+    fetchFeatureFlags();
+  }, []);
 
-  return { featureFlags, loading, error }
+  return { featureFlags, loading, error };
 }
 
 /**
@@ -37,9 +37,9 @@ export function useFeatureFlags() {
  * returns the path.
  */
 export function createDevServerURL(path: string) {
-  const host = import.meta.env.VITE_PUBLIC_API_BASE_URL
+  const host = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!host) {
-    return path
+    return path;
   }
-  return new URL(path, host).toString()
+  return new URL(path, host).toString();
 }

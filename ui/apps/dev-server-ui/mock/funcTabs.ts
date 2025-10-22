@@ -7,13 +7,13 @@ const payloadContent = `{
     fields: { can: 'be nested objects' },
   },
   // optional  
- }`
+ }`;
 
 const schemaContent = `{
   label: Function Schema,
   id: ObjectId,
   count: Integer,
- }`
+ }`;
 
 export const funcTabs = [
   {
@@ -24,4 +24,4 @@ export const funcTabs = [
     label: 'Schema',
     content: schemaContent,
   },
-]
+];

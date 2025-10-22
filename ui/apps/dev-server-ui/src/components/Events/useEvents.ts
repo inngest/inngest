@@ -1,6 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback } from 'react';
 
-import { client } from '@/store/baseApi'
+import { client } from '@/store/baseApi';
 import {
   GetEventV2Document,
   GetEventV2PayloadDocument,
@@ -14,7 +14,7 @@ import {
   type GetEventV2RunsQueryVariables,
   type GetEventsV2Query,
   type GetEventsV2QueryVariables,
-} from '@/store/generated'
+} from '@/store/generated';
 
 export function useEvents() {
   return useCallback(
@@ -35,8 +35,8 @@ export function useEvents() {
         startTime,
         celQuery,
         includeInternalEvents,
-      })
-      const eventsData = data.eventsV2
+      });
+      const eventsData = data.eventsV2;
       const events = eventsData.edges.map(({ node }) => ({
         ...node,
         receivedAt: new Date(node.receivedAt),
@@ -48,59 +48,51 @@ export function useEvents() {
           completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
           startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
         })),
-      }))
+      }));
 
       return {
         events,
         pageInfo: eventsData.pageInfo,
         totalCount: eventsData.totalCount,
-      }
+      };
     },
-    [],
-  )
+    []
+  );
 }
 
 export function useEventDetails() {
   return useCallback(async ({ eventID }: GetEventV2QueryVariables) => {
     const data: GetEventV2Query = await client.request(GetEventV2Document, {
       eventID,
-    })
-    const eventData = data.eventV2
+    });
+    const eventData = data.eventV2;
     return {
       ...eventData,
       receivedAt: new Date(eventData.receivedAt),
-      occurredAt: eventData.occurredAt
-        ? new Date(eventData.occurredAt)
-        : undefined,
-    }
-  }, [])
+      occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+    };
+  }, []);
 }
 
 export function useEventPayload() {
   return useCallback(async ({ eventID }: GetEventV2PayloadQueryVariables) => {
-    const data: GetEventV2PayloadQuery = await client.request(
-      GetEventV2PayloadDocument,
-      {
-        eventID,
-      },
-    )
+    const data: GetEventV2PayloadQuery = await client.request(GetEventV2PayloadDocument, {
+      eventID,
+    });
 
-    const eventData = data.eventV2.raw
+    const eventData = data.eventV2.raw;
 
-    return { payload: eventData }
-  }, [])
+    return { payload: eventData };
+  }, []);
 }
 
 export function useEventRuns() {
   return useCallback(async ({ eventID }: GetEventV2RunsQueryVariables) => {
-    const data: GetEventV2RunsQuery = await client.request(
-      GetEventV2RunsDocument,
-      {
-        eventID,
-      },
-    )
+    const data: GetEventV2RunsQuery = await client.request(GetEventV2RunsDocument, {
+      eventID,
+    });
 
-    const eventData = data.eventV2
+    const eventData = data.eventV2;
     return {
       ...eventData,
       runs: eventData.runs.map((run) => ({
@@ -111,6 +103,6 @@ export function useEventRuns() {
         completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
         startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
       })),
-    }
-  }, [])
+    };
+  }, []);
 }

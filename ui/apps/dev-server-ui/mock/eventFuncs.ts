@@ -1,4 +1,4 @@
-import { EventStatus } from '../src/store/generated'
+import { EventStatus } from '../src/store/generated';
 
 const eventFuncs = [
   {
@@ -65,6 +65,6 @@ const eventFuncs = [
     version: 'v27',
     id: '01GGG522ZATDGVQBCND4ZEAS6Z',
   },
-]
+];
 
-export default eventFuncs
+export default eventFuncs;

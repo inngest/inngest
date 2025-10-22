@@ -1,11 +1,10 @@
-import { createPortal } from 'react-dom'
+import { createPortal } from 'react-dom';
 
 export const usePortal = () => {
-  let container: HTMLElement | null = null
+  let container: HTMLElement | null = null;
   if (typeof window !== 'undefined') {
-    container = window.document.getElementById('modals')
+    container = window.document.getElementById('modals');
   }
 
-  return (node: React.ReactNode) =>
-    container ? createPortal(node, container) : null
-}
+  return (node: React.ReactNode) => (container ? createPortal(node, container) : null);
+};

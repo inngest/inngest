@@ -1,86 +1,78 @@
-'use client'
+'use client';
 
-import { useMemo, useState } from 'react'
-import { Search } from '@inngest/components/Forms/Search'
-import { ThemeImage } from '@inngest/components/Image/Image'
-import { Pill } from '@inngest/components/Pill/NewPill'
-import { Select, type Option } from '@inngest/components/Select/Select'
+import { useMemo, useState } from 'react';
+import NextLink from 'next/link';
+import { Search } from '@inngest/components/Forms/Search';
+import { ThemeImage } from '@inngest/components/Image/Image';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { Select, type Option } from '@inngest/components/Select/Select';
 
-import { useTracking } from '@/hooks/useTracking'
-import { Link } from '@tanstack/react-router'
+import { useTracking } from '@/hooks/useTracking';
 
 type Framework = {
-  framework: string
+  framework: string;
   logo: {
-    dark: string
-    light: string
-  }
-  version_supported?: string
+    dark: string;
+    light: string;
+  };
+  version_supported?: string;
   link: {
-    url: string
-  }
-  language: string
-}
+    url: string;
+  };
+  language: string;
+};
 
 type FrameworkListProps = {
-  frameworksData: Framework[]
-  title: React.ReactNode
-  description: React.ReactNode
-}
+  frameworksData: Framework[];
+  title: React.ReactNode;
+  description: React.ReactNode;
+};
 
 function getPillAppearance(language: string) {
   if (language.toLowerCase() === 'typescript') {
-    return 'primary'
+    return 'primary';
   } else if (language.toLowerCase() === 'python') {
-    return 'info'
+    return 'info';
   } else {
-    return 'default'
+    return 'default';
   }
 }
 
-export default function FrameworkList({
-  frameworksData,
-  title,
-  description,
-}: FrameworkListProps) {
-  const { trackEvent } = useTracking()
+export default function FrameworkList({ frameworksData, title, description }: FrameworkListProps) {
+  const { trackEvent } = useTracking();
   // Extract unique languages from frameworks data
   const languageOptions = useMemo(() => {
     const uniqueLanguages = Array.from(
-      new Set(frameworksData.map((framework) => framework.language)),
-    )
+      new Set(frameworksData.map((framework) => framework.language))
+    );
 
     return uniqueLanguages.map((language) => ({
       id: language.toLowerCase(),
       name: language,
-    }))
-  }, [])
+    }));
+  }, []);
 
-  const [selectedValues, setSelectedValues] = useState<Option[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedValues, setSelectedValues] = useState<Option[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredFrameworks = useMemo(() => {
     // First filter by language selection
-    let filtered = frameworksData
+    let filtered = frameworksData;
 
     if (selectedValues.length > 0) {
       filtered = filtered.filter((framework) =>
-        selectedValues.some(
-          (option) => option.id === framework.language.toLowerCase(),
-        ),
-      )
+        selectedValues.some((option) => option.id === framework.language.toLowerCase())
+      );
     }
 
     // Then filter by search query
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter((framework) =>
-        framework.framework.toLowerCase().includes(query),
-      )
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((framework) => framework.framework.toLowerCase().includes(query));
     }
 
-    return filtered
-  }, [frameworksData, selectedValues, searchQuery])
+    return filtered;
+  }, [frameworksData, selectedValues, searchQuery]);
 
   return (
     <div>
@@ -104,8 +96,7 @@ export default function FrameworkList({
         >
           <Select.Button isLabelVisible>
             <div className="text-left">
-              {selectedValues.length === 0 ||
-              selectedValues.length === languageOptions.length ? (
+              {selectedValues.length === 0 || selectedValues.length === languageOptions.length ? (
                 <span>All</span>
               ) : selectedValues.length === 1 && selectedValues[0] ? (
                 <span>{selectedValues[0].name}</span>
@@ -118,9 +109,7 @@ export default function FrameworkList({
             {languageOptions.map((option) => (
               <Select.CheckboxOption key={option.id} option={option}>
                 <span className="flex items-center gap-1 lowercase">
-                  <label className="text-sm first-letter:capitalize">
-                    {option.name}
-                  </label>
+                  <label className="text-sm first-letter:capitalize">{option.name}</label>
                 </span>
               </Select.CheckboxOption>
             ))}
@@ -131,11 +120,8 @@ export default function FrameworkList({
       <ul className="flex flex-col gap-4">
         {filteredFrameworks.length > 0 ? (
           filteredFrameworks.map((framework) => (
-            <li
-              key={framework.framework}
-              className="border-subtle rounded-sm border"
-            >
-              <Link
+            <li key={framework.framework} className="border-subtle rounded-sm border">
+              <NextLink
                 onClick={() =>
                   trackEvent('cli/onboarding.action', {
                     type: 'btn-click',
@@ -143,7 +129,7 @@ export default function FrameworkList({
                     framework: framework.framework,
                   })
                 }
-                to={framework.link.url}
+                href={framework.link.url}
                 target="_blank"
                 className="hover:bg-canvasSubtle flex items-center justify-between p-3"
               >
@@ -160,18 +146,13 @@ export default function FrameworkList({
                     )}
                   </div>
                   <p className="mr-1">{framework.framework}</p>
-                  {framework.version_supported && (
-                    <Pill>{framework.version_supported}</Pill>
-                  )}
+                  {framework.version_supported && <Pill>{framework.version_supported}</Pill>}
                 </div>
 
-                <Pill
-                  appearance="outlined"
-                  kind={getPillAppearance(framework.language)}
-                >
+                <Pill appearance="outlined" kind={getPillAppearance(framework.language)}>
                   {framework.language}
                 </Pill>
-              </Link>
+              </NextLink>
             </li>
           ))
         ) : (
@@ -181,5 +162,5 @@ export default function FrameworkList({
         )}
       </ul>
     </div>
-  )
+  );
 }

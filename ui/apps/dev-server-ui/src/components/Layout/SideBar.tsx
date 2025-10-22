@@ -1,14 +1,18 @@
-import { EnvironmentMenu } from '../Navigation/Environments'
-import { Help } from '../Navigation/Help'
-import Manage from '../Navigation/Manage'
-import Monitor from '../Navigation/Monitor'
-import Profile from '../Navigation/Profile'
-import Logo from './Logo'
+'use client';
+
+import React from 'react';
+
+import { EnvironmentMenu } from '../Navigation/Environments';
+import { Help } from '../Navigation/Help';
+import Manage from '../Navigation/Manage';
+import Monitor from '../Navigation/Monitor';
+import Profile from '../Navigation/Profile';
+import Logo from './Logo';
 
 type SideBarProps = {
-  collapsed: boolean
-  setCollapsed: (arg: boolean) => void
-}
+  collapsed: boolean;
+  setCollapsed: (arg: boolean) => void;
+};
 
 export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
   return (
@@ -34,5 +38,5 @@ export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
         </div>
       </div>
     </nav>
-  )
+  );
 }

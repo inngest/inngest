@@ -1,33 +1,29 @@
-import { useState } from 'react'
-import { Input } from '@inngest/components/Forms/Input'
-import { Link } from '@inngest/components/Link/NewLink'
-import useDebounce from '@inngest/components/hooks/useDebounce'
-import { IconSpinner } from '@inngest/components/icons/Spinner'
-import { cn } from '@inngest/components/utils/classNames'
-import { RiExternalLinkLine } from '@remixicon/react'
-import { toast } from 'sonner'
+import { useState } from 'react';
+import { Input } from '@inngest/components/Forms/Input';
+import { Link } from '@inngest/components/Link/Link';
+import useDebounce from '@inngest/components/hooks/useDebounce';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiExternalLinkLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
-import { useUpdateAppMutation, type GetAppsQuery } from '@/store/generated'
-import isValidUrl from '@/utils/urlValidation'
+import { useUpdateAppMutation, type GetAppsQuery } from '@/store/generated';
+import isValidUrl from '@/utils/urlValidation';
 
-export default function UpdateApp({
-  app,
-}: {
-  app: GetAppsQuery['apps'][number]
-}) {
-  const [inputUrl, setInputUrl] = useState(app.url || '')
-  const [isUrlInvalid, setUrlInvalid] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [_updateApp] = useUpdateAppMutation()
+export default function UpdateApp({ app }: { app: GetAppsQuery['apps'][number] }) {
+  const [inputUrl, setInputUrl] = useState(app.url || '');
+  const [isUrlInvalid, setUrlInvalid] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [_updateApp] = useUpdateAppMutation();
   const debouncedRequest = useDebounce(() => {
     if (isValidUrl(inputUrl)) {
-      setUrlInvalid(false)
-      updateApp()
+      setUrlInvalid(false);
+      updateApp();
     } else {
-      setUrlInvalid(true)
-      setIsLoading(false)
+      setUrlInvalid(true);
+      setIsLoading(false);
     }
-  })
+  });
 
   async function updateApp() {
     try {
@@ -36,19 +32,19 @@ export default function UpdateApp({
           url: inputUrl,
           id: app.id,
         },
-      })
-      toast.success('The URL was successfully updated.')
-      console.log('Edited app URL:', response)
+      });
+      toast.success('The URL was successfully updated.');
+      console.log('Edited app URL:', response);
     } catch (error) {
-      toast.error('The URL could not be updated.')
-      console.error('Error editing app:', error)
+      toast.error('The URL could not be updated.');
+      console.error('Error editing app:', error);
     }
-    setIsLoading(false)
+    setIsLoading(false);
   }
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setInputUrl(e.target.value)
-    setIsLoading(true)
-    debouncedRequest()
+    setInputUrl(e.target.value);
+    setIsLoading(true);
+    debouncedRequest();
   }
 
   return (
@@ -75,5 +71,5 @@ export default function UpdateApp({
         Syncing to the Dev Server
       </Link>
     </form>
-  )
+  );
 }

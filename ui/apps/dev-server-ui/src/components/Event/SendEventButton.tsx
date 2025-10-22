@@ -1,21 +1,21 @@
-import { useState } from 'react'
-import { Button } from '@inngest/components/Button/NewButton'
-import type { ButtonAppearance } from '@inngest/components/Button/NewButton'
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
+import type { ButtonAppearance } from '@inngest/components/Button/Button';
 
-import SendEventModal from '@/components/Event/SendEventModal'
+import SendEventModal from '@/components/Event/SendEventModal';
 
 type SendEventButtonProps = {
-  data?: string | null
-  label: string
-  appearance?: ButtonAppearance
-}
+  data?: string | null;
+  label: string;
+  appearance?: ButtonAppearance;
+};
 
 export default function SendEventButton({
   data,
   label,
   appearance = 'outlined',
 }: SendEventButtonProps) {
-  const [isSendEventModalVisible, setSendEventModalVisible] = useState(false)
+  const [isSendEventModalVisible, setSendEventModalVisible] = useState(false);
 
   return (
     <>
@@ -33,5 +33,5 @@ export default function SendEventButton({
         />
       )}
     </>
-  )
+  );
 }

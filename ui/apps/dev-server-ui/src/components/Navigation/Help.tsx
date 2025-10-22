@@ -1,12 +1,15 @@
-import { Listbox } from '@headlessui/react'
-import { MenuItem } from '@inngest/components/Menu/NewMenuItem'
+'use client';
+
+import NextLink from 'next/link';
+import { Listbox } from '@headlessui/react';
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
   RiDiscordLine,
   RiExternalLinkLine,
   RiMailLine,
   RiQuestionLine,
   RiRoadMapLine,
-} from '@remixicon/react'
+} from '@remixicon/react';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
   return (
@@ -20,10 +23,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-subtle absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border shadow ring-0 focus:outline-none">
-          <a
-            href="https://www.inngest.com/docs/local-development"
-            target="_blank"
-          >
+          <NextLink href="https://www.inngest.com/docs/local-development" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
@@ -33,8 +33,8 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 <div>Inngest Documentation</div>
               </div>
             </Listbox.Option>
-          </a>
-          <a href="https://app.inngest.com/support" target="_blank">
+          </NextLink>
+          <NextLink href="https://app.inngest.com/support" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
@@ -44,8 +44,8 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 <div>Support</div>
               </div>
             </Listbox.Option>
-          </a>
-          <a href="https://www.inngest.com/discord" target="_blank">
+          </NextLink>
+          <NextLink href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"
@@ -55,8 +55,8 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 <div>Join Discord</div>
               </div>
             </Listbox.Option>
-          </a>
-          <a href="https://roadmap.inngest.com/roadmap" target="_blank">
+          </NextLink>
+          <NextLink href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
@@ -66,9 +66,9 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
                 <div>Inngest Roadmap</div>
               </div>
             </Listbox.Option>
-          </a>
+          </NextLink>
         </Listbox.Options>
       </div>
     </Listbox>
-  )
-}
+  );
+};

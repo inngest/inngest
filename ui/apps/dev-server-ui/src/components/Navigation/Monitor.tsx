@@ -1,6 +1,7 @@
-import { MenuItem as MenuItem } from '@inngest/components/Menu/NewMenuItem'
-import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs'
-import { RunsIcon } from '@inngest/components/icons/sections/Runs'
+import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
+import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { RiMistLine } from '@remixicon/react';
 
 export default function Monitor({ collapsed }: { collapsed: boolean }) {
   return (
@@ -8,9 +9,7 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
       {collapsed ? (
         <div className="border-subtle mx-auto mb-1 w-6 border-b" />
       ) : (
-        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">
-          Monitor
-        </div>
+        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">Monitor</div>
       )}
       <MenuItem
         href="/runs"
@@ -25,5 +24,5 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
       />
     </div>
-  )
+  );
 }

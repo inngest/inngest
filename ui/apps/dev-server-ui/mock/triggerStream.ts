@@ -1,4 +1,4 @@
-import { FunctionRunStatus, FunctionTriggerTypes } from '../src/store/generated'
+import { FunctionRunStatus, FunctionTriggerTypes } from '../src/store/generated';
 
 export const triggerStream = [
   {
@@ -51,4 +51,4 @@ export const triggerStream = [
       },
     ],
   },
-]
+];

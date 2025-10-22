@@ -1,39 +1,39 @@
-import { useState } from 'react'
-import { Button } from '@inngest/components/Button/NewButton'
-import { Input } from '@inngest/components/Forms/Input'
-import { Modal } from '@inngest/components/Modal'
-import useDebounce from '@inngest/components/hooks/useDebounce'
-import { toast } from 'sonner'
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
+import { Modal } from '@inngest/components/Modal';
+import useDebounce from '@inngest/components/hooks/useDebounce';
+import { toast } from 'sonner';
 
-import { useCreateAppMutation } from '@/store/generated'
-import isValidUrl from '@/utils/urlValidation'
+import { useCreateAppMutation } from '@/store/generated';
+import isValidUrl from '@/utils/urlValidation';
 
 type AddAppModalProps = {
-  isOpen: boolean
-  onClose: () => void
-}
+  isOpen: boolean;
+  onClose: () => void;
+};
 
 export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
-  const [inputUrl, setInputUrl] = useState('')
-  const [isUrlInvalid, setUrlInvalid] = useState(false)
-  const [isDisabled, setDisabled] = useState(true)
-  const [_createApp] = useCreateAppMutation()
+  const [inputUrl, setInputUrl] = useState('');
+  const [isUrlInvalid, setUrlInvalid] = useState(false);
+  const [isDisabled, setDisabled] = useState(true);
+  const [_createApp] = useCreateAppMutation();
 
   const debouncedRequest = useDebounce(() => {
     if (isValidUrl(inputUrl)) {
-      setUrlInvalid(false)
+      setUrlInvalid(false);
     } else {
-      setUrlInvalid(true)
+      setUrlInvalid(true);
     }
-  })
+  });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setInputUrl(e.target.value)
-    debouncedRequest()
+    setInputUrl(e.target.value);
+    debouncedRequest();
     if (e.target.value.length > 0) {
-      setDisabled(false)
+      setDisabled(false);
     } else {
-      setDisabled(true)
+      setDisabled(true);
     }
   }
 
@@ -43,25 +43,25 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         input: {
           url: inputUrl,
         },
-      })
-      toast.success('The app was successfully added.')
-      console.log('Created app:', response)
+      });
+      toast.success('The app was successfully added.');
+      console.log('Created app:', response);
     } catch (error) {
-      toast.error('The app could not be created: ${error}.')
-      console.error('Error creating app:', error)
+      toast.error('The app could not be created: ${error}.');
+      console.error('Error creating app:', error);
     }
-    onClose()
+    onClose();
   }
 
   function handleSubmit(e: React.SyntheticEvent) {
-    e.preventDefault()
-    createApp()
+    e.preventDefault();
+    createApp();
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      handleSubmit(e)
+      e.preventDefault();
+      handleSubmit(e);
     }
   }
 
@@ -83,22 +83,13 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
               placeholder="http://localhost:3000/api/inngest"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              error={
-                isUrlInvalid && inputUrl.length > 0
-                  ? 'Please enter a valid URL'
-                  : undefined
-              }
+              error={isUrlInvalid && inputUrl.length > 0 ? 'Please enter a valid URL' : undefined}
             />
           </div>
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button
-          label="Cancel"
-          kind="secondary"
-          appearance="outlined"
-          onClick={onClose}
-        />
+        <Button label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
         <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"
@@ -107,5 +98,5 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
         />
       </Modal.Footer>
     </Modal>
-  )
+  );
 }

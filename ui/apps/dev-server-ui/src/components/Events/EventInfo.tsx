@@ -1,5 +1,5 @@
-import { Info } from '@inngest/components/Info/Info'
-import { Link } from '@inngest/components/Link/Link'
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link/Link';
 
 export const EventInfo = () => (
   <Info
@@ -10,4 +10,4 @@ export const EventInfo = () => (
       </Link>
     }
   />
-)
+);

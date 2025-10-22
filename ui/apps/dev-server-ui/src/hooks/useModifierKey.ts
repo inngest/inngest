@@ -1,14 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 const useModifierKey = () => {
-  const [modifierKey, setModifierKey] = useState('')
+  const [modifierKey, setModifierKey] = useState('');
   useEffect(() => {
-    setModifierKey(
-      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? '⌘' : 'Ctrl',
-    )
-  }, [])
+    setModifierKey(/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? '⌘' : 'Ctrl');
+  }, []);
 
-  return modifierKey
-}
+  return modifierKey;
+};
 
-export default useModifierKey
+export default useModifierKey;
