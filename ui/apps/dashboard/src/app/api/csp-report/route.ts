@@ -8,6 +8,8 @@ function getBaseContentType(contentTypeHeader: string | null): string | null {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (process.env.NODE_ENV !== 'production') return makeStaticResponse();
+
   const contentType = getBaseContentType(request.headers.get('content-type'));
   if (contentType === null || !ACCEPTED_TYPES.has(contentType)) return makeStaticResponse();
 
@@ -20,13 +22,7 @@ export async function POST(request: Request): Promise<Response> {
     return makeStaticResponse();
   }
 
-  // Dev-only logging; truncate to avoid noisy output. Never persist.
-  if (process.env.NODE_ENV !== 'production') {
-    const maxLogChars = 1024;
-    const sample = rawText.length > maxLogChars ? rawText.slice(0, maxLogChars) + '…' : rawText;
-    // eslint-disable-next-line no-console
-    console.info('[csp-report] received', { contentType, sampleLength: sample.length, sample });
-  }
+  // TODO: Forward to Sentry.
 
   return makeStaticResponse();
 }
