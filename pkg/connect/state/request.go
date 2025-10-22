@@ -27,6 +27,10 @@ var (
 	ErrExecutorNotFound        = fmt.Errorf("executor not found")
 )
 
+const (
+	UnknownInstanceID = "unknown-instance-id"
+)
+
 type Lease struct {
 	LeaseID    ulid.ULID `json:"leaseID"`
 	ExecutorIP net.IP    `json:"executorIP"`
@@ -44,7 +48,7 @@ func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, reque
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -92,12 +96,18 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
 
 	now := r.c.Now()
+
+	// Get the instance ID of the executor that owns the request's lease.
+	instanceID, err := r.GetExecutorInstanceID(ctx, envID, requestID)
+	if err != nil {
+		return nil, err
+	}
 
 	leaseExpiry := now.Add(duration)
 	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
@@ -217,6 +227,12 @@ func (r *redisConnectionStateManager) GetExecutorInstanceID(ctx context.Context,
 	lease := Lease{}
 	if err := json.Unmarshal([]byte(reply), &lease); err != nil {
 		return "", err
+	}
+
+	// if instanceID is empty, return an unknown-instance ID
+	// allows for backwards compatibility with older versions of the code
+	if lease.InstanceID == "" {
+		return UnknownInstanceID, nil
 	}
 
 	return lease.InstanceID, nil

@@ -66,11 +66,11 @@ type GatewayManager interface {
 
 type RequestStateManager interface {
 	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, instanceID string, duration time.Duration) (leaseID *ulid.ULID, err error)
+	LeaseRequest(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, duration time.Duration) (leaseID *ulid.ULID, err error)
 
 	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 	// the current lease does not match the passed leaseID (ErrRequestLeased).
-	ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
+	ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
 
 	// IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
 	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID string) (bool, error)

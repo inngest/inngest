@@ -781,7 +781,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.InstanceId, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
 				switch {
 				case errors.Is(err, state.ErrRequestLeaseExpired),

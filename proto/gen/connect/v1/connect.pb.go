@@ -645,6 +645,7 @@ type GatewayExecutorRequestData struct {
 	UserTraceCtx   []byte                 `protobuf:"bytes,11,opt,name=user_trace_ctx,json=userTraceCtx,proto3" json:"user_trace_ctx,omitempty"`
 	RunId          string                 `protobuf:"bytes,12,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,13,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	InstanceId     string                 `protobuf:"bytes,14,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -770,6 +771,13 @@ func (x *GatewayExecutorRequestData) GetLeaseId() string {
 	return ""
 }
 
+func (x *GatewayExecutorRequestData) GetInstanceId() string {
+	if x != nil {
+		return x.InstanceId
+	}
+	return ""
+}
+
 type WorkerRequestAckData struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -890,6 +898,7 @@ type WorkerRequestExtendLeaseData struct {
 	UserTraceCtx   []byte                 `protobuf:"bytes,8,opt,name=user_trace_ctx,json=userTraceCtx,proto3" json:"user_trace_ctx,omitempty"`
 	RunId          string                 `protobuf:"bytes,9,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	LeaseId        string                 `protobuf:"bytes,10,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	InstanceId     string                 `protobuf:"bytes,11,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -990,6 +999,13 @@ func (x *WorkerRequestExtendLeaseData) GetRunId() string {
 func (x *WorkerRequestExtendLeaseData) GetLeaseId() string {
 	if x != nil {
 		return x.LeaseId
+	}
+	return ""
+}
+
+func (x *WorkerRequestExtendLeaseData) GetInstanceId() string {
+	if x != nil {
+		return x.InstanceId
 	}
 	return ""
 }
@@ -1858,7 +1874,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x1d_max_concurrent_worker_leases\"\x7f\n" +
 	"\x1aGatewayConnectionReadyData\x12-\n" +
 	"\x12heartbeat_interval\x18\x01 \x01(\tR\x11heartbeatInterval\x122\n" +
-	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\"\xbe\x03\n" +
+	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\"\xdf\x03\n" +
 	"\x1aGatewayExecutorRequestData\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
@@ -1876,7 +1892,9 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	" \x01(\fR\x0esystemTraceCtx\x12$\n" +
 	"\x0euser_trace_ctx\x18\v \x01(\fR\fuserTraceCtx\x12\x15\n" +
 	"\x06run_id\x18\f \x01(\tR\x05runId\x12\x19\n" +
-	"\blease_id\x18\r \x01(\tR\aleaseIdB\n" +
+	"\blease_id\x18\r \x01(\tR\aleaseId\x12\x1f\n" +
+	"\vinstance_id\x18\x0e \x01(\tR\n" +
+	"instanceIdB\n" +
 	"\n" +
 	"\b_step_id\"\xb8\x02\n" +
 	"\x14WorkerRequestAckData\x12\x1d\n" +
@@ -1892,7 +1910,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x0euser_trace_ctx\x18\b \x01(\fR\fuserTraceCtx\x12\x15\n" +
 	"\x06run_id\x18\t \x01(\tR\x05runIdB\n" +
 	"\n" +
-	"\b_step_id\"\xdb\x02\n" +
+	"\b_step_id\"\xfc\x02\n" +
 	"\x1cWorkerRequestExtendLeaseData\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
@@ -1906,7 +1924,9 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\x0euser_trace_ctx\x18\b \x01(\fR\fuserTraceCtx\x12\x15\n" +
 	"\x06run_id\x18\t \x01(\tR\x05runId\x12\x19\n" +
 	"\blease_id\x18\n" +
-	" \x01(\tR\aleaseIdB\n" +
+	" \x01(\tR\aleaseId\x12\x1f\n" +
+	"\vinstance_id\x18\v \x01(\tR\n" +
+	"instanceIdB\n" +
 	"\n" +
 	"\b_step_id\"\xea\x01\n" +
 	"\x1fWorkerRequestExtendLeaseAckData\x12\x1d\n" +
