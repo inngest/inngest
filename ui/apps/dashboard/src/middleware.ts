@@ -142,11 +142,12 @@ function makeCSPHeader() {
       LAUNCHDARKLY_URLS
     )} ${getClerkURL(
       isProdEnvironment
-    )} ${CLERK_API_URL} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${combineCSPURLs(
-      getAllowLocalURLs(isDevBuild)
-    )} ${getAllowInnGSURL(isProdEnvironment, isDevBuild)} ${
-      process.env.NEXT_PUBLIC_API_URL ?? ''
-    } ${convertUrlToWebSocketURL(process.env.NEXT_PUBLIC_API_URL)}`,
+    )} ${CLERK_API_URL} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${getAllowInnGSURL(
+      isProdEnvironment,
+      isDevBuild
+    )} ${process.env.NEXT_PUBLIC_API_URL ?? ''} ${convertUrlToWebSocketURL(
+      process.env.NEXT_PUBLIC_API_URL
+    )}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
@@ -189,12 +190,6 @@ function getAllowUnsafeEval(isDevBuild: boolean): string {
   return isDevBuild ? "'unsafe-eval'" : '';
 }
 
-const LOCAL_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:9999'];
-function getAllowLocalURLs(isDevBuild: boolean): string[] {
-  if (isDevBuild) return LOCAL_URLS;
-  return [];
-}
-
 const VERCEL_LIVE_URL = 'https://vercel.live';
 function getAllowVercelLiveURL(isProdEnvironment: boolean, isDevBuild: boolean): string {
   if (isProdEnvironment) return '';
@@ -204,11 +199,12 @@ function getAllowVercelLiveURL(isProdEnvironment: boolean, isDevBuild: boolean):
   return VERCEL_LIVE_URL;
 }
 
+const LOCAL_INN_GS_URL = 'http://127.0.0.1:9999';
 const PREVIEW_ENV_INN_GS_URL = 'https://stage.inn.gs';
 const PROD_INN_GS_URL = 'https://inn.gs';
 function getAllowInnGSURL(isProdEnvironment: boolean, isDevBuild: boolean): string {
   if (isProdEnvironment) return PROD_INN_GS_URL;
-  if (isDevBuild) return '';
+  if (isDevBuild) return LOCAL_INN_GS_URL;
 
   // Preview builds + staging.
   return PREVIEW_ENV_INN_GS_URL;
