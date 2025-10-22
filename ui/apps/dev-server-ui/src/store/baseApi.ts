@@ -9,6 +9,9 @@ const graphQLEndpoint = import.meta.env.VITE_PUBLIC_API_BASE_URL
 export const client = new GraphQLClient(graphQLEndpoint.toString());
 
 export const api = createApi({
-  baseQuery: graphqlRequestBaseQuery({ client }),
+  baseQuery: graphqlRequestBaseQuery({
+    // @ts-expect-error
+    client,
+  }),
   endpoints: () => ({}),
 });
