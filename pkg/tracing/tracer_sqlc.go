@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/logger"
@@ -16,7 +17,8 @@ const (
 )
 
 func NewSqlcTracerProvider(q sqlc.Querier) TracerProvider {
-	return NewOtelTracerProvider(&dbExporter{q: q})
+	// With sqlc, write every 50.
+	return NewOtelTracerProvider(&dbExporter{q: q}, 50*time.Millisecond)
 }
 
 type dbExporter struct {
