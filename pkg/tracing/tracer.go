@@ -151,6 +151,10 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 			// and propagator, which is necessary to tie parents <> children.
 			defaultPropagator.Extract(context.Background(), carrier),
 		)
+	} else {
+		// Use a fresh context for parent traces so that there's no pollution from any
+		// other tracing.
+		ctx = context.Background()
 	}
 
 	attrs := opts.Attributes
