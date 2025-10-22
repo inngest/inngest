@@ -145,6 +145,8 @@ var Attrs = struct {
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
+	StateSaveDuration:                  DurationAttr("timing.state.save"),
+	EnqueueDuration:                    DurationAttr("timing.enqueue"),
 	IsFunctionOutput:                   BoolAttr("is.function.output"),
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestURL:                         StringAttr("request.url"),
