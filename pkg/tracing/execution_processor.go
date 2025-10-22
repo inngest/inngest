@@ -6,7 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/v2"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel/attribute"
@@ -18,7 +18,7 @@ type _spanCtxKeyT struct{}
 var _spanCtxKeyV _spanCtxKeyT
 
 type ExecutionContext struct {
-	Identifier  state.Identifier
+	Identifier  state.ID
 	Attempt     int
 	MaxAttempts int
 	// QueueKind is the queue kind string, eg. "sleep" - the type of job enqueued in our system.
@@ -28,6 +28,11 @@ type ExecutionContext struct {
 // WithExecutionContext stores data for spans in context.
 func WithExecutionContext(ctx context.Context, e ExecutionContext) context.Context {
 	return context.WithValue(ctx, _spanCtxKeyV, &e)
+}
+
+func mixinExecutonContext(input context.Context, with context.Context) context.Context {
+	ec := getExecutionContext(input)
+	return context.WithValue(with, _spanCtxKeyV, ec)
 }
 
 type executionProcessor struct {
@@ -73,10 +78,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	if ec != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &ec.Identifier.RunID)
-		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &ec.Identifier.WorkflowID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &ec.Identifier.AccountID)
-		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &ec.Identifier.WorkspaceID)
-		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &ec.Identifier.AppID)
+		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &ec.Identifier.FunctionID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &ec.Identifier.Tenant.AccountID)
+		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &ec.Identifier.Tenant.EnvID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &ec.Identifier.Tenant.AppID)
 	}
 
 	// Do not set extra contextual data on extension spans

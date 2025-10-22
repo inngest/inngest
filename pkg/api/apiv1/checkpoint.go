@@ -350,7 +350,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 
 			_, err = a.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-					Identifier:  runCtx.LifecycleItem().Identifier,
+					Identifier:  input.md.ID,
 					Attempt:     runCtx.AttemptCount(),
 					MaxAttempts: fn.MaxAttempts(),
 				}),
@@ -391,7 +391,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 			status := enums.StepStatusErrored
 			_, err = a.TracerProvider.CreateSpan(
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-					Identifier:  runCtx.LifecycleItem().Identifier,
+					Identifier:  input.md.ID,
 					Attempt:     runCtx.AttemptCount(),
 					MaxAttempts: fn.MaxAttempts(),
 				}),

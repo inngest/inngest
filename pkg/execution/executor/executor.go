@@ -1085,7 +1085,7 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-		Identifier:  id,
+		Identifier:  sv2.IDFromV1(id),
 		Attempt:     item.Attempt,
 		MaxAttempts: *item.MaxAttempts,
 		QueueKind:   item.Kind,
@@ -2180,6 +2180,13 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  md.ID,
+		Attempt:     0,
+		MaxAttempts: *pause.MaxAttempts,
+	})
+
 	data, err := json.Marshal(r.With)
 	if err != nil {
 		return fmt.Errorf("error marshalling timeout step data: %w", err)
@@ -2292,7 +2299,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("no queue or state manager specified")
 	}
 
-	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
+	sv2id := sv2.ID{
 		RunID:      pause.Identifier.RunID,
 		FunctionID: pause.Identifier.FunctionID,
 		Tenant: sv2.Tenant{
@@ -2300,7 +2307,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 			// NOTE: Pauses do not store app IDs.
 		},
+	}
+
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  sv2id,
+		Attempt:     0,
+		MaxAttempts: *pause.MaxAttempts,
 	})
+
+	md, err := e.smv2.LoadMetadata(ctx, sv2id)
 	if err == state.ErrRunNotFound {
 		return err
 	}

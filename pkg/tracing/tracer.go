@@ -147,7 +147,13 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 			"traceparent": opts.Parent.TraceParent,
 			"tracestate":  opts.Parent.TraceState,
 		}
-		ctx = defaultPropagator.Extract(ctx, carrier)
+		ctx = mixinExecutonContext(
+			ctx,
+			// extract the propagator from a blank contexct, and mixin the execution
+			// context from the parent.  this creates a blank ctx with just the executor context
+			// and propagator, which is necessary to tie parents <> children.
+			defaultPropagator.Extract(context.Background(), carrier),
+		)
 	}
 
 	attrs := opts.Attributes
@@ -283,7 +289,13 @@ func (tp *otelTracerProvider) UpdateSpan(
 		"traceparent": opts.TargetSpan.DynamicSpanTraceParent,
 		"tracestate":  opts.TargetSpan.DynamicSpanTraceState,
 	}
-	ctx = defaultPropagator.Extract(ctx, carrier)
+	ctx = mixinExecutonContext(
+		ctx,
+		// extract the propagator from a blank contexct, and mixin the execution
+		// context from the parent.  this creates a blank ctx with just the executor context
+		// and propagator, which is necessary to tie parents <> children.
+		defaultPropagator.Extract(context.Background(), carrier),
+	)
 
 	if opts.Status.IsEnded() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
