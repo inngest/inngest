@@ -77,10 +77,11 @@ func WithConstraints[T any](
 
 	// If the current action is not allowed, return
 	if !checkResult.allowed {
-		// TODO: Figure out which constraint was lacking (we only check rate limits so we can assume that)
-
 		// TODO : should we record this?
-		return zero, nil
+
+		// NOTE: Since Schedule only enforces RateLimit via the Constraint API, we know that
+		// we got rate limited if the action is not allowed.
+		return zero, ErrFunctionRateLimited
 	}
 
 	userCtx, cancel := context.WithCancel(ctx)
@@ -178,8 +179,8 @@ type checkResult struct {
 	fallbackIdempotencyKey string
 }
 
-func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintCapacityItem, error) {
-	var requests []constraintapi.ConstraintCapacityItem
+func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintItem, error) {
+	var requests []constraintapi.ConstraintItem
 
 	// The only constraint we care about in run scheduling is rate limiting.
 	// Throttle + concurrency constraints are checked in the queue.
@@ -195,14 +196,13 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 			rateLimitKey = key
 		}
 
-		requests = append(requests, constraintapi.ConstraintCapacityItem{
-			Kind: constraintapi.CapacityKindRateLimit,
-			RateLimit: &constraintapi.RateLimitCapacity{
+		requests = append(requests, constraintapi.ConstraintItem{
+			Kind: constraintapi.ConstraintKindRateLimit,
+			RateLimit: &constraintapi.RateLimitConstraint{
 				Scope:             enums.RateLimitScopeFn,
 				KeyExpressionHash: util.XXHash(rateLimitKeyExpr),
 				EvaluatedKeyHash:  rateLimitKey,
 			},
-			Amount: 1,
 		})
 	}
 
@@ -215,7 +215,7 @@ func CheckConstraints(
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	fallback bool,
-	constraints []constraintapi.ConstraintCapacityItem,
+	constraints []constraintapi.ConstraintItem,
 ) (checkResult, error) {
 	// Retrieve idempotency key to acquire lease
 	// NOTE: To allow for retries between multiple executors, this should be
@@ -250,7 +250,8 @@ func CheckConstraints(
 		EnvID:             req.WorkspaceID,
 		FunctionID:        req.Function.ID,
 		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
-		RequestedCapacity: constraints,
+		Constraints:       constraints,
+		Amount:            1,
 		CurrentTime:       time.Now(),
 		Duration:          ScheduleLeaseDuration,
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
@@ -262,20 +263,27 @@ func CheckConstraints(
 			// TODO: Log error
 			return checkResult{
 				mustCheck:              true,
-				fallbackIdempotencyKey: res.FallbackIdempotencyKey,
+				fallbackIdempotencyKey: idempotencyKey,
 			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
 	}
 
-	// TODO: Do we need to add more fine-grained checks here?
-	allowed := len(res.InsufficientCapacity) == 0
+	allowed := len(res.Leases) == 1
+	if !allowed {
+		return checkResult{
+			allowed:   false,
+			mustCheck: false,
+		}, nil
+	}
+
+	lease := res.Leases[0]
 
 	return checkResult{
 		allowed: allowed,
 
-		leaseID:                res.LeaseID,
-		fallbackIdempotencyKey: res.FallbackIdempotencyKey,
+		leaseID:                &lease.LeaseID,
+		fallbackIdempotencyKey: lease.IdempotencyKey,
 
 		// We already checked constraints
 		mustCheck: false,
