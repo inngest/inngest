@@ -16,7 +16,7 @@ message PartitionResponse {
   PartitionTenant tenant = 3;
   bytes config = 4;
   QueueShard queue_shard = 5;
-  CronSchedule cron = 6;
+  repeated CronSchedule crons = 6;
 }
 
 message PartitionStatusResponse {
@@ -48,6 +48,8 @@ message QueueShard {
 message CronSchedule {
   google.protobuf.Timestamp next = 1;
   string job_id = 2;
+  string expr = 3;
+  bool scheduled = 4;
 }
 
 //
