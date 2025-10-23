@@ -2,7 +2,6 @@ const ACCEPTED_TYPES = new Set(['application/csp-report', 'application/reports+j
 const MAX_BODY_BYTES = 32 * 1024; // 32KB limit
 
 export async function POST(request: Request): Promise<Response> {
-  if (process.env.NODE_ENV !== 'production') return makeStaticSuccessResponse();
   if (!process.env.SENTRY_SECURITY_REPORT_URL) return makeStaticSuccessResponse();
 
   const contentType = getMediaType(request.headers.get('content-type'));
