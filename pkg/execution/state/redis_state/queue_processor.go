@@ -1802,22 +1802,31 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		p.queue.useConstraintAPI != nil {
 		useAPI, fallback := p.queue.useConstraintAPI(ctx, p.partition.AccountID)
 
-		if useAPI {
+		// If capacity lease is still valid for the forseeable future, use it
+		hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(p.staticTime.Add(5*time.Second))
+
+		idempotencyKey := item.ID
+
+		switch {
+		case hasValidCapacityLease:
+			capacityLeaseID = *item.CapacityLeaseID
+		case useAPI:
 			res, err := p.queue.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 				AccountID: p.partition.AccountID,
 				EnvID:     *p.partition.EnvID,
 				// TODO: Double check if the item ID works for idempotency:
 				// - Consistent across the same attempt
 				// - Do we need to re-evaluate per retry?
-				IdempotencyKey: item.ID,
+				IdempotencyKey: idempotencyKey,
 				FunctionID:     *p.partition.FunctionID,
 				CurrentTime:    p.staticTime,
 				Duration:       QueueLeaseDuration,
 				// TODO: Build config
 				Configuration: constraintapi.ConstraintConfig{},
-				// TODO: Supply capacity
-				RequestedCapacity: []constraintapi.ConstraintCapacityItem{},
-				MaximumLifetime:   consts.MaxFunctionTimeout + 30*time.Minute,
+				// TODO: Supply constraints
+				Constraints:     []constraintapi.ConstraintItem{},
+				Amount:          1,
+				MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 				Source: constraintapi.LeaseSource{
 					Service:           constraintapi.ServiceExecutor,
 					Location:          constraintapi.LeaseLocationItemLease,
@@ -1832,21 +1841,20 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 				}
 
 				// Fallback to Lease (with idempotency)
-				leaseOptions = append(leaseOptions, LeaseOptionFallbackIdempotencyKey(res.FallbackIdempotencyKey))
+				leaseOptions = append(leaseOptions, LeaseOptionFallbackIdempotencyKey(idempotencyKey))
 			}
 
-			if len(res.InsufficientCapacity) > 0 {
+			if len(res.Leases) == 0 {
 				// TODO: Handle missing capacity properly
+				return nil
 			}
 
-			if res.LeaseID != nil {
-				// TODO: Extend lease, etc.
-				capacityLeaseID = *res.LeaseID
+			// TODO: Extend lease, etc.
+			capacityLeaseID = res.Leases[0].LeaseID
 
-				// Disable constraint checks in Lease
-				// TODO: Support partial capacity leases: Ensure only allowed capacity is used!
-				leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
-			}
+			// Disable constraint checks in Lease
+			// TODO: Support partial capacity leases: Ensure only allowed capacity is used!
+			leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
 		}
 	}
 

@@ -96,6 +96,10 @@ type QueueItem struct {
 	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
+
+	// CapacityLeaseID is the optional capacity lease for this queue item.
+	// This is set when the Constraint API feature flag is enabled and the item was refilled.
+	CapacityLeaseID *ulid.ULID `json:"clid,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
