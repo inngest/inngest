@@ -37,6 +37,10 @@ type Lease struct {
 	InstanceID string    `json:"instanceID"`
 }
 
+func (r *redisConnectionStateManager) keyInstanceCounter(envID uuid.UUID, instanceID string) string {
+	return fmt.Sprintf("{%s}:instance:%s:lease-count", envID, instanceID)
+}
+
 // keyRequestLease points to the key storing the request lease
 func (r *redisConnectionStateManager) keyRequestLease(envID uuid.UUID, requestID string) string {
 	return fmt.Sprintf("{%s}:request-lease:%s", envID, requestID)
@@ -51,6 +55,7 @@ func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, reque
 func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
+		r.keyInstanceCounter(envID, instanceID),
 	}
 
 	now := r.c.Now()
@@ -72,6 +77,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 		// Mapping the request to the current executor
 		connectConfig.Executor(ctx).GRPCIP.String(),
 		instanceID,
+		"60", // instanceExpiry in seconds
 	}
 
 	status, err := scripts["lease"].Exec(
@@ -96,17 +102,18 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
-	keys := []string{
-		r.keyRequestLease(envID, requestID),
-	}
-
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	now := r.c.Now()
 
 	// Get the instance ID of the executor that owns the request's lease.
-	instanceID, err := r.GetExecutorInstanceID(ctx, envID, requestID)
+	instanceID, err := r.GetWorkerInstanceID(ctx, envID, requestID)
 	if err != nil {
 		return nil, err
+	}
+
+	keys := []string{
+		r.keyRequestLease(envID, requestID),
+		r.keyInstanceCounter(envID, instanceID),
 	}
 
 	leaseExpiry := now.Add(duration)
@@ -123,7 +130,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
-		instanceID,
+		"60", // instanceExpiry in seconds
 	}
 
 	status, err := scripts["extend_lease"].Exec(
@@ -185,14 +192,35 @@ func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID
 }
 
 // DeleteLease allows the executor to clean up the lease once the request is done processing.
-func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error {
+func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
 	cmd := r.client.B().Del().Key(r.keyRequestLease(envID, requestID)).Build()
 
-	// TODO: Delete Instance ID information
-
 	err := r.client.Do(ctx, cmd).Error()
+
+	// Delete Instance ID information/Decrement the counter
+	keys := []string{
+		r.keyInstanceCounter(envID, instanceID),
+	}
+
+	args := []string{
+		instanceID,
+	}
+
+	_, errInstance := scripts["delete_instance"].Exec(
+		ctx,
+		r.client,
+		keys,
+		args,
+	).AsInt64()
+
+	// check lease error after deleting the instance counter
 	if err != nil && !rueidis.IsRedisNil(err) {
 		return fmt.Errorf("could not delete lease: %w", err)
+	}
+
+	// check instance error
+	if errInstance != nil && !rueidis.IsRedisNil(errInstance) {
+		return fmt.Errorf("could not execute delete instance script: %w", err)
 	}
 
 	return nil
@@ -215,8 +243,8 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	return lease.ExecutorIP, nil
 }
 
-// GetExecutorInstanceID retrieves the instance ID of the executor that owns the request's lease.
-func (r *redisConnectionStateManager) GetExecutorInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+// GetWorkerInstanceID retrieves the instance ID of the executor that owns the request's lease.
+func (r *redisConnectionStateManager) GetWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
 	cmd := r.client.B().Get().Key(r.keyRequestLease(envID, requestID)).Build()
 
 	reply, err := r.client.Do(ctx, cmd).ToString()

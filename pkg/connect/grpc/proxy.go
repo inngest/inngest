@@ -436,7 +436,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 		// The lease has a short TTL so it will be cleaned up, but we should try
 		// to garbage-collect unused state as quickly as possible
-		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
+		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.InstanceId, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
 			l.ReportError(err, "could not delete lease")
