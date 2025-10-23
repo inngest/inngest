@@ -927,6 +927,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameRun,
 		runSpanOpts,
 	)
