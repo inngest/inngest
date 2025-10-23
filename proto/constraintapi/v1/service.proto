@@ -100,32 +100,47 @@ message ConstraintConfig {
   repeated ThrottleConfig throttle = 4;
 }
 
-message RateLimitCapacity {
+// Individual constraint types
+message RateLimitConstraint {
   ConstraintApiRateLimitScope scope = 1;
   string key_expression_hash = 2;
   string evaluated_key_hash = 3;
 }
 
-message ConcurrencyCapacity {
+message ConcurrencyConstraint {
   ConstraintApiConcurrencyMode mode = 1;
   ConstraintApiConcurrencyScope scope = 2;
   string key_expression_hash = 3;
   string evaluated_key_hash = 4;
 }
 
-message ThrottleCapacity {
+message ThrottleConstraint {
   ConstraintApiThrottleScope scope = 1;
   string key_expression_hash = 2;
   string evaluated_key_hash = 3;
 }
 
-message ConstraintCapacityItem {
+// Constraint item that matches Go's ConstraintItem struct
+message ConstraintItem {
   ConstraintApiConstraintKind kind = 1;
-  optional ConcurrencyCapacity concurrency = 2;
-  optional ThrottleCapacity throttle = 3;
-  optional RateLimitCapacity rate_limit = 4;
-  int32 amount = 5;
+  optional ConcurrencyConstraint concurrency = 2;
+  optional ThrottleConstraint throttle = 3;
+  optional RateLimitConstraint rate_limit = 4;
 }
+
+// Constraint usage information
+message ConstraintUsage {
+  ConstraintItem constraint = 1;
+  int32 used = 2;
+  int32 limit = 3;
+}
+
+// Capacity lease information
+message CapacityLease {
+  string lease_id = 1;  // ULID string
+  string idempotency_key = 2;
+}
+
 
 message LeaseSource {
   ConstraintApiLeaseService service = 1;
@@ -136,9 +151,16 @@ message LeaseSource {
 // Request/Response messages
 message CapacityCheckRequest {
   string account_id = 1;
+  string env_id = 2;
+  string function_id = 3;
+  ConstraintConfig configuration = 4;
+  repeated ConstraintItem constraints = 5;
 }
 
 message CapacityCheckResponse {
+  int32 available_capacity = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  repeated ConstraintUsage usage = 3;
 }
 
 message CapacityAcquireRequest {
@@ -147,19 +169,20 @@ message CapacityAcquireRequest {
   string env_id = 3;
   string function_id = 4;
   ConstraintConfig configuration = 5;
-  repeated ConstraintCapacityItem requested_capacity = 6;
-  google.protobuf.Timestamp current_time = 7;
-  google.protobuf.Duration duration = 8;
-  google.protobuf.Duration maximum_lifetime = 9;
-  google.protobuf.Duration blocking_threshold = 10;
-  LeaseSource source = 11;
+  repeated ConstraintItem constraints = 6;
+  int32 amount = 7;
+  repeated string lease_idempotency_keys = 8;
+  google.protobuf.Timestamp current_time = 9;
+  google.protobuf.Duration duration = 10;
+  google.protobuf.Duration maximum_lifetime = 11;
+  google.protobuf.Duration blocking_threshold = 12;
+  LeaseSource source = 13;
 }
 
 message CapacityAcquireResponse {
-  optional string lease_id = 1;
-  repeated ConstraintCapacityItem reserved_capacity = 2;
-  repeated ConstraintCapacityItem insufficient_capacity = 3;
-  google.protobuf.Timestamp retry_after = 4;
+  repeated CapacityLease leases = 1;
+  repeated ConstraintItem limiting_constraints = 2;
+  google.protobuf.Timestamp retry_after = 3;
 }
 
 message CapacityExtendLeaseRequest {

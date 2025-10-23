@@ -54,11 +54,11 @@ func (r *CapacityAcquireRequest) Valid() error {
 
 	// TODO: Validate configuration
 
-	if len(r.RequestedCapacity) == 0 {
+	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must request capacity"))
 	}
 
-	// TODO: Validate requested capacity
+	// TODO: Validate constraints
 
 	return errs
 }

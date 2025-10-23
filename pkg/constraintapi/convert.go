@@ -366,115 +366,158 @@ func ConstraintConfigFromProto(pbConfig *pb.ConstraintConfig) ConstraintConfig {
 	}
 }
 
-func ConstraintCapacityItemToProto(item ConstraintItem) *pb.ConstraintCapacityItem {
+// New constraint type conversions
+func RateLimitConstraintToProto(constraint RateLimitConstraint) *pb.RateLimitConstraint {
+	return &pb.RateLimitConstraint{
+		Scope:             RateLimitScopeToProto(constraint.Scope),
+		KeyExpressionHash: constraint.KeyExpressionHash,
+		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+	}
+}
+
+func RateLimitConstraintFromProto(pbConstraint *pb.RateLimitConstraint) RateLimitConstraint {
+	if pbConstraint == nil {
+		return RateLimitConstraint{}
+	}
+	return RateLimitConstraint{
+		Scope:             RateLimitScopeFromProto(pbConstraint.Scope),
+		KeyExpressionHash: pbConstraint.KeyExpressionHash,
+		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyConstraintToProto(constraint ConcurrencyConstraint) *pb.ConcurrencyConstraint {
+	return &pb.ConcurrencyConstraint{
+		Mode:              ConcurrencyModeToProto(constraint.Mode),
+		Scope:             ConcurrencyScopeToProto(constraint.Scope),
+		KeyExpressionHash: constraint.KeyExpressionHash,
+		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+	}
+}
+
+func ConcurrencyConstraintFromProto(pbConstraint *pb.ConcurrencyConstraint) ConcurrencyConstraint {
+	if pbConstraint == nil {
+		return ConcurrencyConstraint{}
+	}
+	return ConcurrencyConstraint{
+		Mode:              ConcurrencyModeFromProto(pbConstraint.Mode),
+		Scope:             ConcurrencyScopeFromProto(pbConstraint.Scope),
+		KeyExpressionHash: pbConstraint.KeyExpressionHash,
+		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleConstraintToProto(constraint ThrottleConstraint) *pb.ThrottleConstraint {
+	return &pb.ThrottleConstraint{
+		Scope:             ThrottleScopeToProto(constraint.Scope),
+		KeyExpressionHash: constraint.KeyExpressionHash,
+		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+	}
+}
+
+func ThrottleConstraintFromProto(pbConstraint *pb.ThrottleConstraint) ThrottleConstraint {
+	if pbConstraint == nil {
+		return ThrottleConstraint{}
+	}
+	return ThrottleConstraint{
+		Scope:             ThrottleScopeFromProto(pbConstraint.Scope),
+		KeyExpressionHash: pbConstraint.KeyExpressionHash,
+		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+	}
+}
+
+func ConstraintItemToProto(item ConstraintItem) *pb.ConstraintItem {
 	kind := ConstraintKindToProto(item.Kind)
 
-	pbItem := &pb.ConstraintCapacityItem{
-		Kind:   kind,
-		Amount: int32(item.Amount),
+	pbItem := &pb.ConstraintItem{
+		Kind: kind,
 	}
 
 	if item.Concurrency != nil {
-		pbItem.Concurrency = ConcurrencyCapacityToProto(*item.Concurrency)
+		pbItem.Concurrency = ConcurrencyConstraintToProto(*item.Concurrency)
 	}
 
 	if item.Throttle != nil {
-		pbItem.Throttle = ThrottleCapacityToProto(*item.Throttle)
+		pbItem.Throttle = ThrottleConstraintToProto(*item.Throttle)
 	}
 
 	if item.RateLimit != nil {
-		pbItem.RateLimit = RateLimitCapacityToProto(*item.RateLimit)
+		pbItem.RateLimit = RateLimitConstraintToProto(*item.RateLimit)
 	}
 
 	return pbItem
 }
 
-func ConstraintCapacityItemFromProto(pbItem *pb.ConstraintCapacityItem) ConstraintItem {
+func ConstraintItemFromProto(pbItem *pb.ConstraintItem) ConstraintItem {
 	if pbItem == nil {
 		return ConstraintItem{}
 	}
 
 	item := ConstraintItem{
-		Kind:   ConstraintKindFromProto(pbItem.Kind),
-		Amount: int(pbItem.Amount),
+		Kind: ConstraintKindFromProto(pbItem.Kind),
 	}
 
 	if pbItem.Concurrency != nil {
-		concurrency := ConcurrencyCapacityFromProto(pbItem.Concurrency)
+		concurrency := ConcurrencyConstraintFromProto(pbItem.Concurrency)
 		item.Concurrency = &concurrency
 	}
 
 	if pbItem.Throttle != nil {
-		throttle := ThrottleCapacityFromProto(pbItem.Throttle)
+		throttle := ThrottleConstraintFromProto(pbItem.Throttle)
 		item.Throttle = &throttle
 	}
 
 	if pbItem.RateLimit != nil {
-		rateLimit := RateLimitCapacityFromProto(pbItem.RateLimit)
+		rateLimit := RateLimitConstraintFromProto(pbItem.RateLimit)
 		item.RateLimit = &rateLimit
 	}
 
 	return item
 }
 
-func RateLimitCapacityToProto(capacity RateLimitConstraint) *pb.RateLimitCapacity {
-	return &pb.RateLimitCapacity{
-		Scope:             RateLimitScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+func ConstraintUsageToProto(usage ConstraintUsage) *pb.ConstraintUsage {
+	return &pb.ConstraintUsage{
+		Constraint: ConstraintItemToProto(usage.Constraint),
+		Used:       int32(usage.Used),
+		Limit:      int32(usage.Limit),
 	}
 }
 
-func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitConstraint {
-	if pbCapacity == nil {
-		return RateLimitConstraint{}
+func ConstraintUsageFromProto(pbUsage *pb.ConstraintUsage) ConstraintUsage {
+	if pbUsage == nil {
+		return ConstraintUsage{}
 	}
-	return RateLimitConstraint{
-		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
-	}
-}
-
-func ConcurrencyCapacityToProto(capacity ConcurrencyConstraint) *pb.ConcurrencyCapacity {
-	return &pb.ConcurrencyCapacity{
-		Mode:              ConcurrencyModeToProto(capacity.Mode),
-		Scope:             ConcurrencyScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	return ConstraintUsage{
+		Constraint: ConstraintItemFromProto(pbUsage.Constraint),
+		Used:       int(pbUsage.Used),
+		Limit:      int(pbUsage.Limit),
 	}
 }
 
-func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyConstraint {
-	if pbCapacity == nil {
-		return ConcurrencyConstraint{}
-	}
-	return ConcurrencyConstraint{
-		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
-		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+func CapacityLeaseToProto(lease CapacityLease) *pb.CapacityLease {
+	return &pb.CapacityLease{
+		LeaseId:        lease.LeaseID.String(),
+		IdempotencyKey: lease.IdempotencyKey,
 	}
 }
 
-func ThrottleCapacityToProto(capacity ThrottleConstraint) *pb.ThrottleCapacity {
-	return &pb.ThrottleCapacity{
-		Scope:             ThrottleScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+func CapacityLeaseFromProto(pbLease *pb.CapacityLease) (CapacityLease, error) {
+	if pbLease == nil {
+		return CapacityLease{}, nil
 	}
+
+	leaseID, err := ulid.Parse(pbLease.LeaseId)
+	if err != nil {
+		return CapacityLease{}, fmt.Errorf("invalid lease ID: %w", err)
+	}
+
+	return CapacityLease{
+		LeaseID:        leaseID,
+		IdempotencyKey: pbLease.IdempotencyKey,
+	}, nil
 }
 
-func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleConstraint {
-	if pbCapacity == nil {
-		return ThrottleConstraint{}
-	}
-	return ThrottleConstraint{
-		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
-	}
-}
+
 
 func LeaseSourceToProto(source LeaseSource) *pb.LeaseSource {
 	return &pb.LeaseSource{
@@ -499,8 +542,18 @@ func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckReq
 	if req == nil {
 		return nil
 	}
+
+	constraints := make([]*pb.ConstraintItem, len(req.Constraints))
+	for i, constraint := range req.Constraints {
+		constraints[i] = ConstraintItemToProto(constraint)
+	}
+
 	return &pb.CapacityCheckRequest{
-		AccountId: req.AccountID.String(),
+		AccountId:     req.AccountID.String(),
+		EnvId:         req.EnvID.String(),
+		FunctionId:    req.FunctionID.String(),
+		Configuration: ConstraintConfigToProto(req.Configuration),
+		Constraints:   constraints,
 	}
 }
 
@@ -514,8 +567,27 @@ func CapacityCheckRequestFromProto(pbReq *pb.CapacityCheckRequest) (*CapacityChe
 		return nil, fmt.Errorf("invalid account ID: %w", err)
 	}
 
+	envID, err := uuid.Parse(pbReq.EnvId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid env ID: %w", err)
+	}
+
+	functionID, err := uuid.Parse(pbReq.FunctionId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid function ID: %w", err)
+	}
+
+	constraints := make([]ConstraintItem, len(pbReq.Constraints))
+	for i, constraint := range pbReq.Constraints {
+		constraints[i] = ConstraintItemFromProto(constraint)
+	}
+
 	return &CapacityCheckRequest{
-		AccountID: accountID,
+		AccountID:     accountID,
+		EnvID:         envID,
+		FunctionID:    functionID,
+		Configuration: ConstraintConfigFromProto(pbReq.Configuration),
+		Constraints:   constraints,
 	}, nil
 }
 
@@ -523,14 +595,44 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 	if resp == nil {
 		return nil
 	}
-	return &pb.CapacityCheckResponse{}
+
+	limitingConstraints := make([]*pb.ConstraintItem, len(resp.LimitingConstraints))
+	for i, constraint := range resp.LimitingConstraints {
+		limitingConstraints[i] = ConstraintItemToProto(constraint)
+	}
+
+	usage := make([]*pb.ConstraintUsage, len(resp.Usage))
+	for i, u := range resp.Usage {
+		usage[i] = ConstraintUsageToProto(u)
+	}
+
+	return &pb.CapacityCheckResponse{
+		AvailableCapacity:   int32(resp.AvailableCapacity),
+		LimitingConstraints: limitingConstraints,
+		Usage:               usage,
+	}
 }
 
 func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityCheckResponse {
 	if pbResp == nil {
 		return nil
 	}
-	return &CapacityCheckResponse{}
+
+	limitingConstraints := make([]ConstraintItem, len(pbResp.LimitingConstraints))
+	for i, constraint := range pbResp.LimitingConstraints {
+		limitingConstraints[i] = ConstraintItemFromProto(constraint)
+	}
+
+	usage := make([]ConstraintUsage, len(pbResp.Usage))
+	for i, u := range pbResp.Usage {
+		usage[i] = ConstraintUsageFromProto(u)
+	}
+
+	return &CapacityCheckResponse{
+		AvailableCapacity:   int(pbResp.AvailableCapacity),
+		LimitingConstraints: limitingConstraints,
+		Usage:               usage,
+	}
 }
 
 func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcquireRequest {
@@ -538,23 +640,25 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		return nil
 	}
 
-	requestedCapacity := make([]*pb.ConstraintCapacityItem, len(req.RequestedCapacity))
-	for i, item := range req.RequestedCapacity {
-		requestedCapacity[i] = ConstraintCapacityItemToProto(item)
+	constraints := make([]*pb.ConstraintItem, len(req.Constraints))
+	for i, item := range req.Constraints {
+		constraints[i] = ConstraintItemToProto(item)
 	}
 
 	return &pb.CapacityAcquireRequest{
-		IdempotencyKey:    req.IdempotencyKey,
-		AccountId:         req.AccountID.String(),
-		EnvId:             req.EnvID.String(),
-		FunctionId:        req.FunctionID.String(),
-		Configuration:     ConstraintConfigToProto(req.Configuration),
-		RequestedCapacity: requestedCapacity,
-		CurrentTime:       timestamppb.New(req.CurrentTime),
-		Duration:          durationpb.New(req.Duration),
-		MaximumLifetime:   durationpb.New(req.MaximumLifetime),
-		BlockingThreshold: durationpb.New(req.BlockingThreshold),
-		Source:            LeaseSourceToProto(req.Source),
+		IdempotencyKey:         req.IdempotencyKey,
+		AccountId:              req.AccountID.String(),
+		EnvId:                  req.EnvID.String(),
+		FunctionId:             req.FunctionID.String(),
+		Configuration:          ConstraintConfigToProto(req.Configuration),
+		Constraints:            constraints,
+		Amount:                 int32(req.Amount),
+		LeaseIdempotencyKeys:   req.LeaseIdempotencyKeys,
+		CurrentTime:            timestamppb.New(req.CurrentTime),
+		Duration:               durationpb.New(req.Duration),
+		MaximumLifetime:        durationpb.New(req.MaximumLifetime),
+		BlockingThreshold:      durationpb.New(req.BlockingThreshold),
+		Source:                 LeaseSourceToProto(req.Source),
 	}
 }
 
@@ -578,9 +682,9 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		return nil, fmt.Errorf("invalid function ID: %w", err)
 	}
 
-	requestedCapacity := make([]ConstraintItem, len(pbReq.RequestedCapacity))
-	for i, item := range pbReq.RequestedCapacity {
-		requestedCapacity[i] = ConstraintCapacityItemFromProto(item)
+	constraints := make([]ConstraintItem, len(pbReq.Constraints))
+	for i, item := range pbReq.Constraints {
+		constraints[i] = ConstraintItemFromProto(item)
 	}
 
 	var currentTime time.Time
@@ -604,17 +708,19 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	}
 
 	return &CapacityAcquireRequest{
-		IdempotencyKey:    pbReq.IdempotencyKey,
-		AccountID:         accountID,
-		EnvID:             envID,
-		FunctionID:        functionID,
-		Configuration:     ConstraintConfigFromProto(pbReq.Configuration),
-		RequestedCapacity: requestedCapacity,
-		CurrentTime:       currentTime,
-		Duration:          duration,
-		MaximumLifetime:   maximumLifetime,
-		BlockingThreshold: blockingThreshold,
-		Source:            LeaseSourceFromProto(pbReq.Source),
+		IdempotencyKey:         pbReq.IdempotencyKey,
+		AccountID:              accountID,
+		EnvID:                  envID,
+		FunctionID:             functionID,
+		Configuration:          ConstraintConfigFromProto(pbReq.Configuration),
+		Constraints:            constraints,
+		Amount:                 int(pbReq.Amount),
+		LeaseIdempotencyKeys:   pbReq.LeaseIdempotencyKeys,
+		CurrentTime:            currentTime,
+		Duration:               duration,
+		MaximumLifetime:        maximumLifetime,
+		BlockingThreshold:      blockingThreshold,
+		Source:                 LeaseSourceFromProto(pbReq.Source),
 	}, nil
 }
 
@@ -623,27 +729,20 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		return nil
 	}
 
-	reservedCapacity := make([]*pb.ConstraintCapacityItem, len(resp.ReservedCapacity))
-	for i, item := range resp.ReservedCapacity {
-		reservedCapacity[i] = ConstraintCapacityItemToProto(item)
+	leases := make([]*pb.CapacityLease, len(resp.Leases))
+	for i, lease := range resp.Leases {
+		leases[i] = CapacityLeaseToProto(lease)
 	}
 
-	insufficientCapacity := make([]*pb.ConstraintCapacityItem, len(resp.InsufficientCapacity))
-	for i, item := range resp.InsufficientCapacity {
-		insufficientCapacity[i] = ConstraintCapacityItemToProto(item)
-	}
-
-	var leaseID *string
-	if resp.LeaseID != nil {
-		s := resp.LeaseID.String()
-		leaseID = &s
+	limitingConstraints := make([]*pb.ConstraintItem, len(resp.LimitingConstraints))
+	for i, constraint := range resp.LimitingConstraints {
+		limitingConstraints[i] = ConstraintItemToProto(constraint)
 	}
 
 	return &pb.CapacityAcquireResponse{
-		LeaseId:              leaseID,
-		ReservedCapacity:     reservedCapacity,
-		InsufficientCapacity: insufficientCapacity,
-		RetryAfter:           timestamppb.New(resp.RetryAfter),
+		Leases:              leases,
+		LimitingConstraints: limitingConstraints,
+		RetryAfter:          timestamppb.New(resp.RetryAfter),
 	}
 }
 
@@ -652,23 +751,18 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		return nil, nil
 	}
 
-	reservedCapacity := make([]ConstraintItem, len(pbResp.ReservedCapacity))
-	for i, item := range pbResp.ReservedCapacity {
-		reservedCapacity[i] = ConstraintCapacityItemFromProto(item)
-	}
-
-	insufficientCapacity := make([]ConstraintItem, len(pbResp.InsufficientCapacity))
-	for i, item := range pbResp.InsufficientCapacity {
-		insufficientCapacity[i] = ConstraintCapacityItemFromProto(item)
-	}
-
-	var leaseID *ulid.ULID
-	if pbResp.LeaseId != nil {
-		parsed, err := ulid.Parse(*pbResp.LeaseId)
+	leases := make([]CapacityLease, len(pbResp.Leases))
+	for i, pbLease := range pbResp.Leases {
+		lease, err := CapacityLeaseFromProto(pbLease)
 		if err != nil {
-			return nil, fmt.Errorf("invalid lease ID: %w", err)
+			return nil, fmt.Errorf("invalid lease at index %d: %w", i, err)
 		}
-		leaseID = &parsed
+		leases[i] = lease
+	}
+
+	limitingConstraints := make([]ConstraintItem, len(pbResp.LimitingConstraints))
+	for i, constraint := range pbResp.LimitingConstraints {
+		limitingConstraints[i] = ConstraintItemFromProto(constraint)
 	}
 
 	var retryAfter time.Time
@@ -677,10 +771,9 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 	}
 
 	return &CapacityAcquireResponse{
-		LeaseID:              leaseID,
-		ReservedCapacity:     reservedCapacity,
-		InsufficientCapacity: insufficientCapacity,
-		RetryAfter:           retryAfter,
+		Leases:              leases,
+		LimitingConstraints: limitingConstraints,
+		RetryAfter:          retryAfter,
 	}, nil
 }
 

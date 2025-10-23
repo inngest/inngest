@@ -31,12 +31,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -57,12 +57,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -84,12 +84,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -111,12 +111,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -138,12 +138,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -165,12 +165,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 0,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -192,12 +192,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     time.Time{},
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -219,12 +219,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        0,
 				MaximumLifetime: 30 * time.Minute,
@@ -246,12 +246,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 0,
@@ -273,12 +273,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -300,12 +300,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -318,7 +318,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 			errMsgs: []string{"missing source location"},
 		},
 		{
-			name: "missing requested capacity",
+			name: "missing constraints",
 			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
 				AccountID:      accountID,
@@ -327,7 +327,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{}, // Empty slice
+				Constraints: []ConstraintItem{}, // Empty slice
+				Amount:      0,
 				CurrentTime:       baseTime,
 				Duration:          5 * time.Minute,
 				MaximumLifetime:   30 * time.Minute,
@@ -349,7 +350,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 0,
 				},
-				RequestedCapacity: []ConstraintItem{}, // Empty slice
+				Constraints: []ConstraintItem{}, // Empty slice
+				Amount:      0,
 				CurrentTime:       time.Time{},
 				Duration:          0,
 				MaximumLifetime:   0,
@@ -383,12 +385,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:       baseTime,
 				Duration:          5 * time.Minute,
 				BlockingThreshold: 0, // Zero blocking threshold should be valid since it's not required
@@ -441,12 +443,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        1 * time.Nanosecond,
 				MaximumLifetime: 1 * time.Nanosecond,
@@ -467,12 +469,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 999999,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        24 * time.Hour,
 				MaximumLifetime: 168 * time.Hour, // 1 week
@@ -493,12 +495,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        -1 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -520,12 +522,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: -1 * time.Minute,
@@ -547,12 +549,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -573,12 +575,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -599,12 +601,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -625,12 +627,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -651,12 +653,12 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -708,12 +710,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     time.Unix(0, 1), // Minimum non-zero time
 				Duration:        1,               // Minimum non-zero duration
 				MaximumLifetime: 1,               // Minimum non-zero lifetime
@@ -734,12 +736,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        time.Duration(1<<63 - 1), // Max duration
 				MaximumLifetime: time.Duration(1<<63 - 1), // Max lifetime
@@ -760,12 +762,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
 				Duration:        1 * time.Hour,
 				MaximumLifetime: 24 * time.Hour,
@@ -786,12 +788,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -812,12 +814,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -838,12 +840,12 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1<<63 - 1, // Max int64
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -895,7 +897,13 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				CurrentTime:     baseTime,
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+					},
+				},
+				Amount:      1,
+				CurrentTime: baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
@@ -915,12 +923,12 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
@@ -941,12 +949,12 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
 				},
-				RequestedCapacity: []ConstraintItem{
+				Constraints: []ConstraintItem{
 					{
-						Kind:   kindConcurrency,
-						Amount: 1,
+						Kind: kindConcurrency,
 					},
 				},
+				Amount: 1,
 				CurrentTime:     baseTime,
 				Duration:        5 * time.Minute,
 				MaximumLifetime: 30 * time.Minute,
