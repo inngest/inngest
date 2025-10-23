@@ -483,81 +483,66 @@ func ConstraintUsageToProto(usage ConstraintUsage) *pb.ConstraintUsage {
 	}
 
 	if pbItem.Concurrency != nil {
-		concurrency := ConcurrencyCapacityFromProto(pbItem.Concurrency)
+		concurrency := ConcurrencyConstraintFromProto(pbItem.Concurrency)
 		item.Concurrency = &concurrency
 	}
 
 	if pbItem.Throttle != nil {
-		throttle := ThrottleCapacityFromProto(pbItem.Throttle)
+		throttle := ThrottleConstraintFromProto(pbItem.Throttle)
 		item.Throttle = &throttle
 	}
 
 	if pbItem.RateLimit != nil {
-		rateLimit := RateLimitCapacityFromProto(pbItem.RateLimit)
+		rateLimit := RateLimitConstraintFromProto(pbItem.RateLimit)
 		item.RateLimit = &rateLimit
 	}
 
 	return item
 }
 
-func RateLimitCapacityToProto(capacity RateLimitConstraint) *pb.RateLimitCapacity {
-	return &pb.RateLimitCapacity{
-		Scope:             RateLimitScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+func ConstraintUsageToProto(usage ConstraintUsage) *pb.ConstraintUsage {
+	return &pb.ConstraintUsage{
+		Constraint: ConstraintItemToProto(usage.Constraint),
+		Used:       int32(usage.Used),
+		Limit:      int32(usage.Limit),
 	}
 }
 
-func RateLimitCapacityFromProto(pbCapacity *pb.RateLimitCapacity) RateLimitConstraint {
-	if pbCapacity == nil {
-		return RateLimitConstraint{}
+func ConstraintUsageFromProto(pbUsage *pb.ConstraintUsage) ConstraintUsage {
+	if pbUsage == nil {
+		return ConstraintUsage{}
 	}
-	return RateLimitConstraint{
-		Scope:             RateLimitScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
-	}
-}
-
-func ConcurrencyCapacityToProto(capacity ConcurrencyConstraint) *pb.ConcurrencyCapacity {
-	return &pb.ConcurrencyCapacity{
-		Mode:              ConcurrencyModeToProto(capacity.Mode),
-		Scope:             ConcurrencyScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+	return ConstraintUsage{
+		Constraint: ConstraintItemFromProto(pbUsage.Constraint),
+		Used:       int(pbUsage.Used),
+		Limit:      int(pbUsage.Limit),
 	}
 }
 
-func ConcurrencyCapacityFromProto(pbCapacity *pb.ConcurrencyCapacity) ConcurrencyConstraint {
-	if pbCapacity == nil {
-		return ConcurrencyConstraint{}
-	}
-	return ConcurrencyConstraint{
-		Mode:              ConcurrencyModeFromProto(pbCapacity.Mode),
-		Scope:             ConcurrencyScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
+func CapacityLeaseToProto(lease CapacityLease) *pb.CapacityLease {
+	return &pb.CapacityLease{
+		LeaseId:        lease.LeaseID.String(),
+		IdempotencyKey: lease.IdempotencyKey,
 	}
 }
 
-func ThrottleCapacityToProto(capacity ThrottleConstraint) *pb.ThrottleCapacity {
-	return &pb.ThrottleCapacity{
-		Scope:             ThrottleScopeToProto(capacity.Scope),
-		KeyExpressionHash: capacity.KeyExpressionHash,
-		EvaluatedKeyHash:  capacity.EvaluatedKeyHash,
+func CapacityLeaseFromProto(pbLease *pb.CapacityLease) (CapacityLease, error) {
+	if pbLease == nil {
+		return CapacityLease{}, nil
 	}
+
+	leaseID, err := ulid.Parse(pbLease.LeaseId)
+	if err != nil {
+		return CapacityLease{}, fmt.Errorf("invalid lease ID: %w", err)
+	}
+
+	return CapacityLease{
+		LeaseID:        leaseID,
+		IdempotencyKey: pbLease.IdempotencyKey,
+	}, nil
 }
 
-func ThrottleCapacityFromProto(pbCapacity *pb.ThrottleCapacity) ThrottleConstraint {
-	if pbCapacity == nil {
-		return ThrottleConstraint{}
-	}
-	return ThrottleConstraint{
-		Scope:             ThrottleScopeFromProto(pbCapacity.Scope),
-		KeyExpressionHash: pbCapacity.KeyExpressionHash,
-		EvaluatedKeyHash:  pbCapacity.EvaluatedKeyHash,
-	}
-}
+
 
 func ConstraintUsageFromProto(pbUsage *pb.ConstraintUsage) ConstraintUsage {
 	if pbUsage == nil {
