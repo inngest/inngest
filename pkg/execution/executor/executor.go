@@ -678,8 +678,6 @@ func (e *executor) schedule(
 	}
 
 	// NOTE: From this point, we are guaranteed to operate within user constraints.
-	// We can decide whether to commit (persist) or rollback the reserved capacity
-	// for individual return statements. Rollbacks should be used for transient errors.
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
@@ -878,6 +876,7 @@ func (e *executor) schedule(
 
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameRun,
 		runSpanOpts,
 	)
@@ -1075,6 +1074,7 @@ func (e *executor) schedule(
 		// where to find the latest span and just always fetch it from the queue
 		// item.
 		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
