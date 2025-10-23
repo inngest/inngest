@@ -4,6 +4,12 @@ const MAX_BODY_BYTES = 32 * 1024; // 32KB limit
 export async function POST(request: Request): Promise<Response> {
   if (!process.env.SENTRY_SECURITY_REPORT_URL) return makeStaticSuccessResponse();
 
+  const sentryEnvironment = getSentryEnvironment();
+  if (sentryEnvironment === null) return makeStaticSuccessResponse();
+
+  // TODO: Add sentry_release parameter.
+  const _reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
+
   const contentType = getMediaType(request.headers.get('content-type'));
   if (contentType === null || !ACCEPTED_TYPES.has(contentType)) {
     return new Response('Unsupported media type', { status: 415 });
@@ -23,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
   /*
   // Forward to Sentry using a clean, credential-free request.
   try {
-    await fetch(process.env.SENTRY_SECURITY_REPORT_URL, {
+    await fetch(reportUrl, {
       body,
       cache: 'no-store',
       credentials: 'omit',
@@ -61,4 +67,11 @@ function getMediaType(contentTypeHeader: string | null): string | null {
 
 function makeStaticSuccessResponse(): Response {
   return new Response(null, { status: 204 });
+}
+
+// This should match the logic that the @sentry/nextjs package uses.
+function getSentryEnvironment(): string | null {
+  if (!process.env.VERCEL_ENV) return null;
+
+  return `vercel-${process.env.VERCEL_ENV}`;
 }
