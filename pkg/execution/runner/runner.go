@@ -24,7 +24,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -143,8 +142,6 @@ type svc struct {
 	queue queue.Queue
 	// batcher handles batch operations
 	batcher batch.BatchManager
-	// rl rate-limits functions.
-	rl ratelimit.RateLimiter
 	// croner handles cron operations
 	croner cron.CronManager
 
@@ -248,32 +245,37 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	// Process each function to initialize its cron schedule
 	for _, f := range fns {
 		fn := f
-		// Skip functions that don't have scheduled triggers to avoid
-		// unnecessary processing
-		if !fn.IsScheduled() {
-			continue
-		}
 
-		// Launch each cron initialization in a separate goroutine to avoid
-		// blocking the startup process. This allows multiple functions to be
-		// initialized concurrently.
-		go func(ctx context.Context, fn inngest.Function) {
-			// Configure queue item parameters for the cron sync job
-			//
-			// This will trigger the cron manager's UpdateSchedule method with the
-			// CronInit operation to initialize the schedule if needed.
-			if err := s.croner.Sync(ctx, cron.CronItem{
-				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-				AccountID:       consts.DevServerAccountID,
-				WorkspaceID:     consts.DevServerEnvID,
-				FunctionID:      fn.ID,
-				FunctionVersion: fn.FunctionVersion,
-				Expression:      fn.ScheduleExpression(),
-				Op:              enums.CronInit, // Initialize operation
-			}); err != nil {
-				l.Error("error initializing cron sync job", "error", err)
-			}
-		}(ctx, fn)
+		cqrsFn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
+		if err != nil {
+			return fmt.Errorf("error fetching appID during cron initialization for fn: %s, err: %w", fn.ID, err)
+		}
+		appID := cqrsFn.AppID
+
+		cronExprs := f.ScheduleExpressions()
+		for _, cronExpr := range cronExprs {
+			// Launch each cron initialization in a separate goroutine to avoid
+			// blocking the startup process. This allows multiple functions to be
+			// initialized concurrently.
+			go func(ctx context.Context, fn inngest.Function) {
+				// Configure queue item parameters for the cron sync job
+				//
+				// This will trigger the cron manager's UpdateSchedule method with the
+				// CronInit operation to initialize the schedule if needed.
+				if err := s.croner.Sync(ctx, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					FunctionID:      fn.ID,
+					AppID:           appID,
+					FunctionVersion: fn.FunctionVersion,
+					Expression:      cronExpr,
+					Op:              enums.CronInit, // Initialize operation
+				}); err != nil {
+					l.Error("error initializing cron sync job", "error", err)
+				}
+			}(ctx, fn)
+		}
 	}
 	return nil
 }

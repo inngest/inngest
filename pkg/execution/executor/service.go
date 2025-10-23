@@ -881,8 +881,9 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 	l.Trace("cron sync", "item", ci)
 
 	// handle the schedule update
-	if err := s.croner.UpdateSchedule(ctx, ci); err != nil {
+	if _, err := s.croner.ScheduleNext(ctx, ci); err != nil {
 		// TODO does this need special error handling?
+		l.Error("Failed to schedule next cron run", "err", err)
 		return fmt.Errorf("error upserting cron schedule: %w", err)
 	}
 
@@ -903,22 +904,14 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
 	}
 
-	l = l.With("cron_item", ci)
+	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion, "scheduleTime", ci.ID.Timestamp())
 	l.Trace("handling cron")
 
-	// Check if the function can be ran
-	ok, err := s.croner.CanRun(ctx, ci)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		// no action needed
-		return nil
-	}
-
+	// JIT check to verify function exists and is not archived
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			l.Info("Breaking cron cycle, function does not exist")
 			// function doesn't exist, no action needed
 			return nil
 		}
@@ -926,23 +919,30 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 	// function is archived/deleted, so don't do anything
 	if fn.IsArchived() {
+		l.Info("Breaking cron cycle, function is archived")
 		return nil
 	}
 
+	// JIT check to verify function version is current
 	conf, err := fn.InngestFunction()
 	if err != nil {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
+	if conf.FunctionVersion > ci.FunctionVersion {
+		l.Info("Breaking cron cycle, function version was upgraded")
+		return nil
+	}
 
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
+
 	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
 
 	evt := event.NewOSSTrackedEvent(event.Event{
 		ID:   idempotencyKey,
 		Name: consts.FnCronName,
 		Data: map[string]any{
-			"cron": conf.ScheduleExpression(),
+			"cron": ci.Expression,
 		},
 		Timestamp: time.Now().UnixMilli(),
 	}, nil)
@@ -976,7 +976,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
 			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
 			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
-			attribute.String(consts.OtelSysCronExpr, conf.ScheduleExpression()),
+			attribute.String(consts.OtelSysCronExpr, ci.Expression),
 			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
 		),
 	)
@@ -1000,10 +1000,14 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			l.ReportError(err, "error scheduling cron function execution")
 			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
+		l.Trace("cron function run already scheduled")
+	} else {
+		l.Trace("cron function run scheduled", "idempotencyKey", idempotencyKey)
 	}
 
 	// enqueue the next schedule
-	return s.croner.UpdateSchedule(ctx, ci)
+	_, err = s.croner.ScheduleNext(ctx, ci)
+	return err
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

@@ -5,11 +5,10 @@ package enums
 type CronOp int
 
 const (
-	CronOpNew CronOp = iota
-	CronOpUpdate
-	CronOpArchive
+	CronOpNew    CronOp = iota // new scheduled function
+	CronOpUpdate               // function config updated
 	CronOpPause
-	CronOpUnpause
+	CronOpUnpause // function unpaused, resume crons.
 	CronOpProcess
-	CronInit
+	CronInit // function enrolled in system queue for crons
 )

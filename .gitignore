@@ -29,4 +29,3 @@ docs/openapi/v2/
 docs/openapi/v3/
 
 /bin/
-!/bin/.gitkeep

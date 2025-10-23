@@ -314,7 +314,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		// handle cron sync to system queue
 		for _, ci := range crons {
 			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
-				l.Error("error on cron sync", "error", err)
+				l.Error("error on triggering cron-sync", "functionID", ci.FunctionID, "cronExpr", ci.Expression, "functionVersion", ci.FunctionVersion, "error", err)
 			}
 		}
 	}()
@@ -370,18 +370,20 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
-			if fn.IsScheduled() {
+			cronExprs := fn.ScheduleExpressions()
+			for _, cronExpr := range cronExprs {
 				crons = append(crons, cron.CronItem{
 					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 					AccountID:       consts.DevServerAccountID,
 					WorkspaceID:     consts.DevServerEnvID,
 					AppID:           appID,
 					FunctionID:      fn.ID,
-					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
-					Expression:      fn.ScheduleExpression(),
+					FunctionVersion: fn.FunctionVersion,
+					Expression:      cronExpr,
 					Op:              enums.CronOpUpdate,
 				})
 			}
+
 			continue
 		}
 
@@ -398,17 +400,19 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
 
-		if fn.IsScheduled() {
+		cronExprs := fn.ScheduleExpressions()
+		for _, cronExpr := range cronExprs {
 			crons = append(crons, cron.CronItem{
 				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 				AccountID:       consts.DevServerAccountID,
 				WorkspaceID:     consts.DevServerEnvID,
 				AppID:           appID,
 				FunctionID:      fn.ID,
-				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
-				Expression:      fn.ScheduleExpression(),
+				FunctionVersion: fn.FunctionVersion,
+				Expression:      cronExpr,
 				Op:              enums.CronOpNew,
 			})
+
 		}
 	}
 
@@ -424,14 +428,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	for _, fn := range existing {
 		if _, ok := seen[fn.ID]; !ok {
 			deletes = append(deletes, fn.ID)
-			crons = append(crons, cron.CronItem{
-				ID:          ulid.MustNew(ulid.Now(), rand.Reader),
-				AccountID:   consts.DevServerAccountID,
-				WorkspaceID: consts.DevServerEnvID,
-				AppID:       appID,
-				FunctionID:  fn.ID,
-				Op:          enums.CronOpArchive,
-			})
 		}
 	}
 	if len(deletes) == 0 {

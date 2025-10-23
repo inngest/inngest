@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CronOpName = "NewUpdateArchivePauseUnpauseProcessCronInit"
+const _CronOpName = "NewUpdatePauseUnpauseProcessCronInit"
 
-var _CronOpIndex = [...]uint8{0, 3, 9, 16, 21, 28, 35, 43}
+var _CronOpIndex = [...]uint8{0, 3, 9, 14, 21, 28, 36}
 
-const _CronOpLowerName = "newupdatearchivepauseunpauseprocesscroninit"
+const _CronOpLowerName = "newupdatepauseunpauseprocesscroninit"
 
 func (i CronOp) String() string {
 	if i < 0 || i >= CronOp(len(_CronOpIndex)-1) {
@@ -27,40 +27,36 @@ func _CronOpNoOp() {
 	var x [1]struct{}
 	_ = x[CronOpNew-(0)]
 	_ = x[CronOpUpdate-(1)]
-	_ = x[CronOpArchive-(2)]
-	_ = x[CronOpPause-(3)]
-	_ = x[CronOpUnpause-(4)]
-	_ = x[CronOpProcess-(5)]
-	_ = x[CronInit-(6)]
+	_ = x[CronOpPause-(2)]
+	_ = x[CronOpUnpause-(3)]
+	_ = x[CronOpProcess-(4)]
+	_ = x[CronInit-(5)]
 }
 
-var _CronOpValues = []CronOp{CronOpNew, CronOpUpdate, CronOpArchive, CronOpPause, CronOpUnpause, CronOpProcess, CronInit}
+var _CronOpValues = []CronOp{CronOpNew, CronOpUpdate, CronOpPause, CronOpUnpause, CronOpProcess, CronInit}
 
 var _CronOpNameToValueMap = map[string]CronOp{
 	_CronOpName[0:3]:        CronOpNew,
 	_CronOpLowerName[0:3]:   CronOpNew,
 	_CronOpName[3:9]:        CronOpUpdate,
 	_CronOpLowerName[3:9]:   CronOpUpdate,
-	_CronOpName[9:16]:       CronOpArchive,
-	_CronOpLowerName[9:16]:  CronOpArchive,
-	_CronOpName[16:21]:      CronOpPause,
-	_CronOpLowerName[16:21]: CronOpPause,
-	_CronOpName[21:28]:      CronOpUnpause,
-	_CronOpLowerName[21:28]: CronOpUnpause,
-	_CronOpName[28:35]:      CronOpProcess,
-	_CronOpLowerName[28:35]: CronOpProcess,
-	_CronOpName[35:43]:      CronInit,
-	_CronOpLowerName[35:43]: CronInit,
+	_CronOpName[9:14]:       CronOpPause,
+	_CronOpLowerName[9:14]:  CronOpPause,
+	_CronOpName[14:21]:      CronOpUnpause,
+	_CronOpLowerName[14:21]: CronOpUnpause,
+	_CronOpName[21:28]:      CronOpProcess,
+	_CronOpLowerName[21:28]: CronOpProcess,
+	_CronOpName[28:36]:      CronInit,
+	_CronOpLowerName[28:36]: CronInit,
 }
 
 var _CronOpNames = []string{
 	_CronOpName[0:3],
 	_CronOpName[3:9],
-	_CronOpName[9:16],
-	_CronOpName[16:21],
+	_CronOpName[9:14],
+	_CronOpName[14:21],
 	_CronOpName[21:28],
-	_CronOpName[28:35],
-	_CronOpName[35:43],
+	_CronOpName[28:36],
 }
 
 // CronOpString retrieves an enum value from the enum constants string name.

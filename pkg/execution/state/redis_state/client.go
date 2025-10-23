@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -170,19 +171,14 @@ func NewDebounceClient(r rueidis.Client, queueDefaultKey string) *DebounceClient
 }
 
 type CronClient struct {
-	kg          CronKeyGenerator
-	unshardedRc rueidis.Client
+	queueDefaultKey string
+	unshardedRc     rueidis.Client
 }
 
 func NewCronClient(r rueidis.Client, queueDefaultKey string) *CronClient {
 	return &CronClient{
-		kg: cronKeyGenerator{
-			queueDefaultKey: queueDefaultKey,
-			queueItemKeyGenerator: queueItemKeyGenerator{
-				queueDefaultKey: queueDefaultKey,
-			},
-		},
-		unshardedRc: r,
+		queueDefaultKey: queueDefaultKey,
+		unshardedRc:     r,
 	}
 }
 
@@ -190,8 +186,8 @@ func (c *CronClient) Client() rueidis.Client {
 	return c.unshardedRc
 }
 
-func (c *CronClient) KeyGenerator() CronKeyGenerator {
-	return c.kg
+func (c *CronClient) QueueDefaultKey() string {
+	return c.queueDefaultKey
 }
 
 type GlobalClient struct {

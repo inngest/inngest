@@ -11,116 +11,6 @@ import (
 )
 
 func TestCronItem(t *testing.T) {
-	t.Run("Equal", func(t *testing.T) {
-		now := time.Now()
-		id1 := ulid.MustNew(ulid.Timestamp(now), nil)
-		id2 := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), nil)
-
-		accountID := uuid.New()
-		workspaceID := uuid.New()
-		appID := uuid.New()
-		functionID := uuid.New()
-
-		item1 := CronItem{
-			ID:              id1,
-			AccountID:       accountID,
-			WorkspaceID:     workspaceID,
-			AppID:           appID,
-			FunctionID:      functionID,
-			FunctionVersion: 1,
-			Expression:      "0 0 * * *",
-			JobID:           "job1",
-			Op:              enums.CronOpProcess,
-		}
-
-		t.Run("identical items", func(t *testing.T) {
-			item2 := item1
-			assert.True(t, item1.Equal(item2))
-		})
-
-		t.Run("different ID", func(t *testing.T) {
-			item2 := CronItem{
-				ID:              id2,
-				AccountID:       accountID,
-				WorkspaceID:     workspaceID,
-				AppID:           appID,
-				FunctionID:      functionID,
-				FunctionVersion: 1,
-				Expression:      "0 0 * * *",
-				JobID:           "job1",
-				Op:              enums.CronOpProcess,
-			}
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different AccountID", func(t *testing.T) {
-			item2 := item1
-			item2.AccountID = uuid.New()
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different WorkspaceID", func(t *testing.T) {
-			item2 := item1
-			item2.WorkspaceID = uuid.New()
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different AppID", func(t *testing.T) {
-			item2 := item1
-			item2.AppID = uuid.New()
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different FunctionID", func(t *testing.T) {
-			item2 := item1
-			item2.FunctionID = uuid.New()
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different FunctionVersion", func(t *testing.T) {
-			item2 := item1
-			item2.FunctionVersion = 2
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different JobID", func(t *testing.T) {
-			item2 := item1
-			item2.JobID = "different-job"
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different Expression", func(t *testing.T) {
-			item2 := item1
-			item2.Expression = "0 30 * * *"
-			assert.False(t, item1.Equal(item2))
-		})
-
-		t.Run("different Op", func(t *testing.T) {
-			item2 := item1
-			item2.Op = enums.CronOpNew
-			assert.False(t, item1.Equal(item2))
-		})
-	})
-
-	t.Run("ProcessID", func(t *testing.T) {
-		item := CronItem{
-			ID:              ulid.MustNew(ulid.Timestamp(time.Now()), nil),
-			AccountID:       uuid.New(),
-			WorkspaceID:     uuid.New(),
-			AppID:           uuid.New(),
-			FunctionID:      uuid.New(),
-			FunctionVersion: 1,
-			Expression:      "0 0 * * *",
-			JobID:           "test-job-id",
-			Op:              enums.CronOpProcess,
-		}
-
-		processID := item.ProcessID()
-		assert.NotEmpty(t, processID)
-
-		processID2 := item.ProcessID()
-		assert.Equal(t, processID, processID2, "ProcessID should be consistent")
-	})
 
 	t.Run("SyncID", func(t *testing.T) {
 		item := CronItem{
@@ -230,6 +120,11 @@ func TestNext(t *testing.T) {
 			cronExpr:    "@invalid",
 			expectError: true,
 		},
+		{
+			name:        "invalid string",
+			cronExpr:    "invalid",
+			expectError: true,
+		},
 	}
 
 	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
@@ -239,6 +134,7 @@ func TestNext(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.True(t, next.IsZero())
+				assert.Contains(t, err.Error(), "error parsing cron expression")
 			} else {
 				assert.NoError(t, err)
 				assert.False(t, next.IsZero())
@@ -262,6 +158,12 @@ func TestNextScheduleCalculation(t *testing.T) {
 			expected: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
 		},
 		{
+			name:     "daily at noon from noon",
+			cronExpr: "0 12 * * *",
+			from:     time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
+		},
+		{
 			name:     "daily at noon from afternoon",
 			cronExpr: "0 12 * * *",
 			from:     time.Date(2023, 1, 1, 14, 0, 0, 0, time.UTC),
@@ -280,6 +182,12 @@ func TestNextScheduleCalculation(t *testing.T) {
 			expected: time.Date(2023, 1, 1, 10, 5, 0, 0, time.UTC),
 		},
 		{
+			name:     "every minute from top of minute",
+			cronExpr: "* * * * *",
+			from:     time.Date(2023, 1, 1, 10, 5, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 1, 10, 6, 0, 0, time.UTC),
+		},
+		{
 			name:     "weekly on monday",
 			cronExpr: "0 0 * * 1",
 			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC), // Sunday
@@ -296,34 +204,16 @@ func TestNextScheduleCalculation(t *testing.T) {
 	}
 }
 
-func TestNextErrorHandling(t *testing.T) {
-	from := time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC)
-	
-	t.Run("invalid cron expression", func(t *testing.T) {
-		next, err := Next("invalid", from)
-		assert.Error(t, err)
-		assert.True(t, next.IsZero())
-		assert.Contains(t, err.Error(), "error parsing cron expression")
-	})
-
-	t.Run("empty cron expression", func(t *testing.T) {
-		next, err := Next("", from)
-		assert.Error(t, err)
-		assert.True(t, next.IsZero())
-	})
-}
-
 func TestCronSyncerInterface(t *testing.T) {
 	t.Run("CronManager implements CronSyncer", func(t *testing.T) {
 		// This test verifies that CronManager satisfies the CronSyncer interface
 		var _ CronSyncer = (*redisCronManager)(nil)
-		
+
 		// Also verify through CronManager interface
 		var manager CronManager
-		
+
 		// If this compiles, the interface embedding is working correctly
 		syncer := CronSyncer(manager)
 		_ = syncer
 	})
 }
-

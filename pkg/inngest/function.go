@@ -308,18 +308,15 @@ func (f Function) IsScheduled() bool {
 	return false
 }
 
-// ScheduleExpression returns the cron expression string for the function
-//
-// NOTE
-// the code technically allow multiple triggers, should this also return a
-// list of string instead?
-func (f Function) ScheduleExpression() string {
+// ScheduleExpression returns all the cron expression strings for the function
+func (f Function) ScheduleExpressions() []string {
+	var cronExpressions []string
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
-			return t.CronTrigger.Cron
+			cronExpressions = append(cronExpressions, t.CronTrigger.Cron)
 		}
 	}
-	return ""
+	return cronExpressions
 }
 
 func (f Function) IsBatchEnabled() bool {

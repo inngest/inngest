@@ -283,13 +283,13 @@ func TestIsScheduled(t *testing.T) {
 	})
 }
 
-func TestScheduleExpression(t *testing.T) {
-	t.Run("returns empty string for function with no triggers", func(t *testing.T) {
+func TestScheduleExpressions(t *testing.T) {
+	t.Run("returns empty slice for function with no triggers", func(t *testing.T) {
 		f := Function{}
-		require.Equal(t, "", f.ScheduleExpression())
+		require.Empty(t, f.ScheduleExpressions())
 	})
 
-	t.Run("returns empty string for function with only event triggers", func(t *testing.T) {
+	t.Run("returns empty slice for function with only event triggers", func(t *testing.T) {
 		f := Function{
 			Triggers: []Trigger{
 				{
@@ -304,7 +304,7 @@ func TestScheduleExpression(t *testing.T) {
 				},
 			},
 		}
-		require.Equal(t, "", f.ScheduleExpression())
+		require.Empty(t, f.ScheduleExpressions())
 	})
 
 	t.Run("returns cron expression for function with single cron trigger", func(t *testing.T) {
@@ -318,10 +318,12 @@ func TestScheduleExpression(t *testing.T) {
 				},
 			},
 		}
-		require.Equal(t, cronExpr, f.ScheduleExpression())
+		cronExprs := f.ScheduleExpressions()
+		require.Len(t, cronExprs, 1)
+		require.Equal(t, cronExpr, cronExprs[0])
 	})
 
-	t.Run("returns first cron expression for function with multiple cron triggers", func(t *testing.T) {
+	t.Run("returns all cron expressions for function with multiple cron triggers", func(t *testing.T) {
 		firstCronExpr := "0 9 * * *"
 		secondCronExpr := "0 17 * * *"
 		f := Function{
@@ -338,7 +340,10 @@ func TestScheduleExpression(t *testing.T) {
 				},
 			},
 		}
-		require.Equal(t, firstCronExpr, f.ScheduleExpression())
+		cronExprs := f.ScheduleExpressions()
+		require.Len(t, cronExprs, 2)
+		require.Equal(t, firstCronExpr, cronExprs[0])
+		require.Equal(t, secondCronExpr, cronExprs[1])
 	})
 
 	t.Run("returns cron expression for mixed triggers with cron", func(t *testing.T) {
@@ -362,19 +367,21 @@ func TestScheduleExpression(t *testing.T) {
 				},
 			},
 		}
-		require.Equal(t, cronExpr, f.ScheduleExpression())
+		cronExprs := f.ScheduleExpressions()
+		require.Len(t, cronExprs, 1)
+		require.Equal(t, cronExpr, cronExprs[0])
 	})
 
 	t.Run("handles various valid cron expressions", func(t *testing.T) {
 		testCases := []string{
-			"* * * * *",        // every minute
-			"0 * * * *",        // every hour
-			"0 0 * * *",        // daily at midnight
-			"0 0 * * 0",        // weekly on Sunday
-			"0 0 1 * *",        // monthly on 1st
-			"0 0 1 1 *",        // yearly on Jan 1st
-			"*/5 * * * *",      // every 5 minutes
-			"0 9-17 * * 1-5",   // business hours weekdays
+			"* * * * *",      // every minute
+			"0 * * * *",      // every hour
+			"0 0 * * *",      // daily at midnight
+			"0 0 * * 0",      // weekly on Sunday
+			"0 0 1 * *",      // monthly on 1st
+			"0 0 1 1 *",      // yearly on Jan 1st
+			"*/5 * * * *",    // every 5 minutes
+			"0 9-17 * * 1-5", // business hours weekdays
 		}
 
 		for _, cronExpr := range testCases {
@@ -388,7 +395,9 @@ func TestScheduleExpression(t *testing.T) {
 						},
 					},
 				}
-				require.Equal(t, cronExpr, f.ScheduleExpression())
+				cronExprs := f.ScheduleExpressions()
+				require.Len(t, cronExprs, 1)
+				require.Equal(t, cronExpr, cronExprs[0])
 			})
 		}
 	})
