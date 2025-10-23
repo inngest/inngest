@@ -33,6 +33,15 @@ var (
 	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
+// BacklogManager defines the interface for backlog operations
+type BacklogManager interface {
+	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error)
+	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error)
+	ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog
+	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
+}
+
+
 type PartitionConstraintConfig struct {
 	FunctionVersion int `json:"fv,omitempty,omitzero"`
 
@@ -922,6 +931,11 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	default:
 		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
+}
+
+// BacklogPeek is the public interface to peek items from a backlog
+func (q *queue) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	return q.backlogPeek(ctx, b, from, until, limit, opts...)
 }
 
 func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
