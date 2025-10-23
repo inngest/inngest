@@ -4,6 +4,10 @@ import { GraphQLClient } from 'graphql-request';
 
 //
 // Extend import.meta.env types for type-checking from external packages (e.g., dashboard)
+// FYI this is here because we actually import from the dev server ui in
+// ui/apps/dev-server-ui/src/components/Function/FunctionConfigurationContainer.tsx
+// This causes to reach out here via generated code which fails type checking without this.
+// TODO: this can go away when dashboard is migrated.
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface ImportMetaEnv extends Record<string, unknown> {

@@ -12,6 +12,8 @@ export default defineConfig({
         '../../packages/components/src',
       ),
     },
+    //
+    // TODO: these can go away when dashboard is converted and versions are in line
     dedupe: ['next-themes', '@tanstack/react-query', 'react', 'react-dom'],
   },
   ssr: {
