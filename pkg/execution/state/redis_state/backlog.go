@@ -595,7 +595,7 @@ type BacklogRefillResult struct {
 	RetryAt           time.Time
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error) {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -610,14 +610,6 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	nowMS := q.clock.Now().UnixMilli()
-
-	refillLimit := q.backlogRefillLimit
-	if refillLimit > BacklogRefillHardLimit {
-		refillLimit = BacklogRefillHardLimit
-	}
-	if refillLimit <= 0 {
-		refillLimit = BacklogRefillHardLimit
-	}
 
 	var (
 		throttleKey                                  string
@@ -684,7 +676,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.PartitionID,
 		accountID,
 		refillUntil.UnixMilli(),
-		refillLimit,
+		refillItems,
 		nowMS,
 
 		latestConstraints.Concurrency.AccountConcurrency,

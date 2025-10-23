@@ -436,13 +436,35 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		return nil, false, nil
 	}
 
+	refillLimit := q.backlogRefillLimit
+	if refillLimit > BacklogRefillHardLimit {
+		refillLimit = BacklogRefillHardLimit
+	}
+	if refillLimit <= 0 {
+		refillLimit = BacklogRefillHardLimit
+	}
+
+	items, _, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not peek backlog items for refill: %w", err)
+	}
+
+	if len(items) == 0 {
+		return nil, false, nil
+	}
+
+	itemIDs := make([]string, len(items))
+	for i, item := range items {
+		itemIDs[i] = item.ID
+	}
+
 	res, err := durationWithTags(
 		ctx,
 		q.primaryQueueShard.Name,
 		"backlog_process_duration",
 		q.clock.Now(),
 		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraints)
+			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, itemIDs, constraints)
 		},
 		map[string]any{
 			//	"partition_id": shadowPart.PartitionID,
