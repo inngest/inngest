@@ -65,6 +65,16 @@ func TestStepStatusToRunStatus(t *testing.T) {
 			stepStatus: StepStatusTimedOut,
 			want:       RunStatusCancelled,
 		},
+		{
+			name:       "StepStatusSkipped should map to RunStatusUnknown",
+			stepStatus: StepStatusSkipped,
+			want:       RunStatusUnknown,
+		},
+		{
+			name:       "StepStatusUnknown should map to RunStatusUnknown",
+			stepStatus: StepStatusUnknown,
+			want:       RunStatusUnknown,
+		},
 	}
 
 	for _, tt := range tests {
