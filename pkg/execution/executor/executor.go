@@ -892,8 +892,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 						l.ReportError(err, "error canceling singleton run")
 					}
 				default:
-					// Immediately end before creating state
-					return nil, ErrFunctionSkipped
+					// Skip this run and trigger lifecycle event to create proper trace run record
+					return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
