@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -20,6 +21,56 @@ type backlogRefillConstraintCheckResult struct {
 
 	fallbackIdempotencyKey string
 	retryAfter             time.Time
+}
+
+func convertLimitingConstraint(
+	constraints PartitionConstraintConfig,
+	limitingConstraints []constraintapi.ConstraintItem,
+) enums.QueueConstraint {
+	constraint := enums.QueueConstraintNotLimited
+
+	for _, c := range limitingConstraints {
+		switch {
+		// Account concurrency
+		case
+			c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency.Scope == enums.ConcurrencyScopeAccount &&
+				c.Concurrency.KeyExpressionHash == util.XXHash(""):
+			constraint = enums.QueueConstraintAccountConcurrency
+
+		// Function concurrency
+		case
+			c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency.Scope == enums.ConcurrencyScopeFn &&
+				c.Concurrency.KeyExpressionHash == util.XXHash(""):
+			constraint = enums.QueueConstraintFunctionConcurrency
+
+		// Custom concurrency key 1
+		case
+			len(constraints.Concurrency.CustomConcurrencyKeys) > 0 &&
+				c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[0].Mode &&
+				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[0].Scope &&
+				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[0].HashedKeyExpression:
+			constraint = enums.QueueConstraintCustomConcurrencyKey1
+
+		// Custom concurrency key 2
+		case
+			len(constraints.Concurrency.CustomConcurrencyKeys) > 1 &&
+				c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[1].Mode &&
+				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[1].Scope &&
+				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[1].HashedKeyExpression:
+			constraint = enums.QueueConstraintCustomConcurrencyKey2
+
+		// Throttle
+		case
+			c.Kind == constraintapi.ConstraintKindThrottle:
+			constraint = enums.QueueConstraintThrottle
+		}
+	}
+
+	return constraint
 }
 
 func (q *queue) backlogRefillConstraintCheck(
@@ -92,18 +143,13 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	if len(res.Leases) < len(items) {
-		// TODO: Report missing capacity properly
-	}
-
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.LimitingConstraints) > 0 {
-		// TODO: Resolve constraint
+		constraint = convertLimitingConstraint(constraints, res.LimitingConstraints)
 	}
 
 	if len(res.Leases) == 0 {
 		// TODO Handle no capacity
-
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill:      nil,
 			limitingConstraint: constraint,
