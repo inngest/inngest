@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
@@ -38,6 +39,7 @@ import (
 
 const (
 	CancelTimeout = (24 * time.Hour) * 365
+	pkgName       = "execution.runner"
 )
 
 type Opt func(s *svc)
@@ -688,6 +690,14 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		AccountID:      consts.DevServerAccountID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "event",
+			"status": executor.ScheduleStatus(err),
+		},
 	})
 
 	switch err {

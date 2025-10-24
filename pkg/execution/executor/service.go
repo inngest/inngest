@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -494,6 +495,15 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				PreventRateLimit: true, // Rate limit was already enforced for this
 				FunctionPausedAt: di.FunctionPausedAt,
 			})
+
+			metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"type":   "debounce",
+					"status": ScheduleStatus(err),
+				},
+			})
+
 			if err != nil {
 				span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 				return err
@@ -1075,7 +1085,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	// NOTE
 	// should this also handle batching and rate limit like runner.initialize?
 	// seems kinda weird to have those settisngs with cron tbh
-	if _, err := s.Executor().Schedule(ctx, execution.ScheduleRequest{
+	_, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      ci.AccountID,
 		WorkspaceID:    ci.WorkspaceID,
 		AppID:          ci.AppID,
@@ -1083,7 +1093,17 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		Events:         []event.TrackedEvent{evt},
 		At:             &at,
 		IdempotencyKey: &idempotencyKey,
-	}); err != nil {
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "cron",
+			"status": ScheduleStatus(err),
+		},
+	})
+
+	if err != nil {
 		if !errors.Is(err, redis_state.ErrQueueItemExists) &&
 			!errors.Is(err, state.ErrIdentifierExists) &&
 			!errors.Is(err, ErrFunctionSkippedIdempotency) {

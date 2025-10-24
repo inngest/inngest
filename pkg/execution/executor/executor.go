@@ -4163,6 +4163,14 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		PreventRateLimit: true,
 	})
 
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "batch",
+			"status": ScheduleStatus(err),
+		},
+	})
+
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
 	shouldDeleteBatch := err == nil ||
 		err == redis_state.ErrQueueItemExists ||
