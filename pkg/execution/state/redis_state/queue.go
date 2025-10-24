@@ -1027,7 +1027,7 @@ type processItem struct {
 	// PCtr represents the number of times the partition has been continued.
 	PCtr uint
 
-	capacityLeaseID ulid.ULID
+	capacityLeaseID *ulid.ULID
 }
 
 // FnMetadata is stored within the queue for retrieving
