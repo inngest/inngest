@@ -1,0 +1,58 @@
+import { Callout, CodeGroup, Properties, Property, Row, Col, VersionBadge } from "src/shared/Docs/mdx";
+
+# Run
+
+Turn a normal function into a durable function. Any function passed to `step.run` will be executed in a durable way, including retries and memoization.
+
+
+## Arguments
+
+<Properties>
+    <Property name="step_id" required type="str">
+        Step ID. Should be unique within the function.
+    </Property>
+
+    <Property name="handler" required type="Callable">
+        A callable that has no arguments and returns a JSON serializable value.
+    </Property>
+
+    <Property name="*handler_args">
+        Positional arguments for the handler. This is type-safe since we infer the types from the handler using generics.
+    </Property>
+</Properties>
+
+## Examples
+
+```py
+@inngest_client.create_function(
+    fn_id="my_function",
+    trigger=inngest.TriggerEvent(event="app/my_function"),
+)
+async def fn(ctx: inngest.Context) -> None:
+    # Pass a function to step.run
+    await ctx.step.run("my_fn", my_fn)
+
+    # Args are passed after the function
+    await ctx.step.run("my_fn_with_args", my_fn_with_args, 1, "a")
+
+    # Kwargs require functools.partial
+    await ctx.step.run(
+        "my_fn_with_args_and_kwargs",
+        functools.partial(my_fn_with_args_and_kwargs, 1, b="a"),
+    )
+
+    # Defining functions like this gives you easy access to scoped variables
+    def use_scoped_variable() -> None:
+        print(ctx.event.data["user_id"])
+
+    await ctx.step.run("use_scoped_variable", use_scoped_variable)
+
+async def my_fn() -> None:
+    pass
+
+async def my_fn_with_args(a: int, b: str) -> None:
+    pass
+
+async def my_fn_with_args_and_kwargs(a: int, *, b: str) -> None:
+    pass
+```

@@ -1,0 +1,131 @@
+import { CodeGroup, CardGroup, Card, VersionBadge } from "src/shared/Docs/mdx";
+
+
+export const description = "Make durable HTTP requests within an Inngest function.";
+
+# Fetch: performing API requests or fetching data <VersionBadge version="TypeScript only" />
+
+The Inngest TypeScript SDK provides a `step.fetch()` API and a `fetch()` utility, enabling you to make requests to third-party APIs or fetch data in a durable way by offloading them to the Inngest Platform.
+
+For more information on how Fetch works, see the [Fetch documentation](/docs/features/inngest-functions/steps-workflows/fetch).
+
+## Getting started with `step.fetch()`
+
+The `step.fetch()` API enables you to make durable HTTP requests while offloading them to the Inngest Platform, saving you compute and improving reliability:
+
+```ts {{ title: "src/inngest/functions.ts" }}
+import { inngest } from "./client";
+
+export const retrieveTextFile = inngest.createFunction(
+  { id: "retrieveTextFile" },
+  { event: "textFile/retrieve" },
+  async ({ step }) => {
+    // The fetching of the text file is offloaded to the Inngest Platform
+    const response = await step.fetch(
+      "https://example-files.online-convert.com/document/txt/example.txt"
+    );
+
+    // The Inngest function run is resumed when the HTTP request is complete
+    await step.run("extract-text", async () => {
+      const text = await response.text();
+      const exampleOccurences = text.match(/example/g);
+      return exampleOccurences?.length;
+    });
+  }
+);
+```
+
+`step.fetch()` takes the same arguments as the [native `fetch` API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch).
+
+<CardGroup cols={1}>
+
+  <Card
+    href={"https://github.com/inngest/inngest-js/tree/main/examples/node-step-fetch/"}
+    title={"Clone this example on GitHub"}
+    iconPlacement="top"
+  >
+    Check out this complete `step.fetch()` example on GitHub.
+  </Card>
+
+</CardGroup>
+
+
+## Parallelize HTTP requests with `step.fetch()`
+
+`step.fetch()` shares all the benefits of `step.run()`, including the ability to parallelize requests using `Promise.all()`:
+
+```typescript
+const processFiles = inngest.createFunction(
+  { id: "process-files", concurrency: 10 },
+  { event: "files/process" },
+  async ({ step, event }) => {
+    // All requests will be offloaded and processed in parallel while matching the concurrency limit
+    const responses = await Promise.all(event.data.files.map(async (file) => {
+      return step.fetch(`https://api.example.com/files/${file.id}`)
+    }))
+
+    // Your Inngest function is resumed here with the responses
+    await step.run("process-file", async (file) => {
+      const body = await response.json()
+      // body.files
+    })
+  }
+)
+```
+Note that `step.fetch()`, like all other `step` APIs, matches your function's configuration such as [concurrency](/docs/guides/concurrency) or [throttling](/docs/guides/throttling).
+
+## Make 3rd party library HTTP requests durable with the `fetch()` utility
+
+Inngest's `fetch()` utility can be passed as a custom fetch handler to make all the requests made by a 3rd party library durable.
+
+For example, you can pass the `fetch()` utility to the AI SDK or the OpenAI libraries:
+
+<CodeGroup>
+```typescript {{ title: "AI SDK" }}
+import { fetch as inngestFetch } from 'inngest';
+import { generateText } from 'ai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+
+// Pass the Inngest fetch utility to the AI SDK's model constructor:
+const anthropic = createAnthropic({
+  fetch: inngestFetch,
+});
+
+const weatherFunction = inngest.createFunction(
+  { id: "weather-function" },
+  { event: "weather/get" },
+  async ({ step }) => {
+    // This request is offloaded to the Inngest platform
+    // and it also retries automatically if it fails!
+    const response = await generateText({
+      model: anthropic('claude-3-5-sonnet-20240620'),
+      prompt: `What's the weather in London?`,
+    });
+  }
+)
+```
+```typescript {{ title: "OpenAI SDK" }}
+import { fetch } from "inngest";
+import OpenAI from 'openai';
+
+const client = new OpenAI({ fetch });
+
+// use the global fetch
+const completion = await client.chat.completions.create({
+  model: "gpt-3.5-turbo",
+  messages: [{ role: "user", content: "Hello, world!" }],
+});
+
+const weatherFunction = inngest.createFunction(
+  { id: "weather-function" },
+  { event: "weather/get" },
+  async ({ step }) => {
+    // The OpenAI request is automatically offloaded to the Inngest Platform
+    const completion = await client.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: "What's the weather in London?" }],
+    });
+  }
+)
+```
+</CodeGroup>

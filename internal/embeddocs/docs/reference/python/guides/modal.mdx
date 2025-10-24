@@ -1,0 +1,122 @@
+# Modal
+
+This guide will help you use setup an Inngest app in [Modal](https://modal.com), a platform for building and deploying serverless Python applications.
+
+## Setting up your development environment
+
+This section will help you setup your development environment. You'll have an Inngest Dev Server running locally and a FastAPI app running in Modal.
+
+### Creating a tunnel
+
+Since we need bidirectional communication between the Dev Server and your app, you'll also need a tunnel to allow your app to reach your locally-running Dev Server. We recommend using [ngrok](https://ngrok.com) for this.
+
+```sh
+# Tunnel to the Dev Server's port
+ngrok http 8288
+```
+
+This should output a public URL that can reach port `8288` on your machine. The URL can be found in the `Forwarding` part of ngrok's output:
+```
+Forwarding    https://23ef-173-10-53-121.ngrok-free.app -> http://localhost:8288
+```
+
+### Creating and deploying a FastAPI app
+
+Create an `.env` file that contains the tunnel URL:
+```
+INNGEST_DEV=https://23ef-173-10-53-121.ngrok-free.app
+```
+
+Create a dependency file that Modal will use to install dependencies. For this guide, we'll use `requirements.txt`:
+```
+fastapi==0.115.0
+inngest==0.4.12
+python-dotenv==1.0.1
+```
+
+Create a `main.py` file that contains your FastAPI app:
+```py
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+import inngest
+import inngest.fast_api
+import modal
+
+load_dotenv()
+
+app = modal.App("test-fast-api")
+
+# Load all environment variables that start with "INNGEST_"
+env: dict[str, str] = {}
+for k, v, in os.environ.items():
+    if k.startswith("INNGEST_"):
+        env[k] = v
+
+image = (
+    modal.Image.debian_slim()
+    .pip_install_from_requirements("requirements.txt")
+    .env(env)
+)
+
+fast_api_app = FastAPI()
+
+# Create an Inngest client
+inngest_client = inngest.Inngest(app_id="fast_api_example")
+
+# Create an Inngest function
+@inngest_client.create_function(
+    fn_id="my-fn",
+    trigger=inngest.TriggerEvent(event="my-event"),
+)
+async def fn(ctx: inngest.Context) -> str:
+    print(ctx.event)
+    return "done"
+
+# Serve the Inngest endpoint (its path is /api/inngest)
+inngest.fast_api.serve(fast_api_app, inngest_client, [fn])
+
+@app.function(image=image)
+@modal.asgi_app()
+def fastapi_app():
+    return fast_api_app
+```
+
+Deploy your app to Modal:
+```sh
+modal deploy main.py
+```
+
+Your terminal should show the deployed app's URL:
+
+```
+└── 🔨 Created web function fastapi_app =>
+    https://test-fast-api-fastapi-app.modal.run
+```
+
+To test whether the deploy worked, send a request to the Inngest endpoint (note that we added the `/api/inngest` to the Modal URL). It should output JSON similar to the following:
+```sh
+$ curl https://test-fast-api-fastapi-app.modal.run/api/inngest
+{"schema_version": "2024-05-24", "authentication_succeeded": null, "function_count": 1, "has_event_key": false, "has_signing_key": false, "has_signing_key_fallback": false, "mode": "dev"}
+```
+
+### Syncing with the Dev Server
+
+Start the Dev Server, specifying the FastAPI app's Inngest endpoint:
+```sh
+npx inngest-cli@latest dev -u https://test-fast-api-fastapi-app.modal.run/api/inngest --no-discovery
+```
+
+In your browser, navigate to `http://127.0.0.1:8288/apps`. Your app should be successfully synced.
+
+## Deploying to production
+
+A production Inngest app is very similar to an development app. The only difference is with environment variables:
+- `INNGEST_DEV` must not be set. Alternatively, you can set it to `0`.
+- `INNGEST_EVENT_KEY` must be set. Its value can be found on the [event keys page](https://app.inngest.com/env/production/manage/keys).
+- `INNGEST_SIGNING_KEY` must be set. Its value can be found on the [signing key page](https://app.inngest.com/env/production/manage/signing-key).
+
+Once your app is deployed with these environment variables, you can sync it on our [new app page](https://app.inngest.com/env/production/apps/sync-new).
+
+For more information about syncing, please see our [docs](/docs/apps/cloud).

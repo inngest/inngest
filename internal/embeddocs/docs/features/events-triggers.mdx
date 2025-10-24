@@ -1,0 +1,66 @@
+import { CardGroup, Card, ImageTheme } from "src/shared/Docs/mdx";
+import {
+  RiTimeLine,
+  RiCloudLine,
+  RiGitForkFill,
+  RiWebhookFill,
+  RiNewspaperLine,
+} from "@remixicon/react";
+
+# Events & Triggers
+
+Inngest functions are triggered asynchronously by **events** coming from various sources, including:
+
+
+<CardGroup cols={2}>
+  <Card title="Your application" icon={<RiCloudLine className="text-basis h-4 w-4" />} href={'/docs/events'}>
+    Send an event from your application’s backend with the Inngest SDK.
+  </Card>
+  <Card title="Cron schedule" icon={<RiTimeLine className="text-basis h-4 w-4" />} href={'/docs/guides/scheduled-functions'}>
+    Run an Inngest function periodically with a trigger using cron syntax.
+  </Card>
+  <Card title="Webhook events" icon={<RiWebhookFill className="text-basis h-4 w-4"/>} href={'/docs/platform/webhooks'}>
+    Use Inngest as a webhook consumer for any service to trigger functions.
+  </Card>
+  <Card title="Another Inngest function" icon={<RiGitForkFill className="rotate-90 text-basis h-4 w-4" />} href={'/docs/guides/invoking-functions-directly'}>
+    Directly invoke other functions to compose more powerful functions.
+  </Card>
+</CardGroup>
+
+You can customize each of these triggers in multiple ways:
+
+- **[Filtering event triggers](/docs/guides/writing-expressions)** - Trigger a function for a subset of matching events sent.
+- **[Delaying execution](/docs/guides/delayed-functions)** - Trigger a function to run at a specific timestamp in the future.
+- **[Batching events](/docs/guides/batching)** - Process multiple events in a single function for more efficient systems.
+- **[Multiple triggers](/docs/guides/multiple-triggers)** - Use a single function to handle multiple event types.
+
+
+## Why events?
+
+Using Events to trigger Inngest Functions instead of direct invocations offers a lot of flexibility:
+
+- Events can trigger multiple Inngest Functions.
+- Events can be used to synchronize Inngest Function runs with [cancellation](/docs/features/inngest-functions/cancellation) and [“wait for event” step](/docs/reference/functions/step-wait-for-event).
+- Events can be leveraged to trigger Functions across multiple applications.
+- Similar Events can be grouped together for faster processing.
+
+Events act as a convenient mapping between your application actions (ex, `user.signup`) and your application's code (ex, `sendWelcomeEmail()` and `importContacts()`):
+
+<ImageTheme
+  dark={'/assets/docs/features/events-triggers/inngest-function-triggers-dark.jpg'}
+  light={'/assets/docs/features/events-triggers/inngest-function-triggers-light.jpg'}
+  className="my-0"
+  alt={'Illustration of a demo application sending a "user.signup" event to the Inngest Platform which triggers two Inngest Functions: sendWelcomeEmail and importContacts.'}
+/>
+
+### Learn more about Events
+
+
+<CardGroup cols={2}>
+  <Card title="Blog post: How event Filtering works" icon={<RiNewspaperLine className="text-basis h-4 w-4"/>} href={'https://www.inngest.com/blog/accidentally-quadratic-evaluating-trillions-of-event-matches-in-real-time'}>
+    Accidentally Quadratic: Evaluating trillions of event matches in real-time
+  </Card>
+  <Card title="Blog post: Events in practice" icon={<RiNewspaperLine className="text-basis h-4 w-4"/>} href={'https://www.inngest.com/blog/nextjs-trpc-inngest'}>
+    Building an Event Driven Video Processing Workflow with Next.js, tRPC, and Inngest
+  </Card>
+</CardGroup>

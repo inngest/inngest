@@ -1,0 +1,150 @@
+import { Callout, CodeGroup } from "src/shared/Docs/mdx";
+
+# Render
+
+[Render](https://render.com) lets you easily deploy and scale full stack applications. You can deploy your Inngest functions on Render using any web framework, including [Next.js](https://docs.render.com/deploy-nextjs-app), [Express](https://docs.render.com/deploy-node-express-app), and [FastAPI](https://docs.render.com/deploy-fastapi).
+
+
+
+Below, we'll cover how to deploy:
+1. A production Inngest app
+1. Preview apps for each of your Git development branches
+
+### Before you begin
+* Create a web application that serves Inngest functions.
+* Test this web app locally with the [Inngest dev server](/docs/dev-server).
+
+## Deploy a production app on Render
+1. Deploy the web application that contains your Inngest functions to Render.
+    * See [Render's guides](https://docs.render.com) to learn how to deploy specific frameworks, such as:
+        - [Next.js](https://docs.render.com/deploy-nextjs-app)
+        - [Express](https://docs.render.com/deploy-node-express-app)
+        - [FastAPI](https://docs.render.com/deploy-fastapi)
+1. Set the `INNGEST_SIGNING_KEY` and `INNGEST_EVENT_KEY` environment variables on your Render web app.
+    * You can easily [configure environment variables](https://docs.render.com/configure-environment-variables) on a Render service through the Render dashboard.
+    * You can find your production `INNGEST_SIGNING_KEY` [here](https://app.inngest.com/env/production/manage/signing-key), and your production `INNGEST_EVENT_KEY`s [here](https://app.inngest.com/env/production/manage/keys).
+1. Manually sync your Render web app with Inngest.
+    * See [this Inngest guide](/docs/apps/cloud) for instructions.
+
+## Automatically sync your app with Inngest
+Each time you push changes to your Inngest functions, you need to sync your web app with Inngest. For convenience, you can automate these syncs from your CI/CD or from your API.
+
+
+### Automatically sync from your CI/CD
+
+Automatically sync your app with Inngest using the [Render Deploy Action](https://github.com/marketplace/actions/render-deploy-action), combined with a ["curl command"](/docs/apps/cloud#curl-command):
+
+```yaml
+# .github/workflows/deploy.yaml
+name: My Deploy
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.MY_RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.MY_RENDER_API_KEY }}
+          wait-for-success: true
+
+  sync_inngest:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Register application to Inngest
+       - run: |
+            curl -X PUT ${{ secrets.APP_URL }}/api/inngest
+```
+
+_The above GitHub Action requires the `MY_RENDER_API_KEY`, `MY_RENDER_SERVICE_ID` and `APP_URL` to be configured on your repository._
+
+
+### Automatically sync from your app
+
+You app can self-register as part of its startup flow **if it matches the following requirements**:
+- Your application should run as a long-lived server instance (not serverless)
+- Your application should be deployed as a single node (not with auto scaled replicas)
+
+The following Express.js code snippet showcases how to achieve self-register:
+
+```tsx {{ title: "index.ts (Express.js)" }}
+
+// your express `app` definition stands here...
+
+app.listen(PORT, async () => {
+  console.log(`✅ Server started on localhost:${PORT}
+➡️ Inngest running at http://localhost:${PORT}/api/inngest`);
+
+  // Attempt to self-register the app after deploy
+  if (process.env.RENDER_EXTERNAL_URL) {
+    console.log(
+      `Attempting self-register. Functions: `,
+      functions.map((f) => f.name).join(', ')
+    );
+    const inngestURL = new URL('/api/inngest', process.env.RENDER_EXTERNAL_URL);
+    const result = await fetch(inngestURL, {
+      method: 'PUT',
+    });
+    await sleep(2000);
+    try {
+      const json = await result.json();
+      console.log(
+        `Register attempted:`,
+        inngestURL.toString(),
+        result.status,
+        json
+      );
+    } catch (err) {
+      console.log(
+        `Register failed:`,
+        inngestURL.toString(),
+        result.status,
+        result.body
+      );
+    }
+  }
+});
+
+function sleep(t: number): Promise<void> {
+  return new Promise((res) => {
+    return setTimeout(res, t);
+  });
+}
+```
+_[The full code is available on GitHub](https://github.com/inngest/inngest-demo-app/blob/e95247d3e3277ecd57bd9a8bb1478c36b3ee09b2/index.ts)_
+
+
+## Set up preview apps on Render
+### What are preview apps?
+Render lets you deploy work-in-progress versions of your apps using code in a Git development branch. Specifically, you can deploy:
+* [Service previews](https://docs.render.com/pull-request-previews): a temporary standalone instance of a single Render service.
+* [Preview environments](https://docs.render.com/preview-environments): a disposable copy of your production environment that can include multiple services and databases.
+
+You can use Render's service previews and preview environments together with Inngest's [branch environments](/docs/platform/environments).
+
+### Set up Inngest in preview apps
+To use Inngest in a Render service preview or preview environment, follow these steps.
+
+One-time setup:
+1. Follow Render's guides to enable either a [service preview](https://docs.render.com/pull-request-previews) or a [preview environment](https://docs.render.com/preview-environments).
+2. In Inngest, create a _branch environment_ `INNGEST_SIGNING_KEY` and a _branch environment_ `INNGEST_EVENT_KEY`.
+    * You can find your branch environment `INNGEST_SIGNING_KEY` [here](https://app.inngest.com/env/branch/manage/signing-key).
+    * You can create a branch environment `INNGEST_EVENT_KEY` [here](https://app.inngest.com/env/branch/manage/keys).
+
+Each time a preview app is deployed:
+1. Set the following environment variables on the preview service:
+    * `INNGEST_SIGNING_KEY` and `INNGEST_EVENT_KEY`: Use the values from your Inngest branch environment.
+    * `INNGEST_ENV`: Provide any value you want. This value will be used as [the name of the branch in Inngest](/docs/platform/environments#configuring-branch-environments). As an option, you can use the value of [`RENDER_GIT_BRANCH`](https://docs.render.com/environment-variables#all-runtimes).
+
+    You can [configure environment variables](https://docs.render.com/configure-environment-variables) on the preview service through the Render dashboard. Alternatively, you can send a `PUT` or `PATCH` request [via the Render API](https://api-docs.render.com/reference/update-env-vars-for-service).
+2. Sync the app with Inngest.
+
+    You can manually sync the app [from the branch environments section](https://app.inngest.com/env/branch/apps/sync-new) of your Inngest dashboard, or automatically sync your app using a strategy [described above](#automatically-sync-your-app-with-inngest).
