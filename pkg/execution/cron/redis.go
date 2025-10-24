@@ -39,7 +39,6 @@ func WithJitterRange(min time.Duration, max time.Duration) RedisCronManagerOpt {
 }
 
 func NewRedisCronManager(
-	c *redis_state.CronClient,
 	q redis_state.QueueManager,
 	log logger.Logger,
 	opts ...RedisCronManagerOpt,
@@ -53,7 +52,6 @@ func NewRedisCronManager(
 	}
 
 	manager := &redisCronManager{
-		c:   c,
 		q:   q,
 		log: log,
 		opt: opt,
@@ -63,7 +61,6 @@ func NewRedisCronManager(
 }
 
 type redisCronManager struct {
-	c *redis_state.CronClient
 	q redis_state.QueueManager
 
 	log logger.Logger
