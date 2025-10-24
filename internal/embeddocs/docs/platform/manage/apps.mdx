@@ -1,0 +1,80 @@
+import { Callout } from "src/shared/Docs/mdx";
+
+# Apps
+
+Inngest enables you to manage your Inngest Functions deployments via [Inngest Environments and Apps](/docs/apps). Inngest Environments (ex, production, testing) can contain multiple Apps that can be managed using:
+
+- [The Apps Overview](#apps-overview) - A quick access to all apps, including the unattached syncs
+- [Syncs management](#syncs) - Run App diagnostics and access all syncs history
+- [Archiving](#archive-an-app) - Archive inactive Apps
+
+
+## Apps Overview
+
+The Apps Overview is the main entry page of the Inngest Platform, listing the Apps of the active Environment, visible in the top left Environment selector:
+
+![The home page of the Inngest Platform is an Apps listing. Each App item display the App status along with some essential information such as active Functions count and the SDK version used.](/assets/docs/platform/manage/environments-apps/apps-overview.png)
+
+The Apps Overview provides all the essential information to assess the healthy sync status of your active Apps: Functions identified, Inngest SDK version. You can switch to “Archived Apps” using the top left selector.
+
+### Unattached Syncs
+
+Automatic syncs or an App misconfiguration can result in syncs failing to attach to an existing app.
+
+These unsuccessful syncs are listed in the “Unattached Syncs” section where detailed information are available, helping in resolving the issue:
+
+![The Unattached Syncs list provides detailed information regarding failed syncs.](/assets/docs/platform/manage/environments-apps/unattached-syncs.png)
+
+<Callout variant="info">
+Please read our [Syncs Troubleshooting section](/docs/apps/cloud#troubleshooting) for more information on how to deal with failed sync.
+</Callout>
+
+## App management
+
+### Overview
+
+Navigating to an App provides more detailed information (SDK version and language, deployment URL) that can be helpful when interacting with our Support.
+
+You will also find quick access to all active functions and their associated triggers:
+
+![Clicking on an App from the home page will give you more detailed information about the current App deployment such as: the Functions list, the target URL. Those information can be useful when exchanging with Support.](/assets/docs/platform/manage/environments-apps/app-overview.png)
+
+### Syncs
+
+Triggering a Manual Sync from the Inngest Platform sends requests to your app to fetch the up-to-date configuration of your applications's functions. At any time, access the history of all syncs from the App page:
+
+![The list of an App Syncs provide helpful information to navigate through recent deployments and their associated Functions changes.](/assets/docs/platform/manage/environments-apps/app-syncs.png)
+
+If a sync fails, try running an App Diagnostic before reaching out to Support:
+
+![A App Diagnostic tool is available to help mitigating any sync issues. You can access it by opening the top left menu from the App Syncs listing page.](/assets/docs/platform/manage/environments-apps/check-app-health.png)
+
+### Archive an app
+
+Apps can be archived and unarchived at any time. Once an app is archived, all of its functions are archived.
+
+When the app is archived:
+
+- New function runs will not be triggered.
+- Existing function runs will continue until completion.
+- Functions will be marked as archived, but will still be visible, including their run history.
+
+If you need to cancel all runs prior to completion, read our [cancellation guide](/docs/guides/cancel-running-functions).
+
+**How to archive an app**
+
+1. Navigate to the app you want to archive. You will find an “Archive” button at the top-right corner of the page.
+
+![Archiving an app is accessible from an App page by using the top left menu.](/assets/docs/platform/manage/environments-apps/archive-app.png)
+
+2. Confirm that you want to archive the app by clicking "Yes".
+
+![A confirmation modal will open to confirm the action. Please note that archiving is not an irreversible action.](/assets/docs/platform/manage/environments-apps/archiving-app.png)
+
+3. Your app is now archived. 🎉
+
+![An archived App features a top informative banner.](/assets/docs/platform/manage/environments-apps/archived-app.png)
+
+In the image below, you can see how archived apps look like in Inngest Cloud:
+
+![An archived App is still accessible from the Home page, by switching the top left filter to "Archived Apps".](/assets/docs/platform/manage/environments-apps/archived-apps.png)
