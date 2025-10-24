@@ -91,9 +91,9 @@ type normalizedSpan interface {
 	GetRunID() string
 	GetDynamicSpanID() sql.NullString
 	GetParentSpanID() sql.NullString
-	GetStartTime() interface{}
-	GetEndTime() interface{}
-	GetSpanFragments() any
+	GetStartTime() time.Time
+	GetEndTime() time.Time
+	GetSpanFragments() string
 }
 
 func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
@@ -168,7 +168,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	var runID ulid.ULID
 
 	for _, span := range spans {
-		// Use interface methods to get the fields directly
 		traceID := span.GetTraceID()
 		runIDStr := span.GetRunID()
 		dynamicSpanID := span.GetDynamicSpanID()
@@ -176,20 +175,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		startTime := span.GetStartTime()
 		endTime := span.GetEndTime()
 		spanFragments := span.GetSpanFragments()
-
-		st := strings.Split(startTime.(string), " m=")[0]
-		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
-			return nil, err
-		}
-
-		et := strings.Split(endTime.(string), " m=")[0]
-		parsedEndTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
-			return nil, err
-		}
 
 		var parentSpanIDPtr *string
 		if parentSpanID.Valid {
@@ -207,8 +192,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 				SpanID:       dynamicSpanID.String,
 				TraceID:      traceID,
 				ParentSpanID: parentSpanIDPtr,
-				StartTime:    parsedStartTime,
-				EndTime:      parsedEndTime,
+				StartTime:    startTime,
+				EndTime:      endTime,
 				Name:         "",
 				Attributes:   make(map[string]any),
 			},
@@ -223,7 +208,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			fragments    []map[string]interface{}
 		)
 		groupedAttrs := make(map[string]any)
-		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
+		_ = json.Unmarshal([]byte(spanFragments), &fragments)
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
