@@ -24,11 +24,18 @@ import (
 
 // getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
 func getItemIDsFromBacklog(ctx context.Context, q *queue, backlog *QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
-	items, _, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
+	items, _, err := q.backlogPeek(
+		ctx,
+		backlog,
+		time.Time{},
+		refillUntil,
+		limit,
+		WithPeekOptIgnoreCleanup(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	itemIDs := make([]string, len(items))
 	for i, item := range items {
 		itemIDs[i] = item.ID
@@ -211,6 +218,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		itemIDs, err := getItemIDsFromBacklog(ctx, q, &expectedBacklog, clock.Now(), 1000)
 		require.NoError(t, err)
 
+		// Peek will not return missing items, but also don't delete them due to WithPeekOptIgnoreCleanup
+		require.Len(t, itemIDs, 1)
+		// Simulate peek returned missing items
+		itemIDs = append(itemIDs, "missing-1", "missing-2", "missing-3")
+
 		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), itemIDs, PartitionConstraintConfig{
 			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  defaultConcurrency,
@@ -320,6 +332,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WorkflowID:  fnID,
 		}, at)
 
+		addItem("test3", state.Identifier{
+			AccountID:   accountId,
+			WorkspaceID: wsID,
+			WorkflowID:  fnID,
+		}, at.Add(time.Second))
+
 		backlog := q.ItemBacklog(ctx, qi1)
 		shadowPart := q.ItemShadowPartition(ctx, qi1)
 
@@ -328,6 +346,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		// Get items to refill from backlog
 		itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
 		require.NoError(t, err)
+		require.Len(t, itemIDs, 3)
+
+		// Only include first 2 items
+		itemIDs = itemIDs[:2]
 
 		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
 			Concurrency: PartitionConcurrency{
@@ -337,11 +359,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.Equal(t, 2, res.TotalBacklogCount)
-		require.Equal(t, 2, res.BacklogCountUntil)
+		require.Equal(t, 3, res.TotalBacklogCount)
+		require.Equal(t, 3, res.BacklogCountUntil)
 		require.Equal(t, 45, res.Capacity) // limit by function concurrency
-		require.Equal(t, 1, res.Refill)    // limited by max refill limit of 1
-		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, 2, res.Refill)    // limited by max refill limit of 1
+		require.Equal(t, 2, res.Refilled)
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 	})
 
@@ -607,11 +629,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		sp := q.ItemShadowPartition(ctx, qi)
 
 		enqueueToBacklog = true
-		
+
 		// Get items to refill from backlog
 		itemIDs, err := getItemIDsFromBacklog(ctx, q, &b, q.clock.Now().Add(10*time.Second), 1000)
 		require.NoError(t, err)
-		
+
 		res, err := q.BacklogRefill(ctx, &b, &sp, q.clock.Now().Add(10*time.Second), itemIDs, PartitionConstraintConfig{
 			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  1,
@@ -629,11 +651,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		sp2 := q.ItemShadowPartition(ctx, item2)
 
 		enqueueToBacklog = true
-		
+
 		// Get items to refill from backlog
 		itemIDs2, err := getItemIDsFromBacklog(ctx, q, &b2, q.clock.Now().Add(10*time.Second), 1000)
 		require.NoError(t, err)
-		
+
 		res, err = q.BacklogRefill(ctx, &b2, &sp2, q.clock.Now().Add(10*time.Second), itemIDs2, PartitionConstraintConfig{
 			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  1,
@@ -2079,11 +2101,11 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		for i := range numItems {
 			itemAt := now.Add(time.Duration(i+1) * time.Second)
 			refillUntil := itemAt
-			
+
 			// Get items to refill from backlog
 			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
 			require.NoError(t, err)
-			
+
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  123,

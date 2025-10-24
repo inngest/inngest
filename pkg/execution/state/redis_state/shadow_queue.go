@@ -444,6 +444,20 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		refillLimit = BacklogRefillHardLimit
 	}
 
+	// Peek items (scheduled to run within the next 2s) to be refilled.
+	//
+	// Peek will delete missing items at the time of peeking.
+	//
+	// NOTE: We are guaranteed to be the only refilling process for this backlog.
+	// There may be concurrent backlog modifications in the data store:
+	// - Items may be added to the backlog (earlier or later than peeked items)
+	// - Items may be removed from the backlog (dequeued by a cancellation, etc.)
+	// - Items may be requeued within the backlog (changing the score to an earlier or later time)
+	//
+	// Missing items are gracefully handled by BacklogRefill.
+	//
+	// Items that were added between backlogPeek and BacklogRefill will be considered in the next refill.
+	// Items that were moved between backlogPeek and BacklogRefill will still be refilled.
 	items, _, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not peek backlog items for refill: %w", err)

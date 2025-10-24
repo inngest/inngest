@@ -41,7 +41,6 @@ type BacklogManager interface {
 	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
 }
 
-
 type PartitionConstraintConfig struct {
 	FunctionVersion int `json:"fv,omitempty,omitzero"`
 
@@ -938,6 +937,9 @@ func (q *queue) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	return q.backlogPeek(ctx, b, from, until, limit, opts...)
 }
 
+// backlogPeek peeks item from the given backlog.
+//
+// Pointers to missing items will be removed from the backlog.
 func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
@@ -989,14 +991,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			cmd := rc.Client().B().Zrem().Key(rc.kg.QueueItem()).Member(pointers...).Build()
-			err := rc.Client().Do(ctx, cmd).Error()
-			if err != nil {
-				l.Warn("failed to clean up dangling queue items in the backlog", "missing", pointers)
-			}
-			return nil
-		},
+		handleMissingItems:     CleanupMissingPointers(ctx, backlogSet, rc.Client(), l),
 		isMillisecondPrecision: true,
 		fromTime:               fromTime,
 	}
