@@ -1,3 +1,4 @@
+import headlessui from '@headlessui/tailwindcss';
 import type { Config } from 'tailwindcss';
 import defaultTheme from 'tailwindcss/defaultTheme';
 
@@ -259,6 +260,8 @@ export default {
       },
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  plugins: [require('@headlessui/tailwindcss')],
+  //
+  // TODO: Temp cast to avoid lots of changes to dashboard before we migrate to tanstack
+  // Remove this when we migrate to tanstack
+  plugins: [headlessui as any],
 } satisfies Config;

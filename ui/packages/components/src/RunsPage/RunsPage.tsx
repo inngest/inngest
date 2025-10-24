@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';

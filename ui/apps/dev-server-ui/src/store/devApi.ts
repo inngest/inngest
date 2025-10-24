@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { api } from './generated';
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL)
+const baseURL = import.meta.env.VITE_PUBLIC_API_BASE_URL
+  ? new URL('/', import.meta.env.VITE_PUBLIC_API_BASE_URL)
   : '/';
 
 export interface EventPayload {
@@ -44,10 +44,19 @@ export const devApi = createApi({
     }),
     sendEvent: builder.mutation<
       void,
-      { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
+      {
+        id: string;
+        name: string;
+        ts: number;
+        data?: object;
+        user?: object;
+        functionId?: string;
+      }
     >({
       query: ({ functionId, ...event }) => ({
-        url: functionId ? `/invoke/${encodeURIComponent(functionId)}` : '/e/dev_key',
+        url: functionId
+          ? `/invoke/${encodeURIComponent(functionId)}`
+          : '/e/dev_key',
         method: 'POST',
         body: event,
       }),
@@ -76,8 +85,8 @@ export const devApi = createApi({
                 createdAt: event.ts,
                 status: null,
               },
-            }
-          )
+            },
+          ),
         );
       },
     }),

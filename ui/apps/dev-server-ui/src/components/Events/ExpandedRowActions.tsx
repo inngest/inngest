@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 
 type ExpandedRowProps = {
   eventName?: string;
@@ -6,7 +6,11 @@ type ExpandedRowProps = {
   onReplay: (eventName: string, payload: string) => void;
 };
 
-export function ExpandedRowActions({ eventName, payload, onReplay }: ExpandedRowProps) {
+export function ExpandedRowActions({
+  eventName,
+  payload,
+  onReplay,
+}: ExpandedRowProps) {
   const isInternalEvent = eventName?.startsWith('inngest/');
 
   return (
