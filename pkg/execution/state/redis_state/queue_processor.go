@@ -1793,96 +1793,61 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 	var leaseOptions []leaseOptionFn
 
-	// TODO: Extract this
-	var capacityLeaseID ulid.ULID
-	if p.partition.AccountID != uuid.Nil &&
-		p.partition.EnvID != nil &&
-		p.partition.FunctionID != nil &&
-		p.queue.capacityManager != nil &&
-		p.queue.useConstraintAPI != nil {
-		useAPI, fallback := p.queue.useConstraintAPI(ctx, p.partition.AccountID)
-
-		// If capacity lease is still valid for the forseeable future, use it
-		hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(p.staticTime.Add(5*time.Second))
-
-		idempotencyKey := item.ID
-
-		switch {
-		case hasValidCapacityLease:
-			capacityLeaseID = *item.CapacityLeaseID
-		case useAPI:
-			res, err := p.queue.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-				AccountID: p.partition.AccountID,
-				EnvID:     *p.partition.EnvID,
-				// TODO: Double check if the item ID works for idempotency:
-				// - Consistent across the same attempt
-				// - Do we need to re-evaluate per retry?
-				IdempotencyKey: idempotencyKey,
-				FunctionID:     *p.partition.FunctionID,
-				CurrentTime:    p.staticTime,
-				Duration:       QueueLeaseDuration,
-				// TODO: Build config
-				Configuration: constraintapi.ConstraintConfig{},
-				// TODO: Supply constraints
-				Constraints:     []constraintapi.ConstraintItem{},
-				Amount:          1,
-				MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
-				Source: constraintapi.LeaseSource{
-					Service:           constraintapi.ServiceExecutor,
-					Location:          constraintapi.LeaseLocationItemLease,
-					RunProcessingMode: constraintapi.RunProcessingModeBackground,
-				},
-			})
-			if err != nil {
-				if !fallback {
-					p.queue.sem.Release(1)
-					metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
-					return fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
-				}
-
-				// Fallback to Lease (with idempotency)
-				leaseOptions = append(leaseOptions, LeaseOptionFallbackIdempotencyKey(idempotencyKey))
-			}
-
-			if len(res.Leases) == 0 {
-				// TODO: Handle missing capacity properly
-				return nil
-			}
-
-			// TODO: Extend lease, etc.
-			capacityLeaseID = res.Leases[0].LeaseID
-
-			// Disable constraint checks in Lease
-			// TODO: Support partial capacity leases: Ensure only allowed capacity is used!
-			leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
-		}
-	}
-
-	// Attempt to lease this item before passing this to a worker.  We have to do this
-	// synchronously as we need to lease prior to requeueing the partition pointer. If
-	// we don't do this here, the workers may not lease the items before calling Peek
-	// to re-enqeueu the pointer, which then increases contention - as we requeue a
-	// pointer too early.
-	//
-	// This is safe:  only one process runs scan(), and we guard the total number of
-	// available workers with the above semaphore.
-	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		return p.queue.Lease(
-			ctx,
-			*item,
-			QueueLeaseDuration,
-			p.staticTime,
-			p.denies,
-			leaseOptions...,
-		)
-	})
-	// NOTE: If this loop ends in an error, we must _always_ release an item from the
-	// semaphore to free capacity.  This will happen automatically when the worker
-	// finishes processing a queue item on success.
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, item, p.staticTime)
 	if err != nil {
-		// Continue on and handle the error below.
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
+
+		return fmt.Errorf("could not check constraints to lease item: %w", err)
+	}
+
+	if constraintRes.fallbackIdempotencyKey != "" {
+		leaseOptions = append(leaseOptions, LeaseOptionFallbackIdempotencyKey(constraintRes.fallbackIdempotencyKey))
+	}
+
+	if constraintRes.skipConstraintChecks {
+		leaseOptions = append(leaseOptions, LeaseOptionDisableConstraintChecks(true))
+	}
+
+	var leaseID *ulid.ULID
+
+	switch constraintRes.limitingConstraint {
+	case enums.QueueConstraintNotLimited:
+
+		// Attempt to lease this item before passing this to a worker.  We have to do this
+		// synchronously as we need to lease prior to requeueing the partition pointer. If
+		// we don't do this here, the workers may not lease the items before calling Peek
+		// to re-enqeueu the pointer, which then increases contention - as we requeue a
+		// pointer too early.
+		//
+		// This is safe:  only one process runs scan(), and we guard the total number of
+		// available workers with the above semaphore.
+		leaseID, err = duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+			return p.queue.Lease(
+				ctx,
+				*item,
+				QueueLeaseDuration,
+				p.staticTime,
+				p.denies,
+				leaseOptions...,
+			)
+		})
+		// NOTE: If this loop ends in an error, we must _always_ release an item from the
+		// semaphore to free capacity.  This will happen automatically when the worker
+		// finishes processing a queue item on success.
+		if err != nil {
+			// Continue on and handle the error below.
+			p.queue.sem.Release(1)
+			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
+		}
+	case enums.QueueConstraintThrottle:
+	case enums.QueueConstraintAccountConcurrency:
+	case enums.QueueConstraintFunctionConcurrency:
+	case enums.QueueConstraintCustomConcurrencyKey1:
+	case enums.QueueConstraintCustomConcurrencyKey2:
+	default:
+		// Limited but the constraint is unknown?
+
 	}
 
 	// Check the sojourn delay for this item in the queue. Tracking system latency vs
