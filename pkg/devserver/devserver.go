@@ -670,6 +670,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			DB:            ds.Data,
 			Queue:         rq,
 			State:         ds.State,
+			Cron:          croner,
 			ShardSelector: shardSelector,
 		}))
 	}

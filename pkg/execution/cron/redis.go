@@ -116,9 +116,30 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 }
 
 // NextScheduledItemIDForFunction returns the expected identifier (ID, JobID) information for the next scheduled system "cron" job.
+// Note that this reconstructs the identifier based on exact logic used by the system job handler and does not verify that the item for the next schedule is actually scheduled.
 func (c *redisCronManager) NextScheduledItemIDForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error) {
-	//TODO(lkasinathan) Implement this.
-	return nil, nil
+	// Get current time as the starting point
+	from := time.Now()
+
+	// Get the next schedule time based on the cron expression
+	next, err := Next(expr, from)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cron expression %q: %w", expr, err)
+	}
+
+	// Generate the job ID for this scheduled item
+	jobID := queue.HashID(ctx, c.CronProcessJobID(next, expr, functionID, fnVersion))
+
+	// Construct the cron item with ID and JobID populated
+	item := &CronItem{
+		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
+		FunctionID:      functionID,
+		FunctionVersion: fnVersion,
+		Expression:      expr,
+		JobID:           jobID,
+	}
+
+	return item, nil
 }
 
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
