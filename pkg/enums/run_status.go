@@ -119,8 +119,9 @@ func StepStatusToRunStatus(stepStatus StepStatus) RunStatus {
 		return RunStatusCancelled
 	case StepStatusTimedOut:
 		return RunStatusCancelled // Map timeout to cancelled
-	case StepStatusScheduled, StepStatusQueued, StepStatusWaiting, StepStatusSleeping, StepStatusInvoking:
-		// XXX: there is no RunStatusQueued, so qeued/scheduled steps -> running.
+	case StepStatusScheduled, StepStatusQueued:
+		return RunStatusScheduled // Functions in queue due to concurrency limits
+	case StepStatusWaiting, StepStatusSleeping, StepStatusInvoking:
 		return RunStatusRunning // These are all "in progress" states
 	default:
 		return RunStatusUnknown // default to unknown
