@@ -18,6 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// getItemIDsFromBacklog is a helper function to peek items from a backlog and extract their IDs
+func getItemIDsFromBacklog(ctx context.Context, mgr redis_state.BacklogManager, backlog *redis_state.QueueBacklog, refillUntil time.Time, limit int64) ([]string, error) {
+	items, _, err := mgr.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, limit)
+	if err != nil {
+		return nil, err
+	}
+	
+	itemIDs := make([]string, len(items))
+	for i, item := range items {
+		itemIDs[i] = item.ID
+	}
+	return itemIDs, nil
+}
+
 // LuaCompatibilityTestCase defines a test case for Lua compatibility across different Redis-compatible servers
 type LuaCompatibilityTestCase struct {
 	Name       string                // Test case name
@@ -299,7 +313,13 @@ func TestLuaCompatibility(t *testing.T) {
 				backlog := q.ItemBacklog(ctx, qi)
 				sp := q.ItemShadowPartition(ctx, qi)
 
-				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, now.Add(time.Minute), constraints)
+				// Use BacklogManager interface to peek items and get their IDs
+				var mgr redis_state.BacklogManager = q
+				refillUntil := now.Add(time.Minute)
+				refillItems, err := getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
+				require.NoError(t, err)
+
+				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
 			})
