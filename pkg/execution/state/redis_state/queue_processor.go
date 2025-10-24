@@ -1350,12 +1350,12 @@ func (q *queue) process(
 	// When capacity is leased, release it after requeueing/dequeueing the item.
 	// This MUST happen to free up concurrency capacity in a timely manner for
 	// the next worker to lease a queue item.
-	if capacityLeaseID != ulid.Zero {
+	if capacityLeaseID != nil {
 		defer func() {
 			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
-				LeaseID:        capacityLeaseID,
+				LeaseID:        *capacityLeaseID,
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity")
