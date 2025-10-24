@@ -1,0 +1,79 @@
+import { Callout } from "src/shared/Docs/mdx";
+
+# Prometheus metrics export integration
+
+Inngest supports exporting [Prometheus](https://prometheus.io/) metrics via scrape endpoints. This enables you to monitor your Inngest functions from your existing Prometheus or Prometheus-compatible monitoring tools like [Grafana](https://prometheus.io/docs/visualization/grafana/), [New Relic](https://docs.newrelic.com/docs/infrastructure/prometheus-integrations/get-started/send-prometheus-metric-data-new-relic/), or similar.
+
+## Setup
+
+To get started, navigate to the Prometheus integration page in the Inngest dashboard's "Integrations" section.
+
+Select the Inngest environment you want to export metrics from. The scrape config will be automatically generated including your Inngest API key required to authenticate with the scrape endpoint. You can use this configuration in your Prometheus instance or similar tool that supports scraping from a URL.
+
+![Prometheus integration page](/assets/docs/platform/monitor/prometheus-exports/prometheus-integration-page.png)
+
+## Metrics
+
+The following metrics are exported:
+
+| Metric | Type | Tags |
+|---|---|---|
+| `inngest_function_run_scheduled_total`| counter | `fn`, `date` |
+| `inngest_function_run_started_total`| counter | `fn`, `date` |
+| `inngest_function_run_ended_total`| counter | `fn`, `date`, `status` |
+| `inngest_sdk_req_scheduled_total`| counter | `fn`, `date` |
+| `inngest_sdk_req_started_total`| counter | `fn`, `date` |
+| `inngest_sdk_req_ended_total`| counter | `fn`, `date`, `status` |
+| `inngest_step_output_bytes_total`| counter | `fn`, `date` |
+| `inngest_steps_scheduled`| gauge | `fn` |
+| `inngest_steps_running`| gauge | `fn` |
+
+<details>
+  <summary><strong>Example output:</strong></summary>
+
+```yaml
+# HELP inngest_function_run_ended_total The total number of function runs ended
+# TYPE inngest_function_run_ended_total counter
+inngest_function_run_ended_total{date="2025-02-12",fn="my-app-my-function",status="Completed"} 480
+inngest_function_run_ended_total{date="2025-02-12",fn="my-app-my-function",status="Failed"} 20
+# HELP inngest_function_run_scheduled_total The total number of function runs scheduled
+# TYPE inngest_function_run_scheduled_total counter
+inngest_function_run_scheduled_total{date="2025-02-12",fn="my-app-my-function"} 500
+# HELP inngest_function_run_started_total The total number of function runs started
+# TYPE inngest_function_run_started_total counter
+inngest_function_run_started_total{date="2025-02-12",fn="my-app-my-function"} 500
+# HELP inngest_sdk_req_ended_total The total number of SDK invocation/step execution ended
+# TYPE inngest_sdk_req_ended_total counter
+inngest_sdk_req_ended_total{date="2025-02-12",fn="my-app-my-function",status="errored"} 17
+inngest_sdk_req_ended_total{date="2025-02-12",fn="my-app-my-function",status="failed"} 15
+inngest_sdk_req_ended_total{date="2025-02-12",fn="my-app-my-function",status="success"} 740
+# HELP inngest_sdk_req_scheduled_total The total number of SDK invocation/step execution scheduled
+# TYPE inngest_sdk_req_scheduled_total counter
+inngest_sdk_req_scheduled_total{date="2025-02-12",fn="my-app-my-function"} 772
+# HELP inngest_sdk_req_started_total The total number of SDK invocation/step execution started
+# TYPE inngest_sdk_req_started_total counter
+inngest_sdk_req_started_total{date="2025-02-12",fn="my-app-my-function"} 772
+# HELP inngest_step_output_bytes_total The total number of bytes used by step outputs
+# TYPE inngest_step_output_bytes_total counter
+inngest_step_output_bytes_total{date="2025-02-12",fn="my-app-my-function"} 2804
+# HELP inngest_steps_running The number of steps currently running
+# TYPE inngest_steps_running gauge
+inngest_steps_running{fn="my-app-my-function"} 7
+# HELP inngest_steps_scheduled The number of steps scheduled
+# TYPE inngest_steps_scheduled gauge
+inngest_steps_scheduled{fn="my-app-my-function"} 30
+```
+
+</details>
+
+## Limits
+
+The Prometheus integration is available to all paid plans and is subject to the following limits.
+
+| Plan | Granularity | Delay |
+|---|---|---|
+| Basic | 15 minutes | 15 minutes |
+| Pro | 5 minutes | 5 minutes |
+| Enterprise | 1 minute | Immediate |
+
+All plans are subject to a rate limit of 30 requests per minute.
