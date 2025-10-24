@@ -295,7 +295,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Attempt to lease the request. If the request is still running on a worker,
 	// this will fail with ErrRequestLeased. In this case, we can just wait for the request to complete.
 	// Otherwise, we acquired the lease and need to forward the request to the worker.
-	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.InstanceId, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
+	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.InstanceID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
 	if err != nil && !errors.Is(err, state.ErrRequestLeased) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to lease request")

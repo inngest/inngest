@@ -35,45 +35,6 @@ type RouteResult struct {
 	InstanceID   string
 }
 
-// GetRouteWithCapacityCheck performs capacity-aware routing by first getting a route
-// and then checking if the worker has capacity to handle the request.
-func GetRouteWithCapacityCheck(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
-	// First, get the regular route
-	route, err := GetRoute(ctx, stateMgr, rnd, tracer, log, data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the connection to find the worker instance ID
-	envID, err := uuid.Parse(data.EnvId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse env ID: %w", err)
-	}
-
-	conn, err := stateMgr.GetConnection(ctx, envID, route.ConnectionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get connection for capacity check: %w", err)
-	}
-
-	if conn == nil {
-		return nil, fmt.Errorf("connection not found for capacity check")
-	}
-
-	// Try to add a request lease for this worker
-	if err := stateMgr.AddRequestLeaseToWorker(ctx, envID, conn.InstanceId, data.RequestId); err != nil {
-		if errors.Is(err, state.ErrWorkerCapacityExceeded) {
-			log.Debug("worker at capacity, trying alternative route", "instance_id", conn.InstanceId)
-			// Could implement retry logic here, but for now just return the error
-			return nil, state.ErrWorkerCapacityExceeded
-		}
-		return nil, fmt.Errorf("failed to claim worker capacity: %w", err)
-	}
-
-	log.Debug("claimed worker capacity", "instance_id", conn.InstanceId, "request_id", data.RequestId)
-
-	return route, nil
-}
-
 func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
 	appID, err := uuid.Parse(data.AppId)
 	if err != nil {

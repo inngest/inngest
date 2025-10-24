@@ -87,8 +87,6 @@ message GatewayExecutorRequestData {
 	string run_id = 12;
 
 	string lease_id = 13;
-
-	string instance_id = 14;
 }
 
 message WorkerRequestAckData {
@@ -115,8 +113,6 @@ message WorkerRequestExtendLeaseData {
 	string run_id = 9;
 
 	string lease_id = 10;
-
-	string instance_id = 11;
 }
 
 message WorkerRequestExtendLeaseAckData {
