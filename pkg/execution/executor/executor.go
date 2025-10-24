@@ -80,6 +80,28 @@ var (
 	PauseHandleConcurrency = 100
 )
 
+// ScheduleStatus returns a string status category for a Schedule error.
+// This is useful for metrics and observability to categorize schedule attempts.
+func ScheduleStatus(err error) string {
+	switch {
+	case err == nil:
+		return "success"
+	case errors.Is(err, ErrFunctionRateLimited):
+		return "rate_limited"
+	case errors.Is(err, ErrFunctionDebounced):
+		return "debounced"
+	case errors.Is(err, ErrFunctionSkipped):
+		return "skipped"
+	case errors.Is(err, redis_state.ErrQueueItemExists), errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
+		return "idempotency"
+	case err != nil:
+		return "error"
+	default:
+		// should be unreachable
+		return "unknown"
+	}
+}
+
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
 //
