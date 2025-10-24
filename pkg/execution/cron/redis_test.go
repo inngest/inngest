@@ -175,10 +175,8 @@ func TestRedisCronManager(t *testing.T) {
 			AccountWeight: 85,
 		}),
 	)
-	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 
 	cm := NewRedisCronManager(
-		unshardedClient.Cron(),
 		q,
 		logger.StdlibLogger(ctx),
 	)
