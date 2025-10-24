@@ -36,7 +36,7 @@ var (
 // BacklogManager defines the interface for backlog operations
 type BacklogManager interface {
 	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error)
-	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error)
+	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...backlogRefillOptionFn) (*BacklogRefillResult, error)
 	ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog
 	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
 }
