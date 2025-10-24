@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -18,16 +19,21 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var defaultPropagator = propagation.NewCompositeTextMapPropagator(
-	propagation.TraceContext{},
-	propagation.Baggage{},
+var (
+	defaultPropagator = propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+
+	tracer     trace.Tracer
+	tracerOnce sync.Once
 )
 
 // TracerProvider defines the interface for tracing providers.
 type TracerProvider interface {
-	CreateSpan(name string, opts *CreateSpanOptions) (*meta.SpanReference, error)
-	CreateDroppableSpan(name string, opts *CreateSpanOptions) (*DroppableSpan, error)
-	UpdateSpan(opts *UpdateSpanOptions) error
+	CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error)
+	CreateDroppableSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*DroppableSpan, error)
+	UpdateSpan(ctx context.Context, opts *UpdateSpanOptions) error
 }
 
 type SpanDebugData struct {
@@ -66,23 +72,27 @@ type UpdateSpanOptions struct {
 // otelTracerProvider implements TracerProvider.
 type otelTracerProvider struct {
 	exp sdktrace.SpanExporter
+	bt  time.Duration
 }
 
-func NewOtelTracerProvider(exp sdktrace.SpanExporter) TracerProvider {
+func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration) TracerProvider {
 	return &otelTracerProvider{
 		exp: exp,
+		bt:  batchTimeout,
 	}
 }
 
-func (tp *otelTracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.Tracer {
-	base := sdktrace.NewSimpleSpanProcessor(tp.exp)
+func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
+	tracerOnce.Do(func() {
+		base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
-	otelTP := sdktrace.NewTracerProvider(
-		sdktrace.WithSpanProcessor(newExecutionProcessor(md, qi, base)),
-		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
-	)
+		otelTP := sdktrace.NewTracerProvider(
+			sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
+			// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
+		)
 
-	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
+		tracer = otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
+	})
 
 	return tracer
 }
@@ -94,17 +104,17 @@ func (d *DroppableSpan) Drop() {
 	d.span.End()
 }
 
-// TODO Sync send span; might wait for flush channel
 func (d *DroppableSpan) Send() error {
 	d.span.End()
 	return nil
 }
 
 func (tp *otelTracerProvider) CreateSpan(
+	ctx context.Context,
 	name string,
 	opts *CreateSpanOptions,
 ) (*meta.SpanReference, error) {
-	ds, err := tp.CreateDroppableSpan(name, opts)
+	ds, err := tp.CreateDroppableSpan(ctx, name, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
 	}
@@ -120,6 +130,7 @@ func (tp *otelTracerProvider) CreateSpan(
 // CreateDroppableSpan creates a span that can be dropped and relies on us
 // calling `.End()`.
 func (tp *otelTracerProvider) CreateDroppableSpan(
+	ctx context.Context,
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
@@ -128,13 +139,22 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		st = time.Now()
 	}
 
-	ctx := context.Background()
 	if opts.Parent != nil {
 		carrier := propagation.MapCarrier{
 			"traceparent": opts.Parent.TraceParent,
 			"tracestate":  opts.Parent.TraceState,
 		}
-		ctx = defaultPropagator.Extract(context.Background(), carrier)
+		ctx = mixinExecutonContext(
+			ctx,
+			// extract the propagator from a blank contexct, and mixin the execution
+			// context from the parent.  this creates a blank ctx with just the executor context
+			// and propagator, which is necessary to tie parents <> children.
+			defaultPropagator.Extract(context.Background(), carrier),
+		)
+	} else {
+		// Use a fresh context for parent traces so that there's no pollution from any
+		// other tracing.
+		ctx = context.Background()
 	}
 
 	attrs := opts.Attributes
@@ -175,7 +195,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		)
 	}
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
+	tracer := tp.getTracer(opts.Metadata)
 	ctx, span := tracer.Start(ctx, name, spanOptions...)
 
 	carrier := propagation.MapCarrier{}
@@ -236,6 +256,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 
 // Returns nothing, as the span is only extended and no further context is given
 func (tp *otelTracerProvider) UpdateSpan(
+	ctx context.Context,
 	opts *UpdateSpanOptions,
 ) error {
 	ts := opts.EndTime
@@ -269,7 +290,13 @@ func (tp *otelTracerProvider) UpdateSpan(
 		"traceparent": opts.TargetSpan.DynamicSpanTraceParent,
 		"tracestate":  opts.TargetSpan.DynamicSpanTraceState,
 	}
-	ctx := defaultPropagator.Extract(context.Background(), carrier)
+	ctx = mixinExecutonContext(
+		ctx,
+		// extract the propagator from a blank contexct, and mixin the execution
+		// context from the parent.  this creates a blank ctx with just the executor context
+		// and propagator, which is necessary to tie parents <> children.
+		defaultPropagator.Extract(context.Background(), carrier),
+	)
 
 	if opts.Status.IsEnded() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
@@ -295,7 +322,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 		opts.RawOtelSpanOptions...,
 	)
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
+	tracer := tp.getTracer(opts.Metadata)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 
 	span.End()

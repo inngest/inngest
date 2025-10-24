@@ -74,7 +74,7 @@ type PartitionResponse struct {
 	Tenant        *PartitionTenant       `protobuf:"bytes,3,opt,name=tenant,proto3" json:"tenant,omitempty"`
 	Config        []byte                 `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
 	QueueShard    *QueueShard            `protobuf:"bytes,5,opt,name=queue_shard,json=queueShard,proto3" json:"queue_shard,omitempty"`
-	Cron          *CronSchedule          `protobuf:"bytes,6,opt,name=cron,proto3" json:"cron,omitempty"`
+	Crons         []*CronSchedule        `protobuf:"bytes,6,rep,name=crons,proto3" json:"crons,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -144,9 +144,9 @@ func (x *PartitionResponse) GetQueueShard() *QueueShard {
 	return nil
 }
 
-func (x *PartitionResponse) GetCron() *CronSchedule {
+func (x *PartitionResponse) GetCrons() []*CronSchedule {
 	if x != nil {
-		return x.Cron
+		return x.Crons
 	}
 	return nil
 }
@@ -383,6 +383,8 @@ type CronSchedule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Next          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=next,proto3" json:"next,omitempty"`
 	JobId         string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Expr          string                 `protobuf:"bytes,3,opt,name=expr,proto3" json:"expr,omitempty"`
+	Scheduled     bool                   `protobuf:"varint,4,opt,name=scheduled,proto3" json:"scheduled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -429,6 +431,20 @@ func (x *CronSchedule) GetJobId() string {
 		return x.JobId
 	}
 	return ""
+}
+
+func (x *CronSchedule) GetExpr() string {
+	if x != nil {
+		return x.Expr
+	}
+	return ""
+}
+
+func (x *CronSchedule) GetScheduled() bool {
+	if x != nil {
+		return x.Scheduled
+	}
+	return false
 }
 
 // Item
@@ -542,15 +558,15 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"\n" +
 	"\x14debug/v1/queue.proto\x12\bdebug.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\"\n" +
 	"\x10PartitionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xe5\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xe7\x01\n" +
 	"\x11PartitionResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\x121\n" +
 	"\x06tenant\x18\x03 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
 	"\x06config\x18\x04 \x01(\fR\x06config\x125\n" +
 	"\vqueue_shard\x18\x05 \x01(\v2\x14.debug.v1.QueueShardR\n" +
-	"queueShard\x12*\n" +
-	"\x04cron\x18\x06 \x01(\v2\x16.debug.v1.CronScheduleR\x04cron\"\xb5\x02\n" +
+	"queueShard\x12,\n" +
+	"\x05crons\x18\x06 \x03(\v2\x16.debug.v1.CronScheduleR\x05crons\"\xb5\x02\n" +
 	"\x17PartitionStatusResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06paused\x18\x02 \x01(\bR\x06paused\x12\x18\n" +
@@ -572,10 +588,12 @@ const file_debug_v1_queue_proto_rawDesc = "" +
 	"\n" +
 	"QueueShard\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
-	"\x04kind\x18\x02 \x01(\tR\x04kind\"U\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\"\x87\x01\n" +
 	"\fCronSchedule\x12.\n" +
 	"\x04next\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04next\x12\x15\n" +
-	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"c\n" +
+	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x12\n" +
+	"\x04expr\x18\x03 \x01(\tR\x04expr\x12\x1c\n" +
+	"\tscheduled\x18\x04 \x01(\bR\tscheduled\"c\n" +
 	"\x10QueueItemRequest\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x12\x1f\n" +
@@ -611,7 +629,7 @@ var file_debug_v1_queue_proto_goTypes = []any{
 var file_debug_v1_queue_proto_depIdxs = []int32{
 	3, // 0: debug.v1.PartitionResponse.tenant:type_name -> debug.v1.PartitionTenant
 	4, // 1: debug.v1.PartitionResponse.queue_shard:type_name -> debug.v1.QueueShard
-	5, // 2: debug.v1.PartitionResponse.cron:type_name -> debug.v1.CronSchedule
+	5, // 2: debug.v1.PartitionResponse.crons:type_name -> debug.v1.CronSchedule
 	8, // 3: debug.v1.CronSchedule.next:type_name -> google.protobuf.Timestamp
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type

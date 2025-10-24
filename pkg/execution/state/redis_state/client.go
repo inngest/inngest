@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -169,6 +170,26 @@ func NewDebounceClient(r rueidis.Client, queueDefaultKey string) *DebounceClient
 	}
 }
 
+type CronClient struct {
+	queueDefaultKey string
+	unshardedRc     rueidis.Client
+}
+
+func NewCronClient(r rueidis.Client, queueDefaultKey string) *CronClient {
+	return &CronClient{
+		queueDefaultKey: queueDefaultKey,
+		unshardedRc:     r,
+	}
+}
+
+func (c *CronClient) Client() rueidis.Client {
+	return c.unshardedRc
+}
+
+func (c *CronClient) QueueDefaultKey() string {
+	return c.queueDefaultKey
+}
+
 type GlobalClient struct {
 	kg          GlobalKeyGenerator
 	unshardedRc rueidis.Client
@@ -196,6 +217,7 @@ type UnshardedClient struct {
 	queue    *QueueClient
 	debounce *DebounceClient
 	global   *GlobalClient
+	cron     *CronClient
 }
 
 func (u *UnshardedClient) Pauses() *PauseClient {
@@ -214,12 +236,17 @@ func (u *UnshardedClient) Global() *GlobalClient {
 	return u.global
 }
 
+func (u *UnshardedClient) Cron() *CronClient {
+	return u.cron
+}
+
 func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
 	return &UnshardedClient{
 		pauses:        NewPauseClient(r, stateDefaultKey),
 		queue:         NewQueueClient(r, queueDefaultKey),
 		debounce:      NewDebounceClient(r, queueDefaultKey),
 		global:        NewGlobalClient(r, stateDefaultKey),
+		cron:          NewCronClient(r, queueDefaultKey),
 		unshardedConn: r,
 	}
 }
