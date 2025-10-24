@@ -85,6 +85,8 @@ local enableKeyQueues = tonumber(ARGV[16])
 
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
+local fallbackIdempotencyKey = ARGV[18]
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
