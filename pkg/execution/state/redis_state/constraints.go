@@ -110,7 +110,7 @@ func (q *queue) backlogRefillConstraintCheck(
 
 	// NOTE: This idempotency key is simply used for retrying Acquire
 	// We do not use the same key for multiple processShadowPartitionBacklog attempts
-	idempotencyKey := fmt.Sprint("%s-%d", backlog.BacklogID, now.UnixMilli())
+	idempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:      *shadowPart.AccountID,
