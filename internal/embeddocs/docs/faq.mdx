@@ -1,0 +1,133 @@
+export const description = "Frequently asked questions about Inngest";
+
+# Frequently Asked Questions (FAQs)
+
+- [How do I run crons only in production?](#how-do-i-run-crons-only-in-production)
+- [How do I stop functions from running?](#how-do-i-stop-functions-from-running)
+- [What is the "Finalization" step in my trace?](#what-is-the-finalization-step-in-my-trace)
+- [Why am I getting “Event key not found" errors in branch environments?](#why-am-i-getting-event-key-not-found-errors-in-branch-environments)
+- [How do I specify multiple serve paths for a same Vercel application on the Dashboard?](#why-am-i-getting-event-key-not-found-errors-in-branch-environments)
+- [What's the recommended way to redact data from step outputs?](#what-s-the-recommended-way-to-redact-data-from-step-outputs)
+- [Why am I getting a `FUNCTION_INVOCATION_TIMEOUT` error?](#why-am-i-getting-a-function-invocation-timeout-error)
+- [My app's serve endpoint requires authentication. What should I
+  do?](#my-app-s-serve-endpoint-requires-authentication-what-should-i-do)
+- [Why am I getting a `killed` error when running the Dev Server?](#why-am-i-getting-a-killed-error-when-running-the-dev-server)
+- [Why am I getting a `NON_DETERMINISTIC_FUNCTION`
+  error?](#why-am-i-getting-a-non-deterministic-function-error)
+- [Why am I getting an `Illegal invocation` error?](#why-am-i-getting-an-illegal-invocation-error)
+- [Why is the dev server polling endpoints that don't exist?](#why-is-the-dev-server-polling-endpoints-that-don-t-exist)
+
+## How do I run crons only in production?
+
+There are multiple ways to achieve it:
+1. Conditionally rendering depending on the environment.
+```javascript
+process.env.NODE_ENV === "production" ? { cron: "* * *" } : { event: "dev/manualXYZ" }
+```
+💡 If you render an event instead of a cron in the other environments, you can still trigger your functions manually if needed.
+
+2. [Disable branch environments](/docs/platform/environments#disabling-branch-environments-in-vercel).
+
+## How do I stop functions from running?
+The best way to ensure a deprecated function doesn't run is to deploy without including it in your [serve handler](/docs/reference/serve). You can temporarily achieved the same result by archiving the function on our dashboard, but note that a new deployment will unarchive the function.
+
+## What is the "Finalization" step in my trace?
+
+The "finalization" step in a run's trace represents the execution of the code between your function's last step and the end of the function handler.
+
+```ts {{ x: "10"}}
+const myFunction = inngest.createFunction(
+  { id: "handle-import" }
+  { event: "integration.connected" }
+  async ({ event, step }) => {
+    const res = await step.run("import-data", async () => {
+      // ...
+    });
+    // -- Finalization starts ⬇️ --
+    const newRows = res.rows.filter((row) => row.created === true)
+    return { message: `Imported ${newRows.length} rows` }
+    // -- Finalization ends ⬆️ --
+  },
+)
+```
+
+## Why am I getting “Event key not found" errors in branch environments?
+Branch environments are [automatically archived](/docs/platform/environments#archiving-branch-environments) 3 days after their latest deploy.
+It's possible to disable the auto archive functionality for each active environment on our [dashboard](https://app.inngest.com/env).
+
+
+## How do I specify multiple serve paths for a same Vercel application on the dashboard?
+You can pass multiple paths by adding their path information to each Vercel project in the [Vercel Integration’s settings](https://app.inngest.com/settings/integrations/vercel).
+
+## What's the recommended way to redact data from step outputs?
+We recommend doing [E2E encryption](/docs/reference/middleware/examples#e2-e-encryption) instead, as it's more secure and plaintext data never leaves your servers.
+
+## Why am I getting a `FUNCTION_INVOCATION_TIMEOUT` error?
+This is a Vercel error that means your function timed out within Vercel's infrastructure before it was able to respond to Inngest. More information can be found in [Vercel's docs](https://vercel.com/docs/functions/serverless-functions/runtimes#max-duration).
+
+If you're unable to sufficiently extend the timeout within Vercel, our [streaming feature](/docs/streaming) can help.
+
+## My app's serve endpoint requires authentication. What should I do?
+Your app's [serve endpoint](/docs/learn/serving-inngest-functions) needs to be accessible by our
+servers, so we can trigger your functions. For this reason, we recommend disabling authentication
+for the serve endpoint.
+
+Our servers communicate securely with your app's serve endpoint using your [signing key](/docs/learn/serving-inngest-functions#signing-key).
+
+### Vercel
+By default, Vercel enables [Deployment Protection](https://vercel.com/docs/security/deployment-protection)
+for both preview and generated production URLs. This means that your app's serve endpoint will be
+unreachable by our servers unless you [disable Deployment Protection](https://vercel.com/docs/security/deployment-protection#configuring-deployment-protection)
+or, if you're on Vercel's Pro plan, [configure protection bypass](/docs/deploy/vercel#bypassing-deployment-protection).
+
+## Why am I getting a `killed` error when running the Dev Server?
+The Inngest CLI binary may become corrupted, particularly during updates while
+being downloaded. Symptoms can also include the CLI giving no output or a
+`Segmentation fault`.
+
+Clear your npx cache by running `rm -rf ~/.npm/_npx`, or the cache of whichever
+package manager you're using to run the Dev Server (for example `pnpm prune`, `yarn
+cache clean`).
+
+If the error still persists, please reach out to us on [our Discord](https://www.inngest.com/discord).
+
+## Why am I getting a `NON_DETERMINISTIC_FUNCTION` error?
+This is an error present in v2.x.x of the TypeScript SDK that can be thrown when a deployment changes a function in the middle of a run.
+
+If you're seeing this error, we encourage you to upgrade to v3.x.x of the TypeScript SDK, which will recover and continue gracefully from this circumstance.
+
+For more information, see the [Upgrading from v2 to v3](/docs/sdk/migration) migration guide.
+
+## Why am I getting an `Illegal invocation` error?
+When making requests to an Inngest Server, the TypeScript SDK uses
+[`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). The
+actual implementation of this varies across different runtimes, versions, and
+environments. The SDK tries to account for these differences internally, but
+sometimes providing a custom `fetch` function is necessary or wanted.
+
+This error is usually indicative of providing a custom `fetch` function to
+either a `new Inngest()` or `serve()` call, but not carrying over its
+[binding](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_objects/Function/bind).
+This is a common JavaScript gotcha, where bound methods lose their binding when
+passed into an object.
+
+To resolve, make sure that you rebind the `fetch` function as it is passed. This
+is commonly bound to `globalThis`, though your specific runtime/version/environment
+may vary.
+
+```ts
+new Inngest({
+  fetch: fetch.bind(globalThis),
+});
+```
+
+## Why is the dev server polling endpoints that don't exist?
+The dev server will automatically detect and connect to apps running on common ports and endpoints. These endpoints include `/api/inngest`, `/x/inngest`, `/.netlify/functions/inngest`, `/.redwood/functions/inngest`.
+
+You can disable auto-discovery by passing the `--no-discovery` flag to the `dev` command:
+
+```sh
+npx inngest-cli@latest dev --no-discovery
+```
+
+Learn more about this in the [dev server](/docs/dev-server#auto-discovery) docs.

@@ -1,0 +1,261 @@
+import { ImageTheme, GuideSelector, GuideSection, CodeGroup } from "src/shared/Docs/mdx";
+
+export const description = 'How to use the fan-out pattern with Inngest to trigger multiple functions from a single event.'
+
+# Fan-out (one-to-many)
+
+The fan-out pattern enables you to send a single event and trigger multiple functions in parallel (one-to-many). The key benefits of this approach are:
+
+* **Reliability**: Logic from each function runs independently, meaning an issue with one function will not affect the other(s).
+* **Performance**: As functions area run in parallel, all of the work will execute faster than running in sequence.
+
+
+<ImageTheme
+  light={'/assets/docs/guides/fan-out-diagram.png'}
+  alt={'A diagram showing how to fan-out to multiple functions'}
+  className="rounded-md"
+/>
+
+
+A use case for fan-out is, for example, when a user signs up for your product. In this scenario, you may want to:
+1. Send a welcome email
+2. Start a trial in Stripe
+3. Add the user to your CRM
+4. Add the user's email to your mailing list
+
+{/* TODO - Link to future distributed systems guide*/}
+The fan-out pattern is also useful in distributed systems where a single event is consumed by functions running in different applications.
+
+## How to fan-out to multiple functions
+
+<GuideSelector
+  options={[
+    { key: "typescript", title: "TypeScript" },
+    { key: "go", title: "Go" },
+    { key: "python", title: "Python" },
+  ]}>
+
+<GuideSection show="typescript">
+
+Since Inngest is powered by events, implementing fan-out is as straightforward as defining multiple functions that use the same event trigger. Let's take the above example of user signup and implement it in Inngest.
+
+First, set up a `/signup` route handler to send an event to Inngest when a user signs up:
+
+```ts {{ filename: "app/routes/signup/route.ts" }}
+import { inngest } from '../inngest/client';
+
+export async function POST(request: Request) {
+  // NOTE - this code is simplified for the of the example:
+  const { email, password } = await request.json();
+  const user = await createUser({ email, password });
+  await createSession(user.id);
+
+  // Send an event to Inngest
+  await inngest.send({
+    name: 'app/user.signup',
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    },
+  });
+
+  redirect('https://myapp.com/dashboard');
+}
+```
+
+Now, with this event, any function using `"app/user.signup"` as its event trigger will be automatically invoked.
+
+Next, define two functions: `sendWelcomeEmail` and `startStripeTrial`. As you can see below, both functions use the same event trigger, but perform different work.
+
+```ts {{ filename: "inngest/functions.ts" }}
+const sendWelcomeEmail = inngest.createFunction(
+  { id: 'send-welcome-email' },
+  { event: 'app/user.signup' },
+  async ({ event, step }) => {
+    await step.run('send-email', async () => {
+      await sendEmail({ email: event.data.user.email, template: 'welcome');
+    });
+  }
+)
+
+const startStripeTrial = inngest.createFunction(
+  { id: 'start-stripe-trial' },
+  { event: 'app/user.signup' },
+  async ({ event }) => {
+    const customer = await step.run('create-customer', async () => {
+      return await stripe.customers.create({ email: event.data.user.email });
+    });
+    await step.run('create-subscription', async () => {
+      return await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: 'price_1MowQULkdIwHu7ixraBm864M' }],
+        trial_period_days: 14,
+      });
+    });
+  }
+)
+```
+
+You've now successfully implemented fan-out in our application. Each function will run independently and in parallel. If one function fails, the others will not be disrupted.
+
+Other benefits of fan-out include:
+
+* **Bulk Replay**: If a third-party API goes down for a period of time (for example, your email provider), you can use [Replay](/docs/platform/replay) to selectively re-run all functions that failed, without having to re-run all sign-up flow functions.
+* **Testing**: Each function can be tested in isolation, without having to run the entire sign-up flow.
+* **New features or refactors**: As each function is independent, you can add new functions or refactor existing ones without having to edit unrelated code.
+* **Trigger functions in different codebases**: If you have multiple codebases, even using different programming languages (for example [Python](/docs/reference/python) or [Go](https://pkg.go.dev/github.com/inngest/inngestgo)), you can trigger functions in both codebases from a single event.
+
+</GuideSection>
+<GuideSection show="go">
+
+Since Inngest is powered by events, implementing fan-out is as straightforward as defining multiple functions that use the same event trigger. Let's take the above example of user signup and implement it in Inngest.
+
+First, set up a `/signup` route handler to send an event to Inngest when a user signs up:
+
+```go {{ filename: "main.go" }}
+!snippet:path=snippets/go/docs/examples/fan_out_jobs/main.go
+```
+
+Now, with this event, any function using `"app/user.signup"` as its event trigger will be automatically invoked.
+
+Next, define two functions: `sendWelcomeEmail` and `startStripeTrial`. As you can see below, both functions use the same event trigger, but perform different work.
+
+```go {{ filename: "inngest/functions.go" }}
+!snippet:path=snippets/go/docs/functions/fan_out_functions.go
+```
+
+You've now successfully implemented fan-out in our application. Each function will run independently and in parallel. If one function fails, the others will not be disrupted.
+
+Other benefits of fan-out include:
+
+* **Bulk Replay**: If a third-party API goes down for a period of time (for example, your email provider), you can use [Replay](/docs/platform/replay) to selectively re-run all functions that failed, without having to re-run all sign-up flow functions.
+* **Testing**: Each function can be tested in isolation, without having to run the entire sign-up flow.
+* **New features or refactors**: As each function is independent, you can add new functions or refactor existing ones without having to edit unrelated code.
+* **Trigger functions in different codebases**: If you have multiple codebases, even using different programming languages (for example [TypeScript](/docs/reference/typescript) or [Python](/docs/reference/python)), you can trigger functions in both codebases from a single event.
+
+</GuideSection>
+<GuideSection show="python">
+
+Since Inngest is powered by events, implementing fan-out is as straightforward as defining multiple functions that use the same event trigger. Let's take the above example of user signup and implement it in Inngest.
+
+First, set up a `/signup` route handler to send an event to Inngest when a user signs up:
+
+<CodeGroup>
+
+```ts {{ title: "Flask route" }}
+from flask import Flask, request, redirect
+from src.inngest.client import inngest_client
+
+app = Flask(__name__)
+
+@app.route('/signup', methods=['POST'])
+async def signup():
+    // NOTE - this code is simplified for the example:
+    data = await request.get_json()
+    email = data['email']
+    password = data['password']
+    
+    user = await create_user(email=email, password=password)
+    await create_session(user.id)
+
+    // Send an event to Inngest
+    await inngest_client.send(
+        name="app/user.signup",
+        data={
+            "user": {
+                "id": user.id,
+                "email": user.email
+            }
+        }
+    )
+
+    return redirect('https://myapp.com/dashboard')
+```
+
+```ts {{ title: "FastAPI route" }}
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse
+from src.inngest.client import inngest_client
+
+app = FastAPI()
+
+@app.post("/signup")
+async def signup(request: Request):
+    # NOTE - this code is simplified for the example:
+    data = await request.json()
+    email = data['email']
+    password = data['password']
+    
+    user = await create_user(email=email, password=password)
+    await create_session(user.id)
+
+    # Send an event to Inngest
+    await inngest_client.send(
+        name="app/user.signup",
+        data={
+            "user": {
+                "id": user.id,
+                "email": user.email
+            }
+        }
+    )
+
+    return RedirectResponse(url="https://myapp.com/dashboard")
+```
+
+</CodeGroup>
+
+Now, with this event, any function using `"app/user.signup"` as its event trigger will be automatically invoked.
+
+Next, define two functions: `sendWelcomeEmail` and `startStripeTrial`. As you can see below, both functions use the same event trigger, but perform different work.
+
+```py {{ filename: "inngest/functions.py" }}
+@inngest_client.create_function(
+    fn_id="send-welcome-email",
+    trigger=inngest.TriggerEvent(event="app/user.signup"),
+)
+async def send_welcome_email(ctx: inngest.Context) -> None:
+    await step.run("send-email", lambda: send_email(
+        email=ctx.event.data["user"]["email"],
+        template="welcome"
+    ))
+
+@inngest_client.create_function(
+    fn_id="start-stripe-trial", 
+    trigger=inngest.TriggerEvent(event="app/user.signup"),
+)
+async def start_stripe_trial(
+    ctx: inngest.Context,
+    step: inngest.Step,
+) -> None:
+    customer = await step.run("create-customer", lambda: stripe.Customer.create(
+        email=ctx.event.data["user"]["email"]
+    ))
+    
+    await step.run("create-subscription", lambda: stripe.Subscription.create(
+        customer=customer.id,
+        items=[{"price": "price_1MowQULkdIwHu7ixraBm864M"}],
+        trial_period_days=14
+    ))
+```
+
+You've now successfully implemented fan-out in our application. Each function will run independently and in parallel. If one function fails, the others will not be disrupted.
+
+Other benefits of fan-out include:
+
+* **Bulk Replay**: If a third-party API goes down for a period of time (for example, your email provider), you can use [Replay](/docs/platform/replay) to selectively re-run all functions that failed, without having to re-run all sign-up flow functions.
+* **Testing**: Each function can be tested in isolation, without having to run the entire sign-up flow.
+* **New features or refactors**: As each function is independent, you can add new functions or refactor existing ones without having to edit unrelated code.
+* **Trigger functions in different codebases**: If you have multiple codebases, even using different programming languages (for example [TypeScript](/docs/reference/typescript) or [Go](https://pkg.go.dev/github.com/inngest/inngestgo)), you can trigger functions in both codebases from a single event.
+
+</GuideSection>
+
+</GuideSelector>
+
+## Further reading
+
+* [Sending events](/docs/events)
+* [Invoking functions from within functions](/docs/guides/invoking-functions-directly)
+* [Sending events from functions](/docs/guides/sending-events-from-functions)

@@ -1,0 +1,87 @@
+import { Steps, Step, Button, Info } from "shared/Docs/mdx";
+import { RiExternalLinkLine } from "@remixicon/react";
+
+export const description = "Inngest supports exporting metrics to Datadog. This enables you to monitor your Ingest functions from your existing Datadog or Datadog-compatible monitoring tools like Grafana, New Relic, or similar."
+
+# Datadog integration
+
+Inngest has a native Datadog integration which publishes metrics from your Inngest environment to your Datadog account. This enables you to monitor your Inngest functions and configure alerts based on your Inngest metrics. No Datadog agent configuration is required.
+
+<figure>
+![The Inngest Datadog integration](/assets/docs/platform/monitor/datadog-integration/example-dashboard-2025-05-23.png "The default dashboard for the Inngest Datadog integration")
+  <figcaption>
+    The Datadog integration comes with a default dashboard that you can use to monitor your Inngest functions.
+  </figcaption>
+</figure>
+
+## Setup
+
+<Steps>
+  <Step>
+    Navigate to the Inngest integration's page in the Datadog dashboard:
+
+    {/* This button is on one line to ensure there is no nested p tag adding margin */}
+    <Button href="https://app.datadoghq.com/integrations/inngest" variant="secondary" target="_blank" className="no-underline">Open Datadog integration <RiExternalLinkLine className="ml-2 w-4 h-4" /></Button>
+
+    <Info>
+      If you have multiple Inngest organizations, please use the "[Switch organization](https://app.inngest.com/organization-list)" button located in the user menu in the Inngest dashboard to ensure that you have the correct organization selected.
+    </Info>
+  </Step>
+  <Step>
+    Click the "**Install integration**" button at the top right.
+
+    ![The Datadog integration's install page](/assets/docs/platform/monitor/datadog-integration/datadog-install-integration.png "The Datadog integration's install page")
+  </Step>
+  <Step>
+    Now click "**Connect Accounts**" to connect your Inngest account to Datadog. This will open an authentication flow. You will be asked to authorize Inngest to access your Datadog account.
+
+    ![The Datadog integration's connect accounts page](/assets/docs/platform/monitor/datadog-integration/datadog-connect-accounts.png "The Datadog integration's connect accounts page")
+  </Step>
+  <Step>
+    Once you have connected your Inngest account to Datadog, you will be redirected to [the Datadog integration page in the Inngest dashboard](https://app.inngest.com/settings/integrations/datadog). The connected Inngest environment will begin setup which may take up to 60 seconds to complete.
+
+    Here you can connect additional Inngest environments to connect to Datadog as well as add add additional Datadog accounts to send metrics to.
+
+    You will see the granularity and delay of the metrics that will be sent to Datadog based on your Inngest [billing plan](/pricing).
+
+    ![The Datadog integration page](/assets/docs/platform/monitor/datadog-integration/inngest-dashboard-post-setup.png)
+
+    <Info>
+      The setup process may take up to 60 seconds to complete. You can refresh the page to see the status of the setup.
+    </Info>
+  </Step>
+  <Step>
+    Once the setup is complete, you can navigate to [the Dashboards tab in the Datadog dashboard](https://app.datadoghq.com/dashboard/lists?q=Inngest) and located the newly installed "Inngest" dashboard.
+
+    This dashboard (pictured at the top of this page), gives some default visualizations to help you get started. You can also create your own custom dashboards to monitor your Inngest functions using the `inngest.*` metrics.
+  </Step>
+</Steps>
+
+## Metrics
+
+The integration publishes several metrics including the metrics below. You can also view a full list of metrics available from the integration's "Data Collected" tab:
+
+| **Metric Name** | **Description**  |
+|---|---|
+| **inngest.function_run.scheduled.total**<br/>(count) | Function runs scheduled during the time interval <br/>*Unit: run* | environment, function |
+| **inngest.function_run.started.total**<br/>(count) | Function runs that started during the time interval <br/>*Unit: run* | environment, function |
+| **inngest.function_run.ended.total**<br/>(count) | Function runs that ended during the time interval <br/>*Unit: run* | status, environment, function |
+| **inngest.function_run.rate_limited.total**<br/>(count) | Function runs that did not execute due to rate limiting during the time interval <br/>*Unit: run* | environment, function |
+| **inngest.step.output_bytes.total**<br/>(count) | Bytes used by step outputs during the time interval <br/>*Unit: byte* | environment, function |
+| **inngest.sdk.req_scheduled.total**<br/>(count) | Step executions scheduled during the time interval <br/>*Unit: step* | environment, function |
+| **inngest.sdk.req_started.total**<br/>(count) | Step executions started during the time interval <br/>*Unit: step* | environment, function |
+| **inngest.sdk.req_ended.total**<br/>(count) | Step executions that ended during the time interval <br/>*Unit: step* | environment, function, status |
+| **inngest.steps.scheduled**<br/>(gauge) | Steps currently scheduled <br/>*Unit: step* | environment, function |
+| **inngest.steps.running**<br/>(gauge) | Steps currently running <br/>*Unit: step* | environment, function |
+| **inngest.steps.sleeping**<br/>(gauge) | Steps currently sleeping <br/>*Unit: step* | environment, function |
+| **inngest.metric_export_integration_healthy**<br/>(gauge) | Indicates the Inngest integration successfully sent metrics to Datadog <br/>*Unit: success* |
+
+## Granularity and delay
+
+The Datadog integration is available to all paid plans and is subject to the following limits.
+
+| Plan | Granularity | Delay |
+|---|---|---|
+| Basic | 15 minutes | 15 minutes |
+| Pro | 5 minutes | 5 minutes |
+| Enterprise | 1 minute | Immediate |

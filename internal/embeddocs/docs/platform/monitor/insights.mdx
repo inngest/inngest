@@ -1,0 +1,181 @@
+import { Info } from "src/shared/Docs/mdx";
+
+export const description = 'Query and analyze event data with SQL in the Inngest platform.';
+
+# Insights
+
+Inngest Insights allows you to query and analyze your event data using SQL directly within the Inngest platform. Every event sent to Inngest contains valuable information, and Insights gives you the power to extract meaningful patterns and analytics from that data.
+
+<Info>
+  Insights support is currently in Public Beta. Some details including SQL syntax and feature availability are still subject to change during this period. Read more about the [Public Beta release phase here](/docs/release-phases#public-beta) and the [roadmap here](#roadmap).
+</Info>
+
+## Overview
+
+Insights provides an in-app SQL editor and query interface where you can:
+- Query event data using familiar SQL syntax
+- Save and reuse common queries
+- Analyze patterns in your event triggers
+- Extract business intelligence from your workflows
+
+Currently, you can **only query events**. Support for querying function runs will be added in future releases.
+
+## Getting Started
+
+Access Insights through the Inngest dashboard by clicking on the "Insights" tab in the left navigation. 
+
+![Getting Started Dashboard View](/assets/docs/platform/monitor/insights/insights_dashboard_view.png)
+
+We have several pre-built query templates to help you get started exploring your data.
+
+![Getting Started Templates View](/assets/docs/platform/monitor/insights/insights_template_view.png)
+
+## SQL Editor
+
+The Insights interface includes a full-featured SQL editor where you can:
+
+- Write and execute SQL queries against your event data
+- Save frequently used queries for later access
+- View query results in an organized table format
+- Access query history and templates from the sidebar
+
+![Sql Editor View](/assets/docs/platform/monitor/insights/insights_sql_editor.png)
+
+### Available Columns
+
+When querying events, you have access to the following columns:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | String | Unique identifier for the event |
+| `name` | String | The name/type of the event |
+| **`data`** | **JSON** | **The event payload data - users can send any JSON structure here** |
+| `ts` | Unix timestamp (ms) | Unix timestamp in milliseconds when the event occurred - [reference](https://www.unixtimestamp.com/) |
+| `v` | String | Event format version |
+
+For more details on the event format, see the [Inngest Event Format documentation](/docs/features/events-triggers/event-format).
+
+### Data Retention
+
+Refer to [pricing plans](/pricing) for data retention limits.
+
+### Result Limits
+
+- Current page limit: **1000 rows**
+- Future updates will support larger result sets through async data exports
+
+## SQL Support
+
+Insights is built on ClickHouse, which provides powerful SQL capabilities with some differences from traditional SQL databases.
+
+![Sql Editor View](/assets/docs/platform/monitor/insights/insights_query_results.png)
+
+### Supported Functions
+
+#### Arithmetic Functions
+Basic mathematical operations and calculations.
+[View ClickHouse arithmetic functions documentation](https://clickhouse.com/docs/sql-reference/functions/arithmetic-functions)
+
+#### String Functions
+String manipulation and search capabilities.
+- [String search functions](https://clickhouse.com/docs/sql-reference/functions/string-search-functions)
+- [String manipulation functions](https://clickhouse.com/docs/sql-reference/functions/string-functions)
+
+#### JSON Functions
+Essential for working with `events.data` payloads.
+[View ClickHouse JSON functions documentation](https://clickhouse.com/docs/sql-reference/functions/json-functions)
+
+#### Date/Time Functions
+For analyzing event timing and patterns.
+[View ClickHouse date/time functions documentation](https://clickhouse.com/docs/sql-reference/functions/date-time-functions)
+
+#### Other Supported Function Categories
+- [Logical functions](https://clickhouse.com/docs/sql-reference/functions/logical-functions)
+- [Rounding functions](https://clickhouse.com/docs/sql-reference/functions/rounding-functions)
+- [Type conversion functions](https://clickhouse.com/docs/sql-reference/functions/type-conversion-functions)
+- [Functions for nulls](https://clickhouse.com/docs/sql-reference/functions/functions-for-nulls)
+- [ULID functions](https://clickhouse.com/docs/sql-reference/functions/ulid-functions)
+
+### Aggregate Functions
+
+The following aggregate functions are supported:
+
+| Function | Description |
+|----------|-------------|
+| `ARRAY_AGG()` | [Aggregates values into an array](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/grouparray)  * |
+| `AVG()` | [Calculates average](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/avg) |
+| `COUNT()` | [Counts rows](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/count) |
+| `MAX()` | [Finds maximum value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/max) |
+| `MIN()` | [Finds minimum value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/min) |
+| `STDDEV_POP()` | [Population standard deviation](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/stddevpop) |
+| `STDDEV_SAMP()` | [Sample standard deviation](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/stddevsamp) |
+| `SUM()` | [Calculates sum](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/sum) |
+| `VAR_POP()` | [Population variance](https://clickhouse.com/docs/en/sql-reference/aggregate-functions/reference/varPop) |
+| `VAR_SAMP()` | [Sample variance](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/varSamp) |
+| `median()` | [Finds median value](https://clickhouse.com/docs/sql-reference/aggregate-functions/reference/median) |
+
+
+
+### SQL Syntax Limitations
+
+Some SQL features are not yet supported but are planned for future releases:
+
+- **CTEs (Common Table Expressions)** using `WITH`
+- **`IS` operator**
+- **`NOT` operator**
+
+
+## Working with Event Data
+
+### Event-Specific Schema
+
+Within **`events.data`**, users can send any JSON they want, so the structure and available fields will be specific to their payloads. You can use ClickHouse's JSON functions to extract and query specific fields within your event data.
+
+### Example Queries
+
+#### Basic Event Filtering
+```sql
+SELECT count(*)
+FROM events
+WHERE name = 'inngest/function.failed'
+AND simpleJSONExtractString(data, 'function_id') = 'generate-report'
+AND ts > toUnixTimestamp(addHours(now(), -1)) * 1000;
+```
+
+#### Extracting JSON Data and Aggregating
+```sql
+SELECT simpleJSONExtractString(data, 'user_id') as user_id, count(*) 
+FROM events
+WHERE name = 'order.created'
+GROUP BY user_id
+ORDER BY count(*) DESC
+LIMIT 10;
+```
+
+## Saved Queries
+
+You can save frequently used queries for quick access. Queries are only saved private for you to use; they are not shared across your Inngest organization.
+
+## Roadmap
+
+### Coming Soon
+- Query support for function runs
+- `received_at` column for tracking event receipt time
+- Pagination for large result sets
+- Async data exports for results larger than 1000 rows
+
+### Future Enhancements
+- Support for CTEs (Common Table Expressions)
+- `IS` and `NOT` operators
+- Advanced visualization capabilities
+
+## Need Help?
+
+If you encounter issues or have questions about Insights:
+1. Check this documentation for common solutions
+2. Review the [ClickHouse SQL reference](https://clickhouse.com/docs/sql-reference/) for advanced function usage
+3. Contact support through the Inngest platform
+
+---
+
+*Insights is actively under development. Features and column names may change as we continue to improve the product.*

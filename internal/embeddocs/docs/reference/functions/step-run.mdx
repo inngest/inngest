@@ -1,0 +1,105 @@
+import { Callout, Properties, Property, Row, Col, CodeGroup, VersionBadge } from "src/shared/Docs/mdx";
+
+export const description = `Define steps to execute with step.run()`
+
+# Run
+
+Use `step.run()` to run synchronous or asynchronous code as a retriable step in your function. `step.run()` returns a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) that resolves with the return value of your handler function.
+
+```ts
+export default inngest.createFunction(
+  { id: "import-product-images" },
+  { event: "shop/product.imported" },
+  async ({ event, step }) => {
+    const uploadedImageURLs = await step.run("copy-images-to-s3", async () => {
+      return copyAllImagesToS3(event.data.imageURLs);
+    });
+  }
+);
+```
+
+---
+
+## `step.run(id, handler): Promise`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="id" type="string" required>
+        The ID of the step. This will be what appears in your function's logs and is used to memoize step state across function versions.
+      </Property>
+      <Property name="handler" type="function" required>
+        The function that code that you want to run and automatically retry for this step. Functions can be:
+        * A synchronous function
+        * An `async` function
+        * Any function that returns a [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
+
+        Throwing errors within the handler function will trigger the step to be retried ([reference](/docs/functions/retries)).
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Steps can have async handlers
+  const result = await step.run("get-api-data", async () => {
+    // Steps should return data used in other steps
+    return fetch("...").json();
+  });
+
+  // Steps can have synchronous handlers
+  const data = await step.run("transform", () => {
+    return transformData(result);
+  });
+
+  // Returning data is optional
+  await step.run("insert-data", async () => {
+    db.insert(data);
+  });
+  ```
+  </Col>
+</Row>
+
+## How to call `step.run()`
+
+As `step.run()` returns a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise), you will need to handle it like any other Promise in JavaScript. Here are some ways you can use `step.run()` in your code:
+
+```ts
+// Use the "await" keyword to wait for the promise to fulfil
+await step.run("create-user", () => {/* ... */});
+const user = await step.run("create-user", () => {/* ... */});
+
+// Use `then` (or similar)
+step.run("create-user", () => {/* ... */})
+  .then((user) => {
+    // do something else
+  });
+
+// Use with a Promise helper function to run in parallel
+Promise.all([
+  step.run("create-subscription", () => {/* ... */}),
+  step.run("add-to-crm", () => {/* ... */}),
+  step.run("send-welcome-email", () => {/* ... */}),
+]);
+```
+
+## Return values and serialization
+
+All data returned from `step.run` is serialized as JSON. This is done to enable the SDK to return a valid serialized response to the Inngest service.
+
+```ts
+const output = await step.run("create-user", () => {
+  return { id: new ObjectId(), createdAt: new Date() };
+});
+/*
+{
+  "id": "647731d1759aa55be43b975d",
+  "createdAt": "2023-05-31T11:39:18.097Z"
+}
+*/
+```
+
+## Usage limits
+
+See [usage limits][usage-limits] for more details.
+
+[usage-limits]: /docs/usage-limits/inngest#functions

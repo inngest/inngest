@@ -1,0 +1,115 @@
+import { Callout, CodeGroup, Properties, Property, Row, Col, VersionBadge } from "src/shared/Docs/mdx";
+
+# Python middleware lifecycle
+
+The order of middleware lifecycle hooks is as follows:
+1. [`transform_input`](#transform-input)
+2. [`before_memoization`](#before-memoization)
+3. [`after_memoization`](#after-memoization)
+4. [`before_execution`](#before-execution)
+5. [`after_execution`](#after-execution)
+6. [`transform_output`](#transform-output)
+7. [`before_response`](#before-response)
+
+All of these functions may be called multiple times in a single function run. For example, if your function has 2 steps then all of the hooks will run 3 times (once for each step and once for the function).
+
+Additionally, there are two hooks when sending events:
+1. [`before_send_events`](#before-send-events)
+2. [`after_send_events`](#after-send-events)
+
+## Hook reference
+
+### `transform_input`
+
+Called when receiving a request from Inngest and before running any functions. Commonly used to mutate data sent by Inngest, like decryption.
+
+<Properties name="Arguments" nested>
+  <Property name="ctx" type="Context" required>
+    `ctx` argument passed to Inngest functions.
+  </Property>
+  <Property name="function" type="Function" required>
+    Inngest function object.
+  </Property>
+  <Property name="steps" type="StepMemos" required>
+    Memoized step data.
+  </Property>
+</Properties>
+
+### `before_memoization`
+
+Called before checking memoized step data.
+
+### `after_memoization`
+
+Called after exhausting memoized step data.
+
+### `before_execution`
+
+Called before executing "new code". For example, `before_execution` is called after returning the last memoized step data, since function-level code after that step is "new".
+
+### `after_execution`
+
+Called after executing "new code".
+
+### `transform_output`
+
+Called after a step or function returns. Commonly used to mutate data before sending it back to Inngest, like encryption.
+
+<Properties name="Arguments" nested>
+  <Property name="result" type="TransformOutputResult" required>
+    <Properties nested collapse>
+      <Property name="error" type="Exception">
+        Only set if there's an error.
+      </Property>
+      <Property name="output" type="object">
+        Step or function output. Since `None` is a valid output, always call the `has_output` method before accessing the output.
+      </Property>
+      <Property name="step" type="TransformOutputStepInfo">
+        Step or function output. Since `None` is a valid output, always call the `has_output` method before accessing the output.
+
+        <Properties nested collapse>
+          <Property name="id" type="str" required>
+            Step ID.
+          </Property>
+          <Property name="op" type="object">
+            Step type enum. Useful in very rare cases.
+          </Property>
+          <Property name="opts" type="dict[str, object]">
+            Step options. Useful in very rare cases.
+          </Property>
+        </Properties>
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+### `before_response`
+
+Called before sending a response back to Inngest.
+
+### `before_send_events`
+
+Called before sending events to Inngest.
+
+<Properties name="Arguments" nested>
+  <Property name="events" type="list[Event]" required>
+    Events to send.
+  </Property>
+</Properties>
+
+### `after_send_events`
+
+Called after sending events to Inngest.
+
+<Properties name="Arguments" nested>
+  <Property name="result" type="SendEventsResult" required>
+    <Properties nested collapse>
+      <Property name="error" type="str">
+        Error string if an error occurred.
+      </Property>
+      <Property name="ids" type="list[str]" required>
+        Event IDs.
+      </Property>
+    </Properties>
+  </Property>
+</Properties>

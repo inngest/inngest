@@ -178,6 +178,31 @@
       }
     }
   },
+  "/envs/{id}": {
+    "patch": {
+      "200": {
+        "// TODO": "Add example data for patch /envs/{id} 200"
+      },
+      "400": {
+        "// TODO": "Add example data for patch /envs/{id} 400"
+      },
+      "401": {
+        "// TODO": "Add example data for patch /envs/{id} 401"
+      },
+      "403": {
+        "// TODO": "Add example data for patch /envs/{id} 403"
+      },
+      "404": {
+        "// TODO": "Add example data for patch /envs/{id} 404"
+      },
+      "422": {
+        "// TODO": "Add example data for patch /envs/{id} 422"
+      },
+      "500": {
+        "// TODO": "Add example data for patch /envs/{id} 500"
+      }
+    }
+  },
   "/health": {
     "get": {
       "200": {

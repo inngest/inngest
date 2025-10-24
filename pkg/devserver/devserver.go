@@ -517,6 +517,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
+	
+	// Add MCP server route
+	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data)
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
