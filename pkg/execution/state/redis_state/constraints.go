@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -170,6 +171,102 @@ func (q *queue) backlogRefillConstraintCheck(
 		itemCapacityLeases: itemCapacityLeases,
 		limitingConstraint: constraint,
 		// NOTE: We've enforced constraints, so BacklogRefill can skip GCRA, etc.
+		skipConstraintChecks: true,
+	}, nil
+}
+
+type itemLeaseConstraintCheckResult struct {
+	leaseID              *ulid.ULID
+	limitingConstraint   enums.QueueConstraint
+	skipConstraintChecks bool
+
+	fallbackIdempotencyKey string
+	retryAfter             time.Time
+}
+
+func (q *queue) itemLeaseConstraintCheck(
+	ctx context.Context,
+	partition QueuePartition,
+	constraints PartitionConstraintConfig,
+	item *osqueue.QueueItem,
+	now time.Time,
+) (*itemLeaseConstraintCheckResult, error) {
+	if partition.AccountID == uuid.Nil ||
+		partition.EnvID == nil ||
+		partition.FunctionID == nil {
+		return &itemLeaseConstraintCheckResult{}, nil
+	}
+
+	if q.capacityManager == nil ||
+		q.useConstraintAPI == nil {
+		return &itemLeaseConstraintCheckResult{}, nil
+	}
+
+	useAPI, fallback := q.useConstraintAPI(ctx, partition.AccountID)
+	if !useAPI {
+		return &itemLeaseConstraintCheckResult{}, nil
+	}
+
+	// If capacity lease is still valid for the forseeable future, use it
+	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(now.Add(5*time.Second))
+	if hasValidCapacityLease {
+		return &itemLeaseConstraintCheckResult{
+			leaseID:              item.CapacityLeaseID,
+			skipConstraintChecks: true,
+		}, nil
+	}
+
+	idempotencyKey := item.ID
+
+	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+		AccountID: partition.AccountID,
+		EnvID:     *partition.EnvID,
+		// TODO: Double check if the item ID works for idempotency:
+		// - Consistent across the same attempt
+		// - Do we need to re-evaluate per retry?
+		IdempotencyKey: idempotencyKey,
+		FunctionID:     *partition.FunctionID,
+		CurrentTime:    now,
+		Duration:       QueueLeaseDuration,
+		// TODO: Build config
+		Configuration: constraintapi.ConstraintConfig{},
+		// TODO: Supply constraints
+		Constraints:     []constraintapi.ConstraintItem{},
+		Amount:          1,
+		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
+		Source: constraintapi.LeaseSource{
+			Service:           constraintapi.ServiceExecutor,
+			Location:          constraintapi.LeaseLocationItemLease,
+			RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		},
+	})
+	if err != nil {
+		if !fallback {
+			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
+		}
+
+		// Fallback to Lease (with idempotency)
+		return &itemLeaseConstraintCheckResult{
+			fallbackIdempotencyKey: idempotencyKey,
+		}, nil
+	}
+
+	constraint := enums.QueueConstraintNotLimited
+	if len(res.LimitingConstraints) > 0 {
+		constraint = convertLimitingConstraint(constraints, res.LimitingConstraints)
+	}
+
+	if len(res.Leases) == 0 {
+		return &itemLeaseConstraintCheckResult{
+			limitingConstraint: constraint,
+			retryAfter:         res.RetryAfter,
+		}, nil
+	}
+
+	capacityLeaseID := res.Leases[0].LeaseID
+
+	return &itemLeaseConstraintCheckResult{
+		leaseID:              &capacityLeaseID,
 		skipConstraintChecks: true,
 	}, nil
 }
