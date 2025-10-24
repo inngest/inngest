@@ -715,7 +715,6 @@ export type Event = {
   usage: Usage;
   versionCount: Scalars['Int'];
   versions: Array<Maybe<EventType>>;
-  workflows: Array<Workflow>;
   workspaceID: Maybe<Scalars['UUID']>;
 };
 
@@ -914,7 +913,6 @@ export type FunctionRun = {
   __typename?: 'FunctionRun';
   accountID: Scalars['UUID'];
   batchID: Maybe<Scalars['ULID']>;
-  canRerun: Maybe<Scalars['Boolean']>;
   endedAt: Maybe<Scalars['Time']>;
   event: Maybe<ArchivedEvent>;
   eventID: Maybe<Scalars['ULID']>;
@@ -927,7 +925,6 @@ export type FunctionRun = {
   startedAt: Scalars['Time'];
   status: FunctionRunStatus;
   workflowID: Scalars['UUID'];
-  workflowVersion: Maybe<WorkflowVersion>;
   workflowVersionInt: Scalars['Int'];
   workspaceID: Scalars['UUID'];
 };
@@ -2359,16 +2356,13 @@ export type Workflow = {
   cancellationRunCount: Scalars['Int'];
   cancellations: CancellationConnection;
   configuration: Maybe<FunctionConfiguration>;
-  current: Maybe<WorkflowVersion>;
   failureHandler: Maybe<Workflow>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
   isParentArchived: Scalars['Boolean'];
   isPaused: Scalars['Boolean'];
-  latestVersion: Maybe<WorkflowVersion>;
   metrics: MetricsResponse;
   name: Scalars['String'];
-  previous: Array<Maybe<WorkflowVersion>>;
   replayCounts: ReplayRunCounts;
   /**
    * A list of all the function's replays.
