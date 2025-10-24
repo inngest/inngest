@@ -1791,14 +1791,22 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
 
-	var leaseOptions []leaseOptionFn
+	backlog := p.queue.ItemBacklog(ctx, *item)
+	partition := p.queue.ItemShadowPartition(ctx, *item)
+	constraints := p.queue.partitionConstraintConfigGetter(ctx, partition.Identifier())
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, item, p.staticTime)
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, constraints, item, p.staticTime)
 	if err != nil {
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
 
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
+	}
+
+	leaseOptions := []leaseOptionFn{
+		LeaseBacklog(backlog),
+		LeaseShadowPartition(partition),
+		LeaseConstraints(constraints),
 	}
 
 	if constraintRes.fallbackIdempotencyKey != "" {
@@ -1810,8 +1818,8 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	}
 
 	var leaseID *ulid.ULID
-
 	switch constraintRes.limitingConstraint {
+	// If no constraints were hit (or we didn't invoke the Constraint API)
 	case enums.QueueConstraintNotLimited:
 
 		// Attempt to lease this item before passing this to a worker.  We have to do this
@@ -1840,14 +1848,19 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			p.queue.sem.Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
 		}
+	// Simulate errors returned by Lease
 	case enums.QueueConstraintThrottle:
+		err = ErrQueueItemThrottled
 	case enums.QueueConstraintAccountConcurrency:
+		err = newKeyError(ErrAccountConcurrencyLimit, partition.AccountID.String())
 	case enums.QueueConstraintFunctionConcurrency:
+		err = newKeyError(ErrPartitionConcurrencyLimit, partition.FunctionID.String())
 	case enums.QueueConstraintCustomConcurrencyKey1:
+		err = newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(1))
 	case enums.QueueConstraintCustomConcurrencyKey2:
+		err = newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(2))
 	default:
 		// Limited but the constraint is unknown?
-
 	}
 
 	// Check the sojourn delay for this item in the queue. Tracking system latency vs
@@ -2084,7 +2097,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		I:    *item,
 		PCtr: p.partitionContinueCtr,
 
-		capacityLeaseID: capacityLeaseID,
+		capacityLeaseID: *constraintRes.leaseID,
 	}
 
 	return nil
