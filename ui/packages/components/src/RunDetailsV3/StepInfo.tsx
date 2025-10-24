@@ -144,6 +144,7 @@ export const StepInfo = ({
     traceID: trace.outputID,
     refetchInterval: pollInterval ? pollInterval : undefined,
     preview: tracesPreviewEnabled,
+    enabled: Boolean(trace.outputID),
   });
 
   useEffect(() => {
@@ -179,6 +180,10 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
+
+  // Handle cases where there's no outputID (error occurred before output could be recorded)
+  const hasNoOutputID = !trace.outputID;
+  const isFailed = trace.status === 'FAILED';
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
@@ -259,10 +264,12 @@ export const StepInfo = ({
         <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
         <>
-          {result?.error && <ErrorInfo error={prettyShortError} />}
+          {(result?.error || (hasNoOutputID && isFailed)) && (
+            <ErrorInfo error={prettyShortError || 'Error details unavailable'} />
+          )}
           <div className="flex-1">
             <Tabs
-              defaultActive={result?.error ? 'error' : 'output'}
+              defaultActive={result?.error || (hasNoOutputID && isFailed) ? 'error' : 'output'}
               tabs={[
                 ...(prettyInput
                   ? [
@@ -293,6 +300,21 @@ export const StepInfo = ({
                             raw={prettyErrorBody ?? ''}
                             error={true}
                             loading={loading}
+                          />
+                        ),
+                      },
+                    ]
+                  : hasNoOutputID && isFailed
+                  ? [
+                      {
+                        label: 'Error details',
+                        id: 'error',
+                        node: (
+                          <IO
+                            title="Error details unavailable"
+                            raw="No error details could be retrieved for this step. This may occur when an error happens before the step output could be recorded."
+                            error={true}
+                            loading={false}
                           />
                         ),
                       },
