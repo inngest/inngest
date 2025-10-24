@@ -1155,11 +1155,11 @@ func (q *queue) process(
 				}
 
 				// If no capacity lease is used, no-op
-				if i.capacityLeaseID == ulid.Zero {
+				if i.capacityLeaseID == nil {
 					continue
 				}
 
-				if capacityLeaseID == ulid.Zero {
+				if capacityLeaseID == nil {
 					q.log.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
@@ -1172,7 +1172,7 @@ func (q *queue) process(
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 					AccountID:      p.AccountID,
 					IdempotencyKey: idempotencyKey,
-					LeaseID:        capacityLeaseID,
+					LeaseID:        *capacityLeaseID,
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1202,7 +1202,7 @@ func (q *queue) process(
 					return
 				}
 
-				capacityLeaseID = *res.LeaseID
+				capacityLeaseID = res.LeaseID
 			}
 		}
 	}()
@@ -2082,7 +2082,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		I:    *item,
 		PCtr: p.partitionContinueCtr,
 
-		capacityLeaseID: *constraintRes.leaseID,
+		capacityLeaseID: constraintRes.leaseID,
 	}
 
 	return nil
