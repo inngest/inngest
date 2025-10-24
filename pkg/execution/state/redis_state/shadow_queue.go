@@ -510,6 +510,11 @@ func (q *queue) processShadowPartitionBacklog(
 		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
 	}
 
+	// Report limiting constraint
+	if res.Constraint == enums.QueueConstraintNotLimited && constraintCheckRes.limitingConstraint != enums.QueueConstraintNotLimited {
+		res.Constraint = constraintCheckRes.limitingConstraint
+	}
+
 	q.log.Trace("processed backlog",
 		"backlog", backlog.BacklogID,
 		"total", res.TotalBacklogCount,
