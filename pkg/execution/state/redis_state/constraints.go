@@ -19,6 +19,7 @@ type backlogRefillConstraintCheckResult struct {
 	skipConstraintChecks bool
 
 	fallbackIdempotencyKey string
+	retryAfter             time.Time
 }
 
 func (q *queue) backlogRefillConstraintCheck(
@@ -106,6 +107,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill:      nil,
 			limitingConstraint: constraint,
+			retryAfter:         res.RetryAfter,
 		}, nil
 	}
 
