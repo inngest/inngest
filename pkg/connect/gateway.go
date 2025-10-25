@@ -804,7 +804,23 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			// get worker capacity to check if we have worker limits to enforce
+			workerCap, err := c.svc.stateManager.GetWorkerCapacities(ctx, c.conn.EnvID, c.conn.Data.InstanceId)
+			if err != nil {
+				c.log.ReportError(err, "failed to get worker available capacity",
+					logger.WithErrorReportTags(map[string]string{
+						"instance_id": c.conn.Data.InstanceId,
+						"env_id":      c.conn.EnvID.String(),
+					}))
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "failed to get total worker capacity",
+				}
+			}
+			// extend lease with worker capacity limit if set
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, c.conn.Data.InstanceId,
+				data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration, workerCap.IsUnlimited())
 			if err != nil {
 				switch {
 				case errors.Is(err, state.ErrRequestLeaseExpired),
@@ -1195,7 +1211,11 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 		if err := c.svc.stateManager.SetWorkerTotalCapacity(context.Background(), authResp.EnvID, initialMessageData.InstanceId, maxConcurrency); err != nil {
 			log.ReportError(err, "failed to set worker capacity")
-			// Don't fail the connection if we can't set capacity - log and continue
+			return nil, &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "worker capacity not enforced",
+			}
 		}
 
 		// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal

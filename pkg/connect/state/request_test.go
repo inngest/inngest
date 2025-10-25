@@ -39,6 +39,8 @@ func TestLeaseRequest(t *testing.T) {
 	var requestStateManager RequestStateManager = connManager
 
 	envID := uuid.New()
+	instanceID := "instance-1"
+	isWorkerCapacityLimited := true
 	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 	executorIP := net.IPv4(1, 1, 1, 1)
 
@@ -57,7 +59,7 @@ func TestLeaseRequest(t *testing.T) {
 
 	t.Run("extending missing lease should not work", func(t *testing.T) {
 		otherLeaseID := ulid.MustNew(ulid.Now(), rand.Reader)
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityLimited)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeaseNotFound)
@@ -111,14 +113,14 @@ func TestLeaseRequest(t *testing.T) {
 
 	t.Run("extending somebody else's lease should not work", func(t *testing.T) {
 		otherLeaseID := ulid.MustNew(ulid.Now(), rand.Reader)
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, otherLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityLimited)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeased)
 	})
 
 	t.Run("extending own lease should work", func(t *testing.T) {
-		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, existingLeaseID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, existingLeaseID, consts.ConnectWorkerRequestLeaseDuration, isWorkerCapacityLimited)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.NotEqual(t, existingLeaseID, leaseID)
@@ -149,7 +151,7 @@ func TestLeaseRequest(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, leased)
 
-		newLeaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, existingLeaseID, 0)
+		newLeaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, instanceID, requestID, existingLeaseID, 0, isWorkerCapacityLimited)
 		require.NoError(t, err)
 		require.Nil(t, newLeaseID)
 

@@ -90,9 +90,11 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityLimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
+		r.workerLeasesCounterKey(envID, instanceID),
+		r.leaseWorkerKey(envID, requestID),
 	}
 
 	now := r.c.Now()
@@ -111,6 +113,9 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
+		fmt.Sprintf("%d", int(consts.ConnectWorkerRequestLeaseDuration.Seconds())), // Counter TTL
+		instanceID,
+		fmt.Sprintf("%t", isWorkerCapacityLimited),
 	}
 
 	status, err := scripts["extend_lease"].Exec(
