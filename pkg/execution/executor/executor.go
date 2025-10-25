@@ -577,9 +577,6 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	return nil
 }
 
-// Execute loads a workflow and the current run state, then executes the
-// function's step via the necessary driver.
-//
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
