@@ -253,6 +253,7 @@ type isHealthyRes struct {
 	isHealthy                       bool
 	shouldDeleteUnhealthyConnection bool
 	shouldDeleteUnhealthyGateway    bool
+	workerAtCapacity                bool
 	workerGroup                     *state.WorkerGroup
 }
 
@@ -354,6 +355,24 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		return isHealthyRes{
 			shouldDeleteUnhealthyConnection: true,
 		}
+	}
+
+	// Check worker capacity
+	if conn.InstanceId == "" {
+		log.Error("connection has no instance ID", "conn_id", conn.Id)
+		return isHealthyRes{}
+	}
+
+	workerCap, err := stateManager.GetWorkerCapacities(ctx, envID, conn.InstanceId)
+	if err != nil {
+		log.Error("could not get worker available capacity", "instance_id", conn.InstanceId, "err", err)
+		// Fail the health check if we can't get capacity - err on side of safety to prevent executions
+		return isHealthyRes{}
+	}
+	if workerCap.IsAtCapacity() {
+		// Worker has a capacity limit set and is at capacity
+		log.Debug("worker at capacity", "instance_id", conn.InstanceId, "total_capacity")
+		return isHealthyRes{workerAtCapacity: true}
 	}
 
 	return isHealthyRes{

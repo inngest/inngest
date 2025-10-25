@@ -385,6 +385,7 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       true,
 				shouldDeleteUnhealthyConnection: false,
 				shouldDeleteUnhealthyGateway:    false,
+				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -395,6 +396,7 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
 				shouldDeleteUnhealthyGateway:    false,
+				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -404,6 +406,7 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: false,
 				shouldDeleteUnhealthyGateway:    false,
+				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -413,6 +416,7 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
 				shouldDeleteUnhealthyGateway:    false,
+				workerAtCapacity:                false,
 			},
 		},
 	}

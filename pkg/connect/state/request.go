@@ -200,6 +200,22 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	return lease.ExecutorIP, nil
 }
 
+// GetLeaseWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
+func (r *redisConnectionStateManager) GetLeaseWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
+
+	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(leaseWorkerKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// No mapping exists - request may not have a worker capacity lease
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get worker instance ID: %w", err)
+	}
+
+	return instanceID, nil
+}
+
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 // in case Redis PubSub fails to notify the executor.
 func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, resp *connpb.SDKResponse) error {
