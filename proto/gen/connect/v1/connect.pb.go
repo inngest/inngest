@@ -431,22 +431,23 @@ func (x *AuthData) GetSyncToken() string {
 }
 
 type WorkerConnectRequestData struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	ConnectionId             string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
-	InstanceId               string                 `protobuf:"bytes,2,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	AuthData                 *AuthData              `protobuf:"bytes,3,opt,name=auth_data,json=authData,proto3" json:"auth_data,omitempty"`
-	Capabilities             []byte                 `protobuf:"bytes,4,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
-	Apps                     []*AppConfiguration    `protobuf:"bytes,5,rep,name=apps,proto3" json:"apps,omitempty"`
-	WorkerManualReadinessAck bool                   `protobuf:"varint,6,opt,name=worker_manual_readiness_ack,json=workerManualReadinessAck,proto3" json:"worker_manual_readiness_ack,omitempty"`
-	SystemAttributes         *SystemAttributes      `protobuf:"bytes,7,opt,name=system_attributes,json=systemAttributes,proto3" json:"system_attributes,omitempty"`
-	Environment              *string                `protobuf:"bytes,8,opt,name=environment,proto3,oneof" json:"environment,omitempty"`
-	Framework                string                 `protobuf:"bytes,9,opt,name=framework,proto3" json:"framework,omitempty"`
-	Platform                 *string                `protobuf:"bytes,10,opt,name=platform,proto3,oneof" json:"platform,omitempty"`
-	SdkVersion               string                 `protobuf:"bytes,11,opt,name=sdk_version,json=sdkVersion,proto3" json:"sdk_version,omitempty"`
-	SdkLanguage              string                 `protobuf:"bytes,12,opt,name=sdk_language,json=sdkLanguage,proto3" json:"sdk_language,omitempty"`
-	StartedAt                *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId              string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	InstanceId                string                 `protobuf:"bytes,2,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	AuthData                  *AuthData              `protobuf:"bytes,3,opt,name=auth_data,json=authData,proto3" json:"auth_data,omitempty"`
+	Capabilities              []byte                 `protobuf:"bytes,4,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	Apps                      []*AppConfiguration    `protobuf:"bytes,5,rep,name=apps,proto3" json:"apps,omitempty"`
+	WorkerManualReadinessAck  bool                   `protobuf:"varint,6,opt,name=worker_manual_readiness_ack,json=workerManualReadinessAck,proto3" json:"worker_manual_readiness_ack,omitempty"`
+	SystemAttributes          *SystemAttributes      `protobuf:"bytes,7,opt,name=system_attributes,json=systemAttributes,proto3" json:"system_attributes,omitempty"`
+	Environment               *string                `protobuf:"bytes,8,opt,name=environment,proto3,oneof" json:"environment,omitempty"`
+	Framework                 string                 `protobuf:"bytes,9,opt,name=framework,proto3" json:"framework,omitempty"`
+	Platform                  *string                `protobuf:"bytes,10,opt,name=platform,proto3,oneof" json:"platform,omitempty"`
+	SdkVersion                string                 `protobuf:"bytes,11,opt,name=sdk_version,json=sdkVersion,proto3" json:"sdk_version,omitempty"`
+	SdkLanguage               string                 `protobuf:"bytes,12,opt,name=sdk_language,json=sdkLanguage,proto3" json:"sdk_language,omitempty"`
+	StartedAt                 *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	MaxConcurrentWorkerLeases *int64                 `protobuf:"varint,14,opt,name=max_concurrent_worker_leases,json=maxConcurrentWorkerLeases,proto3,oneof" json:"max_concurrent_worker_leases,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *WorkerConnectRequestData) Reset() {
@@ -568,6 +569,13 @@ func (x *WorkerConnectRequestData) GetStartedAt() *timestamppb.Timestamp {
 		return x.StartedAt
 	}
 	return nil
+}
+
+func (x *WorkerConnectRequestData) GetMaxConcurrentWorkerLeases() int64 {
+	if x != nil && x.MaxConcurrentWorkerLeases != nil {
+		return *x.MaxConcurrentWorkerLeases
+	}
+	return 0
 }
 
 type GatewayConnectionReadyData struct {
@@ -1825,7 +1833,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\bAuthData\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12\x1d\n" +
 	"\n" +
-	"sync_token\x18\x02 \x01(\tR\tsyncToken\"\xf5\x04\n" +
+	"sync_token\x18\x02 \x01(\tR\tsyncToken\"\xdc\x05\n" +
 	"\x18WorkerConnectRequestData\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
 	"\vinstance_id\x18\x02 \x01(\tR\n" +
@@ -1843,9 +1851,11 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"sdkVersion\x12!\n" +
 	"\fsdk_language\x18\f \x01(\tR\vsdkLanguage\x129\n" +
 	"\n" +
-	"started_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAtB\x0e\n" +
+	"started_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12D\n" +
+	"\x1cmax_concurrent_worker_leases\x18\x0e \x01(\x03H\x02R\x19maxConcurrentWorkerLeases\x88\x01\x01B\x0e\n" +
 	"\f_environmentB\v\n" +
-	"\t_platform\"\x7f\n" +
+	"\t_platformB\x1f\n" +
+	"\x1d_max_concurrent_worker_leases\"\x7f\n" +
 	"\x1aGatewayConnectionReadyData\x12-\n" +
 	"\x12heartbeat_interval\x18\x01 \x01(\tR\x11heartbeatInterval\x122\n" +
 	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\"\xbe\x03\n" +
