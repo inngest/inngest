@@ -130,6 +130,15 @@ func WorkerQueueCapacityCounter(ctx context.Context, incr int64, opts CounterOpt
 	})
 }
 
+func IncrExecutorScheduleCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_scheduled_total",
+		Description: "Total number of executor schedule calls",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
