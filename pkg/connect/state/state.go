@@ -120,9 +120,9 @@ type WorkerCapacityManager interface {
 	// DeleteRequestLeaseFromWorker decrements the active lease count for a worker instance.
 	DeleteRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
-	// WorkerCapacitiesHeartbeat refreshes the TTL on the worker capacity key.
+	// WorkerTotalCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
 	// Called on heartbeat to keep the capacity limit alive while worker is active.
-	WorkerCapacitiesHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
+	WorkerTotalCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
 }
 
 type AuthContext struct {
@@ -409,6 +409,10 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 type WorkerCapacity struct {
 	Total     int64
 	Available int64
+}
+
+func (w *WorkerCapacity) IsUnlimited() bool {
+	return w.Total == 0
 }
 
 func (w *WorkerCapacity) IsAvailable() bool {

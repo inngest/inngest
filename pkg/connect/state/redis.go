@@ -977,14 +977,14 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	return nil
 }
 
-// WorkerCapacitiesHeartbeat refreshes the TTL on the worker capacity key and counter key.
-// Called on heartbeat to keep the capacity limit and counter alive while worker is active.
-func (r *redisConnectionStateManager) WorkerCapacitiesHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
+// WorkerTotalCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
+// Called on heartbeat to keep the capacity limit alive if it exists while worker is active.
+// Counter TTL is associated with the lease mapping, so it will be refreshed when the lease is extended.
+func (r *redisConnectionStateManager) WorkerTotalCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
-	counterKey := r.workerLeasesCounterKey(envID, instanceID)
 
 	capacityTTL := 4 * consts.ConnectWorkerHeartbeatInterval
-	keys := []string{capacityKey, counterKey}
+	keys := []string{capacityKey}
 	args := []string{fmt.Sprintf("%d", int64(capacityTTL.Seconds()))}
 
 	_, err := scripts["heartbeat_worker_capacity"].Exec(ctx, r.client, keys, args).AsInt64()

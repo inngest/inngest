@@ -1496,7 +1496,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 	})
 }
 
-func TestWorkerCapacitiesHeartbeat(t *testing.T) {
+func TestWorkerTotalCapcityOnHeartbeat(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1512,7 +1512,7 @@ func TestWorkerCapacitiesHeartbeat(t *testing.T) {
 
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
-		err := mgr.WorkerCapacitiesHeartbeat(ctx, envID, instanceID)
+		err := mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 	})
 
@@ -1525,7 +1525,7 @@ func TestWorkerCapacitiesHeartbeat(t *testing.T) {
 		r.FastForward(20 * time.Second)
 
 		// Refresh TTL
-		err = mgr.WorkerCapacitiesHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check TTL is reset
@@ -1547,7 +1547,7 @@ func TestWorkerCapacitiesHeartbeat(t *testing.T) {
 		r.FastForward(30 * time.Second)
 
 		// Refresh TTL
-		err = mgr.WorkerCapacitiesHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check both TTLs are reset
@@ -1661,7 +1661,8 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.True(t, r.Exists(leaseWorkerKey))
 
 		for i := 0; i < 6; i++ {
-			err = mgr.WorkerCapacitiesHeartbeat(ctx, envID, instanceID)
+			err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
+			// TODO: extend lease for req-2
 			require.NoError(t, err)
 			r.FastForward(10 * time.Second)
 		}
@@ -1715,9 +1716,8 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		// Should return unlimited
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		require.Equal(t, consts.ConnectWorkerNoConcurrencyLimitForRequests, caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
 		require.Equal(t, int64(0), caps.Total)
-		require.Equal(t, consts.ConnectWorkerNoConcurrencyLimitForRequests, caps.Available)
 		require.False(t, caps.IsAtCapacity())
 		require.True(t, caps.IsAvailable())
 

@@ -672,7 +672,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		// Refresh worker capacity TTL if capacity is set
-		if err := c.svc.stateManager.WorkerCapacitiesHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
+		if err := c.svc.stateManager.WorkerTotalCapcityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
 			// Log but don't fail the heartbeat if TTL refresh fails
 			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
 				logger.WithErrorReportTags(map[string]string{
