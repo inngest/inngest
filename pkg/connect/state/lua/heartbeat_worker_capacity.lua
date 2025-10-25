@@ -25,6 +25,7 @@ end
 redis.call("EXPIRE", capacityKey, ttl)
 
 -- Refresh counter key TTL if it exists
+-- this check can be skipped but it will create the value if it doesn't exist
 local counterExists = redis.call("EXISTS", counterKey)
 if counterExists == 1 then
   redis.call("EXPIRE", counterKey, ttl)

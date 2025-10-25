@@ -385,7 +385,6 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       true,
 				shouldDeleteUnhealthyConnection: false,
 				shouldDeleteUnhealthyGateway:    false,
-				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -396,7 +395,6 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
 				shouldDeleteUnhealthyGateway:    false,
-				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -406,7 +404,6 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: false,
 				shouldDeleteUnhealthyGateway:    false,
-				workerAtCapacity:                false,
 			},
 		},
 		{
@@ -416,7 +413,6 @@ func TestIsHealthy(t *testing.T) {
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
 				shouldDeleteUnhealthyGateway:    false,
-				workerAtCapacity:                false,
 			},
 		},
 	}
@@ -532,5 +528,324 @@ func TestGetConnectionWeight(t *testing.T) {
 
 			require.Greater(t, newConnWeight, oldConnWeight)
 		}
+	})
+}
+
+func TestCheckCapacity(t *testing.T) {
+	ctx := context.Background()
+	stateMan, cleanup := setupRedis(t)
+	defer cleanup()
+
+	log := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
+
+	envID := uuid.New()
+
+	t.Run("worker without capacity limit should have capacity", func(t *testing.T) {
+		instanceID := "worker-no-limit"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-1",
+			InstanceId: instanceID,
+		}
+
+		// No capacity limit set for this worker
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("worker with capacity limit and no leases should have capacity", func(t *testing.T) {
+		instanceID := "worker-with-limit"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-2",
+			InstanceId: instanceID,
+		}
+
+		// Set capacity limit
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
+		require.NoError(t, err)
+
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("worker with partial capacity usage should have capacity", func(t *testing.T) {
+		instanceID := "worker-partial-usage"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-3",
+			InstanceId: instanceID,
+		}
+
+		// Set capacity limit
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 10)
+		require.NoError(t, err)
+
+		// Assign some leases (partial usage)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		require.NoError(t, err)
+
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+
+		// Verify available capacity
+		capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Equal(t, int64(7), capacity.Available) // 10 - 3 = 7
+	})
+
+	t.Run("worker at full capacity should not have capacity", func(t *testing.T) {
+		instanceID := "worker-at-capacity"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-4",
+			InstanceId: instanceID,
+		}
+
+		// Set capacity limit
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 3)
+		require.NoError(t, err)
+
+		// Fill capacity completely
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		require.NoError(t, err)
+
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+
+		// Verify capacity is at zero
+		capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), capacity.Available)
+		require.True(t, capacity.IsAtCapacity())
+	})
+
+	t.Run("capacity changes with lease assignments and releases", func(t *testing.T) {
+		instanceID := "worker-dynamic-capacity"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-5",
+			InstanceId: instanceID,
+		}
+
+		// Set capacity limit
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
+		require.NoError(t, err)
+
+		// Initially should have capacity
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+
+		// Assign leases one by one and verify capacity decreases
+		for i := 1; i <= 5; i++ {
+			err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
+			require.NoError(t, err)
+
+			capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+			require.NoError(t, err)
+			require.Equal(t, int64(5-i), capacity.Available)
+
+			res = checkCapacity(ctx, stateMan, envID, conn, log)
+			if i < 5 {
+				require.True(t, res.hasWorkerCapacity, "should have capacity after %d assignments", i)
+			} else {
+				require.False(t, res.hasWorkerCapacity, "should not have capacity after %d assignments", i)
+			}
+		}
+
+		// Release leases one by one and verify capacity increases
+		for i := 1; i <= 5; i++ {
+			err = stateMan.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
+			require.NoError(t, err)
+
+			capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+			require.NoError(t, err)
+			require.Equal(t, int64(i), capacity.Available)
+
+			res = checkCapacity(ctx, stateMan, envID, conn, log)
+			require.True(t, res.hasWorkerCapacity, "should have capacity after releasing %d leases", i)
+		}
+	})
+
+	t.Run("capacity limit can be updated", func(t *testing.T) {
+		instanceID := "worker-capacity-update"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-6",
+			InstanceId: instanceID,
+		}
+
+		// Set initial capacity
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 3)
+		require.NoError(t, err)
+
+		// Assign leases up to capacity
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		require.NoError(t, err)
+
+		// Should be at capacity
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+
+		// Increase capacity
+		err = stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 6)
+		require.NoError(t, err)
+
+		// Should now have capacity
+		res = checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+
+		capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), capacity.Available) // 6 - 3 = 3
+
+		// Decrease capacity below current usage
+		err = stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 2)
+		require.NoError(t, err)
+
+		// Should not have capacity (over limit)
+		capacity, err = stateMan.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		// 2 - 3 = -1 (over capacity), but we take a max with 0
+		require.Equal(t, int64(0), capacity.Available)
+		require.True(t, capacity.IsAtCapacity())
+
+		res = checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("capacity can be removed by setting to zero", func(t *testing.T) {
+		instanceID := "worker-remove-capacity"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-7",
+			InstanceId: instanceID,
+		}
+
+		// Set capacity and assign leases
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 2)
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		require.NoError(t, err)
+
+		// Should be at capacity
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+
+		// Remove capacity limit (set to 0)
+		err = stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 0)
+		require.NoError(t, err)
+
+		// Should now have unlimited capacity
+		res = checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("connection without instance ID should not have capacity", func(t *testing.T) {
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-no-instance",
+			InstanceId: "", // Empty instance ID
+		}
+
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("concurrent lease assignments respect capacity limits", func(t *testing.T) {
+		instanceID := "worker-concurrent"
+		conn := &connectpb.ConnMetadata{
+			Id:         "conn-8",
+			InstanceId: instanceID,
+		}
+
+		// Set small capacity
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 2)
+		require.NoError(t, err)
+
+		// Assign leases
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		require.NoError(t, err)
+
+		// Should be at capacity
+		res := checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+
+		// Release one lease
+		err = stateMan.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+
+		// Should have capacity again
+		res = checkCapacity(ctx, stateMan, envID, conn, log)
+		require.True(t, res.hasWorkerCapacity)
+
+		// Assign another lease
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		require.NoError(t, err)
+
+		// Should be at capacity again
+		res = checkCapacity(ctx, stateMan, envID, conn, log)
+		require.False(t, res.hasWorkerCapacity)
+	})
+
+	t.Run("multiple workers can have independent capacity tracking", func(t *testing.T) {
+		instanceID1 := "worker-independent-1"
+		instanceID2 := "worker-independent-2"
+		conn1 := &connectpb.ConnMetadata{
+			Id:         "conn-9",
+			InstanceId: instanceID1,
+		}
+		conn2 := &connectpb.ConnMetadata{
+			Id:         "conn-10",
+			InstanceId: instanceID2,
+		}
+
+		// Set different capacities
+		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID1, 3)
+		require.NoError(t, err)
+		err = stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID2, 5)
+		require.NoError(t, err)
+
+		// Fill first worker to capacity
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-2")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-3")
+		require.NoError(t, err)
+
+		// Partially fill second worker
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID2, "req-2-1")
+		require.NoError(t, err)
+		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID2, "req-2-2")
+		require.NoError(t, err)
+
+		// Check capacities independently
+		res1 := checkCapacity(ctx, stateMan, envID, conn1, log)
+		require.False(t, res1.hasWorkerCapacity) // First worker at capacity
+
+		res2 := checkCapacity(ctx, stateMan, envID, conn2, log)
+		require.True(t, res2.hasWorkerCapacity) // Second worker has capacity
+
+		// Verify actual capacities
+		capacity1, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID1)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), capacity1.Available)
+
+		capacity2, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID2)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), capacity2.Available) // 5 - 2 = 3
 	})
 }

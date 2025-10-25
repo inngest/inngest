@@ -411,9 +411,6 @@ type WorkerCapacity struct {
 	Available int64
 }
 
-func (w *WorkerCapacity) IsUnlimited() bool {
-	return w.Total == 0
-}
 func (w *WorkerCapacity) IsAvailable() bool {
 	return w.Available > 0 || w.Available == consts.ConnectWorkerNoConcurrencyLimitForRequests
 }

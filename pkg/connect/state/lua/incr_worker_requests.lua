@@ -17,11 +17,12 @@ local counterTTL = tonumber(ARGV[1])
 local instanceID = ARGV[2]
 local requestID = ARGV[3]
 
--- Get the worker's capacity limit
+-- Get the worker's capacity limit (returns a string)
 local capacity = redis.call("GET", capacityKey)
 
 -- If no capacity limit is set, don't track leases
-if capacity == nil or capacity == 0 or capacity == false then
+-- redis nil becomes false in lua: https://redis.io/docs/latest/commands/eval/#conversion-between-lua-and-redis-data-types
+if capacity == nil or capacity == 0 or capacity == false or capacity == "0" then
   return 0
 end
 
@@ -29,6 +30,12 @@ capacity = tonumber(capacity)
 
 -- Get current number of active leases
 local currentLeases = tonumber(redis.call("GET", counterKey) or "0")
+
+-- If current leases is not a number (and doesn't exist), we assume that
+-- there are no active leases
+if currentLeases == nil or currentLeases == 0 or currentLeases == false then
+  currentLeases = 0
+end
 
 -- Check if at capacity
 if currentLeases >= capacity then

@@ -123,7 +123,8 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	healthy := make([]connWithGroup, 0, len(conns))
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
-		if res.isHealthy {
+		capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
+		if res.isHealthy && capacityRes.hasWorkerCapacity {
 			healthy = append(healthy, connWithGroup{
 				conn:  conn,
 				group: res.workerGroup,
@@ -253,7 +254,6 @@ type isHealthyRes struct {
 	isHealthy                       bool
 	shouldDeleteUnhealthyConnection bool
 	shouldDeleteUnhealthyGateway    bool
-	workerAtCapacity                bool
 	workerGroup                     *state.WorkerGroup
 }
 
@@ -357,26 +357,36 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		}
 	}
 
+	return isHealthyRes{
+		isHealthy:   true,
+		workerGroup: group,
+	}
+}
+
+type checkCapacityRes struct {
+	hasWorkerCapacity bool
+}
+
+func checkCapacity(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log logger.Logger) *checkCapacityRes {
+
 	// Check worker capacity
 	if conn.InstanceId == "" {
+		// This should never happen
 		log.Error("connection has no instance ID", "conn_id", conn.Id)
-		return isHealthyRes{}
+		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 
 	workerCap, err := stateManager.GetWorkerCapacities(ctx, envID, conn.InstanceId)
 	if err != nil {
 		log.Error("could not get worker available capacity", "instance_id", conn.InstanceId, "err", err)
 		// Fail the health check if we can't get capacity - err on side of safety to prevent executions
-		return isHealthyRes{}
+		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 	if workerCap.IsAtCapacity() {
 		// Worker has a capacity limit set and is at capacity
 		log.Debug("worker at capacity", "instance_id", conn.InstanceId, "total_capacity")
-		return isHealthyRes{workerAtCapacity: true}
+		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 
-	return isHealthyRes{
-		isHealthy:   true,
-		workerGroup: group,
-	}
+	return &checkCapacityRes{hasWorkerCapacity: true}
 }

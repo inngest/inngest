@@ -864,6 +864,8 @@ func (r *redisConnectionStateManager) GetWorkerTotalCapacity(ctx context.Context
 	capacity, err := r.client.Do(ctx, r.client.B().Get().Key(key).Build()).AsInt64()
 
 	// If the key doesn't exist, return 0 (no limit set)
+	// It also will return 0 if the key is expired (i.e expired values for total capacity = unlimited)
+	// In case of failures, the sdk should connect again
 	if err != nil && rueidis.IsRedisNil(err) {
 		return 0, nil // No limit set
 	} else if err != nil {
