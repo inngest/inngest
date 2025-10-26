@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -19,14 +18,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var (
-	defaultPropagator = propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-
-	tracer     trace.Tracer
-	tracerOnce sync.Once
+var defaultPropagator = propagation.NewCompositeTextMapPropagator(
+	propagation.TraceContext{},
+	propagation.Baggage{},
 )
 
 // TracerProvider defines the interface for tracing providers.
@@ -83,17 +77,15 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 }
 
 func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
-	tracerOnce.Do(func() {
-		base := sdktrace.NewSimpleSpanProcessor(tp.exp)
+	base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
-		otelTP := sdktrace.NewTracerProvider(
-			sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
-			// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
-		)
+	otelTP := sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
+		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
+	)
 
-		tracer = otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
-	})
-
+	// TODO: This could be a singleton once old tracing is removed.
+	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
 	return tracer
 }
 

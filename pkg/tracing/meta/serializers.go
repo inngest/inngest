@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -266,6 +267,9 @@ func TimeAttr(key string) attr[*time.Time] {
 					t := time.UnixMilli(int64(f))
 					return &t, true
 				}
+				if t, err := dateutil.Parse(v); err == nil {
+					return &t, true
+				}
 			}
 			return nil, false
 		},
@@ -353,7 +357,22 @@ func IntAttr(key string) attr[*int] {
 			return attribute.Int(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*int, bool) {
-			if i, ok := v.(float64); ok {
+			// NOTE: Sometimes we may need to typecast from (string, *string) -> int in order
+			// to properly fill our values when reading a Map(string, string) from clickhouse.
+			switch i := v.(type) {
+			case string:
+				val, err := strconv.Atoi(i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case *string:
+				val, err := strconv.Atoi(*i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case float64:
 				val := int(i)
 				return &val, true
 			}

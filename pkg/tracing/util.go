@@ -204,6 +204,8 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 
 	case enums.OpcodeSleep:
 		{
+			now := time.Now()
+			meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 			if dur, err := op.SleepDuration(); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepSleepDuration, &dur)
 			} else {
