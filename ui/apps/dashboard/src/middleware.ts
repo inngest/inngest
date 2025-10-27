@@ -182,7 +182,6 @@ function getAppURL(): string | null {
   const configuredURL = process.env.NEXT_PUBLIC_APP_URL;
   if (!configuredURL) return null;
 
-  // Handle preview environments with placeholder (check before isValidURL since "$" is technically valid in URLs)
   if (configuredURL.includes('$VERCEL_URL') && process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
