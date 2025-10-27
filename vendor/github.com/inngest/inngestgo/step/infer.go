@@ -113,7 +113,8 @@ func Infer[InputT any, OutputT any](
 			Format:  in.Opts.Format,
 			Body:    in.Body,
 		},
-		Data: reqBytes,
+		Data:     reqBytes,
+		Userland: op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 	panic(sdkrequest.ControlHijack{})

@@ -22,11 +22,20 @@ type peekOption struct {
 	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
 	// The use of this should be rare, and should be limited to system queue operations as much as possible.
 	Shard *QueueShard
+
+	ignoreCleanup bool
 }
 
 func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
 	return func(p *peekOption) {
 		p.Shard = qs
+	}
+}
+
+// WithPeekOptIgnoreCleanup will prevent missing items from being deleted.
+func WithPeekOptIgnoreCleanup() PeekOpt {
+	return func(p *peekOption) {
+		p.ignoreCleanup = true
 	}
 }
 
@@ -225,7 +234,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("error decoding items: %w", err)
 	}
 
-	if p.handleMissingItems != nil && len(missingItems) > 0 {
+	if !opt.ignoreCleanup && p.handleMissingItems != nil && len(missingItems) > 0 {
 		if err := p.handleMissingItems(missingItems); err != nil {
 			return nil, fmt.Errorf("could not handle missing items: %w", err)
 		}

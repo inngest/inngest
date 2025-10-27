@@ -29,6 +29,7 @@ type CallCtx struct {
 	StepID                    string    `json:"step_id"`
 	Stack                     CallStack `json:"stack"`
 	Attempt                   int       `json:"attempt"`
+	MaxAttempts               *int      `json:"max_attempts"`
 }
 
 type CallStack struct {

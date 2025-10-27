@@ -874,7 +874,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		executor.WithFunctionLoader(loader),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithSendingEventHandler(func(ctx context.Context, evt event.Event, item queue.Item) error {
 			if evt.Name == "inngest/function.invoked" {
 				eventCaptured = true
@@ -1052,7 +1052,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		executor.WithFunctionLoader(loader),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithDriverV1(nonRetriableDriver),
 	)
 	require.NoError(t, err)
@@ -1231,7 +1231,7 @@ func TestExecutorScheduleRateLimit(t *testing.T) {
 		executor.WithFunctionLoader(loader),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithRateLimiter(rl),
 	)
 	require.NoError(t, err)

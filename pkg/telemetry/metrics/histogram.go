@@ -308,3 +308,13 @@ func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_flush_duration",
+		Description: "Distribution of span flushes from tracing",
+		Tags:        opts.Tags,
+		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}
