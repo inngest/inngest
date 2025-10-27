@@ -548,7 +548,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
-			GRPCConfig:                 opts.ConnectGRPCConfig,
+			ConnectGRPCConfig:          opts.ConnectGRPCConfig,
 		},
 	})
 	if err != nil {

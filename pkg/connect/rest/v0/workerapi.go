@@ -232,7 +232,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	switch {
 	case err == nil:
 		executorIP := ip.String()
-		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", cr.Opts.GRPCConfig.Executor.Port))
+		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", cr.Opts.ConnectGRPCConfig.Executor.Port))
 		grpcClient, err := cr.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 		if err != nil {
 			l.Error("could not create grpc client", "url", grpcURL, "err", err)

@@ -27,7 +27,7 @@ type Opts struct {
 	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
 
-	GRPCConfig connectConfig.ConnectGRPCConfig
+	ConnectGRPCConfig connectConfig.ConnectGRPCConfig
 
 	Dev bool
 }
