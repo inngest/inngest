@@ -179,21 +179,16 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
 const CSP_REPORT_PATH = '/api/csp-report';
 
 function getAppURL(): string | null {
-  console.log(1);
   const configuredURL = process.env.NEXT_PUBLIC_APP_URL;
   if (!configuredURL) return null;
 
-  console.log(2);
-  if (isValidURL(configuredURL)) return configuredURL;
-  console.log(3);
-
-  // Handle preview environments.
-  console.log('>>>', configuredURL.includes('$VERCEL_URL'), Boolean(process.env.VERCEL_URL));
+  // Handle preview environments with placeholder (check before isValidURL since "$" is technically valid in URLs)
   if (configuredURL.includes('$VERCEL_URL') && process.env.VERCEL_URL) {
-    console.log('3.1');
     return `https://${process.env.VERCEL_URL}`;
   }
-  console.log(4);
+
+  if (isValidURL(configuredURL)) return configuredURL;
+
   return null;
 }
 
