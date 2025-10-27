@@ -56,7 +56,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
     runs-on: ubuntu-latest
-    needs: [check-release-type]
+    needs: [goreleaser, check-release-type]
     defaults:
       run:
         shell: bash
