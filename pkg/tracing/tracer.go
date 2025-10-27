@@ -153,8 +153,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		)
 	} else {
 		// Use a fresh context for parent traces so that there's no pollution from any
-		// other tracing.
-		ctx = context.Background()
+		// other tracing, but preserve the ExecutionContext so that the span processor
+		// can extract tenant information (AppID, FunctionID, etc.).
+		ctx = mixinExecutonContext(ctx, context.Background())
 	}
 
 	attrs := opts.Attributes

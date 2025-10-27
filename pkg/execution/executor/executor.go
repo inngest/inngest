@@ -813,6 +813,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		&status,
 	)
 
+	// Set execution context for tracing before creating the span, so that
+	// the span processor can extract AppID and other tenant information.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier: metadata.ID,
+	})
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
