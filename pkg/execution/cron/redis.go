@@ -44,8 +44,10 @@ type redisCronManagerOpt struct {
 func (opts *redisCronManagerOpt) validate() {
 	if opts.healthCheckLeadTimeSeconds >= int(opts.healthCheckInterval.Seconds()) {
 		l := logger.StdlibLogger(context.Background())
-		l.Warn("Invalid redisCronManagerOpt, health lead time cannot be >= health check interval", "leadTime_seconds", opts.healthCheckLeadTimeSeconds, "interval", opts.healthCheckInterval)
+
 		opts.healthCheckLeadTimeSeconds = defaultHealthCheckLeadTimeSeconds
+
+		l.Warn("Invalid redisCronManagerOpt, health lead time cannot be >= health check interval", "leadTime_seconds", opts.healthCheckLeadTimeSeconds, "interval", opts.healthCheckInterval)
 		l.Info("Resetting health check lead time", "leadTime", opts.healthCheckLeadTimeSeconds)
 	}
 }
@@ -183,7 +185,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 	kind := queue.KindCronHealthCheck
 	jobID := c.CronHealthCheckJobID(nextCheck)
 
-	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "now", now, "nextCheck", nextCheck, "jobID", jobID)
+	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "now", now, "nextCheck", nextCheck)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -217,7 +219,7 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 	// Get the next schedule time based on the cron expression
 	next, err := Next(expr, from)
 	if err != nil {
-		return CronHealthCheckStatus{}, fmt.Errorf("failed to parse cron expression %q for health check: %w", expr, err)
+		return CronHealthCheckStatus{}, fmt.Errorf("failed to get next schedule time for health check: %w", err)
 	}
 
 	// Generate the job ID for this scheduled item
