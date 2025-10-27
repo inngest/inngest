@@ -33,6 +33,14 @@ var (
 	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
+// BacklogManager defines the interface for backlog operations
+type BacklogManager interface {
+	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error)
+	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error)
+	ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog
+	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
+}
+
 type PartitionConstraintConfig struct {
 	FunctionVersion int `json:"fv,omitempty,omitzero"`
 
@@ -595,7 +603,7 @@ type BacklogRefillResult struct {
 	RetryAt           time.Time
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error) {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -610,14 +618,6 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	nowMS := q.clock.Now().UnixMilli()
-
-	refillLimit := q.backlogRefillLimit
-	if refillLimit > BacklogRefillHardLimit {
-		refillLimit = BacklogRefillHardLimit
-	}
-	if refillLimit <= 0 {
-		refillLimit = BacklogRefillHardLimit
-	}
 
 	var (
 		throttleKey                                  string
@@ -684,7 +684,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.PartitionID,
 		accountID,
 		refillUntil.UnixMilli(),
-		refillLimit,
+		refillItems,
 		nowMS,
 
 		latestConstraints.Concurrency.AccountConcurrency,
@@ -932,6 +932,14 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 }
 
+// BacklogPeek is the public interface to peek items from a backlog
+func (q *queue) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	return q.backlogPeek(ctx, b, from, until, limit, opts...)
+}
+
+// backlogPeek peeks item from the given backlog.
+//
+// Pointers to missing items will be removed from the backlog.
 func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
 
@@ -983,14 +991,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			cmd := rc.Client().B().Zrem().Key(rc.kg.QueueItem()).Member(pointers...).Build()
-			err := rc.Client().Do(ctx, cmd).Error()
-			if err != nil {
-				l.Warn("failed to clean up dangling queue items in the backlog", "missing", pointers)
-			}
-			return nil
-		},
+		handleMissingItems:     CleanupMissingPointers(ctx, backlogSet, rc.Client(), l),
 		isMillisecondPrecision: true,
 		fromTime:               fromTime,
 	}

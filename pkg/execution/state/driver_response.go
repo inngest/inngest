@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 const (
@@ -403,6 +404,16 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		key: json.RawMessage(*output),
 	})
 	if err != nil {
+		if v, ok := r.Output.(string); ok {
+			// Reach here when output isn't valid JSON. For example, when we get
+			// a 502 HTML page
+
+			keyedByt := StandardError{
+				Message: "Invalid JSON in response",
+				Stack:   v,
+			}.Serialize(key)
+			return util.ToPtr(string(keyedByt)), nil
+		}
 		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
 	}
 	s := string(keyedByt)

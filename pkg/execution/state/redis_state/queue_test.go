@@ -3241,7 +3241,11 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		//
 
 		// drop backlog
-		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), PartitionConstraintConfig{})
+		// Get items to refill from backlog
+		itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, time.Now().Add(time.Minute), 1000)
+		require.NoError(t, err)
+
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), itemIDs, PartitionConstraintConfig{})
 		require.NoError(t, err)
 		require.Equal(t, 1, res.Refilled)
 
@@ -6798,7 +6802,11 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Zero(t, i.RefilledAt)
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, PartitionConstraintConfig{
+			// Get items to refill from backlog
+			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			require.NoError(t, err)
+
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
@@ -6866,7 +6874,11 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Zero(t, i.RefilledAt)
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, PartitionConstraintConfig{
+			// Get items to refill from backlog
+			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			require.NoError(t, err)
+
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
@@ -7107,7 +7119,11 @@ func TestQueueActiveCounters(t *testing.T) {
 			//
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, PartitionConstraintConfig{
+			// Get items to refill from backlog
+			itemIDs, err := getItemIDsFromBacklog(ctx, q, &backlog, refillUntil, 1000)
+			require.NoError(t, err)
+
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, itemIDs, PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,

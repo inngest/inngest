@@ -84,11 +84,7 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 
 func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 	tracerOnce.Do(func() {
-		base := sdktrace.NewBatchSpanProcessor(tp.exp,
-			sdktrace.BatchSpanProcessorOption(
-				sdktrace.WithBatchTimeout(tp.bt),
-			),
-		)
+		base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
 		otelTP := sdktrace.NewTracerProvider(
 			sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
@@ -155,6 +151,10 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 			// and propagator, which is necessary to tie parents <> children.
 			defaultPropagator.Extract(context.Background(), carrier),
 		)
+	} else {
+		// Use a fresh context for parent traces so that there's no pollution from any
+		// other tracing.
+		ctx = context.Background()
 	}
 
 	attrs := opts.Attributes
