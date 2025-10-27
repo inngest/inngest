@@ -343,7 +343,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
-	croner := cron.NewRedisCronManager(unshardedClient.Cron(), rq, l)
+	croner := cron.NewRedisCronManager(rq, l)
 
 	sn := singleton.New(ctx, queueShards, shardSelector)
 
@@ -404,7 +404,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
-	tracer := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
+	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
 		MaxIdleConns:    opts.PostgresMaxIdleConns,
 		MaxOpenConns:    opts.PostgresMaxOpenConns,
 		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
@@ -469,7 +469,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
-		executor.WithTracerProvider(tracer),
+		executor.WithTracerProvider(tp),
 	)
 	if err != nil {
 		return err
@@ -520,7 +520,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	
 	// Add MCP server route
 	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data)
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -566,11 +565,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:        dbcqrs,
-			FunctionCreator:   dbcqrs,
-			EventPublisher:    runner,
-			TracerProvider:    tracer,
-			State:             smv2,
+			AppCreator:      dbcqrs,
+			FunctionCreator: dbcqrs,
+			EventPublisher:  runner,
+			TracerProvider:  tp,
+			State:           smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{

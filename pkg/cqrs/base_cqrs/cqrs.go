@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -166,6 +167,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
+	var err error
 
 	for _, span := range spans {
 		// Use interface methods to get the fields directly
@@ -222,7 +224,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			inputSpanID  *string
 			fragments    []map[string]interface{}
 		)
-		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
@@ -239,7 +240,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 					return nil, err
 				}
 
-				maps.Copy(groupedAttrs, fragmentAttr)
+				maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
@@ -261,7 +262,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			}
 		}
 
-		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
+		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
 		}
@@ -314,8 +315,30 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		spanMap.Set(dynamicSpanID.String, newSpan)
 	}
 
+	// Build a reverse lookup map for output references
+	outputDynamicRefs := make(map[string]*string)
+	for spanID, ioRef := range dynamicRefs {
+		if ioRef != nil && ioRef.OutputRef != "" {
+			outputDynamicRefs[ioRef.OutputRef] = &spanID
+		}
+	}
+
 	for _, span := range spanMap.AllFromFront() {
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+		// If we have an output reference for this span, set the appropriate
+		// target span ID here
+		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
+			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
+				// We've found the span ID that we need to target for
+				// this span. So let's use it!
+				span.OutputID, err = encodeSpanOutputID(targetSpanID, nil)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+					return nil, err
+				}
+			}
+		}
+
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
 		}
@@ -331,6 +354,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			item, _ := spanMap.Get(span.SpanID)
 			parent.Children = append(parent.Children, item)
 		} else {
+			spew.Dump(span)
+
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
 				"spanID", span.SpanID,
@@ -1000,7 +1025,6 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		Order(order...).
 		Limit(uint(opts.Limit)).
 		ToSQL()
-
 	if err != nil {
 		return nil, err
 	}
@@ -1101,7 +1125,6 @@ func (w wrapper) GetEventsIDbound(
 	limit int,
 	includeInternal bool,
 ) ([]*cqrs.Event, error) {
-
 	if ids.Before == nil {
 		ids.Before = &endULID
 	}
@@ -1498,7 +1521,6 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
-
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
@@ -2739,7 +2761,7 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		// Find min start_time and max end_time across all spans in this group
 		startTime := spans[0].StartTime
 		var endTime *time.Time
-		var status = enums.RunStatusRunning
+		status := enums.RunStatusRunning
 		var triggerIDs []string
 
 		for _, span := range spans {
