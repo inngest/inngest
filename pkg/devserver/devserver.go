@@ -83,6 +83,7 @@ const (
 	DefaultPollInterval       = 5
 	DefaultQueueWorkers       = 100
 	DefaultConnectGatewayPort = 8289
+	DefaultDebugAPIPort       = 7778
 )
 
 var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
@@ -140,6 +141,9 @@ type StartOpts struct {
 
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
+
+	// Debug API
+	DebugAPIPort int `json:"debugAPIPort"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -671,6 +675,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			State:         ds.State,
 			Cron:          croner,
 			ShardSelector: shardSelector,
+			Port:          ds.Opts.DebugAPIPort,
 		}))
 	}
 

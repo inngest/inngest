@@ -75,6 +75,16 @@ func Command() *cli.Command {
 				Usage:  "Use in memory sqlite db",
 				Hidden: true,
 			},
+			&cli.IntFlag{
+				Name:  "debug-api-port",
+				Value: devserver.DefaultDebugAPIPort,
+				Usage: "Port to expose the debug api endpoint",
+			},
+			// &cli.IntFlag{
+			// 	Name:  "debug-api-port",
+			// 	Value: devserver.DefaultConnectGatewayPort,
+			// 	Usage: "Port to expose the debug api endpoint",
+			// },
 		},
 	}
 

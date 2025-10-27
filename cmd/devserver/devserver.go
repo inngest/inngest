@@ -11,6 +11,7 @@ import (
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -68,6 +69,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
 	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
 	inMemory := localconfig.GetBoolValue(cmd, "in-memory", true)
+	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", debugapi.DefaultDebugAPIPort)
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -110,6 +112,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		ConnectGatewayPort: connectGatewayPort,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
 		InMemory:           inMemory,
+		DebugAPIPort:       debugAPIPort,
 	}
 
 	err = devserver.New(ctx, opts)

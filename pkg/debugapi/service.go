@@ -15,9 +15,17 @@ import (
 	"google.golang.org/grpc"
 )
 
+const DefaultDebugAPIPort = 7778
+
 func NewDebugAPI(o Opts) service.Service {
+	port := DefaultDebugAPIPort
+	if o.Port != 0 {
+		port = o.Port
+	}
+
 	return &debugAPI{
 		rpc:       grpc.NewServer(),
+		port:      port,
 		log:       o.Log,
 		db:        o.DB,
 		queue:     o.Queue,
@@ -35,10 +43,13 @@ type Opts struct {
 	Cron  cron.CronManager
 
 	ShardSelector redis_state.ShardSelector
+
+	Port int
 }
 
 type debugAPI struct {
 	pb.DebugServer
+	port int
 
 	rpc       *grpc.Server
 	log       logger.Logger
@@ -61,8 +72,7 @@ func (d *debugAPI) Pre(ctx context.Context) error {
 }
 
 func (d *debugAPI) Run(ctx context.Context) error {
-	// TODO: make the port overridable
-	addr := fmt.Sprintf(":%d", 7777)
+	addr := fmt.Sprintf(":%d", d.port)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
