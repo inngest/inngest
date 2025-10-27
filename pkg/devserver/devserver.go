@@ -86,7 +86,7 @@ const (
 	DefaultConnectGatewayPort      = 8289
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
-	DefaultDebugAPIPort            = 7778
+	DefaultDebugAPIPort            = 7777
 )
 
 var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{

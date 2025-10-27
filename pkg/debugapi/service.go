@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const DefaultDebugAPIPort = 7778
+const DefaultDebugAPIPort = 7777
 
 func NewDebugAPI(o Opts) service.Service {
 	port := DefaultDebugAPIPort
