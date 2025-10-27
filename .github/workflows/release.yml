@@ -19,9 +19,9 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     needs: [check-release-type]
-    if: needs.check-release-type.outputs.prerelease == ''
     steps:
       - name: Login to Docker Hub
+        if: needs.check-release-type.outputs.prerelease == ''
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
@@ -45,13 +45,14 @@ jobs:
         id: tag
         run: echo "tag=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_OUTPUT
       - name: Set up Docker Buildx
+        if: needs.check-release-type.outputs.prerelease == ''
         id: buildx
         uses: docker/setup-buildx-action@v3
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           version: "~> 2"
-          args: release --clean --verbose
+          args: ${{ needs.check-release-type.outputs.prerelease != '' && 'release --clean --verbose --skip=docker' || 'release --clean --verbose' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:
