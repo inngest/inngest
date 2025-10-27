@@ -142,14 +142,16 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
 
   const csp = [
     `base-uri 'self'`,
-    `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${appURL} ${combineCSPURLs(
-      LAUNCHDARKLY_URLS
-    )} ${getClerkURL(
+    `connect-src 'self' data: ${LOCAL_DEV_SERVER_URL} ${
+      process.env.NEXT_PUBLIC_API_URL ?? ''
+    } ${combineCSPURLs(LAUNCHDARKLY_URLS)} ${getClerkURL(
       isProdEnvironment
     )} ${CLERK_API_URL} ${MAZE_PROMPTS_URL} ${INNGEST_STATUS_URL} ${getAllowInnGSURL(
       isProdEnvironment,
       isDevBuild
-    )} ${getAllowClerkTelemetryURL(isProdEnvironment)} ${convertUrlToWebSocketURL(appURL)}`,
+    )} ${getAllowClerkTelemetryURL(isProdEnvironment)} ${convertUrlToWebSocketURL(
+      process.env.NEXT_PUBLIC_API_URL
+    )}`,
     `default-src 'self'`,
     `font-src 'self' ${INNGEST_FONT_CDN_URL} ${MONACO_EDITOR_CDN_FONT_URL}`,
     `form-action 'self'`,
