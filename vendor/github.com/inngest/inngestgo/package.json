@@ -1,7 +1,7 @@
 {
 	"name": "inngestgo",
 	"private": true,
-	"version": "0.14.0",
+	"version": "0.14.1",
 	"scripts": {
 		"changeset": "changeset",
 		"release:version": "changeset version && ./release/set_version.sh",

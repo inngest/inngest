@@ -86,10 +86,11 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   op.Op,
-		Name: id,
-		Opts: args,
+		ID:       hashedID,
+		Op:       op.Op,
+		Name:     id,
+		Opts:     args,
+		Userland: op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 	panic(sdkrequest.ControlHijack{})

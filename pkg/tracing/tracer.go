@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -19,14 +18,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var (
-	defaultPropagator = propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-
-	tracer     trace.Tracer
-	tracerOnce sync.Once
+var defaultPropagator = propagation.NewCompositeTextMapPropagator(
+	propagation.TraceContext{},
+	propagation.Baggage{},
 )
 
 // TracerProvider defines the interface for tracing providers.
@@ -83,18 +77,14 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 }
 
 func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
-	tracerOnce.Do(func() {
-		base := sdktrace.NewSimpleSpanProcessor(tp.exp)
+	base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
-		otelTP := sdktrace.NewTracerProvider(
-			sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
-			// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
-		)
+	otelTP := sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
+		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
+	)
 
-		tracer = otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
-	})
-
-	return tracer
+	return otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
 }
 
 func (d *DroppableSpan) Drop() {
@@ -134,9 +124,16 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
+	attrs := opts.Attributes
+	if attrs == nil {
+		attrs = meta.NewAttrSet()
+	}
+
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
+	} else {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
@@ -157,10 +154,6 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		ctx = context.Background()
 	}
 
-	attrs := opts.Attributes
-	if attrs == nil {
-		attrs = meta.NewAttrSet()
-	}
 	if opts.Debug != nil {
 		if opts.Debug.Location != "" {
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
