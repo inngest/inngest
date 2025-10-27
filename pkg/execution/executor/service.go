@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -882,7 +883,12 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 		return fmt.Errorf("error accessing scheduled functions: %w", err)
 	}
 
-	var errors []error
+	eg := errgroup.Group{}
+	var success int64
+	var errored int64
+	var failed int64
+	eg.SetLimit(20)
+
 	for _, fn := range scheduledFns {
 		// Get AppID
 		cqrsFn, err := s.data.GetFunctionByInternalUUID(ctx, fn.ID)
@@ -892,39 +898,54 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
-			status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err))
-				continue
-			}
+			fn := fn
+			appID := appID
+			cronExpr := cronExpr
 
-			if !status.Scheduled {
-				l.Error("cron health check failed, re-syncing", "fnID", fn.ID, "fnV", fn.FunctionVersion, "cronExpr", cronExpr, "expectedJob", status.JobID, "next", status.Next)
-				err = s.croner.Sync(ctx, cron.CronItem{
-					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-					AccountID:       consts.DevServerAccountID,
-					WorkspaceID:     consts.DevServerEnvID,
-					AppID:           appID,
-					FunctionID:      fn.ID,
-					FunctionVersion: fn.FunctionVersion,
-					Expression:      cronExpr,
-					Op:              enums.CronInit,
-				})
+			eg.Go(func() error {
+				l := s.log.With("fnID", fn.ID, "cronExpr", cronExpr, "fnVersion", fn.FunctionVersion)
+
+				status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
 				if err != nil {
-					errors = append(errors, fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err))
+					atomic.AddInt64(&errored, 1)
+					l.Error("health check failed", "err", err)
+					return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
 				}
-			}
+
+				if !status.Scheduled {
+					l.Warn("cron health check failed, re-syncing")
+					err = s.croner.Sync(ctx, cron.CronItem{
+						ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+						AccountID:       consts.DevServerAccountID,
+						WorkspaceID:     consts.DevServerEnvID,
+						AppID:           appID,
+						FunctionID:      fn.ID,
+						FunctionVersion: fn.FunctionVersion,
+						Expression:      cronExpr,
+						Op:              enums.CronInit,
+					})
+					if err != nil {
+						atomic.AddInt64(&errored, 1)
+						l.Error("failed to sync on health check failure", "err", err)
+						return fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err)
+					}
+					atomic.AddInt64(&failed, 1)
+				} else {
+					atomic.AddInt64(&success, 1)
+				}
+				return nil
+			})
 		}
 	}
 
-	for _, err := range errors {
-		l.Error("cron health check failed", "err", err)
+	err = eg.Wait()
+	l.Info("health checks finished", "success", success, "failed", failed, "errors", errored)
+
+	if err != nil {
+		return fmt.Errorf("some cron health checks errored %w", err)
 	}
 
-	if len(errors) > 0 {
-		l.Error("health check failed for %d cron triggers", len(errors))
-		return errors[0]
-	}
+	l.Info("finished cron health check")
 
 	// enqueue next health check.
 	return s.croner.EnqueueNextHealthCheck(ctx)
