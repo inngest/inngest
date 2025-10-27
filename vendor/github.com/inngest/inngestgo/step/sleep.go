@@ -41,6 +41,7 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 		Opts: map[string]any{
 			"duration": str2duration.String(duration),
 		},
+		Userland: op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 

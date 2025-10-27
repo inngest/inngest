@@ -1,5 +1,11 @@
 # inngestgo
 
+## 0.14.1
+
+### Patch Changes
+
+- b9dbde9: Add support for the `StepFailed` opcode, which denotes a permanent, non-retriable failure.
+
 ## 0.14.0
 
 ### Minor Changes

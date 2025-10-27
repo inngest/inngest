@@ -428,10 +428,12 @@ func (o *requestOwner) appendResult(ctx context.Context, res APIResult) error {
 		}
 	}
 
+	mgrOp := o.mgr.NewOp(enums.OpcodeRunComplete, "complete")
 	op := sdkrequest.GeneratorOpcode{
-		ID:   o.mgr.NewOp(enums.OpcodeRunComplete, "complete").MustHash(),
-		Op:   enums.OpcodeRunComplete,
-		Data: responseBody,
+		ID:       mgrOp.MustHash(),
+		Op:       enums.OpcodeRunComplete,
+		Data:     responseBody,
+		Userland: mgrOp.Userland(),
 	}
 
 	o.mgr.AppendOp(ctx, op)
