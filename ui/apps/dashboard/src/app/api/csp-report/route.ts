@@ -10,7 +10,7 @@ export async function POST(request: Request): Promise<Response> {
   if (sentryEnvironment === null) return makeStaticSuccessResponse();
 
   // TODO: Add sentry_release parameter.
-  const reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
+  const _reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
 
   const contentType = getMediaType(request.headers.get('content-type'));
   if (contentType === null || !ACCEPTED_TYPES.has(contentType)) {
@@ -29,6 +29,8 @@ export async function POST(request: Request): Promise<Response> {
   const tid = setTimeout(() => ctrl.abort(), 3000);
 
   try {
+    console.log('Would have reported to Sentry.');
+    /*
     const res = await fetch(reportUrl, {
       body,
       cache: 'no-store',
@@ -44,6 +46,7 @@ export async function POST(request: Request): Promise<Response> {
     console.log('Status:', res.status);
     console.log('End of Sentry CSP Response');
     console.log('--- End Sentry CSP Response ---');
+    */
   } catch {
     return new Response(null, { status: 502 });
   } finally {
