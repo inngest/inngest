@@ -1140,7 +1140,7 @@ func TestRedisCronManager(t *testing.T) {
 					hc, err := cm.HealthCheck(ctx, functionID, tc.expression, fnVersion)
 					assert.Error(t, err)
 					assert.Equal(t, CronHealthCheckStatus{}, hc)
-					assert.Contains(t, err.Error(), "failed to parse cron expression")
+					assert.Contains(t, err.Error(), "failed to get next schedule time for health check")
 				})
 			}
 		})
