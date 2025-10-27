@@ -178,9 +178,23 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
 
 const CSP_REPORT_PATH = '/api/csp-report';
 
+function getAppURL(): string | null {
+  const configuredURL = process.env.NEXT_PUBLIC_APP_URL;
+  if (!configuredURL) return null;
+
+  if (isValidURL(configuredURL)) return configuredURL;
+
+  // Handle preview environments.
+  if (configuredURL.includes('$VERCEL_URL') && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return null;
+}
+
 // TODO: Remove -Report-Only once we're confident CSP is working as expected.
 function withCSPResponseHeaderReportOnly(response: NextResponse) {
-  const appURL = process.env.NEXT_PUBLIC_APP_URL;
+  const appURL = getAppURL();
   if (!appURL) return response;
 
   let cspReportURL: string | null = null;
@@ -246,4 +260,13 @@ function convertUrlToWebSocketURL(url: undefined | string): string {
 const CLERK_TELEMETRY_URL = 'https://clerk-telemetry.com';
 function getAllowClerkTelemetryURL(isProdEnvironment: boolean): string {
   return isProdEnvironment ? '' : CLERK_TELEMETRY_URL;
+}
+
+function isValidURL(urlString: string): boolean {
+  try {
+    new URL(urlString);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
