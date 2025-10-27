@@ -192,6 +192,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 		MaxAttempts: &maxAttempts,
 		Payload: CronItem{
 			Op: enums.CronHealthCheck,
+			ID: ulid.MustNew(uint64(nextCheck.UnixMilli()), rand.Reader),
 		},
 		QueueName: &kind,
 	}, nextCheck, queue.EnqueueOpts{})

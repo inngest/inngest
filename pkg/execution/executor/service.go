@@ -281,7 +281,7 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindCron:
 			err = s.handleCron(ctx, item)
 		case queue.KindCronHealthCheck:
-			err = s.handleCronHealthCheck(ctx)
+			err = s.handleCronHealthCheck(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -874,10 +874,22 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 	return nil
 }
 
-func (s *svc) handleCronHealthCheck(ctx context.Context) error {
+func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "cron-health-check")
 
-	l.Info("starting cron health check")
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	if ci.Op != enums.CronHealthCheck {
+		return queue.NeverRetryError(fmt.Errorf("rejecting cron-health-check, invalid CronItem.Op: %s", ci.Op))
+	}
+
+	hcTime := ci.ID.Timestamp()
+	l.Info("starting cron health check", "scheduled_health_check_time", hcTime)
+
 	cqrsFns, err := s.data.GetFunctions(ctx)
 	if err != nil {
 		return fmt.Errorf("error accessing scheduled functions: %w", err)
