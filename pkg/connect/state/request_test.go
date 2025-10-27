@@ -65,8 +65,7 @@ func TestLeaseRequest(t *testing.T) {
 
 	t.Run("leasing request should work", func(t *testing.T) {
 		connectconfig.SetConfig(ctx, connectconfig.ConnectExecutor{
-			GRPCIP:   executorIP,
-			GRPCPort: 4567,
+			GRPCIP: executorIP,
 		})
 		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
 		require.NoError(t, err)
@@ -93,8 +92,7 @@ func TestLeaseRequest(t *testing.T) {
 		// Simulate a new executor
 		newIP := net.IPv4(1, 2, 3, 4)
 		connectconfig.SetConfig(ctx, connectconfig.ConnectExecutor{
-			GRPCIP:   newIP,
-			GRPCPort: 3456,
+			GRPCIP: newIP,
 		})
 
 		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
