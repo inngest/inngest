@@ -10,7 +10,7 @@ export async function POST(request: Request): Promise<Response> {
   if (sentryEnvironment === null) return makeStaticSuccessResponse();
 
   // TODO: Add sentry_release parameter.
-  const _reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
+  // const reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
 
   const contentType = getMediaType(request.headers.get('content-type'));
   if (contentType === null || !ACCEPTED_TYPES.has(contentType)) {
