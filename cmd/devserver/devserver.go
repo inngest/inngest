@@ -11,6 +11,8 @@ import (
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/config"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -104,20 +106,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		Autodiscover:            !noDiscovery,
-		Config:                  *conf,
-		Poll:                    !noPoll,
-		PollInterval:            pollInterval,
-		RetryInterval:           retryInterval,
-		QueueWorkers:            queueWorkers,
-		Tick:                    time.Duration(tick) * time.Millisecond,
-		URLs:                    urls,
-		ConnectGatewayPort:      connectGatewayPort,
-		ConnectGatewayHost:      conf.CoreAPI.Addr,
-		ConnectGatewayGRPCPort:  connectGatewayGRPCPort,
-		ConnectExecutorGRPCPort: connectExecutorGRPCPort,
-		InMemory:                inMemory,
-		DebugAPIPort:            debugAPIPort,
+		Autodiscover:       !noDiscovery,
+		Config:             *conf,
+		Poll:               !noPoll,
+		PollInterval:       pollInterval,
+		RetryInterval:      retryInterval,
+		QueueWorkers:       queueWorkers,
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               urls,
+		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
+		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
+			ctx,
+			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
+			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+		),
+		InMemory:     inMemory,
+		DebugAPIPort: debugAPIPort,
 	}
 
 	err = devserver.New(ctx, opts)

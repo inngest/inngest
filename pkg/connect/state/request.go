@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/consts"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -43,7 +42,7 @@ func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, reque
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration, executorIP net.IP) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -65,7 +64,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 		fmt.Sprintf("%d", now.UnixMilli()),
 
 		// Mapping the request to the current executor
-		connectConfig.Executor(ctx).GRPCIP.String(),
+		executorIP.String(),
 	}
 
 	status, err := scripts["lease"].Exec(

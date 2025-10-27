@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
@@ -122,10 +123,9 @@ type StartOpts struct {
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
 
-	ConnectGatewayPort      int    `json:"connectGatewayPort"`
-	ConnectGatewayHost      string `json:"connectGatewayHost"`
-	ConnectGatewayGRPCPort  int    `json:"connectGatewayGRPCPort"`
-	ConnectExecutorGRPCPort int    `json:"connectExecutorGRPCPort"`
+	ConnectGatewayPort int                             `json:"connectGatewayPort"`
+	ConnectGatewayHost string                          `json:"connectGatewayHost"`
+	ConnectGRPCConfig  connectConfig.ConnectGRPCConfig `json:"connectGRPCConfig"`
 
 	NoUI bool
 
@@ -370,8 +370,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-		GatewayGRPCPort:    opts.ConnectGatewayGRPCPort,
-		ExecutorGRPCPort:   opts.ConnectExecutorGRPCPort,
+		GRPCConfig:         opts.ConnectGRPCConfig,
 	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
@@ -549,7 +548,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
-			ExecutorGRPCPort:           opts.ConnectExecutorGRPCPort,
+			GRPCConfig:                 opts.ConnectGRPCConfig,
 		},
 	})
 	if err != nil {
@@ -573,11 +572,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tp,
-			State:           smv2,
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tp,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
@@ -592,8 +591,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
-		connect.WithGatewayGRPCPort(opts.ConnectGatewayGRPCPort),
-		connect.WithExecutorGRPCPort(opts.ConnectExecutorGRPCPort),
+		connect.WithGRPCConfig(opts.ConnectGRPCConfig),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{

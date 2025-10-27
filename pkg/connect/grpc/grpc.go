@@ -18,6 +18,7 @@ import (
 const (
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
+	DefaultConnectGRPCIP           = "127.0.0.1"
 )
 
 type GatewayGRPCForwarder interface {

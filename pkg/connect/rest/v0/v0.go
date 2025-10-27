@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -26,7 +27,7 @@ type Opts struct {
 	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
 
-	ExecutorGRPCPort int
+	GRPCConfig connectConfig.ConnectGRPCConfig
 
 	Dev bool
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -60,6 +61,7 @@ type grpcConnector struct {
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
 	gatewayGRPCManager GatewayGRPCManager
+	grpcConfig         connectConfig.ConnectGRPCConfig
 }
 
 type GRPCConnectorOpts struct {
@@ -67,8 +69,7 @@ type GRPCConnectorOpts struct {
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	GatewayGRPCPort  int
-	ExecutorGRPCPort int
+	GRPCConfig connectConfig.ConnectGRPCConfig
 }
 
 type GRPCConnectorOption func(*grpcConnector)
@@ -91,6 +92,7 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 		tracer:             opts.Tracer,
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 		stateManager:       opts.StateManager,
+		grpcConfig:         opts.GRPCConfig,
 		rnd:                util.NewFrandRNG(),
 	}
 
@@ -105,8 +107,8 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 			ctx,
 			opts.StateManager,
 			WithGatewayLogger(connector.logger),
-			WithGatewayGRPCPort(opts.GatewayGRPCPort),
-			WithExecutorGRPCPort(opts.ExecutorGRPCPort),
+			WithGatewayGRPCPort(opts.GRPCConfig.Gateway.Port),
+			WithExecutorGRPCPort(opts.GRPCConfig.Executor.Port),
 		)
 	}
 
@@ -304,7 +306,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Attempt to lease the request. If the request is still running on a worker,
 	// this will fail with ErrRequestLeased. In this case, we can just wait for the request to complete.
 	// Otherwise, we acquired the lease and need to forward the request to the worker.
-	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
+	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration, i.grpcConfig.Executor.IP)
 	if err != nil && !errors.Is(err, state.ErrRequestLeased) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to lease request")
