@@ -2,6 +2,11 @@ node_modules
 package-lock.json
 yarn.lock
 
+# Next.js
+.next/
+dist/
+next-env.d.ts
+
 .DS_Store
 .cache
 .env
