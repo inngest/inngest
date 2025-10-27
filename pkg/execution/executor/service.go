@@ -902,7 +902,6 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 	eg.SetLimit(20)
 
 	for _, cqrsFn := range cqrsFns {
-		// Ignore non-scheduled fns.
 		fn := inngest.Function{}
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
