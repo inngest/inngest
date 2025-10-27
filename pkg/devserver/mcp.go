@@ -71,8 +71,8 @@ type MCPHandler struct {
 	data   cqrs.Manager
 }
 
-// convertToDataMap converts various input types to a map suitable for event data
-func convertToDataMap(input any) map[string]any {
+// convertToMap converts various input types to a map with a fallback key
+func convertToMap(input any, fallbackKey string) map[string]any {
 	if input == nil {
 		return nil
 	}
@@ -85,32 +85,31 @@ func convertToDataMap(input any) map[string]any {
 		if err := json.Unmarshal([]byte(data), &parsed); err == nil {
 			return parsed
 		}
-		return map[string]any{"value": data}
+		return map[string]any{fallbackKey: data}
 	default:
-		return map[string]any{"value": input}
+		return map[string]any{fallbackKey: input}
 	}
+}
+
+// convertToDataMap converts various input types to a map suitable for event data
+func convertToDataMap(input any) map[string]any {
+	return convertToMap(input, "value")
 }
 
 // convertToUserMap converts various input types to a map suitable for user data
 func convertToUserMap(input any) map[string]any {
-	if input == nil {
-		return nil
-	}
-
-	switch user := input.(type) {
-	case map[string]any:
-		return user
-	case string:
-		var parsed map[string]any
-		if err := json.Unmarshal([]byte(user), &parsed); err == nil {
-			return parsed
-		}
-		return map[string]any{"id": user}
-	default:
-		return map[string]any{"id": input}
-	}
+	return convertToMap(input, "id")
 }
 
+// isRunCompleted checks if a run status indicates completion (success or skipped)
+func isRunCompleted(status string) bool {
+	return status == statusCompleted || status == statusSkipped
+}
+
+// isRunFailed checks if a run status indicates failure
+func isRunFailed(status string) bool {
+	return status == statusFailed || status == statusCancelled || status == statusOverflowed
+}
 
 // NewMCPHandler creates a new MCP handler for the dev server
 func NewMCPHandler(events api.EventHandler, data cqrs.Manager) http.Handler {
@@ -135,37 +134,31 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 		Title:   mcpTitle,
 	}, nil)
 
-	// Add the send event tool
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_event",
 		Description: "Send an event to the Inngest dev server which will trigger any functions listening to that event. Returns event ID and run IDs of triggered functions. Parameters: name (required string - the event name like 'test/hello.world'), data (optional JSON object - the event data), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
 	}, h.sendEvent)
 
-	// Add list functions tool
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_functions",
 		Description: "List all registered functions in the dev server",
 	}, h.listFunctions)
 
-	// Add get run status tool
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_run_status",
 		Description: "Get detailed status and trace information for a specific function run. Parameters: runId (required string - the run ID returned from send_event or found in logs)",
 	}, h.getRunStatus)
 
-	// Add poll run status tool
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "poll_run_status",
 		Description: "Poll multiple function runs until they complete or timeout. Returns detailed status for all runs. Parameters: runIds (required array of strings - run IDs to poll), timeout (optional int - seconds to poll, default 30), pollInterval (optional int - milliseconds between polls, default 1000)",
 	}, h.pollRunStatus)
 
-	// Add invoke function tool
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "invoke_function",
 		Description: "Directly invoke a specific function and wait for its result. Unlike send_event (which is fire-and-forget), this waits for completion and returns the function's actual output data. Parameters: functionId (required string - function slug, ID, or name), data (optional JSON object - function input data), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
 	}, h.invokeFunction)
 
-	// Add documentation tools
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "grep_docs",
 		Description: "Search documentation using exact string matching (grep). Useful for finding specific API names, error codes, or identifiers. Parameters: pattern (required string - the search pattern, regex supported), limit (optional int - maximum results, default 10)",
@@ -252,14 +245,13 @@ type ReadDocResult struct {
 
 // ListDocsResult represents the result of list_docs tool
 type ListDocsResult struct {
-	GeneratedAt   string            `json:"generatedAt"`
-	TotalDocs     int               `json:"totalDocs"`
-	TotalChunks   int               `json:"totalChunks"`
-	Categories    map[string]int    `json:"categories"`
-	SDKs          map[string]int    `json:"sdks"`
+	GeneratedAt string         `json:"generatedAt"`
+	TotalDocs   int            `json:"totalDocs"`
+	TotalChunks int            `json:"totalChunks"`
+	Categories  map[string]int `json:"categories"`
+	SDKs        map[string]int `json:"sdks"`
 }
 
-// sendEvent handles the send_event tool
 func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, args SendEventArgs) (*mcp.CallToolResult, any, error) {
 	// Track MCP tool usage
 	metadata := tel.NewMetadata(ctx)
@@ -270,7 +262,6 @@ func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, ar
 	}
 	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
 
-	// Create the event
 	evt := event.Event{
 		Name: args.Name,
 	}
@@ -317,7 +308,6 @@ func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, ar
 		Message: fmt.Sprintf("Event '%s' sent successfully", args.Name),
 	}
 
-	// Create response text
 	responseText := result.Message + "\nEvent ID: " + result.EventID
 	if len(result.RunIDs) > 0 {
 		responseText += fmt.Sprintf("\nTriggered %d function run(s): %v", len(result.RunIDs), result.RunIDs)
@@ -513,7 +503,6 @@ func (h *MCPHandler) getRunStatusInternal(ctx context.Context, runIDStr string) 
 		}
 	}
 
-	// Prepare the result
 	result := &RunStatusResult{
 		RunID:        runIDStr,
 		FunctionName: functionName,
@@ -531,7 +520,7 @@ func (h *MCPHandler) getRunStatusInternal(ctx context.Context, runIDStr string) 
 
 	// Parse output if available
 	if run.Output != nil {
-		var outputData map[string]interface{}
+		var outputData map[string]any
 		if err := json.Unmarshal(run.Output, &outputData); err == nil {
 			result.Output = outputData
 
@@ -568,7 +557,7 @@ func (h *MCPHandler) getRunStatus(ctx context.Context, req *mcp.CallToolRequest,
 	if result.EventName != "" {
 		text += fmt.Sprintf("Triggered by: %s\n", result.EventName)
 	}
-	
+
 	if len(result.Steps) > 0 {
 		text += fmt.Sprintf("\nSteps (%d):\n", len(result.Steps))
 		for _, step := range result.Steps {
@@ -642,12 +631,11 @@ func (h *MCPHandler) pollRunStatus(ctx context.Context, req *mcp.CallToolRequest
 			runs = append(runs, *status)
 
 			// Count statuses
-			switch status.Status {
-			case statusCompleted, statusSkipped:
+			if isRunCompleted(status.Status) {
 				completed++
-			case statusFailed, statusCancelled, statusOverflowed:
+			} else if isRunFailed(status.Status) {
 				failed++
-			default:
+			} else {
 				running++ // Treat unknown/running as running
 			}
 		}
@@ -795,10 +783,8 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 			return nil, nil, fmt.Errorf("failed to get run status: %w", err)
 		}
 
-
 		// Check if run is complete
-		switch status.Status {
-		case statusCompleted, statusSkipped:
+		if isRunCompleted(status.Status) {
 			// Success
 			duration := time.Since(startTime).Milliseconds()
 			result := &InvokeFunctionResult{
@@ -829,7 +815,7 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 				},
 			}, result, nil
 
-		case statusFailed, statusCancelled, statusOverflowed:
+		} else if isRunFailed(status.Status) {
 			// Failed
 			duration := time.Since(startTime).Milliseconds()
 			result := &InvokeFunctionResult{
@@ -856,7 +842,7 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 				},
 			}, result, nil
 
-		default:
+		} else {
 			// Still running, continue polling
 			time.Sleep(time.Duration(defaultPollIntervalMs) * time.Millisecond)
 		}
