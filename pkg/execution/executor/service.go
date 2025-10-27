@@ -878,7 +878,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 	l := s.log.With("handler", "cron-health-check")
 
 	l.Info("starting cron health check")
-	scheduledFns, err := s.data.FunctionsScheduled(ctx)
+	cqrsFns, err := s.data.GetFunctions(ctx)
 	if err != nil {
 		return fmt.Errorf("error accessing scheduled functions: %w", err)
 	}
@@ -889,12 +889,12 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 	var failed int64
 	eg.SetLimit(20)
 
-	for _, fn := range scheduledFns {
+	for _, cqrsFn := range cqrsFns {
+		// Ignore non-scheduled fns.
+		fn := inngest.Function{}
+		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
+
 		// Get AppID
-		cqrsFn, err := s.data.GetFunctionByInternalUUID(ctx, fn.ID)
-		if err != nil {
-			return fmt.Errorf("error fetching appID during cron initialization for fn: %s, err: %w", fn.ID, err)
-		}
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
