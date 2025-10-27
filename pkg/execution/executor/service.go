@@ -280,7 +280,7 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindCron:
 			err = s.handleCron(ctx, item)
 		case queue.KindCronHealthCheck:
-			err = s.handleCronHealthCheck(ctx, item)
+			err = s.handleCronHealthCheck(ctx)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -873,14 +873,8 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 	return nil
 }
 
-func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
+func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 	l := s.log.With("handler", "cron-health-check")
-
-	var ci cron.CronItem
-	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
-		l.Error("error unmarshalling cron item", "item", item)
-		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
-	}
 
 	l.Info("starting cron health check")
 	scheduledFns, err := s.data.FunctionsScheduled(ctx)
