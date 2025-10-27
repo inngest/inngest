@@ -73,10 +73,11 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   op.Op,
-		Name: opts.Name,
-		Opts: args,
+		ID:       hashedID,
+		Op:       op.Op,
+		Name:     opts.Name,
+		Opts:     args,
+		Userland: op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 	// This cannot resolve.  It must always hand control back to the handler.

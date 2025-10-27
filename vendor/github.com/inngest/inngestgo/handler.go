@@ -844,13 +844,20 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	// For that reason, we check those values first.
 	noRetry := sdkerrors.IsNoRetryError(err)
 	retryAt := sdkerrors.GetRetryAtTime(err)
+
 	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepError {
 		// Now we've handled error types we can ignore step
 		// errors safely.
 		err = nil
 	}
 
-	// Now that we've handled the OpcodeStepError, if we *still* ahve
+	// Handle OpcodeStepFailed for permanent step failures
+	if len(ops) == 1 && ops[0].Op == enums.OpcodeStepFailed {
+		err = nil
+		noRetry = true
+	}
+
+	// Now that we've handled the OpcodeStepError, if we *still* have
 	// a StepError kind returned from a function we must have an unhandled
 	// step error.  This is a NonRetryableError, as the most likely code is:
 	//

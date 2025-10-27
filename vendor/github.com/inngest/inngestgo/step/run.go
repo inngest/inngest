@@ -38,13 +38,14 @@ func Run[T any](
 ) (T, error) {
 	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx, enums.OpcodeStepRun)
-	op := mgr.NewOp(enums.OpcodeStepRun, id)
-	hashedID := op.MustHash()
 
 	if mgr == nil {
 		// If there's no manager, execute the function directly.
 		return f(ctx)
 	}
+
+	op := mgr.NewOp(enums.OpcodeStepRun, id)
+	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(ctx, op); ok {
 		return loadExistingStep(id, mgr, val, f)
@@ -60,9 +61,10 @@ func Run[T any](
 	planBeforeRun := targetID == nil && mgr.Request().CallCtx.DisableImmediateExecution
 	if planParallel || planBeforeRun {
 		plannedOp := sdkrequest.GeneratorOpcode{
-			ID:   hashedID,
-			Op:   enums.OpcodeStepPlanned,
-			Name: id,
+			ID:       hashedID,
+			Op:       enums.OpcodeStepPlanned,
+			Name:     id,
+			Userland: op.Userland(),
 		}
 		mgr.AppendOp(ctx, plannedOp)
 		panic(sdkrequest.ControlHijack{})
@@ -86,26 +88,39 @@ func Run[T any](
 	mutated := out.Result
 	err = out.Error
 	if err != nil {
-		// If tihs is a StepFailure already, fail fast.
+		// If this is a StepFailure already, fail fast.
 		if errors.IsStepError(err) {
 			mgr.SetErr(fmt.Errorf("unhandled step error: %s", err))
 			panic(sdkrequest.ControlHijack{})
 		}
 
+		isNoRetry := errors.IsNoRetryError(err)
+		maxAttemptsReached := shouldUseStepFailed(mgr)
+
 		marshalled, _ := json.Marshal(mutated)
 
-		// Implement per-step errors.
+		// Determine opcode based on retry eligibility
+		opcode := enums.OpcodeStepError
+		errorName := "Step error"
+
+		if isNoRetry || maxAttemptsReached {
+			opcode = enums.OpcodeStepFailed
+			errorName = "Step failed"
+		}
+
 		mgr.SetErr(err)
+
 		mgr.AppendOp(ctx, sdkrequest.GeneratorOpcode{
 			ID:   hashedID,
-			Op:   enums.OpcodeStepError,
+			Op:   opcode,
 			Name: id,
 			Error: &sdkrequest.UserError{
-				Name:    "Step failed",
+				Name:    errorName,
 				Message: err.Error(),
 				Data:    marshalled,
 			},
-			Timing: interval.New(pre, post),
+			Timing:   interval.New(pre, post),
+			Userland: op.Userland(),
 		})
 
 		// API functions: return the error without panic
@@ -120,11 +135,12 @@ func Run[T any](
 	// Depending on the manager's step mode, this will either return control to the handler
 	// to prevent function execution or checkpoint the step immediately.
 	mgr.AppendOp(ctx, sdkrequest.GeneratorOpcode{
-		ID:     hashedID,
-		Op:     enums.OpcodeStepRun,
-		Name:   id,
-		Data:   byt,
-		Timing: interval.New(pre, post),
+		ID:       hashedID,
+		Op:       enums.OpcodeStepRun,
+		Name:     id,
+		Data:     byt,
+		Timing:   interval.New(pre, post),
+		Userland: op.Userland(),
 	})
 
 	return result, nil
@@ -176,4 +192,13 @@ func loadExistingStep[T any](
 
 	val, _ := reflect.ValueOf(v).Elem().Interface().(T)
 	return val, nil
+}
+
+func shouldUseStepFailed(mgr sdkrequest.InvocationManager) bool {
+	callCtx := mgr.Request().CallCtx
+	if callCtx.MaxAttempts == nil {
+		return false
+	}
+
+	return callCtx.Attempt+1 >= *callCtx.MaxAttempts
 }
