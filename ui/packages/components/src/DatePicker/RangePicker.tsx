@@ -182,7 +182,7 @@ export const RangePicker = ({
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
-      <PopoverTrigger asChild>
+      <PopoverTrigger>
         <TriggerComponent {...props}>
           {displayValue ? (
             displayValue
