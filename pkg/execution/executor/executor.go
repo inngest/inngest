@@ -629,6 +629,21 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	return nil
 }
 
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	// Check constraints and acquire lease
+	return WithConstraints(
+		ctx,
+		e.capacityManager,
+		e.useConstraintAPI,
+		req,
+		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+			return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+		})
+}
+
+// Execute loads a workflow and the current run state, then executes the
+// function's step via the necessary driver.
+//
 // If this function has a debounce config, this will return ErrFunctionDebounced instead
 // of an identifier as the function is not scheduled immediately.
 func (e *executor) schedule(
@@ -1706,11 +1721,6 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	}
 
 	step := &i.f.Steps[0]
-
-	if i.execSpan != nil {
-		// Allow deep driver code to grab the execution span from context
-		ctx = i.execSpan.SetToCtx(ctx)
-	}
 
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 
