@@ -517,6 +517,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
+
+	// Add MCP server route
+	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data)
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -562,11 +565,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tp,
-			State:           smv2,
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tp,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
