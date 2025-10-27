@@ -154,7 +154,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					err := a.commitSpan(res, ss.Scope, s)
+					err := a.commitSpan(ctx, res, ss.Scope, s)
 					if err != nil {
 						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
@@ -170,7 +170,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -239,7 +239,7 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		}
 	}
 
-	_, err = a.opts.TracerProvider.CreateSpan(meta.SpanNameUserland, &tracing.CreateSpanOptions{
+	_, err = a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
