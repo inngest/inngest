@@ -2,13 +2,15 @@ const ACCEPTED_TYPES = new Set(['application/csp-report', 'application/reports+j
 const MAX_BODY_BYTES = 32 * 1024; // 32KB limit
 
 export async function POST(request: Request): Promise<Response> {
+  console.log('*** CSP Report Request ***');
   if (!process.env.SENTRY_SECURITY_REPORT_URL) return makeStaticSuccessResponse();
+  console.log('Found SENTRY_SECURITY_REPORT_URL:');
 
   const sentryEnvironment = getSentryEnvironment();
   if (sentryEnvironment === null) return makeStaticSuccessResponse();
 
   // TODO: Add sentry_release parameter.
-  const _reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
+  const reportUrl = `${process.env.SENTRY_SECURITY_REPORT_URL}&sentry_environment=${sentryEnvironment}`;
 
   const contentType = getMediaType(request.headers.get('content-type'));
   if (contentType === null || !ACCEPTED_TYPES.has(contentType)) {
@@ -24,12 +26,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const ctrl = new AbortController();
-  const _tid = setTimeout(() => ctrl.abort(), 3000);
+  const tid = setTimeout(() => ctrl.abort(), 3000);
 
-  /*
-  // Forward to Sentry using a clean, credential-free request.
   try {
-    await fetch(reportUrl, {
+    const res = await fetch(reportUrl, {
       body,
       cache: 'no-store',
       credentials: 'omit',
@@ -39,12 +39,16 @@ export async function POST(request: Request): Promise<Response> {
       referrerPolicy: 'no-referrer',
       signal: ctrl.signal,
     });
+    console.log('--- Sentry CSP Response ---');
+    console.log('Ok:', res.ok);
+    console.log('Status:', res.status);
+    console.log('End of Sentry CSP Response');
+    console.log('--- End Sentry CSP Response ---');
   } catch {
     return new Response(null, { status: 502 });
   } finally {
     clearTimeout(tid);
   }
-  */
 
   return makeStaticSuccessResponse();
 }
