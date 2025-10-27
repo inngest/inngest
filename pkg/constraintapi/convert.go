@@ -517,8 +517,6 @@ func CapacityLeaseFromProto(pbLease *pb.CapacityLease) (CapacityLease, error) {
 	}, nil
 }
 
-
-
 func LeaseSourceToProto(source LeaseSource) *pb.LeaseSource {
 	return &pb.LeaseSource{
 		Service:           LeaseServiceToProto(source.Service),
@@ -646,19 +644,19 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 	}
 
 	return &pb.CapacityAcquireRequest{
-		IdempotencyKey:         req.IdempotencyKey,
-		AccountId:              req.AccountID.String(),
-		EnvId:                  req.EnvID.String(),
-		FunctionId:             req.FunctionID.String(),
-		Configuration:          ConstraintConfigToProto(req.Configuration),
-		Constraints:            constraints,
-		Amount:                 int32(req.Amount),
-		LeaseIdempotencyKeys:   req.LeaseIdempotencyKeys,
-		CurrentTime:            timestamppb.New(req.CurrentTime),
-		Duration:               durationpb.New(req.Duration),
-		MaximumLifetime:        durationpb.New(req.MaximumLifetime),
-		BlockingThreshold:      durationpb.New(req.BlockingThreshold),
-		Source:                 LeaseSourceToProto(req.Source),
+		IdempotencyKey:       req.IdempotencyKey,
+		AccountId:            req.AccountID.String(),
+		EnvId:                req.EnvID.String(),
+		FunctionId:           req.FunctionID.String(),
+		Configuration:        ConstraintConfigToProto(req.Configuration),
+		Constraints:          constraints,
+		Amount:               int32(req.Amount),
+		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
+		CurrentTime:          timestamppb.New(req.CurrentTime),
+		Duration:             durationpb.New(req.Duration),
+		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
+		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
+		Source:               LeaseSourceToProto(req.Source),
 	}
 }
 
@@ -708,19 +706,19 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	}
 
 	return &CapacityAcquireRequest{
-		IdempotencyKey:         pbReq.IdempotencyKey,
-		AccountID:              accountID,
-		EnvID:                  envID,
-		FunctionID:             functionID,
-		Configuration:          ConstraintConfigFromProto(pbReq.Configuration),
-		Constraints:            constraints,
-		Amount:                 int(pbReq.Amount),
-		LeaseIdempotencyKeys:   pbReq.LeaseIdempotencyKeys,
-		CurrentTime:            currentTime,
-		Duration:               duration,
-		MaximumLifetime:        maximumLifetime,
-		BlockingThreshold:      blockingThreshold,
-		Source:                 LeaseSourceFromProto(pbReq.Source),
+		IdempotencyKey:       pbReq.IdempotencyKey,
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           functionID,
+		Configuration:        ConstraintConfigFromProto(pbReq.Configuration),
+		Constraints:          constraints,
+		Amount:               int(pbReq.Amount),
+		LeaseIdempotencyKeys: pbReq.LeaseIdempotencyKeys,
+		CurrentTime:          currentTime,
+		Duration:             duration,
+		MaximumLifetime:      maximumLifetime,
+		BlockingThreshold:    blockingThreshold,
+		Source:               LeaseSourceFromProto(pbReq.Source),
 	}, nil
 }
 
