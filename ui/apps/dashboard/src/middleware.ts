@@ -167,7 +167,7 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
     )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
     `worker-src 'self' blob:`,
-    `report-to ${CSP_REPORT_GROUP}`,
+    // `report-to ${CSP_REPORT_GROUP}`,
     `report-uri ${cspReportURL}`,
   ]
     .map((line) => line.trim())
