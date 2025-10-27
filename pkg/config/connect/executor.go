@@ -10,8 +10,7 @@ import (
 )
 
 type ConnectExecutor struct {
-	GRPCIP   net.IP
-	GRPCPort uint16
+	GRPCIP net.IP
 }
 
 var (
@@ -27,7 +26,6 @@ const (
 func Executor(ctx context.Context) ConnectExecutor {
 	executorConfigOnce.Do(func() {
 		ipStr := getWithDefault(ExecutorIPKey, "127.0.0.1", viper.GetString)
-		port := getWithDefault(ExecutorPortKey, uint32(50053), viper.GetUint32)
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
@@ -35,8 +33,7 @@ func Executor(ctx context.Context) ConnectExecutor {
 		}
 
 		executorConfig = ConnectExecutor{
-			GRPCIP:   ip,
-			GRPCPort: uint16(port),
+			GRPCIP: ip,
 		}
 	})
 	return executorConfig

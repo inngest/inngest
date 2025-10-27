@@ -78,12 +78,14 @@ import (
 )
 
 const (
-	DefaultTick               = 150
-	DefaultTickDuration       = time.Millisecond * DefaultTick
-	DefaultPollInterval       = 5
-	DefaultQueueWorkers       = 100
-	DefaultConnectGatewayPort = 8289
-	DefaultDebugAPIPort       = 7778
+	DefaultTick                    = 150
+	DefaultTickDuration            = time.Millisecond * DefaultTick
+	DefaultPollInterval            = 5
+	DefaultQueueWorkers            = 100
+	DefaultConnectGatewayPort      = 8289
+	DefaultConnectGatewayGRPCPort  = 50052
+	DefaultConnectExecutorGRPCPort = 50053
+	DefaultDebugAPIPort            = 7778
 )
 
 var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
@@ -120,8 +122,10 @@ type StartOpts struct {
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
 
-	ConnectGatewayPort int    `json:"connectGatewayPort"`
-	ConnectGatewayHost string `json:"connectGatewayHost"`
+	ConnectGatewayPort      int    `json:"connectGatewayPort"`
+	ConnectGatewayHost      string `json:"connectGatewayHost"`
+	ConnectGatewayGRPCPort  int    `json:"connectGatewayGRPCPort"`
+	ConnectExecutorGRPCPort int    `json:"connectExecutorGRPCPort"`
 
 	NoUI bool
 
@@ -366,6 +370,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+		GatewayGRPCPort:    opts.ConnectGatewayGRPCPort,
+		ExecutorGRPCPort:   opts.ConnectExecutorGRPCPort,
 	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
@@ -543,6 +549,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
+			ExecutorGRPCPort:           opts.ConnectExecutorGRPCPort,
 		},
 	})
 	if err != nil {
@@ -585,6 +592,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
+		connect.WithGatewayGRPCPort(opts.ConnectGatewayGRPCPort),
+		connect.WithExecutorGRPCPort(opts.ConnectExecutorGRPCPort),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{

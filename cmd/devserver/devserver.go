@@ -11,7 +11,6 @@ import (
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -67,9 +66,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", 0)
 	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
-	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
 	inMemory := localconfig.GetBoolValue(cmd, "in-memory", true)
-	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", debugapi.DefaultDebugAPIPort)
+
+	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", devserver.DefaultDebugAPIPort)
+
+	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
+	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
+	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -101,18 +104,20 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		Autodiscover:       !noDiscovery,
-		Config:             *conf,
-		Poll:               !noPoll,
-		PollInterval:       pollInterval,
-		RetryInterval:      retryInterval,
-		QueueWorkers:       queueWorkers,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               urls,
-		ConnectGatewayPort: connectGatewayPort,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		InMemory:           inMemory,
-		DebugAPIPort:       debugAPIPort,
+		Autodiscover:            !noDiscovery,
+		Config:                  *conf,
+		Poll:                    !noPoll,
+		PollInterval:            pollInterval,
+		RetryInterval:           retryInterval,
+		QueueWorkers:            queueWorkers,
+		Tick:                    time.Duration(tick) * time.Millisecond,
+		URLs:                    urls,
+		ConnectGatewayPort:      connectGatewayPort,
+		ConnectGatewayHost:      conf.CoreAPI.Addr,
+		ConnectGatewayGRPCPort:  connectGatewayGRPCPort,
+		ConnectExecutorGRPCPort: connectExecutorGRPCPort,
+		InMemory:                inMemory,
+		DebugAPIPort:            debugAPIPort,
 	}
 
 	err = devserver.New(ctx, opts)

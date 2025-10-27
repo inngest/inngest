@@ -26,6 +26,8 @@ type Opts struct {
 	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
 
+	ExecutorGRPCPort int
+
 	Dev bool
 }
 

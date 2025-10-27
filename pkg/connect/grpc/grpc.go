@@ -7,13 +7,17 @@ import (
 	"sync"
 	"time"
 
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	grpcLib "google.golang.org/grpc"
+)
+
+const (
+	DefaultConnectGatewayGRPCPort  = 50052
+	DefaultConnectExecutorGRPCPort = 50053
 )
 
 type GatewayGRPCForwarder interface {
@@ -47,6 +51,9 @@ type gatewayGRPCManager struct {
 	grpcServer       *grpcLib.Server
 	inFlightRequests sync.Map
 	inFlightAcks     sync.Map
+
+	gatewayGRPCPort  int
+	executorGRPCPort int
 }
 
 type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.ClientConn, error)
@@ -65,17 +72,37 @@ func WithGatewayLogger(logger logger.Logger) GatewayGRPCManagerOption {
 	}
 }
 
+func WithGatewayGRPCPort(p int) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		// Keep using the default value if an invalid port is passed
+		if p > 0 {
+			m.gatewayGRPCPort = p
+		}
+	}
+}
+
+func WithExecutorGRPCPort(p int) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		// Keep using the default value if an invalid port is passed
+		if p > 0 {
+			m.executorGRPCPort = p
+		}
+	}
+}
+
 // gatewayURL creates a URL for connecting to a gateway's gRPC port
-func gatewayURL(ctx context.Context, gateway *state.Gateway) string {
-	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", connectConfig.Gateway(ctx).GRPCPort))
+func (i *gatewayGRPCManager) gatewayURL(ctx context.Context, gateway *state.Gateway) string {
+	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", i.gatewayGRPCPort))
 }
 
 func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManager, opts ...GatewayGRPCManagerOption) GatewayGRPCManager {
 	mgr := &gatewayGRPCManager{
-		gatewayManager: stateManager,
-		dialer:         grpcLib.NewClient,
-		grpcServer:     grpcLib.NewServer(),
-		logger:         logger.StdlibLogger(ctx),
+		gatewayManager:   stateManager,
+		dialer:           grpcLib.NewClient,
+		grpcServer:       grpcLib.NewServer(),
+		logger:           logger.StdlibLogger(ctx),
+		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
+		executorGRPCPort: DefaultConnectExecutorGRPCPort,
 	}
 
 	for _, opt := range opts {
@@ -100,7 +127,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 }
 
 func (i *gatewayGRPCManager) gRPCServerListen(ctx context.Context) {
-	addr := fmt.Sprintf(":%d", connectConfig.Executor(ctx).GRPCPort)
+	addr := fmt.Sprintf(":%d", i.executorGRPCPort)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -195,7 +222,7 @@ func (i *gatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 
 	var successCount int64
 	for _, g := range gateways {
-		url := gatewayURL(ctx, g)
+		url := i.gatewayURL(ctx, g)
 		_, err := i.grpcClientManager.GetOrCreateClient(ctx, g.Id.String(), url)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", "error", err)
@@ -227,7 +254,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 			return fmt.Errorf("could not find gateway %s: %w", gatewayID.String(), err)
 		}
 
-		url := gatewayURL(ctx, gateway)
+		url := i.gatewayURL(ctx, gateway)
 
 		grpcClient, err = i.grpcClientManager.GetOrCreateClient(ctx, gatewayID.String(), url)
 		if err != nil {

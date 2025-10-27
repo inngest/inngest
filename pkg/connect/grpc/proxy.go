@@ -66,6 +66,9 @@ type GRPCConnectorOpts struct {
 	Tracer             trace.ConditionalTracer
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+
+	GatewayGRPCPort  int
+	ExecutorGRPCPort int
 }
 
 type GRPCConnectorOption func(*grpcConnector)
@@ -90,17 +93,23 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 		stateManager:       opts.StateManager,
 		rnd:                util.NewFrandRNG(),
 	}
-	
+
 	// Apply functional options
 	for _, option := range options {
 		option(connector)
 	}
-	
+
 	// Create default gateway manager if not provided via options
 	if connector.gatewayGRPCManager == nil {
-		connector.gatewayGRPCManager = newGatewayGRPCManager(ctx, opts.StateManager, WithGatewayLogger(connector.logger))
+		connector.gatewayGRPCManager = newGatewayGRPCManager(
+			ctx,
+			opts.StateManager,
+			WithGatewayLogger(connector.logger),
+			WithGatewayGRPCPort(opts.GatewayGRPCPort),
+			WithExecutorGRPCPort(opts.ExecutorGRPCPort),
+		)
 	}
-	
+
 	return connector
 }
 

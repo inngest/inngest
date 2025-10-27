@@ -66,6 +66,8 @@ type connectGatewaySvc struct {
 	pb.ConnectGatewayServer
 
 	gatewayPublicPort int
+	gatewayGRPCPort   int
+	executorGRPCPort  int
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
@@ -166,6 +168,17 @@ func WithGatewayPublicPort(port int) gatewayOpt {
 	}
 }
 
+func WithGatewayGRPCPort(port int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.gatewayGRPCPort = port
+	}
+}
+func WithExecutorGRPCPort(port int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.executorGRPCPort = port
+	}
+}
+
 func WithApiBaseUrl(url string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.apiBaseUrl = url
@@ -208,6 +221,8 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+		gatewayGRPCPort:   grpc.DefaultConnectGatewayGRPCPort,
+		executorGRPCPort:  grpc.DefaultConnectExecutorGRPCPort,
 
 		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
@@ -428,10 +443,8 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return err
 	})
 
-	connectConfig := connectConfig.Gateway(ctx)
-
 	eg.Go(func() error {
-		addr := fmt.Sprintf(":%d", connectConfig.GRPCPort)
+		addr := fmt.Sprintf(":%d", c.gatewayGRPCPort)
 
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -550,7 +563,7 @@ func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uui
 	}
 	executorIP := ip.String()
 
-	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", c.executorGRPCPort))
 
 	return c.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 }

@@ -12,8 +12,7 @@ import (
 type ConnectGateway struct {
 	// To be used only by the connect-gateway service. Executors will get the IPs dynamically
 	// from the Gateway metadata.
-	GRPCIP   net.IP
-	GRPCPort uint16
+	GRPCIP net.IP
 }
 
 var (
@@ -33,9 +32,7 @@ func getWithDefault[T any](key string, defaultValue T, getter func(string) T) T 
 
 func Gateway(ctx context.Context) ConnectGateway {
 	configOnce.Do(func() {
-
 		ipStr := getWithDefault(GatewayIPKey, "127.0.0.1", viper.GetString)
-		port := getWithDefault(GatewayPortKey, uint32(50052), viper.GetUint32)
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
@@ -43,8 +40,7 @@ func Gateway(ctx context.Context) ConnectGateway {
 		}
 
 		gatewayConfig = ConnectGateway{
-			GRPCIP:   ip,
-			GRPCPort: uint16(port),
+			GRPCIP: ip,
 		}
 	})
 	return gatewayConfig
