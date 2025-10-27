@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
@@ -87,6 +88,7 @@ type devserver struct {
 	Queue       queue.Queue
 	Executor    execution.Executor
 	publisher   pubsub.Publisher
+	CronSyncer  cron.CronSyncer
 	redisClient rueidis.Client
 
 	Apiservice service.Service
