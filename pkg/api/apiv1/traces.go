@@ -3,7 +3,6 @@ package apiv1
 import (
 	"compress/gzip"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,9 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/resource"
-	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	collecttrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -239,7 +236,7 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		}
 	}
 
-	_, err = a.opts.TracerProvider.CreateSpan(meta.SpanNameUserland, &tracing.CreateSpanOptions{
+	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
@@ -251,46 +248,6 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	}
 
 	return nil
-}
-
-func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
-	for _, kv := range s.Attributes {
-		if kv.Key == "inngest.traceparent" {
-			// This is the traceparent attribute, so we can use it to get the
-			// trace ID and span ID
-			parts := strings.Split(kv.GetValue().GetStringValue(), "-")
-			if len(parts) < 3 {
-				return nil, fmt.Errorf("invalid traceparent header format")
-			}
-
-			traceIDStr := parts[1]
-			if len(traceIDStr) != 32 {
-				return nil, fmt.Errorf("invalid trace ID length %d", len(traceIDStr))
-			}
-			var traceID trace.TraceID
-			_, err := hex.Decode(traceID[:], []byte(traceIDStr))
-			if err != nil {
-				return nil, fmt.Errorf("invalid trace ID hex string: %v", err)
-			}
-
-			spanIDStr := parts[2]
-			if len(spanIDStr) != 16 {
-				return nil, fmt.Errorf("invalid span ID length %d", len(spanIDStr))
-			}
-			var spanID trace.SpanID
-			_, err = hex.Decode(spanID[:], []byte(spanIDStr))
-			if err != nil {
-				return nil, fmt.Errorf("invalid span ID hex string: %v", err)
-			}
-
-			return &TraceParent{
-				TraceID: traceID,
-				SpanID:  spanID,
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no traceparent attribute found")
 }
 
 func getInngestTraceRef(s *tracev1.Span) (*meta.SpanReference, error) {
@@ -356,33 +313,6 @@ func convertAnyValue(v *commonv1.AnyValue) attribute.Value {
 	}
 }
 
-func convertEvents(evts []*tracev1.Span_Event) []tracesdk.Event {
-	out := make([]tracesdk.Event, 0, len(evts))
-	for _, e := range evts {
-		out = append(out, tracesdk.Event{
-			Name:       e.Name,
-			Time:       time.Unix(0, int64(e.TimeUnixNano)),
-			Attributes: convertAttributes(e.Attributes),
-		})
-	}
-	return out
-}
-
-func convertLinks(links []*tracev1.Span_Link) []tracesdk.Link {
-	out := make([]tracesdk.Link, 0, len(links))
-	for _, l := range links {
-		sc := trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID: trace.TraceID(l.TraceId),
-			SpanID:  trace.SpanID(l.SpanId),
-		})
-		out = append(out, tracesdk.Link{
-			SpanContext: sc,
-			Attributes:  convertAttributes(l.Attributes),
-		})
-	}
-	return out
-}
-
 func convertResource(res *resourcev1.Resource) *resource.Resource {
 	if res == nil {
 		return resource.Empty()
@@ -402,38 +332,4 @@ func resourceServiceName(res *resource.Resource) string {
 		}
 	}
 	return ""
-}
-
-func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
-	switch code {
-	case tracev1.Status_STATUS_CODE_ERROR:
-		return codes.Error
-	case tracev1.Status_STATUS_CODE_OK:
-		return codes.Ok
-	case tracev1.Status_STATUS_CODE_UNSET:
-		return codes.Unset
-	default:
-		return codes.Unset
-	}
-}
-
-func hasRequiredAttributes(attrs []*commonv1.KeyValue, required []string) error {
-	attrMap := make(map[string]string)
-	for _, attr := range attrs {
-		if val := attr.GetValue().GetStringValue(); val != "" {
-			attrMap[attr.Key] = val
-		}
-	}
-
-	missing := []string{}
-	for _, req := range required {
-		if _, exists := attrMap[req]; !exists {
-			missing = append(missing, req)
-		}
-	}
-
-	if len(missing) > 0 {
-		return fmt.Errorf("missing attributes: %v", missing)
-	}
-	return nil
 }
