@@ -1722,6 +1722,11 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 
 	step := &i.f.Steps[0]
 
+	if i.execSpan != nil {
+		// Allow deep driver code to grab the execution span from context
+		ctx = i.execSpan.SetToCtx(ctx)
+	}
+
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 
 	if response == nil {
