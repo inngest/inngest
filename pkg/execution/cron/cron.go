@@ -31,16 +31,22 @@ type CronSyncer interface {
 	Sync(ctx context.Context, ci CronItem) error
 }
 
+type CronHealthChecker interface {
+	// HealthCheck checks if a "cron" queue item exists in the system queue for the next expected schedule time
+	HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
+
+	// Enqueues a cron-health-check system job
+	EnqueueNextHealthCheck(ctx context.Context) error
+}
+
 // CronManager represents the handling of cron
 type CronManager interface {
 	CronSyncer
 
+	CronHealthChecker
+
 	// ScheduleNext handles the scheduling of the next cron job
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
-
-	// NextScheduledItemIDForFunction returns identifying information about the next cron schedule that is expected to be scheduled.
-	// Note: It does not guarantee that the schedule actually exists in the system queue.
-	NextScheduledItemIDForFunction(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (*CronItem, error)
 }
 
 // CronItem represent an item that can be scheduled via the cron expression
@@ -70,4 +76,13 @@ type CronItem struct {
 // SyncID is used for the jobID when enqueueing non processing types
 func (i CronItem) SyncID() string {
 	return fmt.Sprintf("%s:sync", i.ID)
+}
+
+type CronHealthCheckStatus struct {
+	// next expected cron schedule time
+	Next time.Time `json:"next"`
+	// JobID is the "cron" system queue item's jobID for a given fnID, fnVersion, cronExpr combination for the next expected schedule time
+	JobID string `json:"jobID"`
+	// Scheduled indicates whether a queue item with the above jobID exists in the system queue
+	Scheduled bool `json:"scheduled"`
 }

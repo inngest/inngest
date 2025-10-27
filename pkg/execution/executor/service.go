@@ -2,11 +2,13 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -278,6 +280,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleCronSync(ctx, item)
 		case queue.KindCron:
 			err = s.handleCron(ctx, item)
+		case queue.KindCronHealthCheck:
+			err = s.handleCronHealthCheck(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -868,6 +872,94 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		}
 	}
 	return nil
+}
+
+func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron-health-check")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	if ci.Op != enums.CronHealthCheck {
+		return queue.NeverRetryError(fmt.Errorf("rejecting cron-health-check, invalid CronItem.Op: %s", ci.Op))
+	}
+
+	hcTime := ci.ID.Timestamp()
+	l.Info("starting cron health check", "scheduled_health_check_time", hcTime)
+
+	cqrsFns, err := s.data.GetFunctions(ctx)
+	if err != nil {
+		return fmt.Errorf("error accessing scheduled functions: %w", err)
+	}
+
+	eg := errgroup.Group{}
+	var success int64
+	var errored int64
+	var failed int64
+	eg.SetLimit(20)
+
+	for _, cqrsFn := range cqrsFns {
+		fn := inngest.Function{}
+		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
+
+		// Get AppID
+		appID := cqrsFn.AppID
+
+		for _, cronExpr := range fn.ScheduleExpressions() {
+			fn := fn
+			appID := appID
+			cronExpr := cronExpr
+
+			eg.Go(func() error {
+				l := s.log.With("fnID", fn.ID, "cronExpr", cronExpr, "fnVersion", fn.FunctionVersion)
+
+				status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
+				if err != nil {
+					atomic.AddInt64(&errored, 1)
+					l.Error("health check failed", "err", err)
+					return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
+				}
+
+				if !status.Scheduled {
+					l.Warn("cron health check failed, re-syncing")
+					err = s.croner.Sync(ctx, cron.CronItem{
+						ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+						AccountID:       consts.DevServerAccountID,
+						WorkspaceID:     consts.DevServerEnvID,
+						AppID:           appID,
+						FunctionID:      fn.ID,
+						FunctionVersion: fn.FunctionVersion,
+						Expression:      cronExpr,
+						Op:              enums.CronInit,
+					})
+					if err != nil {
+						atomic.AddInt64(&errored, 1)
+						l.Error("failed to sync on health check failure", "err", err)
+						return fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err)
+					}
+					atomic.AddInt64(&failed, 1)
+				} else {
+					atomic.AddInt64(&success, 1)
+				}
+				return nil
+			})
+		}
+	}
+
+	err = eg.Wait()
+	l.Info("health checks finished", "success", success, "failed", failed, "errors", errored)
+
+	if err != nil {
+		return fmt.Errorf("some cron health checks errored %w", err)
+	}
+
+	l.Info("finished cron health check")
+
+	// enqueue next health check.
+	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
 func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {

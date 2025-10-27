@@ -48,25 +48,14 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 	}
 
 	var cronSchedules []*pb.CronSchedule
-	if conf.IsScheduled() {
-		for _, cronExpr := range conf.ScheduleExpressions() {
-			if ci, err := d.croner.NextScheduledItemIDForFunction(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
-				// NextScheduledItemIDForFunction returns the expected jobID of next schedule
-				// Check if that jobID actually exists in the queue
-				opts := []redis_state.QueueOpOpt{}
-				_, err := d.queue.ItemByID(ctx, ci.JobID, opts...)
-				if err != nil && err != redis_state.ErrQueueItemNotFound {
-					return nil, status.Error(codes.Unknown, fmt.Errorf("error finding scheduled cron queue item: %w", err).Error())
-				}
-				cronScheduled := err == nil
-
-				cronSchedules = append(cronSchedules, &pb.CronSchedule{
-					Next:      timestamppb.New(ci.ID.Timestamp()),
-					JobId:     ci.JobID,
-					Expr:      ci.Expression,
-					Scheduled: cronScheduled,
-				})
-			}
+	for _, cronExpr := range conf.ScheduleExpressions() {
+		if healthCheckStatus, err := d.croner.HealthCheck(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+			cronSchedules = append(cronSchedules, &pb.CronSchedule{
+				Next:      timestamppb.New(healthCheckStatus.Next),
+				JobId:     healthCheckStatus.JobID,
+				Expr:      cronExpr,
+				Scheduled: healthCheckStatus.Scheduled,
+			})
 		}
 	}
 
