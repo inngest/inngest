@@ -646,6 +646,7 @@ func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt
 		if rueidis.IsRedisNil(err) {
 			return false, nil
 		}
+		return false, err
 	}
 
 	return exists, nil

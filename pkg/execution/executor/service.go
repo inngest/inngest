@@ -882,6 +882,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 		return fmt.Errorf("error accessing scheduled functions: %w", err)
 	}
 
+	var errors []error
 	for _, fn := range scheduledFns {
 		// Get AppID
 		cqrsFn, err := s.data.GetFunctionByInternalUUID(ctx, fn.ID)
@@ -893,7 +894,8 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 		for _, cronExpr := range fn.ScheduleExpressions() {
 			status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
 			if err != nil {
-				return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
+				errors = append(errors, fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err))
+				continue
 			}
 
 			if !status.Scheduled {
@@ -909,10 +911,19 @@ func (s *svc) handleCronHealthCheck(ctx context.Context) error {
 					Op:              enums.CronInit,
 				})
 				if err != nil {
-					return fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err)
+					errors = append(errors, fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err))
 				}
 			}
 		}
+	}
+
+	for _, err := range errors {
+		l.Error("cron health check failed", "err", err)
+	}
+
+	if len(errors) > 0 {
+		l.Error("health check failed for %d cron triggers", len(errors))
+		return errors[0]
 	}
 
 	// enqueue next health check.
