@@ -21,13 +21,13 @@ type ConnectGRPCConfig struct {
 func NewGRPCConfig(ctx context.Context, gatewayIP string, gatewayPort int, executorIP string, executorPort int) ConnectGRPCConfig {
 	parsedGatewayIP := net.ParseIP(gatewayIP)
 	if parsedGatewayIP == nil {
-		logger.StdlibLogger(ctx).Error("invalid connect gateway IP", "ip", gatewayIP)
+		logger.StdlibLogger(ctx).Warn("connect gateway IP not set, this is completely fine if the instance is not a connect gateway", "ip", gatewayIP)
 		parsedGatewayIP = net.ParseIP("127.0.0.1") // fallback to localhost
 	}
 
 	parsedExecutorIP := net.ParseIP(executorIP)
 	if parsedExecutorIP == nil {
-		logger.StdlibLogger(ctx).Error("invalid connect executor IP", "ip", executorIP)
+		logger.StdlibLogger(ctx).Warn("invalid connect executor IP not set, this is completely fine if the instance is not an executor", "ip", executorIP)
 		parsedExecutorIP = net.ParseIP("127.0.0.1") // fallback to localhost
 	}
 
