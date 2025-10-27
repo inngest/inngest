@@ -84,9 +84,7 @@ func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
 	)
 
-	// TODO: This could be a singleton once old tracing is removed.
-	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
-	return tracer
+	return otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
 }
 
 func (d *DroppableSpan) Drop() {
@@ -126,9 +124,16 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
+	attrs := opts.Attributes
+	if attrs == nil {
+		attrs = meta.NewAttrSet()
+	}
+
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
+	} else {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
@@ -149,10 +154,6 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		ctx = context.Background()
 	}
 
-	attrs := opts.Attributes
-	if attrs == nil {
-		attrs = meta.NewAttrSet()
-	}
 	if opts.Debug != nil {
 		if opts.Debug.Location != "" {
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)

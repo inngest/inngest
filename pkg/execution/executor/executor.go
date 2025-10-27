@@ -735,23 +735,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	strEvts := string(bytEvts)
 
-	runSpanOpts := &tracing.CreateSpanOptions{
-		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-		Metadata: &metadata,
-		Attributes: meta.NewAttrSet(
-			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			meta.Attr(meta.Attrs.EventsInput, &strEvts),
-			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
-		),
-	}
-	if req.RunMode == enums.RunModeSync {
-		// XXX: If this is a sync run, always add the start time to the span.  We do this
-		// because sync runs have already started by the time we call Schedule;  theyre
-		// in-process, and Schedule gets called via an API endpoint when the run starts.
-		runSpanOpts.StartTime = runID.Timestamp()
-	}
-
 	var (
 		runSpanRef       *tracing.DroppableSpan
 		discoverySpanRef *tracing.DroppableSpan
@@ -796,39 +779,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			discoverySpanRef.Drop()
 		}
 	}()
-
-	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
-		status = enums.StepStatusSkipped
-	}
-
-	// Always add either queued or skipped as a status.
-	meta.AddAttr(
-		runSpanOpts.Attributes,
-		meta.Attrs.DynamicStatus,
-		&status,
-	)
-
-	// Always the root span.
-	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
-		ctx,
-		meta.SpanNameRun,
-		runSpanOpts,
-	)
-	if err != nil {
-		// return nil, fmt.Errorf("error creating run span: %w", err)
-		l.Debug("error creating run span", "error", err)
-	}
-
-	if runSpanRef != nil {
-		config.NewSetFunctionTrace(runSpanRef.Ref)
-	}
-
-	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
-	}
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
@@ -940,6 +890,56 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	runSpanOpts := &tracing.CreateSpanOptions{
+		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+		Metadata: &metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+		),
+	}
+	if req.RunMode == enums.RunModeSync {
+		// XXX: If this is a sync run, always add the start time to the span. We do this
+		// because sync runs have already started by the time we call Schedule; they're
+		// in-process, and Schedule gets called via an API endpoint when the run starts.
+		runSpanOpts.StartTime = runID.Timestamp()
+	}
+
+	status := enums.StepStatusQueued
+	if req.SkipReason() != enums.SkipReasonNone {
+		status = enums.StepStatusSkipped
+	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
+	// Always the root span.
+	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameRun,
+		runSpanOpts,
+	)
+	if err != nil {
+		// return nil, fmt.Errorf("error creating run span: %w", err)
+		l.Debug("error creating run span", "error", err)
+	}
+
+	if runSpanRef != nil {
+		config.NewSetFunctionTrace(runSpanRef.Ref)
+	}
+
+	// If this is paused, immediately end just before creating state.
+	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+		sendSpans()
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
 	}
 
 	if req.BatchID == nil {
@@ -1620,6 +1620,11 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	}
 
 	step := &i.f.Steps[0]
+
+	if i.execSpan != nil {
+		// Allow deep driver code to grab the execution span from context
+		ctx = i.execSpan.SetToCtx(ctx)
+	}
 
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 

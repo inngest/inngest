@@ -85,10 +85,11 @@ func Fetch[OutputT any](
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   enums.OpcodeGateway,
-		Name: id,
-		Opts: in,
+		ID:       hashedID,
+		Op:       enums.OpcodeGateway,
+		Name:     id,
+		Opts:     in,
+		Userland: op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 	panic(sdkrequest.ControlHijack{})

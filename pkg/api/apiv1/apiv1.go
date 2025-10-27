@@ -52,11 +52,11 @@ type Opts struct {
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
-	// AppCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
+	// FunctionCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
 	FunctionCreator cqrs.FunctionCreator
 	// EventPublisher publishes events via HTTP/API-based functions
 	EventPublisher event.Publisher
-	// TracerProvider allows the checkpointing API to write traces.
+	// TracerProvider is used to create spans within the APIv1 endpoints and allows the checkpointing API to write traces.
 	TracerProvider tracing.TracerProvider
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService

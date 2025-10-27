@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -190,6 +191,42 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	debugRunID := span.GetDebugRunID()
 	debugSessionID := span.GetDebugSessionID()
 
+	isUserland := false
+	var userlandSpan *models.UserlandSpan
+
+	if span.Attributes.IsUserland != nil && *span.Attributes.IsUserland {
+		isUserland = true
+
+		filteredAttrs := make(map[string]any)
+		for k, v := range span.RawOtelSpan.Attributes {
+			if !strings.HasPrefix(k, meta.AttrKeyPrefix) {
+				filteredAttrs[k] = v
+			}
+		}
+
+		filteredAttrsByt, err := json.Marshal(filteredAttrs)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling filtered attributes: %w", err)
+		}
+
+		filteredAttrsStr := string(filteredAttrsByt)
+
+		userlandSpan = &models.UserlandSpan{
+			SpanName:     span.Attributes.UserlandName,
+			SpanKind:     span.Attributes.UserlandKind,
+			ScopeName:    span.Attributes.UserlandScopeName,
+			ScopeVersion: span.Attributes.UserlandScopeVersion,
+			ServiceName:  span.Attributes.UserlandServiceName,
+			SpanAttrs:    &filteredAttrsStr,
+		}
+
+	}
+
+	name := span.GetStepName()
+	if isUserland {
+		name = *userlandSpan.SpanName
+	}
+
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
 		Attempts:       &attempts,
@@ -197,7 +234,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		EndedAt:        span.GetEndedAtTime(),
 		FunctionID:     span.GetFunctionID(),
 		IsRoot:         span.GetIsRoot(),
-		Name:           span.GetStepName(),
+		Name:           name,
 		OutputID:       span.GetOutputID(),
 		ParentSpanID:   span.GetParentSpanID(),
 		QueuedAt:       span.GetQueuedAtTime(),
@@ -208,15 +245,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		TraceID:        span.GetTraceID(),
 		DebugRunID:     debugRunID,
 		DebugSessionID: debugSessionID,
-
-		SpanTypeName: span.Name,
-
-		// IsUserland: , TODO
-		// UserlandSpan: , TODO
+		SpanTypeName:   span.Name,
+		IsUserland:     isUserland,
+		UserlandSpan:   userlandSpan,
 	}
 
 	// If this was a discovery span, we may not want to show it.
-
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
@@ -403,6 +437,19 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
 		}
 
+		// If we only have a single child, this span isn't a userland span,
+		// but the single child is, return its children.
+		//
+		// We do this because userland spans are always underneath an
+		// `"inngest.execution"` span created by an SDK, which houses useful
+		// information about the environment, versions, scope, etc.
+		//
+		// Critically, this means we also ignore the `"inggest.execution"`
+		// span itself, as we never want to display it to the user.
+		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
+			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
+		}
+
 		// For the run span, the start is the first child span's start
 		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
 			if (gqlSpan.StartedAt == nil || !haveSetRunStartTime) && gqlSpan.ChildrenSpans[0].StartedAt != nil {
@@ -420,7 +467,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			// Step spans should not show attempts if they only have one and
 			// have resolved
 			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
-				gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
+				// However, we preserve any userland spans from the
+				// successful execution if we have any.
+				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
 			}
 		}
 
