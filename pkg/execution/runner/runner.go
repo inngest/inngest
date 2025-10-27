@@ -277,7 +277,9 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}(ctx, fn)
 		}
 	}
-	return nil
+
+	// Start health check for crons.
+	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
 func (s *svc) StateManager() state.Manager {

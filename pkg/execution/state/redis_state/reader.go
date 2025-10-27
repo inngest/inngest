@@ -629,6 +629,28 @@ func (q *queue) ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) 
 	return &item, nil
 }
 
+func (q *queue) ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt) (bool, error) {
+	opt := newQueueOpOptWithOpts(opts...)
+
+	shard := q.primaryQueueShard
+	if opt.shard != nil {
+		shard = *opt.shard
+	}
+
+	rc := shard.RedisClient.Client()
+	kg := shard.RedisClient.kg
+
+	cmd := rc.B().Hexists().Key(kg.QueueItem()).Field(jobID).Build()
+	exists, err := rc.Do(ctx, cmd).AsBool()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return false, nil
+		}
+	}
+
+	return exists, nil
+}
+
 func (q *queue) Shard(ctx context.Context, shardName string) (QueueShard, bool) {
 	shard, ok := q.queueShardClients[shardName]
 	return shard, ok

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -278,6 +279,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleCronSync(ctx, item)
 		case queue.KindCron:
 			err = s.handleCron(ctx, item)
+		case queue.KindCronHealthCheck:
+			err = s.handleCronHealthCheck(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -868,6 +871,58 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		}
 	}
 	return nil
+}
+
+func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron-health-check")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	l.Info("starting cron health check")
+	scheduledFns, err := s.data.FunctionsScheduled(ctx)
+	if err != nil {
+		return fmt.Errorf("error accessing scheduled functions: %w", err)
+	}
+
+	for _, fn := range scheduledFns {
+		// Get AppID
+		cqrsFn, err := s.data.GetFunctionByInternalUUID(ctx, fn.ID)
+		if err != nil {
+			return fmt.Errorf("error fetching appID during cron initialization for fn: %s, err: %w", fn.ID, err)
+		}
+		appID := cqrsFn.AppID
+
+		for _, cronExpr := range fn.ScheduleExpressions() {
+			status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
+			if err != nil {
+				return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
+			}
+
+			if !status.Scheduled {
+				l.Error("cron health check failed, re-syncing", "fnID", fn.ID, "fnV", fn.FunctionVersion, "cronExpr", cronExpr, "expectedJob", status.JobID, "next", status.Next)
+				err = s.croner.Sync(ctx, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					AppID:           appID,
+					FunctionID:      fn.ID,
+					FunctionVersion: fn.FunctionVersion,
+					Expression:      cronExpr,
+					Op:              enums.CronInit,
+				})
+				if err != nil {
+					return fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err)
+				}
+			}
+		}
+	}
+
+	// enqueue next health check.
+	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
 func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
