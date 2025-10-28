@@ -144,8 +144,11 @@ type RunContext interface {
 	Metadata() *sv2.Metadata
 	Events() []json.RawMessage
 	HTTPClient() exechttp.RequestExecutor
+
 	// The span that represents this individual execution
 	ExecutionSpan() *meta.SpanReference
+	// The span that represents this execution's parent.
+	ParentSpan() *meta.SpanReference
 
 	// Group correlation - for pause operations and history tracking
 	GroupID() string

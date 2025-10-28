@@ -339,3 +339,8 @@ func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
 	// TODO
 	return nil
 }
+
+func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+	// TODO
+	return nil
+}
