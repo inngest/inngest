@@ -5,7 +5,7 @@ import (
 	"io/fs"
 )
 
-//go:embed website/pages/docs
+//go:embed website/pages/docs/*
 var EmbeddedDocs embed.FS
 
 // GetDocsFS returns the embedded docs filesystem

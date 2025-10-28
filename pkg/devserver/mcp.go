@@ -682,11 +682,7 @@ func (h *MCPHandler) pollRunStatus(ctx context.Context, req *mcp.CallToolRequest
 	deadline := startTime.Add(time.Duration(timeout) * time.Second)
 
 	var lastResult *PollRunStatusResult
-	for {
-		// Check timeout
-		if time.Now().After(deadline) {
-			break
-		}
+	for time.Now().Before(deadline) {
 
 		// Get status for all runs
 		var runs []RunStatusResult
