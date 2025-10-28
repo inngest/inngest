@@ -98,9 +98,6 @@ const (
 	defaultPollTimeoutSeconds = 30
 	defaultPollIntervalMs     = 1000
 
-	// Event processing delay
-	eventProcessingDelay = 500 * time.Millisecond
-
 	// MCP implementation details
 	mcpName    = "inngest-dev"
 	mcpVersion = "v1.0.0"
@@ -117,6 +114,7 @@ const (
 type MCPHandler struct {
 	events api.EventHandler
 	data   cqrs.Manager
+	tick   time.Duration
 	
 	serverOnce sync.Once
 	server     *mcp.Server
@@ -170,10 +168,11 @@ func isRunFailed(status string) bool {
 }
 
 // NewMCPHandler creates a new MCP handler for the dev server
-func NewMCPHandler(events api.EventHandler, data cqrs.Manager) http.Handler {
+func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration) http.Handler {
 	h := &MCPHandler{
 		events:        events,
 		data:          data,
+		tick:          tick,
 		fileCache:     make(map[string][]byte),
 		fileInfoCache: make(map[string]fs.FileInfo),
 	}
@@ -357,7 +356,7 @@ func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, ar
 	}
 
 	// Wait a moment for the event to be processed and runs to be created
-	time.Sleep(eventProcessingDelay)
+	time.Sleep(h.tick * 3)
 
 	// Get the function runs triggered by this event using existing CQRS interface
 	var runIDs []string
@@ -817,7 +816,7 @@ func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	// Wait for the function to be triggered
-	time.Sleep(eventProcessingDelay)
+	time.Sleep(h.tick * 3)
 
 	// Get the run ID for this function
 	runs, err := h.data.GetEventRuns(ctx, eventULID, consts.DevServerAccountID, consts.DevServerEnvID)
@@ -1158,6 +1157,6 @@ func (h *MCPHandler) listDocs(ctx context.Context, req *mcp.CallToolRequest, _ s
 }
 
 // AddMCPRoute adds the MCP route to the dev server router
-func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager) {
-	r.Mount("/mcp", NewMCPHandler(events, data))
+func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager, tick time.Duration) {
+	r.Mount("/mcp", NewMCPHandler(events, data, tick))
 }

@@ -519,7 +519,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
 	// Add MCP server route
-	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data)
+	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data, opts.Tick)
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
