@@ -1,25 +1,29 @@
 'use client';
 
 import { useMemo } from 'react';
+import { RiCloseLine } from '@remixicon/react';
 
 import { InsightsChat } from '../InsightsChat/InsightsChat';
+import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
+import { DOCS, INSIGHTS_AI, SCHEMAS, SUPPORT, type HelperTitle } from './helperConstants';
 
 type InsightsHelperPanelProps = {
-  active: null | string;
+  active: null | HelperTitle;
   agentThreadId?: string;
+  onClose: () => void;
 };
 
-export function InsightsHelperPanel({ active, agentThreadId }: InsightsHelperPanelProps) {
+export function InsightsHelperPanel({ active, agentThreadId, onClose }: InsightsHelperPanelProps) {
   const content = useMemo(() => {
     switch (active) {
-      case 'AI':
+      case INSIGHTS_AI:
         if (!agentThreadId) return null;
         return <InsightsChat agentThreadId={agentThreadId} onToggleChat={() => {}} />;
-      case 'Docs':
+      case DOCS:
         return <div className="text-sm">Docs helper (placeholder)</div>;
-      case 'Schemas':
+      case SCHEMAS:
         return <div className="text-sm">Schemas helper (placeholder)</div>;
-      case 'Support':
+      case SUPPORT:
         return <div className="text-sm">Support helper (placeholder)</div>;
       default:
         return null;
@@ -28,5 +32,25 @@ export function InsightsHelperPanel({ active, agentThreadId }: InsightsHelperPan
 
   if (content === null) return null;
 
-  return <div className="h-full w-full overflow-auto p-3">{content}</div>;
+  return (
+    <div className="flex h-full w-full flex-col">
+      <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
+        <div className="flex flex-row items-center gap-2">
+          {active ? (
+            <InsightsHelperPanelIcon className="text-subtle" size={20} title={active} />
+          ) : null}
+          <div className="text-muted text-sm font-normal uppercase tracking-wider">{active}</div>
+        </div>
+        <button
+          aria-label="Close helper"
+          className="text-subtle hover:text-basis hover:bg-canvasSubtle flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          onClick={onClose}
+          type="button"
+        >
+          <RiCloseLine size={18} />
+        </button>
+      </div>
+      {content}
+    </div>
+  );
 }

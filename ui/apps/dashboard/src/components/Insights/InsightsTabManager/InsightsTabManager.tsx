@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useUser } from '@clerk/nextjs';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agent';
-import { RiBookOpenLine, RiFeedbackLine, RiSparkling2Line, RiTable2 } from '@remixicon/react';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,9 +20,11 @@ import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel';
 import { InsightsHelperPanelControl, type HelperItem } from './InsightsHelperPanelControl';
+import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
+import { DOCS, INSIGHTS_AI, SCHEMAS, SUPPORT, type HelperTitle } from './helperConstants';
 
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
@@ -193,10 +194,10 @@ function InsightsTabManagerInternal({
   setIsHelperPanelOpen,
   isInsightsAgentEnabled,
 }: InsightsTabManagerInternalProps) {
-  const [activeHelper, setActiveHelper] = useState<string | null>(null);
+  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
 
   const handleSelectHelper = useCallback(
-    (title: string) => {
+    (title: HelperTitle) => {
       if (activeHelper === title && isHelperPanelOpen) {
         setIsHelperPanelOpen(false);
         setActiveHelper(null);
@@ -213,31 +214,31 @@ function InsightsTabManagerInternal({
 
     if (isInsightsAgentEnabled) {
       items.push({
-        title: 'AI',
-        icon: <RiSparkling2Line size={20} />,
-        action: () => handleSelectHelper('AI'),
+        title: INSIGHTS_AI,
+        icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} size={20} />,
+        action: () => handleSelectHelper(INSIGHTS_AI),
       });
     }
 
     if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
       items.push({
-        title: 'Docs',
-        icon: <RiBookOpenLine size={20} />,
-        action: () => handleSelectHelper('Docs'),
+        title: DOCS,
+        icon: <InsightsHelperPanelIcon title={DOCS} size={20} />,
+        action: () => handleSelectHelper(DOCS),
       });
     }
 
     if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
       items.push({
-        title: 'Schemas',
-        icon: <RiTable2 size={20} />,
-        action: () => handleSelectHelper('Schemas'),
+        title: SCHEMAS,
+        icon: <InsightsHelperPanelIcon title={SCHEMAS} size={20} />,
+        action: () => handleSelectHelper(SCHEMAS),
       });
     }
 
     items.push({
-      title: 'Support',
-      icon: <RiFeedbackLine size={20} />,
+      title: SUPPORT,
+      icon: <InsightsHelperPanelIcon title={SUPPORT} size={20} />,
       action: noOp,
       href: pathCreator.support({ ref: 'app-insights' }),
     });
@@ -287,6 +288,10 @@ function InsightsTabManagerInternal({
                       <InsightsHelperPanel
                         active={activeHelper}
                         agentThreadId={getAgentThreadIdForTab(tab.id)}
+                        onClose={() => {
+                          setIsHelperPanelOpen(false);
+                          setActiveHelper(null);
+                        }}
                       />
                     }
                   />
