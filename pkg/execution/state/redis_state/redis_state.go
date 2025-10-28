@@ -825,13 +825,28 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 func (m unshardedMgr) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error) {
 	pc := m.u.Pauses()
 	idx := pc.kg.PauseIndex(ctx, "add", workspaceID, event)
-	ts, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).AsInt64()
-	if rueidis.IsRedisNil(err) {
+	result, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).ToArray()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return time.Time{}, fmt.Errorf("pause timestamp not found")
+		}
+		return time.Time{}, err
+	}
+	
+	if len(result) == 0 {
 		return time.Time{}, fmt.Errorf("pause timestamp not found")
 	}
+	
+	// ZMSCORE returns nil for non-existent members
+	if result[0].IsNil() {
+		return time.Time{}, fmt.Errorf("pause timestamp not found")
+	}
+	
+	ts, err := result[0].AsInt64()
 	if err != nil {
 		return time.Time{}, err
 	}
+	
 	return time.Unix(ts, 0), nil
 }
 
