@@ -83,6 +83,9 @@ export default clerkMiddleware((auth, request) => {
     auth().protect();
     return afterAuth(auth, request);
   }
+
+  // Public routes: allow request through with CSP header set.
+  return withCSPResponseHeaderReportOnly(NextResponse.next());
 });
 
 export const config = {
@@ -186,7 +189,7 @@ function getAppURL(): string | null {
 }
 
 // TODO: Remove -Report-Only once we're confident CSP is working as expected.
-function withCSPResponseHeaderReportOnly(response: NextResponse) {
+function withCSPResponseHeaderReportOnly(response: Response) {
   const appURL = getAppURL();
   if (!appURL) return response;
 
