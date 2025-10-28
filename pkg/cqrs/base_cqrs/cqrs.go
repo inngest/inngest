@@ -1599,6 +1599,13 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 
 			so.Data = []byte(fmt.Append(nil, row.Output))
 			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+				// NOTE: By default, we wrap errors and data.  However, unforutnately
+				// step.waitForEvent is _not_ wrapped, so we check to see if there's
+				// both "data" and "name";  if so, we return the data wholesale.
+				if isWaitForEventOutput(m) {
+					return so, nil
+				}
+
 				if errData, ok := m["error"]; ok {
 					so.IsError = true
 					so.Data, _ = json.Marshal(errData)
@@ -3003,4 +3010,11 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		cursor:       reqCursor,
 		cursorLayout: resCursorLayout,
 	}
+}
+
+func isWaitForEventOutput(o map[string]any) bool {
+	_, name := o["name"]
+	_, data := o["data"]
+	_, ts := o["ts"]
+	return name && data && ts
 }
