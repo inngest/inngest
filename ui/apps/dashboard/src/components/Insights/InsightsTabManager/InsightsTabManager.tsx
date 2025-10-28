@@ -11,12 +11,13 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { InsightsChat } from '../InsightsChat/InsightsChat';
 import {
   InsightsChatProvider,
   useInsightsChatProvider,
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
+import { InsightsHelperPanel } from './InsightsHelperPanel';
+import { InsightsHelperPanelCollapsed } from './InsightsHelperPanelCollapsed';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
@@ -50,6 +51,7 @@ export function useInsightsTabManager(
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
+  const [isHelperPanelOpen, setIsHelperPanelOpen] = useState(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
 
   const onToggleChatPanelVisibility = useCallback(() => {
@@ -149,9 +151,8 @@ export function useInsightsTabManager(
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
-        isChatPanelVisible={effectiveChatPanelVisible}
+        isHelperPanelOpen={isHelperPanelOpen}
         isInsightsAgentEnabled={isInsightsAgentEnabled.value}
-        onToggleChatPanelVisibility={onToggleChatPanelVisibility}
       />
     ),
     [
@@ -162,9 +163,8 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
-      effectiveChatPanelVisible,
+      isHelperPanelOpen,
       isInsightsAgentEnabled.value,
-      onToggleChatPanelVisibility,
     ]
   );
 
@@ -179,9 +179,8 @@ interface InsightsTabManagerInternalProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
-  isChatPanelVisible: boolean;
+  isHelperPanelOpen: boolean;
   isInsightsAgentEnabled: boolean;
-  onToggleChatPanelVisibility: () => void;
 }
 
 function InsightsTabManagerInternal({
@@ -192,9 +191,8 @@ function InsightsTabManagerInternal({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  isChatPanelVisible,
+  isHelperPanelOpen,
   isInsightsAgentEnabled,
-  onToggleChatPanelVisibility,
 }: InsightsTabManagerInternalProps) {
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
@@ -216,16 +214,13 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
-            {isInsightsAgentEnabled &&
-            tab.id !== HOME_TAB.id &&
-            tab.id !== TEMPLATES_TAB.id &&
-            isChatPanelVisible ? (
+            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && isHelperPanelOpen ? (
               <Resizable
                 defaultSplitPercentage={75}
                 minSplitPercentage={20}
                 maxSplitPercentage={85}
                 orientation="horizontal"
-                splitKey="insights-chat-split"
+                splitKey="insights-helper-split"
                 first={
                   <div className="h-full min-w-0 overflow-hidden">
                     <InsightsTabPanel
@@ -233,30 +228,24 @@ function InsightsTabManagerInternal({
                       isTemplatesTab={tab.id === TEMPLATES_TAB.id}
                       tab={tab}
                       historyWindow={historyWindow}
-                      isChatPanelVisible={isChatPanelVisible}
-                      onToggleChatPanelVisibility={onToggleChatPanelVisibility}
-                      isInsightsAgentEnabled={isInsightsAgentEnabled}
                     />
                   </div>
                 }
-                second={
-                  <InsightsChat
-                    agentThreadId={getAgentThreadIdForTab(tab.id)}
-                    onToggleChat={onToggleChatPanelVisibility}
-                  />
-                }
+                second={<InsightsHelperPanel />}
               />
             ) : (
-              <div className="h-full min-w-0 overflow-hidden">
-                <InsightsTabPanel
-                  isHomeTab={tab.id === HOME_TAB.id}
-                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                  tab={tab}
-                  historyWindow={historyWindow}
-                  isChatPanelVisible={isChatPanelVisible}
-                  onToggleChatPanelVisibility={onToggleChatPanelVisibility}
-                  isInsightsAgentEnabled={isInsightsAgentEnabled}
-                />
+              <div className="flex h-full w-full">
+                <div className="h-full min-w-0 flex-1 overflow-hidden">
+                  <InsightsTabPanel
+                    isHomeTab={tab.id === HOME_TAB.id}
+                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                    tab={tab}
+                    historyWindow={historyWindow}
+                  />
+                </div>
+                {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id ? (
+                  <InsightsHelperPanelCollapsed />
+                ) : null}
               </div>
             )}
           </div>
