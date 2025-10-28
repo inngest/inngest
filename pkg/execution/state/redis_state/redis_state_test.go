@@ -455,7 +455,6 @@ func TestPauseCreatedAt(t *testing.T) {
 	r, rc := initRedis(t)
 	defer rc.Close()
 
-	// Create Redis state manager
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
 	shardedClient := NewShardedClient(ShardedClientOpts{
 		UnshardedClient:        unshardedClient,
@@ -475,13 +474,11 @@ func TestPauseCreatedAt(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create test data
 	workspaceID := uuid.New()
 	eventName := "test.event"
 	pauseID := uuid.New()
 	runID := ulid.Make()
-	
-	// Create a pause with our test data
+
 	pause := state.Pause{
 		ID:          pauseID,
 		WorkspaceID: workspaceID,
@@ -494,15 +491,13 @@ func TestPauseCreatedAt(t *testing.T) {
 		Expires: state.Time(time.Now().Add(time.Hour)),
 	}
 
-	// Save the pause first
 	_, err = mgr.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	// Now test PauseCreatedAt - this should work with our ZMSCORE fix
 	createdAt, err := mgr.PauseCreatedAt(ctx, workspaceID, eventName, pauseID)
 	require.NoError(t, err)
 	require.False(t, createdAt.IsZero(), "created at timestamp should not be zero")
-	
+
 	// The timestamp should be reasonably recent (within the last minute)
 	require.True(t, time.Since(createdAt) < time.Minute, "timestamp should be recent")
 
