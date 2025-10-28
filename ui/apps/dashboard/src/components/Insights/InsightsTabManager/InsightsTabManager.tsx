@@ -54,7 +54,6 @@ export function useInsightsTabManager(
 ): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
-  const [isHelperPanelOpen, setIsHelperPanelOpen] = useState(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
 
   // Map each UI tab to a stable agent thread id
@@ -147,8 +146,6 @@ export function useInsightsTabManager(
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
-        isHelperPanelOpen={isHelperPanelOpen}
-        setIsHelperPanelOpen={setIsHelperPanelOpen}
         isInsightsAgentEnabled={isInsightsAgentEnabled.value}
       />
     ),
@@ -160,8 +157,6 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
-      isHelperPanelOpen,
-      setIsHelperPanelOpen,
       isInsightsAgentEnabled.value,
     ]
   );
@@ -177,8 +172,6 @@ interface InsightsTabManagerInternalProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
-  isHelperPanelOpen: boolean;
-  setIsHelperPanelOpen: (open: boolean) => void;
   isInsightsAgentEnabled: boolean;
 }
 
@@ -190,24 +183,22 @@ function InsightsTabManagerInternal({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  isHelperPanelOpen,
-  setIsHelperPanelOpen,
   isInsightsAgentEnabled,
 }: InsightsTabManagerInternalProps) {
   const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
 
   const handleSelectHelper = useCallback(
     (title: HelperTitle) => {
-      if (activeHelper === title && isHelperPanelOpen) {
-        setIsHelperPanelOpen(false);
+      if (activeHelper === title) {
         setActiveHelper(null);
       } else {
         setActiveHelper(title);
-        if (!isHelperPanelOpen) setIsHelperPanelOpen(true);
       }
     },
-    [activeHelper, isHelperPanelOpen, setIsHelperPanelOpen]
+    [activeHelper]
   );
+
+  const isHelperPanelOpen = activeHelper !== null;
 
   const helperItems = useMemo<HelperItem[]>(() => {
     const items: HelperItem[] = [];
@@ -289,7 +280,6 @@ function InsightsTabManagerInternal({
                         active={activeHelper}
                         agentThreadId={getAgentThreadIdForTab(tab.id)}
                         onClose={() => {
-                          setIsHelperPanelOpen(false);
                           setActiveHelper(null);
                         }}
                       />
