@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -69,6 +70,9 @@ const (
 type MCPHandler struct {
 	events api.EventHandler
 	data   cqrs.Manager
+	
+	serverOnce sync.Once
+	server     *mcp.Server
 }
 
 // convertToMap converts various input types to a map with a fallback key
@@ -120,10 +124,18 @@ func NewMCPHandler(events api.EventHandler, data cqrs.Manager) http.Handler {
 
 	// Create a streamable HTTP handler that returns the same server for all requests
 	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return h.createMCPServer()
+		return h.getMCPServer()
 	}, &mcp.StreamableHTTPOptions{
 		JSONResponse: true, // Use JSON responses for better compatibility
 	})
+}
+
+// getMCPServer returns the cached MCP server, creating it once if needed
+func (h *MCPHandler) getMCPServer() *mcp.Server {
+	h.serverOnce.Do(func() {
+		h.server = h.createMCPServer()
+	})
+	return h.server
 }
 
 // createMCPServer creates an MCP server instance with dev server tools
