@@ -106,6 +106,9 @@ type Manager interface {
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
 	Delete(ctx context.Context, index Index, pause state.Pause) error
+
+	// FlushIndexBlock flushes a new pauses block for the specified index.
+	FlushIndexBlock(ctx context.Context, index Index) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
