@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useUser } from '@clerk/nextjs';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 import { AgentProvider, createInMemorySessionTransport } from '@inngest/use-agent';
+import { RiBookOpenLine, RiFeedbackLine, RiSparkling2Line, RiTable2 } from '@remixicon/react';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,7 +18,7 @@ import {
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsHelperPanel } from './InsightsHelperPanel';
-import { InsightsHelperPanelCollapsed } from './InsightsHelperPanelCollapsed';
+import { InsightsHelperPanelCollapsed, type HelperItem } from './InsightsHelperPanelCollapsed';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
@@ -194,6 +195,19 @@ function InsightsTabManagerInternal({
   isHelperPanelOpen,
   isInsightsAgentEnabled,
 }: InsightsTabManagerInternalProps) {
+  const helperItems = useMemo<HelperItem[]>(
+    () => [
+      { title: 'AI', icon: <RiSparkling2Line size={20} />, action: () => console.log('ai') },
+      { title: 'Docs', icon: <RiBookOpenLine size={20} />, action: () => console.log('docs') },
+      { title: 'Schemas', icon: <RiTable2 size={20} />, action: () => console.log('schemas') },
+      {
+        title: 'Support',
+        icon: <RiFeedbackLine size={20} />,
+        action: () => console.log('support'),
+      },
+    ],
+    []
+  );
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
@@ -244,7 +258,7 @@ function InsightsTabManagerInternal({
                   />
                 </div>
                 {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id ? (
-                  <InsightsHelperPanelCollapsed />
+                  <InsightsHelperPanelCollapsed items={helperItems} />
                 ) : null}
               </div>
             )}
