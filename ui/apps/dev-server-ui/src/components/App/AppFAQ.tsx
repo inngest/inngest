@@ -28,7 +28,7 @@ export default function AppFAQ({ openByDefault = false }) {
                   label: 'choose-framework',
                 })
               }
-              href="/apps/choose-framework"
+              to="/apps/choose-framework"
               icon={
                 <div className="bg-primary-3xSubtle w-fit rounded-sm p-[10px]">
                   <RiAddLine className="h-5 w-5" />
@@ -44,7 +44,7 @@ export default function AppFAQ({ openByDefault = false }) {
                   label: 'choose-template',
                 })
               }
-              href="/apps/choose-template"
+              to="/apps/choose-template"
               icon={
                 <div className="bg-tertiary-3xSubtle w-fit rounded-sm p-[10px]">
                   <RiFunctionLine className="h-5 w-5" />

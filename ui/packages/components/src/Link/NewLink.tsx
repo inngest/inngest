@@ -25,7 +25,25 @@ export function Link({
   children,
   ...props
 }: React.PropsWithChildren<LinkProps>) {
-  return (
+  return href ? (
+    <a
+      href={href}
+      className={cn(
+        defaultLinkStyles,
+        'group flex items-center gap-1',
+        size === 'small' && 'text-sm',
+        size === 'medium' && 'text-base',
+        className
+      )}
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    >
+      {iconBefore}
+      {children}
+      {iconAfter}
+    </a>
+  ) : (
     <TanstackLink
       className={cn(
         defaultLinkStyles,
@@ -34,7 +52,6 @@ export function Link({
         size === 'medium' && 'text-base',
         className
       )}
-      href={href}
       {...props}
     >
       {iconBefore}

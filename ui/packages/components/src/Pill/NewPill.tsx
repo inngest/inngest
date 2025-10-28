@@ -5,7 +5,7 @@ import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
-import { Link } from '@tanstack/react-router';
+import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error' | 'secondary';
 export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
@@ -14,6 +14,7 @@ export function Pill({
   children,
   className = '',
   href,
+  to,
   kind = 'default',
   appearance = 'solid',
   flatSide,
@@ -22,7 +23,8 @@ export function Pill({
 }: {
   children: React.ReactNode;
   className?: string;
-  href?: string;
+  href?: LinkComponentProps['href'];
+  to?: LinkComponentProps['to'];
   appearance?: PillAppearance;
   kind?: PillKind;
   icon?: React.ReactNode;
@@ -80,21 +82,22 @@ export function Pill({
 
   const tooltipText = extractText(children);
 
-  const pillWrapper = href ? (
-    <Link to={href} className="flex" onClick={(e) => e.stopPropagation()}>
-      <span ref={pillRef} className={cn('rounded', classNames)}>
+  const pillWrapper =
+    href || to ? (
+      <Link href={href} to={to} className="flex" onClick={(e) => e.stopPropagation()}>
+        <span ref={pillRef} className={cn('rounded', classNames)}>
+          {icon && iconSide === 'left' && icon}
+          {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
+          {icon && iconSide === 'right' && icon}
+        </span>
+      </Link>
+    ) : (
+      <span ref={pillRef} className={cn(roundedClasses, classNames)}>
         {icon && iconSide === 'left' && icon}
         {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
         {icon && iconSide === 'right' && icon}
       </span>
-    </Link>
-  ) : (
-    <span ref={pillRef} className={cn(roundedClasses, classNames)}>
-      {icon && iconSide === 'left' && icon}
-      {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
-      {icon && iconSide === 'right' && icon}
-    </span>
-  );
+    );
   return (
     <>
       {isTruncated ? (
