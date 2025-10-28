@@ -167,8 +167,6 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
     )} ${getAllowVercelLiveURL(isProdEnvironment, isDevBuild)}`,
     `style-src 'self' ${MONACO_EDITOR_CDN_STYLE_URL} 'unsafe-inline'`,
     `worker-src 'self' blob:`,
-    // `report-to ${CSP_REPORT_GROUP}`,
-    `report-uri ${cspReportURL}`,
   ]
     .map((line) => line.trim())
     .join('; ');
@@ -204,7 +202,6 @@ function withCSPResponseHeaderReportOnly(response: NextResponse) {
   }
 
   response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL, cspReportURL));
-  response.headers.set('Reporting-Endpoints', `${CSP_REPORT_GROUP}="${cspReportURL}"`);
 
   return response;
 }
