@@ -1106,7 +1106,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if isSleepResume {
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
-			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResumeA"},
+			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResume"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
 			TargetSpan: tracing.SpanRefFromQueueItem(&item),
