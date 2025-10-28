@@ -46,6 +46,53 @@ func walkEmbeddedDocs(fn func(path string, d fs.DirEntry, err error) error) erro
 	return fs.WalkDir(docsFS, ".", fn)
 }
 
+// getCachedFileContent returns cached file content or reads and caches it
+func (h *MCPHandler) getCachedFileContent(path string) ([]byte, error) {
+	h.fileCacheMu.RLock()
+	if content, exists := h.fileCache[path]; exists {
+		h.fileCacheMu.RUnlock()
+		return content, nil
+	}
+	h.fileCacheMu.RUnlock()
+
+	// Read file content
+	content, err := readEmbeddedFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the content
+	h.fileCacheMu.Lock()
+	h.fileCache[path] = content
+	h.fileCacheMu.Unlock()
+
+	return content, nil
+}
+
+// getCachedFileInfo returns cached file info or reads and caches it
+func (h *MCPHandler) getCachedFileInfo(path string) (fs.FileInfo, error) {
+	h.fileCacheMu.RLock()
+	if info, exists := h.fileInfoCache[path]; exists {
+		h.fileCacheMu.RUnlock()
+		return info, nil
+	}
+	h.fileCacheMu.RUnlock()
+
+	// Get file info
+	docsFS := getDocsFS()
+	info, err := fs.Stat(docsFS, path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the info
+	h.fileCacheMu.Lock()
+	h.fileInfoCache[path] = info
+	h.fileCacheMu.Unlock()
+
+	return info, nil
+}
+
 const (
 	// Default polling configuration
 	defaultPollTimeoutSeconds = 30
@@ -73,6 +120,13 @@ type MCPHandler struct {
 	
 	serverOnce sync.Once
 	server     *mcp.Server
+	
+	// File content cache
+	fileCacheMu sync.RWMutex
+	fileCache   map[string][]byte
+	
+	// File info cache
+	fileInfoCache map[string]fs.FileInfo
 }
 
 // convertToMap converts various input types to a map with a fallback key
@@ -118,8 +172,10 @@ func isRunFailed(status string) bool {
 // NewMCPHandler creates a new MCP handler for the dev server
 func NewMCPHandler(events api.EventHandler, data cqrs.Manager) http.Handler {
 	h := &MCPHandler{
-		events: events,
-		data:   data,
+		events:        events,
+		data:          data,
+		fileCache:     make(map[string][]byte),
+		fileInfoCache: make(map[string]fs.FileInfo),
 	}
 
 	// Create a streamable HTTP handler that returns the same server for all requests
@@ -899,8 +955,8 @@ func (h *MCPHandler) grepDocs(ctx context.Context, req *mcp.CallToolRequest, arg
 			return nil
 		}
 
-		// Read file content
-		content, err := readEmbeddedFile(path)
+		// Read file content from cache
+		content, err := h.getCachedFileContent(path)
 		if err != nil {
 			return nil // Skip files that can't be read
 		}
@@ -974,15 +1030,14 @@ func (h *MCPHandler) readDoc(ctx context.Context, req *mcp.CallToolRequest, args
 	// Clean the path to use forward slashes
 	cleanPath := filepath.ToSlash(args.Path)
 
-	// Read file content from embedded filesystem
-	content, err := readEmbeddedFile(cleanPath)
+	// Read file content from cache or embedded filesystem
+	content, err := h.getCachedFileContent(cleanPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("file not found: %s", args.Path)
 	}
 
-	// Get file info from embedded filesystem
-	docsFS := getDocsFS()
-	info, err := fs.Stat(docsFS, cleanPath)
+	// Get file info from cache or embedded filesystem
+	info, err := h.getCachedFileInfo(cleanPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to stat file: %w", err)
 	}
