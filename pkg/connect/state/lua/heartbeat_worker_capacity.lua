@@ -24,10 +24,10 @@ end
 -- Refresh capacity key TTL
 redis.call("EXPIRE", capacityKey, ttl)
 
--- Refresh set key TTL if it exists
-local setExists = redis.call("EXISTS", leasesSetKey)
-if setExists == 1 then
-  redis.call("EXPIRE", leasesSetKey, ttl)
-end
+-- Refresh set key TTL
+--local setExists = redis.call("EXISTS", leasesSetKey)
+-- if setExists == 1 then
+redis.call("EXPIRE", leasesSetKey, ttl) -- incase the set doesn't exist, it' returns -2 but we ignore output
+--end
 
 return 1

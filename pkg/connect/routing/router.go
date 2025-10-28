@@ -127,10 +127,16 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	}
 
 	healthy := make([]connWithGroup, 0, len(conns))
+	capacityCache := make(map[string]*checkCapacityRes)
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
-		capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
-		if res.isHealthy && capacityRes.hasWorkerCapacity {
+		// avoid duplicate calls to check capacity for same instance
+		if _, ok := capacityCache[conn.InstanceId]; !ok {
+			capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
+			capacityCache[conn.InstanceId] = capacityRes
+		}
+		// check if the connection is healthy and has worker capacity
+		if res.isHealthy && capacityCache[conn.InstanceId].hasWorkerCapacity {
 			healthy = append(healthy, connWithGroup{
 				conn:  conn,
 				group: res.workerGroup,

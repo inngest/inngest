@@ -938,12 +938,14 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
 	expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 
+	now := r.c.Now()
 	keys := []string{capacityKey, leasesSetKey, leaseWorkerKey}
 	args := []string{
 		fmt.Sprintf("%d", int64(setTTL.Seconds())),
 		instanceID,
 		requestID,
 		fmt.Sprintf("%d", expirationTime),
+		fmt.Sprintf("%d", now.UnixMilli()),
 	}
 
 	result, err := scripts["incr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
@@ -968,13 +970,13 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	keys := []string{leasesSetKey, leaseWorkerKey}
 	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID}
 
-	_, err := scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
-	if err != nil {
-		return fmt.Errorf("failed to remove worker lease from set: %w", err)
-	}
+	// ignore errors
+	scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
+	//if err != nil {
+	//	return fmt.Errorf("failed to remove worker lease from set: %w", err)
+	//}
 
 	// Result codes:
-	// 0: Set deleted (empty) and mapping deleted
 	// 1: Lease removed and TTL refreshed, mapping deleted
 	// 2: Set doesn't exist (no-op)
 

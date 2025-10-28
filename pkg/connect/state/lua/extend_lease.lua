@@ -1,6 +1,6 @@
 --[[
 Output:
-	-2: Request leased by somebody else
+  -2: Request leased by somebody else
   -1: Request not leased
   1: Successfully extended lease
   2: Successfully dropped lease
@@ -44,17 +44,17 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 		if oldInstanceID then
 			-- Remove from the old instance's set
 			local oldLeasesSetKey = string.gsub(leasesSetKey, instanceID, oldInstanceID)
-			
+
 			-- Get request ID from the request item
 			local requestIDToRemove = requestItem.requestID
 			if not requestIDToRemove and requestItem.Request then
 				requestIDToRemove = requestItem.Request.id
 			end
-			
+
 			if requestIDToRemove then
 				-- Remove the request from old worker's set
 				redis.call("ZREM", oldLeasesSetKey, requestIDToRemove)
-				
+
 				-- Check if old set is now empty
 				local oldRemainingCount = redis.call("ZCARD", oldLeasesSetKey)
 				if oldRemainingCount == 0 then
@@ -83,20 +83,20 @@ if isWorkerCapacityLimited == "true" then
 	if not requestIDToManage and requestItem.Request then
 		requestIDToManage = requestItem.Request.id
 	end
-	
+
 	if not requestIDToManage then
 		-- This shouldn't happen, but handle gracefully
 		return -1
 	end
-	
+
 	-- If there was an old instance ID and it's different from the new one
 	if oldInstanceID and oldInstanceID ~= instanceID then
 		-- Remove from the old instance's set
 		local oldLeasesSetKey = string.gsub(leasesSetKey, instanceID, oldInstanceID)
-		
+
 		-- Remove the request from old worker's set
 		redis.call("ZREM", oldLeasesSetKey, requestIDToManage)
-		
+
 		-- Check if old set is now empty
 		local oldRemainingCount = redis.call("ZCARD", oldLeasesSetKey)
 		if oldRemainingCount == 0 then

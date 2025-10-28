@@ -18,6 +18,7 @@ local setTTL = tonumber(ARGV[1])
 local instanceID = ARGV[2]
 local requestID = ARGV[3]
 local expirationTime = ARGV[4]
+local currentTime = ARGV[5]
 
 -- Get the worker's capacity limit (returns a string)
 local capacity = redis.call("GET", capacityKey)
@@ -31,14 +32,15 @@ end
 capacity = tonumber(capacity)
 
 -- Get current time to filter out expired leases
-local currentTime = redis.call("TIME")
-local currentTimeUnix = tonumber(currentTime[1])
+-- previous second, this makes us very sensitive to time changes
+-- Should we use the logical clock instead?
+local currentTimeUnix = tonumber(currentTime[1]) - 1
 
 -- Remove expired leases from the set first
 redis.call("ZREMRANGEBYSCORE", leasesSetKey, "-inf", tostring(currentTimeUnix))
 
 -- Get current number of active leases (those with expiration time > current time)
-local currentLeases = redis.call("ZCOUNT", leasesSetKey, tostring(currentTimeUnix + 1), "+inf")
+local currentLeases = redis.call("ZCOUNT", leasesSetKey, tostring(currentTimeUnix), "+inf")
 
 -- Check if at capacity
 if currentLeases >= capacity then

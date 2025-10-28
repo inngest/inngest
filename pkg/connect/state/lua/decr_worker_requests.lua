@@ -26,25 +26,17 @@ if setExists == 0 then
   return 2
 end
 
--- Get current time to clean up expired leases
-local currentTime = redis.call("TIME")
-local currentTimeUnix = tonumber(currentTime[1])
-
--- Remove expired leases from the set first
-redis.call("ZREMRANGEBYSCORE", leasesSetKey, "-inf", tostring(currentTimeUnix))
-
 -- Remove the specific request ID from the set
-local removed = redis.call("ZREM", leasesSetKey, requestID)
+redis.call("ZREM", leasesSetKey, requestID)
 
--- Check if set is now empty
-local remainingCount = redis.call("ZCARD", leasesSetKey)
-
-if remainingCount == 0 then
+-- Check if set is now empty and delete it
+-- local remainingCount = redis.call("ZCARD", leasesSetKey)
+-- if remainingCount == 0 then
   -- Set is empty, delete it and the mapping
-  redis.call("DEL", leasesSetKey)
-  redis.call("DEL", leaseWorkerKey)
-  return 0
-end
+--  redis.call("DEL", leasesSetKey)
+--  redis.call("DEL", leaseWorkerKey)
+--  return 0
+--end
 
 -- Set still has leases, refresh TTL
 redis.call("EXPIRE", leasesSetKey, setTTL)
