@@ -398,3 +398,89 @@ func (m *mockBuffererSameTimestamp) IndexExists(ctx context.Context, i Index) (b
 	defer m.mu.RUnlock()
 	return len(m.pauses) > 0, nil
 }
+
+func TestLastBlockMetadata(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	mockBufferer := &mockBufferer{
+		pauses: []*state.Pause{
+			{ID: uuid.New()},
+		},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         mockBufferer,
+		Leaser:           leaser,
+		BlockSize:        1,
+		CompactionLimit:  1,
+		CompactionSample: 0.1,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return false },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+	ctx := context.Background()
+
+	t.Run("should return nil when no blocks exist", func(t *testing.T) {
+		metadata, err := store.(*blockstore).LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.Nil(t, metadata)
+	})
+
+	t.Run("should return metadata after creating first block", func(t *testing.T) {
+		err := store.FlushIndexBlock(ctx, index)
+		require.NoError(t, err)
+
+		metadata, err := store.(*blockstore).LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, metadata)
+		require.Equal(t, 1, metadata.Len)
+		require.False(t, metadata.FirstTimestamp().IsZero())
+		require.False(t, metadata.LastTimestamp().IsZero())
+	})
+
+	t.Run("should return latest block metadata after creating second block", func(t *testing.T) {
+		// Add another pause to trigger a second block
+		mockBufferer.mu.Lock()
+		mockBufferer.pauses = append(mockBufferer.pauses, &state.Pause{ID: uuid.New()})
+		mockBufferer.mu.Unlock()
+
+		// Get metadata from first block
+		firstMetadata, err := store.(*blockstore).LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, firstMetadata)
+
+		// Create second block
+		err = store.FlushIndexBlock(ctx, index)
+		require.NoError(t, err)
+
+		// Should now return the second block's metadata
+		secondMetadata, err := store.(*blockstore).LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, secondMetadata)
+		require.Equal(t, 1, secondMetadata.Len)
+		
+		// Second block should have later timestamp than first
+		require.True(t, secondMetadata.LastTimestamp().After(firstMetadata.LastTimestamp()))
+	})
+}
