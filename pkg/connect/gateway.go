@@ -1204,10 +1204,10 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 
 		// Set worker capacity limit
-		// If MaxConcurrentWorkerLeases is 0, this will clear any existing capacity limit
+		// If MaxWorkerConcurrency is 0, this will clear any existing capacity limit
 		maxConcurrency := int64(0)
-		if initialMessageData.MaxConcurrentWorkerLeases != nil {
-			maxConcurrency = *initialMessageData.MaxConcurrentWorkerLeases
+		if initialMessageData.MaxWorkerConcurrency != nil {
+			maxConcurrency = *initialMessageData.MaxWorkerConcurrency
 		}
 		if err := c.svc.stateManager.SetWorkerTotalCapacity(context.Background(), authResp.EnvID, initialMessageData.InstanceId, maxConcurrency); err != nil {
 			log.ReportError(err, "failed to set worker capacity")

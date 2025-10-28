@@ -59,7 +59,7 @@ message WorkerConnectRequestData {
 
 	google.protobuf.Timestamp started_at = 13;
 
-	optional int64 max_concurrent_worker_leases = 14;
+	optional int64 max_worker_concurrency = 14;
 }
 
 message GatewayConnectionReadyData {
