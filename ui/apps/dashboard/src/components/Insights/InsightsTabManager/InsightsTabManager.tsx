@@ -18,7 +18,7 @@ import {
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { InsightsHelperPanel } from './InsightsHelperPanel';
-import { InsightsHelperPanelCollapsed, type HelperItem } from './InsightsHelperPanelCollapsed';
+import { InsightsHelperPanelControl, type HelperItem } from './InsightsHelperPanelControl';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
@@ -153,6 +153,7 @@ export function useInsightsTabManager(
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
         isHelperPanelOpen={isHelperPanelOpen}
+        setIsHelperPanelOpen={setIsHelperPanelOpen}
         isInsightsAgentEnabled={isInsightsAgentEnabled.value}
       />
     ),
@@ -165,6 +166,7 @@ export function useInsightsTabManager(
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
       isHelperPanelOpen,
+      setIsHelperPanelOpen,
       isInsightsAgentEnabled.value,
     ]
   );
@@ -181,6 +183,7 @@ interface InsightsTabManagerInternalProps {
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
   isHelperPanelOpen: boolean;
+  setIsHelperPanelOpen: (open: boolean) => void;
   isInsightsAgentEnabled: boolean;
 }
 
@@ -193,20 +196,44 @@ function InsightsTabManagerInternal({
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
   isHelperPanelOpen,
+  setIsHelperPanelOpen,
   isInsightsAgentEnabled,
 }: InsightsTabManagerInternalProps) {
+  const [activeHelper, setActiveHelper] = useState<string | null>(null);
+
+  const handleSelectHelper = useCallback(
+    (title: string) => {
+      if (activeHelper === title && isHelperPanelOpen) {
+        setIsHelperPanelOpen(false);
+        setActiveHelper(null);
+      } else {
+        setActiveHelper(title);
+        if (!isHelperPanelOpen) setIsHelperPanelOpen(true);
+      }
+    },
+    [activeHelper, isHelperPanelOpen, setIsHelperPanelOpen]
+  );
+
   const helperItems = useMemo<HelperItem[]>(
     () => [
-      { title: 'AI', icon: <RiSparkling2Line size={20} />, action: () => console.log('ai') },
-      { title: 'Docs', icon: <RiBookOpenLine size={20} />, action: () => console.log('docs') },
-      { title: 'Schemas', icon: <RiTable2 size={20} />, action: () => console.log('schemas') },
+      { title: 'AI', icon: <RiSparkling2Line size={20} />, action: () => handleSelectHelper('AI') },
+      {
+        title: 'Docs',
+        icon: <RiBookOpenLine size={20} />,
+        action: () => handleSelectHelper('Docs'),
+      },
+      {
+        title: 'Schemas',
+        icon: <RiTable2 size={20} />,
+        action: () => handleSelectHelper('Schemas'),
+      },
       {
         title: 'Support',
         icon: <RiFeedbackLine size={20} />,
-        action: () => console.log('support'),
+        action: () => handleSelectHelper('Support'),
       },
     ],
-    []
+    [handleSelectHelper]
   );
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
@@ -228,25 +255,32 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
-            {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id && isHelperPanelOpen ? (
-              <Resizable
-                defaultSplitPercentage={75}
-                minSplitPercentage={20}
-                maxSplitPercentage={85}
-                orientation="horizontal"
-                splitKey="insights-helper-split"
-                first={
-                  <div className="h-full min-w-0 overflow-hidden">
-                    <InsightsTabPanel
-                      isHomeTab={tab.id === HOME_TAB.id}
-                      isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                      tab={tab}
-                      historyWindow={historyWindow}
-                    />
-                  </div>
-                }
-                second={<InsightsHelperPanel />}
-              />
+            {isHelperPanelOpen ? (
+              <div className="flex h-full w-full">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <Resizable
+                    defaultSplitPercentage={75}
+                    minSplitPercentage={20}
+                    maxSplitPercentage={85}
+                    orientation="horizontal"
+                    splitKey="insights-helper-split"
+                    first={
+                      <div className="h-full min-w-0 overflow-hidden">
+                        <InsightsTabPanel
+                          isHomeTab={tab.id === HOME_TAB.id}
+                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                          tab={tab}
+                          historyWindow={historyWindow}
+                        />
+                      </div>
+                    }
+                    second={<InsightsHelperPanel active={activeHelper} />}
+                  />
+                </div>
+                {isQueryTab(tab.id) ? (
+                  <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
+                ) : null}
+              </div>
             ) : (
               <div className="flex h-full w-full">
                 <div className="h-full min-w-0 flex-1 overflow-hidden">
@@ -257,8 +291,8 @@ function InsightsTabManagerInternal({
                     historyWindow={historyWindow}
                   />
                 </div>
-                {tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id ? (
-                  <InsightsHelperPanelCollapsed items={helperItems} />
+                {isQueryTab(tab.id) ? (
+                  <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
                 ) : null}
               </div>
             )}
@@ -365,4 +399,8 @@ function ActiveThreadBridge({
   }, [currentThreadId, targetThreadId, setCurrentThreadId]);
 
   return null;
+}
+
+function isQueryTab(tabId: string): boolean {
+  return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
 }
