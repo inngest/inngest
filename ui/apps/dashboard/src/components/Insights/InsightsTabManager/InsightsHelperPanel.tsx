@@ -18,7 +18,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
     switch (active) {
       case INSIGHTS_AI:
         if (!agentThreadId) return null;
-        return <InsightsChat agentThreadId={agentThreadId} onToggleChat={() => {}} />;
+        return <InsightsChat agentThreadId={agentThreadId} />;
       case DOCS:
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case SCHEMAS:
@@ -50,7 +50,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
           <RiCloseLine size={18} />
         </button>
       </div>
-      {content}
+      <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
     </div>
   );
 }
