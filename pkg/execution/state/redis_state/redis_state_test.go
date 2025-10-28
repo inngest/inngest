@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -447,6 +448,72 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 	// Clean up
 	_, err = mgr.Delete(ctx, createdState.Identifier())
 	require.NoError(t, err)
+}
+
+func TestPauseCreatedAt(t *testing.T) {
+	// Setup miniredis
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	// Create Redis state manager
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	mgr, err := New(
+		context.Background(),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Create test data
+	workspaceID := uuid.New()
+	eventName := "test.event"
+	pauseID := uuid.New()
+	runID := ulid.Make()
+	
+	// Create a pause with our test data
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			FunctionID: uuid.New(),
+			AccountID:  uuid.New(),
+		},
+		Event:   &eventName,
+		Expires: state.Time(time.Now().Add(time.Hour)),
+	}
+
+	// Save the pause first
+	_, err = mgr.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Now test PauseCreatedAt - this should work with our ZMSCORE fix
+	createdAt, err := mgr.PauseCreatedAt(ctx, workspaceID, eventName, pauseID)
+	require.NoError(t, err)
+	require.False(t, createdAt.IsZero(), "created at timestamp should not be zero")
+	
+	// The timestamp should be reasonably recent (within the last minute)
+	require.True(t, time.Since(createdAt) < time.Minute, "timestamp should be recent")
+
+	// Test with non-existent pause
+	nonExistentPauseID := uuid.New()
+	_, err = mgr.PauseCreatedAt(ctx, workspaceID, eventName, nonExistentPauseID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "pause timestamp not found")
+
+	// Clean up
+	r.FlushAll()
 }
 
 func BenchmarkNew(b *testing.B) {
