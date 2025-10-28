@@ -1,10 +1,12 @@
 'use client';
 
-import type { ReactElement } from 'react';
+import { useMemo, type ReactElement } from 'react';
+import { Link } from '@inngest/components/Link/Link';
 import { cn } from '@inngest/components/utils/classNames';
 
 export interface HelperItem {
   action: () => void;
+  href?: string;
   icon: ReactElement;
   title: string;
 }
@@ -20,21 +22,40 @@ export function InsightsHelperPanelControl({
 }: InsightsHelperPanelControlProps) {
   return (
     <div className="border-subtle flex h-full w-[56px] flex-col items-center gap-2 border-l px-3 py-2">
-      {items.map((item) => (
-        <button
-          key={item.title}
-          aria-label={item.title}
-          className={cn(
-            'text-subtle hover:text-basis flex h-8 w-8 items-center justify-center rounded-md transition-colors',
-            activeTitle === item.title && 'bg-secondary-4xSubtle text-info'
-          )}
-          onClick={() => item.action()}
-          title={item.title}
-          type="button"
-        >
-          {item.icon}
-        </button>
-      ))}
+      {items.map((item) => {
+        const sharedProps = useMemo(
+          () =>
+            ({
+              'aria-label': item.title,
+              className: cn(
+                'text-subtle hover:text-basis flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+                activeTitle === item.title && 'bg-secondary-4xSubtle text-info'
+              ),
+              title: item.title,
+            } as const),
+          [activeTitle, item.title]
+        );
+
+        if (item.href) {
+          return (
+            <Link
+              {...sharedProps}
+              key={item.title}
+              href={item.href}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {item.icon}
+            </Link>
+          );
+        }
+
+        return (
+          <button {...sharedProps} key={item.title} onClick={item.action} type="button">
+            {item.icon}
+          </button>
+        );
+      })}
     </div>
   );
 }

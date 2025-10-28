@@ -12,6 +12,7 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import {
   InsightsChatProvider,
   useInsightsChatProvider,
@@ -230,7 +231,8 @@ function InsightsTabManagerInternal({
       {
         title: 'Support',
         icon: <RiFeedbackLine size={20} />,
-        action: () => handleSelectHelper('Support'),
+        action: noOp,
+        href: pathCreator.support({ ref: 'app-insights' }),
       },
     ],
     [handleSelectHelper]
@@ -403,4 +405,8 @@ function ActiveThreadBridge({
 
 function isQueryTab(tabId: string): boolean {
   return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
+}
+
+function noOp() {
+  return;
 }
