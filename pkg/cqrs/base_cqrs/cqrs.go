@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -354,8 +353,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			item, _ := spanMap.Get(span.SpanID)
 			parent.Children = append(parent.Children, item)
 		} else {
-			spew.Dump(span)
-
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
 				"spanID", span.SpanID,
