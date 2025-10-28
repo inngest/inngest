@@ -901,6 +901,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 		),
+		Seed: []byte(metadata.ID.RunID[:]),
 	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
@@ -930,10 +931,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if err != nil {
 		// return nil, fmt.Errorf("error creating run span: %w", err)
 		l.Debug("error creating run span", "error", err)
-	}
-
-	if runSpanRef != nil {
-		config.NewSetFunctionTrace(runSpanRef.Ref)
 	}
 
 	// If this is paused, immediately end just before creating state.
