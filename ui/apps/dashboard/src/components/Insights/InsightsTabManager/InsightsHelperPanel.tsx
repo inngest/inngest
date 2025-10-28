@@ -5,7 +5,13 @@ import { RiCloseLine } from '@remixicon/react';
 
 import { InsightsChat } from '../InsightsChat/InsightsChat';
 import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
-import { DOCS, INSIGHTS_AI, SCHEMAS, SUPPORT, type HelperTitle } from './helperConstants';
+import {
+  DOCUMENTATION,
+  INSIGHTS_AI,
+  SCHEMA_EXPLORER,
+  SUPPORT,
+  type HelperTitle,
+} from './helperConstants';
 
 type InsightsHelperPanelProps = {
   active: null | HelperTitle;
@@ -19,9 +25,9 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
       case INSIGHTS_AI:
         if (!agentThreadId) return null;
         return <InsightsChat agentThreadId={agentThreadId} />;
-      case DOCS:
+      case DOCUMENTATION:
         return <div className="text-sm">Docs helper (placeholder)</div>;
-      case SCHEMAS:
+      case SCHEMA_EXPLORER:
         return <div className="text-sm">Schemas helper (placeholder)</div>;
       case SUPPORT:
         return <div className="text-sm">Support helper (placeholder)</div>;

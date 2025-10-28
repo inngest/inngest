@@ -24,7 +24,13 @@ import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
-import { DOCS, INSIGHTS_AI, SCHEMAS, SUPPORT, type HelperTitle } from './helperConstants';
+import {
+  DOCUMENTATION,
+  INSIGHTS_AI,
+  SCHEMA_EXPLORER,
+  SUPPORT,
+  type HelperTitle,
+} from './helperConstants';
 
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
@@ -213,17 +219,17 @@ function InsightsTabManagerInternal({
 
     if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
       items.push({
-        title: DOCS,
-        icon: <InsightsHelperPanelIcon title={DOCS} size={20} />,
-        action: () => handleSelectHelper(DOCS),
+        title: DOCUMENTATION,
+        icon: <InsightsHelperPanelIcon title={DOCUMENTATION} size={20} />,
+        action: () => handleSelectHelper(DOCUMENTATION),
       });
     }
 
     if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
       items.push({
-        title: SCHEMAS,
-        icon: <InsightsHelperPanelIcon title={SCHEMAS} size={20} />,
-        action: () => handleSelectHelper(SCHEMAS),
+        title: SCHEMA_EXPLORER,
+        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} size={20} />,
+        action: () => handleSelectHelper(SCHEMA_EXPLORER),
       });
     }
 

@@ -2,7 +2,13 @@
 
 import { RiBookOpenLine, RiFeedbackLine, RiSparkling2Line, RiTable2 } from '@remixicon/react';
 
-import { DOCS, INSIGHTS_AI, SCHEMAS, SUPPORT, type HelperTitle } from './helperConstants';
+import {
+  DOCUMENTATION,
+  INSIGHTS_AI,
+  SCHEMA_EXPLORER,
+  SUPPORT,
+  type HelperTitle,
+} from './helperConstants';
 
 type InsightsHelperPanelIconProps = {
   className?: string;
@@ -18,9 +24,9 @@ export function InsightsHelperPanelIcon({
   switch (title) {
     case INSIGHTS_AI:
       return <RiSparkling2Line className={className} size={size} />;
-    case DOCS:
+    case DOCUMENTATION:
       return <RiBookOpenLine className={className} size={size} />;
-    case SCHEMAS:
+    case SCHEMA_EXPLORER:
       return <RiTable2 className={className} size={size} />;
     case SUPPORT:
       return <RiFeedbackLine className={className} size={size} />;
