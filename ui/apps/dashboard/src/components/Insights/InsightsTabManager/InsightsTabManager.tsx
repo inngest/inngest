@@ -18,6 +18,7 @@ import {
   useInsightsChatProvider,
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
+import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel';
 import { InsightsHelperPanelControl, type HelperItem } from './InsightsHelperPanelControl';
 import { InsightsTabPanel } from './InsightsTabPanel';
@@ -215,28 +216,36 @@ function InsightsTabManagerInternal({
     [activeHelper, isHelperPanelOpen, setIsHelperPanelOpen]
   );
 
-  const helperItems = useMemo<HelperItem[]>(
-    () => [
+  const helperItems = useMemo<HelperItem[]>(() => {
+    const items: HelperItem[] = [
       { title: 'AI', icon: <RiSparkling2Line size={20} />, action: () => handleSelectHelper('AI') },
-      {
+    ];
+
+    if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
+      items.push({
         title: 'Docs',
         icon: <RiBookOpenLine size={20} />,
         action: () => handleSelectHelper('Docs'),
-      },
-      {
+      });
+    }
+
+    if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
+      items.push({
         title: 'Schemas',
         icon: <RiTable2 size={20} />,
         action: () => handleSelectHelper('Schemas'),
-      },
-      {
-        title: 'Support',
-        icon: <RiFeedbackLine size={20} />,
-        action: noOp,
-        href: pathCreator.support({ ref: 'app-insights' }),
-      },
-    ],
-    [handleSelectHelper]
-  );
+      });
+    }
+
+    items.push({
+      title: 'Support',
+      icon: <RiFeedbackLine size={20} />,
+      action: noOp,
+      href: pathCreator.support({ ref: 'app-insights' }),
+    });
+
+    return items;
+  }, [handleSelectHelper]);
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
