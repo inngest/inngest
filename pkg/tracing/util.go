@@ -375,7 +375,18 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		return nil
 	}
 
-	return md.Config.NewFunctionTrace()
+	if sr := md.Config.NewFunctionTrace(); sr != nil {
+		return sr
+	}
+
+	// This uses deterministic span IDs based off of the reference.
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	return &meta.SpanReference{
+		DynamicSpanID: cfg.SpanID.String(),
+		// NOTE: This is ALWAYS the root, so the prefix and suffix of 00 is fine.
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-0000000000000000-00", cfg.TraceID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+	}
 }
 
 func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
