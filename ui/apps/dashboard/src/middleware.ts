@@ -191,12 +191,17 @@ function getAppURL(): string | null {
 
 // TODO: Remove -Report-Only once we're confident CSP is working as expected.
 function withCSPResponseHeaderReportOnly(response: Response) {
-  const appURL = getAppURL();
-  if (!appURL) return response;
+  try {
+    const appURL = getAppURL();
+    if (!appURL) return response;
 
-  response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL));
+    response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL));
 
-  return response;
+    return response;
+  } catch (_) {
+    // Never fail to process a request.
+    return response;
+  }
 }
 
 function combineCSPURLs(urls: string[]): string {
