@@ -2,11 +2,19 @@
 
 import { useMemo } from 'react';
 
-export function InsightsHelperPanel({ active }: { active: null | string }) {
+import { InsightsChat } from '../InsightsChat/InsightsChat';
+
+type InsightsHelperPanelProps = {
+  active: null | string;
+  agentThreadId?: string;
+};
+
+export function InsightsHelperPanel({ active, agentThreadId }: InsightsHelperPanelProps) {
   const content = useMemo(() => {
     switch (active) {
       case 'AI':
-        return <div className="text-sm">AI helper (placeholder)</div>;
+        if (!agentThreadId) return null;
+        return <InsightsChat agentThreadId={agentThreadId} onToggleChat={() => {}} />;
       case 'Docs':
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case 'Schemas':
@@ -16,7 +24,7 @@ export function InsightsHelperPanel({ active }: { active: null | string }) {
       default:
         return null;
     }
-  }, [active]);
+  }, [active, agentThreadId]);
 
   if (content === null) return null;
 

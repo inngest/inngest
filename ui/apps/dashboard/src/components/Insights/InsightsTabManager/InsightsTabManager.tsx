@@ -53,16 +53,8 @@ export function useInsightsTabManager(
 ): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
-  const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
   const [isHelperPanelOpen, setIsHelperPanelOpen] = useState(false);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
-
-  const onToggleChatPanelVisibility = useCallback(() => {
-    if (!isInsightsAgentEnabled.value) return;
-    setIsChatPanelVisible((prev) => !prev);
-  }, [isInsightsAgentEnabled.value]);
-
-  const effectiveChatPanelVisible = isInsightsAgentEnabled.value && isChatPanelVisible;
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -217,9 +209,15 @@ function InsightsTabManagerInternal({
   );
 
   const helperItems = useMemo<HelperItem[]>(() => {
-    const items: HelperItem[] = [
-      { title: 'AI', icon: <RiSparkling2Line size={20} />, action: () => handleSelectHelper('AI') },
-    ];
+    const items: HelperItem[] = [];
+
+    if (isInsightsAgentEnabled) {
+      items.push({
+        title: 'AI',
+        icon: <RiSparkling2Line size={20} />,
+        action: () => handleSelectHelper('AI'),
+      });
+    }
 
     if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
       items.push({
@@ -245,7 +243,7 @@ function InsightsTabManagerInternal({
     });
 
     return items;
-  }, [handleSelectHelper]);
+  }, [handleSelectHelper, isInsightsAgentEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
@@ -285,7 +283,12 @@ function InsightsTabManagerInternal({
                         />
                       </div>
                     }
-                    second={<InsightsHelperPanel active={activeHelper} />}
+                    second={
+                      <InsightsHelperPanel
+                        active={activeHelper}
+                        agentThreadId={getAgentThreadIdForTab(tab.id)}
+                      />
+                    }
                   />
                 </div>
                 {isQueryTab(tab.id) ? (
