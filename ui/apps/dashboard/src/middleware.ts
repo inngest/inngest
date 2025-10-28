@@ -133,10 +133,8 @@ const MONACO_EDITOR_CDN_STYLE_URL = `${MONACO_EDITOR_CDN_URL}/editor/editor.main
 
 const PROD_URL = 'https://app.inngest.com';
 
-const CSP_REPORT_GROUP = 'csp-endpoint';
-
 // TODO: Add nonce, and remove unsafe-* usages, but that would require dynamic rendering of all pages.
-function makeCSPHeader(appURL: string, cspReportURL: string) {
+function makeCSPHeader(appURL: string) {
   const isDevBuild = process.env.NODE_ENV === 'development';
   const isProdEnvironment = appURL === PROD_URL;
 
@@ -174,8 +172,6 @@ function makeCSPHeader(appURL: string, cspReportURL: string) {
   return csp;
 }
 
-const CSP_REPORT_PATH = '/api/csp-report';
-
 function getAppURL(): string | null {
   const configuredURL = process.env.NEXT_PUBLIC_APP_URL;
   if (!configuredURL) return null;
@@ -194,14 +190,7 @@ function withCSPResponseHeaderReportOnly(response: NextResponse) {
   const appURL = getAppURL();
   if (!appURL) return response;
 
-  let cspReportURL: string | null = null;
-  try {
-    cspReportURL = new URL(CSP_REPORT_PATH, appURL).toString();
-  } catch (_) {
-    return response;
-  }
-
-  response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL, cspReportURL));
+  response.headers.set('Content-Security-Policy-Report-Only', makeCSPHeader(appURL));
 
   return response;
 }
