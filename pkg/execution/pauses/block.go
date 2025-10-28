@@ -191,9 +191,25 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// buffer flushes that may not have had corresponding deletes (as deletes)
 	// happen in goroutines best-effort.
 	var since time.Time
-	if lastBlock, err := b.LastBlockMetadata(ctx, index); err == nil {
+	lastBlock, err := b.LastBlockMetadata(ctx, index)
+	if err != nil {
+		return fmt.Errorf("could not last block metadata: %w", err)
+	} else if lastBlock != nil {
 		since = lastBlock.LastTimestamp()
+	} else {
+		// Hack so that PausesSince never uses a key scan to get the pauses
+		// as that would result in unordered pauses that cannot be sorted
+		// by score because that data isn't available in the pause item.
+		// When <since> isn't zeroed PausesSince uses a ZRANGE BYSCORE which
+		// will return pauses correctly sorted by score.
+
+		// Perf wise it should be fine, we only need <blocksize> amount of
+		// pauses anyways.
+		since = time.Unix(0, 1)
 	}
+
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "since", since.UnixMilli())
+	l.Debug("flushing block index")
 
 	iter, err := b.buf.PausesSince(ctx, index, since)
 	if err != nil {
@@ -221,7 +237,9 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		}
 	}
 
-	if iter.Error() != nil {
+	// A cancelled context in iterator while the parent is still
+	// not done just means that we are done scanning...
+	if iter.Error() != nil && iter.Error() != context.Canceled && ctx.Err() == nil {
 		return fmt.Errorf("error iterating over buffered pauses: %w", iter.Error())
 	}
 
@@ -234,6 +252,11 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		// from iterators often;  this only happens in a race where the iterator
 		// has pauses in-memory which are then deleted while iterating, leading to
 		// a race condition.
+		// Another case where this could happen is during rollout when we are not
+		// deleting pauses from the buffer after flushing to a block which will
+		// make it that we trigger flush jobs because the buffer is always at the
+		// threshold but we can't find enough pauses since the last block.
+		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses))
 		return nil
 	}
 
@@ -268,6 +291,10 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// NOTE: This can happen in the background as we pick flushing up from the
 	// last block written.
 	go func() {
+		// Otherwise the job will end and we won't be able to finish deleting
+		ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+		defer cancel()
+
 		if b.deleteAfterFlush(ctx, index.WorkspaceID) {
 			start := time.Now()
 			var deleted int64
@@ -280,6 +307,9 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
+
+			l.Debug("deleted pauses after flush", "len", deleted)
+
 			metrics.HistogramPauseDeleteLatencyAfterBlockFlush(ctx, time.Since(start), metrics.HistogramOpt{
 				PkgName: pkgName,
 				Tags:    map[string]any{},
@@ -294,6 +324,13 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		// XXX: We should add an N% chance of loading all pauses from 0 -> wm.Epoch
 		// in case any deletions in a previous flush failed.
 	}()
+
+	l.Debug("flushed block index", "duration", time.Since(start).Milliseconds(), "len", len(block.Pauses), "block_key", key)
+
+	// TODO: remove this
+	for i := 0; i < len(block.Pauses); i++ {
+		l.Debug("pause", "i", i, "pause", *block.Pauses[i])
+	}
 
 	metrics.HistogramPauseBlockFlushLatency(ctx, time.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
@@ -347,6 +384,7 @@ func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Tim
 
 func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error) {
 	key := b.BlockKey(index, blockID)
+	logger.StdlibLogger(ctx).Debug("reading block", "block_key", key)
 	byt, err := b.bucket.ReadAll(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading block from index '%s': id '%s': %w", index, blockID, err)
@@ -419,14 +457,21 @@ func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*block
 		Limit(0, 1).
 		Build()
 
-	id, err := b.rc.Do(ctx, cmd).ToString()
-	if rueidis.IsRedisNil(err) {
-		// Doesn't exist.
-		return nil, nil
-	}
+	ids, err := b.rc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// Doesn't exist.
+			return nil, nil
+		}
 		return nil, fmt.Errorf("error looking up last block metadata write: %w", err)
 	}
+
+	if len(ids) == 0 {
+		// No blocks exist for this index.
+		return nil, nil
+	}
+
+	id := ids[0]
 
 	cmd = b.rc.B().Hget().Key(blockMetadataKey(index)).Field(id).Build()
 
