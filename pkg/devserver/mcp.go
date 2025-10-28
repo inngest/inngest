@@ -128,6 +128,8 @@ type MCPHandler struct {
 }
 
 // convertToMap converts various input types to a map with a fallback key
+// This is necessary because Inngest events require map[string]any for data fields.
+// Non-object values (strings, numbers, etc.) are wrapped in a map with the fallbackKey.
 func convertToMap(input any, fallbackKey string) map[string]any {
 	if input == nil {
 		return nil
@@ -137,12 +139,15 @@ func convertToMap(input any, fallbackKey string) map[string]any {
 	case map[string]any:
 		return data
 	case string:
+		// Try to parse as JSON first
 		var parsed map[string]any
 		if err := json.Unmarshal([]byte(data), &parsed); err == nil {
 			return parsed
 		}
+		// If not valid JSON object, wrap in fallback key
 		return map[string]any{fallbackKey: data}
 	default:
+		// Wrap non-object types in fallback key
 		return map[string]any{fallbackKey: input}
 	}
 }
@@ -203,7 +208,7 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_event",
-		Description: "Send an event to the Inngest dev server which will trigger any functions listening to that event. Returns event ID and run IDs of triggered functions. Parameters: name (required string - the event name like 'test/hello.world'), data (optional JSON object - the event data), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
+		Description: "Send an event to the Inngest dev server which will trigger any functions listening to that event. Returns event ID and run IDs of triggered functions. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
 	}, h.sendEvent)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -223,7 +228,7 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "invoke_function",
-		Description: "Directly invoke a specific function and wait for its result. Unlike send_event (which is fire-and-forget), this waits for completion and returns the function's actual output data. Parameters: functionId (required string - function slug, ID, or name), data (optional JSON object - function input data), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
+		Description: "Directly invoke a specific function and wait for its result. Unlike send_event (which is fire-and-forget), this waits for completion and returns the function's actual output data. Parameters: functionId (required string - function slug, ID, or name), data (optional - function input data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
 	}, h.invokeFunction)
 
 	mcp.AddTool(server, &mcp.Tool{
