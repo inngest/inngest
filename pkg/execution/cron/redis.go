@@ -307,8 +307,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	// The previous version would be dropped by the cron handler anyway, so it is safe to log and ignore any errors here.
 	// The previous cron may not exist
 	if ci.Op == enums.CronOpUpdate {
-		prev := c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion-1)
-		prevJobID := queue.HashID(ctx, prev)
+		prevJobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion-1))
 		err = c.q.DequeueByJobID(ctx, prevJobID)
 		if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 			l.Warn("failed to dequeue previous cron version", "err", err)
