@@ -31,6 +31,7 @@ var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
 type RouteResult struct {
 	GatewayID    ulid.ULID
 	ConnectionID ulid.ULID
+	InstanceID   string
 }
 
 func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
@@ -91,6 +92,10 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
 	}
 
+	if routeTo.InstanceId == "" {
+		return nil, fmt.Errorf("failed to get instance ID for connection: %q: %w", routeTo.Id, state.ErrNoInstanceIDFound)
+	}
+
 	// Set app name: This is important to help the SDK find the respective function to invoke
 	data.AppName = group.AppName
 
@@ -102,6 +107,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	return &RouteResult{
 		GatewayID:    gatewayId,
 		ConnectionID: connId,
+		InstanceID:   routeTo.InstanceId,
 	}, nil
 }
 

@@ -672,7 +672,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		// Refresh worker capacity TTL if capacity is set
-		if err := c.svc.stateManager.WorkerTotalCapcityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
+		if err := c.svc.stateManager.WorkerCapcityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
 			// Log but don't fail the heartbeat if TTL refresh fails
 			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
 				logger.WithErrorReportTags(map[string]string{
@@ -1200,6 +1200,15 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "connection not stored",
+			}
+		}
+
+		// if the instance ID is not set, we return an error
+		if initialMessageData.InstanceId == "" {
+			return nil, &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "instance ID is required",
 			}
 		}
 

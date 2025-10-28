@@ -1500,7 +1500,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 	})
 }
 
-func TestWorkerTotalCapcityOnHeartbeat(t *testing.T) {
+func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1516,7 +1516,7 @@ func TestWorkerTotalCapcityOnHeartbeat(t *testing.T) {
 
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
-		err := mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
+		err := mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 	})
 
@@ -1529,7 +1529,7 @@ func TestWorkerTotalCapcityOnHeartbeat(t *testing.T) {
 		r.FastForward(20 * time.Second)
 
 		// Refresh TTL
-		err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check TTL is reset
@@ -1551,7 +1551,7 @@ func TestWorkerTotalCapcityOnHeartbeat(t *testing.T) {
 		r.FastForward(30 * time.Second)
 
 		// Refresh TTL
-		err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check both TTLs are reset
@@ -1665,7 +1665,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.False(t, r.Exists(leaseWorkerKey))
 
 		for i := 0; i < 6; i++ {
-			err = mgr.WorkerTotalCapcityOnHeartbeat(ctx, envID, instanceID)
+			err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 			// TODO: extend lease for req-2
 			require.NoError(t, err)
 			r.FastForward(10 * time.Second)

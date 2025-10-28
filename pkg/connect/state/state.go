@@ -120,9 +120,9 @@ type WorkerCapacityManager interface {
 	// DeleteRequestLeaseFromWorker decrements the active lease count for a worker instance.
 	DeleteRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
-	// WorkerTotalCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
+	// WorkerCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
 	// Called on heartbeat to keep the capacity limit alive while worker is active.
-	WorkerTotalCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
+	WorkerCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
 }
 
 type AuthContext struct {

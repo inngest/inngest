@@ -36,6 +36,7 @@ var (
 	ErrGatewayNotFound     = fmt.Errorf("gateway not found")
 	// ErrWorkerCapacityExceeded is returned when the worker capacity is exceeded
 	ErrWorkerCapacityExceeded = fmt.Errorf("worker capacity exceeded")
+	ErrNoInstanceIDFound      = fmt.Errorf("no instance ID found")
 )
 
 func init() {
@@ -980,10 +981,10 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	return nil
 }
 
-// WorkerTotalCapcityOnHeartbeat refreshes the TTL on the worker capacity key and leases set.
+// WorkerCapcityOnHeartbeat refreshes the TTL on the worker capacity key and leases set.
 // Called on heartbeat to keep the capacity limit alive if it exists while worker is active.
 // Set TTL is also refreshed to keep active leases from expiring while the worker is active.
-func (r *redisConnectionStateManager) WorkerTotalCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
+func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	leasesSetKey := r.workerLeasesSetKey(envID, instanceID)
 
