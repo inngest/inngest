@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/logger"
@@ -16,7 +17,8 @@ const (
 )
 
 func NewSqlcTracerProvider(q sqlc.Querier) TracerProvider {
-	return NewOtelTracerProvider(&dbExporter{q: q})
+	// With sqlc, write every 50.
+	return NewOtelTracerProvider(&dbExporter{q: q}, 50*time.Millisecond)
 }
 
 type dbExporter struct {
@@ -41,6 +43,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var debugRunID string
 		var status string
 		var eventIdsByt []byte
+		var userlandSpanID string
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -159,7 +162,21 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				}
 			}
 
+			if string(attr.Key) == meta.Attrs.UserlandSpanID.Key() {
+				userlandSpanID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
 			attrs[string(attr.Key)] = attr.Value.AsInterface()
+		}
+
+		// This is a userland span, so we'll trust the span ID it gave us, as
+		// it's part of a remote lineage.
+		if userlandSpanID != "" {
+			spanID = userlandSpanID
+			dynamicSpanID = userlandSpanID
 		}
 
 		// If we don't have a run ID, we can't store this span

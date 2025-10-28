@@ -3,6 +3,7 @@ package pauses
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -19,6 +21,7 @@ import (
 )
 
 const (
+	pkgName = "pauses.execution.inngest"
 	// DefaultPausesPerBlock is the number of pauses to store in a single block.
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default.
 	DefaultPausesPerBlock = 10_000
@@ -61,9 +64,9 @@ type BlockstoreOpts struct {
 	CompactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	CompactionSample float64
-	// Delete indicates whether we delete from the backing buffer,
-	// or if deletes are ignored.
-	Delete bool
+	// DeleteAfterFlush is a callback that returns whether we delete from the backing buffer,
+	// or if deletes are ignored for the current workspace.
+	DeleteAfterFlush FeatureCallback
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
@@ -78,6 +81,11 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	}
 	if opts.Leaser == nil {
 		return nil, fmt.Errorf("leaser is required")
+	}
+	if opts.DeleteAfterFlush == nil {
+		opts.DeleteAfterFlush = func(ctx context.Context, workspaceID uuid.UUID) bool {
+			return false
+		}
 	}
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
@@ -97,7 +105,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		buf:              opts.Bufferer,
 		bucket:           opts.Bucket,
 		leaser:           opts.Leaser,
-		delete:           opts.Delete,
+		deleteAfterFlush: opts.DeleteAfterFlush,
 	}, nil
 }
 
@@ -131,8 +139,8 @@ type blockstore struct {
 	// rc is the Redis client used to manage block indexes.
 	rc rueidis.Client
 
-	// delete, if false, prevents deleting items from the backing buffer when flushed.
-	delete bool
+	// deleteAfterFlush, if it returns false, prevents deleting items from the backing buffer when flushed.
+	deleteAfterFlush FeatureCallback
 }
 
 func (b blockstore) BlockSize() int {
@@ -175,6 +183,8 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		// Don't bother.
 		return nil
 	}
+
+	start := time.Now()
 
 	// Firstly, we need to find the last block written for the current buffer.
 	// This lets us know where to read from, so that we can ignore any previous
@@ -258,17 +268,47 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// NOTE: This can happen in the background as we pick flushing up from the
 	// last block written.
 	go func() {
-		if b.delete {
+		if b.deleteAfterFlush(ctx, index.WorkspaceID) {
+			start := time.Now()
+			var deleted int64
+
 			for _, p := range block.Pauses {
 				if err := b.buf.Delete(ctx, index, *p); err != nil {
 					logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+				} else {
+					deleted = deleted + 1
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
+			metrics.HistogramPauseDeleteLatencyAfterBlockFlush(ctx, time.Since(start), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{},
+			})
+
+			metrics.IncrPausesDeletedAfterBlockFlush(ctx, deleted, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{},
+			})
+
 		}
 		// XXX: We should add an N% chance of loading all pauses from 0 -> wm.Epoch
 		// in case any deletions in a previous flush failed.
 	}()
+
+	metrics.HistogramPauseBlockFlushLatency(ctx, time.Since(start), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
+
+	metrics.IncrPausesFlushedToBlocks(ctx, int64(len(block.Pauses)), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
+
+	metrics.IncrPausesBlocksCreated(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{},
+	})
 
 	return nil
 }
@@ -443,6 +483,14 @@ func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block)
 	latest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[len(block.Pauses)-1])
 	if err != nil {
 		return nil, fmt.Errorf("error fetching latest pause time: %w", err)
+	}
+
+	if earliest.Equal(latest) {
+		// This should never normally occur. Since we use Unix seconds for pause index scores,
+		// there's an upper limit on how many pauses can be added within a single second.
+		// Exceeding that limit (blockSize) could trigger this condition.
+		// If this happens in practice, consider increasing the block size to accommodate more pauses per second.
+		return nil, errors.New("block boundaries should never be the same, consider increasing the block size")
 	}
 
 	// Block indexes are a zset of blocks stored by last pause timestamp,

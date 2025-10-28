@@ -31,7 +31,7 @@ type InvokeOpts struct {
 // fail and the function will stop with a `NoRetryError`.
 func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	targetID := getTargetStepID(ctx)
-	mgr := preflight(ctx)
+	mgr := preflight(ctx, enums.OpcodeInvokeFunction)
 	args := map[string]any{
 		"function_id": opts.FunctionId,
 		"payload": map[string]any{
@@ -42,7 +42,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	if opts.Timeout > 0 {
 		args["timeout"] = str2duration.String(opts.Timeout)
 	}
-	op := mgr.NewOp(enums.OpcodeInvokeFunction, id, args)
+	op := mgr.NewOp(enums.OpcodeInvokeFunction, id)
 	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(ctx, op); ok {
@@ -50,13 +50,13 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 		var valMap map[string]json.RawMessage
 		if err := json.Unmarshal(val, &valMap); err != nil {
 			mgr.SetErr(fmt.Errorf("error unmarshalling invoke value for '%s': %w", opts.FunctionId, err))
-			panic(ControlHijack{})
+			panic(sdkrequest.ControlHijack{})
 		}
 
 		if data, ok := valMap["data"]; ok {
 			if err := json.Unmarshal(data, &output); err != nil {
 				mgr.SetErr(fmt.Errorf("error unmarshalling invoke data for '%s': %w", opts.FunctionId, err))
-				panic(ControlHijack{})
+				panic(sdkrequest.ControlHijack{})
 			}
 			return output, nil
 		}
@@ -69,29 +69,29 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 			}
 			if err := json.Unmarshal(errorVal, &errObj); err != nil {
 				mgr.SetErr(fmt.Errorf("error unmarshalling invoke error for '%s': %w", opts.FunctionId, err))
-				panic(ControlHijack{})
+				panic(sdkrequest.ControlHijack{})
 			}
 
 			return output, sdkerrors.NoRetryError(fmt.Errorf("%s", errObj.Message))
 		}
 
 		mgr.SetErr(fmt.Errorf("error parsing invoke value for '%s'; unknown shape", opts.FunctionId))
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
 	if targetID != nil && *targetID != hashedID {
 		// Don't report this step since targeting is happening and it isn't
 		// targeted
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   op.Op,
-		Name: id,
-		Opts: op.Opts,
+		ID:       hashedID,
+		Op:       op.Op,
+		Name:     id,
+		Opts:     args,
+		Userland: op.Userland(),
 	}
-	plannedOp.SetParallelMode(parallelMode(ctx))
-	mgr.AppendOp(plannedOp)
-	panic(ControlHijack{})
+	mgr.AppendOp(ctx, plannedOp)
+	panic(sdkrequest.ControlHijack{})
 }

@@ -40,7 +40,7 @@ type WaitForEventOpts struct {
 //	})
 func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOpts) (T, error) {
 	targetID := getTargetStepID(ctx)
-	mgr := preflight(ctx)
+	mgr := preflight(ctx, enums.OpcodeWaitForEvent)
 	args := map[string]any{
 		"timeout": str2duration.String(opts.Timeout),
 		"event":   opts.Event,
@@ -51,7 +51,7 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	if opts.Name == "" {
 		opts.Name = stepID
 	}
-	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID, args)
+	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID)
 	hashedID := op.MustHash()
 
 	if val, ok := mgr.Step(ctx, op); ok {
@@ -61,7 +61,7 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 		}
 		if err := json.Unmarshal(val, &output); err != nil {
 			mgr.SetErr(fmt.Errorf("error unmarshalling wait for event value in '%s': %w", opts.Event, err))
-			panic(ControlHijack{})
+			panic(sdkrequest.ControlHijack{})
 		}
 		return output, nil
 	}
@@ -69,16 +69,17 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	if targetID != nil && *targetID != hashedID {
 		// Don't report this step since targeting is happening and it isn't
 		// targeted
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
 	plannedOp := sdkrequest.GeneratorOpcode{
-		ID:   hashedID,
-		Op:   op.Op,
-		Name: opts.Name,
-		Opts: op.Opts,
+		ID:       hashedID,
+		Op:       op.Op,
+		Name:     opts.Name,
+		Opts:     args,
+		Userland: op.Userland(),
 	}
-	plannedOp.SetParallelMode(parallelMode(ctx))
-	mgr.AppendOp(plannedOp)
-	panic(ControlHijack{})
+	mgr.AppendOp(ctx, plannedOp)
+	// This cannot resolve.  It must always hand control back to the handler.
+	panic(sdkrequest.ControlHijack{})
 }

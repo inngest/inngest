@@ -21,8 +21,17 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient exechttp.RequestExecutor
 	stackIndex int
-	// If specified, this is the span reference that represents this execution.
+
+	// If specified, this is the span reference that represents this execution:
+	// the current request outgoing to the user's SDK.
+	// This span will be updated once the SDK responds.
 	execSpan *meta.SpanReference
+
+	// If specified, this is the span reference for the parent discovery call.
+	//
+	// This is necessary to properly tie the parent span to queue items for eg.
+	// step.sleep, which require a completion span in some other future thread.
+	parentSpan *meta.SpanReference
 }
 
 // RunContext interface implementation for runInstance
@@ -99,4 +108,8 @@ func (r *runInstance) SetError(err error) {
 
 func (r *runInstance) ExecutionSpan() *meta.SpanReference {
 	return r.execSpan
+}
+
+func (r *runInstance) ParentSpan() *meta.SpanReference {
+	return r.parentSpan
 }

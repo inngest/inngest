@@ -9,9 +9,9 @@ import (
 // ensure that the MiddlewareManager implements Middleware at compile time.
 var _ Middleware = &MiddlewareManager{}
 
-// NewMiddlewareManager returns a new middleware manager which invokes
+// New returns a new middleware manager which invokes
 // each registered middleware.
-func NewMiddlewareManager() *MiddlewareManager {
+func New() *MiddlewareManager {
 	return &MiddlewareManager{
 		idempotentHooks: &types.Set[string]{},
 		items:           []Middleware{},

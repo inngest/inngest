@@ -52,23 +52,20 @@ type Opts struct {
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
-	// AppCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
+	// FunctionCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
 	FunctionCreator cqrs.FunctionCreator
 	// EventPublisher publishes events via HTTP/API-based functions
 	EventPublisher event.Publisher
-	// TracerProvider allows the checkpointing API to write traces.
+	// TracerProvider is used to create spans within the APIv1 endpoints and allows the checkpointing API to write traces.
 	TracerProvider tracing.TracerProvider
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
 
-	// RunOutputReader is the reader used to fetch run outputs for checkpoint APIs.
-	RunOutputReader RunOutputReader
-
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
-	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
-	// to redirect to an API endpoint that fetches outputs for a specific run.
-	RunJWTSecret []byte
+
+	// CheckpointOpts represents required opts for the checkpoint API
+	CheckpointOpts CheckpointAPIOpts
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -134,9 +131,7 @@ func (a *router) setup() {
 			// Add the HTTP-based checkpointing API.  Note that for backcompat,
 			// this exists at two URLs.
 			{
-				api := NewCheckpointAPI(a.opts, CheckpointAPIOpts{
-					RunClaimsSecret: a.opts.RunJWTSecret,
-				})
+				api := NewCheckpointAPI(a.opts)
 				for _, prefix := range CheckpointRoutePrefixes {
 					r.Route(prefix, func(sub chi.Router) {
 						sub.Mount("/", api)

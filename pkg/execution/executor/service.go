@@ -2,10 +2,13 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -78,6 +82,12 @@ func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
 	}
 }
 
+func WithServiceCroner(c cron.CronManager) func(s *svc) {
+	return func(s *svc) {
+		s.croner = c
+	}
+}
+
 func WithServiceLogger(l logger.Logger) func(s *svc) {
 	return func(s *svc) {
 		s.log = l
@@ -93,6 +103,12 @@ func WithServiceShardSelector(sl redis_state.ShardSelector) func(s *svc) {
 func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) bool) func(*svc) {
 	return func(s *svc) {
 		s.allowKeyQueues = kq
+	}
+}
+
+func WithServicePublisher(p pubsub.Publisher) func(*svc) {
+	return func(s *svc) {
+		s.publisher = p
 	}
 }
 
@@ -127,6 +143,7 @@ type svc struct {
 	exec          execution.Executor
 	debouncer     debounce.Debouncer
 	batcher       batch.BatchManager
+	croner        cron.CronManager
 	log           logger.Logger
 	shardSelector redis_state.ShardSelector
 
@@ -134,6 +151,8 @@ type svc struct {
 
 	opts      []ExecutorOpt
 	findShard redis_state.ShardSelector
+
+	publisher pubsub.Publisher
 
 	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
@@ -257,6 +276,12 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleScheduledBatch(ctx, item)
 		case queue.KindCancel:
 			err = s.handleCancel(ctx, item)
+		case queue.KindCronSync:
+			err = s.handleCronSync(ctx, item)
+		case queue.KindCron:
+			err = s.handleCron(ctx, item)
+		case queue.KindCronHealthCheck:
+			err = s.handleCronHealthCheck(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -466,6 +491,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				AppID:            di.AppID,
 				Events:           []event.TrackedEvent{di},
 				PreventDebounce:  true,
+				PreventRateLimit: true, // Rate limit was already enforced for this
 				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
@@ -684,7 +710,6 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 }
 
 func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -759,7 +784,6 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 }
 
 func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -787,7 +811,6 @@ func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) err
 }
 
 func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation) error {
-
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -849,6 +872,234 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		}
 	}
 	return nil
+}
+
+func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron-health-check")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	if ci.Op != enums.CronHealthCheck {
+		return queue.NeverRetryError(fmt.Errorf("rejecting cron-health-check, invalid CronItem.Op: %s", ci.Op))
+	}
+
+	hcTime := ci.ID.Timestamp()
+	l.Info("starting cron health check", "scheduled_health_check_time", hcTime)
+
+	cqrsFns, err := s.data.GetFunctions(ctx)
+	if err != nil {
+		return fmt.Errorf("error accessing scheduled functions: %w", err)
+	}
+
+	eg := errgroup.Group{}
+	var success int64
+	var errored int64
+	var failed int64
+	eg.SetLimit(20)
+
+	for _, cqrsFn := range cqrsFns {
+		fn := inngest.Function{}
+		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
+
+		// Get AppID
+		appID := cqrsFn.AppID
+
+		for _, cronExpr := range fn.ScheduleExpressions() {
+			fn := fn
+			appID := appID
+			cronExpr := cronExpr
+
+			eg.Go(func() error {
+				l := s.log.With("fnID", fn.ID, "cronExpr", cronExpr, "fnVersion", fn.FunctionVersion)
+
+				status, err := s.croner.HealthCheck(ctx, fn.ID, cronExpr, fn.FunctionVersion)
+				if err != nil {
+					atomic.AddInt64(&errored, 1)
+					l.Error("health check failed", "err", err)
+					return fmt.Errorf("health check failed for fn:%s fnV:%d cron:%s with %w", fn.ID, fn.FunctionVersion, cronExpr, err)
+				}
+
+				if !status.Scheduled {
+					l.Warn("cron health check failed, re-syncing")
+					err = s.croner.Sync(ctx, cron.CronItem{
+						ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+						AccountID:       consts.DevServerAccountID,
+						WorkspaceID:     consts.DevServerEnvID,
+						AppID:           appID,
+						FunctionID:      fn.ID,
+						FunctionVersion: fn.FunctionVersion,
+						Expression:      cronExpr,
+						Op:              enums.CronInit,
+					})
+					if err != nil {
+						atomic.AddInt64(&errored, 1)
+						l.Error("failed to sync on health check failure", "err", err)
+						return fmt.Errorf("health check failed to sync fn %s: %w", fn.ID, err)
+					}
+					atomic.AddInt64(&failed, 1)
+				} else {
+					atomic.AddInt64(&success, 1)
+				}
+				return nil
+			})
+		}
+	}
+
+	err = eg.Wait()
+	l.Info("health checks finished", "success", success, "failed", failed, "errors", errored)
+
+	if err != nil {
+		return fmt.Errorf("some cron health checks errored %w", err)
+	}
+
+	l.Info("finished cron health check")
+
+	// enqueue next health check.
+	return s.croner.EnqueueNextHealthCheck(ctx)
+}
+
+func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron-sync")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+	l.Trace("cron sync", "item", ci)
+
+	// handle the schedule update
+	if _, err := s.croner.ScheduleNext(ctx, ci); err != nil {
+		// TODO does this need special error handling?
+		l.Error("Failed to schedule next cron run", "err", err)
+		return fmt.Errorf("error upserting cron schedule: %w", err)
+	}
+
+	return nil
+}
+
+// handleCron schedules the function run for the cron item, and enqueues the next schedule
+//
+// NOTE
+// operations need to be idempotent for this function so it doesn't end up breaking the
+// scheduling loop for random reasons
+func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		l.Error("error unmarshalling cron item", "item", item)
+		return queue.NeverRetryError(fmt.Errorf("error unmarshalling cron item: %w", err))
+	}
+
+	l = l.With("functionID", ci.FunctionID, "cronExpr", ci.Expression, "fnVersion", ci.FunctionVersion, "scheduleTime", ci.ID.Timestamp())
+	l.Trace("handling cron")
+
+	// JIT check to verify function exists and is not archived
+	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			l.Info("Breaking cron cycle, function does not exist")
+			// function doesn't exist, no action needed
+			return nil
+		}
+		return fmt.Errorf("error retrieving function: %w", err)
+	}
+	// function is archived/deleted, so don't do anything
+	if fn.IsArchived() {
+		l.Info("Breaking cron cycle, function is archived")
+		return nil
+	}
+
+	// JIT check to verify function version is current
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return fmt.Errorf("error converting function to config: %w", err)
+	}
+	if conf.FunctionVersion > ci.FunctionVersion {
+		l.Info("Breaking cron cycle, function version was upgraded")
+		return nil
+	}
+
+	// now actually schedule the cron run
+	at := ci.ID.Timestamp()
+
+	idempotencyKey := ci.ID.Timestamp().UTC().Format(time.RFC3339)
+
+	evt := event.NewOSSTrackedEvent(event.Event{
+		ID:   idempotencyKey,
+		Name: consts.FnCronName,
+		Data: map[string]any{
+			"cron": ci.Expression,
+		},
+		Timestamp: time.Now().UnixMilli(),
+	}, nil)
+
+	// publish cron event to pubsub
+	go func(ctx context.Context) {
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			l.Error("error marshalling cron event", "error", err)
+			return
+		}
+
+		if err = s.publisher.Publish(
+			ctx,
+			s.config.EventStream.Service.TopicName(),
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: time.Now(),
+			},
+		); err != nil {
+			l.Error("error publishing cron event", "error", err)
+		}
+	}(ctx)
+
+	ctx, span := run.NewSpan(ctx,
+		run.WithNewRoot(),
+		run.WithName(consts.OtelSpanCron),
+		run.WithScope(consts.OtelScopeCron),
+		run.WithSpanAttributes(
+			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
+			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
+			attribute.String(consts.OtelSysCronExpr, ci.Expression),
+			attribute.Int64(consts.OtelSysCronTimestamp, at.UnixMilli()),
+		),
+	)
+	defer span.End()
+
+	// NOTE
+	// should this also handle batching and rate limit like runner.initialize?
+	// seems kinda weird to have those settisngs with cron tbh
+	if _, err := s.Executor().Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      ci.AccountID,
+		WorkspaceID:    ci.WorkspaceID,
+		AppID:          ci.AppID,
+		Function:       *conf,
+		Events:         []event.TrackedEvent{evt},
+		At:             &at,
+		IdempotencyKey: &idempotencyKey,
+	}); err != nil {
+		if !errors.Is(err, redis_state.ErrQueueItemExists) &&
+			!errors.Is(err, state.ErrIdentifierExists) &&
+			!errors.Is(err, ErrFunctionSkippedIdempotency) {
+			l.ReportError(err, "error scheduling cron function execution")
+			return fmt.Errorf("error scheduling run for cron: %w", err)
+		}
+		l.Trace("cron function run already scheduled")
+	} else {
+		l.Trace("cron function run scheduled", "idempotencyKey", idempotencyKey)
+	}
+
+	// enqueue the next schedule
+	_, err = s.croner.ScheduleNext(ctx, ci)
+	return err
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

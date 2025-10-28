@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -16,18 +17,23 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"lukechampine.com/frand"
 )
 
-var defaultPropagator = propagation.NewCompositeTextMapPropagator(
-	propagation.TraceContext{},
-	propagation.Baggage{},
+var (
+	defaultPropagator = propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+
+	idGen = idGenerator{}
 )
 
 // TracerProvider defines the interface for tracing providers.
 type TracerProvider interface {
-	CreateSpan(name string, opts *CreateSpanOptions) (*meta.SpanReference, error)
-	CreateDroppableSpan(name string, opts *CreateSpanOptions) (*DroppableSpan, error)
-	UpdateSpan(opts *UpdateSpanOptions) error
+	CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error)
+	CreateDroppableSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*DroppableSpan, error)
+	UpdateSpan(ctx context.Context, opts *UpdateSpanOptions) error
 }
 
 type SpanDebugData struct {
@@ -50,6 +56,8 @@ type CreateSpanOptions struct {
 	RawOtelSpanOptions []trace.SpanStartOption
 	StartTime          time.Time
 	EndTime            time.Time
+
+	Seed []byte
 }
 
 type UpdateSpanOptions struct {
@@ -66,25 +74,29 @@ type UpdateSpanOptions struct {
 // otelTracerProvider implements TracerProvider.
 type otelTracerProvider struct {
 	exp sdktrace.SpanExporter
+	bt  time.Duration
 }
 
-func NewOtelTracerProvider(exp sdktrace.SpanExporter) TracerProvider {
+func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration) TracerProvider {
 	return &otelTracerProvider{
 		exp: exp,
+		bt:  batchTimeout,
 	}
 }
 
-func (tp *otelTracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.Tracer {
+func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 	base := sdktrace.NewSimpleSpanProcessor(tp.exp)
 
 	otelTP := sdktrace.NewTracerProvider(
-		sdktrace.WithSpanProcessor(newExecutionProcessor(md, qi, base)),
-		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
+		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
+		sdktrace.WithIDGenerator(idGen),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
-	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
-
-	return tracer
+	return otelTP.Tracer(
+		"inngest",
+		trace.WithInstrumentationVersion(version.Print()),
+	)
 }
 
 func (d *DroppableSpan) Drop() {
@@ -94,19 +106,19 @@ func (d *DroppableSpan) Drop() {
 	d.span.End()
 }
 
-// TODO Sync send span; might wait for flush channel
 func (d *DroppableSpan) Send() error {
 	d.span.End()
 	return nil
 }
 
 func (tp *otelTracerProvider) CreateSpan(
+	ctx context.Context,
 	name string,
 	opts *CreateSpanOptions,
 ) (*meta.SpanReference, error) {
-	ds, err := tp.CreateDroppableSpan(name, opts)
+	ds, err := tp.CreateDroppableSpan(ctx, name, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
+		return nil, fmt.Errorf("failed to C{reateSpan: %w", err)
 	}
 
 	err = ds.Send()
@@ -120,27 +132,40 @@ func (tp *otelTracerProvider) CreateSpan(
 // CreateDroppableSpan creates a span that can be dropped and relies on us
 // calling `.End()`.
 func (tp *otelTracerProvider) CreateDroppableSpan(
+	ctx context.Context,
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
+	attrs := opts.Attributes
+	if attrs == nil {
+		attrs = meta.NewAttrSet()
+	}
+
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
+	} else {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
-	ctx := context.Background()
 	if opts.Parent != nil {
 		carrier := propagation.MapCarrier{
 			"traceparent": opts.Parent.TraceParent,
 			"tracestate":  opts.Parent.TraceState,
 		}
-		ctx = defaultPropagator.Extract(context.Background(), carrier)
+		ctx = mixinExecutonContext(
+			ctx,
+			// extract the propagator from a blank contexct, and mixin the execution
+			// context from the parent.  this creates a blank ctx with just the executor context
+			// and propagator, which is necessary to tie parents <> children.
+			defaultPropagator.Extract(context.Background(), carrier),
+		)
+	} else {
+		// Use a fresh context for parent traces so that there's no pollution from any
+		// other tracing.
+		ctx = context.Background()
 	}
 
-	attrs := opts.Attributes
-	if attrs == nil {
-		attrs = meta.NewAttrSet()
-	}
 	if opts.Debug != nil {
 		if opts.Debug.Location != "" {
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
@@ -175,7 +200,13 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		)
 	}
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
+	// IF THERE IS SEED, we're creating something with deterministic span and trace IDs.
+	// YAY.  We love determinism.  This is important for eg. root spans.
+	if len(opts.Seed) > 0 {
+		ctx = setDeteterministicIDs(ctx, DeterministicSpanConfig(opts.Seed))
+	}
+
+	tracer := tp.getTracer(opts.Metadata)
 	ctx, span := tracer.Start(ctx, name, spanOptions...)
 
 	carrier := propagation.MapCarrier{}
@@ -236,6 +267,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 
 // Returns nothing, as the span is only extended and no further context is given
 func (tp *otelTracerProvider) UpdateSpan(
+	ctx context.Context,
 	opts *UpdateSpanOptions,
 ) error {
 	ts := opts.EndTime
@@ -269,7 +301,13 @@ func (tp *otelTracerProvider) UpdateSpan(
 		"traceparent": opts.TargetSpan.DynamicSpanTraceParent,
 		"tracestate":  opts.TargetSpan.DynamicSpanTraceState,
 	}
-	ctx := defaultPropagator.Extract(context.Background(), carrier)
+	ctx = mixinExecutonContext(
+		ctx,
+		// extract the propagator from a blank contexct, and mixin the execution
+		// context from the parent.  this creates a blank ctx with just the executor context
+		// and propagator, which is necessary to tie parents <> children.
+		defaultPropagator.Extract(context.Background(), carrier),
+	)
 
 	if opts.Status.IsEnded() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
@@ -295,9 +333,64 @@ func (tp *otelTracerProvider) UpdateSpan(
 		opts.RawOtelSpanOptions...,
 	)
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
+	tracer := tp.getTracer(opts.Metadata)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 
 	span.End()
 	return nil
+}
+
+func DeterministicSpanConfig(seed []byte) DeterministicIDs {
+	sum := sha256.Sum256(seed)
+	// XXX: can we not allocate here?
+	r := frand.NewCustom(sum[:], 16+8, 10)
+	return DeterministicIDs{
+		TraceID: [16]byte(r.Bytes(16)[:16]),
+		SpanID:  [8]byte(r.Bytes(8)[:8]),
+	}
+}
+
+type deterministicIDKeyT = struct{}
+
+var deterministicIDKeyV deterministicIDKeyT
+
+func getDeterministicIDs(ctx context.Context) (DeterministicIDs, bool) {
+	did, ok := ctx.Value(deterministicIDKeyV).(DeterministicIDs)
+	return did, ok
+}
+
+func setDeteterministicIDs(ctx context.Context, did DeterministicIDs) context.Context {
+	return context.WithValue(ctx, deterministicIDKeyV, did)
+}
+
+type DeterministicIDs struct {
+	TraceID trace.TraceID
+	SpanID  trace.SpanID
+}
+
+// idGenerator returns stable trace and span IDs using the SpanContext data.
+//
+// This does a passthrough:  if you have NOT generated a deterministic span
+// via DeterministicSpanConfig, this will generate random numbers.
+type idGenerator struct{}
+
+// NewIDs returns a new trace and span ID.
+func (idGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+	// Does span context exist?
+	if did, ok := getDeterministicIDs(ctx); ok {
+		return did.TraceID, did.SpanID
+	}
+	tID := frand.Entropy128()
+	sID := frand.Entropy128()
+	return trace.TraceID([16]byte(tID)), trace.SpanID([8]byte(sID[:8]))
+}
+
+// NewSpanID returns a ID for a new span in the trace with TraceID.
+func (idGenerator) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+	if did, ok := getDeterministicIDs(ctx); ok {
+		return did.SpanID
+	}
+
+	sID := frand.Entropy128()
+	return trace.SpanID([8]byte(sID[:8]))
 }

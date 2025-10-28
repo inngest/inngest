@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -71,6 +72,22 @@ func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
 	newAttr := Attr(attr, value)
 	r.keyMap[attr.key] = len(r.Attrs)
 	r.Attrs = append(r.Attrs, newAttr)
+}
+
+func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
+	// Attributes that are applied later will override earlier ones, so we
+	// iterate in reverse order.
+	for i := len(r.Attrs) - 1; i >= 0; i-- {
+		if r.Attrs[i].key == attr.Key() {
+			if val, ok := r.Attrs[i].value.(T); ok {
+				return &val, true
+			}
+
+			return nil, false
+		}
+	}
+
+	return nil, false
 }
 
 func (r *SerializableAttrs) AddErr(err error) {
@@ -266,6 +283,9 @@ func TimeAttr(key string) attr[*time.Time] {
 					t := time.UnixMilli(int64(f))
 					return &t, true
 				}
+				if t, err := dateutil.Parse(v); err == nil {
+					return &t, true
+				}
 			}
 			return nil, false
 		},
@@ -353,7 +373,22 @@ func IntAttr(key string) attr[*int] {
 			return attribute.Int(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*int, bool) {
-			if i, ok := v.(float64); ok {
+			// NOTE: Sometimes we may need to typecast from (string, *string) -> int in order
+			// to properly fill our values when reading a Map(string, string) from clickhouse.
+			switch i := v.(type) {
+			case string:
+				val, err := strconv.Atoi(i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case *string:
+				val, err := strconv.Atoi(*i)
+				if err != nil {
+					return nil, false
+				}
+				return &val, true
+			case float64:
 				val := int(i)
 				return &val, true
 			}

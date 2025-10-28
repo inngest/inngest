@@ -25,7 +25,6 @@ const (
 	SpanStatusError
 )
 
-// Raw otel span
 type RawOtelSpan struct {
 	Name         string         `json:"name"`
 	SpanID       string         `json:"span_id"`
@@ -132,8 +131,8 @@ func (s *OtelSpan) GetIsRoot() bool {
 	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
 }
 
-// Get the time that the span was "queued". This will always be present. If a
-// value cannot be found internally (i.e. we haven't explicitly set the moment
+// GetQueuedAtTime gets the time that the span was "queued". This will always be present.
+// If a value cannot be found internally (i.e. we haven't explicitly set the moment
 // this span was queued), then the time will match the span's start time in
 // order to show no queued time in the UI.
 func (s *OtelSpan) GetQueuedAtTime() time.Time {
@@ -146,19 +145,27 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
-// Get the time that the span started. Note that this is not necessarily when
-// the span created, as it may be dynamic.
+// GetStartedAtTime gets the time that the span started. Note that this is not necessarily
+// when the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
-	if s.Attributes == nil {
+	if s.Attributes == nil || s.Attributes.StartedAt == nil {
+		// Fall abck to s.StartTime
+		if !s.StartTime.IsZero() {
+			return &s.StartTime
+		}
 		return nil
 	}
 	return s.Attributes.StartedAt
 }
 
-// Get the time that the span ended. Note that this is not necessarily when the
-// span was persisted, as it may be dynamic.
+// GetEndedAtTime gets the time that the span ended. Note that this is not necessarily
+// when the span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
-	if s.Attributes == nil {
+	if s.Attributes == nil || s.Attributes.EndedAt == nil {
+		// Fall abck to s.EndTime
+		if !s.EndTime.IsZero() {
+			return &s.EndTime
+		}
 		return nil
 	}
 	return s.Attributes.EndedAt

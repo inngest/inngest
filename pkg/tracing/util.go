@@ -71,7 +71,7 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 	return rawAttrs
 }
 
-// ApplyResponseToSpan applies details from the given `DriverResponse` to the
+// DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
 // exectution has completed.
 func DriverResponseAttrs(
@@ -161,6 +161,11 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		rawAttrs.AddErr(fmt.Errorf("failed to get step input: %w", err))
 	}
 
+	if op.Userland != nil {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandID, &op.Userland.ID)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepUserlandIndex, &op.Userland.Index)
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
@@ -199,6 +204,8 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 
 	case enums.OpcodeSleep:
 		{
+			now := time.Now()
+			meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 			if dur, err := op.SleepDuration(); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepSleepDuration, &dur)
 			} else {
@@ -358,7 +365,8 @@ func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
 	return nil
 }
 
-// TODO Everywhere this is used, we're creating a step span directly under the
+// RunSpanRefFromMetadata creates a new span DIRECTLY under the root run.
+// TODO: Everywhere this is used, we're creating a step span directly under the
 // run. When supporting userland spans anywhere, this method must be deprecated
 // and all calls should instead use something that fetches which span (run or
 // _userland_) this step should be under.
@@ -370,7 +378,18 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		return nil
 	}
 
-	return md.Config.NewFunctionTrace()
+	if sr := md.Config.NewFunctionTrace(); sr != nil {
+		return sr
+	}
+
+	// This uses deterministic span IDs based off of the reference.
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	return &meta.SpanReference{
+		DynamicSpanID: cfg.SpanID.String(),
+		// NOTE: This is ALWAYS the root, so the prefix and suffix of 00 is fine.
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-0000000000000000-00", cfg.TraceID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+	}
 }
 
 func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {

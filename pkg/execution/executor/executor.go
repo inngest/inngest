@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -66,6 +67,7 @@ var (
 	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
 	ErrFunctionDebounced          = fmt.Errorf("function debounced")
+	ErrFunctionRateLimited        = fmt.Errorf("function rate-limited")
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
@@ -223,6 +225,13 @@ func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	}
 }
 
+func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rateLimiter = rl
+		return nil
+	}
+}
+
 func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).debouncer = d
@@ -347,6 +356,7 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
+	rateLimiter         ratelimit.RateLimiter
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
@@ -568,11 +578,7 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	return nil
 }
 
-// Execute loads a workflow and the current run state, then executes the
-// function's step via the necessary driver.
-//
-// If this function has a debounce config, this will return ErrFunctionDebounced instead
-// of an identifier as the function is not scheduled immediately.
+// Schedule schedules a new workflow run.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
@@ -586,6 +592,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
 	)
+
+	// Attempt to rate-limit the incoming function.
+	if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+		evtMap := req.Events[0].GetEvent().Map()
+		key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+		switch err {
+		case nil:
+			limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+			if err != nil {
+				return nil, fmt.Errorf("could not check rate limit: %w", err)
+			}
+
+			if limited {
+				// Do nothing.
+				return nil, ErrFunctionRateLimited
+			}
+		case ratelimit.ErrNotRateLimited:
+			// no-op: proceed with function run as usual
+		default:
+			return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
+		}
+	}
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
@@ -708,32 +736,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	strEvts := string(bytEvts)
 
-	// XXX: If this is a sync run, always add the start time to the span.  We do this
-	// because sync runs have already started by the time we call Schedule;  theyre
-	// in-process, and Schedule gets called via an API endpoint when the run starts.
-	runSpanOpts := &tracing.CreateSpanOptions{
-		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-		Metadata: &metadata,
-		Attributes: meta.NewAttrSet(
-			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			meta.Attr(meta.Attrs.EventsInput, &strEvts),
-			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
-		),
-	}
-	if req.RunMode == enums.RunModeSync {
-		runSpanOpts.StartTime = runID.Timestamp()
-	}
-
 	var (
 		runSpanRef       *tracing.DroppableSpan
 		discoverySpanRef *tracing.DroppableSpan
 	)
-	defer func() {
-		// Always attempt to send the spans. They may have already been dropped
-		// (e.g. if the queue item already exists), in which case `Send()` will
-		// no-op
 
+	// Send spans to the history store (ClickHouse). If not called, we'll drop
+	// the spans and not send them. There's a variety of scenarios where the run
+	// ends up not scheduling so we don't want to add it to the history store.
+	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
+	// path (e.g. Executor borked)
+	sendSpans := func() {
 		if runSpanRef != nil {
 			err := runSpanRef.Send()
 			if err != nil {
@@ -755,11 +768,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				)
 			}
 		}
-	}()
+	}
 
-	// We may need to drop the spans later, like if the queue item already
-	// exists
-	dropSpans := func() {
+	// Handle span dropping. The drops will be noops if the spans were sent
+	defer func() {
 		if runSpanRef != nil {
 			runSpanRef.Drop()
 		}
@@ -767,38 +779,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if discoverySpanRef != nil {
 			discoverySpanRef.Drop()
 		}
-	}
-
-	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
-		status = enums.StepStatusSkipped
-	}
-
-	// Always add either queued or skipped as a status.
-	meta.AddAttr(
-		runSpanOpts.Attributes,
-		meta.Attrs.DynamicStatus,
-		&status,
-	)
-
-	// Always the root span.
-	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
-		meta.SpanNameRun,
-		runSpanOpts,
-	)
-	if err != nil {
-		// return nil, fmt.Errorf("error creating run span: %w", err)
-		l.Debug("error creating run span", "error", err)
-	}
-
-	if runSpanRef != nil {
-		config.NewSetFunctionTrace(runSpanRef.Ref)
-	}
-
-	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
-	}
+	}()
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
@@ -912,6 +893,53 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
+	runSpanOpts := &tracing.CreateSpanOptions{
+		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+		Metadata: &metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+		),
+		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	if req.RunMode == enums.RunModeSync {
+		// XXX: If this is a sync run, always add the start time to the span. We do this
+		// because sync runs have already started by the time we call Schedule; they're
+		// in-process, and Schedule gets called via an API endpoint when the run starts.
+		runSpanOpts.StartTime = runID.Timestamp()
+	}
+
+	status := enums.StepStatusQueued
+	if req.SkipReason() != enums.SkipReasonNone {
+		status = enums.StepStatusSkipped
+	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
+	// Always the root span.
+	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameRun,
+		runSpanOpts,
+	)
+	if err != nil {
+		// return nil, fmt.Errorf("error creating run span: %w", err)
+		l.Debug("error creating run span", "error", err)
+	}
+
+	// If this is paused, immediately end just before creating state.
+	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+		sendSpans()
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+	}
+
 	if req.BatchID == nil {
 
 		// Create cancellation pauses immediately, only if this is a non-batch event.
@@ -979,6 +1007,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// where to find the latest span and just always fetch it from the queue
 		// item.
 		discoverySpanRef, err = e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
@@ -1013,8 +1042,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
-		dropSpans()
-
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
@@ -1028,6 +1055,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
+	sendSpans()
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
@@ -1049,6 +1077,14 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  sv2.IDFromV1(id),
+		Attempt:     item.Attempt,
+		MaxAttempts: item.MaxAttempts,
+		QueueKind:   item.Kind,
+	})
+
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
@@ -1065,11 +1101,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
+	//
+	// This also marks the sleep item as completed.
 	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
 	if isSleepResume {
-		err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
-			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResume"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
 			TargetSpan: tracing.SpanRefFromQueueItem(&item),
@@ -1090,7 +1128,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
 			return nil, err
 		}
-
 		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
 			// Other steps are pending before we re-enter the function, so
 			// we're now done with this execution.
@@ -1168,7 +1205,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if v.stopWithoutRetry {
-
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
 		_, err := e.smv2.Delete(ctx, md.ID)
@@ -1185,7 +1221,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// trace context set
 	ctx = extractTraceCtx(ctx, md)
 	runSpanRef := tracing.RunSpanRefFromMetadata(&md)
-	parentRef := tracing.SpanRefFromQueueItem(&item)
+	parentRef := e.getParentSpan(ctx, item, md)
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
@@ -1228,8 +1264,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			// Set some run span details to be explicit that this has been
 			// kicked off
-			if err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
-				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "executor.ExecuteTrigger"},
 				QueueItem:  &item,
 				Metadata:   &md,
 				Status:     enums.StepStatusRunning,
@@ -1247,6 +1283,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	// Organize the run instance.
 	instance := runInstance{
 		md:         md,
 		f:          *ef.Function,
@@ -1255,46 +1292,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		edge:       edge,
 		stackIndex: stackIndex,
 		httpClient: e.httpClient,
+		parentSpan: parentRef,
 	}
 
-	st := time.Now()
-
-	// Set the parent span for this execution.
-	var execParent *meta.SpanReference
-	if isSleepResume {
-		// If we're resuming a sleep here, we're also starting a new discovery
-		// step here.
-		execParent, err = e.tracerProvider.CreateSpan(
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				FollowsFrom: parentRef,
-				Debug:       &tracing.SpanDebugData{Location: "executor.Execute"},
-				Metadata:    &md,
-				Parent:      runSpanRef,
-				QueueItem:   &item,
-				StartTime:   st,
-			},
-		)
-		if err != nil {
-			// return nil, fmt.Errorf("error creating discovery step span
-			// after sleep resume: %w", err)
-			l.Debug("error creating discovery step span after sleep resume", "error", err)
-		}
-	} else {
-		// If we're here, we assume that the step span has already been
-		// created, so add it here.
-		execParent = parentRef
-	}
-
+	// This span will be updated with output as soon as execution finishes.
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
+		ctx,
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
-			Parent:     execParent,
+			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePre"},
+			Parent:     parentRef,
 			Metadata:   &md,
 			QueueItem:  &item,
 			Attributes: tracing.FunctionAttrs(&instance.f),
-			StartTime:  st,
+			StartTime:  time.Now(),
 		},
 	)
 	if err != nil {
@@ -1305,8 +1316,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
+		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
+		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		updateOpts := &tracing.UpdateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
 			Metadata:   &md,
 			QueueItem:  &item,
 			TargetSpan: instance.execSpan,
@@ -1326,7 +1339,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			updateOpts.Status = status
 		}
 
-		_ = e.tracerProvider.UpdateSpan(updateOpts)
+		_ = e.tracerProvider.UpdateSpan(ctx, updateOpts)
 
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
@@ -1606,6 +1619,11 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 	}
 
 	step := &i.f.Steps[0]
+
+	if i.execSpan != nil {
+		// Allow deep driver code to grab the execution span from context
+		ctx = i.execSpan.SetToCtx(ctx)
+	}
 
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 
@@ -2078,6 +2096,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load run: %w", err)
 	}
 
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier: md.ID,
+		Attempt:    0,
+	})
+
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
 	if err != nil {
@@ -2137,6 +2160,13 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  md.ID,
+		Attempt:     0,
+		MaxAttempts: pause.MaxAttempts,
+	})
+
 	data, err := json.Marshal(r.With)
 	if err != nil {
 		return fmt.Errorf("error marshalling timeout step data: %w", err)
@@ -2156,7 +2186,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	pauseSpan := tracing.SpanRefFromPause(&pause)
-	_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
 		Status:     enums.StepStatusTimedOut,
@@ -2188,6 +2218,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		}
 
 		nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2248,7 +2279,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("no queue or state manager specified")
 	}
 
-	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
+	sv2id := sv2.ID{
 		RunID:      pause.Identifier.RunID,
 		FunctionID: pause.Identifier.FunctionID,
 		Tenant: sv2.Tenant{
@@ -2256,7 +2287,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			AccountID: pause.Identifier.AccountID,
 			// NOTE: Pauses do not store app IDs.
 		},
+	}
+
+	// Immediately store execution context for tracing.
+	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+		Identifier:  sv2id,
+		Attempt:     0,
+		MaxAttempts: pause.MaxAttempts,
 	})
+
+	md, err := e.smv2.LoadMetadata(ctx, sv2id)
 	if err == state.ErrRunNotFound {
 		return err
 	}
@@ -2311,7 +2351,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			status = enums.StepStatusTimedOut
 		}
 		pauseSpan := tracing.SpanRefFromPause(&pause)
-		_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
@@ -2346,6 +2386,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
+				ctx,
 				meta.SpanNameStepDiscovery,
 				&tracing.CreateSpanOptions{
 					Carriers:    []map[string]any{nextItem.Metadata},
@@ -2648,6 +2689,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		attrs := tracing.GeneratorAttrs(&gen)
 		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
 		_, err := e.tracerProvider.CreateSpan(
+			ctx,
 			meta.SpanNameStep,
 			&tracing.CreateSpanOptions{
 				Parent:    runCtx.Metadata().Config.NewFunctionTrace(),
@@ -2697,6 +2739,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2851,6 +2894,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -2928,6 +2972,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
@@ -2972,10 +3017,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
-	now := time.Now()
-
-	startedAt := now
-	until := startedAt.Add(dur)
+	until := time.Now().Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
@@ -3003,7 +3045,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
+
+	// Create a new span that we'll use to record the sleep as complete.
+	// This is going to be attached to the same parent (the discovery step that started this sleep).
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
@@ -3011,14 +3057,40 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
 			Metadata:    metadata,
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(metadata),
+			Parent:      runCtx.ParentSpan(),
 			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
 	if err != nil {
-		// return fmt.Errorf("error creating span for next step after Sleep:
-		// %w", err)
 		e.log.Debug("error creating span for next step after Sleep", "error", err)
+	}
+
+	// And, annoyingly, we need to schedule the next discovery step span _now_.  We must do that
+	// because when the sleep resumes, the next step may fail;  if we create a discovery step
+	// when we resume the sleep there'll be a new discovery group per retry.  Not ideal.
+	//
+	// Doing that here allows us to make this deterministic.  In the future, if we had deterministic
+	// span IDs we could remove this.
+	{
+		discoveryRef, err := e.tracerProvider.CreateSpan(
+			ctx,
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Debug:       &tracing.SpanDebugData{Location: "executor.sleepDiscovery"},
+				Metadata:    metadata,
+				FollowsFrom: span.Ref,
+				// Always from the root span.
+				Parent:    tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem: &nextItem,
+				StartTime: until,
+			},
+		)
+		if err != nil {
+			e.log.Debug("error creating span discovery step after sleep", "error", err)
+		}
+		// Plumb this into the queue item manually, unfortunately.
+		byt, _ := json.Marshal(discoveryRef)
+		nextItem.Metadata["discovery"] = string(byt)
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
@@ -3069,7 +3141,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
@@ -3121,7 +3193,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
 			Metadata:   metadata,
@@ -3174,6 +3246,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -3271,7 +3344,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
@@ -3336,7 +3409,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, rawBody),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
 			Metadata:   metadata,
@@ -3394,6 +3467,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		lifecycleItem := runCtx.LifecycleItem()
 		metadata := runCtx.Metadata()
 		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
@@ -3508,6 +3582,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -3552,7 +3627,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 				meta.AddAttr(attrs, meta.Attrs.StepHasOutput, &hasOutput)
 			}
 
-			if updateSpanErr := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+			if updateSpanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 				EndTime:    time.Now(),
 				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
 				Status:     enums.StepStatusFailed,
@@ -3698,6 +3773,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -3904,6 +3980,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
@@ -4075,6 +4152,8 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		BatchID:          &payload.BatchID,
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,
+		// Batching does not work with rate limiting
+		PreventRateLimit: true,
 	})
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
@@ -4303,6 +4382,49 @@ func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool 
 	return !hasPendingSteps || mode == enums.ParallelModeRace
 }
 
+func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Metadata) *meta.SpanReference {
+	if item.Kind != queue.KindSleep {
+		return tracing.SpanRefFromQueueItem(&item)
+	}
+
+	// Grab the discovery step from the queue item, if it exists.  This is created when
+	// handling the generator item.
+	//
+	// This makes sure that the discovery span ID is *stable* after a queue item is ran
+	// across all retries.
+	if data, ok := item.Metadata["discovery"].(string); ok {
+		ref := &meta.SpanReference{}
+		if err := json.Unmarshal([]byte(data), ref); err == nil {
+			return ref
+		}
+	}
+
+	// The embedded discovery span might not've existed for old sleeps, so create a new
+	// one and deal with it being unstable across each sleep resume attempt...
+	parentRef, err := e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			FollowsFrom: tracing.SpanRefFromQueueItem(&item),
+			Debug:       &tracing.SpanDebugData{Location: "executor.PostSleepDiscovery"},
+			Metadata:    &md,
+			// Always from the root span.
+			Parent:    tracing.RunSpanRefFromMetadata(&md),
+			QueueItem: &item,
+			StartTime: time.Now(),
+		},
+	)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("error creating discovery step span after sleep resume", "error", err)
+		// fallback. this literally should NEVER happen
+		parentRef = tracing.SpanRefFromQueueItem(&item)
+	}
+
+	return parentRef
+}
+
+// Checkpoint traces configures hwehter we should emit traces after recording steps.
+
 type traceStepsValT struct{}
 
 var traceStepsVal = traceStepsValT{}
@@ -4313,6 +4435,5 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
-	fmt.Println("YES?", ok)
 	return ok
 }

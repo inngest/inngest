@@ -2,7 +2,6 @@ package step
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -19,8 +18,8 @@ type SleepOpts struct {
 
 func Sleep(ctx context.Context, id string, duration time.Duration) {
 	targetID := getTargetStepID(ctx)
-	mgr := preflight(ctx)
-	op := mgr.NewOp(enums.OpcodeSleep, id, nil)
+	mgr := preflight(ctx, enums.OpcodeSleep)
+	op := mgr.NewOp(enums.OpcodeSleep, id)
 	if _, ok := mgr.Step(ctx, op); ok {
 		// We've already slept.
 		return
@@ -29,15 +28,12 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 	if targetID != nil && *targetID != op.MustHash() {
 		// Don't report this step since targeting is happening and it isn't
 		// targeted
-		panic(ControlHijack{})
+		panic(sdkrequest.ControlHijack{})
 	}
 
-	mw, ok := internal.MiddlewareManagerFromContext(ctx)
-	if !ok {
-		mgr.SetErr(fmt.Errorf("no middleware manager found in context"))
-		panic(ControlHijack{})
-	}
-	mw.BeforeExecution(ctx, mgr.MiddlewareCallCtx())
+	mw := internal.MiddlewareFromContext(ctx)
+	mw.BeforeExecution(ctx, mgr.CallContext())
+
 	plannedOp := sdkrequest.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   enums.OpcodeSleep,
@@ -45,11 +41,11 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 		Opts: map[string]any{
 			"duration": str2duration.String(duration),
 		},
+		Userland: op.Userland(),
 	}
-	plannedOp.SetParallelMode(parallelMode(ctx))
-	mgr.AppendOp(plannedOp)
+	mgr.AppendOp(ctx, plannedOp)
 
-	panic(ControlHijack{})
+	panic(sdkrequest.ControlHijack{})
 }
 
 // SleepUntil sleeps until a given time.  This halts function execution entirely,

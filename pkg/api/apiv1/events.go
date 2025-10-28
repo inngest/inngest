@@ -14,6 +14,8 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngestgo/step"
+	"github.com/inngest/inngestgo/stephttp"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -147,28 +149,42 @@ func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.Funct
 }
 
 func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
+	stephttp.Configure(r.Context(), stephttp.FnOpts{
+		ID: "/v1/events/{eventID}/runs",
+	})
+
 	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
-	parsed, err := ulid.Parse(eventID)
+
+	parsed, err := step.Run(ctx, "fetch ulid", func(ctx context.Context) (ulid.ULID, error) {
+		return ulid.Parse(eventID)
+	})
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", eventID))
 		return
 	}
-	runs, err := a.GetEventRuns(ctx, parsed)
+
+	runs, err := step.Run(ctx, "fetch runs via event", func(ctx context.Context) ([]*cqrs.FunctionRun, error) {
+		return a.GetEventRuns(ctx, parsed)
+	})
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
 
-	// allow user to pass a flag and get the same run status as trace previews
-	if r.URL.Query().Get("trace_preview") == "true" {
+	// XXX (tonyhb, 2025-10-17): Moving to the new trace pipeline means that we're going to query
+	// for the runs found from each event, then fetch the status directly.
+	{
 		for _, run := range runs {
-			rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
-			if err != nil {
-				_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
-				return
-			}
-			run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
+			_, _ = step.Run(ctx, "trace v2: fetch status", func(ctx context.Context) (enums.RunStatus, error) {
+				rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
+				if err != nil || rootSpan == nil {
+					_ = publicerr.WriteHTTP(w, err) // return with error since user can leave out trace_preview flag
+					return enums.RunStatusUnknown, err
+				}
+				run.Status = enums.StepStatusToRunStatus(rootSpan.Status)
+				return run.Status, nil
+			})
 		}
 	}
 

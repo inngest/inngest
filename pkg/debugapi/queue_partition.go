@@ -11,6 +11,7 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -41,6 +42,23 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		return nil, status.Error(codes.Unknown, fmt.Errorf("error finding shard: %w", err).Error())
 	}
 
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return nil, status.Error(codes.Unknown, fmt.Errorf("error retrieving function config: %w", err).Error())
+	}
+
+	var cronSchedules []*pb.CronSchedule
+	for _, cronExpr := range conf.ScheduleExpressions() {
+		if healthCheckStatus, err := d.croner.HealthCheck(ctx, fn.ID, cronExpr, conf.FunctionVersion); err == nil {
+			cronSchedules = append(cronSchedules, &pb.CronSchedule{
+				Next:      timestamppb.New(healthCheckStatus.Next),
+				JobId:     healthCheckStatus.JobID,
+				Expr:      cronExpr,
+				Scheduled: healthCheckStatus.Scheduled,
+			})
+		}
+	}
+
 	return &pb.PartitionResponse{
 		Id:   req.GetId(),
 		Slug: fn.Slug,
@@ -54,6 +72,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 			Name: shard.Name,
 			Kind: shard.Kind,
 		},
+		Crons: cronSchedules,
 	}, nil
 }
 

@@ -182,6 +182,8 @@ type QueueManager interface {
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
 	// ItemByID retrieves the queue item by the jobID
 	ItemByID(ctx context.Context, jobID string, opts ...QueueOpOpt) (*osqueue.QueueItem, error)
+	// ItemExists checks if an item with jobID exists in the queue
+	ItemExists(ctx context.Context, jobID string, opts ...QueueOpOpt) (bool, error)
 	// ItemsByRunID retrieves all queue items via runID
 	//
 	// NOTE

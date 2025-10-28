@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -873,7 +874,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 		executor.WithFunctionLoader(loader),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithSendingEventHandler(func(ctx context.Context, evt event.Event, item queue.Item) error {
 			if evt.Name == "inngest/function.invoked" {
 				eventCaptured = true
@@ -1051,7 +1052,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 		executor.WithFunctionLoader(loader),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
-		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil)),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
 		executor.WithDriverV1(nonRetriableDriver),
 	)
 	require.NoError(t, err)
@@ -1121,4 +1122,187 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	// State should have been deleted when finalizing the run
 	_, err = smv2.LoadState(ctx, run.ID)
 	require.ErrorContains(t, err, state.ErrRunNotFound.Error())
+}
+
+func TestExecutorScheduleRateLimit(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	require.NoError(t, err)
+
+	dbDriver := "sqlite"
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
+	loader := dbcqrs.(state.FunctionLoader)
+
+	fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	rateLimitKey := "event.data.userID"
+	rateLimit := &inngest.RateLimit{
+		Limit:  1,
+		Period: "24h",
+		Key:    &rateLimitKey,
+	}
+
+	fn := inngest.Function{
+		ID:              fnID,
+		FunctionVersion: 1,
+		Name:            "test-fn",
+		Slug:            "test-fn",
+		RateLimit:       rateLimit,
+		Steps: []inngest.Step{
+			{
+				ID:   "step",
+				Name: "step",
+				URI:  "/step",
+			},
+		},
+	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:   appID,
+		Name: "test-app",
+	})
+	require.NoError(t, err)
+
+	_, err = dbcqrs.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		ID:     fnID,
+		AppID:  appID,
+		Name:   fn.Name,
+		Slug:   fn.Slug,
+		Config: string(config),
+	})
+	require.NoError(t, err)
+
+	_, shardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer shardedRc.Close()
+
+	_, unshardedRc, err := createInmemoryRedis(t)
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: shardedRc,
+		StateDefaultKey:        redis_state.StateDefaultKey,
+		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		BatchClient:            shardedRc,
+		QueueDefaultKey:        redis_state.QueueDefaultKey,
+	})
+
+	queueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	shardSelector := func(ctx context.Context, _ uuid.UUID, _ *string) (redis_state.QueueShard, error) {
+		return queueShard, nil
+	}
+
+	queueShards := map[string]redis_state.QueueShard{
+		consts.DefaultQueueShardName: queueShard,
+	}
+
+	var sm state.Manager
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithShardedClient(shardedClient),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+	smv2 := redis_state.MustRunServiceV2(sm)
+
+	queueOpts := []redis_state.QueueOpt{
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithShardSelector(shardSelector),
+		redis_state.WithQueueShardClients(queueShards),
+	}
+
+	rq := redis_state.NewQueue(queueShard, queueOpts...)
+
+	rl := ratelimit.New(ctx, unshardedClient.Global().Client(), "{ratelimit}:")
+
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+		executor.WithRateLimiter(rl),
+	)
+	require.NoError(t, err)
+
+	//
+	// First event: Success
+	//
+
+	now := time.Now()
+	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	evt := event.NewOSSTrackedEventWithID(event.Event{
+		Name: "test/event",
+		Data: map[string]any{
+			"userID": "inngest",
+		},
+	}, evtID)
+
+	run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			evt,
+		},
+	})
+	require.NoError(t, err)
+
+	// Job should have been scheduled
+	jobsAfterSchedule, err := rq.RunJobs(
+		ctx,
+		queueShard.Name,
+		run.ID.Tenant.EnvID,
+		run.ID.FunctionID,
+		run.ID.RunID,
+		1000,
+		0,
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, jobsAfterSchedule)
+
+	stateBefore, err := smv2.LoadState(ctx, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stateBefore)
+
+	//
+	// Second event: Rate limited
+	//
+
+	now = time.Now()
+	evtID = ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+	evt2 := event.NewOSSTrackedEventWithID(event.Event{
+		Name: "test/event",
+		Data: map[string]any{
+			"userID": "inngest",
+		},
+	}, evtID)
+
+	_, err = exec.Schedule(ctx, execution.ScheduleRequest{
+		Function:    fn,
+		At:          &now,
+		AccountID:   aID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		Events: []event.TrackedEvent{
+			evt2,
+		},
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, executor.ErrFunctionRateLimited)
 }

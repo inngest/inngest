@@ -278,3 +278,43 @@ func HistogramHTTPAPIBytesWritten(ctx context.Context, bytes int64, opts Histogr
 		Boundaries:  DefaultBoundaries,
 	})
 }
+
+func HistogramPauseBlockFlushLatency(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_flush_duration",
+		Description: "Distribution of pauses block flush latency",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramPauseBlockFetchLatency(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_fetch_duration",
+		Description: "Distribution of pauses block fetching latency",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_delete_after_flush_duration",
+		Description: "Distribution of pauses deletion duration after flushing a block",
+		Tags:        opts.Tags,
+		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "span_flush_duration",
+		Description: "Distribution of span flushes from tracing",
+		Tags:        opts.Tags,
+		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}

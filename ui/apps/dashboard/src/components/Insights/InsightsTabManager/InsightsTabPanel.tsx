@@ -39,7 +39,7 @@ export function InsightsTabPanel({
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
-  // TODO: Adjust home tab to AI panel.
+  // TODO: Adjust home tab to AI panel
   if (isHomeTab) return <InsightsTabPanelTemplatesTab />;
 
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
