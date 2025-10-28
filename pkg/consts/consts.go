@@ -151,6 +151,8 @@ const (
 	// ConnectWorkerNoConcurrencyLimitForRequests is used to indicate that a worker has no capacity limit.
 	ConnectWorkerNoConcurrencyLimitForRequests = -1
 
+	ConnectWorkerConcurrencyLimitMaxAllowed = 100
+
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
 )
 

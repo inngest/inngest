@@ -7,14 +7,14 @@ Output:
 ]]
 
 local keyRequestLease = KEYS[1]
-local counterKey = KEYS[2]
+local leasesSetKey = KEYS[2]
 local leaseWorkerKey = KEYS[3]
 
 local leaseID 				= ARGV[1]
 local newLeaseID 			= ARGV[2]
 local expiry					= tonumber(ARGV[3])
 local currentTime			= tonumber(ARGV[4])
-local counterTTL			= tonumber(ARGV[5])
+local setTTL			= tonumber(ARGV[5])
 local instanceID			= ARGV[6]
 local isWorkerCapacityLimited = ARGV[7]
 
@@ -37,17 +37,28 @@ end
 -- If new lease expiry is in the past, drop the lease
 if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 	redis.call("DEL", keyRequestLease)
-	-- If worker capacity is limited, also clean up the counter and mapping
+	-- If worker capacity is limited, also clean up the set and mapping
 	if isWorkerCapacityLimited == "true" then
 		-- Get the old worker instance ID from the lease mapping
 		local oldInstanceID = redis.call("GET", leaseWorkerKey)
 		if oldInstanceID then
-			-- Decrement the old counter and clean up the mapping
-			local currentValue = redis.call("GET", counterKey)
-			if currentValue then
-				local newValue = redis.call("DECR", counterKey)
-				if newValue <= 0 then
-					redis.call("DEL", counterKey)
+			-- Remove from the old instance's set
+			local oldLeasesSetKey = string.gsub(leasesSetKey, instanceID, oldInstanceID)
+			
+			-- Get request ID from the request item
+			local requestIDToRemove = requestItem.requestID
+			if not requestIDToRemove and requestItem.Request then
+				requestIDToRemove = requestItem.Request.id
+			end
+			
+			if requestIDToRemove then
+				-- Remove the request from old worker's set
+				redis.call("ZREM", oldLeasesSetKey, requestIDToRemove)
+				
+				-- Check if old set is now empty
+				local oldRemainingCount = redis.call("ZCARD", oldLeasesSetKey)
+				if oldRemainingCount == 0 then
+					redis.call("DEL", oldLeasesSetKey)
 				end
 			end
 			redis.call("DEL", leaseWorkerKey)
@@ -56,7 +67,7 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 	return 2
 end
 
--- Get the old worker instance ID from the lease mapping (for potential counter transfer)
+-- Get the old worker instance ID from the lease mapping (for potential set transfer)
 local oldInstanceID = nil
 if isWorkerCapacityLimited == "true" then
 	oldInstanceID = redis.call("GET", leaseWorkerKey)
@@ -65,30 +76,49 @@ end
 requestItem.leaseID = newLeaseID
 redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 
--- Handle worker capacity counter management
+-- Handle worker capacity set management
 if isWorkerCapacityLimited == "true" then
+	-- Get request ID from the request item
+	local requestIDToManage = requestItem.requestID
+	if not requestIDToManage and requestItem.Request then
+		requestIDToManage = requestItem.Request.id
+	end
+	
+	if not requestIDToManage then
+		-- This shouldn't happen, but handle gracefully
+		return -1
+	end
+	
 	-- If there was an old instance ID and it's different from the new one
 	if oldInstanceID and oldInstanceID ~= instanceID then
-		-- Decrement the old instance's counter
-		local oldCounterKey = string.gsub(counterKey, instanceID, oldInstanceID)
-		local currentValue = redis.call("GET", oldCounterKey)
-		if currentValue then
-			local newValue = redis.call("DECR", oldCounterKey)
-			if newValue <= 0 then
-				redis.call("DEL", oldCounterKey)
-			else
-				-- Refresh TTL on the old counter
-				redis.call("EXPIRE", oldCounterKey, counterTTL)
-			end
+		-- Remove from the old instance's set
+		local oldLeasesSetKey = string.gsub(leasesSetKey, instanceID, oldInstanceID)
+		
+		-- Remove the request from old worker's set
+		redis.call("ZREM", oldLeasesSetKey, requestIDToManage)
+		
+		-- Check if old set is now empty
+		local oldRemainingCount = redis.call("ZCARD", oldLeasesSetKey)
+		if oldRemainingCount == 0 then
+			redis.call("DEL", oldLeasesSetKey)
+		else
+			-- Refresh TTL on the old set
+			redis.call("EXPIRE", oldLeasesSetKey, setTTL)
 		end
 
-		-- Increment the new instance's counter
-		redis.call("INCR", counterKey)
+		-- Add to the new instance's set
+		local newExpirationTime = decode_ulid_time(newLeaseID)
+		redis.call("ZADD", leasesSetKey, newExpirationTime, requestIDToManage)
+		redis.call("EXPIRE", leasesSetKey, setTTL)
+	else
+		-- Same worker, just update the expiration time in the set
+		local newExpirationTime = decode_ulid_time(newLeaseID)
+		redis.call("ZADD", leasesSetKey, newExpirationTime, requestIDToManage)
+		redis.call("EXPIRE", leasesSetKey, setTTL)
 	end
 
-	-- Always refresh the counter TTL and update the mapping
-	redis.call("EXPIRE", counterKey, counterTTL)
-	redis.call("SET", leaseWorkerKey, instanceID, "EX", counterTTL)
+	-- Always update the mapping
+	redis.call("SET", leaseWorkerKey, instanceID, "EX", setTTL)
 end
 
 return 1

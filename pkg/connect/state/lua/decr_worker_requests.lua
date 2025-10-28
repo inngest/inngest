@@ -1,39 +1,53 @@
 --[[
 
-Decrements the worker lease counter and manages TTL/cleanup.
+Removes a lease from the worker's sorted set and manages TTL/cleanup.
 
 Output:
-  0: Successfully decremented, counter deleted (reached 0 or below)
-  1: Successfully decremented, counter still active
-  2: Counter doesn't exist, nothing to decrement
+  0: Successfully removed, set deleted (empty)
+  1: Successfully removed, set still active
+  2: Set doesn't exist, nothing to remove
 
-ARGV[1]: TTL in seconds for the counter key
+ARGV[1]: TTL in seconds for the set key
+ARGV[2]: Request ID to remove
 ]]
 
-local counterKey = KEYS[1]
+local leasesSetKey = KEYS[1]
 local leaseWorkerKey = KEYS[2]
-local counterTTL = tonumber(ARGV[1])
+local setTTL = tonumber(ARGV[1])
+local requestID = ARGV[2]
 
--- Check if counter exists
-local currentValue = redis.call("GET", counterKey)
+-- Check if set exists
+local setExists = redis.call("EXISTS", leasesSetKey)
 
--- If counter doesn't exist, nothing to decrement
-if currentValue == false or currentValue == nil then
+-- If set doesn't exist, nothing to remove
+if setExists == 0 then
+  -- Still clean up the mapping in case it exists
+  redis.call("DEL", leaseWorkerKey)
   return 2
 end
 
--- Decrement the counter
-local newValue = redis.call("DECR", counterKey)
+-- Get current time to clean up expired leases
+local currentTime = redis.call("TIME")
+local currentTimeUnix = tonumber(currentTime[1])
 
--- If counter is now 0 or negative, delete it and the mapping
-if newValue <= 0 then
-  redis.call("DEL", counterKey)
+-- Remove expired leases from the set first
+redis.call("ZREMRANGEBYSCORE", leasesSetKey, "-inf", tostring(currentTimeUnix))
+
+-- Remove the specific request ID from the set
+local removed = redis.call("ZREM", leasesSetKey, requestID)
+
+-- Check if set is now empty
+local remainingCount = redis.call("ZCARD", leasesSetKey)
+
+if remainingCount == 0 then
+  -- Set is empty, delete it and the mapping
+  redis.call("DEL", leasesSetKey)
   redis.call("DEL", leaseWorkerKey)
   return 0
 end
 
--- Counter is still positive, refresh TTL
-redis.call("EXPIRE", counterKey, counterTTL)
--- Also delete the specific request's worker mapping
+-- Set still has leases, refresh TTL
+redis.call("EXPIRE", leasesSetKey, setTTL)
+-- Delete the specific request's worker mapping
 redis.call("DEL", leaseWorkerKey)
 return 1

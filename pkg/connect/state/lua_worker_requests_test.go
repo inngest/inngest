@@ -30,7 +30,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	// Helper to get Redis keys
 	capacityKey := fmt.Sprintf("{%s}:worker_capacity:%s", envID.String(), instanceID)
-	counterKey := fmt.Sprintf("{%s}:worker_leases_counter:%s", envID.String(), instanceID)
+	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
@@ -40,19 +40,21 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-1"
 
 		counterTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64(counterTTL.Seconds())),
 			instanceID,
 			requestID,
+			fmt.Sprintf("%d", expirationTime),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
 		require.Equal(t, int64(0), result, "should return 0 when no capacity set")
 
-		// Verify no counter was created
-		require.False(t, r.Exists(counterKey), "counter should not be created when no capacity limit")
+		// Verify no set was created
+		require.False(t, r.Exists(leasesSetKey), "set should not be created when no capacity limit")
 		require.False(t, r.Exists(leaseWorkerKey(requestID)), "lease mapping should not be created when no capacity limit")
 	})
 
@@ -61,11 +63,13 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		r.Set(capacityKey, "0")
 		requestID := "req-2"
 
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
+			fmt.Sprintf("%d", expirationTime),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -81,25 +85,28 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		r.Set(capacityKey, "5")
 		requestID := "req-3"
 
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
+			fmt.Sprintf("%d", expirationTime),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
 		require.Equal(t, int64(0), result, "should successfully increment")
 
-		// Verify counter was incremented
-		counterVal, err := r.Get(counterKey)
+		// Verify request was added to set
+		setMembers, err := r.ZMembers(leasesSetKey)
 		require.NoError(t, err)
-		require.Equal(t, "1", counterVal)
+		require.Len(t, setMembers, 1)
+		require.Equal(t, requestID, setMembers[0])
 
-		// Verify TTL is set on counter
-		require.True(t, r.Exists(counterKey))
-		ttl := r.TTL(counterKey)
+		// Verify TTL is set on set
+		require.True(t, r.Exists(leasesSetKey))
+		ttl := r.TTL(leasesSetKey)
 		require.Greater(t, ttl, time.Duration(0))
 
 		// Verify lease-to-worker mapping was created
@@ -114,7 +121,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(counterKey)
+		r.Del(leasesSetKey)
 		r.Del(leaseWorkerKey(requestID))
 	})
 
@@ -124,179 +131,68 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
+				fmt.Sprintf("%d", expirationTime),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
 			require.Equal(t, int64(0), result, "should successfully increment on iteration %d", i)
 
-			counterVal, err := r.Get(counterKey)
+			// Verify request was added to set
+			setMembers, err := r.ZMembers(leasesSetKey)
 			require.NoError(t, err)
-			require.Equal(t, fmt.Sprintf("%d", i), counterVal, "counter should be %d", i)
+			require.Len(t, setMembers, i, "set should have %d members", i)
 		}
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(counterKey)
+		r.Del(leasesSetKey)
 		for i := 1; i <= 3; i++ {
 			r.Del(leaseWorkerKey(fmt.Sprintf("req-%d", i)))
 		}
 	})
 
 	t.Run("returns 1 when at capacity", func(t *testing.T) {
-		// Set capacity to 2
+		// Set capacity to 2 and fill it with 2 existing requests
 		r.Set(capacityKey, "2")
-		r.Set(counterKey, "2") // Already at capacity
+		for i := 1; i <= 2; i++ {
+			existingReqID := fmt.Sprintf("existing-req-%d", i)
+			existingExpTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			r.ZAdd(leasesSetKey, float64(existingExpTime), existingReqID)
+		}
 
 		requestID := "req-overflow"
-
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
+			fmt.Sprintf("%d", expirationTime),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
 		require.Equal(t, int64(1), result, "should return 1 when at capacity")
 
-		// Verify counter was NOT incremented
-		counterVal, err := r.Get(counterKey)
+		// Verify set still has only 2 members
+		setMembers, err := r.ZMembers(leasesSetKey)
 		require.NoError(t, err)
-		require.Equal(t, "2", counterVal, "counter should remain at 2")
+		require.Len(t, setMembers, 2, "set should still have 2 members")
+		require.NotContains(t, setMembers, requestID, "overflow request should not be in set")
 
 		// Verify no mapping was created
 		require.False(t, r.Exists(leaseWorkerKey(requestID)))
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(counterKey)
-	})
-
-	t.Run("returns 1 when exactly at capacity boundary", func(t *testing.T) {
-		// Set capacity to 3
-		r.Set(capacityKey, "3")
-		r.Set(counterKey, "3") // Exactly at capacity
-
-		requestID := "req-boundary"
-
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			instanceID,
-			requestID,
-		}
-
-		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(1), result, "should reject when exactly at capacity")
-
-		// Clean up
-		r.Del(capacityKey)
-		r.Del(counterKey)
-	})
-
-	t.Run("allows increment when one below capacity", func(t *testing.T) {
-		// Set capacity to 5
-		r.Set(capacityKey, "5")
-		r.Set(counterKey, "4") // One below capacity
-
-		requestID := "req-one-below"
-
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			instanceID,
-			requestID,
-		}
-
-		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(0), result, "should allow increment when one below capacity")
-
-		counterVal, err := r.Get(counterKey)
-		require.NoError(t, err)
-		require.Equal(t, "5", counterVal)
-
-		// Clean up
-		r.Del(capacityKey)
-		r.Del(counterKey)
-		r.Del(leaseWorkerKey(requestID))
-	})
-
-	t.Run("refreshes TTL on counter when incrementing", func(t *testing.T) {
-		// Set capacity and initial counter
-		r.Set(capacityKey, "5")
-		r.Set(counterKey, "1")
-
-		// Fast forward time
-		r.FastForward(30 * time.Second)
-
-		requestID := "req-ttl-refresh"
-
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			instanceID,
-			requestID,
-		}
-
-		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(0), result)
-
-		// TTL should be reset
-		ttl := r.TTL(counterKey)
-		expectedTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
-		// TTL should be close to expected (within 5 seconds)
-		require.Greater(t, ttl, expectedTTL-5*time.Second)
-
-		// Clean up
-		r.Del(capacityKey)
-		r.Del(counterKey)
-		r.Del(leaseWorkerKey(requestID))
-	})
-
-	t.Run("handles capacity of 1", func(t *testing.T) {
-		// Set capacity to 1 (edge case)
-		r.Set(capacityKey, "1")
-
-		requestID1 := "req-capacity-1-first"
-		keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID1)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			instanceID,
-			requestID1,
-		}
-
-		// First request should succeed
-		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(0), result)
-
-		// Second request should fail
-		requestID2 := "req-capacity-1-second"
-		keys = []string{capacityKey, counterKey, leaseWorkerKey(requestID2)}
-		args = []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			instanceID,
-			requestID2,
-		}
-
-		result, err = scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(1), result, "should reject second request with capacity of 1")
-
-		// Clean up
-		r.Del(capacityKey)
-		r.Del(counterKey)
-		r.Del(leaseWorkerKey(requestID1))
+		r.Del(leasesSetKey)
 	})
 }
 
@@ -316,92 +212,81 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 	instanceID := "test-instance"
 
 	// Helper to get Redis keys
-	counterKey := fmt.Sprintf("{%s}:worker_leases_counter:%s", envID.String(), instanceID)
+	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
 
-	t.Run("returns 2 when counter doesn't exist", func(t *testing.T) {
-		// No counter exists
+	t.Run("returns 2 when set doesn't exist", func(t *testing.T) {
+		// No set exists
 		requestID := "req-nonexistent"
 
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
+		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			requestID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
-		require.Equal(t, int64(2), result, "should return 2 when counter doesn't exist")
+		require.Equal(t, int64(2), result, "should return 2 when set doesn't exist")
 	})
 
-	t.Run("returns 0 and deletes counter when reaching 0", func(t *testing.T) {
-		// Set counter to 1
-		r.Set(counterKey, "1")
+	t.Run("returns 0 and deletes set when removing last member", func(t *testing.T) {
+		// Set up set with one member
 		requestID := "req-last"
+		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		r.ZAdd(leasesSetKey, float64(expTime), requestID)
 		r.Set(leaseWorkerKey(requestID), instanceID)
 
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
+		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			requestID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
-		require.Equal(t, int64(0), result, "should return 0 when counter reaches 0")
+		require.Equal(t, int64(0), result, "should return 0 when set becomes empty")
 
-		// Verify counter was deleted
-		require.False(t, r.Exists(counterKey), "counter should be deleted when reaching 0")
+		// Verify set was deleted
+		require.False(t, r.Exists(leasesSetKey), "set should be deleted when empty")
 
 		// Verify lease-to-worker mapping was deleted
 		require.False(t, r.Exists(leaseWorkerKey(requestID)), "lease mapping should be deleted")
 	})
 
-	t.Run("returns 0 and deletes counter when going negative", func(t *testing.T) {
-		// Set counter to 0 (edge case - shouldn't happen but script should handle it)
-		r.Set(counterKey, "0")
-		requestID := "req-negative"
-		r.Set(leaseWorkerKey(requestID), instanceID)
-
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+	t.Run("returns 1 and refreshes TTL when set still has members", func(t *testing.T) {
+		// Set up set with multiple members
+		for i := 1; i <= 3; i++ {
+			reqID := fmt.Sprintf("req-%d", i)
+			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			r.ZAdd(leasesSetKey, float64(expTime), reqID)
+			r.Set(leaseWorkerKey(reqID), instanceID)
 		}
-
-		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(0), result, "should return 0 when counter goes negative")
-
-		// Verify counter was deleted
-		require.False(t, r.Exists(counterKey))
-		require.False(t, r.Exists(leaseWorkerKey(requestID)))
-	})
-
-	t.Run("returns 1 and refreshes TTL when counter still positive", func(t *testing.T) {
-		// Set counter to 5
-		r.Set(counterKey, "5")
-		requestID := "req-middle"
-		r.Set(leaseWorkerKey(requestID), instanceID)
 
 		// Fast forward time to simulate TTL decay
 		r.FastForward(30 * time.Second)
 
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
+		requestID := "req-1"
+		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			requestID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
-		require.Equal(t, int64(1), result, "should return 1 when counter still positive")
+		require.Equal(t, int64(1), result, "should return 1 when set still has members")
 
-		// Verify counter was decremented
-		counterVal, err := r.Get(counterKey)
+		// Verify request was removed from set
+		setMembers, err := r.ZMembers(leasesSetKey)
 		require.NoError(t, err)
-		require.Equal(t, "4", counterVal)
+		require.Len(t, setMembers, 2, "set should have 2 remaining members")
+		require.NotContains(t, setMembers, requestID, "removed request should not be in set")
 
 		// Verify TTL was refreshed
-		ttl := r.TTL(counterKey)
+		ttl := r.TTL(leasesSetKey)
 		expectedTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
 		require.Greater(t, ttl, expectedTTL-5*time.Second)
 
@@ -409,126 +294,46 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.False(t, r.Exists(leaseWorkerKey(requestID)))
 
 		// Clean up
-		r.Del(counterKey)
-	})
-
-	t.Run("decrements counter multiple times", func(t *testing.T) {
-		// Set counter to 5
-		r.Set(counterKey, "5")
-
-		for i := 5; i > 0; i-- {
-			requestID := fmt.Sprintf("req-%d", i)
-			r.Set(leaseWorkerKey(requestID), instanceID)
-
-			keys := []string{counterKey, leaseWorkerKey(requestID)}
-			args := []string{
-				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-			}
-
-			result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-			require.NoError(t, err)
-
-			if i == 1 {
-				// Last decrement should return 0 and delete counter
-				require.Equal(t, int64(0), result)
-				require.False(t, r.Exists(counterKey))
-			} else {
-				// Other decrements should return 1
-				require.Equal(t, int64(1), result)
-				counterVal, err := r.Get(counterKey)
-				require.NoError(t, err)
-				require.Equal(t, fmt.Sprintf("%d", i-1), counterVal)
-			}
+		r.Del(leasesSetKey)
+		for i := 2; i <= 3; i++ {
+			r.Del(leaseWorkerKey(fmt.Sprintf("req-%d", i)))
 		}
 	})
 
-	t.Run("deletes lease mapping even when counter doesn't exist", func(t *testing.T) {
-		// Only lease mapping exists, no counter
-		requestID := "req-orphan"
-		r.Set(leaseWorkerKey(requestID), instanceID)
-
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+	t.Run("removes specific request from set", func(t *testing.T) {
+		// Set up set with multiple members
+		requestIDs := []string{"req-a", "req-b", "req-c"}
+		for _, reqID := range requestIDs {
+			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			r.ZAdd(leasesSetKey, float64(expTime), reqID)
+			r.Set(leaseWorkerKey(reqID), instanceID)
 		}
 
-		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(2), result, "should return 2 when counter doesn't exist")
-
-		// Lease mapping should still exist because script only deletes it when counter is modified
-		// Note: The current script implementation doesn't delete the mapping when returning 2
-		// This is the actual behavior - we're testing what the script does, not what it should do
-	})
-
-	t.Run("handles decrement from counter value of 1", func(t *testing.T) {
-		// Set counter to 1 (going to 0)
-		r.Set(counterKey, "1")
-		requestID := "req-from-1"
-		r.Set(leaseWorkerKey(requestID), instanceID)
-
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
+		// Remove middle request
+		requestID := "req-b"
+		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-		}
-
-		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(0), result, "should return 0 and delete counter")
-
-		require.False(t, r.Exists(counterKey))
-		require.False(t, r.Exists(leaseWorkerKey(requestID)))
-	})
-
-	t.Run("handles decrement from counter value of 2", func(t *testing.T) {
-		// Set counter to 2
-		r.Set(counterKey, "2")
-		requestID := "req-from-2"
-		r.Set(leaseWorkerKey(requestID), instanceID)
-
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
-		}
-
-		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
-		require.NoError(t, err)
-		require.Equal(t, int64(1), result, "should return 1 and keep counter")
-
-		counterVal, err := r.Get(counterKey)
-		require.NoError(t, err)
-		require.Equal(t, "1", counterVal)
-
-		require.True(t, r.Exists(counterKey), "counter should still exist")
-		require.False(t, r.Exists(leaseWorkerKey(requestID)), "lease mapping should be deleted")
-
-		// Clean up
-		r.Del(counterKey)
-	})
-
-	t.Run("TTL is properly set on counter after decrement", func(t *testing.T) {
-		// Set counter without TTL initially
-		r.Set(counterKey, "3")
-		requestID := "req-ttl-test"
-		r.Set(leaseWorkerKey(requestID), instanceID)
-
-		keys := []string{counterKey, leaseWorkerKey(requestID)}
-		args := []string{
-			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			requestID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
 		require.Equal(t, int64(1), result)
 
-		// Verify TTL is set
-		ttl := r.TTL(counterKey)
-		require.Greater(t, ttl, time.Duration(0))
-		expectedTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
-		require.LessOrEqual(t, ttl, expectedTTL)
+		// Verify specific request was removed
+		setMembers, err := r.ZMembers(leasesSetKey)
+		require.NoError(t, err)
+		require.Len(t, setMembers, 2)
+		require.Contains(t, setMembers, "req-a")
+		require.Contains(t, setMembers, "req-c")
+		require.NotContains(t, setMembers, "req-b")
 
 		// Clean up
-		r.Del(counterKey)
+		r.Del(leasesSetKey)
+		for _, reqID := range requestIDs {
+			r.Del(leaseWorkerKey(reqID))
+		}
 	})
 }
 
@@ -548,7 +353,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 	instanceID := "test-instance"
 
 	capacityKey := fmt.Sprintf("{%s}:worker_capacity:%s", envID.String(), instanceID)
-	counterKey := fmt.Sprintf("{%s}:worker_leases_counter:%s", envID.String(), instanceID)
+	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
@@ -560,11 +365,13 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Increment to capacity
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
+				fmt.Sprintf("%d", expirationTime),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -573,16 +380,18 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		}
 
 		// Verify at capacity
-		counterVal, err := r.Get(counterKey)
+		setMembers, err := r.ZMembers(leasesSetKey)
 		require.NoError(t, err)
-		require.Equal(t, "3", counterVal)
+		require.Len(t, setMembers, 3, "set should have 3 members")
 
 		// Try to exceed capacity
-		keys := []string{capacityKey, counterKey, leaseWorkerKey("req-overflow")}
+		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey("req-overflow")}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			"req-overflow",
+			fmt.Sprintf("%d", expirationTime),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -592,9 +401,10 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Decrement all requests
 		for i := 3; i >= 1; i-- {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{counterKey, leaseWorkerKey(requestID)}
+			keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				requestID,
 			}
 
 			result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -607,8 +417,8 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			}
 		}
 
-		// Verify counter is deleted
-		require.False(t, r.Exists(counterKey))
+		// Verify set is deleted
+		require.False(t, r.Exists(leasesSetKey))
 
 		// Clean up
 		r.Del(capacityKey)
@@ -621,11 +431,13 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// First cycle: increment and decrement
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
-			keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
+				fmt.Sprintf("%d", expirationTime),
 			}
 			_, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
@@ -634,9 +446,10 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Decrement all
 		for i := 2; i >= 1; i-- {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
-			keys := []string{counterKey, leaseWorkerKey(requestID)}
+			keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				requestID,
 			}
 			_, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
@@ -645,11 +458,13 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Second cycle: should work again
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle2-%d", i)
-			keys := []string{capacityKey, counterKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
+				fmt.Sprintf("%d", expirationTime),
 			}
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
@@ -658,7 +473,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(counterKey)
+		r.Del(leasesSetKey)
 		for i := 1; i <= 2; i++ {
 			r.Del(leaseWorkerKey(fmt.Sprintf("req-cycle2-%d", i)))
 		}

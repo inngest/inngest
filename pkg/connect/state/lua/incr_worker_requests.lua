@@ -1,21 +1,23 @@
 --[[
 
 Output:
-  0: Successfully incremented lease counter
+  0: Successfully added lease to set
   1: Worker capacity exceeded
 
-ARGV[1]: TTL in seconds for the counter and mapping keys
+ARGV[1]: TTL in seconds for the set and mapping keys
 ARGV[2]: Instance ID of the worker
 ARGV[3]: Request ID
+ARGV[4]: Expiration time as Unix timestamp (score for sorted set)
 ]]
 
 local capacityKey = KEYS[1]
-local counterKey = KEYS[2]
+local leasesSetKey = KEYS[2]
 local leaseWorkerKey = KEYS[3]
 
-local counterTTL = tonumber(ARGV[1])
+local setTTL = tonumber(ARGV[1])
 local instanceID = ARGV[2]
 local requestID = ARGV[3]
+local expirationTime = ARGV[4]
 
 -- Get the worker's capacity limit (returns a string)
 local capacity = redis.call("GET", capacityKey)
@@ -28,27 +30,29 @@ end
 
 capacity = tonumber(capacity)
 
--- Get current number of active leases
-local currentLeases = tonumber(redis.call("GET", counterKey) or "0")
+-- Get current time to filter out expired leases
+local currentTime = redis.call("TIME")
+local currentTimeUnix = tonumber(currentTime[1])
 
--- If current leases is not a number (and doesn't exist), we assume that
--- there are no active leases
-if currentLeases == nil or currentLeases == 0 or currentLeases == false then
-  currentLeases = 0
-end
+-- Remove expired leases from the set first
+redis.call("ZREMRANGEBYSCORE", leasesSetKey, "-inf", tostring(currentTimeUnix))
+
+-- Get current number of active leases (those with expiration time > current time)
+local currentLeases = redis.call("ZCOUNT", leasesSetKey, tostring(currentTimeUnix + 1), "+inf")
 
 -- Check if at capacity
 if currentLeases >= capacity then
   return 1
 end
 
--- Increment the lease counter
-redis.call("INCR", counterKey)
+-- Add the lease to the sorted set with expiration time as score
+local expTime = tonumber(expirationTime)
+redis.call("ZADD", leasesSetKey, expTime, requestID)
 
--- Set/refresh TTL on the counter to ensure it expires if worker stops processing
-redis.call("EXPIRE", counterKey, counterTTL)
+-- Set/refresh TTL on the set to ensure it expires if worker stops processing
+redis.call("EXPIRE", leasesSetKey, setTTL)
 
 -- Store the mapping of request ID to worker instance ID
-redis.call("SET", leaseWorkerKey, instanceID, "EX", counterTTL)
+redis.call("SET", leaseWorkerKey, instanceID, "EX", setTTL)
 
 return 0
