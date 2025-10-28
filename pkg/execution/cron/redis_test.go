@@ -900,6 +900,48 @@ func TestRedisCronManager(t *testing.T) {
 			require.NotNil(t, nextItem)
 			require.Equal(t, nextItem.Op, enums.CronOpProcess)
 		})
+
+		t.Run("should remove previous cron on updates", func(t *testing.T) {
+			ci := createCronItem(enums.CronOpUpdate)
+
+			// schedule a cron
+			_, err := cm.ScheduleNext(ctx, ci)
+			require.NoError(t, err)
+
+			// check that next cron is scheduled
+			status, err := cm.HealthCheck(ctx, ci.FunctionID, ci.Expression, ci.FunctionVersion)
+			require.NoError(t, err)
+			require.True(t, status.Scheduled)
+
+			// update version
+			ci.FunctionVersion++
+			_, err = cm.ScheduleNext(ctx, ci)
+			require.NoError(t, err)
+
+			// cron for new version should be scheduled
+			status, err = cm.HealthCheck(ctx, ci.FunctionID, ci.Expression, ci.FunctionVersion)
+			require.NoError(t, err)
+			require.True(t, status.Scheduled)
+
+			// cron for previous version should be removed
+			status, err = cm.HealthCheck(ctx, ci.FunctionID, ci.Expression, ci.FunctionVersion-1)
+			require.NoError(t, err)
+			require.False(t, status.Scheduled)
+		})
+
+		t.Run("should not error if prev version to dequeue does not exist", func(t *testing.T) {
+			ci := createCronItem(enums.CronOpUpdate)
+
+			// no previous version exists.
+			status, err := cm.HealthCheck(ctx, ci.FunctionID, ci.Expression, ci.FunctionVersion-1)
+			require.NoError(t, err)
+			require.False(t, status.Scheduled)
+
+			// schedule a cron for the first time
+			_, err = cm.ScheduleNext(ctx, ci)
+			// there should be no error
+			require.NoError(t, err)
+		})
 	})
 
 	t.Run("Sync", func(t *testing.T) {

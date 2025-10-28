@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -299,6 +300,19 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")
 		return nil, fmt.Errorf("error enqueueing cron for next schedule: %w", err)
+	}
+
+	// If we've successfully scheduled a new "cron" for time `next`, we can remove crons for previous versions
+	// for the same {next, expr, fnID} combination.
+	// The previous version would be dropped by the cron handler anyway, so it is safe to log and ignore any errors here.
+	// The previous cron may not exist
+	if ci.Op == enums.CronOpUpdate {
+		prev := c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion-1)
+		prevJobID := queue.HashID(ctx, prev)
+		err = c.q.DequeueByJobID(ctx, prevJobID)
+		if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+			l.Warn("failed to dequeue previous cron version", "err", err)
+		}
 	}
 
 	return &nextItem, nil
