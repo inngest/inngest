@@ -22,7 +22,8 @@ declare global {
 //
 // TODO: temporary hack here until we are completely cut over to tanstack
 // since this code actually gets evaluated in dashboard (see above)
-const viteEnv = 'env' in import.meta ? import.meta.env : undefined;
+const viteEnv = import.meta.env;
+
 const graphQLEndpoint = viteEnv?.VITE_PUBLIC_API_BASE_URL
   ? new URL('/v0/gql', viteEnv.VITE_PUBLIC_API_BASE_URL)
   : process.env.NEXT_PUBLIC_API_BASE_URL

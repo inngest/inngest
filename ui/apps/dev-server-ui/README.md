@@ -20,6 +20,18 @@ Or, optionally in the root `ui` run:
 pnpm pnpm dev:dev-server-ui
 ```
 
+## Preview "production" builds
+
+copy `.env.development` to `.env`
+
+```sh
+pnpm build
+```
+
+```sh
+pnpm preview
+```
+
 ## GraphQL Codegen
 
 Edit or add your queries within `coreapi.ts` and the GraphQL Codegen should automatically create a hook to use in `store/generated.ts`.
