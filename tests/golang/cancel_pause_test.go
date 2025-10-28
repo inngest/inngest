@@ -42,10 +42,11 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	triggerEvtName := uuid.New().String()
 
+	testPauseCancelFnName := "function-test-pause-cancel"
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "function-test-pause-cancel",
+			ID: testPauseCancelFnName,
 		},
 		inngestgo.EventTrigger(triggerEvtName, nil),
 		func(ctx context.Context, input inngestgo.Input[testCancelEvt]) (any, error) {
@@ -97,7 +98,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			return false
 		}
 		for _, function := range functions {
-			if function.App.ExternalID != appName {
+			if function.App.ExternalID != appName || function.Name != testPauseCancelFnName {
 				continue
 			}
 
