@@ -175,6 +175,7 @@ function makeCSPHeader(appURL: string) {
   return csp;
 }
 
+// $VERCEL_URL has to be interpolated for dynamic preview environments.
 function getAppURL(): string | null {
   const configuredURL = process.env.NEXT_PUBLIC_APP_URL;
   if (!configuredURL) return null;
