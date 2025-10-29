@@ -28,7 +28,7 @@ export function InsightsHelperPanelControl({
             ({
               'aria-label': item.title,
               className: cn(
-                'text-subtle flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+                'flex h-8 items-center justify-center rounded-md text-subtle transition-colors w-8',
                 activeTitle !== item.title && 'hover:bg-canvasSubtle',
                 activeTitle === item.title &&
                   'bg-secondary-4xSubtle hover:bg-secondary-3xSubtle text-info'

@@ -47,7 +47,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
         </div>
         <button
           aria-label="Close helper"
-          className="text-subtle hover:text-basis hover:bg-canvasSubtle flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className="hover:bg-canvasSubtle hover:text-basis text-subtle flex h-8 w-8 items-center justify-center rounded-md transition-colors"
           onClick={onClose}
           type="button"
         >
