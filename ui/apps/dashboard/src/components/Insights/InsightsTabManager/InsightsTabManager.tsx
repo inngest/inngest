@@ -184,6 +184,8 @@ interface InsightsTabManagerInternalProps {
   isInsightsAgentEnabled: boolean;
 }
 
+// TODO: Remove check on isInsightsAgentEnabled to determine whether to render InsightsHelperPanelControl.
+// That check currently exists because most customers would only see the support link icon, which would be strange.
 function InsightsTabManagerInternal({
   tabs,
   activeTabId,
@@ -295,7 +297,7 @@ function InsightsTabManagerInternal({
                     }
                   />
                 </div>
-                {isQueryTab(tab.id) ? (
+                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
                   <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
                 ) : null}
               </div>
@@ -309,7 +311,7 @@ function InsightsTabManagerInternal({
                     historyWindow={historyWindow}
                   />
                 </div>
-                {isQueryTab(tab.id) ? (
+                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
                   <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
                 ) : null}
               </div>
