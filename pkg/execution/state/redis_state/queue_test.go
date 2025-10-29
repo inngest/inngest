@@ -7388,5 +7388,6 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, 0, res.Refilled)
+	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, qi2.ID, res.RefilledItems[0])
 }
