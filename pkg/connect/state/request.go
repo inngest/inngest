@@ -115,7 +115,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		fmt.Sprintf("%d", now.UnixMilli()),
 		fmt.Sprintf("%d", int(consts.ConnectWorkerRequestLeaseDuration.Seconds())), // Counter TTL
 		instanceID,
-		fmt.Sprintf("%t", !isWorkerCapacityUnlimited),
+		fmt.Sprintf("%t", isWorkerCapacityUnlimited),
 	}
 
 	status, err := scripts["extend_lease"].Exec(

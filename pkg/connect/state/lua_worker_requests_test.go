@@ -30,7 +30,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	// Helper to get Redis keys
 	capacityKey := fmt.Sprintf("{%s}:worker_capacity:%s", envID.String(), instanceID)
-	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
+	workerLeasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
@@ -41,7 +41,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		counterTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
 		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64(counterTTL.Seconds())),
 			instanceID,
@@ -54,7 +54,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(0), result, "should return 0 when no capacity set")
 
 		// Verify no set was created
-		require.False(t, r.Exists(leasesSetKey), "set should not be created when no capacity limit")
+		require.False(t, r.Exists(workerLeasesSetKey), "set should not be created when no capacity limit")
 		require.False(t, r.Exists(leaseWorkerKey(requestID)), "lease mapping should not be created when no capacity limit")
 	})
 
@@ -64,7 +64,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-2"
 
 		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
@@ -86,7 +86,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-3"
 
 		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
@@ -99,14 +99,14 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(0), result, "should successfully increment")
 
 		// Verify request was added to set
-		setMembers, err := r.ZMembers(leasesSetKey)
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
 		require.NoError(t, err)
 		require.Len(t, setMembers, 1)
 		require.Equal(t, requestID, setMembers[0])
 
 		// Verify TTL is set on set
-		require.True(t, r.Exists(leasesSetKey))
-		ttl := r.TTL(leasesSetKey)
+		require.True(t, r.Exists(workerLeasesSetKey))
+		ttl := r.TTL(workerLeasesSetKey)
 		require.Greater(t, ttl, time.Duration(0))
 
 		// Verify lease-to-worker mapping was created
@@ -121,7 +121,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 		r.Del(leaseWorkerKey(requestID))
 	})
 
@@ -131,7 +131,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
@@ -145,14 +145,14 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			require.Equal(t, int64(0), result, "should successfully increment on iteration %d", i)
 
 			// Verify request was added to set
-			setMembers, err := r.ZMembers(leasesSetKey)
+			setMembers, err := r.ZMembers(workerLeasesSetKey)
 			require.NoError(t, err)
 			require.Len(t, setMembers, i, "set should have %d members", i)
 		}
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 		for i := 1; i <= 3; i++ {
 			r.Del(leaseWorkerKey(fmt.Sprintf("req-%d", i)))
 		}
@@ -164,12 +164,12 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		for i := 1; i <= 2; i++ {
 			existingReqID := fmt.Sprintf("existing-req-%d", i)
 			existingExpTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(leasesSetKey, float64(existingExpTime), existingReqID)
+			r.ZAdd(workerLeasesSetKey, float64(existingExpTime), existingReqID)
 		}
 
 		requestID := "req-overflow"
 		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
@@ -182,7 +182,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(1), result, "should return 1 when at capacity")
 
 		// Verify set still has only 2 members
-		setMembers, err := r.ZMembers(leasesSetKey)
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
 		require.NoError(t, err)
 		require.Len(t, setMembers, 2, "set should still have 2 members")
 		require.NotContains(t, setMembers, requestID, "overflow request should not be in set")
@@ -192,7 +192,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 	})
 }
 
@@ -212,7 +212,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 	instanceID := "test-instance"
 
 	// Helper to get Redis keys
-	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
+	workerLeasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
@@ -221,7 +221,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// No set exists
 		requestID := "req-nonexistent"
 
-		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
@@ -236,10 +236,10 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-last"
 		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		r.ZAdd(leasesSetKey, float64(expTime), requestID)
+		r.ZAdd(workerLeasesSetKey, float64(expTime), requestID)
 		r.Set(leaseWorkerKey(requestID), instanceID)
 
-		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
@@ -250,7 +250,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(0), result, "should return 0 when set becomes empty")
 
 		// Verify set was deleted
-		require.False(t, r.Exists(leasesSetKey), "set should be deleted when empty")
+		require.False(t, r.Exists(workerLeasesSetKey), "set should be deleted when empty")
 
 		// Verify lease-to-worker mapping was deleted
 		require.False(t, r.Exists(leaseWorkerKey(requestID)), "lease mapping should be deleted")
@@ -261,7 +261,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		for i := 1; i <= 3; i++ {
 			reqID := fmt.Sprintf("req-%d", i)
 			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(leasesSetKey, float64(expTime), reqID)
+			r.ZAdd(workerLeasesSetKey, float64(expTime), reqID)
 			r.Set(leaseWorkerKey(reqID), instanceID)
 		}
 
@@ -269,7 +269,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		r.FastForward(30 * time.Second)
 
 		requestID := "req-1"
-		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
@@ -280,13 +280,13 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(1), result, "should return 1 when set still has members")
 
 		// Verify request was removed from set
-		setMembers, err := r.ZMembers(leasesSetKey)
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
 		require.NoError(t, err)
 		require.Len(t, setMembers, 2, "set should have 2 remaining members")
 		require.NotContains(t, setMembers, requestID, "removed request should not be in set")
 
 		// Verify TTL was refreshed
-		ttl := r.TTL(leasesSetKey)
+		ttl := r.TTL(workerLeasesSetKey)
 		expectedTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
 		require.Greater(t, ttl, expectedTTL-5*time.Second)
 
@@ -294,7 +294,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.False(t, r.Exists(leaseWorkerKey(requestID)))
 
 		// Clean up
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 		for i := 2; i <= 3; i++ {
 			r.Del(leaseWorkerKey(fmt.Sprintf("req-%d", i)))
 		}
@@ -305,13 +305,13 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		requestIDs := []string{"req-a", "req-b", "req-c"}
 		for _, reqID := range requestIDs {
 			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(leasesSetKey, float64(expTime), reqID)
+			r.ZAdd(workerLeasesSetKey, float64(expTime), reqID)
 			r.Set(leaseWorkerKey(reqID), instanceID)
 		}
 
 		// Remove middle request
 		requestID := "req-b"
-		keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+		keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
@@ -322,7 +322,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(1), result)
 
 		// Verify specific request was removed
-		setMembers, err := r.ZMembers(leasesSetKey)
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
 		require.NoError(t, err)
 		require.Len(t, setMembers, 2)
 		require.Contains(t, setMembers, "req-a")
@@ -330,7 +330,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.NotContains(t, setMembers, "req-b")
 
 		// Clean up
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 		for _, reqID := range requestIDs {
 			r.Del(leaseWorkerKey(reqID))
 		}
@@ -353,7 +353,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 	instanceID := "test-instance"
 
 	capacityKey := fmt.Sprintf("{%s}:worker_capacity:%s", envID.String(), instanceID)
-	leasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
+	workerLeasesSetKey := fmt.Sprintf("{%s}:worker_leases_set:%s", envID.String(), instanceID)
 	leaseWorkerKey := func(requestID string) string {
 		return fmt.Sprintf("{%s}:lease_worker:%s", envID.String(), requestID)
 	}
@@ -365,7 +365,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Increment to capacity
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
@@ -380,13 +380,13 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		}
 
 		// Verify at capacity
-		setMembers, err := r.ZMembers(leasesSetKey)
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
 		require.NoError(t, err)
 		require.Len(t, setMembers, 3, "set should have 3 members")
 
 		// Try to exceed capacity
 		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		keys := []string{capacityKey, leasesSetKey, leaseWorkerKey("req-overflow")}
+		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey("req-overflow")}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
@@ -401,7 +401,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Decrement all requests
 		for i := 3; i >= 1; i-- {
 			requestID := fmt.Sprintf("req-%d", i)
-			keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				requestID,
@@ -418,7 +418,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		}
 
 		// Verify set is deleted
-		require.False(t, r.Exists(leasesSetKey))
+		require.False(t, r.Exists(workerLeasesSetKey))
 
 		// Clean up
 		r.Del(capacityKey)
@@ -431,7 +431,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// First cycle: increment and decrement
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
-			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
@@ -446,7 +446,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Decrement all
 		for i := 2; i >= 1; i-- {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
-			keys := []string{leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				requestID,
@@ -458,7 +458,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		// Second cycle: should work again
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle2-%d", i)
-			keys := []string{capacityKey, leasesSetKey, leaseWorkerKey(requestID)}
+			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
@@ -473,7 +473,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 		// Clean up
 		r.Del(capacityKey)
-		r.Del(leasesSetKey)
+		r.Del(workerLeasesSetKey)
 		for i := 1; i <= 2; i++ {
 			r.Del(leaseWorkerKey(fmt.Sprintf("req-cycle2-%d", i)))
 		}
