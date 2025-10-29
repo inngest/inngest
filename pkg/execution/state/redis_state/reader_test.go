@@ -193,7 +193,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 	systemQueueName := "a-system-queue"
 
 	for i := range num {
-		at := clock.Now().Add(time.Duration(i)*time.Millisecond)
+		at := clock.Now().Add(time.Duration(i) * time.Millisecond)
 
 		item := osqueue.QueueItem{
 			ID:          fmt.Sprintf("test%d", i),
@@ -486,6 +486,94 @@ func TestItemByID(t *testing.T) {
 		res, err := q1.ItemByID(ctx, "random")
 		require.ErrorIs(t, err, ErrQueueItemNotFound)
 		require.Nil(t, res)
+	})
+}
+
+func TestItemExists(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, QueueDefaultKey),
+		Name:        consts.DefaultQueueShardName,
+	}
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithClock(clock),
+	)
+
+	enqueue := func(ctx context.Context, shard QueueShard, jobID string) (osqueue.QueueItem, error) {
+		item := osqueue.QueueItem{
+			ID:          jobID,
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					AccountID:   acctId,
+					WorkspaceID: wsID,
+					WorkflowID:  fnID,
+				},
+			},
+		}
+
+		return q.EnqueueItem(ctx, shard, item, clock.Now(), osqueue.EnqueueOpts{})
+	}
+
+	t.Run("should return true when item exists", func(t *testing.T) {
+		r.FlushAll()
+
+		jobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		enqueued, err := enqueue(ctx, defaultShard, jobID)
+		require.NoError(t, err)
+
+		exists, err := q.ItemExists(ctx, enqueued.ID)
+		require.NoError(t, err)
+		require.True(t, exists, "item should exist")
+	})
+
+	t.Run("should return false when item does not exist", func(t *testing.T) {
+		r.FlushAll()
+
+		nonExistentJobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		exists, err := q.ItemExists(ctx, nonExistentJobID)
+		require.NoError(t, err)
+		require.False(t, exists, "item should not exist")
+	})
+
+	t.Run("should return false after item is dequeued", func(t *testing.T) {
+		r.FlushAll()
+
+		jobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		enqueued, err := enqueue(ctx, defaultShard, jobID)
+		require.NoError(t, err)
+
+		// Verify it exists
+		exists, err := q.ItemExists(ctx, enqueued.ID)
+		require.NoError(t, err)
+		require.True(t, exists)
+
+		// Dequeue the item
+		err = q.Dequeue(ctx, defaultShard, enqueued)
+		require.NoError(t, err)
+
+		// Should no longer exist
+		exists, err = q.ItemExists(ctx, enqueued.ID)
+		require.NoError(t, err)
+		require.False(t, exists, "dequeued item should not exist")
 	})
 }
 

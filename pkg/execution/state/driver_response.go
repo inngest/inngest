@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 const (
@@ -313,17 +314,13 @@ func (r *DriverResponse) IsDiscoveryResponse() bool {
 		return true
 	}
 
-	firstOpIsRequest := r.Generator[0].Op != enums.OpcodeStep &&
-		r.Generator[0].Op != enums.OpcodeStepRun &&
-		r.Generator[0].Op != enums.OpcodeStepError
-	if firstOpIsRequest {
-		// First op is a request, so this is still a discovery response.
+	// There's only one step.
+	switch r.Generator[0].Op {
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+		return false
+	default:
 		return true
 	}
-
-	// Response has a single op code which indicates the SDK did idempotent
-	// work during this execution.
-	return false
 }
 
 // IsGatewayRequest returns true if this `DriverResponse` is the SDK reporting that they
@@ -403,6 +400,16 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		key: json.RawMessage(*output),
 	})
 	if err != nil {
+		if v, ok := r.Output.(string); ok {
+			// Reach here when output isn't valid JSON. For example, when we get
+			// a 502 HTML page
+
+			keyedByt := StandardError{
+				Message: "Invalid JSON in response",
+				Stack:   v,
+			}.Serialize(key)
+			return util.ToPtr(string(keyedByt)), nil
+		}
 		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
 	}
 	s := string(keyedByt)

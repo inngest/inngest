@@ -167,9 +167,6 @@ github.com/Songmu/gotesplit/cmd/gotesplit
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
-# github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da
-## explicit
-github.com/aead/chacha20/chacha
 # github.com/agnivade/levenshtein v1.1.1
 ## explicit; go 1.13
 github.com/agnivade/levenshtein
@@ -756,7 +753,7 @@ github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
-# github.com/inngest/inngestgo v0.14.0
+# github.com/inngest/inngestgo v0.14.2-0.20251027185638-062a493891af
 ## explicit; go 1.24
 github.com/inngest/inngestgo
 github.com/inngest/inngestgo/connect
@@ -1699,8 +1696,8 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# lukechampine.com/frand v1.4.2
-## explicit; go 1.12
+# lukechampine.com/frand v1.5.1
+## explicit; go 1.23.1
 lukechampine.com/frand
 # lukechampine.com/uint128 v1.2.0
 ## explicit; go 1.12

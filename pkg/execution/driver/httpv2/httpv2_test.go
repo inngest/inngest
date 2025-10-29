@@ -90,6 +90,7 @@ func TestSyncMethod(t *testing.T) {
 						RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 					},
 				},
+				URL: u.String(),
 			}
 
 			resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
@@ -134,6 +135,7 @@ func TestSyncHeaders(t *testing.T) {
 				RunID: runID,
 			},
 		},
+		URL: u.String(),
 	}
 
 	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
@@ -175,6 +177,7 @@ func TestSyncNonSDKResponse(t *testing.T) {
 				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 			},
 		},
+		URL: u.String(),
 	}
 
 	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
@@ -238,6 +241,7 @@ func TestSyncRequestErrors(t *testing.T) {
 						RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 					},
 				},
+				URL: u.String(),
 			}
 
 			resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
@@ -420,6 +424,7 @@ func TestSyncResponseParsing(t *testing.T) {
 				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 			},
 		},
+		URL: u.String(),
 	}
 
 	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
@@ -485,6 +490,7 @@ func TestSyncDriverTypeDetection(t *testing.T) {
 						RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 					},
 				},
+				URL: "http://example.com",
 			}
 
 			resp, userErr, internalErr := d.Do(context.Background(), nil, opts)

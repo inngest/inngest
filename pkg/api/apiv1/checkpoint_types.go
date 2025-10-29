@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
@@ -131,8 +132,18 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 	return util.DeterministicUUID(append(appID[:], []byte(r.FnSlug())...))
 }
 
+func (r CheckpointNewRunRequest) URL() string {
+	return r.Event.Data.Domain + r.Event.Data.Path
+}
+
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
-	uri := r.Event.Data.Domain + r.Event.Data.Path
+	// NOTE: We don't use r.Event.Data.Path, because that could contain IDs
+	// inside the URL (eg /v1/users/:id).
+	//
+	// This makes reusming sync functions harder.  For each request, we
+	// must store the URL in the run metadata.
+	uri := r.Event.Data.Domain
+
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
@@ -322,20 +333,23 @@ func (c *checkpointRunContext) SetStatusCode(code int) {
 }
 
 func (c *checkpointRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {
-	// TODO: Update the error by storing the opcodes in the checkpoint
-	// struct c.
+	// this is a noop.
 }
 
 func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {
-	// TODO: Update the output by storing the opcodes in the
-	// checkpoint struct c.
+	// this is a noop.
 }
 
 func (c *checkpointRunContext) SetError(err error) {
-	// TODO
+	// this is a noop.
 }
 
 func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
-	// TODO
+	// this is currently a noop.  we may need to implement
+	// this in the future.
 	return nil
+}
+
+func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+	return tracing.RunSpanRefFromMetadata(&c.md)
 }

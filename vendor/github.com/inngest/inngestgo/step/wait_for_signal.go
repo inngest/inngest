@@ -96,6 +96,7 @@ func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignal
 		Name:        opts.Name,
 		DisplayName: &opts.Name,
 		Opts:        args,
+		Userland:    op.Userland(),
 	}
 	mgr.AppendOp(ctx, plannedOp)
 	panic(sdkrequest.ControlHijack{})

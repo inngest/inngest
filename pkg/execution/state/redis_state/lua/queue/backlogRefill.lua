@@ -64,7 +64,7 @@ local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
 local refillUntilMS = tonumber(ARGV[4])
-local refillLimit   = tonumber(ARGV[5])
+local refillItems   = cjson.decode(ARGV[5])
 local nowMS         = tonumber(ARGV[6])
 
 -- We check concurrency limits before refilling
@@ -128,13 +128,8 @@ end
 -- Calculate initial number of items to refill
 --
 
--- Set items to refill to number of items in backlog
-local refill = backlogCountUntil
-
--- Limit items to refill to max refill limit if more items are in backlog
-if refill > refillLimit then
-  refill = refillLimit
-end
+-- Set items to refill to number of items provided
+local refill = #refillItems
 
 --
 -- Check constraints and adjust capacity
@@ -241,8 +236,11 @@ local refilledItemIDs = {}
 if refill > 0 then
   -- Move item(s) out of backlog and into partition
 
-  -- Peek item IDs and scores
-  local itemIDs = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, refill)
+  -- Use provided item IDs, limited by final refill count
+  local itemIDs = {}
+  for i = 1, math.min(refill, #refillItems) do
+    table.insert(itemIDs, refillItems[i])
+  end
   local itemScores = redis.call("ZMSCORE", keyBacklogSet, unpack(itemIDs))
 
   -- Attempt to load item data
@@ -261,8 +259,15 @@ if refill > 0 then
     local itemScore = tonumber(itemScores[i])
     local itemData = potentiallyMissingQueueItems[i]
 
+    -- If queue item does not exist in backlog, skip
+    local missingInBacklog = itemScore == nil
+
     -- If queue item does not exist in hash, delete from backlog
-    if itemData == false or itemData == nil or itemData == "" then
+    local missingInHash = itemData == false or itemData == nil or itemData == ""
+
+    if missingInBacklog then
+      -- no-op
+    elseif missingInHash then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
       hasRemove = true
     else

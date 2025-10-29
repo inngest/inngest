@@ -173,6 +173,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		AppID:       input.AppID(auth.WorkspaceID()),
 		RunMode:     enums.RunModeSync,
 		Events:      []event.TrackedEvent{evt},
+		URL:         input.URL(),
 	})
 
 	switch err {
@@ -357,7 +358,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent:    input.md.Config.NewFunctionTrace(),
+					Parent:    tracing.RunSpanRefFromMetadata(input.md),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
 					Attributes: attrs.Merge(
@@ -399,7 +400,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent:    input.md.Config.NewFunctionTrace(),
+					Parent:    tracing.RunSpanRefFromMetadata(input.md),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
 					Attributes: attrs.Merge(

@@ -3,21 +3,25 @@ package apiv1
 import (
 	"compress/gzip"
 	"context"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/resource"
-	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	collecttrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -73,7 +77,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rejectedSpans := a.convertOTLPAndSend(auth, req)
+	rejectedSpans := a.convertOTLPAndSend(r.Context(), auth, req)
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
@@ -119,141 +123,170 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	_, _ = w.Write(data)
 }
 
-func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
-	ctx := context.Background()
+func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) int64 {
+	var (
+		errs atomic.Int64
+		wg   sync.WaitGroup
+	)
+
+	l := logger.StdlibLogger(ctx).With(
+		"account_id", auth.AccountID(),
+		"workspace_id", auth.WorkspaceID(),
+	)
 
 	for _, rs := range req.ResourceSpans {
 		res := convertResource(rs.Resource)
 
 		for _, ss := range rs.ScopeSpans {
-			scope := ss.Scope.GetName()
-
 			for _, s := range ss.Spans {
-				// To be valid, each span must have an "inngest.traceparent"
-				// attribute
-				tp, err := getInngestTraceparent(s)
-				if err != nil {
-					// If we can't find the traceparent, we can't create a
-					// span. So let's skip it.
-					rejectedSpans++
-					continue
-				}
 
-				opts := []run.SpanOpt{
-					run.WithTraceID(tp.TraceID),
-					run.WithSpanID(trace.SpanID(s.SpanId)),
-					run.WithName(s.Name),
-					run.WithSpanKind(trace.SpanKind(s.Kind)),
-					run.WithScope(scope),
-					run.WithLinks(convertLinks(s.Links)...),
-					run.WithTimestamp(time.Unix(0, int64(s.StartTimeUnixNano))),
-				}
+				wg.Add(1)
 
-				attrs := convertAttributes(s.Attributes)
+				go func() {
+					defer wg.Done()
+					defer func() {
+						if r := recover(); r != nil {
+							l.Error("failed to commit span with", "panic", r)
+							errs.Add(1)
+						}
+					}()
 
-				if err := hasRequiredAttributes(s.Attributes, []string{
-					consts.OtelSysAppID,
-					consts.OtelAttrSDKRunID,
-					consts.OtelSysFunctionID,
-				}); err != nil {
-					logger.StdlibLogger(ctx).Error("missing required attributes, skipping ingestion", "error", err)
-					rejectedSpans++
-					continue
-				}
-
-				// Add the run ID to attrs so we can query for it later
-				attrs = append(attrs,
-					attribute.KeyValue{
-						Key:   attribute.Key(consts.OtelSysAccountID),
-						Value: attribute.StringValue(auth.AccountID().String()),
-					},
-					attribute.KeyValue{
-						Key:   attribute.Key(consts.OtelSysWorkspaceID),
-						Value: attribute.StringValue(auth.WorkspaceID().String()),
-					},
-				)
-
-				// Always mark the span as userland
-				attrs = append(attrs, attribute.KeyValue{
-					Key:   attribute.Key(consts.OtelScopeUserland),
-					Value: attribute.BoolValue(true),
-				})
-
-				opts = append(opts, run.WithSpanAttributes(attrs...))
-
-				if scope == "inngest" && s.Name == "inngest.execution" {
-					// This is the "root" span created by an SDK, so let's
-					// set its parent to our span ID
-					opts = append(opts, run.WithParentSpanID(trace.SpanID(tp.SpanID)))
-				} else if len(s.ParentSpanId) == 12 {
-					opts = append(opts, run.WithParentSpanID(trace.SpanID(s.ParentSpanId)))
-				}
-
-				if res != nil {
-					opts = append(opts, run.WithServiceName(resourceServiceName(res)))
-				}
-
-				_, span := run.NewSpan(ctx, opts...)
-
-				for _, e := range convertEvents(s.Events) {
-					span.AddEvent(e.Name, trace.WithTimestamp(e.Time), trace.WithAttributes(e.Attributes...))
-				}
-
-				if s.Status != nil {
-					span.SetStatus(traceStatusCode(s.Status.Code), s.Status.Message)
-				}
-
-				span.End(trace.WithTimestamp(time.Unix(0, int64(s.EndTimeUnixNano))))
+					err := a.commitSpan(res, ss.Scope, s)
+					if err != nil {
+						l.Error("failed to commit span with", "error", err)
+						errs.Add(1)
+						return
+					}
+				}()
 			}
 		}
 	}
 
-	return
+	wg.Wait()
+
+	return errs.Load()
 }
 
-func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
-	for _, kv := range s.Attributes {
-		if kv.Key == "inngest.traceparent" {
-			// This is the traceparent attribute, so we can use it to get the
-			// trace ID and span ID
-			parts := strings.Split(kv.GetValue().GetStringValue(), "-")
-			if len(parts) < 3 {
-				return nil, fmt.Errorf("invalid traceparent header format")
-			}
+func (a router) commitSpan(res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+	// To be valid, each span must have an "inngest.traceref" attribute
+	tr, err := getInngestTraceRef(s)
+	if err != nil {
+		// If we can't find the traceref, we can't create a span. So let's
+		// skip it.
+		return fmt.Errorf("failed to get traceref: %w", err)
+	}
 
-			traceIDStr := parts[1]
-			if len(traceIDStr) != 32 {
-				return nil, fmt.Errorf("invalid trace ID length %d", len(traceIDStr))
-			}
-			var traceID trace.TraceID
-			_, err := hex.Decode(traceID[:], []byte(traceIDStr))
-			if err != nil {
-				return nil, fmt.Errorf("invalid trace ID hex string: %v", err)
-			}
+	attrs := convertAttributes(s.Attributes)
 
-			spanIDStr := parts[2]
-			if len(spanIDStr) != 16 {
-				return nil, fmt.Errorf("invalid span ID length %d", len(spanIDStr))
-			}
-			var spanID trace.SpanID
-			_, err = hex.Decode(spanID[:], []byte(spanIDStr))
-			if err != nil {
-				return nil, fmt.Errorf("invalid span ID hex string: %v", err)
-			}
-
-			return &TraceParent{
-				TraceID: traceID,
-				SpanID:  spanID,
-			}, nil
+	status := enums.StepStatusUnknown
+	if s.Status != nil {
+		switch s.Status.Code {
+		case tracev1.Status_STATUS_CODE_ERROR:
+			status = enums.StepStatusFailed
+		case tracev1.Status_STATUS_CODE_OK:
+			status = enums.StepStatusCompleted
 		}
 	}
 
-	return nil, fmt.Errorf("no traceparent attribute found")
+	// Legacy, but try to pull the run ID out from the attributes using the
+	// legacy key.
+	var runID ulid.ULID
+	for _, kv := range attrs {
+		if kv.Key == consts.OtelAttrSDKRunID {
+			runID, err = ulid.Parse(kv.Value.AsString())
+			if err != nil {
+				return fmt.Errorf("failed to parse run ID from attributes: %w", err)
+			}
+
+			break
+		}
+	}
+
+	spanID := trace.SpanID(s.SpanId).String()
+	spanKind := trace.SpanKind(s.Kind).String()
+	resourceServiceName := resourceServiceName(res)
+	isUserland := true
+
+	ourAttrs := meta.NewAttrSet(
+		meta.Attr(meta.Attrs.IsUserland, &isUserland),
+		meta.Attr(meta.Attrs.UserlandSpanID, &spanID),
+		meta.Attr(meta.Attrs.DynamicSpanID, &spanID),
+		meta.Attr(meta.Attrs.UserlandName, &s.Name),
+		meta.Attr(meta.Attrs.DynamicStatus, &status),
+		meta.Attr(meta.Attrs.RunID, &runID),
+		meta.Attr(meta.Attrs.UserlandKind, &spanKind),
+		meta.Attr(meta.Attrs.UserlandServiceName, &resourceServiceName),
+		meta.Attr(meta.Attrs.UserlandScopeName, &scope.Name),
+		meta.Attr(meta.Attrs.UserlandScopeVersion, &scope.Version),
+	)
+
+	// Add some additional attributes on top
+	attrs = append(attrs, ourAttrs.Serialize()...)
+
+	// By default, the parent span is the trace ref we found.
+	parent := tr
+
+	if (scope.Name != "inngest" || s.Name != "inngest.execution") && len(s.ParentSpanId) == 12 {
+		// If this is not the "root" span created by an SDK, we need to listen to
+		// the parent span ID that they have set so we can preserve whatever
+		// lineage they're passing us.
+		parent, err = tr.SetParentSpanID(trace.SpanID(s.ParentSpanId))
+		if err != nil {
+			return fmt.Errorf("failed to set parent span ID: %w", err)
+		}
+	}
+
+	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
+		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
+		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
+		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
+		Parent:             parent,
+		RawOtelSpanOptions: []trace.SpanStartOption{trace.WithAttributes(attrs...)},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create span: %w", err)
+	}
+
+	return nil
+}
+
+func getInngestTraceRef(s *tracev1.Span) (*meta.SpanReference, error) {
+	for _, kv := range s.Attributes {
+		if kv.Key != "inngest.traceref" {
+			continue
+		}
+
+		sr := &meta.SpanReference{}
+
+		traceRefStr, err := url.QueryUnescape(kv.GetValue().GetStringValue())
+		if err != nil {
+			return nil, fmt.Errorf("failed to unescape trace reference: %w", err)
+		}
+
+		err = json.Unmarshal([]byte(traceRefStr), sr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal span reference: %w", err)
+		}
+
+		err = sr.Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid span reference: %w", err)
+		}
+
+		return sr, nil
+	}
+
+	return nil, fmt.Errorf("no span reference found in attributes")
 }
 
 func convertAttributes(attrs []*commonv1.KeyValue) []attribute.KeyValue {
 	out := make([]attribute.KeyValue, 0, len(attrs))
 	for _, kv := range attrs {
+		// Filter out any attributes that have our prefixes
+		if strings.HasPrefix(kv.Key, meta.AttrKeyPrefix) {
+			continue
+		}
+
 		out = append(out, attribute.KeyValue{
 			Key:   attribute.Key(kv.Key),
 			Value: convertAnyValue(kv.Value),
@@ -280,33 +313,6 @@ func convertAnyValue(v *commonv1.AnyValue) attribute.Value {
 	}
 }
 
-func convertEvents(evts []*tracev1.Span_Event) []tracesdk.Event {
-	out := make([]tracesdk.Event, 0, len(evts))
-	for _, e := range evts {
-		out = append(out, tracesdk.Event{
-			Name:       e.Name,
-			Time:       time.Unix(0, int64(e.TimeUnixNano)),
-			Attributes: convertAttributes(e.Attributes),
-		})
-	}
-	return out
-}
-
-func convertLinks(links []*tracev1.Span_Link) []tracesdk.Link {
-	out := make([]tracesdk.Link, 0, len(links))
-	for _, l := range links {
-		sc := trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID: trace.TraceID(l.TraceId),
-			SpanID:  trace.SpanID(l.SpanId),
-		})
-		out = append(out, tracesdk.Link{
-			SpanContext: sc,
-			Attributes:  convertAttributes(l.Attributes),
-		})
-	}
-	return out
-}
-
 func convertResource(res *resourcev1.Resource) *resource.Resource {
 	if res == nil {
 		return resource.Empty()
@@ -326,38 +332,4 @@ func resourceServiceName(res *resource.Resource) string {
 		}
 	}
 	return ""
-}
-
-func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
-	switch code {
-	case tracev1.Status_STATUS_CODE_ERROR:
-		return codes.Error
-	case tracev1.Status_STATUS_CODE_OK:
-		return codes.Ok
-	case tracev1.Status_STATUS_CODE_UNSET:
-		return codes.Unset
-	default:
-		return codes.Unset
-	}
-}
-
-func hasRequiredAttributes(attrs []*commonv1.KeyValue, required []string) error {
-	attrMap := make(map[string]string)
-	for _, attr := range attrs {
-		if val := attr.GetValue().GetStringValue(); val != "" {
-			attrMap[attr.Key] = val
-		}
-	}
-
-	missing := []string{}
-	for _, req := range required {
-		if _, exists := attrMap[req]; !exists {
-			missing = append(missing, req)
-		}
-	}
-
-	if len(missing) > 0 {
-		return fmt.Errorf("missing attributes: %v", missing)
-	}
-	return nil
 }
