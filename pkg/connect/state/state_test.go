@@ -30,12 +30,12 @@ func TestWorkerCapacity_IsUnlimited(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "returns false when Total is negative",
+			name: "returns true when Total is negative",
 			capacity: WorkerCapacity{
 				Total:     -1,
 				Available: 5,
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "returns true when both Total and Available are 0",
@@ -150,12 +150,12 @@ func TestWorkerCapacity_IsAtCapacity(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "returns true when both Total and Available are 0",
+			name: "returns false when both Total and Available are 0",
 			capacity: WorkerCapacity{
 				Total:     0,
 				Available: 0,
 			},
-			expected: true,
+			expected: false,
 		},
 	}
 

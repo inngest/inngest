@@ -851,7 +851,7 @@ func (r *redisConnectionStateManager) SetWorkerTotalCapacity(ctx context.Context
 	}
 
 	// Set the capacity limit with TTL aligned with worker request lease duration
-	capacityTTL := 4 * consts.ConnectWorkerHeartbeatInterval
+	capacityTTL := consts.ConnectWorkerInformationDuration
 	err := r.client.Do(ctx, r.client.B().Set().Key(capacityKey).Value(fmt.Sprintf("%d", maxConcurrentLeases)).Ex(capacityTTL).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("failed to set worker capacity: %w", err)
@@ -937,7 +937,7 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 	}
 
 	// Use Lua script to atomically check capacity and add to sorted set
-	setTTL := 4 * consts.ConnectWorkerHeartbeatInterval
+	setTTL := consts.ConnectWorkerInformationDuration
 	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
 	expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 
@@ -969,7 +969,7 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
 
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
-	setTTL := 4 * consts.ConnectWorkerHeartbeatInterval
+	setTTL := consts.ConnectWorkerInformationDuration
 	keys := []string{workerLeasesKey, leaseWorkerKey}
 	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID, instanceID}
 
@@ -999,7 +999,7 @@ func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Conte
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
 
-	capacityTTL := 4 * consts.ConnectWorkerHeartbeatInterval
+	capacityTTL := consts.ConnectWorkerInformationDuration
 	keys := []string{capacityKey, workerLeasesKey}
 	args := []string{fmt.Sprintf("%d", int64(capacityTTL.Seconds()))}
 

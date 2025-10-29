@@ -1116,7 +1116,7 @@ func TestSetWorkerTotalCapacity(t *testing.T) {
 		capacityKey := mgr.workerCapacityKey(envID, instanceID)
 		ttl := r.TTL(capacityKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, 4*consts.ConnectWorkerRequestLeaseDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
 	})
 
 	t.Run("deletes capacity when set to zero", func(t *testing.T) {
@@ -1327,7 +1327,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		setKey := mgr.workerLeasesKey(envID, instanceID)
 		ttl := r.TTL(setKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, 4*consts.ConnectWorkerRequestLeaseDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
 	})
 
 	t.Run("rejects when at capacity", func(t *testing.T) {
@@ -1384,7 +1384,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
 		err := mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrWorkerLeasesSetDoesNotExists)
 	})
 
 	t.Run("decrements counter", func(t *testing.T) {
@@ -1884,7 +1884,7 @@ func TestGetLeaseWorkerInstanceID(t *testing.T) {
 		leaseWorkerKey := mgr.leaseWorkerKey(envID, requestID)
 		ttl := r.TTL(leaseWorkerKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, 4*consts.ConnectWorkerRequestLeaseDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
 	})
 
 	t.Run("no mapping created when no capacity limit", func(t *testing.T) {

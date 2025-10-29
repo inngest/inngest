@@ -412,13 +412,13 @@ type WorkerCapacity struct {
 }
 
 func (w *WorkerCapacity) IsUnlimited() bool {
-	return w.Total == 0
+	return w.Total <= 0
 }
 
 func (w *WorkerCapacity) IsAvailable() bool {
-	return w.Available > 0 || w.Available == consts.ConnectWorkerNoConcurrencyLimitForRequests
+	return w.Available > 0 || w.Available == consts.ConnectWorkerNoConcurrencyLimitForRequests || w.IsUnlimited()
 }
 
 func (w *WorkerCapacity) IsAtCapacity() bool {
-	return w.Available == 0
+	return w.Available == 0 && !w.IsUnlimited() // Total > 0 means there is a limit set
 }
