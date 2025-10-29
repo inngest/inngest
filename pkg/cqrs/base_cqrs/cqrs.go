@@ -209,9 +209,14 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 				TraceID:      traceID,
 				ParentSpanID: parentSpanIDPtr,
 				StartTime:    parsedStartTime,
-				EndTime:      parsedEndTime,
-				Name:         "",
-				Attributes:   make(map[string]any),
+				// NOTE:
+				// The end time is only valid if this span denotes a step end, or the run end.
+				// EG. if this is an "Executor.run" span, this would never have an end time.
+				// However, this is the actual span commit time.  We must handle this when we
+				// parse the spans.
+				EndTime:    parsedEndTime,
+				Name:       "",
+				Attributes: make(map[string]any),
 			},
 			Status:          enums.StepStatusRunning,
 			RunID:           runID,

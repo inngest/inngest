@@ -58,3 +58,7 @@ type RunTraceSpan struct {
 	SpanTypeName string
 	Omit         bool
 }
+
+func RunTraceEnded(s RunTraceSpanStatus) bool {
+	return s == RunTraceSpanStatusCompleted || s == RunTraceSpanStatusCancelled || s == RunTraceSpanStatusFailed
+}
