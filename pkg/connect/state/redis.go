@@ -37,6 +37,9 @@ var (
 	// ErrWorkerCapacityExceeded is returned when the worker capacity is exceeded
 	ErrWorkerCapacityExceeded = fmt.Errorf("worker capacity exceeded")
 	ErrNoInstanceIDFound      = fmt.Errorf("no instance ID found")
+	// ErrInstanceIDMismatch is returned when the instance ID doesn't match the lease owner
+	ErrInstanceIDMismatch           = fmt.Errorf("instance ID mismatch")
+	ErrWorkerLeasesSetDoesNotExists = fmt.Errorf("worker leases set does not exist")
 )
 
 func init() {
@@ -968,17 +971,23 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
 	setTTL := 4 * consts.ConnectWorkerHeartbeatInterval
 	keys := []string{workerLeasesSetKey, leaseWorkerKey}
-	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID}
+	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID, instanceID}
 
-	// ignore errors
-	scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
-	//if err != nil {
-	//	return fmt.Errorf("failed to remove worker lease from set: %w", err)
-	//}
+	result, err := scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
+	if err != nil {
+		return fmt.Errorf("failed to remove worker lease from set: %w", err)
+	}
 
-	// Result codes:
-	// 1: Lease removed and TTL refreshed, mapping deleted
-	// 2: Set doesn't exist (no-op)
+	switch result {
+	case 0:
+		return nil
+	case 1:
+		return nil
+	case 2:
+		return ErrWorkerLeasesSetDoesNotExists
+	case 3:
+		return ErrInstanceIDMismatch
+	}
 
 	return nil
 }

@@ -235,6 +235,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
+			instanceID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -253,6 +254,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
+			instanceID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -283,6 +285,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
+			instanceID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -325,6 +328,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			requestID,
+			instanceID,
 		}
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -344,6 +348,37 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		for _, reqID := range requestIDs {
 			r.Del(leaseWorkerKey(reqID))
 		}
+	})
+
+	t.Run("returns 3 when instance ID doesn't match", func(t *testing.T) {
+		// Set up set with one member
+		requestID := "req-mismatch"
+		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		r.ZAdd(workerLeasesSetKey, float64(expTime), requestID)
+		r.Set(leaseWorkerKey(requestID), "other-instance")
+
+		keys := []string{workerLeasesSetKey, leaseWorkerKey(requestID)}
+		args := []string{
+			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			requestID,
+			instanceID, // Different from "other-instance"
+		}
+
+		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
+		require.NoError(t, err)
+		require.Equal(t, int64(3), result, "should return 3 when instance ID doesn't match")
+
+		// Verify the lease wasn't removed
+		setMembers, err := r.ZMembers(workerLeasesSetKey)
+		require.NoError(t, err)
+		require.Equal(t, []string{requestID}, setMembers, "lease should not be removed")
+
+		// Verify mapping still exists
+		require.True(t, r.Exists(leaseWorkerKey(requestID)))
+
+		// Clean up
+		r.Del(workerLeasesSetKey)
+		r.Del(leaseWorkerKey(requestID))
 	})
 }
 
@@ -419,6 +454,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				requestID,
+				instanceID,
 			}
 
 			result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -466,6 +502,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				requestID,
+				instanceID,
 			}
 			_, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)

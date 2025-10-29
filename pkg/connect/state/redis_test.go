@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -1497,6 +1498,53 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		// Should now succeed
 		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
+	})
+
+	t.Run("returns error when instance ID doesn't match", func(t *testing.T) {
+		instanceID := "test-instance-security"
+		
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
+		require.NoError(t, err)
+
+		// Instance assigns a lease
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+
+		// Manually corrupt the lease mapping to point to a different instance
+		// This simulates a race condition or data corruption scenario
+		leaseWorkerKey := fmt.Sprintf("{%s}:lease_worker:req-1", envID.String())
+		rc, _ := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		rc.Do(ctx, rc.B().Set().Key(leaseWorkerKey).Value("different-instance").Build())
+		rc.Close()
+
+		// Now when the original instance tries to delete its lease, it should fail
+		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		require.ErrorIs(t, err, ErrInstanceIDMismatch)
+
+		// Verify lease still exists in the set
+		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Equal(t, int64(4), caps.Available) // Should still be 4 (5-1)
+
+		// Fix the mapping back to the correct instance
+		rc2, _ := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		rc2.Do(ctx, rc2.B().Set().Key(leaseWorkerKey).Value(instanceID).Build())
+		rc2.Close()
+
+		// Now the deletion should succeed
+		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		require.NoError(t, err)
+
+		// Verify lease is now gone
+		caps, err = mgr.GetWorkerCapacities(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Equal(t, int64(5), caps.Available) // Should be back to 5
 	})
 }
 
