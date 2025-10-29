@@ -1,4 +1,4 @@
-import { transformJSONSchema } from '@inngest/components/TreeViewer/transform';
+import { transformJSONSchema } from '@inngest/components/TreeViewer/transform/transform';
 import type { JSONSchema, TreeNode } from '@inngest/components/TreeViewer/types';
 
 export const EVENT_SCHEMA_JSON: JSONSchema = {
