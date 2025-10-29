@@ -4,8 +4,8 @@ export type TreeNodeKind = 'array' | 'object' | 'value';
 
 export interface BaseNode {
   kind: TreeNodeKind;
-  id: string;
   name: string;
+  path: string;
 }
 
 export interface ArrayNode extends BaseNode {
