@@ -1589,10 +1589,8 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	switch d := e.fnDriver(ctx, i.f).(type) {
 	case driver.DriverV2:
-		fmt.Println("V2")
 		return e.executeDriverV2(ctx, i, d, endpoint.String())
 	case driver.DriverV1:
-		fmt.Println("V1")
 		{
 			// Execute the actual step using V1 drivers.  The V1 driver embeds errors in driver
 			// response and has generally difficult error management.

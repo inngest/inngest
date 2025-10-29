@@ -49,7 +49,7 @@ type V2RequestOpts struct {
 	Attempt int
 
 	// Index is the index for this particular request.  This is required for
-	// specif curl -X POST http://localhost:8080/users -d '{"email":"user@example.com"}'ic SDK implementations.
+	// specific SDK implementations.
 	Index int
 
 	// StepID is an optional step ID that we're specifically executing.
@@ -58,7 +58,8 @@ type V2RequestOpts struct {
 	// to be executed via this request.
 	StepID *string
 
-	// URL is the URL to hit.  This is always provided.
+	// URL is the URL to hit.  This is always provided by the caller instead of being derived
+	// from the function, as individual runs in a function may hit a unique URL.
 	URL string
 }
 
