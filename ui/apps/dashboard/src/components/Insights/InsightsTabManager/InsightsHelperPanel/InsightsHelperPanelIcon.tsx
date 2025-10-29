@@ -12,14 +12,14 @@ import {
 
 type InsightsHelperPanelIconProps = {
   className?: string;
-  title: HelperTitle;
   size?: number;
+  title: HelperTitle;
 };
 
 export function InsightsHelperPanelIcon({
   className,
-  title,
   size = 20,
+  title,
 }: InsightsHelperPanelIconProps) {
   switch (title) {
     case INSIGHTS_AI:

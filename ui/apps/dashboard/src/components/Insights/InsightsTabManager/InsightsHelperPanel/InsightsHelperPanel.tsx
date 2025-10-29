@@ -42,9 +42,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
     <div className="flex h-full w-full flex-col">
       <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
         <div className="flex flex-row items-center gap-2">
-          {active ? (
-            <InsightsHelperPanelIcon className="text-subtle" size={20} title={active} />
-          ) : null}
+          {active ? <InsightsHelperPanelIcon className="text-subtle" title={active} /> : null}
           <div className="text-muted text-sm font-normal uppercase tracking-wider">{active}</div>
         </div>
         <button

@@ -215,7 +215,7 @@ function InsightsTabManagerInternal({
     if (isInsightsAgentEnabled) {
       items.push({
         title: INSIGHTS_AI,
-        icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} size={20} />,
+        icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
         action: () => handleSelectHelper(INSIGHTS_AI),
       });
     }
@@ -223,7 +223,7 @@ function InsightsTabManagerInternal({
     if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
       items.push({
         title: DOCUMENTATION,
-        icon: <InsightsHelperPanelIcon title={DOCUMENTATION} size={20} />,
+        icon: <InsightsHelperPanelIcon title={DOCUMENTATION} />,
         action: () => handleSelectHelper(DOCUMENTATION),
       });
     }
@@ -231,14 +231,14 @@ function InsightsTabManagerInternal({
     if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
       items.push({
         title: SCHEMA_EXPLORER,
-        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} size={20} />,
+        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
         action: () => handleSelectHelper(SCHEMA_EXPLORER),
       });
     }
 
     items.push({
       title: SUPPORT,
-      icon: <InsightsHelperPanelIcon title={SUPPORT} size={20} />,
+      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
       action: noOp,
       href: pathCreator.support({ ref: 'app-insights' }),
     });
