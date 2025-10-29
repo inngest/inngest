@@ -201,7 +201,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 
 	switch err {
 	case nil:
-		l.Info("cron-health-check enqueued")
+		l.Trace("cron-health-check enqueued")
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
 		l.Trace("cron-health-check already exists")

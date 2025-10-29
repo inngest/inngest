@@ -428,6 +428,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
+		executor.WithSigningKeyLoader(func(ctx context.Context, envID uuid.UUID) ([]byte, error) {
+			// for httpv2, ensuring we sign sync and async requests using the new driver.
+			if opts.SigningKey == nil {
+				return nil, nil
+			}
+			return []byte(*opts.SigningKey), nil
+		}),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -562,11 +569,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tp,
-			State:           smv2,
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tp,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
