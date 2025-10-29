@@ -267,7 +267,7 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
-            {isHelperPanelOpen ? (
+            {isQueryTab(tab.id) && isHelperPanelOpen ? (
               <div className="flex h-full w-full">
                 <div className="min-w-0 flex-1 overflow-hidden">
                   <Resizable
