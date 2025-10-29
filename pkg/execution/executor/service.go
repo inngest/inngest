@@ -349,7 +349,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 		}
 
 		// Always retry; non-retryable is covered above.
-		return false, fmt.Errorf("%s", resp.Error())
+		return false, fmt.Errorf("error here!: %s", resp.Error())
 	}
 
 	if resp != nil && len(resp.Generator) > 0 {
