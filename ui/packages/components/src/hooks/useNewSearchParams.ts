@@ -129,21 +129,32 @@ export const useStringArraySearchParam = (
     });
   }, [name, navigate]);
 
-  let value = undefined;
   const rawValue = (search as Record<string, unknown>)?.[name];
-  if (typeof rawValue === 'string') {
-    try {
-      const parsed: unknown = JSON.parse(rawValue);
-
-      if (isStringArray(parsed)) {
-        value = parsed;
-      } else {
-        console.error(`invalid type for search param ${name}`);
-      }
-    } catch {
-      console.error(`invalid JSON for search param ${name}`);
+  const value = useMemo(() => {
+    if (rawValue === null || rawValue === undefined) {
+      return undefined;
     }
-  }
+
+    if (typeof rawValue !== 'string') {
+      console.error(`invalid type for search param ${name}: ${rawValue}`);
+      return undefined;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawValue);
+    } catch {
+      console.error(`invalid JSON for search param ${name}: ${rawValue}`);
+      return undefined;
+    }
+
+    if (!isStringArray(parsed)) {
+      console.error(`invalid type for search param ${name}`);
+      return undefined;
+    }
+
+    return parsed;
+  }, [name, rawValue]);
 
   return [value, upsert, remove];
 };
