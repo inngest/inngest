@@ -40,13 +40,15 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-1"
 
 		counterTTL := 4 * consts.ConnectWorkerRequestLeaseDuration
-		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		now := time.Now()
+		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64(counterTTL.Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
+			fmt.Sprintf("%d", now.UnixMilli()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -63,13 +65,15 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		r.Set(capacityKey, "0")
 		requestID := "req-2"
 
-		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		now := time.Now()
+		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
+			fmt.Sprintf("%d", now.UnixMilli()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -85,13 +89,15 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		r.Set(capacityKey, "5")
 		requestID := "req-3"
 
-		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		now := time.Now()
+		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
+			fmt.Sprintf("%d", now.UnixMilli()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -132,12 +138,14 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
 			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
-			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			now := time.Now()
+			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
+				fmt.Sprintf("%d", now.UnixMilli()),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -168,13 +176,15 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		}
 
 		requestID := "req-overflow"
-		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		now := time.Now()
+		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
+			fmt.Sprintf("%d", now.UnixMilli()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -366,12 +376,14 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
 			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
-			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			now := time.Now()
+			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
+				fmt.Sprintf("%d", now.UnixMilli()),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -385,13 +397,15 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		require.Len(t, setMembers, 3, "set should have 3 members")
 
 		// Try to exceed capacity
-		expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		now := time.Now()
+		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 		keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey("req-overflow")}
 		args := []string{
 			fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			"req-overflow",
 			fmt.Sprintf("%d", expirationTime),
+			fmt.Sprintf("%d", now.UnixMilli()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -432,12 +446,14 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
 			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
-			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			now := time.Now()
+			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
+				fmt.Sprintf("%d", now.UnixMilli()),
 			}
 			_, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
@@ -459,12 +475,14 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		for i := 1; i <= 2; i++ {
 			requestID := fmt.Sprintf("req-cycle2-%d", i)
 			keys := []string{capacityKey, workerLeasesSetKey, leaseWorkerKey(requestID)}
-			expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			now := time.Now()
+			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((4 * consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
+				fmt.Sprintf("%d", now.UnixMilli()),
 			}
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)

@@ -30,13 +30,13 @@ end
 redis.call("ZREM", workerLeasesSetKey, requestID)
 
 -- Check if set is now empty and delete it
--- local remainingCount = redis.call("ZCARD", workerLeasesSetKey)
--- if remainingCount == 0 then
+local remainingCount = redis.call("ZCARD", workerLeasesSetKey)
+if remainingCount == 0 then
   -- Set is empty, delete it and the mapping
---  redis.call("DEL", workerLeasesSetKey)
---  redis.call("DEL", leaseWorkerKey)
---  return 0
---end
+  redis.call("DEL", workerLeasesSetKey)
+  redis.call("DEL", leaseWorkerKey)
+  return 0
+end
 
 -- Set still has leases, refresh TTL
 redis.call("EXPIRE", workerLeasesSetKey, setTTL)

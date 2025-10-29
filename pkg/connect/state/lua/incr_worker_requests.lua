@@ -34,7 +34,7 @@ capacity = tonumber(capacity)
 -- Get current time to filter out expired leases
 -- previous second, this makes us very sensitive to time changes
 -- Should we use the logical clock instead?
-local currentTimeUnix = tonumber(currentTime[1])
+local currentTimeUnix = tonumber(currentTime) / 1000
 
 -- Remove expired leases from the set first
 redis.call("ZREMRANGEBYSCORE", workerLeasesSetKey, "-inf", tostring(currentTimeUnix))
