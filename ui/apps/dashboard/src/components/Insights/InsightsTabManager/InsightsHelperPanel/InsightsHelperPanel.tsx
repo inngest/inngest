@@ -22,9 +22,10 @@ type InsightsHelperPanelProps = {
 export function InsightsHelperPanel({ active, agentThreadId, onClose }: InsightsHelperPanelProps) {
   const content = useMemo(() => {
     switch (active) {
-      case INSIGHTS_AI:
+      case INSIGHTS_AI: {
         if (!agentThreadId) return null;
         return <InsightsChat agentThreadId={agentThreadId} />;
+      }
       case DOCUMENTATION:
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case SCHEMA_EXPLORER:
