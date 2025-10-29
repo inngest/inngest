@@ -968,6 +968,15 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
 	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
 
+	// check instance capacity - if the capacity is 0/infinite, we don't need to delete the lease
+	capacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
+	if err != nil {
+		return err
+	}
+	if capacity <= 0 {
+		return nil
+	}
+
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
 	setTTL := consts.ConnectWorkerInformationDuration
 	keys := []string{workerLeasesKey, leaseWorkerKey}

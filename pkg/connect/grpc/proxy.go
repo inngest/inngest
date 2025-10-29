@@ -460,7 +460,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 		// Clean up worker lease for capacity tracking
 		cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-			l, "could not delete worker lease on timeout")
+			l, "could not delete worker lease after context finished")
 
 		if reply.RequestId == "" {
 			span.SetStatus(codes.Error, "missing response")
