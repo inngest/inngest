@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactElement } from 'react';
+import { type ReactElement } from 'react';
 import { Link } from '@inngest/components/Link/Link';
 import { cn } from '@inngest/components/utils/classNames';
 
