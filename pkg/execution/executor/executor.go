@@ -261,6 +261,13 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 	}
 }
 
+func WithSigningKeyLoader(f func(ctx context.Context, envID uuid.UUID) ([]byte, error)) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).signingKeyLoader = f
+		return nil
+	}
+}
+
 // WithDriverV1 specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -368,6 +375,9 @@ type executor struct {
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
 	httpClient          exechttp.RequestExecutor
+	// signingKeyLoader is used to load signing keys for an env.  This is required for the
+	// HTTPv2 driver.
+	signingKeyLoader func(ctx context.Context, envID uuid.UUID) ([]byte, error)
 
 	driverv1 map[string]driver.DriverV1
 	driverv2 map[string]driver.DriverV2
@@ -1599,18 +1609,25 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 }
 
 func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2, url string) (*state.DriverResponse, error) {
+	var sk []byte
+
+	if e.signingKeyLoader != nil {
+		var err error
+		if sk, err = e.signingKeyLoader(ctx, run.Metadata().ID.Tenant.EnvID); err != nil {
+			return nil, fmt.Errorf("error loading environment from ID: %w", err)
+		}
+	}
+
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
 		Metadata:   *run.Metadata(),
 		Fn:         run.f,
-		SigningKey: []byte{}, // TODO
+		SigningKey: sk,
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
 		StepID:     &run.edge.Outgoing,
 		URL:        url,
 	})
 
-	// TODO: Handle errors appropriately.
-	//
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.
 	// We move all UserErrors into state.DriverResponse, and always return a response...
 	// until we refactor the executor to handle (Option<Response>, UserError, InternalError).
