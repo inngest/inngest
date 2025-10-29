@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -16,11 +17,16 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"lukechampine.com/frand"
 )
 
-var defaultPropagator = propagation.NewCompositeTextMapPropagator(
-	propagation.TraceContext{},
-	propagation.Baggage{},
+var (
+	defaultPropagator = propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+
+	idGen = idGenerator{}
 )
 
 // TracerProvider defines the interface for tracing providers.
@@ -50,6 +56,8 @@ type CreateSpanOptions struct {
 	RawOtelSpanOptions []trace.SpanStartOption
 	StartTime          time.Time
 	EndTime            time.Time
+
+	Seed []byte
 }
 
 type UpdateSpanOptions struct {
@@ -81,10 +89,14 @@ func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 
 	otelTP := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
-		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
+		sdktrace.WithIDGenerator(idGen),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
-	return otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
+	return otelTP.Tracer(
+		"inngest",
+		trace.WithInstrumentationVersion(version.Print()),
+	)
 }
 
 func (d *DroppableSpan) Drop() {
@@ -106,7 +118,7 @@ func (tp *otelTracerProvider) CreateSpan(
 ) (*meta.SpanReference, error) {
 	ds, err := tp.CreateDroppableSpan(ctx, name, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
+		return nil, fmt.Errorf("failed to C{reateSpan: %w", err)
 	}
 
 	err = ds.Send()
@@ -186,6 +198,12 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 				},
 			}),
 		)
+	}
+
+	// IF THERE IS SEED, we're creating something with deterministic span and trace IDs.
+	// YAY.  We love determinism.  This is important for eg. root spans.
+	if len(opts.Seed) > 0 {
+		ctx = setDeteterministicIDs(ctx, DeterministicSpanConfig(opts.Seed))
 	}
 
 	tracer := tp.getTracer(opts.Metadata)
@@ -320,4 +338,59 @@ func (tp *otelTracerProvider) UpdateSpan(
 
 	span.End()
 	return nil
+}
+
+func DeterministicSpanConfig(seed []byte) DeterministicIDs {
+	sum := sha256.Sum256(seed)
+	// XXX: can we not allocate here?
+	r := frand.NewCustom(sum[:], 16+8, 10)
+	return DeterministicIDs{
+		TraceID: [16]byte(r.Bytes(16)[:16]),
+		SpanID:  [8]byte(r.Bytes(8)[:8]),
+	}
+}
+
+type deterministicIDKeyT = struct{}
+
+var deterministicIDKeyV deterministicIDKeyT
+
+func getDeterministicIDs(ctx context.Context) (DeterministicIDs, bool) {
+	did, ok := ctx.Value(deterministicIDKeyV).(DeterministicIDs)
+	return did, ok
+}
+
+func setDeteterministicIDs(ctx context.Context, did DeterministicIDs) context.Context {
+	return context.WithValue(ctx, deterministicIDKeyV, did)
+}
+
+type DeterministicIDs struct {
+	TraceID trace.TraceID
+	SpanID  trace.SpanID
+}
+
+// idGenerator returns stable trace and span IDs using the SpanContext data.
+//
+// This does a passthrough:  if you have NOT generated a deterministic span
+// via DeterministicSpanConfig, this will generate random numbers.
+type idGenerator struct{}
+
+// NewIDs returns a new trace and span ID.
+func (idGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+	// Does span context exist?
+	if did, ok := getDeterministicIDs(ctx); ok {
+		return did.TraceID, did.SpanID
+	}
+	tID := frand.Entropy128()
+	sID := frand.Entropy128()
+	return trace.TraceID([16]byte(tID)), trace.SpanID([8]byte(sID[:8]))
+}
+
+// NewSpanID returns a ID for a new span in the trace with TraceID.
+func (idGenerator) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+	if did, ok := getDeterministicIDs(ctx); ok {
+		return did.SpanID
+	}
+
+	sID := frand.Entropy128()
+	return trace.SpanID([8]byte(sID[:8]))
 }
