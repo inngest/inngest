@@ -8,7 +8,7 @@ import {
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from './helperConstants';
+} from './constants';
 
 type InsightsHelperPanelIconProps = {
   className?: string;

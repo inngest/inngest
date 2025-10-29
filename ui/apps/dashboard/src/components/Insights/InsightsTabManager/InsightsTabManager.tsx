@@ -18,19 +18,22 @@ import {
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
-import { InsightsHelperPanel } from './InsightsHelperPanel';
-import { InsightsHelperPanelControl, type HelperItem } from './InsightsHelperPanelControl';
-import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
-import { InsightsTabPanel } from './InsightsTabPanel';
-import { InsightsTabsList } from './InsightsTabsList';
-import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
+import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
+import {
+  InsightsHelperPanelControl,
+  type HelperItem,
+} from './InsightsHelperPanel/InsightsHelperPanelControl';
+import { InsightsHelperPanelIcon } from './InsightsHelperPanel/InsightsHelperPanelIcon';
 import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from './helperConstants';
+} from './InsightsHelperPanel/constants';
+import { InsightsTabPanel } from './InsightsTabPanel';
+import { InsightsTabsList } from './InsightsTabsList';
+import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
