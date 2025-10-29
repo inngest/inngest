@@ -62,7 +62,8 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	t.Run("returns 0 when capacity is zero", func(t *testing.T) {
 		// Set capacity to 0 (unlimited)
-		r.Set(capacityKey, "0")
+		err := r.Set(capacityKey, "0")
+		require.NoError(t, err)
 		requestID := "req-2"
 
 		now := time.Now()
@@ -86,7 +87,8 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	t.Run("successfully increments when under capacity", func(t *testing.T) {
 		// Set capacity to 5
-		r.Set(capacityKey, "5")
+		err := r.Set(capacityKey, "5")
+		require.NoError(t, err)
 		requestID := "req-3"
 
 		now := time.Now()
@@ -133,7 +135,8 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	t.Run("increments counter multiple times", func(t *testing.T) {
 		// Set capacity to 5
-		r.Set(capacityKey, "5")
+		err := r.Set(capacityKey, "5")
+		require.NoError(t, err)
 
 		for i := 1; i <= 3; i++ {
 			requestID := fmt.Sprintf("req-%d", i)
@@ -168,11 +171,13 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	t.Run("returns 1 when at capacity", func(t *testing.T) {
 		// Set capacity to 2 and fill it with 2 existing requests
-		r.Set(capacityKey, "2")
+		err := r.Set(capacityKey, "2")
+		require.NoError(t, err)
 		for i := 1; i <= 2; i++ {
 			existingReqID := fmt.Sprintf("existing-req-%d", i)
 			existingExpTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(workerLeasesKey, float64(existingExpTime), existingReqID)
+			_, err := r.ZAdd(workerLeasesKey, float64(existingExpTime), existingReqID)
+			require.NoError(t, err)
 		}
 
 		requestID := "req-overflow"
@@ -247,8 +252,10 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-last"
 		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		r.ZAdd(workerLeasesKey, float64(expTime), requestID)
-		r.Set(leaseWorkerKey(requestID), instanceID)
+		_, err := r.ZAdd(workerLeasesKey, float64(expTime), requestID)
+		require.NoError(t, err)
+		err = r.Set(leaseWorkerKey(requestID), instanceID)
+		require.NoError(t, err)
 
 		keys := []string{workerLeasesKey, leaseWorkerKey(requestID)}
 		args := []string{
@@ -273,8 +280,10 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		for i := 1; i <= 3; i++ {
 			reqID := fmt.Sprintf("req-%d", i)
 			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(workerLeasesKey, float64(expTime), reqID)
-			r.Set(leaseWorkerKey(reqID), instanceID)
+			_, err := r.ZAdd(workerLeasesKey, float64(expTime), reqID)
+			require.NoError(t, err)
+			err = r.Set(leaseWorkerKey(reqID), instanceID)
+			require.NoError(t, err)
 		}
 
 		// Fast forward time to simulate TTL decay
@@ -318,8 +327,10 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		requestIDs := []string{"req-a", "req-b", "req-c"}
 		for _, reqID := range requestIDs {
 			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-			r.ZAdd(workerLeasesKey, float64(expTime), reqID)
-			r.Set(leaseWorkerKey(reqID), instanceID)
+			_, err := r.ZAdd(workerLeasesKey, float64(expTime), reqID)
+			require.NoError(t, err)
+			err = r.Set(leaseWorkerKey(reqID), instanceID)
+			require.NoError(t, err)
 		}
 
 		// Remove middle request
@@ -354,8 +365,10 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-mismatch"
 		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
-		r.ZAdd(workerLeasesKey, float64(expTime), requestID)
-		r.Set(leaseWorkerKey(requestID), "other-instance")
+		_, err := r.ZAdd(workerLeasesKey, float64(expTime), requestID)
+		require.NoError(t, err)
+		err = r.Set(leaseWorkerKey(requestID), "other-instance")
+		require.NoError(t, err)
 
 		keys := []string{workerLeasesKey, leaseWorkerKey(requestID)}
 		args := []string{
@@ -405,7 +418,8 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 	t.Run("complete lifecycle: incr to capacity then decr back to zero", func(t *testing.T) {
 		// Set capacity to 3
-		r.Set(capacityKey, "3")
+		err := r.Set(capacityKey, "3")
+		require.NoError(t, err)
 
 		// Increment to capacity
 		for i := 1; i <= 3; i++ {
@@ -476,7 +490,8 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 	t.Run("can increment again after full cycle", func(t *testing.T) {
 		// Set capacity
-		r.Set(capacityKey, "2")
+		err := r.Set(capacityKey, "2")
+		require.NoError(t, err)
 
 		// First cycle: increment and decrement
 		for i := 1; i <= 2; i++ {

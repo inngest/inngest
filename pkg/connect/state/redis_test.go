@@ -1460,8 +1460,8 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
-		// Fast forward time a bit in miniredis
-		r.FastForward(50 * time.Second)
+		// Fast forward time a bit in miniredis to exceed ConnectWorkerInformationDuration (MaxFunctionTimeout + 80s = ~2h20m)
+		r.FastForward(3 * time.Hour)
 
 		// Get the Total Capacity, it should have expired, but we still
 		// don't return error on expired total capacity
