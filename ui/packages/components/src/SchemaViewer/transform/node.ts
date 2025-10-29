@@ -1,10 +1,10 @@
-import type { JSONSchema, TreeNode } from '../types';
+import type { JSONSchema, SchemaNode } from '../types';
 import { buildArrayVariants } from './array';
 import { determineKind } from './kind';
 import { buildObjectChildren } from './object';
 import { inferScalarType } from './type';
 
-export function buildNode(schema: JSONSchema, name: string, path: string): TreeNode {
+export function buildNode(schema: JSONSchema, name: string, path: string): SchemaNode {
   const kind = determineKind(schema);
   switch (kind) {
     case 'array': {

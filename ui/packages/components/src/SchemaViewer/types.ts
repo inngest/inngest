@@ -1,22 +1,22 @@
 import type { JSONSchema7TypeName as JSONSchemaTypeName } from 'json-schema';
 
-export type TreeNodeKind = 'array' | 'object' | 'value';
+export type SchemaNodeKind = 'array' | 'object' | 'value';
 
 export interface BaseNode {
-  kind: TreeNodeKind;
+  kind: SchemaNodeKind;
   name: string;
   path: string;
 }
 
 export interface ArrayNode extends BaseNode {
   kind: 'array';
-  elementVariants: TreeNode[];
+  elementVariants: SchemaNode[];
   various: boolean;
 }
 
 export interface ObjectNode extends BaseNode {
   kind: 'object';
-  children: TreeNode[];
+  children: SchemaNode[];
 }
 
 export interface ValueNode extends BaseNode {
@@ -24,7 +24,7 @@ export interface ValueNode extends BaseNode {
   type: JSONSchemaTypeName | JSONSchemaTypeName[] | 'unknown';
 }
 
-export type TreeNode = ArrayNode | ObjectNode | ValueNode;
+export type SchemaNode = ArrayNode | ObjectNode | ValueNode;
 
 export type {
   JSONSchema7 as JSONSchema,
