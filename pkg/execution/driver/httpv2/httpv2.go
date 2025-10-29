@@ -78,7 +78,7 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 
 	req, err := exechttp.NewRequest(
 		method,
-		opts.Fn.Driver.URI,
+		opts.URL,
 		nil,
 	)
 	if err != nil {

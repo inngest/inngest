@@ -344,6 +344,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		isFirstChild := true
 		haveSetRunStartTime := span.Name != meta.SpanNameRun
 
+		// If there's a run start time on the overall parent, use that.  Sometimes this
+		// is the case for eg. sync based runs.
+		if span.GetStartedAtTime() != nil {
+			haveSetRunStartTime = true
+		}
+
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
 			if err != nil {

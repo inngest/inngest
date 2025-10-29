@@ -49,7 +49,7 @@ type V2RequestOpts struct {
 	Attempt int
 
 	// Index is the index for this particular request.  This is required for
-	// specific SDK implementations.
+	// specif curl -X POST http://localhost:8080/users -d '{"email":"user@example.com"}'ic SDK implementations.
 	Index int
 
 	// StepID is an optional step ID that we're specifically executing.
@@ -57,6 +57,9 @@ type V2RequestOpts struct {
 	// This happens in the case of StepPlanned ops, which request an explicit step ID
 	// to be executed via this request.
 	StepID *string
+
+	// URL is the URL to hit.  This is always provided.
+	URL string
 }
 
 // DriverV1 represents an old deprecated driver type for

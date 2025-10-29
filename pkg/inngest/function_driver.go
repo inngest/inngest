@@ -11,6 +11,14 @@ type FunctionDriver struct {
 }
 
 func Driver(f Function) string {
+	if len(f.Driver.Metadata) > 0 {
+		// Alweays check for V2 drivers in sync (API-based) fns.
+		driver, _ := f.Driver.Metadata["type"].(string)
+		if driver == "sync" {
+			return "httpv2"
+		}
+	}
+
 	url := f.URI()
 
 	switch url.Scheme {
@@ -24,7 +32,7 @@ func Driver(f Function) string {
 			return "http"
 		}
 
-		driver, _ := f.Driver.Metadata["kind"].(string)
+		driver, _ := f.Driver.Metadata["type"].(string)
 		if driver == "sync" {
 			return "httpv2"
 		}

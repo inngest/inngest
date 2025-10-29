@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -691,6 +692,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Context:         req.Context,
 	})
 
+	// If we have a specifc URL to hit for this run, add it to context.
+	if req.URL != "" {
+		config.Context["url"] = req.URL
+	}
+
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
 	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
@@ -907,7 +913,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		// XXX: If this is a sync run, always add the start time to the span. We do this
 		// because sync runs have already started by the time we call Schedule; they're
 		// in-process, and Schedule gets called via an API endpoint when the run starts.
-		runSpanOpts.StartTime = runID.Timestamp()
+		time := runID.Timestamp()
+		runSpanOpts.StartTime = time
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.StartedAt, &time)
 	}
 
 	status := enums.StepStatusQueued
@@ -1025,6 +1033,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
 	if req.RunMode == enums.RunModeSync {
+		sendSpans()
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
@@ -1550,15 +1559,30 @@ func correlationID(event event.Event) *string {
 // A nil response with an error indicates that an internal error occurred and the step
 // did not run.
 func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
-	url := i.f.URI()
+	endpoint := i.f.URI()
+
+	// XXX: If we have a URI in the run metadata, use it.
+	//
+	// This allows us to override URIs on a per-run bases, useful if the URI has
+	// identifiers in it which change between runs.
+	//
+	// This is only used for V2 based drivers, specifically for sync REST-based endpoints.
+	if uri, ok := i.md.Config.Context["url"].(string); ok && len(uri) > 0 {
+		if parsed, _ := url.Parse(uri); parsed != nil {
+			endpoint = parsed
+		}
+	}
+
 	for _, e := range e.lifecycles {
-		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, url.String())
+		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, endpoint.String())
 	}
 
 	switch d := e.fnDriver(ctx, i.f).(type) {
 	case driver.DriverV2:
-		return e.executeDriverV2(ctx, i, d)
+		fmt.Println("V2")
+		return e.executeDriverV2(ctx, i, d, endpoint.String())
 	case driver.DriverV1:
+		fmt.Println("V1")
 		{
 			// Execute the actual step using V1 drivers.  The V1 driver embeds errors in driver
 			// response and has generally difficult error management.
@@ -1574,7 +1598,7 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 	}
 }
 
-func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2) (*state.DriverResponse, error) {
+func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driver.DriverV2, url string) (*state.DriverResponse, error) {
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
 		Metadata:   *run.Metadata(),
 		Fn:         run.f,
@@ -1582,6 +1606,7 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
 		StepID:     &run.edge.Outgoing,
+		URL:        url,
 	})
 
 	// TODO: Handle errors appropriately.

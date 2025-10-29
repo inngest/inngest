@@ -378,7 +378,7 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		return nil
 	}
 
-	if sr := md.Config.NewFunctionTrace(); sr != nil {
+	if sr := md.Config.RootSpanFromConfig(); sr != nil {
 		return sr
 	}
 
