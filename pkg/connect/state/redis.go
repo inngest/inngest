@@ -40,6 +40,8 @@ var (
 	// ErrInstanceIDMismatch is returned when the instance ID doesn't match the lease owner
 	ErrInstanceIDMismatch           = fmt.Errorf("instance ID mismatch")
 	ErrWorkerLeasesSetDoesNotExists = fmt.Errorf("worker leases set does not exist")
+	// ErrLeaseWorkerDoesNotExist is returned when the lease worker does not exist
+	ErrLeaseWorkerDoesNotExist = fmt.Errorf("lease worker does not exist")
 )
 
 func init() {

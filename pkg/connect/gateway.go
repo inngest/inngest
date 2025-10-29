@@ -825,9 +825,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				switch {
 				case errors.Is(err, state.ErrRequestLeaseExpired),
 					errors.Is(err, state.ErrRequestLeased),
-					errors.Is(err, state.ErrRequestLeaseNotFound):
+					errors.Is(err, state.ErrRequestLeaseNotFound),
+					errors.Is(err, state.ErrLeaseWorkerDoesNotExist):
 
-					c.log.ReportError(err, "lease was claimed by other worker or expired",
+					c.log.ReportError(err, "lease was claimed by other worker, expired, or worker does not exist",
 						logger.WithErrorReportTags(map[string]string{
 							"req_id":   data.RequestId,
 							"lease_id": leaseID.String(),

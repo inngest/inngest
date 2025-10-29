@@ -129,6 +129,8 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 	}
 
 	switch status {
+	case -3:
+		return nil, ErrLeaseWorkerDoesNotExist
 	case -2:
 		return nil, ErrRequestLeased
 	case -1:
