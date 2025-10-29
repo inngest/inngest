@@ -93,7 +93,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
-		r.workerLeasesSetKey(envID, instanceID),
+		r.workerLeasesKey(envID, instanceID),
 		r.leaseWorkerKey(envID, requestID),
 	}
 

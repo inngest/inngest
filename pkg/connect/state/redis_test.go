@@ -1294,7 +1294,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should not create set when no limit
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		require.False(t, r.Exists(setKey))
 	})
 
@@ -1307,7 +1307,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check lease was added to set
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		require.True(t, r.Exists(setKey))
 
 		// Check set contains the request
@@ -1324,7 +1324,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		ttl := r.TTL(setKey)
 		require.Greater(t, ttl, time.Duration(0))
 		require.LessOrEqual(t, ttl, 4*consts.ConnectWorkerRequestLeaseDuration)
@@ -1403,7 +1403,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check set has remaining lease
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		require.True(t, r.Exists(setKey))
 
 		// Check set contains one lease
@@ -1424,7 +1424,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set should be deleted
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		require.False(t, r.Exists(setKey))
 	})
 
@@ -1445,7 +1445,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// TTL should be refreshed
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		ttl := r.TTL(setKey)
 		require.Greater(t, ttl, 30*time.Second) // Should be close to 40s
 	})
@@ -1471,7 +1471,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
 
 		// TTL should be expired
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		ttl := r.TTL(setKey)
 		require.Equal(t, ttl, 0*time.Second) // Should be 0 since it expired
 	})
@@ -1502,7 +1502,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 
 	t.Run("returns error when instance ID doesn't match", func(t *testing.T) {
 		instanceID := "test-instance-security"
-		
+
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
@@ -1512,7 +1512,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 
 		// Manually corrupt the lease mapping to point to a different instance
 		// This simulates a race condition or data corruption scenario
-		leaseWorkerKey := fmt.Sprintf("{%s}:lease_worker:req-1", envID.String())
+		leaseWorkerKey := fmt.Sprintf("{%s}:lease-worker:req-1", envID.String())
 		rc, _ := rueidis.NewClient(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,
@@ -1604,7 +1604,7 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 
 		// Check both TTLs are reset
 		capacityKey := mgr.workerCapacityKey(envID, instanceID)
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 
 		capacityTTL := r.TTL(capacityKey)
 		require.Greater(t, capacityTTL, 30*time.Second) // Should be close to 40s
@@ -1705,7 +1705,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.True(t, caps.IsAvailable())
 
 		// Set should be deleted when all leases are removed
-		setKey := mgr.workerLeasesSetKey(envID, instanceID)
+		setKey := mgr.workerLeasesKey(envID, instanceID)
 		require.False(t, r.Exists(setKey))
 
 		// All lease mappings should be deleted

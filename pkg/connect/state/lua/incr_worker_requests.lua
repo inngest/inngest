@@ -11,7 +11,7 @@ ARGV[4]: Expiration time as Unix timestamp (score for sorted set)
 ]]
 
 local capacityKey = KEYS[1]
-local workerLeasesSetKey = KEYS[2]
+local workerLeasesKey = KEYS[2]
 local leaseWorkerKey = KEYS[3]
 
 local setTTL = tonumber(ARGV[1])
@@ -37,10 +37,10 @@ capacity = tonumber(capacity)
 local currentTimeUnix = tonumber(currentTime) / 1000
 
 -- Remove expired leases from the set first
-redis.call("ZREMRANGEBYSCORE", workerLeasesSetKey, "-inf", tostring(currentTimeUnix))
+redis.call("ZREMRANGEBYSCORE", workerLeasesKey, "-inf", tostring(currentTimeUnix))
 
 -- Get current number of active leases (those with expiration time > current time)
-local currentLeases = redis.call("ZCOUNT", workerLeasesSetKey, tostring(currentTimeUnix + 1), "+inf")
+local currentLeases = redis.call("ZCOUNT", workerLeasesKey, tostring(currentTimeUnix + 1), "+inf")
 
 -- Check if at capacity
 if currentLeases >= capacity then
@@ -49,10 +49,10 @@ end
 
 -- Add the lease to the sorted set with expiration time as score
 local expTime = tonumber(expirationTime)
-redis.call("ZADD", workerLeasesSetKey, expTime, requestID)
+redis.call("ZADD", workerLeasesKey, expTime, requestID)
 
 -- Set/refresh TTL on the set to ensure it expires if worker stops processing
-redis.call("EXPIRE", workerLeasesSetKey, setTTL)
+redis.call("EXPIRE", workerLeasesKey, setTTL)
 
 -- Store the mapping of request ID to worker instance ID
 redis.call("SET", leaseWorkerKey, instanceID, "EX", setTTL)

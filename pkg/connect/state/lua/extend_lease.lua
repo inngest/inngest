@@ -8,7 +8,7 @@ Output:
 ]]
 
 local keyRequestLease = KEYS[1]
-local workerLeasesSetKey = KEYS[2]
+local workerLeasesKey = KEYS[2]
 local leaseWorkerKey = KEYS[3]
 
 local leaseID 				= ARGV[1]
@@ -44,7 +44,7 @@ if workerCapacityUnlimited == false then
 	end
 
     -- Remove the old request from worker's set
-	redis.call("ZREM", workerLeasesSetKey, leaseID)
+	redis.call("ZREM", workerLeasesKey, leaseID)
 end
 
 -- If new lease expiry is in the past, drop the lease
@@ -55,7 +55,7 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 	-- Refresh TTL on the set
 	if workerCapacityUnlimited == false then
 		redis.call("DEL", leaseWorkerKey)
-	    redis.call("EXPIRE", workerLeasesSetKey, setTTL)
+	    redis.call("EXPIRE", workerLeasesKey, setTTL)
 	end
 	return 2
 end
@@ -70,8 +70,8 @@ if workerCapUnlimited == true then
 end
 
 -- Add to the new lease to the worker's set
-redis.call("ZADD", workerLeasesSetKey, decode_ulid_time(newLeaseID), newLeaseID)
-redis.call("EXPIRE", workerLeasesSetKey, setTTL)
+redis.call("ZADD", workerLeasesKey, decode_ulid_time(newLeaseID), newLeaseID)
+redis.call("EXPIRE", workerLeasesKey, setTTL)
 
 -- Update the lease-worker mapping
 redis.call("SET", leaseWorkerKey, instanceID, "EX", setTTL)
