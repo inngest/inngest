@@ -7365,10 +7365,12 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 	backlog := q.ItemBacklog(ctx, qi)
 	sp := q.ItemShadowPartition(ctx, qi)
 
-	r.ZRem(
+	removed, err := r.ZRem(
 		defaultShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		qi.ID,
 	)
+	require.NoError(t, err)
+	require.True(t, removed)
 
 	res, err := q.BacklogRefill(
 		ctx,
