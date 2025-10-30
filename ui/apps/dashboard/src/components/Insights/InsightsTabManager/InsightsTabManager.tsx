@@ -11,12 +11,26 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
-import { InsightsChat } from '../InsightsChat/InsightsChat';
+import { pathCreator } from '@/utils/urls';
 import {
   InsightsChatProvider,
   useInsightsChatProvider,
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
+import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
+import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
+import {
+  InsightsHelperPanelControl,
+  type HelperItem,
+} from './InsightsHelperPanel/InsightsHelperPanelControl';
+import { InsightsHelperPanelIcon } from './InsightsHelperPanel/InsightsHelperPanelIcon';
+import {
+  DOCUMENTATION,
+  INSIGHTS_AI,
+  SCHEMA_EXPLORER,
+  SUPPORT,
+  type HelperTitle,
+} from './InsightsHelperPanel/constants';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
@@ -49,15 +63,7 @@ export function useInsightsTabManager(
 ): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
-  const [isChatPanelVisible, setIsChatPanelVisible] = useState(true);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
-
-  const onToggleChatPanelVisibility = useCallback(() => {
-    if (!isInsightsAgentEnabled.value) return;
-    setIsChatPanelVisible((prev) => !prev);
-  }, [isInsightsAgentEnabled.value]);
-
-  const effectiveChatPanelVisible = isInsightsAgentEnabled.value && isChatPanelVisible;
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -149,9 +155,7 @@ export function useInsightsTabManager(
         historyWindow={props.historyWindow}
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
-        isChatPanelVisible={effectiveChatPanelVisible}
         isInsightsAgentEnabled={isInsightsAgentEnabled.value}
-        onToggleChatPanelVisibility={onToggleChatPanelVisibility}
       />
     ),
     [
@@ -162,9 +166,7 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
-      effectiveChatPanelVisible,
       isInsightsAgentEnabled.value,
-      onToggleChatPanelVisibility,
     ]
   );
 
@@ -179,11 +181,11 @@ interface InsightsTabManagerInternalProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
-  isChatPanelVisible: boolean;
   isInsightsAgentEnabled: boolean;
-  onToggleChatPanelVisibility: () => void;
 }
 
+// TODO: Remove check on isInsightsAgentEnabled to determine whether to render InsightsHelperPanelControl.
+// That check currently exists because most customers would only see the support link icon, which would be strange.
 function InsightsTabManagerInternal({
   tabs,
   activeTabId,
@@ -192,10 +194,59 @@ function InsightsTabManagerInternal({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  isChatPanelVisible,
   isInsightsAgentEnabled,
-  onToggleChatPanelVisibility,
 }: InsightsTabManagerInternalProps) {
+  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
+
+  const handleSelectHelper = useCallback(
+    (title: HelperTitle) => {
+      if (activeHelper === title) {
+        setActiveHelper(null);
+      } else {
+        setActiveHelper(title);
+      }
+    },
+    [activeHelper]
+  );
+
+  const isHelperPanelOpen = activeHelper !== null;
+
+  const helperItems = useMemo<HelperItem[]>(() => {
+    const items: HelperItem[] = [];
+
+    if (isInsightsAgentEnabled) {
+      items.push({
+        title: INSIGHTS_AI,
+        icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
+        action: () => handleSelectHelper(INSIGHTS_AI),
+      });
+    }
+
+    if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
+      items.push({
+        title: DOCUMENTATION,
+        icon: <InsightsHelperPanelIcon title={DOCUMENTATION} />,
+        action: () => handleSelectHelper(DOCUMENTATION),
+      });
+    }
+
+    if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
+      items.push({
+        title: SCHEMA_EXPLORER,
+        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
+        action: () => handleSelectHelper(SCHEMA_EXPLORER),
+      });
+    }
+
+    items.push({
+      title: SUPPORT,
+      icon: <InsightsHelperPanelIcon title={SUPPORT} />,
+      action: noOp,
+      href: pathCreator.support({ ref: 'app-insights' }),
+    });
+
+    return items;
+  }, [handleSelectHelper, isInsightsAgentEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
@@ -216,49 +267,48 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
-            {isInsightsAgentEnabled &&
-            tab.id !== HOME_TAB.id &&
-            tab.id !== TEMPLATES_TAB.id &&
-            isChatPanelVisible ? (
-              <Resizable
-                defaultSplitPercentage={75}
-                minSplitPercentage={20}
-                maxSplitPercentage={85}
-                orientation="horizontal"
-                splitKey="insights-chat-split"
-                first={
-                  <div className="h-full min-w-0 overflow-hidden">
-                    <InsightsTabPanel
-                      isHomeTab={tab.id === HOME_TAB.id}
-                      isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                      tab={tab}
-                      historyWindow={historyWindow}
-                      isChatPanelVisible={isChatPanelVisible}
-                      onToggleChatPanelVisibility={onToggleChatPanelVisibility}
-                      isInsightsAgentEnabled={isInsightsAgentEnabled}
-                    />
-                  </div>
-                }
-                second={
-                  <InsightsChat
-                    agentThreadId={getAgentThreadIdForTab(tab.id)}
-                    onToggleChat={onToggleChatPanelVisibility}
+            <div className="flex h-full w-full">
+              <div className="h-full min-w-0 flex-1 overflow-hidden">
+                {isQueryTab(tab.id) && isHelperPanelOpen ? (
+                  <Resizable
+                    defaultSplitPercentage={75}
+                    minSplitPercentage={20}
+                    maxSplitPercentage={85}
+                    orientation="horizontal"
+                    splitKey="insights-helper-split"
+                    first={
+                      <div className="h-full min-w-0 overflow-hidden">
+                        <InsightsTabPanel
+                          isHomeTab={tab.id === HOME_TAB.id}
+                          isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                          tab={tab}
+                          historyWindow={historyWindow}
+                        />
+                      </div>
+                    }
+                    second={
+                      <InsightsHelperPanel
+                        active={activeHelper}
+                        agentThreadId={getAgentThreadIdForTab(tab.id)}
+                        onClose={() => {
+                          setActiveHelper(null);
+                        }}
+                      />
+                    }
                   />
-                }
-              />
-            ) : (
-              <div className="h-full min-w-0 overflow-hidden">
-                <InsightsTabPanel
-                  isHomeTab={tab.id === HOME_TAB.id}
-                  isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-                  tab={tab}
-                  historyWindow={historyWindow}
-                  isChatPanelVisible={isChatPanelVisible}
-                  onToggleChatPanelVisibility={onToggleChatPanelVisibility}
-                  isInsightsAgentEnabled={isInsightsAgentEnabled}
-                />
+                ) : (
+                  <InsightsTabPanel
+                    isHomeTab={tab.id === HOME_TAB.id}
+                    isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+                    tab={tab}
+                    historyWindow={historyWindow}
+                  />
+                )}
               </div>
-            )}
+              {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
+                <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
+              ) : null}
+            </div>
           </div>
         </InsightsStateMachineContextProvider>
       ))}
@@ -362,4 +412,12 @@ function ActiveThreadBridge({
   }, [currentThreadId, targetThreadId, setCurrentThreadId]);
 
   return null;
+}
+
+function isQueryTab(tabId: string): boolean {
+  return tabId !== HOME_TAB.id && tabId !== TEMPLATES_TAB.id;
+}
+
+function noOp() {
+  return;
 }
