@@ -18,7 +18,7 @@ local currentTime			= tonumber(ARGV[4])
 local setTTL			= tonumber(ARGV[5])
 local instanceID			= ARGV[6]
 local workerCapacityUnlimited = ARGV[7]
-local workerCapUnlimited = (workerCapacityUnlimited == "true")
+local workerCapUnlimitedBool = (workerCapacityUnlimited == "true")
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_request_lease.lua)
@@ -37,7 +37,7 @@ if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > cu
 end
 
 -- this field is only set if worker capacity is limited
-if workerCapacityUnlimited == false then
+if workerCapUnlimitedBool == false then
 	local workerInstanceID = redis.call("GET", leaseWorkerKey)
 	if workerInstanceID ~= instanceID then
 		return -3
@@ -53,7 +53,7 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 
 	-- Clean up the lease-worker mapping
 	-- Refresh TTL on the set
-	if workerCapacityUnlimited == false then
+	if workerCapUnlimitedBool == false then
 		redis.call("DEL", leaseWorkerKey)
 	    redis.call("EXPIRE", workerLeasesKey, setTTL)
 	end
@@ -65,7 +65,7 @@ requestItem.leaseID = newLeaseID
 redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 
 -- If worker capacity is unlimited, we don't need to manage the set
-if workerCapUnlimited == true then
+if workerCapUnlimitedBool == true then
 	return 1
 end
 
