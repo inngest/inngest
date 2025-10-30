@@ -1,5 +1,5 @@
-import { transformJSONSchema } from '@inngest/components/TreeViewer/transform/transform';
-import type { JSONSchema, TreeNode } from '@inngest/components/TreeViewer/types';
+import { transformJSONSchema } from '@inngest/components/SchemaViewer/transform/transform';
+import type { JSONSchema, SchemaNode } from '@inngest/components/SchemaViewer/types';
 
 export const EVENT_SCHEMA_JSON: JSONSchema = {
   title: 'event',
@@ -23,7 +23,6 @@ export const EVENT_SCHEMA_JSON: JSONSchema = {
       description: 'Event format version',
     },
   },
-  required: ['id', 'name', 'ts', 'v'],
 };
 
-export const EVENT_SCHEMA_TREE: TreeNode = transformJSONSchema(EVENT_SCHEMA_JSON);
+export const EVENT_SCHEMA_TREE: SchemaNode = transformJSONSchema(EVENT_SCHEMA_JSON);
