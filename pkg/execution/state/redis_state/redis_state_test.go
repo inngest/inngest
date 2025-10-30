@@ -338,7 +338,7 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 			Data: map[string]any{"input": "step1_input"},
 		},
 		{
-			ID:   "step-2", 
+			ID:   "step-2",
 			Data: map[string]any{"input": "step2_input"},
 		},
 		{

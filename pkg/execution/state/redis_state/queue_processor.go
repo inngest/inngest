@@ -678,6 +678,10 @@ func (q *queue) scan(ctx context.Context) error {
 		processAccount = true
 	}
 
+	if len(q.runMode.ExclusiveAccounts) > 0 {
+		processAccount = true
+	}
+
 	if processAccount {
 		metrics.IncrQueueScanCounter(ctx,
 			metrics.CounterOpt{
@@ -689,11 +693,17 @@ func (q *queue) scan(ctx context.Context) error {
 			},
 		)
 
-		peekedAccounts, err := duration(ctx, q.primaryQueueShard.Name, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-			return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
-		})
-		if err != nil {
-			return fmt.Errorf("could not peek accounts: %w", err)
+		var peekedAccounts []uuid.UUID
+		if len(q.runMode.ExclusiveAccounts) > 0 {
+			peekedAccounts = q.runMode.ExclusiveAccounts
+		} else {
+			peeked, err := duration(ctx, q.primaryQueueShard.Name, "account_peek", q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+				return q.accountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+			})
+			if err != nil {
+				return fmt.Errorf("could not peek accounts: %w", err)
+			}
+			peekedAccounts = peeked
 		}
 
 		if len(peekedAccounts) == 0 {

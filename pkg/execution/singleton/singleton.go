@@ -31,7 +31,7 @@ func SingletonKey(ctx context.Context, id uuid.UUID, c inngest.Singleton, evt ma
 	if err != nil {
 		return "", ErrEvaluatingSingletonExpression
 	}
-	res, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
+	res, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
 	if err != nil {
 		return "", ErrEvaluatingSingletonExpression
 	}

@@ -3,7 +3,6 @@ package expressions
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -16,16 +15,6 @@ import (
 // the earliest time >= now().
 type celProgram struct {
 	cel.Program
-	*timeRefs
-}
-
-// EarliestTimeReference returns the earliest time referenced in the
-// expression that is >= now().
-func (c celProgram) EarliestTimeReference() *time.Time {
-	if c.timeRefs == nil {
-		return nil
-	}
-	return c.timeRefs.Next()
 }
 
 // program takes a compiled AST, a cel.Env, and the data that's used in the expression and
@@ -59,13 +48,8 @@ func program(
 		return nil, nil, err
 	}
 
-	// We want to perform an exhaustive search and track the state of the search
-	// to see if dates are compared, then return the minimum date compared.
-	tr, td := timeDecorator(act)
-
 	opts := []cel.ProgramOption{
 		cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval), // Exhaustive, always, right now.
-		cel.CustomDecorator(td),
 	}
 
 	if evalUnknowns {
@@ -78,25 +62,25 @@ func program(
 	// created the environment with our custom library.
 	prog, err := env.Program(ast, opts...)
 
-	return &celProgram{Program: prog, timeRefs: tr}, act, err
+	return &celProgram{Program: prog}, act, err
 }
 
-func eval(program *celProgram, activation interpreter.PartialActivation) (interface{}, *time.Time, error) {
+func eval(program *celProgram, activation interpreter.PartialActivation) (interface{}, error) {
 	result, _, err := program.Eval(activation)
 	if result == nil {
-		return false, nil, ErrNoResult
+		return false, ErrNoResult
 	}
 	if types.IsUnknown(result) {
 		// When evaluating to a strict result this should never happen.  We inject a decorator
 		// to handle unknowns as values similar to null, and should always get a value.
-		return false, nil, nil
+		return false, nil
 	}
 	if types.IsError(result) {
-		return false, nil, errors.Wrapf(ErrInvalidResult, "invalid type comparison: %s", err.Error())
+		return false, errors.Wrapf(ErrInvalidResult, "invalid type comparison: %s", err.Error())
 	}
 	if err != nil {
 		// This shouldn't be handled, as we should get an Error type in result above.
-		return false, nil, fmt.Errorf("error evaluating expression: %w", err)
+		return false, fmt.Errorf("error evaluating expression: %w", err)
 	}
-	return result.Value(), program.EarliestTimeReference(), nil
+	return result.Value(), nil
 }

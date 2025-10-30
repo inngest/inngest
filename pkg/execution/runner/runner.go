@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
@@ -38,6 +39,7 @@ import (
 
 const (
 	CancelTimeout = (24 * time.Hour) * 365
+	pkgName       = "execution.runner"
 )
 
 type Opt func(s *svc)
@@ -502,7 +504,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
-					ok, _, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
+					ok, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
 						"event": evtMap,
 					})
 					if evalerr != nil {
@@ -605,7 +607,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		// If the conditional expression evaluation fails or the expression evaluates to false, then the event is scheduled for immediate execution without waiting for a batch to fill up.
 		eligibleForBatching := true
 		if batchCondition := fn.EventBatch.If; batchCondition != nil {
-			ok, _, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
+			ok, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
 				"event": evt.GetEvent().Map(),
 			})
 			if evalerr != nil || !ok {
@@ -688,6 +690,14 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		AccountID:      consts.DevServerAccountID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "event",
+			"status": executor.ScheduleStatus(err),
+		},
 	})
 
 	switch err {
