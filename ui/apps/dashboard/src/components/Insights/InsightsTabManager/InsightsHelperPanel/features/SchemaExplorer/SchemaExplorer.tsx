@@ -8,8 +8,7 @@ export function SchemaExplorer() {
   const { schemas } = useSchemas();
 
   return (
-    <div>
-      <h1>Schema Explorer</h1>
+    <div className="h-full w-full overflow-auto p-4">
       <pre>{JSON.stringify(schemas, null, 2)}</pre>
     </div>
   );
