@@ -416,7 +416,8 @@ func checkCapacity(ctx context.Context, stateManager state.StateManager, envID u
 	}
 	if workerCap.IsAtCapacity() {
 		// Worker has a capacity limit set and is at capacity
-		log.Debug("worker at capacity", "instance_id", conn.InstanceId, "total_capacity")
+		allActiveLeases, _ := stateManager.GetAllActiveWorkerLeases(ctx, envID, conn.InstanceId)
+		log.Debug("worker at capacity", "instance_id", conn.InstanceId, "total_capacity", workerCap.Total, "available_capacity", workerCap.Available, "all_active_leases", allActiveLeases)
 		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 

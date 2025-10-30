@@ -368,6 +368,14 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "failed to route message")
 
+			// Check if this is a capacity error
+			if errors.Is(err, routing.ErrAllWorkersAtCapacity) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectAllWorkersAtCapacity,
+					Message: "All workers are at capacity",
+				}
+			}
+
 			if errors.Is(err, routing.ErrNoHealthyConnection) {
 				return nil, syscode.Error{
 					Code:    syscode.CodeConnectNoHealthyConnection,
@@ -385,11 +393,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			l.ReportError(err, "could not assign request lease to worker")
 
-			// Check if this is a capacity error
+			// Check if this is a capacity error, this will happen when two in parallel
+			// checked for worker capacity earlier but now one got to this point first
 			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
 				return nil, syscode.Error{
-					Code:    syscode.CodeConnectNoHealthyConnection,
-					Message: "Worker is at capacity",
+					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+					Message: "Assigned worker reached capacity before request was assigned",
 				}
 			}
 		}

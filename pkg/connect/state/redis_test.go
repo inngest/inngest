@@ -1902,3 +1902,210 @@ func TestGetLeaseWorkerInstanceID(t *testing.T) {
 		require.Equal(t, "", retrievedInstance)
 	})
 }
+
+func TestGetAllActiveWorkerLeases(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	mgr := NewRedisConnectionStateManager(rc)
+	ctx := context.Background()
+	envID := uuid.New()
+
+	t.Run("returns error for nil envID", func(t *testing.T) {
+		instanceID := "test-instance"
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, uuid.Nil, instanceID)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "envID cannot be nil")
+		require.Nil(t, leases)
+	})
+
+	t.Run("returns error for empty instanceID", func(t *testing.T) {
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, "")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "instanceID cannot be empty")
+		require.Nil(t, leases)
+
+		// Test with whitespace-only instanceID
+		leases, err = mgr.GetAllActiveWorkerLeases(ctx, envID, "   ")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "instanceID cannot be empty")
+		require.Nil(t, leases)
+	})
+
+	t.Run("returns empty slice when no leases exist", func(t *testing.T) {
+		instanceID := "non-existent-instance"
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.NotNil(t, leases)
+		require.Equal(t, []string{}, leases)
+	})
+
+	t.Run("returns active leases correctly", func(t *testing.T) {
+		instanceID := "test-instance-active"
+		
+		// Set capacity to enable lease tracking
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 10)
+		require.NoError(t, err)
+
+		// Add some leases
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-1")
+		require.NoError(t, err)
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-2")
+		require.NoError(t, err)
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-3")
+		require.NoError(t, err)
+
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Len(t, leases, 3)
+		require.Contains(t, leases, "lease-1")
+		require.Contains(t, leases, "lease-2")
+		require.Contains(t, leases, "lease-3")
+	})
+
+	t.Run("filters out expired leases", func(t *testing.T) {
+		instanceID := "test-instance-expired"
+		
+		// Set capacity to enable lease tracking
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 10)
+		require.NoError(t, err)
+
+		// Add lease that should be active
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-lease")
+		require.NoError(t, err)
+
+		// Manually add an expired lease to the sorted set
+		setKey := mgr.workerLeasesKey(envID, instanceID)
+		pastTime := time.Now().Add(-1 * time.Hour).Unix()
+		_, _ = r.ZAdd(setKey, float64(pastTime), "expired-lease")
+
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Len(t, leases, 1)
+		require.Contains(t, leases, "active-lease")
+		require.NotContains(t, leases, "expired-lease")
+	})
+
+	t.Run("handles mixed active and expired leases", func(t *testing.T) {
+		instanceID := "test-instance-mixed"
+		
+		// Set capacity to enable lease tracking
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 10)
+		require.NoError(t, err)
+
+		// Add active leases
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-1")
+		require.NoError(t, err)
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-2")
+		require.NoError(t, err)
+
+		// Manually add expired leases
+		setKey := mgr.workerLeasesKey(envID, instanceID)
+		pastTime1 := time.Now().Add(-2 * time.Hour).Unix()
+		pastTime2 := time.Now().Add(-1 * time.Hour).Unix()
+		_, _ = r.ZAdd(setKey, float64(pastTime1), "expired-1")
+		_, _ = r.ZAdd(setKey, float64(pastTime2), "expired-2")
+
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Len(t, leases, 2)
+		require.Contains(t, leases, "active-1")
+		require.Contains(t, leases, "active-2")
+		require.NotContains(t, leases, "expired-1")
+		require.NotContains(t, leases, "expired-2")
+	})
+
+	t.Run("filters out empty lease values", func(t *testing.T) {
+		instanceID := "test-instance-empty"
+		
+		// Set capacity to enable lease tracking
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 10)
+		require.NoError(t, err)
+
+		// Add valid lease
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "valid-lease")
+		require.NoError(t, err)
+
+		// Manually add empty entries to the sorted set
+		setKey := mgr.workerLeasesKey(envID, instanceID)
+		futureTime := time.Now().Add(1 * time.Hour).Unix()
+		_, _ = r.ZAdd(setKey, float64(futureTime), "")        // empty string
+		_, _ = r.ZAdd(setKey, float64(futureTime), "   ")     // whitespace only
+
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Len(t, leases, 1)
+		require.Contains(t, leases, "valid-lease")
+	})
+
+	t.Run("handles large number of leases", func(t *testing.T) {
+		instanceID := "test-instance-large"
+		
+		// Set capacity to enable lease tracking
+		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 1000)
+		require.NoError(t, err)
+
+		// Add many leases
+		expectedLeases := make([]string, 100)
+		for i := 0; i < 100; i++ {
+			leaseID := fmt.Sprintf("lease-%d", i)
+			expectedLeases[i] = leaseID
+			err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, leaseID)
+			require.NoError(t, err)
+		}
+
+		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		require.NoError(t, err)
+		require.Len(t, leases, 100)
+		
+		// Check all expected leases are present
+		for _, expectedLease := range expectedLeases {
+			require.Contains(t, leases, expectedLease)
+		}
+	})
+
+	t.Run("works with different envID and instanceID combinations", func(t *testing.T) {
+		envID1 := uuid.New()
+		envID2 := uuid.New()
+		instanceID1 := "instance-1"
+		instanceID2 := "instance-2"
+
+		// Set capacity for both instances in both environments
+		err := mgr.SetWorkerTotalCapacity(ctx, envID1, instanceID1, 5)
+		require.NoError(t, err)
+		err = mgr.SetWorkerTotalCapacity(ctx, envID1, instanceID2, 5)
+		require.NoError(t, err)
+		err = mgr.SetWorkerTotalCapacity(ctx, envID2, instanceID1, 5)
+		require.NoError(t, err)
+
+		// Add leases to different environments and instances
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID1, instanceID1, "env1-inst1-lease1")
+		require.NoError(t, err)
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID1, instanceID2, "env1-inst2-lease1")
+		require.NoError(t, err)
+		err = mgr.AssignRequestLeaseToWorker(ctx, envID2, instanceID1, "env2-inst1-lease1")
+		require.NoError(t, err)
+
+		// Verify isolation
+		leases1, err := mgr.GetAllActiveWorkerLeases(ctx, envID1, instanceID1)
+		require.NoError(t, err)
+		require.Len(t, leases1, 1)
+		require.Contains(t, leases1, "env1-inst1-lease1")
+
+		leases2, err := mgr.GetAllActiveWorkerLeases(ctx, envID1, instanceID2)
+		require.NoError(t, err)
+		require.Len(t, leases2, 1)
+		require.Contains(t, leases2, "env1-inst2-lease1")
+
+		leases3, err := mgr.GetAllActiveWorkerLeases(ctx, envID2, instanceID1)
+		require.NoError(t, err)
+		require.Len(t, leases3, 1)
+		require.Contains(t, leases3, "env2-inst1-lease1")
+	})
+}
