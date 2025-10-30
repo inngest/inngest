@@ -281,6 +281,17 @@ func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return len(m.pauses) > 0, nil
 }
 
+func (m *mockBufferer) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	if int64(len(pausesCopy)) > limit {
+		pausesCopy = pausesCopy[:limit]
+	}
+	return &mockPauseIterator{pauses: pausesCopy}, nil
+}
+
 // Helper methods for thread-safe access in tests
 func (m *mockBufferer) pauseCount() int {
 	m.mu.RLock()
@@ -397,6 +408,17 @@ func (m *mockBuffererSameTimestamp) IndexExists(ctx context.Context, i Index) (b
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.pauses) > 0, nil
+}
+
+func (m *mockBuffererSameTimestamp) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	if int64(len(pausesCopy)) > limit {
+		pausesCopy = pausesCopy[:limit]
+	}
+	return &mockPauseIterator{pauses: pausesCopy}, nil
 }
 
 func TestLastBlockMetadata(t *testing.T) {
