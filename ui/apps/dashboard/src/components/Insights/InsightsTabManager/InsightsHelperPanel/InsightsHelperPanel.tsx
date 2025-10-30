@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { RiCloseLine } from '@remixicon/react';
 
-import { InsightsChat } from '../../InsightsChat/InsightsChat';
 import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import {
   DOCUMENTATION,
@@ -12,6 +11,7 @@ import {
   SUPPORT,
   type HelperTitle,
 } from './constants';
+import { InsightsChat } from './features/InsightsChat/InsightsChat';
 
 type InsightsHelperPanelProps = {
   active: HelperTitle;

@@ -12,10 +12,6 @@ import { InsightsStateMachineContextProvider } from '@/components/Insights/Insig
 import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import {
-  InsightsChatProvider,
-  useInsightsChatProvider,
-} from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
@@ -31,6 +27,10 @@ import {
   SUPPORT,
   type HelperTitle,
 } from './InsightsHelperPanel/constants';
+import {
+  InsightsChatProvider,
+  useInsightsChatProvider,
+} from './InsightsHelperPanel/features/InsightsChat/InsightsChatProvider';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
