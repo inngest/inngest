@@ -202,6 +202,12 @@ func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatew
 	}
 }
 
+func WithServiceLogger(logger logger.Logger) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.logger = logger
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),

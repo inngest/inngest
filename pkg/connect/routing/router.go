@@ -27,6 +27,7 @@ const (
 )
 
 var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
+var ErrAllWorkersAtCapacity = fmt.Errorf("all connect workers at capacity")
 
 type RouteResult struct {
 	GatewayID    ulid.ULID
@@ -62,17 +63,29 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	defer span.End()
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
-	if err != nil && !errors.Is(err, ErrNoHealthyConnection) {
+
+	if err != nil && !(errors.Is(err, ErrNoHealthyConnection) || errors.Is(err, ErrAllWorkersAtCapacity)) {
 		return nil, fmt.Errorf("could not retrieve suitable connection: %w", err)
 	}
 
 	if routeTo == nil {
-		log.Warn("no healthy connections")
-		metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgNameRouter,
-		})
+		// no healthy connections
+		if errors.Is(err, ErrNoHealthyConnection) {
+			log.Warn("no healthy connections")
+			metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgNameRouter,
+			})
 
-		return nil, ErrNoHealthyConnection
+			return nil, ErrNoHealthyConnection
+		}
+		// all workers at capacity
+		if errors.Is(err, ErrAllWorkersAtCapacity) {
+			log.Warn("no worker capacity available")
+			metrics.IncrConnectRouterAllWorkersAtCapacityCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgNameRouter,
+			})
+			return nil, ErrAllWorkersAtCapacity
+		}
 	}
 
 	gatewayId, err := ulid.Parse(routeTo.GatewayId)
@@ -128,6 +141,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 
 	healthy := make([]connWithGroup, 0, len(conns))
 	capacityCache := make(map[string]*checkCapacityRes)
+	workerCapacityAvailable := false
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
 		// avoid duplicate calls to check capacity for same instance
@@ -137,6 +151,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		}
 		// check if the connection is healthy and has worker capacity
 		if res.isHealthy && capacityCache[conn.InstanceId].hasWorkerCapacity {
+			workerCapacityAvailable = true
 			healthy = append(healthy, connWithGroup{
 				conn:  conn,
 				group: res.workerGroup,
@@ -151,6 +166,11 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		if res.shouldDeleteUnhealthyConnection {
 			cleanupUnhealthyConnection(stateMgr, envID, conn, log)
 		}
+	}
+
+	// no available worker has available capacity
+	if !workerCapacityAvailable {
+		return nil, ErrAllWorkersAtCapacity
 	}
 
 	if len(healthy) == 0 {
