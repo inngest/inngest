@@ -62,6 +62,10 @@ type PauseGetter interface {
 
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
+	// PausesByEventSinceWithCreatedAt returns all pauses for a given event within a workspace since a given time,
+	// with createdAt timestamps populated from Redis sorted set scores.
+	PausesByEventSinceWithCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time, limit int64) (PauseIterator, error)
+
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
 
@@ -243,6 +247,13 @@ type Pause struct {
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
+
+	// CreatedAt is the timestamp when the pause was saved. This field may
+	// be empty for older pauses created before this field was added. It's used to
+	// determine which time-based storage blocks contain this pause, as block
+	// timeframes are based on this timestamp (previously only available as the
+	// sort score in pause indexes).
+	CreatedAt time.Time `json:"ca"`
 }
 
 func (p Pause) GetOpcode() enums.Opcode {
