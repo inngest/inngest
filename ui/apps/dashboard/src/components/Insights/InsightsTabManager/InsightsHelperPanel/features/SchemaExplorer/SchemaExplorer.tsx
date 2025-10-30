@@ -1,23 +1,42 @@
 'use client';
 
+import { useState } from 'react';
+import { Search } from '@inngest/components/Forms/Search';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
+import { SHOW_SCHEMA_SEARCH } from '@/components/Insights/temp-flags';
 import { useSchemas } from './useSchemas';
 
 export function SchemaExplorer() {
   const { schemas } = useSchemas();
+  const [search, setSearch] = useState('');
 
   return (
-    <div className="h-full w-full overflow-auto p-4">
-      {schemas.map((schema) => (
-        <SchemaViewer
-          key={schema.name}
-          computeType={computeType}
-          defaultExpandedPaths={['event']}
-          node={schema}
-        />
-      ))}
+    <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4">
+      {SHOW_SCHEMA_SEARCH && (
+        <>
+          <div className="text-light text-xs font-medium uppercase">All Schemas</div>
+          <Search
+            inngestSize="base"
+            onUpdate={setSearch}
+            placeholder="Search event type"
+            value={search}
+          />
+        </>
+      )}
+
+      <div>
+        {schemas.map((schema) => (
+          <SchemaViewer
+            key={schema.name}
+            computeType={computeType}
+            defaultExpandedPaths={['event']}
+            hide={Boolean(search) && !schema.name.startsWith(search)}
+            node={schema}
+          />
+        ))}
+      </div>
     </div>
   );
 }
