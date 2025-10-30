@@ -34,7 +34,7 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}
-	res, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
+	res, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}

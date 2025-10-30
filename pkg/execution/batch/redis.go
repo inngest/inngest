@@ -90,7 +90,7 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 		return "default", nil
 	}
 
-	out, _, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
+	out, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
 	if err != nil {
 		b.log.Error("error evaluating batch key expression",
 			"error", err,
