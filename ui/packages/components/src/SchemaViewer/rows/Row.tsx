@@ -1,6 +1,6 @@
 'use client';
 
-import type { ArrayNode, ObjectNode, SchemaNode, ValueNode } from '../types';
+import type { SchemaNode } from '../types';
 import { ArrayRow } from './ArrayRow';
 import { ObjectRow } from './ObjectRow';
 import { ValueRow } from './ValueRow';
