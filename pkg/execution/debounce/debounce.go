@@ -949,7 +949,7 @@ func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn i
 		return fn.ID.String(), nil
 	}
 
-	out, _, err := expressions.Evaluate(ctx, *fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
+	out, err := expressions.Evaluate(ctx, *fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error evaluating debounce expression",
 			"expression", *fn.Debounce.Key,
