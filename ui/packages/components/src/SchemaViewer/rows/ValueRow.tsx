@@ -9,7 +9,7 @@ export function ValueRow({ node, typeLabelOverride, boldName }: ValueRowProps): 
   const typeLabel = getTypeLabel(node, typeLabelOverride);
 
   return (
-    <div className="flex items-center gap-1.5 px-1 py-0.5">
+    <div className="flex select-none items-center gap-1.5 px-1 py-0.5">
       <span className={cn('text-sm', boldName ? 'text-basis font-semibold' : 'text-subtle')}>
         {node.name}
       </span>
