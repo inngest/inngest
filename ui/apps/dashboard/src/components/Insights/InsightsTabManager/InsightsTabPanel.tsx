@@ -4,7 +4,6 @@ import { Link } from '@inngest/components/Link/Link';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 
 import type { Tab } from '@/components/Insights/types';
-import { MaximizeChatButton } from '../InsightsChat/header/MaximizeChatButton';
 import { InsightsDataTable } from '../InsightsDataTable/InsightsDataTable';
 import { InsightsSQLEditor } from '../InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '../InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
@@ -22,9 +21,6 @@ type InsightsTabPanelProps = {
   isHomeTab?: boolean;
   isTemplatesTab?: boolean;
   tab: Tab;
-  isChatPanelVisible: boolean;
-  isInsightsAgentEnabled: boolean;
-  onToggleChatPanelVisibility: () => void;
 };
 
 export function InsightsTabPanel({
@@ -32,9 +28,6 @@ export function InsightsTabPanel({
   isHomeTab,
   isTemplatesTab,
   tab,
-  isChatPanelVisible,
-  isInsightsAgentEnabled,
-  onToggleChatPanelVisibility,
 }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
@@ -56,12 +49,6 @@ export function InsightsTabPanel({
               <>
                 <InsightsSQLEditorSaveQueryButton tab={tab} />
                 <InsightsSQLEditorQueryButton />
-                {isInsightsAgentEnabled && !isChatPanelVisible && (
-                  <>
-                    <VerticalDivider />
-                    <MaximizeChatButton onClick={onToggleChatPanelVisibility} />
-                  </>
-                )}
               </>
             }
             className="h-full"
@@ -92,8 +79,4 @@ export function InsightsTabPanel({
       />
     </div>
   );
-}
-
-function VerticalDivider() {
-  return <div className="border-subtle mx-1 h-[28px] border-l" />;
 }
