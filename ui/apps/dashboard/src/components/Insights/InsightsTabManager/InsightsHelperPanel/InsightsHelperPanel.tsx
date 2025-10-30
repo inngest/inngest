@@ -12,6 +12,7 @@ import {
   type HelperTitle,
 } from './constants';
 import { InsightsChat } from './features/InsightsChat/InsightsChat';
+import { SchemaExplorer } from './features/SchemaExplorer/SchemaExplorer';
 
 type InsightsHelperPanelProps = {
   active: HelperTitle;
@@ -29,7 +30,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
       case DOCUMENTATION:
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case SCHEMA_EXPLORER:
-        return <div className="text-sm">Schemas helper (placeholder)</div>;
+        return <SchemaExplorer />;
       case SUPPORT:
         return <div className="text-sm">Support helper (placeholder)</div>;
       default:
