@@ -7,5 +7,11 @@ import { useSchemas } from './useSchemas';
 export function SchemaExplorer() {
   const { schemas } = useSchemas();
 
-  return schemas.map((schema) => <SchemaViewer key={schema.name} node={schema} />);
+  return (
+    <div className="h-full w-full overflow-auto p-4">
+      {schemas.map((schema) => (
+        <SchemaViewer key={schema.name} node={schema} />
+      ))}
+    </div>
+  );
 }
