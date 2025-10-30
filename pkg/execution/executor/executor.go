@@ -2720,9 +2720,13 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
-	// Again, we ONLY create new traces if the steps were batched in checkpointing, then returned
-	// by the SDK in an async response due to overly permissive checkpointing (ie. after 10s)
-	// which was never called.
+	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
+	// then returned as an async response because the checkpooint batch time was greater than
+	// the run execution.  In this case, all opcodes are returned to the executor via the async
+	// response, and we have to retroactively save traces for each step.
+	//
+	// Again, we ONLY create new traces if the steps were batched, otherwise the standard
+	// trace -> exec -> cleanup flow handles individual steps.
 	//
 	// In this case, we MUST retroactively record spans for each past step.
 	if emitCheckpointTraces(ctx) {
