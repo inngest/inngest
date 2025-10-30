@@ -753,7 +753,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 				}
 
 				event := st.Event()
-				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+				ok, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 				if err != nil {
 					// NOTE: log but don't exit here, since we want to conitnue
 					l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
@@ -852,7 +852,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 			}
 
 			event := st.Event()
-			ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+			ok, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 			if err != nil {
 				// NOTE: log but don't exit here, since we want to conitnue
 				l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
@@ -888,7 +888,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 	}
 
 	hcTime := ci.ID.Timestamp()
-	l.Info("starting cron health check", "scheduled_health_check_time", hcTime)
+	l.Trace("starting cron health check", "scheduled_health_check_time", hcTime)
 
 	cqrsFns, err := s.data.GetFunctions(ctx)
 	if err != nil {
@@ -950,13 +950,11 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 	}
 
 	err = eg.Wait()
-	l.Info("health checks finished", "success", success, "failed", failed, "errors", errored)
+	l.Trace("health checks finished", "success", success, "failed", failed, "errors", errored)
 
 	if err != nil {
 		return fmt.Errorf("some cron health checks errored %w", err)
 	}
-
-	l.Info("finished cron health check")
 
 	// enqueue next health check.
 	return s.croner.EnqueueNextHealthCheck(ctx)

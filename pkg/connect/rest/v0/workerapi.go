@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -233,7 +232,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	switch {
 	case err == nil:
 		executorIP := ip.String()
-		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", cr.Opts.ConnectGRPCConfig.Executor.Port))
 		grpcClient, err := cr.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 		if err != nil {
 			l.Error("could not create grpc client", "url", grpcURL, "err", err)

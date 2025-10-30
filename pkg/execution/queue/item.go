@@ -591,7 +591,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	var throttleExpr string
 	if throttle.Key != nil {
-		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
+		val, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)

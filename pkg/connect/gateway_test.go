@@ -37,6 +37,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var testExecutorIP = net.ParseIP("127.0.0.1")
+
 func TestConnectionEstablished(t *testing.T) {
 	res := createTestingGateway(t)
 
@@ -77,7 +79,7 @@ func TestLeaseRenewal(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -155,7 +157,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -260,7 +262,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -1229,6 +1231,3 @@ func freePort() int {
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
 }
-
-
-

@@ -226,7 +226,12 @@ type ScheduleRequest struct {
 	// Note that this should never be provided by the user, as that could welcome
 	// conflicts.
 	RunID *ulid.ULID
-
+	// URL is the URL that is being hit for REST-based sync functions.
+	//
+	// This is required because some URLs may contain IDs (/v1/users/:id).
+	// These URLs are *run specific* vs function specific;  we must always include
+	// the URL for these in metadata.
+	URL string
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.
 	OriginalRunID *ulid.ULID
 	// ReplayID is the ID of the ID of the replay, if this a replay.

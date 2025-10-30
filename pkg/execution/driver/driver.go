@@ -61,6 +61,10 @@ type V2RequestOpts struct {
 	// This happens in the case of StepPlanned ops, which request an explicit step ID
 	// to be executed via this request.
 	StepID *string
+
+	// URL is the URL to hit.  This is always provided by the caller instead of being derived
+	// from the function, as individual runs in a function may hit a unique URL.
+	URL string
 }
 
 // DriverV1 represents an old deprecated driver type for

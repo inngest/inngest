@@ -169,15 +169,7 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 }
 
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
-	var duration *int
 	status := models.RunTraceSpanStatusRunning
-	startedAt := span.GetStartedAtTime()
-	endedAt := span.GetEndedAtTime()
-	if startedAt != nil && endedAt != nil {
-		dur := int(endedAt.Sub(*startedAt).Milliseconds())
-		duration = &dur
-		status = models.RunTraceSpanStatusCompleted
-	}
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
@@ -230,7 +222,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
 		Attempts:       &attempts,
-		Duration:       duration,
 		EndedAt:        span.GetEndedAtTime(),
 		FunctionID:     span.GetFunctionID(),
 		IsRoot:         span.GetIsRoot(),
@@ -344,6 +335,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		isFirstChild := true
 		haveSetRunStartTime := span.Name != meta.SpanNameRun
 
+		// If there's a run start time on the overall parent, use that.  Sometimes this
+		// is the case for eg. sync based runs.
+		if span.GetStartedAtTime() != nil {
+			haveSetRunStartTime = true
+		}
+
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
 			if err != nil {
@@ -388,6 +385,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
+
+					gqlSpan.EndedAt = child.EndedAt
 					gqlSpan.Status = child.Status
 
 					if isFirstChild {
@@ -398,8 +397,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					if child.OutputID != nil && *child.OutputID != "" {
 						gqlSpan.OutputID = child.OutputID
 					}
-
-					gqlSpan.EndedAt = child.EndedAt
 
 					if cs.Attributes.IsFunctionOutput != nil && *cs.Attributes.IsFunctionOutput {
 						gqlSpan.Name = FinalizationSpanName
@@ -506,6 +503,23 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.StepType = *span.Attributes.StepRunType
 	} else if gqlSpan.StepOp != nil {
 		gqlSpan.StepType = gqlSpan.StepOp.String()
+	}
+
+	if models.RunTraceEnded(gqlSpan.Status) {
+		startedAt := span.GetStartedAtTime()
+		endedAt := span.GetEndedAtTime()
+		if startedAt != nil && endedAt != nil {
+			dur := int(endedAt.Sub(*startedAt).Milliseconds())
+			gqlSpan.Duration = &dur
+		}
+	} else {
+		// Remove ended at.  There's an issue in the data that CQRS is passed in which
+		// sometimes all spans have an EndedAt field, which actually denotes when the
+		// span was committed.
+		//
+		// EndedAt, to GQL, denotes the step ending, and we merge start and stop spans
+		// together.
+		gqlSpan.EndedAt = nil
 	}
 
 	return gqlSpan, nil

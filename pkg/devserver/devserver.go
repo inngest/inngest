@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
@@ -78,11 +79,14 @@ import (
 )
 
 const (
-	DefaultTick               = 150
-	DefaultTickDuration       = time.Millisecond * DefaultTick
-	DefaultPollInterval       = 5
-	DefaultQueueWorkers       = 100
-	DefaultConnectGatewayPort = 8289
+	DefaultTick                    = 150
+	DefaultTickDuration            = time.Millisecond * DefaultTick
+	DefaultPollInterval            = 5
+	DefaultQueueWorkers            = 100
+	DefaultConnectGatewayPort      = 8289
+	DefaultConnectGatewayGRPCPort  = 50052
+	DefaultConnectExecutorGRPCPort = 50053
+	DefaultDebugAPIPort            = 7777
 )
 
 var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
@@ -119,8 +123,9 @@ type StartOpts struct {
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
 
-	ConnectGatewayPort int    `json:"connectGatewayPort"`
-	ConnectGatewayHost string `json:"connectGatewayHost"`
+	ConnectGatewayPort int                             `json:"connectGatewayPort"`
+	ConnectGatewayHost string                          `json:"connectGatewayHost"`
+	ConnectGRPCConfig  connectConfig.ConnectGRPCConfig `json:"connectGRPCConfig"`
 
 	NoUI bool
 
@@ -140,6 +145,9 @@ type StartOpts struct {
 
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
+
+	// Debug API
+	DebugAPIPort int `json:"debugAPIPort"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -362,6 +370,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+		GRPCConfig:         opts.ConnectGRPCConfig,
 	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
@@ -428,6 +437,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
+		executor.WithSigningKeyLoader(func(ctx context.Context, envID uuid.UUID) ([]byte, error) {
+			// for httpv2, ensuring we sign sync and async requests using the new driver.
+			if opts.SigningKey == nil {
+				return nil, nil
+			}
+			return []byte(*opts.SigningKey), nil
+		}),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,
@@ -539,6 +555,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
+			ConnectGRPCConfig:          opts.ConnectGRPCConfig,
 		},
 	})
 	if err != nil {
@@ -562,11 +579,11 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:      dbcqrs,
-			FunctionCreator: dbcqrs,
-			EventPublisher:  runner,
-			TracerProvider:  tp,
-			State:           smv2,
+			AppCreator:        dbcqrs,
+			FunctionCreator:   dbcqrs,
+			EventPublisher:    runner,
+			TracerProvider:    tp,
+			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
@@ -581,6 +598,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
+		connect.WithGRPCConfig(opts.ConnectGRPCConfig),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
@@ -671,6 +689,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			State:         ds.State,
 			Cron:          croner,
 			ShardSelector: shardSelector,
+			Port:          ds.Opts.DebugAPIPort,
 		}))
 	}
 
