@@ -2732,7 +2732,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 			ctx,
 			meta.SpanNameStep,
 			&tracing.CreateSpanOptions{
-				Parent:    runCtx.Metadata().Config.NewFunctionTrace(),
+				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
 				StartTime: gen.Timing.Start(),
 				EndTime:   gen.Timing.End(),
 				Attributes: attrs.Merge(
