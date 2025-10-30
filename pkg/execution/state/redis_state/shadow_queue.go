@@ -656,13 +656,24 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 	}
 
 	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
+	if len(q.runMode.ExclusiveAccounts) > 0 {
+		shouldScanAccount = true
+	}
+
 	if shouldScanAccount {
 		sequential := false
-		peekedAccounts, err := duration(ctx, q.primaryQueueShard.Name, durOpGobalShadowPartitionAccountPeek, q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-			return q.peekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
-		})
-		if err != nil {
-			return fmt.Errorf("could not peek global shadow partition accounts: %w", err)
+
+		var peekedAccounts []uuid.UUID
+		if len(q.runMode.ExclusiveAccounts) > 0 {
+			peekedAccounts = q.runMode.ExclusiveAccounts
+		} else {
+			peeked, err := duration(ctx, q.primaryQueueShard.Name, durOpGobalShadowPartitionAccountPeek, q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+				return q.peekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
+			})
+			if err != nil {
+				return fmt.Errorf("could not peek global shadow partition accounts: %w", err)
+			}
+			peekedAccounts = peeked
 		}
 
 		if len(peekedAccounts) == 0 {
