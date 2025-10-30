@@ -154,19 +154,9 @@ export const StepInfo = ({
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
   );
 
-  const duration = trace.childrenSpans?.length
-    ? trace.childrenSpans
-        .filter((child) => child.startedAt)
-        .reduce(
-          (total, child) =>
-            total +
-            ((toMaybeDate(child.endedAt) ?? new Date()).getTime() -
-              new Date(child.startedAt!).getTime()),
-          0
-        )
-    : trace.startedAt
-    ? (toMaybeDate(trace.endedAt) ?? new Date()).getTime() - new Date(trace.startedAt).getTime()
-    : 0;
+  const startedAt = toMaybeDate(trace.startedAt);
+  const endedAt = toMaybeDate(trace.endedAt);
+  const duration = startedAt ? (endedAt ?? new Date()).getTime() - startedAt.getTime() : 0;
 
   const durationText = duration > 0 ? formatMilliseconds(duration) : '-';
 
