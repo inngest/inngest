@@ -489,6 +489,16 @@ func (a checkpointAPI) checkpointSyncSteps(ctx context.Context, input checkpoint
 	return jwt
 }
 
+// CheckpointAsyncSteps is used to checkpoint from background functions (async functions).
+//
+// In this case, we can assume that a background function is executed via the classic job
+// queue means, and that we're executing steps as we receive them.
+//
+// Note that step opcodes here in the future could be sync or async:  it's theoretically
+// valid for an executor to hit the SDK;  the SDK to checkpoint
+// StepRun, StepRun, StepWaitForEvent], then return a noop StepNone to the original executor.
+//
+// For now, though, we assume that this only contains sync steps.
 func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.AuthFinder(ctx)
@@ -566,13 +576,15 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 				l.Error("error saving checkpointed step state", "error", err)
 			}
 
-			// TODO: add trace CTX data
-
 			_, err = a.TracerProvider.CreateSpan(
-				ctx,
+				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
+					Identifier: md.ID,
+					Attempt:    0,
+					// XXX: MaxAttempts isn't stored here, as we don't have that info at this time.,
+				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent:    md.Config.NewFunctionTrace(),
+					Parent:    tracing.RunSpanRefFromMetadata(&md),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
 					Attributes: attrs.Merge(
