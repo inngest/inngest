@@ -368,6 +368,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+							meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
 						),
 					),
 				},
