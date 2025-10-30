@@ -1839,7 +1839,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 					return
 				}
 
-				val, _, err := expr.Evaluate(ctx, data)
+				val, err := expr.Evaluate(ctx, data)
 				if err != nil {
 					l.Warn("error evaluating pause expression", "error", err)
 					return

@@ -753,7 +753,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 				}
 
 				event := st.Event()
-				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+				ok, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 				if err != nil {
 					// NOTE: log but don't exit here, since we want to conitnue
 					l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
@@ -852,7 +852,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 			}
 
 			event := st.Event()
-			ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+			ok, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 			if err != nil {
 				// NOTE: log but don't exit here, since we want to conitnue
 				l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)

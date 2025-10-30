@@ -19,4 +19,3 @@ func (noopConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*conn
 
 	return &connpb.SDKResponse{}, nil
 }
-

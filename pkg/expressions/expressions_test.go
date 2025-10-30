@@ -1040,34 +1040,18 @@ func TestEvaluateExpression(t *testing.T) {
 				go func() {
 					// Test thread safety of evaluate and Validate().  We don't care about the results,
 					// as these are checked below.
-					_, _, _ = Evaluate(context.Background(), test.expr, test.data)
+					_, _ = Evaluate(context.Background(), test.expr, test.data)
 					_ = Validate(context.Background(), nil, test.expr)
 				}()
 			}
 
-			actual, earliest, err := Evaluate(context.Background(), test.expr, test.data)
+			actual, err := Evaluate(context.Background(), test.expr, test.data)
 
 			require.Equal(t, err == nil, !test.shouldErr, "unexpected err result '%v' for '%s'", err, test.expr)
 			require.Equal(t, test.expected, actual, "unexpected match result (%t): for (%d) '%s'", actual, n, test.expr)
 
 			if test.shouldErr && err != nil {
 				require.True(t, strings.Contains(err.Error(), test.errMsg), "Error should contain %s, got %s", test.errMsg, err.Error())
-			}
-
-			if test.earliest != nil {
-				require.NotNil(t, earliest, test.expr)
-				require.WithinDuration(
-					t,
-					*test.earliest,
-					*earliest,
-					time.Second,
-					"invalid earliest time.  expected '%s', got '%s' for '%s'",
-					test.earliest.Format(time.RFC3339),
-					earliest.Format(time.RFC3339),
-					test.expr,
-				)
-			} else {
-				require.Nil(t, earliest, "expected nil earliest date for '%s'", test.expr)
 			}
 		})
 
@@ -1227,7 +1211,7 @@ func BenchmarkEvaluate(b *testing.B) {
 		if err != nil {
 			b.Fatalf("unknown error in benchmark: %s", err)
 		}
-		res, _, err := expr.Evaluate(ctx, data)
+		res, err := expr.Evaluate(ctx, data)
 		if err != nil {
 			b.Fatalf("unknown error in benchmark: %s", err)
 		}
@@ -1254,7 +1238,7 @@ func BenchmarkEvaluateParallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			expr, _ := NewBooleanEvaluator(ctx, expression)
-			res, _, err := expr.Evaluate(ctx, data)
+			res, err := expr.Evaluate(ctx, data)
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
 			}
@@ -1290,7 +1274,7 @@ func BenchmarkEvaluateRandomDataParallel(b *testing.B) {
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
 			}
-			_, _, err = expr.Evaluate(ctx, data)
+			_, err = expr.Evaluate(ctx, data)
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
 			}
@@ -1319,7 +1303,7 @@ func BenchmarkEvaluateRandomExpressionParallel(b *testing.B) {
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
 			}
-			_, _, err = expr.Evaluate(ctx, data)
+			_, err = expr.Evaluate(ctx, data)
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
 			}

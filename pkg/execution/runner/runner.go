@@ -502,7 +502,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
-					ok, _, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
+					ok, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
 						"event": evtMap,
 					})
 					if evalerr != nil {
@@ -605,7 +605,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		// If the conditional expression evaluation fails or the expression evaluates to false, then the event is scheduled for immediate execution without waiting for a batch to fill up.
 		eligibleForBatching := true
 		if batchCondition := fn.EventBatch.If; batchCondition != nil {
-			ok, _, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
+			ok, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
 				"event": evt.GetEvent().Map(),
 			})
 			if evalerr != nil || !ok {
