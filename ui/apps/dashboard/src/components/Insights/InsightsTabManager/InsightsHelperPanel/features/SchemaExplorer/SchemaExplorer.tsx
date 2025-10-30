@@ -1,15 +1,11 @@
 'use client';
 
-import * as React from 'react';
+import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 
 import { useSchemas } from './useSchemas';
 
 export function SchemaExplorer() {
   const { schemas } = useSchemas();
 
-  return (
-    <div className="h-full w-full overflow-auto p-4">
-      <pre>{JSON.stringify(schemas, null, 2)}</pre>
-    </div>
-  );
+  return schemas.map((schema) => <SchemaViewer key={schema.name} node={schema} />);
 }
