@@ -9,7 +9,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	connectconfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/consts"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jonboulle/clockwork"
@@ -64,11 +63,7 @@ func TestLeaseRequest(t *testing.T) {
 	})
 
 	t.Run("leasing request should work", func(t *testing.T) {
-		connectconfig.SetConfig(ctx, connectconfig.ConnectExecutor{
-			GRPCIP:   executorIP,
-			GRPCPort: 4567,
-		})
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -92,12 +87,8 @@ func TestLeaseRequest(t *testing.T) {
 
 		// Simulate a new executor
 		newIP := net.IPv4(1, 2, 3, 4)
-		connectconfig.SetConfig(ctx, connectconfig.ConnectExecutor{
-			GRPCIP:   newIP,
-			GRPCPort: 3456,
-		})
 
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, newIP)
 		require.Nil(t, leaseID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrRequestLeased)
@@ -137,7 +128,7 @@ func TestLeaseRequest(t *testing.T) {
 	})
 
 	t.Run("leasing expired item should work", func(t *testing.T) {
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -157,7 +148,7 @@ func TestLeaseRequest(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, leased)
 
-		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, executorIP)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
