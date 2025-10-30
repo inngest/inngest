@@ -538,8 +538,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 
 	baseTime := time.Now().Add(-time.Hour)
 	
-	pauses := []state.Pause{}
-	for i := 0; i < 15; i++ {
+	for range 15 {
 		pause := state.Pause{
 			ID:          uuid.New(),
 			WorkspaceID: workspaceID,
@@ -551,7 +550,6 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 			Event:   &eventName,
 			Expires: state.Time(time.Now().Add(time.Hour)),
 		}
-		pauses = append(pauses, pause)
 		
 		time.Sleep(10 * time.Millisecond)
 		_, err = mgr.SavePause(ctx, pause)
