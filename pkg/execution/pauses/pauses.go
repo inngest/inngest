@@ -136,6 +136,10 @@ type Bufferer interface {
 	// Note that this does not return blocks, as this only reads from the BufferIndexer.
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 
+	// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+	// ordered by creation time, with createdAt populated from Redis sorted set scores. The since time is inclusive.
+	PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error)
+
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 	// the buffer.
 	Delete(ctx context.Context, index Index, pause state.Pause) error

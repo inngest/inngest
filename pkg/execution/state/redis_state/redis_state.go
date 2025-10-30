@@ -832,30 +832,25 @@ func (m unshardedMgr) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID,
 		}
 		return time.Time{}, err
 	}
-	
+
 	if len(result) == 0 {
 		return time.Time{}, fmt.Errorf("pause timestamp not found")
 	}
-	
+
 	// ZMSCORE returns nil for non-existent members
 	if result[0].IsNil() {
 		return time.Time{}, fmt.Errorf("pause timestamp not found")
 	}
-	
+
 	ts, err := result[0].AsInt64()
 	if err != nil {
 		return time.Time{}, err
 	}
-	
+
 	return time.Unix(ts, 0), nil
 }
 
 func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, error) {
-	packed, err := json.Marshal(p)
-	if err != nil {
-		return 0, err
-	}
-
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePause"), redis_telemetry.ScopePauses)
 
 	// `evt` is used to search for pauses based on event names. We only want to
@@ -878,7 +873,16 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	}
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
-	nowUnixSeconds := time.Now().Unix()
+
+	now := time.Now()
+	nowUnixSeconds := now.Unix()
+
+	p.CreatedAt = now
+
+	packed, err := json.Marshal(p)
+	if err != nil {
+		return 0, err
+	}
 
 	pause := m.u.Pauses()
 
@@ -1411,7 +1415,47 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 		kf:    pauses.kg,
 		start: start,
 	}
-	err = iter.init(ctx, ids, 100)
+	err = iter.init(ctx, ids, []float64{}, 100)
+	return iter, err
+}
+
+// PausesByEventSinceWithCreatedAt is for getting ordered pauses and ensuring that they are returned
+// with their createdAt time even when the queue item doesn't have it.
+func (m unshardedMgr) PausesByEventSinceWithCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time, limit int64) (state.PauseIterator, error) {
+	start := time.Now()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByEventSinceWithCreatedAt"), redis_telemetry.ScopePauses)
+
+	pauses := m.u.Pauses()
+
+	cmd := pauses.Client().B().
+		Zrange().
+		Key(pauses.kg.PauseIndex(ctx, "add", workspaceID, event)).
+		Min(strconv.Itoa(int(since.Unix()))).
+		Max("+inf").
+		Byscore().
+		Limit(0, limit).
+		Withscores().
+		Build()
+
+	results, err := pauses.Client().Do(ctx, cmd).AsZScores()
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, len(results))
+	scores := make([]float64, len(results))
+	for i, result := range results {
+		ids[i] = result.Member
+		scores[i] = result.Score
+	}
+
+	iter := &keyIter{
+		r:     pauses.Client(),
+		kf:    pauses.kg,
+		start: start,
+	}
+	err = iter.init(ctx, ids, scores, 100)
 	return iter, err
 }
 
@@ -1796,7 +1840,15 @@ type keyIter struct {
 	// keys stores pause IDs to fetch in batches
 	keys []string
 	// vals stores pauses as strings from MGET
-	vals  []string
+	vals []string
+
+	// scores stores pause creation times or index scores
+	// they are conditionally used so the iterator works
+	// just fine if it's empty
+	scores []float64
+
+	hasScores bool
+
 	idx   int64
 	err   error
 	start time.Time
@@ -1806,9 +1858,11 @@ func (i *keyIter) Error() error {
 	return i.err
 }
 
-func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
+func (i *keyIter) init(ctx context.Context, keys []string, scores []float64, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
+	i.scores = scores
+	i.hasScores = len(scores) > 0
 	err := i.fetch(ctx)
 	if err == errScanDone {
 		return nil
@@ -1875,12 +1929,17 @@ func (i *keyIter) Next(ctx context.Context) bool {
 }
 
 func (i *keyIter) Val(ctx context.Context) *state.Pause {
+	var score float64
 	if len(i.vals) == 0 {
 		return nil
 	}
 
 	val := i.vals[0]
 	i.vals = i.vals[1:]
+	if i.hasScores {
+		score = i.scores[0]
+		i.scores = i.scores[1:]
+	}
 	if val == "" {
 		return nil
 	}
@@ -1890,6 +1949,13 @@ func (i *keyIter) Val(ctx context.Context) *state.Pause {
 	if err != nil {
 		return nil
 	}
+
+	// Hack for older pauses that don't have a createdAt
+	// persisted in the pause item.
+	if i.hasScores && pause.CreatedAt.IsZero() {
+		pause.CreatedAt = time.Unix(int64(score), 0)
+	}
+
 	return pause
 }
 
