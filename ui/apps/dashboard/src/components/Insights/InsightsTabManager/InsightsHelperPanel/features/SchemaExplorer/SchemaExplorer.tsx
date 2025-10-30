@@ -1,6 +1,7 @@
 'use client';
 
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
+import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
 import { useSchemas } from './useSchemas';
 
@@ -10,8 +11,13 @@ export function SchemaExplorer() {
   return (
     <div className="h-full w-full overflow-auto p-4">
       {schemas.map((schema) => (
-        <SchemaViewer key={schema.name} node={schema} />
+        <SchemaViewer key={schema.name} computeType={computeType} node={schema} />
       ))}
     </div>
   );
 }
+
+const computeType = (node: ValueNode, baseLabel: string): string => {
+  if (node.path === 'event.data' && baseLabel === 'string') return 'JSON';
+  return baseLabel;
+};
