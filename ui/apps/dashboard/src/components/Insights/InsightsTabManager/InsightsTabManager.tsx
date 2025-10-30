@@ -267,9 +267,9 @@ function InsightsTabManagerInternal({
           tabId={tab.id}
         >
           <div className={tab.id === activeTabId ? 'h-full w-full' : 'h-0 w-full overflow-hidden'}>
-            {isQueryTab(tab.id) && isHelperPanelOpen ? (
-              <div className="flex h-full w-full">
-                <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex h-full w-full">
+              <div className="h-full min-w-0 flex-1 overflow-hidden">
+                {isQueryTab(tab.id) && isHelperPanelOpen ? (
                   <Resizable
                     defaultSplitPercentage={75}
                     minSplitPercentage={20}
@@ -296,26 +296,19 @@ function InsightsTabManagerInternal({
                       />
                     }
                   />
-                </div>
-                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
-                  <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
-                ) : null}
-              </div>
-            ) : (
-              <div className="flex h-full w-full">
-                <div className="h-full min-w-0 flex-1 overflow-hidden">
+                ) : (
                   <InsightsTabPanel
                     isHomeTab={tab.id === HOME_TAB.id}
                     isTemplatesTab={tab.id === TEMPLATES_TAB.id}
                     tab={tab}
                     historyWindow={historyWindow}
                   />
-                </div>
-                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
-                  <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
-                ) : null}
+                )}
               </div>
-            )}
+              {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
+                <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
+              ) : null}
+            </div>
           </div>
         </InsightsStateMachineContextProvider>
       ))}
