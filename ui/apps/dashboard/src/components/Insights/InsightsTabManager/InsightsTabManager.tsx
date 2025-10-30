@@ -17,7 +17,7 @@ import {
   useInsightsChatProvider,
 } from '../InsightsChat/InsightsChatProvider';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
-import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
+import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
 import {
   InsightsHelperPanelControl,
@@ -230,13 +230,11 @@ function InsightsTabManagerInternal({
       });
     }
 
-    if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
-      items.push({
-        title: SCHEMA_EXPLORER,
-        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
-        action: () => handleSelectHelper(SCHEMA_EXPLORER),
-      });
-    }
+    items.push({
+      title: SCHEMA_EXPLORER,
+      icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
+      action: () => handleSelectHelper(SCHEMA_EXPLORER),
+    });
 
     items.push({
       title: SUPPORT,
@@ -297,7 +295,7 @@ function InsightsTabManagerInternal({
                     }
                   />
                 </div>
-                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
+                {isQueryTab(tab.id) ? (
                   <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
                 ) : null}
               </div>
@@ -311,7 +309,7 @@ function InsightsTabManagerInternal({
                     historyWindow={historyWindow}
                   />
                 </div>
-                {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
+                {isQueryTab(tab.id) ? (
                   <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
                 ) : null}
               </div>
