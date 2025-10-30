@@ -11,7 +11,12 @@ export function SchemaExplorer() {
   return (
     <div className="h-full w-full overflow-auto p-4">
       {schemas.map((schema) => (
-        <SchemaViewer key={schema.name} computeType={computeType} node={schema} />
+        <SchemaViewer
+          key={schema.name}
+          computeType={computeType}
+          defaultExpandedPaths={['event']}
+          node={schema}
+        />
       ))}
     </div>
   );

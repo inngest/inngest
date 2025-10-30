@@ -2,6 +2,11 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
+type ExpansionProviderProps = {
+  children: React.ReactNode;
+  defaultExpandedPaths?: string[];
+};
+
 type ExpansionContextValue = {
   isExpanded: (path: string) => boolean;
   toggle: (path: string) => void;
@@ -9,8 +14,8 @@ type ExpansionContextValue = {
 
 const ExpansionContext = createContext<ExpansionContextValue | undefined>(undefined);
 
-export function ExpansionProvider({ children }: { children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+export function ExpansionProvider({ children, defaultExpandedPaths }: ExpansionProviderProps) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(defaultExpandedPaths ?? []));
 
   const isExpanded = useCallback((path: string) => expanded.has(path), [expanded]);
   const toggle = useCallback((path: string) => {
