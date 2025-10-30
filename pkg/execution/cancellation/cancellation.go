@@ -68,7 +68,7 @@ func (c checker) IsCancelled(ctx context.Context, wsID, fnID uuid.UUID, runID ul
 
 		// This cancellation has an expression, and we should only cancel the function
 		// if the event that initialized the function matches the expression.
-		ok, _, err := expressions.EvaluateBoolean(ctx, *cancel.If, map[string]any{
+		ok, err := expressions.EvaluateBoolean(ctx, *cancel.If, map[string]any{
 			"event": event,
 		})
 		if err != nil {

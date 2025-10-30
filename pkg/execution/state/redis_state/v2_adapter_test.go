@@ -220,7 +220,7 @@ func TestV2Adapter(t *testing.T) {
 			assert.Equal(t, 2, len(stepInputs))
 			assert.Contains(t, stepInputs, "step-1")
 			assert.Contains(t, stepInputs, "step-2")
-			
+
 			// Verify that step inputs are returned directly (not wrapped)
 			for stepID, stepData := range stepInputs {
 				var data map[string]any

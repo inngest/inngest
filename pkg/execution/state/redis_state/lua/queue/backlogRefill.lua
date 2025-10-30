@@ -259,8 +259,15 @@ if refill > 0 then
     local itemScore = tonumber(itemScores[i])
     local itemData = potentiallyMissingQueueItems[i]
 
+    -- If queue item does not exist in backlog, skip
+    local missingInBacklog = itemScore == nil
+
     -- If queue item does not exist in hash, delete from backlog
-    if itemData == false or itemData == nil or itemData == "" then
+    local missingInHash = itemData == false or itemData == nil or itemData == ""
+
+    if missingInBacklog then
+      -- no-op
+    elseif missingInHash then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
       hasRemove = true
     else
