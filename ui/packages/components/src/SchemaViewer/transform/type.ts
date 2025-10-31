@@ -13,7 +13,12 @@ import type { JSONSchema, JSONSchemaTypeName } from '../types';
 export function inferScalarType(
   schema: JSONSchema
 ): JSONSchemaTypeName | JSONSchemaTypeName[] | 'unknown' {
-  if (Array.isArray(schema.type)) return schema.type;
+  if (Array.isArray(schema.type)) {
+    // If union includes structural types, collapse to unknown in value context.
+    const set = new Set(schema.type);
+    if (set.has('object') || set.has('array')) return 'unknown';
+    return schema.type;
+  }
 
   switch (schema.type) {
     case 'string':
