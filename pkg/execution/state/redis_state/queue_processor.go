@@ -119,6 +119,11 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		return err
 	}
 
+	// Pass optional idempotency period to queue item
+	if opts.IdempotencyPeriod != nil {
+		qi.IdempotencyPeriod = opts.IdempotencyPeriod
+	}
+
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
 	next := time.UnixMilli(qi.Score(q.clock.Now()))
