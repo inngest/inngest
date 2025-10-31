@@ -641,6 +641,29 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 		}
 
+		// Refresh worker capacity TTL if set
+		if c.conn.Data.InstanceId == "" {
+			// No instance ID, no capacity TTL to refresh
+			return &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "missing instanceId for connect message",
+			}
+		}
+
+		// Refresh worker capacity TTL if capacity is set
+		if err := c.svc.stateManager.WorkerCapcityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
+			// Log but don't fail the heartbeat if TTL refresh fails
+			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
+				logger.WithErrorReportTags(map[string]string{
+					"instance_id":   c.conn.Data.InstanceId,
+					"env_id":        c.conn.EnvID.String(),
+					"account_id":    c.conn.AccountID.String(),
+					"gateway_id":    c.conn.GatewayId.String(),
+					"connection_id": c.conn.ConnectionId.String(),
+				}))
+		}
+
 		for _, l := range c.svc.lifecycles {
 			go l.OnReady(context.Background(), c.conn)
 		}
@@ -713,6 +736,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				Msg:        "could not update connection status",
 			}
 		}
+
+		// For pauses, worker capacity is not tracked and it will expire
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
