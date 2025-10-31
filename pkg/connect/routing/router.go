@@ -64,7 +64,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
 
-	if err != nil && !(errors.Is(err, ErrNoHealthyConnection) || errors.Is(err, ErrAllWorkersAtCapacity)) {
+	if err != nil && !errors.Is(err, ErrNoHealthyConnection) && !errors.Is(err, ErrAllWorkersAtCapacity) {
 		return nil, fmt.Errorf("could not retrieve suitable connection: %w", err)
 	}
 

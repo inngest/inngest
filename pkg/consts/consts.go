@@ -155,7 +155,8 @@ const (
 )
 
 var (
-	ConnectWorkerCapacityManagerTTL         = 6 * ConnectWorkerRequestLeaseDuration
+	ConnectWorkerRequestToWorkerMappingTTL  = 6 * ConnectWorkerRequestLeaseDuration  // 2 minutes so in case of gateway failure, we don't lose the mapping for too long
+	ConnectWorkerCapacityManagerTTL         = 45 * ConnectWorkerRequestLeaseDuration // 15 minutes
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
 	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions

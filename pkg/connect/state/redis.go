@@ -941,7 +941,7 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 
 	// Use Lua script to atomically check capacity and add to sorted set
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
-	requestTTL := consts.ConnectWorkerRequestLeaseDuration
+	requestTTL := consts.ConnectWorkerRequestToWorkerMappingTTL
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 	now := r.c.Now()
 	expirationTime := now.Add(requestTTL).Unix()

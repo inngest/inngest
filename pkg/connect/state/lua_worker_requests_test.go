@@ -41,7 +41,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 		counterTTL := consts.ConnectWorkerCapacityManagerTTL
 		now := time.Now()
-		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64(counterTTL.Seconds())),
@@ -67,11 +67,11 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-2"
 
 		now := time.Now()
-		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -93,11 +93,11 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		requestID := "req-3"
 
 		now := time.Now()
-		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -144,10 +144,10 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			requestID := fmt.Sprintf("req-%d", i)
 			keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 			now := time.Now()
-			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -178,18 +178,18 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		require.NoError(t, err)
 		for i := 1; i <= 2; i++ {
 			existingReqID := fmt.Sprintf("existing-req-%d", i)
-			existingExpTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			existingExpTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			_, err := r.ZAdd(workerRequestsKey, float64(existingExpTime), existingReqID)
 			require.NoError(t, err)
 		}
 
 		requestID := "req-overflow"
 		now := time.Now()
-		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -256,7 +256,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 	t.Run("returns 0 and deletes set when removing last member", func(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-last"
-		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		_, err := r.ZAdd(workerRequestsKey, float64(expTime), requestID)
 		require.NoError(t, err)
 		err = r.Set(requestWorkerKey(requestID), instanceID)
@@ -284,7 +284,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Set up set with multiple members
 		for i := 1; i <= 3; i++ {
 			reqID := fmt.Sprintf("req-%d", i)
-			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			_, err := r.ZAdd(workerRequestsKey, float64(expTime), reqID)
 			require.NoError(t, err)
 			err = r.Set(requestWorkerKey(reqID), instanceID)
@@ -292,7 +292,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		}
 
 		// Fast forward time to simulate TTL decay (use a fraction of the request lease duration)
-		r.FastForward(consts.ConnectWorkerRequestLeaseDuration + 2*time.Second)
+		r.FastForward(consts.ConnectWorkerRequestToWorkerMappingTTL + 2*time.Second)
 
 		requestID := "req-1"
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
@@ -331,7 +331,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Set up set with multiple members
 		requestIDs := []string{"req-a", "req-b", "req-c"}
 		for _, reqID := range requestIDs {
-			expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			_, err := r.ZAdd(workerRequestsKey, float64(expTime), reqID)
 			require.NoError(t, err)
 			err = r.Set(requestWorkerKey(reqID), instanceID)
@@ -369,7 +369,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 	t.Run("returns 3 when instance ID doesn't match", func(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-mismatch"
-		expTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		_, err := r.ZAdd(workerRequestsKey, float64(expTime), requestID)
 		require.NoError(t, err)
 		err = r.Set(requestWorkerKey(requestID), "other-instance")
@@ -431,10 +431,10 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			requestID := fmt.Sprintf("req-%d", i)
 			keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 			now := time.Now()
-			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -453,11 +453,11 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 		// Try to exceed capacity
 		now := time.Now()
-		expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+		expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 		keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey("req-overflow")}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 			instanceID,
 			"req-overflow",
 			fmt.Sprintf("%d", expirationTime),
@@ -505,10 +505,10 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			requestID := fmt.Sprintf("req-cycle1-%d", i)
 			keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 			now := time.Now()
-			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -536,10 +536,10 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			requestID := fmt.Sprintf("req-cycle2-%d", i)
 			keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 			now := time.Now()
-			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+			expirationTime := now.Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
-				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestToWorkerMappingTTL).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
