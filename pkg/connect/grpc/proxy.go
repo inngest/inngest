@@ -429,7 +429,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.SetStatus(codes.Error, "could not forward request to gateway")
 
 			// Clean up worker lease if forwarding failed
-			cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 				l, "could not clean up worker lease after forward failure")
 
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
@@ -446,14 +446,14 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	select {
 	case <-ctx.Done():
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease on context cancellation")
 
 		return nil, fmt.Errorf("parent context was closed unexpectedly")
 	// Handle maximum function timeout
 	case <-time.After(consts.MaxFunctionTimeout):
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease on timeout")
 
 		return nil, syscode.Error{
@@ -475,7 +475,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease after context finished")
 
 		if reply.RequestId == "" {
@@ -500,7 +500,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		span.SetStatus(codes.Error, "lease expired")
 
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerLeaseOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease on lease expiry")
 
 		return nil, syscode.Error{
@@ -510,7 +510,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	}
 }
 
-func cleanupWorkerLeaseOrLogError(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID string, requestID string, l logger.Logger, message string) {
+func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID string, requestID string, l logger.Logger, message string) {
 	//
 	l.Trace("cleaning up worker lease", "instance_id", instanceID, "request_id", requestID, "env_id", envID.String())
 

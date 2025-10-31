@@ -827,7 +827,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				case errors.Is(err, state.ErrRequestLeaseExpired),
 					errors.Is(err, state.ErrRequestLeased),
 					errors.Is(err, state.ErrRequestLeaseNotFound),
-					errors.Is(err, state.ErrLeaseWorkerDoesNotExist):
+					errors.Is(err, state.ErrRequestWorkerDoesNotExist):
 
 					c.log.ReportError(err, "lease was claimed by other worker, expired, or worker does not exist",
 						logger.WithErrorReportTags(map[string]string{

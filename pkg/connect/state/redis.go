@@ -38,10 +38,10 @@ var (
 	ErrWorkerCapacityExceeded = fmt.Errorf("worker capacity exceeded")
 	ErrNoInstanceIDFound      = fmt.Errorf("no instance ID found")
 	// ErrInstanceIDMismatch is returned when the instance ID doesn't match the lease owner
-	ErrInstanceIDMismatch           = fmt.Errorf("instance ID mismatch")
-	ErrWorkerLeasesSetDoesNotExists = fmt.Errorf("worker leases set does not exist")
-	// ErrLeaseWorkerDoesNotExist is returned when the lease worker does not exist
-	ErrLeaseWorkerDoesNotExist = fmt.Errorf("lease worker does not exist")
+	ErrInstanceIDMismatch             = fmt.Errorf("instance ID mismatch")
+	ErrWorkerRequestsSetDoesNotExists = fmt.Errorf("worker leases set does not exist")
+	// ErrRequestWorkerDoesNotExist is returned when the lease worker does not exist
+	ErrRequestWorkerDoesNotExist = fmt.Errorf("lease worker does not exist")
 )
 
 func init() {
@@ -905,7 +905,7 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	}
 
 	// if the worker has limited capacity, we need to check the leases set
-	allActiveLeases, err := r.getAllActiveWorkerLeases(ctx, envID, instanceID)
+	allActiveLeases, err := r.getAllActiveWorkerRequests(ctx, envID, instanceID)
 	if err != nil { // this shouldn't be redis error
 		return nil, fmt.Errorf("failed to get all active worker leases: %w", err)
 	}
@@ -925,7 +925,7 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 // Returns an error if the worker is at capacity.
 func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
-	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
+	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 
 	// Check if there's a capacity limit
 	capacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
@@ -940,11 +940,11 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 
 	// Use Lua script to atomically check capacity and add to sorted set
 	setTTL := consts.ConnectWorkerInformationDuration
-	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 	expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 
 	now := r.c.Now()
-	keys := []string{capacityKey, workerLeasesKey, leaseWorkerKey}
+	keys := []string{capacityKey, workerRequestsKey, requestWorkerKey}
 	args := []string{
 		fmt.Sprintf("%d", int64(setTTL.Seconds())),
 		instanceID,
@@ -967,8 +967,8 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 
 // DeleteRequestLeaseFromWorker removes a lease from the worker's sorted set.
 func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
-	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
-	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
+	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
 	// check instance capacity - if the capacity is 0/infinite, we don't need to delete the lease
 	capacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
@@ -981,7 +981,7 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
 	setTTL := consts.ConnectWorkerInformationDuration
-	keys := []string{workerLeasesKey, leaseWorkerKey}
+	keys := []string{workerRequestsKey, requestWorkerKey}
 	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID, instanceID}
 
 	result, err := scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
@@ -995,7 +995,7 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	case 1:
 		return nil
 	case 2:
-		return ErrWorkerLeasesSetDoesNotExists
+		return ErrWorkerRequestsSetDoesNotExists
 	case 3:
 		return ErrInstanceIDMismatch
 	}
@@ -1008,10 +1008,10 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 // Set TTL is also refreshed to keep active leases from expiring while the worker is active.
 func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
-	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
+	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 
 	capacityTTL := consts.ConnectWorkerInformationDuration
-	keys := []string{capacityKey, workerLeasesKey}
+	keys := []string{capacityKey, workerRequestsKey}
 	args := []string{fmt.Sprintf("%d", int64(capacityTTL.Seconds()))}
 
 	_, err := scripts["heartbeat_worker_capacity"].Exec(ctx, r.client, keys, args).AsInt64()
@@ -1022,7 +1022,7 @@ func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Conte
 	return nil
 }
 
-func (r *redisConnectionStateManager) getAllActiveWorkerLeases(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
+func (r *redisConnectionStateManager) getAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
 	if envID == uuid.Nil {
 		return nil, fmt.Errorf("envID cannot be nil")
 	}
@@ -1031,12 +1031,12 @@ func (r *redisConnectionStateManager) getAllActiveWorkerLeases(ctx context.Conte
 		return nil, fmt.Errorf("instanceID cannot be empty")
 	}
 
-	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
+	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 	currentTime := r.c.Now().Unix()
 
 	// Query for leases that expire in the future (currentTime or later)
 	// Use currentTime instead of currentTime-1 for more precise timing
-	cmd := r.client.B().Zrangebyscore().Key(workerLeasesKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()
+	cmd := r.client.B().Zrangebyscore().Key(workerRequestsKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()
 
 	result, err := r.client.Do(ctx, cmd).AsStrSlice()
 	// Handle Redis errors more specifically
@@ -1062,12 +1062,12 @@ func (r *redisConnectionStateManager) workerCapacityKey(envID uuid.UUID, instanc
 	return fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
 }
 
-// workerLeasesKey returns the Redis key for storing a worker's active leases as a sorted set
-func (r *redisConnectionStateManager) workerLeasesKey(envID uuid.UUID, instanceID string) string {
-	return fmt.Sprintf("{%s}:worker-leases-set:%s", envID.String(), instanceID)
+// workerRequestsKey returns the Redis key for storing a worker's active leases as a sorted set
+func (r *redisConnectionStateManager) workerRequestsKey(envID uuid.UUID, instanceID string) string {
+	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
 }
 
-// workerLeasesCounterKey returns the Redis key for storing a worker's active lease counter
-func (r *redisConnectionStateManager) leaseWorkerKey(envID uuid.UUID, leaseID string) string {
-	return fmt.Sprintf("{%s}:lease-worker:%s", envID.String(), leaseID)
+// workerRequestsCounterKey returns the Redis key for storing a worker's active lease counter
+func (r *redisConnectionStateManager) requestWorkerKey(envID uuid.UUID, leaseID string) string {
+	return fmt.Sprintf("{%s}:request-worker:%s", envID.String(), leaseID)
 }

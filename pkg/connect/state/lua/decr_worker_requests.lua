@@ -13,43 +13,43 @@ ARGV[2]: Request ID to remove
 ARGV[3]: Instance ID that is requesting the deletion
 ]]
 
-local workerLeasesKey = KEYS[1]
-local leaseWorkerKey = KEYS[2]
+local workerRequestsKey = KEYS[1]
+local requestWorkerKey = KEYS[2]
 local setTTL = tonumber(ARGV[1])
 local requestID = ARGV[2]
 local instanceID = ARGV[3]
 
 -- Check if set exists
-local setExists = redis.call("EXISTS", workerLeasesKey)
+local setExists = redis.call("EXISTS", workerRequestsKey)
 
 -- If set doesn't exist, nothing to remove
 if setExists == 0 then
   -- Still clean up the mapping in case it exists
-  redis.call("DEL", leaseWorkerKey)
+  redis.call("DEL", requestWorkerKey)
   return 2
 end
 
 -- Check if the lease mapping exists and verify instance ID
-local leaseInstanceID = redis.call("GET", leaseWorkerKey)
+local leaseInstanceID = redis.call("GET", requestWorkerKey)
 if leaseInstanceID and leaseInstanceID ~= instanceID then
   -- Instance ID mismatch, deny the operation
   return 3
 end
 
 -- Remove the specific request ID from the set
-redis.call("ZREM", workerLeasesKey, requestID)
+redis.call("ZREM", workerRequestsKey, requestID)
 
 -- Check if set is now empty and delete it
-local remainingCount = redis.call("ZCARD", workerLeasesKey)
+local remainingCount = redis.call("ZCARD", workerRequestsKey)
 if remainingCount == 0 then
   -- Set is empty, delete it and the mapping
-  redis.call("DEL", workerLeasesKey)
-  redis.call("DEL", leaseWorkerKey)
+  redis.call("DEL", workerRequestsKey)
+  redis.call("DEL", requestWorkerKey)
   return 0
 end
 
 -- Set still has leases, refresh TTL
-redis.call("EXPIRE", workerLeasesKey, setTTL)
+redis.call("EXPIRE", workerRequestsKey, setTTL)
 -- Delete the specific request's worker mapping
-redis.call("DEL", leaseWorkerKey)
+redis.call("DEL", requestWorkerKey)
 return 1

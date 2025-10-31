@@ -10,7 +10,7 @@ ARGV[1]: TTL in seconds for both capacity and set keys
 ]]
 
 local capacityKey = KEYS[1]
-local workerLeasesKey = KEYS[2]
+local workerRequestsKey = KEYS[2]
 local ttl = tonumber(ARGV[1])
 
 -- Check if capacity key exists
@@ -25,9 +25,9 @@ end
 redis.call("EXPIRE", capacityKey, ttl)
 
 -- Refresh set key TTL
---local setExists = redis.call("EXISTS", workerLeasesKey)
+--local setExists = redis.call("EXISTS", workerRequestsKey)
 -- if setExists == 1 then
-redis.call("EXPIRE", workerLeasesKey, ttl) -- incase the set doesn't exist, it' returns -2 but we ignore output
+redis.call("EXPIRE", workerRequestsKey, ttl) -- incase the set doesn't exist, it' returns -2 but we ignore output
 --end
 
 return 1

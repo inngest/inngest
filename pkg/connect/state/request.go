@@ -93,8 +93,8 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
-		r.workerLeasesKey(envID, instanceID),
-		r.leaseWorkerKey(envID, requestID),
+		r.workerRequestsKey(envID, instanceID),
+		r.requestWorkerKey(envID, requestID),
 	}
 
 	now := r.c.Now()
@@ -131,7 +131,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 
 	switch status {
 	case -3:
-		return nil, ErrLeaseWorkerDoesNotExist
+		return nil, ErrRequestWorkerDoesNotExist
 	case -2:
 		return nil, ErrRequestLeased
 	case -1:
@@ -208,11 +208,11 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	return lease.ExecutorIP, nil
 }
 
-// GetLeaseWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
-func (r *redisConnectionStateManager) GetLeaseWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
-	leaseWorkerKey := r.leaseWorkerKey(envID, requestID)
+// GetRequestWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
+func (r *redisConnectionStateManager) GetRequestWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
-	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(leaseWorkerKey).Build()).ToString()
+	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(requestWorkerKey).Build()).ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			// No mapping exists - request may not have a worker capacity lease

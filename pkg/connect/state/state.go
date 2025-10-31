@@ -83,8 +83,8 @@ type RequestStateManager interface {
 	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
 	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
 
-	// GetLeaseWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
-	GetLeaseWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
+	// GetRequestWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
+	GetRequestWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
 
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
