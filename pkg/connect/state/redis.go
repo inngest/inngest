@@ -987,8 +987,9 @@ func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Contex
 	_ = r.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
+	workerTotalCapacityKey := r.workerCapacityKey(envID, instanceID)
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
-	keys := []string{workerRequestsKey, requestWorkerKey}
+	keys := []string{workerTotalCapacityKey, workerRequestsKey, requestWorkerKey}
 	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID, instanceID}
 
 	result, err := scripts["decr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()

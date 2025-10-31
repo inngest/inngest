@@ -12,7 +12,7 @@ ARGV[5]: Expiration time as Unix timestamp (score for sorted set)
 ARGV[6]: Current time as Unix timestamp in milliseconds
 ]]
 
-local capacityKey = KEYS[1]
+local workerTotalCapacityKey = KEYS[1]
 local workerRequestsKey = KEYS[2]
 local requestWorkerKey = KEYS[3]
 
@@ -23,8 +23,12 @@ local requestID = ARGV[4]
 local expirationTime = ARGV[5]
 local currentTime = ARGV[6]
 
+-- Separate TTL variables for different components
+local workerRequestsSetTTL = setTTL
+local requestWorkerMappingTTL = requestLeaseDuration
+
 -- Get the worker's capacity limit (returns a string)
-local capacity = redis.call("GET", capacityKey)
+local capacity = redis.call("GET", workerTotalCapacityKey)
 
 -- If no capacity limit is set, don't track leases
 -- redis nil becomes false in lua: https://redis.io/docs/latest/commands/eval/#conversion-between-lua-and-redis-data-types
@@ -55,9 +59,9 @@ local expTime = tonumber(expirationTime)
 redis.call("ZADD", workerRequestsKey, expTime, requestID)
 
 -- Set/refresh TTL on the set to ensure it expires if worker stops processing
-redis.call("EXPIRE", workerRequestsKey, setTTL)
+redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 
 -- Store the mapping of request ID to worker instance ID
-redis.call("SET", requestWorkerKey, instanceID, "EX", requestLeaseDuration)
+redis.call("SET", requestWorkerKey, instanceID, "EX", requestWorkerMappingTTL)
 
 return 0

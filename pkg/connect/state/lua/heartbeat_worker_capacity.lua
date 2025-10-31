@@ -9,12 +9,16 @@ Output:
 ARGV[1]: TTL in seconds for both capacity and set keys
 ]]
 
-local capacityKey = KEYS[1]
+local workerTotalCapacityKey = KEYS[1]
 local workerRequestsKey = KEYS[2]
 local ttl = tonumber(ARGV[1])
 
+-- Separate TTL variables for different components
+local workerTotalCapacityTTL = ttl
+local workerRequestsSetTTL = ttl
+
 -- Check if capacity key exists
-local capacityExists = redis.call("EXISTS", capacityKey)
+local capacityExists = redis.call("EXISTS", workerTotalCapacityKey)
 
 -- If no capacity limit is set, nothing to refresh
 if capacityExists == 0 then
@@ -22,12 +26,12 @@ if capacityExists == 0 then
 end
 
 -- Refresh capacity key TTL
-redis.call("EXPIRE", capacityKey, ttl)
+redis.call("EXPIRE", workerTotalCapacityKey, workerTotalCapacityTTL)
 
 -- Refresh set key TTL
 --local setExists = redis.call("EXISTS", workerRequestsKey)
 -- if setExists == 1 then
-redis.call("EXPIRE", workerRequestsKey, ttl) -- incase the set doesn't exist, it' returns -2 but we ignore output
+redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL) -- incase the set doesn't exist, it' returns -2 but we ignore output
 --end
 
 return 1

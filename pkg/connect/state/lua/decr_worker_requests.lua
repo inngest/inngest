@@ -13,11 +13,16 @@ ARGV[2]: Request ID to remove
 ARGV[3]: Instance ID that is requesting the deletion
 ]]
 
-local workerRequestsKey = KEYS[1]
-local requestWorkerKey = KEYS[2]
+local workerTotalCapacityKey = KEYS[1]
+local workerRequestsKey = KEYS[2]
+local requestWorkerKey = KEYS[3]
 local setTTL = tonumber(ARGV[1])
 local requestID = ARGV[2]
 local instanceID = ARGV[3]
+
+-- Separate TTL variables for different components
+local workerTotalCapacityTTL = setTTL
+local workerRequestsSetTTL = setTTL
 
 -- Check if set exists
 local setExists = redis.call("EXISTS", workerRequestsKey)
@@ -49,7 +54,9 @@ if remainingCount == 0 then
 end
 
 -- Set still has leases, refresh TTL
-redis.call("EXPIRE", workerRequestsKey, setTTL)
+redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
+-- Refresh capacity TTL
+redis.call("EXPIRE", workerTotalCapacityKey, workerTotalCapacityTTL)
 -- Delete the specific request's worker mapping
 redis.call("DEL", requestWorkerKey)
 return 1

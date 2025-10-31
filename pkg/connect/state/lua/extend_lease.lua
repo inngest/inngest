@@ -31,6 +31,11 @@ local requestLeaseDuration			= tonumber(ARGV[6])
 local instanceID			= ARGV[7]
 local workerCapacityUnlimited = ARGV[8]
 local requestID             = ARGV[9]
+
+-- Separate TTL variables for different components
+local workerTotalCapacityTTL = setTTL
+local workerRequestsSetTTL = setTTL
+local requestWorkerMappingTTL = requestLeaseDuration
 local workerCapUnlimitedBool = (workerCapacityUnlimited == "true")
 
 -- $include(decode_ulid_time.lua)
@@ -68,7 +73,7 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 	-- Refresh TTL on the set
 	if workerCapUnlimitedBool == false then
 		redis.call("DEL", requestWorkerKey)
-	    redis.call("EXPIRE", workerRequestsKey, setTTL)
+	    redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 	end
 	return 2
 end
@@ -84,9 +89,9 @@ end
 
 -- Add to the new lease to the worker's set
 redis.call("ZADD", workerRequestsKey, currentTime + requestLeaseDuration, requestID)
-redis.call("EXPIRE", workerRequestsKey, setTTL)
+redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 
 -- Update the request-worker mapping
-redis.call("SET", requestWorkerKey, instanceID, "EX", requestLeaseDuration)
+redis.call("SET", requestWorkerKey, instanceID, "EX", requestWorkerMappingTTL)
 
 return 1
