@@ -889,6 +889,13 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 		return nil, err
 	}
 
+	if envID == uuid.Nil {
+		return nil, fmt.Errorf("envID cannot be nil")
+	}
+	if strings.TrimSpace(instanceID) == "" {
+		return nil, fmt.Errorf("instanceID cannot be empty")
+	}
+
 	// If no limit is set, return 0 (unlimited) and skip everything else
 	if totalCapacity == 0 {
 		return &WorkerCapacity{
@@ -898,29 +905,20 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	}
 
 	// if the worker has limited capacity, we need to check the leases set
-	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
-
-	// Get current lease count using ZCOUNT to count all active leases
-	currentTime := r.c.Now().Unix()
-	currentLeases, err := r.client.Do(ctx, r.client.B().Zcount().Key(workerLeasesKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()).AsInt64()
-
-	if err != nil && rueidis.IsRedisNil(err) {
-		// No set exists yet, no leases active
-		return &WorkerCapacity{
-			Total:     totalCapacity,
-			Available: totalCapacity,
-		}, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to get active leases count: %w", err)
+	allActiveLeases, err := r.getAllActiveWorkerLeases(ctx, envID, instanceID)
+	if err != nil { // this shouldn't be redis error
+		return nil, fmt.Errorf("failed to get all active worker leases: %w", err)
 	}
 
-	// Calculate available capacity
-	availableCapacity := max(0, totalCapacity-currentLeases)
+	// Ensure available capacity is never negative (since -1 is reserved for unlimited capacity)
+	availableCapacity := max(0, totalCapacity-int64(len(allActiveLeases)))
 
 	return &WorkerCapacity{
-		Total:     totalCapacity,
-		Available: availableCapacity,
+		Total:         totalCapacity,
+		Available:     availableCapacity,
+		CurrentLeases: allActiveLeases,
 	}, nil
+
 }
 
 // AssignRequestLeaseToWorker adds a lease to the worker's sorted set with expiration time as score.
@@ -1024,31 +1022,30 @@ func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Conte
 	return nil
 }
 
-func (r *redisConnectionStateManager) GetAllActiveWorkerLeases(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
+func (r *redisConnectionStateManager) getAllActiveWorkerLeases(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
 	if envID == uuid.Nil {
 		return nil, fmt.Errorf("envID cannot be nil")
 	}
+
 	if strings.TrimSpace(instanceID) == "" {
 		return nil, fmt.Errorf("instanceID cannot be empty")
 	}
 
 	workerLeasesKey := r.workerLeasesKey(envID, instanceID)
 	currentTime := r.c.Now().Unix()
-	
+
 	// Query for leases that expire in the future (currentTime or later)
 	// Use currentTime instead of currentTime-1 for more precise timing
 	cmd := r.client.B().Zrangebyscore().Key(workerLeasesKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()
-	
+
 	result, err := r.client.Do(ctx, cmd).AsStrSlice()
-	if err != nil {
-		// Handle Redis errors more specifically
-		if rueidis.IsRedisNil(err) {
-			// Key doesn't exist - return empty slice, not an error
-			return []string{}, nil
-		}
+	// Handle Redis errors more specifically
+	// Key doesn't exist - return empty slice, not an error
+	if err != nil && !rueidis.IsRedisNil(err) {
+		// not a redis nil error, return an error
 		return nil, fmt.Errorf("failed to get active worker leases for envID %s, instanceID %s: %w", envID.String(), instanceID, err)
 	}
-	
+
 	// Filter out any empty strings that might have been returned
 	activeLeases := make([]string, 0, len(result))
 	for _, lease := range result {
@@ -1056,7 +1053,7 @@ func (r *redisConnectionStateManager) GetAllActiveWorkerLeases(ctx context.Conte
 			activeLeases = append(activeLeases, lease)
 		}
 	}
-	
+
 	return activeLeases, nil
 }
 

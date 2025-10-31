@@ -1919,20 +1919,20 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 
 	t.Run("returns error for nil envID", func(t *testing.T) {
 		instanceID := "test-instance"
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, uuid.Nil, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, uuid.Nil, instanceID)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "envID cannot be nil")
 		require.Nil(t, leases)
 	})
 
 	t.Run("returns error for empty instanceID", func(t *testing.T) {
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, "")
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "instanceID cannot be empty")
 		require.Nil(t, leases)
 
 		// Test with whitespace-only instanceID
-		leases, err = mgr.GetAllActiveWorkerLeases(ctx, envID, "   ")
+		leases, err = mgr.getAllActiveWorkerLeases(ctx, envID, "   ")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "instanceID cannot be empty")
 		require.Nil(t, leases)
@@ -1940,7 +1940,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 
 	t.Run("returns empty slice when no leases exist", func(t *testing.T) {
 		instanceID := "non-existent-instance"
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.NotNil(t, leases)
 		require.Equal(t, []string{}, leases)
@@ -1961,7 +1961,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-3")
 		require.NoError(t, err)
 
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Len(t, leases, 3)
 		require.Contains(t, leases, "lease-1")
@@ -1985,7 +1985,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 		pastTime := time.Now().Add(-1 * time.Hour).Unix()
 		_, _ = r.ZAdd(setKey, float64(pastTime), "expired-lease")
 
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Len(t, leases, 1)
 		require.Contains(t, leases, "active-lease")
@@ -2012,7 +2012,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 		_, _ = r.ZAdd(setKey, float64(pastTime1), "expired-1")
 		_, _ = r.ZAdd(setKey, float64(pastTime2), "expired-2")
 
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Len(t, leases, 2)
 		require.Contains(t, leases, "active-1")
@@ -2038,7 +2038,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 		_, _ = r.ZAdd(setKey, float64(futureTime), "")        // empty string
 		_, _ = r.ZAdd(setKey, float64(futureTime), "   ")     // whitespace only
 
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Len(t, leases, 1)
 		require.Contains(t, leases, "valid-lease")
@@ -2060,7 +2060,7 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		leases, err := mgr.GetAllActiveWorkerLeases(ctx, envID, instanceID)
+		leases, err := mgr.getAllActiveWorkerLeases(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Len(t, leases, 100)
 		
@@ -2093,17 +2093,17 @@ func TestGetAllActiveWorkerLeases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify isolation
-		leases1, err := mgr.GetAllActiveWorkerLeases(ctx, envID1, instanceID1)
+		leases1, err := mgr.getAllActiveWorkerLeases(ctx, envID1, instanceID1)
 		require.NoError(t, err)
 		require.Len(t, leases1, 1)
 		require.Contains(t, leases1, "env1-inst1-lease1")
 
-		leases2, err := mgr.GetAllActiveWorkerLeases(ctx, envID1, instanceID2)
+		leases2, err := mgr.getAllActiveWorkerLeases(ctx, envID1, instanceID2)
 		require.NoError(t, err)
 		require.Len(t, leases2, 1)
 		require.Contains(t, leases2, "env1-inst2-lease1")
 
-		leases3, err := mgr.GetAllActiveWorkerLeases(ctx, envID2, instanceID1)
+		leases3, err := mgr.getAllActiveWorkerLeases(ctx, envID2, instanceID1)
 		require.NoError(t, err)
 		require.Len(t, leases3, 1)
 		require.Contains(t, leases3, "env2-inst1-lease1")

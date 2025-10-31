@@ -113,9 +113,6 @@ type WorkerCapacityManager interface {
 	// Returns 0 if no limit is set (unlimited).
 	GetWorkerCapacities(ctx context.Context, envID uuid.UUID, instanceID string) (*WorkerCapacity, error)
 
-	// GetAllActiveWorkerLeases returns all the active leases for a worker instance.
-	GetAllActiveWorkerLeases(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error)
-
 	// AssignRequestLeaseToWorker increments the active lease count for a worker instance.
 	// Returns an error if the worker is at capacity.
 	AssignRequestLeaseToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
@@ -412,7 +409,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 type WorkerCapacity struct {
 	Total         int64
 	Available     int64
-	CurrentLeases int64
+	CurrentLeases []string
 }
 
 func (w *WorkerCapacity) IsUnlimited() bool {

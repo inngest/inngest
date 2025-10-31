@@ -118,16 +118,12 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		fmt.Sprintf("%t", isWorkerCapacityUnlimited),
 	}
 
-	allActiveLeases, _ := r.GetAllActiveWorkerLeases(ctx, envID, instanceID)
-	r.logger.Debug("extending lease", "lease_id", leaseID.String(), "new_lease_id", newLeaseID.String(), "expiry", keyExpiry, "current_time", now.UnixMilli(), "all_active_leases", allActiveLeases)
 	status, err := scripts["extend_lease"].Exec(
 		ctx,
 		r.client,
 		keys,
 		args,
 	).AsInt64()
-	allActiveLeasesAfter, _ := r.GetAllActiveWorkerLeases(ctx, envID, instanceID)
-	r.logger.Debug("extended leases", "lease_id", leaseID.String(), "new_lease_id", newLeaseID.String(), "expiry", keyExpiry, "current_time", now.UnixMilli(), "all_active_leases", allActiveLeasesAfter)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not execute lease script: %w", err)
