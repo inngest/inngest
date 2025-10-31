@@ -25,9 +25,10 @@ function buildNodeFromDef(
   path: string,
   buildNode: (schema: JSONSchema, name: string, path: string) => SchemaNode
 ): SchemaNode | undefined {
-  // TODO: Handle processing of boolean schemas.
-  // For now, it's unnecessary because schemas are derived from concrete instances.
-  if (typeof def === 'boolean') return undefined;
+  if (typeof def === 'boolean') {
+    if (def) return { kind: 'value', name, path, type: 'unknown' };
+    return undefined;
+  }
 
   return buildNode(def, name, path);
 }
