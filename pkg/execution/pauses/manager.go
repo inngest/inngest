@@ -347,6 +347,6 @@ func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	// and pause blocks to contain ordered pauses.
 	//
 	// flushDelay is the amount of clock skew we mitigate.
-	// time.Sleep(m.flushDelay)
+	time.Sleep(m.flushDelay)
 	return m.bs.FlushIndexBlock(ctx, index)
 }
