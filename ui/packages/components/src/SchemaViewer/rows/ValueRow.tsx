@@ -16,7 +16,13 @@ export function ValueRow({ node, typeLabelOverride, boldName }: ValueRowProps): 
 
   return (
     <div className="flex select-none items-baseline gap-1.5 px-1 py-0.5">
-      <span className={cn('text-sm', boldName ? 'text-basis font-semibold' : 'text-subtle')}>
+      <span
+        className={cn(
+          'text-sm',
+          boldName ? 'text-basis font-semibold' : 'text-subtle',
+          'whitespace-nowrap'
+        )}
+      >
         {node.name}
       </span>
       <span className="text-quaternary-warmerxIntense font-mono text-xs capitalize">
