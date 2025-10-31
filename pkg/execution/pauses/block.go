@@ -353,11 +353,6 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 
 	l.Debug("flushed block index", "duration", time.Since(start).Milliseconds(), "len", len(block.Pauses), "block_key", key)
 
-	// TODO: remove this
-	for i := 0; i < len(block.Pauses); i++ {
-		l.Debug("pause", "i", i, "pause", *block.Pauses[i])
-	}
-
 	metrics.HistogramPauseBlockFlushLatency(ctx, time.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags:    map[string]any{},
