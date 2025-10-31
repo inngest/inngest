@@ -505,7 +505,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
-	if models.RunTraceEnded(gqlSpan.Status) {
+	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland {
 		startedAt := span.GetStartedAtTime()
 		endedAt := span.GetEndedAtTime()
 		if startedAt != nil && endedAt != nil {
