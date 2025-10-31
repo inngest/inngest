@@ -388,7 +388,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 		routedInstanceID = route.InstanceID
 		// Assign the request lease to the worker for capacity tracking
-		if err := i.stateManager.AssignRequestLeaseToWorker(ctx, opts.EnvID, route.InstanceID, opts.Data.RequestId); err != nil {
+		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, route.InstanceID, opts.Data.RequestId); err != nil {
 			// if the instance ID is not set, we log the error and skip for now
 			span.RecordError(err)
 			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
@@ -520,7 +520,7 @@ func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.Stat
 		return
 	}
 
-	if err := stateManager.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, requestID); err != nil {
+	if err := stateManager.DeleteRequestFromWorker(ctx, envID, instanceID, requestID); err != nil {
 		l.ReportError(err, message)
 	}
 }

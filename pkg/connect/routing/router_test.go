@@ -583,11 +583,11 @@ func TestCheckCapacity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign some leases (partial usage)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		res := checkCapacity(ctx, stateMan, envID, conn, log)
@@ -611,11 +611,11 @@ func TestCheckCapacity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fill capacity completely
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		res := checkCapacity(ctx, stateMan, envID, conn, log)
@@ -645,7 +645,7 @@ func TestCheckCapacity(t *testing.T) {
 
 		// Assign leases one by one and verify capacity decreases
 		for i := 1; i <= 5; i++ {
-			err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
+			err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
 			require.NoError(t, err)
 
 			capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
@@ -662,7 +662,7 @@ func TestCheckCapacity(t *testing.T) {
 
 		// Release leases one by one and verify capacity increases
 		for i := 1; i <= 5; i++ {
-			err = stateMan.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
+			err = stateMan.DeleteRequestFromWorker(ctx, envID, instanceID, fmt.Sprintf("req-%d", i))
 			require.NoError(t, err)
 
 			capacity, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID)
@@ -686,11 +686,11 @@ func TestCheckCapacity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign leases up to capacity
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		// Should be at capacity
@@ -734,9 +734,9 @@ func TestCheckCapacity(t *testing.T) {
 		// Set capacity and assign leases
 		err := stateMan.SetWorkerTotalCapacity(ctx, envID, instanceID, 2)
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Should be at capacity
@@ -774,9 +774,9 @@ func TestCheckCapacity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign leases
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Should be at capacity
@@ -784,7 +784,7 @@ func TestCheckCapacity(t *testing.T) {
 		require.False(t, res.hasWorkerCapacity)
 
 		// Release one lease
-		err = stateMan.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = stateMan.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Should have capacity again
@@ -792,7 +792,7 @@ func TestCheckCapacity(t *testing.T) {
 		require.True(t, res.hasWorkerCapacity)
 
 		// Assign another lease
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		// Should be at capacity again
@@ -819,17 +819,17 @@ func TestCheckCapacity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fill first worker to capacity
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID1, "req-1-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID1, "req-1-2")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID1, "req-1-3")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID1, "req-1-3")
 		require.NoError(t, err)
 
 		// Partially fill second worker
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID2, "req-2-1")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID2, "req-2-1")
 		require.NoError(t, err)
-		err = stateMan.AssignRequestLeaseToWorker(ctx, envID, instanceID2, "req-2-2")
+		err = stateMan.AssignRequestToWorker(ctx, envID, instanceID2, "req-2-2")
 		require.NoError(t, err)
 
 		// Check capacities independently

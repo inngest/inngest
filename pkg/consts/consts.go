@@ -155,7 +155,8 @@ const (
 )
 
 var (
-	ConnectWorkerInformationDuration        = MaxFunctionTimeout + 4*ConnectWorkerRequestLeaseDuration
+	ConnectWorkerCapacityManagerRequestTTL  = 3 * ConnectWorkerRequestLeaseDuration
+	ConnectWorkerCapacityManagerTTL         = 6 * ConnectWorkerRequestLeaseDuration
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
 	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions

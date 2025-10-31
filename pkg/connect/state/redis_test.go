@@ -1116,7 +1116,7 @@ func TestSetWorkerTotalCapacity(t *testing.T) {
 		capacityKey := mgr.workerCapacityKey(envID, instanceID)
 		ttl := r.TTL(capacityKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerCapacityManagerTTL)
 	})
 
 	t.Run("deletes capacity when set to zero", func(t *testing.T) {
@@ -1240,11 +1240,11 @@ func TestGetWorkerCapacities(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign 3 leases
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
@@ -1260,9 +1260,9 @@ func TestGetWorkerCapacities(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 2)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
@@ -1274,7 +1274,7 @@ func TestGetWorkerCapacities(t *testing.T) {
 	})
 }
 
-func TestAssignRequestLeaseToWorker(t *testing.T) {
+func TestAssignRequestToWorker(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1290,7 +1290,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 
 	t.Run("succeeds when no capacity limit set", func(t *testing.T) {
 		instanceID := "test-instance-no-limit"
-		err := mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err := mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Should not create set when no limit
@@ -1303,7 +1303,7 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Check lease was added to set
@@ -1321,13 +1321,13 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		setKey := mgr.workerRequestsKey(envID, instanceID)
 		ttl := r.TTL(setKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerCapacityManagerTTL)
 	})
 
 	t.Run("rejects when at capacity", func(t *testing.T) {
@@ -1336,13 +1336,13 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fill capacity
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Should reject third
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.ErrorIs(t, err, ErrWorkerCapacityExceeded)
 	})
 
@@ -1356,18 +1356,18 @@ func TestAssignRequestLeaseToWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Worker 1 at capacity
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instance1, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instance1, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instance1, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instance1, "req-2")
 		require.ErrorIs(t, err, ErrWorkerCapacityExceeded)
 
 		// Worker 2 still has capacity
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instance2, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instance2, "req-1")
 		require.NoError(t, err)
 	})
 }
 
-func TestDeleteRequestLeaseFromWorker(t *testing.T) {
+func TestDeleteRequestFromWorker(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1383,7 +1383,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
-		err := mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err := mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.ErrorIs(t, err, ErrWorkerRequestsSetDoesNotExists)
 	})
 
@@ -1393,13 +1393,13 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add some leases
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Remove one
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Check set has remaining lease
@@ -1417,10 +1417,10 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Set should be deleted
@@ -1433,15 +1433,15 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Fast forward time a bit in miniredis
 		r.FastForward(30 * time.Second)
 
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// TTL should be refreshed
@@ -1455,12 +1455,12 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
-		// Fast forward time a bit in miniredis to exceed ConnectWorkerInformationDuration (MaxFunctionTimeout + 80s = ~2h20m)
+		// Fast forward time a bit in miniredis to exceed ConnectWorkerCapacityManagerTTL (MaxFunctionTimeout + 80s = ~2h20m)
 		r.FastForward(90 * time.Second)
 
 		// Get the Total Capacity, it should have expired, but we still
@@ -1482,21 +1482,21 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Fill capacity
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
 		// Should reject
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.ErrorIs(t, err, ErrWorkerCapacityExceeded)
 
 		// Delete one
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Should now succeed
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 	})
 
@@ -1507,7 +1507,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		// Instance assigns a lease
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Manually corrupt the lease mapping to point to a different instance
@@ -1521,7 +1521,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		rc.Close()
 
 		// Now when the original instance tries to delete its lease, it should fail
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.ErrorIs(t, err, ErrInstanceIDMismatch)
 
 		// Verify lease still exists in the set
@@ -1538,7 +1538,7 @@ func TestDeleteRequestLeaseFromWorker(t *testing.T) {
 		rc2.Close()
 
 		// Now the deletion should succeed
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Verify lease is now gone
@@ -1592,7 +1592,7 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign a lease to create the counter key
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Fast forward time
@@ -1643,11 +1643,11 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.True(t, caps.IsAvailable())
 
 		// Assign 3 requests
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
 
 		// At capacity
@@ -1659,11 +1659,11 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.False(t, caps.IsAvailable())
 
 		// Reject new request
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-4")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-4")
 		require.ErrorIs(t, err, ErrWorkerCapacityExceeded)
 
 		// Complete one request
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Verify key deleted
@@ -1685,15 +1685,15 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.True(t, caps.IsAvailable())
 
 		// Can assign new request
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-4")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-4")
 		require.NoError(t, err)
 
 		// Complete all requests
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-2")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-3")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-3")
 		require.NoError(t, err)
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, instanceID, "req-4")
+		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-4")
 		require.NoError(t, err)
 
 		// Back to full capacity
@@ -1737,7 +1737,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign some leases
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Worker reconnects with lower capacity
@@ -1758,7 +1758,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign lease
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
 		// Remove capacity limit
@@ -1775,7 +1775,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 
 		// Can assign without limit
 		for i := 0; i < 100; i++ {
-			err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "req")
+			err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req")
 			require.NoError(t, err)
 		}
 	})
@@ -1810,7 +1810,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign request
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, workerInstance, requestID)
+		err = mgr.AssignRequestToWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
 		// Get worker instance ID
@@ -1826,7 +1826,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, workerInstance, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, workerInstance, requestID)
+		err = mgr.AssignRequestToWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
 		// Verify mapping exists
@@ -1835,7 +1835,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.Equal(t, workerInstance, retrievedInstance)
 
 		// Delete lease
-		err = mgr.DeleteRequestLeaseFromWorker(ctx, envID, workerInstance, requestID)
+		err = mgr.DeleteRequestFromWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
 		// Mapping should be deleted
@@ -1855,9 +1855,9 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		err = mgr.SetWorkerTotalCapacity(ctx, envID, worker2, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, worker1, request1)
+		err = mgr.AssignRequestToWorker(ctx, envID, worker1, request1)
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, worker2, request2)
+		err = mgr.AssignRequestToWorker(ctx, envID, worker2, request2)
 		require.NoError(t, err)
 
 		// Check mappings
@@ -1877,14 +1877,14 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, workerInstance, 5)
 		require.NoError(t, err)
 
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, workerInstance, requestID)
+		err = mgr.AssignRequestToWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
 		// Check TTL is set
 		requestWorkerKey := mgr.requestWorkerKey(envID, requestID)
 		ttl := r.TTL(requestWorkerKey)
 		require.Greater(t, ttl, time.Duration(0))
-		require.LessOrEqual(t, ttl, consts.ConnectWorkerInformationDuration)
+		require.LessOrEqual(t, ttl, consts.ConnectWorkerCapacityManagerTTL)
 	})
 
 	t.Run("no mapping created when no capacity limit", func(t *testing.T) {
@@ -1893,7 +1893,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 
 		// Don't set capacity - worker is unlimited
 
-		err := mgr.AssignRequestLeaseToWorker(ctx, envID, workerInstance, requestID)
+		err := mgr.AssignRequestToWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
 		// No mapping should exist
@@ -1954,11 +1954,11 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add some leases
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "lease-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "lease-2")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "lease-3")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "lease-3")
 		require.NoError(t, err)
 
 		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
@@ -1977,7 +1977,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add lease that should be active
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-lease")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "active-lease")
 		require.NoError(t, err)
 
 		// Manually add an expired lease to the sorted set
@@ -2000,9 +2000,9 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add active leases
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-1")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "active-1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "active-2")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "active-2")
 		require.NoError(t, err)
 
 		// Manually add expired leases
@@ -2029,7 +2029,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add valid lease
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, "valid-lease")
+		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "valid-lease")
 		require.NoError(t, err)
 
 		// Manually add empty entries to the sorted set
@@ -2056,7 +2056,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			leaseID := fmt.Sprintf("lease-%d", i)
 			expectedLeases[i] = leaseID
-			err = mgr.AssignRequestLeaseToWorker(ctx, envID, instanceID, leaseID)
+			err = mgr.AssignRequestToWorker(ctx, envID, instanceID, leaseID)
 			require.NoError(t, err)
 		}
 
@@ -2085,11 +2085,11 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add leases to different environments and instances
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID1, instanceID1, "env1-inst1-lease1")
+		err = mgr.AssignRequestToWorker(ctx, envID1, instanceID1, "env1-inst1-lease1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID1, instanceID2, "env1-inst2-lease1")
+		err = mgr.AssignRequestToWorker(ctx, envID1, instanceID2, "env1-inst2-lease1")
 		require.NoError(t, err)
-		err = mgr.AssignRequestLeaseToWorker(ctx, envID2, instanceID1, "env2-inst1-lease1")
+		err = mgr.AssignRequestToWorker(ctx, envID2, instanceID1, "env2-inst1-lease1")
 		require.NoError(t, err)
 
 		// Verify isolation

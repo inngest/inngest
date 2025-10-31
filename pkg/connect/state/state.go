@@ -113,12 +113,12 @@ type WorkerCapacityManager interface {
 	// Returns 0 if no limit is set (unlimited).
 	GetWorkerCapacities(ctx context.Context, envID uuid.UUID, instanceID string) (*WorkerCapacity, error)
 
-	// AssignRequestLeaseToWorker increments the active lease count for a worker instance.
+	// AssignRequestToWorker increments the active lease count for a worker instance.
 	// Returns an error if the worker is at capacity.
-	AssignRequestLeaseToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
+	AssignRequestToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
-	// DeleteRequestLeaseFromWorker decrements the active lease count for a worker instance.
-	DeleteRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
+	// DeleteRequestFromWorker decrements the active lease count for a worker instance.
+	DeleteRequestFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
 	// WorkerCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
 	// Called on heartbeat to keep the capacity limit alive while worker is active.

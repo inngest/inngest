@@ -853,7 +853,7 @@ func (r *redisConnectionStateManager) SetWorkerTotalCapacity(ctx context.Context
 	}
 
 	// Set the capacity limit with TTL aligned with worker request lease duration
-	capacityTTL := consts.ConnectWorkerInformationDuration
+	capacityTTL := consts.ConnectWorkerCapacityManagerTTL
 	err := r.client.Do(ctx, r.client.B().Set().Key(capacityKey).Value(fmt.Sprintf("%d", maxConcurrentLeases)).Ex(capacityTTL).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("failed to set worker capacity: %w", err)
@@ -921,9 +921,9 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 
 }
 
-// AssignRequestLeaseToWorker adds a lease to the worker's sorted set with expiration time as score.
+// AssignRequestToWorker adds a lease to the worker's sorted set with expiration time as score.
 // Returns an error if the worker is at capacity.
-func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
+func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 
@@ -939,7 +939,7 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 	}
 
 	// Use Lua script to atomically check capacity and add to sorted set
-	setTTL := consts.ConnectWorkerInformationDuration
+	setTTL := consts.ConnectWorkerCapacityManagerTTL
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 	expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 
@@ -965,8 +965,8 @@ func (r *redisConnectionStateManager) AssignRequestLeaseToWorker(ctx context.Con
 	return nil
 }
 
-// DeleteRequestLeaseFromWorker removes a lease from the worker's sorted set.
-func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
+// DeleteRequestFromWorker removes a lease from the worker's sorted set.
+func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
@@ -980,7 +980,7 @@ func (r *redisConnectionStateManager) DeleteRequestLeaseFromWorker(ctx context.C
 	}
 
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
-	setTTL := consts.ConnectWorkerInformationDuration
+	setTTL := consts.ConnectWorkerCapacityManagerTTL
 	keys := []string{workerRequestsKey, requestWorkerKey}
 	args := []string{fmt.Sprintf("%d", int64(setTTL.Seconds())), requestID, instanceID}
 
@@ -1010,7 +1010,8 @@ func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Conte
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 
-	capacityTTL := consts.ConnectWorkerInformationDuration
+	// This is really long (like 2 hours and includes function timeout)
+	capacityTTL := consts.ConnectWorkerCapacityManagerTTL
 	keys := []string{capacityKey, workerRequestsKey}
 	args := []string{fmt.Sprintf("%d", int64(capacityTTL.Seconds()))}
 
