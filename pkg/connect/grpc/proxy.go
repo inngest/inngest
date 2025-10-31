@@ -466,6 +466,10 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		// Stop checking for lease
 		cancelLeaseCtx()
 
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease after context finished")
+
 		// The lease has a short TTL so it will be cleaned up, but we should try
 		// to garbage-collect unused state as quickly as possible
 		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
@@ -473,10 +477,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			l.ReportError(err, "could not delete lease")
 		}
-
-		// Clean up worker lease for capacity tracking
-		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-			l, "could not delete worker lease after context finished")
 
 		if reply.RequestId == "" {
 			span.SetStatus(codes.Error, "missing response")

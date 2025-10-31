@@ -419,6 +419,7 @@ var connsHashKeyPatternRegEx = regexp.MustCompile(connsHashKeyPattern)
 func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Context) (int, error) {
 	var cursor uint64
 	var cleanedUp int
+	now := r.c.Now() // somewhat deterministic time
 	for {
 		scan, err := r.client.Do(ctx, r.client.B().Scan().Cursor(cursor).Count(50).Build()).AsScanEntry()
 		if err != nil {
@@ -460,7 +461,7 @@ func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Cont
 						return 0, fmt.Errorf("could not parse connection data: %w", err)
 					}
 
-					connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-consts.ConnectGCThreshold))
+					connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(now.Add(-consts.ConnectGCThreshold))
 					if connectionHeartbeatMissed {
 						err = r.DeleteConnection(ctx, envID, connID)
 						if err != nil {
@@ -491,7 +492,7 @@ func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Cont
 func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context) (int, error) {
 	var cleanedUp int
 	var hcursor uint64
-
+	now := r.c.Now() // somewhat deterministic time
 	for {
 		res, err := r.client.Do(ctx, r.client.B().Hscan().Key(r.gatewaysHashKey()).Cursor(hcursor).Count(100).Build()).AsScanEntry()
 		if err != nil {
@@ -508,7 +509,7 @@ func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context
 
 			gwLastHeartbeat := time.UnixMilli(gw.LastHeartbeatAtMS)
 
-			gwHeartbeatMissed := gwLastHeartbeat.Before(time.Now().Add(-consts.ConnectGCThreshold))
+			gwHeartbeatMissed := gwLastHeartbeat.Before(now.Add(-consts.ConnectGCThreshold))
 			if gwHeartbeatMissed {
 				err = r.DeleteGateway(ctx, gw.Id)
 				if err != nil {
@@ -942,10 +943,11 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
 	requestTTL := consts.ConnectWorkerRequestLeaseDuration
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
-	expirationTime := time.Now().Add(requestTTL).Unix()
-
 	now := r.c.Now()
+	expirationTime := now.Add(requestTTL).Unix()
+
 	keys := []string{capacityKey, workerRequestsKey, requestWorkerKey}
+
 	args := []string{
 		fmt.Sprintf("%d", int64(setTTL.Seconds())),
 		fmt.Sprintf("%d", int64(requestTTL.Seconds())),
@@ -980,6 +982,9 @@ func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Contex
 	if capacity <= 0 {
 		return nil
 	}
+
+	// refresh the TTL on the worker requests set (ignore the error for this)
+	_ = r.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
