@@ -1,5 +1,9 @@
 import type { TransformCase } from '../types';
 
+/*
+  Asserts: Nested objects become nested object nodes with correct names and
+  dot-paths, preserving hierarchy depth in the transformed tree.
+*/
 export const OBJECT_NESTING_CASE: TransformCase = {
   name: 'should transform minimal object nesting',
   expected: {

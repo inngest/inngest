@@ -1,5 +1,9 @@
 import type { TransformCase } from '../types';
 
+/*
+  Asserts: A simple object schema transforms into an object node with scalar
+  children and stable paths. Serves as a baseline check.
+*/
 export const BASIC_EVENT_CASE: TransformCase = {
   name: 'should transform the basic event schema',
   schema: {
