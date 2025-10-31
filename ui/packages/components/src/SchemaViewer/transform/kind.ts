@@ -11,11 +11,14 @@ export function determineKind(schema: JSONSchema): 'array' | 'object' | 'value' 
 
   if (Array.isArray(t)) {
     const set = new Set(t);
-    if (set.has('object') && (set.size === 1 || (set.size === 2 && set.has('null'))))
+
+    if (set.has('object') && (set.size === 1 || (set.size === 2 && set.has('null')))) {
       return 'object';
-    if (set.has('array') && (set.size === 1 || (set.size === 2 && set.has('null')))) return 'array';
-    if (set.size === 1 && t.length > 0) return mapSingleType(t[0] as string);
-    return 'value';
+    } else if (set.has('array') && (set.size === 1 || (set.size === 2 && set.has('null')))) {
+      return 'array';
+    } else {
+      return 'value';
+    }
   }
 
   return mapSingleType(t);
