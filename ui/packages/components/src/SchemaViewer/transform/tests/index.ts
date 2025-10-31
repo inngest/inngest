@@ -4,6 +4,8 @@ import { ARRAY_SCALAR_UNION_CASE } from './cases/arrayScalarUnion';
 import { ARRAY_TUPLE_CASE } from './cases/arrayTuple';
 import { ARRAY_TUPLE_WITH_BOOLEAN_UNKNOWN_CASE } from './cases/arrayTupleWithBooleanUnknown';
 import { ARRAY_UNION_NULL_CASE } from './cases/arrayUnionNull';
+import { ARRAY_UNKNOWN_ITEMS_BOOLEAN_CASE } from './cases/arrayUnknownItemsBoolean';
+import { ARRAY_UNKNOWN_ITEMS_UNDEFINED_CASE } from './cases/arrayUnknownItemsUndefined';
 import { BASIC_EVENT_CASE } from './cases/basicEvent';
 import { MIXED_STRUCTURAL_UNION_CASE } from './cases/mixedStructuralUnion';
 import { OBJECT_BOOLEAN_PROPERTY_UNKNOWN_CASE } from './cases/objectBooleanPropertyUnknown';
@@ -26,6 +28,8 @@ export const TRANSFORM_TEST_CASES: TransformCase[] = [
   ARRAY_OF_OBJECTS_CASE,
   OBJECT_UNION_NULL_CASE,
   ARRAY_UNION_NULL_CASE,
+  ARRAY_UNKNOWN_ITEMS_UNDEFINED_CASE,
+  ARRAY_UNKNOWN_ITEMS_BOOLEAN_CASE,
   OBJECT_SCALAR_UNION_CASE,
   ARRAY_SCALAR_UNION_CASE,
   MIXED_STRUCTURAL_UNION_CASE,

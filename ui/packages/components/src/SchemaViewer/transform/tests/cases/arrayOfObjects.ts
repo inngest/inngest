@@ -22,27 +22,24 @@ export const ARRAY_OF_OBJECTS_CASE: TransformCase = {
     kind: 'array',
     name: 'items',
     path: 'items',
-    elementVariants: [
-      {
-        kind: 'object',
-        name: '[*]',
-        path: 'items[*]',
-        children: [
-          {
-            kind: 'value',
-            name: 'id',
-            path: 'items[*].id',
-            type: 'string',
-          },
-          {
-            kind: 'value',
-            name: 'qty',
-            path: 'items[*].qty',
-            type: 'integer',
-          },
-        ],
-      },
-    ],
-    various: false,
+    element: {
+      kind: 'object',
+      name: '[*]',
+      path: 'items[*]',
+      children: [
+        {
+          kind: 'value',
+          name: 'id',
+          path: 'items[*].id',
+          type: 'string',
+        },
+        {
+          kind: 'value',
+          name: 'qty',
+          path: 'items[*].qty',
+          type: 'integer',
+        },
+      ],
+    },
   },
 };

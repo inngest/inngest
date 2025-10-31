@@ -15,14 +15,11 @@ export const ROOT_ARRAY_CASE: TransformCase = {
     kind: 'array',
     name: 'list',
     path: 'list',
-    elementVariants: [
-      {
-        kind: 'value',
-        name: '[*]',
-        path: 'list[*]',
-        type: 'integer',
-      },
-    ],
-    various: false,
+    element: {
+      kind: 'value',
+      name: '[*]',
+      path: 'list[*]',
+      type: 'integer',
+    },
   },
 };

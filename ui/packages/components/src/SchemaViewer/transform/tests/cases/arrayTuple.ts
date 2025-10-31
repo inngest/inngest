@@ -1,8 +1,7 @@
 import type { TransformCase } from '../types';
 
 /*
-  Asserts: A tuple-based array renders as an array node with multiple value
-  element variants ([0], [1], etc.); various=true.
+  Asserts: A tuple-based array renders as a tuple node with positional elements.
 */
 export const ARRAY_TUPLE_CASE: TransformCase = {
   name: 'should transform tuple-based arrays with multiple variants',
@@ -12,10 +11,10 @@ export const ARRAY_TUPLE_CASE: TransformCase = {
     items: [{ type: 'string' }, { type: 'number' }],
   },
   expected: {
-    kind: 'array',
+    kind: 'tuple',
     name: 'pair',
     path: 'pair',
-    elementVariants: [
+    elements: [
       {
         kind: 'value',
         name: '[0]',
@@ -29,6 +28,5 @@ export const ARRAY_TUPLE_CASE: TransformCase = {
         type: 'number',
       },
     ],
-    various: true,
   },
 };

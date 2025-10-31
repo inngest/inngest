@@ -15,14 +15,11 @@ export const ARRAY_UNION_NULL_CASE: TransformCase = {
     kind: 'array',
     name: 'numbers',
     path: 'numbers',
-    elementVariants: [
-      {
-        kind: 'value',
-        name: '[*]',
-        path: 'numbers[*]',
-        type: 'integer',
-      },
-    ],
-    various: false,
+    element: {
+      kind: 'value',
+      name: '[*]',
+      path: 'numbers[*]',
+      type: 'integer',
+    },
   },
 };

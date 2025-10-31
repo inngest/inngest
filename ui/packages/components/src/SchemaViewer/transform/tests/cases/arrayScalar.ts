@@ -15,14 +15,11 @@ export const ARRAY_SCALAR_CASE: TransformCase = {
     kind: 'array',
     name: 'tags',
     path: 'tags',
-    elementVariants: [
-      {
-        kind: 'value',
-        name: '[*]',
-        path: 'tags[*]',
-        type: 'string',
-      },
-    ],
-    various: false,
+    element: {
+      kind: 'value',
+      name: '[*]',
+      path: 'tags[*]',
+      type: 'string',
+    },
   },
 };

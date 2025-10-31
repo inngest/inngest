@@ -12,10 +12,10 @@ export const ARRAY_TUPLE_WITH_BOOLEAN_UNKNOWN_CASE: TransformCase = {
     items: [true, { type: 'string' }],
   },
   expected: {
-    kind: 'array',
+    kind: 'tuple',
     name: 'data',
     path: 'data',
-    elementVariants: [
+    elements: [
       {
         kind: 'value',
         name: '[0]',
@@ -29,6 +29,5 @@ export const ARRAY_TUPLE_WITH_BOOLEAN_UNKNOWN_CASE: TransformCase = {
         type: 'string',
       },
     ],
-    various: true,
   },
 };
