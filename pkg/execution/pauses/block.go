@@ -428,12 +428,12 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 	ts := pause.CreatedAt
 	if ts.IsZero() {
 		ts, err = b.buf.PauseTimestamp(ctx, index, pause)
-		if err != nil {
+		if err != nil || ts.IsZero() {
 			return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
 		}
 	}
 
-	// Check which blocks this pause exists in, then delete from the block index.
+	// Check if atleast one block may contain the pause.
 	blockID, err := b.blockIDForTimestamp(ctx, index, ts)
 	if err != nil {
 		return fmt.Errorf("error fetching block for timestamp: %w", err)
