@@ -236,6 +236,9 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		}
 	}
 
+	// TODO: check out if Status is actually an OTEL thing folks care about or just something for us,
+	// and if it's not a user thing then we *could* change it to whatever we want. But what happens if a
+	// user value shadows it and we end up with a weird value somewhere?
 	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
