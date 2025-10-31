@@ -654,7 +654,9 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 	// XXX: It would be good to add an upsert method to the function CQRS layer.
 	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
 	if err == nil && fn != nil {
-		if string(fn.Config) == config {
+
+		out := removeFunctionVersion(ctx, fn.Config)
+		if config == string(out) {
 			return // no need to update
 		}
 		_, err = a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
@@ -694,7 +696,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 
 	// Hash the config so that we can quickly compare whether we upsert when memoizing
 	// this upsert routine.
-	a.upserted.Set(fnID.String(), util.XXHash(config), time.Hour*24)
+	a.upserted.Set(fnID.String(), util.XXHash(config), time.Hour*24*7)
 
 	logger.StdlibLogger(ctx).Debug("upserted fn",
 		"error", err,
@@ -735,4 +737,22 @@ func (a checkpointAPI) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Functio
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+func removeFunctionVersion(ctx context.Context, input json.RawMessage) []byte {
+	// Unfortunately for us, there's a function version inside this config.  We need to ensure
+	// that this is set to "1".
+	// TODO: remove function version from marshalled config.
+	//
+	// It's safe to ignore errors here;  this only resultss in
+	found := inngest.Function{}
+	if err := json.Unmarshal(input, &found); err != nil {
+		logger.StdlibLogger(ctx).Warn("error unmarshalling fn config in checkpoint upsert", "error", err)
+	}
+	found.FunctionVersion = 1
+	out, err := json.Marshal(found)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("error marshalling fn config in checkpoint upsert", "error", err)
+	}
+	return out
 }
