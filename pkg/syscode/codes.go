@@ -30,6 +30,8 @@ const (
 	CodeConnectInvalidFunctionConfig                  = "connect_invalid_function_config"
 	CodeConnectWorkerRequestAckInvalidPayload         = "connect_worker_request_ack_invalid_payload"
 	CodeConnectNoHealthyConnection                    = "connect_no_healthy_connection"
+	CodeConnectRequestAssignWorkerReachedCapacity     = "connect_requested_worker_reached_capacity"
+	CodeConnectAllWorkersAtCapacity                   = "connect_all_workers_at_capacity"
 	CodeConnectTooManyAppsPerConnection               = "connect_too_many_apps_per_connection"
 	CodeConnectWorkerRequestExtendLeaseInvalidPayload = "connect_worker_request_extend_lease_invalid_payload"
 	CodeConnectWorkerStoppedResponding                = "connect_worker_stopped_responding"

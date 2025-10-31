@@ -8,3 +8,11 @@
 
 To filter tests:
 `INNGEST_SIGNING_KEY=test API_URL=http://127.0.0.1:8288 SDK_URL=http://127.0.0.1:3000/api/inngest go test ./tests -v -count=1 -test.run TestSDKCancelNotReceived`
+
+
+#### Connect Gateway
+In order to enable verbose logging of the connect gateway
+
+```
+CONNECT_GATEWAY_FULL_LOGS=true go run ./cmd dev --no-discovery --log-level trace
+```

@@ -355,6 +355,15 @@ func IncrConnectRouterNoHealthyConnectionCounter(ctx context.Context, value int6
 	})
 }
 
+func IncrConnectRouterAllWorkersAtCapacityCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_router.all_workers_at_capacity",
+		Description: "Total number of attempts to forward a message without finding any worker capacity",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueContinuationAddedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

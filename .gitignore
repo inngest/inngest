@@ -29,3 +29,7 @@ docs/openapi/v2/
 docs/openapi/v3/
 
 /bin/
+
+# Go workspace file
+go.work
+go.work.sum
