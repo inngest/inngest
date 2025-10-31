@@ -8,10 +8,28 @@ In the root directory of this repository, start the CLI using the `dev` command.
 go run ./cmd dev -u http://localhost:3000/api/inngest
 ```
 
-Then in this directory, run the UI in dev mode. This will run Next.js and GraphQL codegen concurrently:
+Then in this directory, run the UI in dev mode. This will run Tanstack Start and GraphQL codegen concurrently:
 
 ```sh
 pnpm dev
+```
+
+Or, optionally in the root `ui` run:
+
+```sh
+pnpm pnpm dev:dev-server-ui
+```
+
+## Preview "production" builds
+
+copy `.env.development` to `.env`
+
+```sh
+pnpm build
+```
+
+```sh
+pnpm preview
 ```
 
 ## GraphQL Codegen
@@ -36,3 +54,7 @@ const { value, isReady } = booleanFlag(
   false
 );
 ```
+
+## Stack
+
+This is a Tanstack Start application: https://tanstack.com/start/latest/docs/framework/react/overview

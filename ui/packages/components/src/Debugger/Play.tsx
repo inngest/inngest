@@ -1,5 +1,5 @@
-import { useRouter } from 'next/navigation';
 import { RiPlayLine } from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
@@ -17,7 +17,7 @@ type PlayProps = {
 
 export const Play = ({ functionSlug, runID, debugRunID, debugSessionID }: PlayProps) => {
   const { pathCreator } = usePathCreator();
-  const router = useRouter();
+  const navigate = useNavigate();
   const { selectedStep } = useStepSelection({
     // TODO: add debug run id
     runID,
@@ -57,14 +57,14 @@ export const Play = ({ functionSlug, runID, debugRunID, debugSessionID }: PlayPr
     //
     // if this is our first debug run, send them there
     if (!debugRunID) {
-      router.push(
-        pathCreator.debugger({
+      navigate({
+        to: pathCreator.debugger({
           functionSlug,
           runID,
           debugRunID: newDebugRunID,
           debugSessionID,
-        })
-      );
+        }),
+      });
     }
   };
 

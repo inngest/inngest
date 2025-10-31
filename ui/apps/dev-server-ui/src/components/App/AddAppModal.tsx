@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
 import useDebounce from '@inngest/components/hooks/useDebounce';
@@ -83,13 +83,22 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
               placeholder="http://localhost:3000/api/inngest"
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              error={isUrlInvalid && inputUrl.length > 0 ? 'Please enter a valid URL' : undefined}
+              error={
+                isUrlInvalid && inputUrl.length > 0
+                  ? 'Please enter a valid URL'
+                  : undefined
+              }
             />
           </div>
         </form>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button label="Cancel" kind="secondary" appearance="outlined" onClick={onClose} />
+        <Button
+          label="Cancel"
+          kind="secondary"
+          appearance="outlined"
+          onClick={onClose}
+        />
         <Button
           disabled={isDisabled || isUrlInvalid}
           label="Sync App"

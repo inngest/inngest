@@ -1,23 +1,30 @@
-import type { UrlObject } from 'url';
-import NextLink from 'next/link';
 import { Card } from '@inngest/components/Card';
+import { Link, LinkComponentProps } from '@tanstack/react-router';
 
 type HelperCardProps = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  href: string | UrlObject;
+  to?: LinkComponentProps['to'];
+  href?: LinkComponentProps['href'];
   onClick?: () => void;
 };
 
-export default function HelperCard({ title, description, icon, href, onClick }: HelperCardProps) {
+export default function HelperCard({
+  title,
+  description,
+  icon,
+  to,
+  href,
+  onClick,
+}: HelperCardProps) {
   return (
     <Card className="hover:bg-canvasSubtle flex flex-col">
-      <NextLink className="block p-4" href={href} onClick={onClick}>
+      <Link className="block p-4" to={to} href={href} onClick={onClick}>
         {icon}
         <p className="mb-1 mt-3">{title}</p>
         <p className="text-muted text-sm">{description}</p>
-      </NextLink>
+      </Link>
     </Card>
   );
 }

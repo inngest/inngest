@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { RiGitForkLine, RiPauseLine, RiStopLine } from '@remixicon/react';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { Button } from '../Button';
@@ -16,7 +15,7 @@ import { useRerun } from '../SharedContext/useRerun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
-import { useSearchParam } from '../hooks/useSearchParam';
+import { useSearchParam } from '../hooks/useNewSearchParams';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
 import { DebugRun } from './DebugRun';
@@ -27,7 +26,7 @@ const DEBUG_RUN_REFETCH_INTERVAL = 1000;
 const RUN_REFETCH_INTERVAL = 1000;
 
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { pathCreator } = usePathCreator();
   const [runID] = useSearchParam('runID');
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
@@ -124,13 +123,13 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
       }
 
       if (result.data?.newRunID) {
-        router.push(
-          pathCreator.debugger({
+        navigate({
+          to: pathCreator.debugger({
             functionSlug,
             runID: result.data?.newRunID,
             debugSessionID: result.data?.newRunID,
-          })
-        );
+          }),
+        });
       }
     }
   };
@@ -145,7 +144,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <RiGitForkLine className="text-muted h-6 w-6" />
             <div>Forked from:</div>
             {runTraceData?.status && <StatusDot status={runTraceData.status} className="h-3 w-3" />}
-            <div>{runID && <Link href={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
+            <div>{runID && <Link to={pathCreator.runPopout({ runID })}>{runID}</Link>}</div>
           </div>
         </div>
 
