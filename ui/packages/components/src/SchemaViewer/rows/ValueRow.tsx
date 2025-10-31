@@ -15,7 +15,7 @@ export function ValueRow({ node, typeLabelOverride, boldName }: ValueRowProps): 
       <span className={cn('text-sm', boldName ? 'text-basis font-semibold' : 'text-subtle')}>
         {node.name}
       </span>
-      <span className="text-muted font-mono text-xs capitalize">
+      <span className="text-warning font-mono text-xs capitalize">
         {computeType(node, baseLabel)}
       </span>
     </div>
