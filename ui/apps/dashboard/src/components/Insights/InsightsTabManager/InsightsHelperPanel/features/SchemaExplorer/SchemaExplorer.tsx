@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
@@ -11,6 +12,18 @@ import { useSchemas } from './useSchemas';
 export function SchemaExplorer() {
   const { schemas } = useSchemas();
   const [search, setSearch] = useState('');
+
+  const renderAdornment = useCallback((node: ValueNode) => {
+    if (node.path === 'event') {
+      return (
+        <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
+          Shared schema
+        </Pill>
+      );
+    }
+
+    return null;
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4">
@@ -34,6 +47,7 @@ export function SchemaExplorer() {
             defaultExpandedPaths={['event']}
             hide={Boolean(search) && !schema.name.startsWith(search)}
             node={schema}
+            renderAdornment={renderAdornment}
           />
         ))}
       </div>

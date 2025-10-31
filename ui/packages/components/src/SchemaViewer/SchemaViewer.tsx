@@ -1,5 +1,6 @@
 'use client';
 
+import { AdornmentProvider, type RenderAdornmentFn } from './AdornmentContext';
 import { ExpansionProvider } from './ExpansionContext';
 import { TypeProvider } from './TypeContext';
 import { Row } from './rows/Row';
@@ -10,6 +11,7 @@ export type SchemaViewerProps = {
   defaultExpandedPaths?: string[];
   hide?: boolean;
   node: SchemaNode;
+  renderAdornment?: RenderAdornmentFn;
 };
 
 export function SchemaViewer({
@@ -17,10 +19,13 @@ export function SchemaViewer({
   defaultExpandedPaths,
   hide,
   node,
+  renderAdornment,
 }: SchemaViewerProps): React.ReactElement {
   return (
     <ExpansionProvider defaultExpandedPaths={defaultExpandedPaths}>
-      <TypeProvider computeType={computeType}>{!hide && <Row node={node} />}</TypeProvider>
+      <AdornmentProvider renderAdornment={renderAdornment}>
+        <TypeProvider computeType={computeType}>{!hide && <Row node={node} />}</TypeProvider>
+      </AdornmentProvider>
     </ExpansionProvider>
   );
 }
