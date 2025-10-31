@@ -71,6 +71,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		keys := []string{capacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -96,6 +97,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		keys := []string{capacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -145,6 +147,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -186,6 +189,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 		keys := []string{capacityKey, workerRequestsKey, requestWorkerKey(requestID)}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
@@ -286,8 +290,8 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Fast forward time to simulate TTL decay
-		r.FastForward(30 * time.Second)
+		// Fast forward time to simulate TTL decay (use a fraction of the request lease duration)
+		r.FastForward(consts.ConnectWorkerRequestLeaseDuration + 2*time.Second)
 
 		requestID := "req-1"
 		keys := []string{workerRequestsKey, requestWorkerKey(requestID)}
@@ -310,7 +314,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		// Verify TTL was refreshed
 		ttl := r.TTL(workerRequestsKey)
 		expectedTTL := consts.ConnectWorkerCapacityManagerTTL
-		require.Greater(t, ttl, expectedTTL-5*time.Second)
+		require.Greater(t, ttl, expectedTTL-2*time.Second)
 
 		// Verify lease mapping was deleted
 		require.False(t, r.Exists(requestWorkerKey(requestID)))
@@ -429,6 +433,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -451,6 +456,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 		keys := []string{capacityKey, workerRequestsKey, requestWorkerKey("req-overflow")}
 		args := []string{
 			fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+			fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 			instanceID,
 			"req-overflow",
 			fmt.Sprintf("%d", expirationTime),
@@ -501,6 +507,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
@@ -531,6 +538,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			expirationTime := now.Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
 			args := []string{
 				fmt.Sprintf("%d", int64((consts.ConnectWorkerCapacityManagerTTL).Seconds())),
+				fmt.Sprintf("%d", int64((consts.ConnectWorkerRequestLeaseDuration).Seconds())),
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),

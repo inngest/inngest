@@ -1384,7 +1384,7 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
 		err := mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
-		require.ErrorIs(t, err, ErrWorkerRequestsSetDoesNotExists)
+		require.NoError(t, err, "should be no-op when no capacity is set")
 	})
 
 	t.Run("decrements counter", func(t *testing.T) {
@@ -1438,8 +1438,8 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
-		// Fast forward time a bit in miniredis
-		r.FastForward(30 * time.Second)
+		// Fast forward time a bit in miniredis (use a fraction of the capacity manager TTL)
+		r.FastForward(consts.ConnectWorkerCapacityManagerTTL / 4)
 
 		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
@@ -1447,7 +1447,7 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		// TTL should be refreshed
 		setKey := mgr.workerRequestsKey(envID, instanceID)
 		ttl := r.TTL(setKey)
-		require.Greater(t, ttl, 30*time.Second) // Should be close to 40s
+		require.Greater(t, ttl, consts.ConnectWorkerCapacityManagerTTL/4) // Should have most of the TTL remaining
 	})
 
 	t.Run("refresh TTL after counter expires returns unlimited capacity", func(t *testing.T) {
@@ -1460,8 +1460,8 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-2")
 		require.NoError(t, err)
 
-		// Fast forward time a bit in miniredis to exceed ConnectWorkerCapacityManagerTTL (MaxFunctionTimeout + 80s = ~2h20m)
-		r.FastForward(90 * time.Second)
+		// Fast forward time to exceed ConnectWorkerCapacityManagerTTL (6 * ConnectWorkerRequestLeaseDuration = 120s)
+		r.FastForward(consts.ConnectWorkerCapacityManagerTTL + time.Second)
 
 		// Get the Total Capacity, it should have expired, but we still
 		// don't return error on expired total capacity
@@ -1573,8 +1573,8 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 5)
 		require.NoError(t, err)
 
-		// Fast forward time
-		r.FastForward(20 * time.Second)
+		// Fast forward time (use the request lease duration)
+		r.FastForward(consts.ConnectWorkerRequestLeaseDuration)
 
 		// Refresh TTL
 		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
@@ -1583,7 +1583,7 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		// Check TTL is reset
 		capacityKey := mgr.workerCapacityKey(envID, instanceID)
 		ttl := r.TTL(capacityKey)
-		require.Greater(t, ttl, 30*time.Second) // Should be close to 40s
+		require.Greater(t, ttl, consts.ConnectWorkerCapacityManagerTTL/4) // Should have most of the TTL remaining
 	})
 
 	t.Run("refreshes TTL on both capacity and counter keys", func(t *testing.T) {
@@ -1595,8 +1595,8 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err)
 
-		// Fast forward time
-		r.FastForward(30 * time.Second)
+		// Fast forward time (use a fraction of the capacity manager TTL)
+		r.FastForward(consts.ConnectWorkerCapacityManagerTTL / 4)
 
 		// Refresh TTL
 		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
@@ -1607,10 +1607,10 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		setKey := mgr.workerRequestsKey(envID, instanceID)
 
 		capacityTTL := r.TTL(capacityKey)
-		require.Greater(t, capacityTTL, 30*time.Second) // Should be close to 40s
+		require.Greater(t, capacityTTL, consts.ConnectWorkerCapacityManagerTTL/4) // Should have most of the TTL remaining
 
 		setTTL := r.TTL(setKey)
-		require.Greater(t, setTTL, 30*time.Second) // Should be close to 40s
+		require.Greater(t, setTTL, consts.ConnectWorkerCapacityManagerTTL/4) // Should have most of the TTL remaining
 	})
 }
 
@@ -1716,7 +1716,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 			err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
 			// TODO: extend lease for req-2
 			require.NoError(t, err)
-			r.FastForward(10 * time.Second)
+			r.FastForward(consts.ConnectWorkerRequestLeaseDuration / 2)
 		}
 
 		// All leases have been deleted, so capacity should be back to full

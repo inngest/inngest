@@ -940,13 +940,15 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 
 	// Use Lua script to atomically check capacity and add to sorted set
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
+	requestTTL := consts.ConnectWorkerRequestLeaseDuration
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
-	expirationTime := time.Now().Add(consts.ConnectWorkerRequestLeaseDuration).Unix()
+	expirationTime := time.Now().Add(requestTTL).Unix()
 
 	now := r.c.Now()
 	keys := []string{capacityKey, workerRequestsKey, requestWorkerKey}
 	args := []string{
 		fmt.Sprintf("%d", int64(setTTL.Seconds())),
+		fmt.Sprintf("%d", int64(requestTTL.Seconds())),
 		instanceID,
 		requestID,
 		fmt.Sprintf("%d", expirationTime),
@@ -1068,7 +1070,7 @@ func (r *redisConnectionStateManager) workerRequestsKey(envID uuid.UUID, instanc
 	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
 }
 
-// workerRequestsCounterKey returns the Redis key for storing a worker's active lease counter
-func (r *redisConnectionStateManager) requestWorkerKey(envID uuid.UUID, leaseID string) string {
-	return fmt.Sprintf("{%s}:request-worker:%s", envID.String(), leaseID)
+// requestWorkerKey returns the Redis key for storing the mapping from request ID to worker instance ID
+func (r *redisConnectionStateManager) requestWorkerKey(envID uuid.UUID, requestID string) string {
+	return fmt.Sprintf("{%s}:request-worker:%s", envID.String(), requestID)
 }

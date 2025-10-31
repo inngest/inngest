@@ -4,10 +4,12 @@ Output:
   0: Successfully added lease to set
   1: Worker capacity exceeded
 
-ARGV[1]: TTL in seconds for the set and mapping keys
-ARGV[2]: Instance ID of the worker
-ARGV[3]: Request ID
-ARGV[4]: Expiration time as Unix timestamp (score for sorted set)
+ARGV[1]: TTL in seconds for the set
+ARGV[2]: Request lease duration in seconds
+ARGV[3]: Instance ID of the worker
+ARGV[4]: Request ID
+ARGV[5]: Expiration time as Unix timestamp (score for sorted set)
+ARGV[6]: Current time as Unix timestamp in milliseconds
 ]]
 
 local capacityKey = KEYS[1]
@@ -15,10 +17,11 @@ local workerRequestsKey = KEYS[2]
 local requestWorkerKey = KEYS[3]
 
 local setTTL = tonumber(ARGV[1])
-local instanceID = ARGV[2]
-local requestID = ARGV[3]
-local expirationTime = ARGV[4]
-local currentTime = ARGV[5]
+local requestLeaseDuration = tonumber(ARGV[2])
+local instanceID = ARGV[3]
+local requestID = ARGV[4]
+local expirationTime = ARGV[5]
+local currentTime = ARGV[6]
 
 -- Get the worker's capacity limit (returns a string)
 local capacity = redis.call("GET", capacityKey)
@@ -55,6 +58,6 @@ redis.call("ZADD", workerRequestsKey, expTime, requestID)
 redis.call("EXPIRE", workerRequestsKey, setTTL)
 
 -- Store the mapping of request ID to worker instance ID
-redis.call("SET", requestWorkerKey, instanceID, "EX", setTTL)
+redis.call("SET", requestWorkerKey, instanceID, "EX", requestLeaseDuration)
 
 return 0
