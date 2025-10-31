@@ -1,0 +1,4 @@
+[submodule "internal/embeddocs/website"]
+	path = internal/embeddocs/website
+	url = git@github.com:inngest/website.git
+	branch = main
