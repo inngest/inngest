@@ -13,6 +13,7 @@ export function SchemaExplorer() {
   const { schemas } = useSchemas();
   const [search, setSearch] = useState('');
 
+  // TODO: Make more resilient, an event type could be named "event"
   const renderAdornment = useCallback((node: ValueNode) => {
     if (node.path === 'event') {
       return (
@@ -55,6 +56,7 @@ export function SchemaExplorer() {
   );
 }
 
+// TODO: Make more resilient, an event type could be named "event"
 const computeType = (node: ValueNode, baseLabel: string): string => {
   if (node.path === 'event.data' && baseLabel === 'string') return 'JSON';
   return baseLabel;
