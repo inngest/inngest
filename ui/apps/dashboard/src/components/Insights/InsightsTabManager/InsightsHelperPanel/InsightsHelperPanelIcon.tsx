@@ -1,6 +1,6 @@
 'use client';
 
-import { RiBookOpenLine, RiFeedbackLine, RiSparkling2Line, RiTable2 } from '@remixicon/react';
+import { RiBookOpenLine, RiFeedbackLine, RiNodeTree, RiSparkling2Line } from '@remixicon/react';
 
 import {
   DOCUMENTATION,
@@ -27,7 +27,7 @@ export function InsightsHelperPanelIcon({
     case DOCUMENTATION:
       return <RiBookOpenLine className={className} size={size} />;
     case SCHEMA_EXPLORER:
-      return <RiTable2 className={className} size={size} />;
+      return <RiNodeTree className={className} size={size} />;
     case SUPPORT:
       return <RiFeedbackLine className={className} size={size} />;
     default:

@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { RiCloseLine } from '@remixicon/react';
 
-import { InsightsChat } from '../../InsightsChat/InsightsChat';
 import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
 import {
   DOCUMENTATION,
@@ -12,6 +11,8 @@ import {
   SUPPORT,
   type HelperTitle,
 } from './constants';
+import { InsightsChat } from './features/InsightsChat/InsightsChat';
+import { SchemaExplorer } from './features/SchemaExplorer/SchemaExplorer';
 
 type InsightsHelperPanelProps = {
   active: HelperTitle;
@@ -29,7 +30,7 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
       case DOCUMENTATION:
         return <div className="text-sm">Docs helper (placeholder)</div>;
       case SCHEMA_EXPLORER:
-        return <div className="text-sm">Schemas helper (placeholder)</div>;
+        return <SchemaExplorer />;
       case SUPPORT:
         return <div className="text-sm">Support helper (placeholder)</div>;
       default:
@@ -44,11 +45,11 @@ export function InsightsHelperPanel({ active, agentThreadId, onClose }: Insights
       <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
         <div className="flex flex-row items-center gap-2">
           <InsightsHelperPanelIcon className="text-subtle" title={active} />
-          <div className="text-muted text-sm font-normal uppercase tracking-wider">{active}</div>
+          <div className="text-sm font-normal">{active}</div>
         </div>
         <button
           aria-label="Close helper"
-          className="hover:bg-canvasSubtle hover:text-basis text-subtle flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          className="hover:bg-canvasSubtle hover:text-basis text-subtle -mr-1 flex h-8 w-8 items-center justify-center rounded-md transition-colors"
           onClick={onClose}
           type="button"
         >
