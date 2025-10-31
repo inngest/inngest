@@ -806,6 +806,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			// get worker capacity to check if we have worker limits to enforce
 			workerCap, err := c.svc.stateManager.GetWorkerCapacities(ctx, c.conn.EnvID, c.conn.Data.InstanceId)
+			c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available, "worker_active_leases", workerCap.CurrentLeases)
 			if err != nil {
 				c.log.ReportError(err, "failed to get worker available capacity",
 					logger.WithErrorReportTags(map[string]string{
@@ -1227,6 +1228,8 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				Msg:        "worker capacity not enforced",
 			}
 		}
+
+		log.Trace("worker capacity set", "account_id", authResp.AccountID, "env_id", authResp.EnvID, "instance_id", initialMessageData.InstanceId, "max_concurrency", maxConcurrency)
 
 		// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal
 		for _, l := range c.svc.lifecycles {

@@ -142,6 +142,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	healthy := make([]connWithGroup, 0, len(conns))
 	capacityCache := make(map[string]*checkCapacityRes)
 	workerCapacityAvailable := false
+	hasHealthyConnections := false
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
 		// avoid duplicate calls to check capacity for same instance
@@ -149,6 +150,12 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 			capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
 			capacityCache[conn.InstanceId] = capacityRes
 		}
+
+		// Track if we have any healthy connections
+		if res.isHealthy {
+			hasHealthyConnections = true
+		}
+
 		// check if the connection is healthy and has worker capacity
 		if res.isHealthy && capacityCache[conn.InstanceId].hasWorkerCapacity {
 			workerCapacityAvailable = true
@@ -168,13 +175,14 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		}
 	}
 
-	// no available worker has available capacity
-	if !workerCapacityAvailable {
-		return nil, ErrAllWorkersAtCapacity
+	// If no healthy connections at all, return ErrNoHealthyConnection
+	if !hasHealthyConnections {
+		return nil, ErrNoHealthyConnection
 	}
 
-	if len(healthy) == 0 {
-		return nil, ErrNoHealthyConnection
+	// If we have healthy connections but none have capacity available, return ErrAllWorkersAtCapacity
+	if !workerCapacityAvailable {
+		return nil, ErrAllWorkersAtCapacity
 	}
 
 	if len(healthy) == 1 {
@@ -416,8 +424,7 @@ func checkCapacity(ctx context.Context, stateManager state.StateManager, envID u
 	}
 	if workerCap.IsAtCapacity() {
 		// Worker has a capacity limit set and is at capacity
-		allActiveLeases, _ := stateManager.GetAllActiveWorkerLeases(ctx, envID, conn.InstanceId)
-		log.Debug("worker at capacity", "instance_id", conn.InstanceId, "total_capacity", workerCap.Total, "available_capacity", workerCap.Available, "all_active_leases", allActiveLeases)
+		log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available, "worker_active_leases", workerCap.CurrentLeases)
 		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 

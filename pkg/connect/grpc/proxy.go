@@ -391,7 +391,11 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		if err := i.stateManager.AssignRequestLeaseToWorker(ctx, opts.EnvID, route.InstanceID, opts.Data.RequestId); err != nil {
 			// if the instance ID is not set, we log the error and skip for now
 			span.RecordError(err)
-			l.ReportError(err, "could not assign request lease to worker")
+			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
+				"instance_id": route.InstanceID,
+				"request_id":  opts.Data.RequestId,
+				"gateway_id":  route.GatewayID.String(),
+			}))
 
 			// Check if this is a capacity error, this will happen when two in parallel
 			// checked for worker capacity earlier but now one got to this point first
@@ -402,6 +406,9 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				}
 			}
 		}
+
+		// Trace the request lease assignment
+		l.Trace("assigned request lease to worker", "instance_id", route.InstanceID, "request_id", opts.Data.RequestId, "gateway_id", route.GatewayID.String())
 
 		transport := "grpc"
 
@@ -504,6 +511,9 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 }
 
 func cleanupWorkerLeaseOrLogError(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID string, requestID string, l logger.Logger, message string) {
+	//
+	l.Trace("cleaning up worker lease", "instance_id", instanceID, "request_id", requestID, "env_id", envID.String())
+
 	// if the instance ID is not set, we need to return an error
 	if instanceID == "" {
 		l.ReportError(state.ErrNoInstanceIDFound, message)
