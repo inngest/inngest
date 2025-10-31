@@ -328,7 +328,10 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 		return err
 	}
 
-	if m.bs == nil || !m.blockStoreEnabled(ctx, pause.WorkspaceID) {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. Without compaction it won't really do
+	// anything.
+	if m.bs == nil || !m.blockFlushEnabled(ctx, pause.WorkspaceID) {
 		return nil
 	}
 
