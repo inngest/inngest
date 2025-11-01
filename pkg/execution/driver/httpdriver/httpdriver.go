@@ -66,7 +66,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts())
+	jID := queue.JobIDFromContext(ctx)
+
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt, item.GetMaxAttempts(), jID)
 	if err != nil {
 		return nil, err
 	}

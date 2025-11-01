@@ -46,6 +46,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -1639,13 +1640,14 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	}
 
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:   *run.Metadata(),
-		Fn:         run.f,
-		SigningKey: sk,
-		Attempt:    run.AttemptCount(),
-		Index:      run.stackIndex,
-		StepID:     &run.edge.Outgoing,
-		URL:        url,
+		Metadata:    *run.Metadata(),
+		Fn:          run.f,
+		SigningKey:  sk,
+		Attempt:     run.AttemptCount(),
+		Index:       run.stackIndex,
+		StepID:      &run.edge.Outgoing,
+		QueueItemID: queue.JobIDFromContext(ctx),
+		URL:         url,
 	})
 
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.
@@ -2598,6 +2600,22 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
+	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1)
+	// which contained a step.run.  However, with checkpointing we can batch step.run
+	// outputs into one single HTTP response.
+	//
+	// When this happens, we ALWAYS need to create a trace for each step.
+	//
+	// We pass this down in context, unfortunately.
+	if len(resp.Generator) > 1 {
+		for _, op := range resp.Generator {
+			if op.Op == enums.OpcodeStepRun {
+				ctx = setEmitCheckpointTraces(ctx)
+				break
+			}
+		}
+	}
+
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -2715,8 +2733,45 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// This is fine.
+		return nil
+	}
+
 	if err != nil {
 		return err
+	}
+
+	// Again, we ONLY create new traces if the steps were batched in checkpointing, then returned
+	// by the SDK in an async response due to overly permissive checkpointing (ie. after 10s)
+	// which was never called.
+	//
+	// In this case, we MUST retroactively record spans for each past step.
+	if emitCheckpointTraces(ctx) {
+		attrs := tracing.GeneratorAttrs(&gen)
+		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
+		_, err := e.tracerProvider.CreateSpan(
+			ctx,
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+				StartTime: gen.Timing.Start(),
+				EndTime:   gen.Timing.End(),
+				Attributes: attrs.Merge(
+					meta.NewAttrSet(
+						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(gen.UserDefinedName())),
+						meta.Attr(meta.Attrs.RunID, &runCtx.Metadata().ID.RunID),
+						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
+					),
+				),
+			},
+		)
+		if err != nil {
+			// We should never hit a blocker creating a span.  If so, warn loudly.
+			logger.StdlibLogger(ctx).Error("error saving span for checkpoint op", "error", err)
+		}
 	}
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
@@ -4436,4 +4491,19 @@ func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Me
 	}
 
 	return parentRef
+}
+
+// Checkpoint traces configures hwehter we should emit traces after recording steps.
+
+type traceStepsValT struct{}
+
+var traceStepsVal = traceStepsValT{}
+
+func setEmitCheckpointTraces(ctx context.Context) context.Context {
+	return context.WithValue(ctx, traceStepsVal, true)
+}
+
+func emitCheckpointTraces(ctx context.Context) bool {
+	ok, _ := ctx.Value(traceStepsVal).(bool)
+	return ok
 }
