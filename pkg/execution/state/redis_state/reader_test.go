@@ -12,8 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -164,6 +166,105 @@ func TestItemsByPartition(t *testing.T) {
 			require.Equal(t, tc.expectedItems, count)
 		})
 	}
+}
+
+func TestItemsByPartitionWithMultipleBacklogs(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+	exprHash := util.XXHash("event.data.customerID")
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithClock(clock),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					ThrottleKeyExpressionHash: exprHash,
+					Limit:                     10,
+					Burst:                     1,
+					Period:                    600,
+				},
+			}
+		}),
+	)
+
+	from := clock.Now()
+	interval := time.Second
+	to := from.Add(10 * interval)
+	var batchSize int64 = 5
+	expected := 10
+	numBacklogs := 10
+	numItems := 100
+	for i := range numItems {
+		at := clock.Now().Add(time.Duration(i) * interval)
+
+		// Distribute items across multiple backlogs by generating a "dynamic" throttle key
+		throttleKey := util.XXHash(fmt.Sprintf("backlog:%d", i%numBacklogs))
+
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("test%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindStart,
+				Identifier: state.Identifier{
+					AccountID:       acctId,
+					WorkspaceID:     wsID,
+					WorkflowID:      fnID,
+					WorkflowVersion: 1,
+				},
+				Throttle: &osqueue.Throttle{
+					Limit:             10,
+					Burst:             1,
+					Period:            600,
+					Key:               throttleKey,
+					KeyExpressionHash: exprHash,
+				},
+			},
+		}
+
+		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	// Expect items to be distributed across multiple backlogs
+	backlogs, err := r.ZMembers(kg.ShadowPartitionSet(fnID.String()))
+	require.NoError(t, err)
+	require.Len(t, backlogs, numBacklogs)
+
+	iterateCtx, cancelIterate := context.WithCancel(context.Background())
+	items, err := q.ItemsByPartition(iterateCtx, defaultShard, fnID.String(), from, to,
+		WithQueueItemIterBatchSize(batchSize),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		<-time.After(20 * time.Second)
+		assert.Fail(t, "iteration went on for too long")
+		cancelIterate()
+	}()
+
+	var count int
+	for item := range items {
+		fmt.Printf("%d: %s at %v\n", count, item.ID, time.UnixMilli(item.AtMS))
+		count++
+	}
+
+	require.Less(t, count, numItems)
+	require.Equal(t, expected, count)
 }
 
 func TestItemsByPartitionWithSystemQueue(t *testing.T) {
