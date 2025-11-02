@@ -981,6 +981,10 @@ type QueueRunMode struct {
 
 	// ActiveChecker enables background checking of active sets.
 	ActiveChecker bool
+
+	// ExclusiveAccounts defines a list of account IDs to peek exclusively.
+	// This can be used to configure executors processing only a static subset of accounts.
+	ExclusiveAccounts []uuid.UUID
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

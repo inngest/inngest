@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -368,11 +370,16 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 			{
 				byt, err := json.Marshal(r.Output)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal output: %w", err)
+					logger.StdlibLogger(context.Background()).Warn(
+						"failed to get driver output for type",
+						"type", fmt.Sprintf("%T", r.Output),
+					)
+					s := fmt.Sprintf("%v", r.Output)
+					output = &s
+				} else {
+					s := string(byt)
+					output = &s
 				}
-
-				s := string(byt)
-				output = &s
 			}
 		}
 	}

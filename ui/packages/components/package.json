@@ -67,6 +67,7 @@
     "@storybook/nextjs": "^9.1.1",
     "@storybook/react": "^9.1.1",
     "@testing-library/react": "^16.3.0",
+    "@types/json-schema": "^7.0.15",
     "@types/react": "^18.2.11",
     "eslint": "^9.x",
     "eslint-plugin-react": "^7.35.0",
