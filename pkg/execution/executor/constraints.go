@@ -62,7 +62,6 @@ func WithConstraints[T any](
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
-		// TODO: Should we fall back here?
 		l.Error("failed to get schedule constraints", "err", err)
 		return fn(ctx, true, "")
 	}
