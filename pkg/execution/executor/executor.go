@@ -771,6 +771,11 @@ func (e *executor) schedule(
 		Context:         req.Context,
 	})
 
+	// If we have a specifc URL to hit for this run, add it to context.
+	if req.URL != "" {
+		config.Context["url"] = req.URL
+	}
+
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
 	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
@@ -814,23 +819,6 @@ func (e *executor) schedule(
 	}
 
 	strEvts := string(bytEvts)
-
-	// XXX: If this is a sync run, always add the start time to the span.  We do this
-	// because sync runs have already started by the time we call Schedule;  theyre
-	// in-process, and Schedule gets called via an API endpoint when the run starts.
-	runSpanOpts := &tracing.CreateSpanOptions{
-		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-		Metadata: &metadata,
-		Attributes: meta.NewAttrSet(
-			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			meta.Attr(meta.Attrs.EventsInput, &strEvts),
-			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
-		),
-	}
-	if req.RunMode == enums.RunModeSync {
-		runSpanOpts.StartTime = runID.Timestamp()
-	}
 
 	var (
 		runSpanRef       *tracing.DroppableSpan
@@ -876,39 +864,6 @@ func (e *executor) schedule(
 			discoverySpanRef.Drop()
 		}
 	}()
-
-	status := enums.StepStatusQueued
-	if req.SkipReason() != enums.SkipReasonNone {
-		status = enums.StepStatusSkipped
-	}
-
-	// Always add either queued or skipped as a status.
-	meta.AddAttr(
-		runSpanOpts.Attributes,
-		meta.Attrs.DynamicStatus,
-		&status,
-	)
-
-	// Always the root span.
-	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
-		ctx,
-		meta.SpanNameRun,
-		runSpanOpts,
-	)
-	if err != nil {
-		// return nil, fmt.Errorf("error creating run span: %w", err)
-		l.Debug("error creating run span", "error", err)
-	}
-
-	if runSpanRef != nil {
-		config.NewSetFunctionTrace(runSpanRef.Ref)
-	}
-
-	// If this is paused, immediately end just before creating state.
-	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
-		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
-	}
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
@@ -1022,6 +977,55 @@ func (e *executor) schedule(
 		}
 	}
 
+	runSpanOpts := &tracing.CreateSpanOptions{
+		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+		Metadata: &metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
+		),
+		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	if req.RunMode == enums.RunModeSync {
+		// XXX: If this is a sync run, always add the start time to the span. We do this
+		// because sync runs have already started by the time we call Schedule; they're
+		// in-process, and Schedule gets called via an API endpoint when the run starts.
+		time := runID.Timestamp()
+		runSpanOpts.StartTime = time
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.StartedAt, &time)
+	}
+
+	status := enums.StepStatusQueued
+	if req.SkipReason() != enums.SkipReasonNone {
+		status = enums.StepStatusSkipped
+	}
+
+	// Always add either queued or skipped as a status.
+	meta.AddAttr(
+		runSpanOpts.Attributes,
+		meta.Attrs.DynamicStatus,
+		&status,
+	)
+
+	// Always the root span.
+	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameRun,
+		runSpanOpts,
+	)
+	if err != nil {
+		// return nil, fmt.Errorf("error creating run span: %w", err)
+		l.Debug("error creating run span", "error", err)
+	}
+
+	// If this is paused, immediately end just before creating state.
+	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+		sendSpans()
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
+	}
+
 	if req.BatchID == nil {
 
 		// Create cancellation pauses immediately, only if this is a non-batch event.
@@ -1108,6 +1112,7 @@ func (e *executor) schedule(
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
 	if req.RunMode == enums.RunModeSync {
+		sendSpans()
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
