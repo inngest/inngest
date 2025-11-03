@@ -289,7 +289,7 @@ func constraintConfigFromConstraints(
 	}
 
 	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
-		constraints.Concurrency.CustomConcurrencyKeys = make([]CustomConcurrencyLimit, len(constraints.Concurrency.CustomConcurrencyKeys))
+		config.Concurrency.CustomConcurrencyKeys = make([]constraintapi.CustomConcurrencyLimit, len(constraints.Concurrency.CustomConcurrencyKeys))
 
 		for i, ccl := range constraints.Concurrency.CustomConcurrencyKeys {
 			config.Concurrency.CustomConcurrencyKeys[i] = constraintapi.CustomConcurrencyLimit{

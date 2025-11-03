@@ -850,6 +850,9 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	// When Constraint API is enabled, disable capacity checks on PartitionLease.
+	// This is necessary as capacity was already granted to individual items, and
+	// constraints like concurrency were consumed.
 	disableLeaseChecks := p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil
 
 	// Attempt to lease items.  This checks partition-level concurrency limits

@@ -675,17 +675,19 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 	}
 
 	var customConcurrency []constraintapi.CustomConcurrencyLimit
-	for _, c := range fn.Concurrency.Limits {
-		if !c.IsCustomLimit() {
-			continue
-		}
+	if fn.Concurrency != nil {
+		for _, c := range fn.Concurrency.Limits {
+			if !c.IsCustomLimit() {
+				continue
+			}
 
-		customConcurrency = append(customConcurrency, constraintapi.CustomConcurrencyLimit{
-			Mode:              enums.ConcurrencyModeStep,
-			Scope:             c.Scope,
-			Limit:             c.Limit,
-			KeyExpressionHash: c.Hash,
-		})
+			customConcurrency = append(customConcurrency, constraintapi.CustomConcurrencyLimit{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             c.Scope,
+				Limit:             c.Limit,
+				KeyExpressionHash: c.Hash,
+			})
+		}
 	}
 
 	var throttles []constraintapi.ThrottleConfig
@@ -704,12 +706,17 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 		})
 	}
 
+	functionConcurrency := 0
+	if fn.Concurrency != nil {
+		functionConcurrency = fn.Concurrency.PartitionConcurrency()
+	}
+
 	return constraintapi.ConstraintConfig{
 		FunctionVersion: fn.FunctionVersion,
 		RateLimit:       rateLimit,
 		Concurrency: constraintapi.ConcurrencyConfig{
 			AccountConcurrency:    accountConcurrency,
-			FunctionConcurrency:   fn.Concurrency.PartitionConcurrency(),
+			FunctionConcurrency:   functionConcurrency,
 			CustomConcurrencyKeys: customConcurrency,
 		},
 		Throttle: throttles,
