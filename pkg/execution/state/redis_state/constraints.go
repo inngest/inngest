@@ -190,29 +190,29 @@ func (q *queue) itemLeaseConstraintCheck(
 	constraints PartitionConstraintConfig,
 	item *osqueue.QueueItem,
 	now time.Time,
-) (*itemLeaseConstraintCheckResult, error) {
+) (itemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
 
 	if partition.AccountID == uuid.Nil ||
 		partition.EnvID == nil ||
 		partition.FunctionID == nil {
-		return &itemLeaseConstraintCheckResult{}, nil
+		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	if q.capacityManager == nil ||
 		q.useConstraintAPI == nil {
-		return &itemLeaseConstraintCheckResult{}, nil
+		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	useAPI, fallback := q.useConstraintAPI(ctx, partition.AccountID)
 	if !useAPI {
-		return &itemLeaseConstraintCheckResult{}, nil
+		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
 	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(now.Add(5*time.Second))
 	if hasValidCapacityLease {
-		return &itemLeaseConstraintCheckResult{
+		return itemLeaseConstraintCheckResult{
 			leaseID:              item.CapacityLeaseID,
 			skipConstraintChecks: true,
 		}, nil
@@ -246,11 +246,11 @@ func (q *queue) itemLeaseConstraintCheck(
 		l.Error("could not acquire capacity lease", "err", err)
 
 		if !fallback {
-			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
+			return itemLeaseConstraintCheckResult{}, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
 		// Fallback to Lease (with idempotency)
-		return &itemLeaseConstraintCheckResult{
+		return itemLeaseConstraintCheckResult{
 			fallbackIdempotencyKey: idempotencyKey,
 		}, nil
 	}
@@ -261,7 +261,7 @@ func (q *queue) itemLeaseConstraintCheck(
 	}
 
 	if len(res.Leases) == 0 {
-		return &itemLeaseConstraintCheckResult{
+		return itemLeaseConstraintCheckResult{
 			limitingConstraint: constraint,
 			retryAfter:         res.RetryAfter,
 		}, nil
@@ -269,7 +269,7 @@ func (q *queue) itemLeaseConstraintCheck(
 
 	capacityLeaseID := res.Leases[0].LeaseID
 
-	return &itemLeaseConstraintCheckResult{
+	return itemLeaseConstraintCheckResult{
 		leaseID:              &capacityLeaseID,
 		skipConstraintChecks: true,
 	}, nil
