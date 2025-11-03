@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Button } from '@inngest/components/Button';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Modal } from '@inngest/components/Modal';
-import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
+import {
+  FONT,
+  LINE_HEIGHT,
+  createColors,
+  createRules,
+} from '@inngest/components/utils/monaco';
 import { isDark } from '@inngest/components/utils/theme';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
@@ -18,7 +30,11 @@ type SendEventModalProps = {
   onClose: () => void;
 };
 
-export default function SendEventModal({ data, isOpen, onClose }: SendEventModalProps) {
+export default function SendEventModal({
+  data,
+  isOpen,
+  onClose,
+}: SendEventModalProps) {
   const [dark, setDark] = useState(isDark());
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [_sendEvent, sendEventState] = useSendEventMutation();
@@ -47,7 +63,10 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
     };
   }, []);
 
-  const snippedData = useMemo(() => genericiseEvent(eventDataStr), [eventDataStr]);
+  const snippedData = useMemo(
+    () => genericiseEvent(eventDataStr),
+    [eventDataStr],
+  );
 
   const [input, setInput] = useState(snippedData);
   useEffect(() => {
@@ -81,7 +100,7 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
 
     if (typeof data.name !== 'string') {
       return pushToast(
-        "Event payload name must be a string, ideally in the format 'scope/subject.verb'."
+        "Event payload name must be a string, ideally in the format 'scope/subject.verb'.",
       );
     }
 
@@ -223,7 +242,12 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
         </div>
       </Modal.Body>
       <Modal.Footer className="flex justify-end gap-2">
-        <Button kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
+        <Button
+          kind="secondary"
+          label="Cancel"
+          appearance="outlined"
+          onClick={onClose}
+        />
         <Button
           kind="primary"
           disabled={sendEventState.isLoading}
@@ -232,6 +256,6 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
           keys={[useModifierKey(), '↵']}
         />
       </Modal.Footer>
-    </Modal>
+    </Modal>,
   );
 }

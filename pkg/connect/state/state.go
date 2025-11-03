@@ -310,7 +310,11 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			req.Header.Set("X-Inngest-Env", initialReq.GetEnvironment())
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		client := &http.Client{
+			Timeout: time.Minute,
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("error making sync request: %w", err)
 		}

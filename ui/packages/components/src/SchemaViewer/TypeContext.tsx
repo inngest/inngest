@@ -10,13 +10,12 @@ const defaultComputeType: ComputeTypeFn = (_node, baseLabel) => baseLabel;
 
 const TypeContext = createContext<ComputeTypeFn>(defaultComputeType);
 
-export function TypeProvider({
-  children,
-  computeType,
-}: {
+type TypeProviderProps = {
   children: React.ReactNode;
   computeType?: ComputeTypeFn;
-}) {
+};
+
+export function TypeProvider({ children, computeType }: TypeProviderProps) {
   return (
     <TypeContext.Provider value={computeType ?? defaultComputeType}>
       {children}

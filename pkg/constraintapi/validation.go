@@ -52,6 +52,10 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing source location"))
 	}
 
+	if r.ResourceKind == LeaseResourceUnknown {
+		errs = multierror.Append(errs, fmt.Errorf("missing resource kind"))
+	}
+
 	// TODO: Validate configuration
 
 	if len(r.Constraints) == 0 {

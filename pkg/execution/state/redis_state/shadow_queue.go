@@ -280,16 +280,18 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not process backlog: %w", err)
 		}
 
-		// If we did not refill, continue on to next backlog
-		if res == nil {
-			continue
+		if res != nil {
+			refilledItems += res.Refilled
 		}
-
-		refilledItems += res.Refilled
 
 		// If we fully refilled, track and continue
 		if fullyProcessed {
 			fullyProcessedBacklogs++
+			continue
+		}
+
+		// If we did not refill, continue on to next backlog
+		if res == nil {
 			continue
 		}
 
@@ -382,7 +384,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 }
 
-func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints PartitionConstraintConfig) (*BacklogRefillResult, bool, error) {
+func (q *queue) processShadowPartitionBacklog(
+	ctx context.Context,
+	shadowPart *QueueShadowPartition,
+	backlog *QueueBacklog,
+	refillUntil time.Time,
+	constraints PartitionConstraintConfig,
+) (*BacklogRefillResult, bool, error) {
 	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
 	if shadowPart.AccountID != nil {
 		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
@@ -458,7 +466,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	//
 	// Items that were added between backlogPeek and BacklogRefill will be considered in the next refill.
 	// Items that were moved between backlogPeek and BacklogRefill will still be refilled.
-	items, _, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
+	items, total, err := q.backlogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not peek backlog items for refill: %w", err)
 	}
@@ -467,9 +475,23 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		return nil, false, nil
 	}
 
-	itemIDs := make([]string, len(items))
-	for i, item := range items {
-		itemIDs[i] = item.ID
+	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
+	}
+
+	// If no items can be refilled, exit early
+	if len(constraintCheckRes.itemsToRefill) == 0 {
+		return &BacklogRefillResult{
+			Constraint:        constraintCheckRes.limitingConstraint,
+			Refilled:          0,
+			Refill:            len(items),
+			BacklogCountUntil: total,
+			TotalBacklogCount: 0, // Not fetched
+			Capacity:          0,
+			RefilledItems:     nil,
+			RetryAt:           constraintCheckRes.retryAfter,
+		}, false, nil
 	}
 
 	res, err := durationWithTags(
@@ -478,7 +500,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"backlog_process_duration",
 		q.clock.Now(),
 		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, itemIDs, constraints)
+			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraintCheckRes.itemsToRefill, constraints)
 		},
 		map[string]any{
 			//	"partition_id": shadowPart.PartitionID,
@@ -486,6 +508,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+	}
+
+	// Report limiting constraint
+	if res.Constraint == enums.QueueConstraintNotLimited && constraintCheckRes.limitingConstraint != enums.QueueConstraintNotLimited {
+		res.Constraint = constraintCheckRes.limitingConstraint
 	}
 
 	q.log.Trace("processed backlog",
