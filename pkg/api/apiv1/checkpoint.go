@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -604,6 +605,7 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+							meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
 						),
 					),
 				},
@@ -619,7 +621,16 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// TODO: Reset the queue item!!!
+	// Decode the queue item ID into its shard and job ID.
+	ref := queueref.Decode(input.QueueItemRef)
+	if ref[0] == "" {
+		return
+	}
+
+	if err := a.Opts.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
+		l.Error("error resetting queue item attempts", "error", err)
+		return
+	}
 }
 
 // Output returns run output given a JWT which has access to the given {env, runID} claimset.

@@ -170,7 +170,7 @@ type QueueManager interface {
 
 	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
 	// checkpointing;  a single job becomes shared amongst many  steps.
-	ResetAttemptsByJobID(ctx context.Context, qs QueueShard, jobID string) error
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
 
 	// ItemsByPartition returns a queue item iterator for a function within a specific time range
 	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
@@ -1923,14 +1923,19 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	})
 }
 
-func (q *queue) ResetAttemptsByJobID(ctx context.Context, queueShard QueueShard, jobID string) error {
+func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobID string) error {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("queue shard not found %q", shardName)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ResetAttemptsByJobID"), redis_telemetry.ScopeQueue)
 
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
 	}
 
-	jobID = osqueue.HashID(ctx, jobID)
+	// NOTE: We expect that the job ID is the hashed, stored ID in the queue already.
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
@@ -1940,7 +1945,7 @@ func (q *queue) ResetAttemptsByJobID(ctx context.Context, queueShard QueueShard,
 	if err != nil {
 		return err
 	}
-	status, err := scripts["queue/requeueByID"].Exec(
+	status, err := scripts["queue/resetAttempts"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
 		queueShard.RedisClient.unshardedRc,
 		keys,

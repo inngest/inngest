@@ -1152,7 +1152,8 @@ func (q *queue) process(
 	// arguments.
 	//
 	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
-	// along the job ID as metadata to the SDK.
+	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
+	jobCtx = osqueue.WithShardID(jobCtx, q.primaryQueueShard.Name)
 	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {

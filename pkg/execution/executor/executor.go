@@ -26,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -1640,14 +1641,14 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	}
 
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:    *run.Metadata(),
-		Fn:          run.f,
-		SigningKey:  sk,
-		Attempt:     run.AttemptCount(),
-		Index:       run.stackIndex,
-		StepID:      &run.edge.Outgoing,
-		QueueItemID: queue.JobIDFromContext(ctx),
-		URL:         url,
+		Metadata:   *run.Metadata(),
+		Fn:         run.f,
+		SigningKey: sk,
+		Attempt:    run.AttemptCount(),
+		Index:      run.stackIndex,
+		StepID:     &run.edge.Outgoing,
+		QueueRef:   queueref.StringFromCtx(ctx),
+		URL:        url,
 	})
 
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.

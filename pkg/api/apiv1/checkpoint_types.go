@@ -233,10 +233,10 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 type checkpointAsyncSteps struct {
 	RunID ulid.ULID `json:"run_id"`
 	FnID  uuid.UUID `json:"fn_id"`
-	// QueueItemID represents the queue item ID that's currently leased while
+	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
-	QueueItemID string                  `json:"qi_id"`
-	Steps       []state.GeneratorOpcode `json:"steps"`
+	QueueItemRef string                  `json:"qi_id"`
+	Steps        []state.GeneratorOpcode `json:"steps"`
 
 	// Data added via auth (signing key)
 	AccountID uuid.UUID `json:"-"`

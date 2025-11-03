@@ -47,9 +47,9 @@ type SDKRequestContext struct {
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
 
-	// QueueItemID is the ID of the queue item, used when checkpointing async functions
-	// so that the API knows which queue item to reset.
-	QueueItemID string `json:"qi_id"`
+	// QueueItemID is the ID of the queue item and shard, used when checkpointing
+	// async functions so that the API knows which queue item to reset.
+	QueueItemRef string `json:"qi_id"`
 
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
