@@ -135,7 +135,7 @@ func (q *queue) backlogRefillConstraintCheck(
 			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
-		// Attempt to fall back to BacklogRefill -- ignore GCRA with fallbackIdempofallbackIdempotencyKey
+		// Attempt to fall back to BacklogRefill -- ignore GCRA with fallbackIdempotencyKey
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill:          itemIDs,
 			fallbackIdempotencyKey: idempotencyKey,
