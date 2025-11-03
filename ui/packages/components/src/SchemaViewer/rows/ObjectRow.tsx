@@ -11,11 +11,19 @@ export type ObjectRowProps = { node: ObjectNode };
 export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
   const open = isExpanded(node.path);
+  const hasChildren = node.children.length > 0;
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex cursor-pointer items-center" onClick={() => toggle(node.path)}>
-        <CollapsibleRowWidget open={open} />
+      <div
+        className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
+        onClick={hasChildren ? () => toggle(node.path) : undefined}
+      >
+        {hasChildren ? (
+          <CollapsibleRowWidget open={open} />
+        ) : (
+          <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />
+        )}
         <div className="-ml-0.5">
           <ValueRow boldName={open} node={makeFauxValueNode(node)} typeLabelOverride={'{}'} />
         </div>
