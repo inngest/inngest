@@ -2773,6 +2773,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
 						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
 						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
+						meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
 					),
 				),
 			},
