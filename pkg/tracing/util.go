@@ -21,6 +21,25 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+func RawMetadataAttrs(kind meta.MetadataKind, metadata meta.RawMetadata, op meta.MetadataOp) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
+	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &metadata)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &op)
+
+	return rawAttrs
+}
+
+func MetadataAttrs(metadata meta.StructuredMetadata) (*meta.SerializableAttrs, error) {
+	rawMetadata, err := metadata.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return RawMetadataAttrs(metadata.Kind(), rawMetadata, metadata.Op()), nil
+}
+
 func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 

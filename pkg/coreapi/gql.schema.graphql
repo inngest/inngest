@@ -596,6 +596,18 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+
+  metadata: [RunTraceSpanMetadata!]!
+}
+
+type RunTraceSpanMetadata {
+  kind: String!
+  values: [RunTraceSpanMetadataValue!]!
+}
+
+type RunTraceSpanMetadataValue {
+  key: String!
+  value: Unknown!
 }
 
 type UserlandSpan {

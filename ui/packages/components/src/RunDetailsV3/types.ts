@@ -17,6 +17,15 @@ export type Trace = {
   isUserland: boolean;
   debugRunID?: string | null;
   debugSessionID?: string | null;
+  metadata?: SpanMetadata[];
+};
+
+export type SpanMetadata = {
+  kind: string;
+  values: {
+    key: string;
+    value: any;
+  };
 };
 
 export type UserlandSpanType = {

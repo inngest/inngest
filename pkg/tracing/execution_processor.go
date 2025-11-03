@@ -29,7 +29,7 @@ func WithExecutionContext(ctx context.Context, e ExecutionContext) context.Conte
 	return context.WithValue(ctx, _spanCtxKeyV, &e)
 }
 
-func mixinExecutonContext(input context.Context, with context.Context) context.Context {
+func mixinExecutionContext(input context.Context, with context.Context) context.Context {
 	ec := getExecutionContext(input)
 	return context.WithValue(with, _spanCtxKeyV, ec)
 }

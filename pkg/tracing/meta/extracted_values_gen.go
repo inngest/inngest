@@ -79,4 +79,7 @@ type ExtractedValues struct {
 	DebugRunID *ulid.ULID
 	AIRequestMetadata *aigateway.ParsedInferenceRequest
 	AIResponseMetadata *aigateway.ParsedInferenceResponse
+	Metadata *RawMetadata
+	MetadataKind *MetadataKind
+	MetadataOp *MetadataOp
 }
