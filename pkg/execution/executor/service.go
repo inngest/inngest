@@ -300,7 +300,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if s.isUnexpectedRunError(err) {
-			s.log.Error("error handling queue item", "error", fmt.Sprintf("%#v", err), "item_kind", item.Kind)
+			s.log.Error("error handling queue item", "error", err, "item_kind", item.Kind)
 		}
 
 		return queue.RunResult{

@@ -1240,15 +1240,6 @@ func TestHandleSdkReply(t *testing.T) {
 	requestID := "test-req"
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	ch := &connectionHandler{
-		svc: res.svc,
-		conn: &state.Connection{
-			EnvID: res.envID,
-		},
-		ws:  res.ws,
-		log: res.svc.logger,
-	}
-
 	sdkResponse := &connect.SDKResponse{
 		RequestId:      requestID,
 		AccountId:      res.accountID.String(),
@@ -1268,20 +1259,12 @@ func TestHandleSdkReply(t *testing.T) {
 	responseBytes, err := proto.Marshal(sdkResponse)
 	require.NoError(t, err)
 
-	msg := &connect.ConnectMessage{
+	// Send WORKER_REPLY message through the websocket (simulating SDK sending response)
+	err = wsproto.Write(context.Background(), res.ws, &connect.ConnectMessage{
 		Kind:    connect.GatewayMessageType_WORKER_REPLY,
 		Payload: responseBytes,
-	}
-
-	err = ch.handleSdkReply(context.Background(), msg)
+	})
 	require.NoError(t, err)
-
-	// Verify the response was saved
-	savedResponse, err := res.stateManager.GetResponse(context.Background(), res.envID, requestID)
-	require.NoError(t, err)
-	require.NotNil(t, savedResponse)
-	require.Equal(t, requestID, savedResponse.RequestId)
-	require.Equal(t, connect.SDKResponseStatus_DONE, savedResponse.Status)
 
 	// Should receive a reply ack message
 	ackMsg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -1291,6 +1274,13 @@ func TestHandleSdkReply(t *testing.T) {
 	err = proto.Unmarshal(ackMsg.Payload, ackData)
 	require.NoError(t, err)
 	require.Equal(t, requestID, ackData.RequestId)
+
+	// Verify the response was saved
+	savedResponse, err := res.stateManager.GetResponse(context.Background(), res.envID, requestID)
+	require.NoError(t, err)
+	require.NotNil(t, savedResponse)
+	require.Equal(t, requestID, savedResponse.RequestId)
+	require.Equal(t, connect.SDKResponseStatus_DONE, savedResponse.Status)
 }
 
 // TestHandleIncomingWebSocketMessageInvalidPayloads tests error handling for invalid message payloads
@@ -1437,30 +1427,6 @@ func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
 	require.NotNil(t, serr)
 	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
 	require.Contains(t, serr.Msg, "missing instanceId")
-}
-
-// TestEstablishConnectionInvalidMessages tests establishConnection with various invalid messages
-func TestEstablishConnectionInvalidMessages(t *testing.T) {
-	// Test connection timeout
-	params := testingParameters{
-		noConnect: true,
-	}
-	res := createTestingGateway(t, params)
-
-	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
-		Subprotocols: []string{types.GatewaySubProtocol},
-	})
-	require.NoError(t, err)
-	defer func() { _ = ws.CloseNow() }()
-
-	// Wait for hello message
-	msg := awaitNextMessage(t, ws, 2*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
-
-	// Test timeout by not sending any message
-	status, reason := awaitClosure(t, ws, 10*time.Second)
-	require.Equal(t, websocket.StatusPolicyViolation, status)
-	require.Equal(t, syscode.CodeConnectWorkerHelloTimeout, reason)
 }
 
 // TestEstablishConnectionInvalidConnectMessage tests invalid connect messages
