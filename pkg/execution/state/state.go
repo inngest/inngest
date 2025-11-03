@@ -49,6 +49,8 @@ var (
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	// Error Connect Retry Errors
+	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
 
 const (
