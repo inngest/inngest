@@ -11,10 +11,16 @@ export type ArrayRowProps = { node: ArrayNode };
 export function ArrayRow({ node }: ArrayRowProps): React.ReactElement | null {
   const element = node.element;
 
-  if (element.kind === 'array') return <ArrayRowVariantNested node={node} />;
-  if (element.kind === 'object') return <ArrayRowVariantObject node={node} />;
-  if (element.kind === 'tuple') return <ArrayRowVariantTuple node={node} />;
-  if (element.kind === 'value') return <ArrayRowVariantValue node={node} />;
-
-  return null;
+  switch (element.kind) {
+    case 'array':
+      return <ArrayRowVariantNested node={node} />;
+    case 'object':
+      return <ArrayRowVariantObject node={node} />;
+    case 'tuple':
+      return <ArrayRowVariantTuple node={node} />;
+    case 'value':
+      return <ArrayRowVariantValue node={node} />;
+    default:
+      return null;
+  }
 }
