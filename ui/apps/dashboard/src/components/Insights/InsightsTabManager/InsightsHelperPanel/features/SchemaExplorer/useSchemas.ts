@@ -8,22 +8,10 @@ export const EVENT_SCHEMA_JSON: JSONSchema = {
   type: 'object',
   properties: {
     data: { type: 'string' },
-    id: {
-      type: 'string',
-      description: 'Unique identifier for the event',
-    },
-    name: {
-      type: 'string',
-      description: 'The name/type of the event',
-    },
-    ts: {
-      type: 'number',
-      description: 'Unix timestamp in milliseconds when the event occurred',
-    },
-    v: {
-      type: 'string',
-      description: 'Event format version',
-    },
+    id: { type: 'string' },
+    name: { type: 'string' },
+    ts: { type: 'number' },
+    v: { type: 'string' },
   },
 };
 
