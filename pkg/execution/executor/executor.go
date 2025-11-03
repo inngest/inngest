@@ -3444,6 +3444,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
 		}
 
+		// Emit metadata spans
 		{
 			req, _ := gen.AIGatewayOpts()
 			// Parse the request
