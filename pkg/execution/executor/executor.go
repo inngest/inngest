@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -3382,7 +3381,6 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 }
 
 func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	log.Println("AI GATEWAY START")
 	input, err := gen.AIGatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
@@ -3401,7 +3399,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	metadata := runCtx.Metadata()
 
 	{
-		log.Println("AI GATEWAY")
 		// Parse the request
 		if parsed, err := aigateway.ParseInput(input); err != nil {
 			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
@@ -3447,7 +3444,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	// Emit metadata spans
 	{
 		// And parse the response.
-		if parsed, err := aigateway.ParseOutput(input.Format, gen.Data); err != nil && !errors.Is(err, aigateway.ErrNoOpenAIChoicesError) {
+		if parsed, err := aigateway.ParseOutput(input.Format, resp.Body); err != nil && !errors.Is(err, aigateway.ErrNoOpenAIChoicesError) {
 			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
 		} else {
 			// TODO: name kind properly
