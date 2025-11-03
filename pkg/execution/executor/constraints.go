@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -30,6 +31,8 @@ func WithConstraints[T any](
 	req execution.ScheduleRequest,
 	fn func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (T, error),
 ) (T, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var zero T
 	// Cancel context on return
 	ctx, cancel := context.WithCancel(ctx)
@@ -38,8 +41,7 @@ func WithConstraints[T any](
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
-		res, err := fn(ctx, false, "")
-		return res, err
+		return fn(ctx, true, "")
 	}
 
 	// Read feature flag
@@ -47,13 +49,14 @@ func WithConstraints[T any](
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 
-		res, err := fn(ctx, false, "")
-		return res, err
+		return fn(ctx, true, "")
 	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
-		return zero, fmt.Errorf("could not get schedule constraints: %w", err)
+		// TODO: Should we fall back here?
+		l.Error("failed to get schedule constraints", "err", err)
+		return fn(ctx, true, "")
 	}
 
 	// Perform constraint check to acquire lease
@@ -66,13 +69,13 @@ func WithConstraints[T any](
 		constraints,
 	)
 	if err != nil {
-		return zero, fmt.Errorf("failed to check constraints: %w", err)
+		l.Error("failed to check constraints", "err", err)
+		return fn(ctx, true, "")
 	}
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
-		res, err := fn(ctx, true, checkResult.fallbackIdempotencyKey)
-		return res, err
+		return fn(ctx, true, checkResult.fallbackIdempotencyKey)
 	}
 
 	// If the current action is not allowed, return
@@ -90,7 +93,10 @@ func WithConstraints[T any](
 	// If no lease was provided, we are not allowed to process
 	if checkResult.leaseID == nil {
 		// TODO: When does this happen?
-		return zero, fmt.Errorf("failed to acquire lease: %w", err)
+		l.Warn("acquire request did not return lease ID")
+
+		// Pretend the API request failed
+		return fn(ctx, true, "")
 	}
 
 	leaseID := checkResult.leaseID
@@ -109,7 +115,7 @@ func WithConstraints[T any](
 
 			leaseIDLock.Lock()
 			if leaseID == nil {
-				// TODO: Warn here
+				l.Warn("no leaseID, canceling context")
 				cancel()
 				return
 			}
@@ -123,7 +129,7 @@ func WithConstraints[T any](
 				LeaseID:        lID,
 			})
 			if err != nil {
-				// TODO: Log here
+				l.Error("could not extend schedule capacity lease", "err", err)
 				continue
 			}
 
@@ -139,30 +145,36 @@ func WithConstraints[T any](
 		}
 	}()
 
+	defer func() {
+		leaseIDLock.Lock()
+		defer leaseIDLock.Unlock()
+
+		if leaseID != nil {
+			// Release capacity in a non-blocking call.
+			//
+			// All leases are guaranteed to be released once expired,
+			// which means calling Release early is an optimization
+			// to hand back capacity as soon as possible, but not strictly
+			// required.
+			lID := *leaseID
+
+			go func() {
+				_, internalErr := capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+					AccountID: req.AccountID,
+					LeaseID:   lID,
+					// TODO: Generate idempotency key
+					IdempotencyKey: "",
+				})
+				if internalErr != nil {
+					l.Error("failed to release capacity", "err", internalErr)
+				}
+			}()
+		}
+	}()
+
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
-	res, err := fn(userCtx, false, "")
-
-	if checkResult.leaseID != nil {
-		_, internalErr := capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
-			AccountID: req.AccountID,
-			LeaseID:   *checkResult.leaseID,
-			// TODO: Generate idempotency key
-			IdempotencyKey: "",
-		})
-		if internalErr != nil {
-			// TODO Handle internal err
-			_ = internalErr
-		}
-
-	}
-
-	// TODO Handle error?
-	if err != nil {
-		return zero, err
-	}
-
-	return res, nil
+	return fn(userCtx, false, "")
 }
 
 type checkResult struct {
@@ -217,6 +229,8 @@ func CheckConstraints(
 	fallback bool,
 	constraints []constraintapi.ConstraintItem,
 ) (checkResult, error) {
+	l := logger.StdlibLogger(ctx)
+
 	// Retrieve idempotency key to acquire lease
 	// NOTE: To allow for retries between multiple executors, this should be
 	// consistent between calls to CheckConstraints
@@ -225,7 +239,15 @@ func CheckConstraints(
 		idempotencyKey = *req.IdempotencyKey
 	}
 
-	// TODO: Handle missing idempotency key
+	// Log missing idempotency key
+	if idempotencyKey == "" {
+		l.Warn("missing idempotency key in schedule call", "req", req)
+
+		// Do not send request to Constraint API
+		return checkResult{
+			mustCheck: true,
+		}, nil
+	}
 
 	// NOTE: Schedule may be called from within new-runs or the API
 	// In case of the API, we want to ensure the source is properly reflected in constraint checks
@@ -259,8 +281,9 @@ func CheckConstraints(
 		BlockingThreshold: 0, // Disable this for now
 	})
 	if internalErr != nil {
+		l.Error("acquiring capacity lease failed", "err", internalErr)
+
 		if fallback {
-			// TODO: Log error
 			return checkResult{
 				mustCheck:              true,
 				fallbackIdempotencyKey: idempotencyKey,
@@ -269,6 +292,7 @@ func CheckConstraints(
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
 	}
 
+	// Rate limited
 	allowed := len(res.Leases) == 1
 	if !allowed {
 		return checkResult{
@@ -280,7 +304,7 @@ func CheckConstraints(
 	lease := res.Leases[0]
 
 	return checkResult{
-		allowed: allowed,
+		allowed: true,
 
 		leaseID:                &lease.LeaseID,
 		fallbackIdempotencyKey: lease.IdempotencyKey,
