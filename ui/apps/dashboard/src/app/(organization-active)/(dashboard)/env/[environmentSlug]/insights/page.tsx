@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from 'urql';
 
-import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext';
+import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
