@@ -48,6 +48,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -3569,6 +3570,54 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			TargetSpan: runCtx.ExecutionSpan(),
 		}); spanErr != nil {
 			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+		}
+
+		{
+			req, _ := gen.AIGatewayOpts()
+			// Parse the request
+			if parsed, err := aigateway.ParseInput(req); err == nil {
+				// TODO: name category properly
+				category := "inngest.ai.input"
+				attrs, err := tracing.MetadataAttrs(category, parsed, "merge")
+				if err != nil {
+
+					e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
+				}
+
+				_, err = e.tracerProvider.CreateSpan(ctx,
+					meta.SpanNameMetadata,
+					&tracing.CreateSpanOptions{
+						Parent:     runCtx.ExecutionSpan(),
+						Metadata:   metadata,
+						QueueItem:  &lifecycleItem,
+						Attributes: attrs,
+					})
+				if err != nil {
+					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
+				}
+			}
+			// And parse the response.
+			if parsed, err := aigateway.ParseOutput(req.Format, gen.Data); err == nil {
+				// TODO: name category properly
+				category := "inngest.ai.output"
+				attrs, err := tracing.MetadataAttrs(category, parsed, "merge")
+				if err != nil {
+
+					e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
+				}
+
+				_, err = e.tracerProvider.CreateSpan(ctx,
+					meta.SpanNameMetadata,
+					&tracing.CreateSpanOptions{
+						Parent:     runCtx.ExecutionSpan(),
+						Metadata:   metadata,
+						QueueItem:  &lifecycleItem,
+						Attributes: attrs,
+					})
+				if err != nil {
+					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+				}
+			}
 		}
 
 		// And, finally, if this is retryable return an error which will be retried.
