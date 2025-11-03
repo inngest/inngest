@@ -8,6 +8,7 @@ import { ARRAY_UNKNOWN_ITEMS_BOOLEAN_CASE } from './cases/arrayUnknownItemsBoole
 import { ARRAY_UNKNOWN_ITEMS_UNDEFINED_CASE } from './cases/arrayUnknownItemsUndefined';
 import { BASIC_EVENT_CASE } from './cases/basicEvent';
 import { MIXED_STRUCTURAL_UNION_CASE } from './cases/mixedStructuralUnion';
+import { OBJECT_BOOLEAN_PROPERTY_FALSE_CASE } from './cases/objectBooleanPropertyFalse';
 import { OBJECT_BOOLEAN_PROPERTY_UNKNOWN_CASE } from './cases/objectBooleanPropertyUnknown';
 import { OBJECT_NESTING_CASE } from './cases/objectNesting';
 import { OBJECT_SCALAR_UNION_CASE } from './cases/objectScalarUnion';
@@ -34,6 +35,7 @@ export const TRANSFORM_TEST_CASES: TransformCase[] = [
   ARRAY_SCALAR_UNION_CASE,
   MIXED_STRUCTURAL_UNION_CASE,
   OBJECT_BOOLEAN_PROPERTY_UNKNOWN_CASE,
+  OBJECT_BOOLEAN_PROPERTY_FALSE_CASE,
   ONE_OF_OBJECT_CASE,
   ROOT_ARRAY_CASE,
   UNKNOWN_VALUE_CASE,
