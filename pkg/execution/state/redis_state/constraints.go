@@ -11,7 +11,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -37,14 +36,14 @@ func convertLimitingConstraint(
 		case
 			c.Kind == constraintapi.ConstraintKindConcurrency &&
 				c.Concurrency.Scope == enums.ConcurrencyScopeAccount &&
-				c.Concurrency.KeyExpressionHash == util.XXHash(""):
+				c.Concurrency.KeyExpressionHash == "":
 			constraint = enums.QueueConstraintAccountConcurrency
 
 		// Function concurrency
 		case
 			c.Kind == constraintapi.ConstraintKindConcurrency &&
 				c.Concurrency.Scope == enums.ConcurrencyScopeFn &&
-				c.Concurrency.KeyExpressionHash == util.XXHash(""):
+				c.Concurrency.KeyExpressionHash == "":
 			constraint = enums.QueueConstraintFunctionConcurrency
 
 		// Custom concurrency key 1
