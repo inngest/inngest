@@ -67,7 +67,6 @@ build-ui:
 	cd ui/apps/dev-server-ui && pnpm install --frozen-lockfile
 	cd ui/apps/dev-server-ui && pnpm build
 	cp -r ./ui/apps/dev-server-ui/dist/* ./pkg/devserver/static/
-	cp -r ./ui/apps/dev-server-ui/.next/routes-manifest.json ./pkg/devserver/static/
 
 # Generate OpenAPI documentation from protobuf files
 .PHONY: docs
