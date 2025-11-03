@@ -1459,7 +1459,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						Attributes: tracing.RawMetadataAttrs(
 							kind,
 							metadata,
-							"merge",
+							meta.MetadataOpMerge,
 						),
 						StartTime: time.Now(),
 						EndTime:   time.Now(),
@@ -3398,7 +3398,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
 		} else {
 			// TODO: name kind properly
-			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.input", parsed), "merge")
+			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.input", parsed), meta.MetadataOpMerge)
 			if err != nil {
 				e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
@@ -3441,7 +3441,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
 		} else {
 			// TODO: name kind properly
-			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.output", parsed), "merge")
+			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.output", parsed), meta.MetadataOpMerge)
 			if err != nil {
 				e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
