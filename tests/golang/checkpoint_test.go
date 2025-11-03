@@ -53,12 +53,12 @@ func TestFnCheckpoint(t *testing.T) {
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-					step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
-					step.Run(ctx, "b", func(ctx context.Context) (string, error) {
+					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
+					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
 						<-time.After(delay)
 						return "b", nil
 					})
-					step.Run(ctx, "c", func(ctx context.Context) (string, error) {
+					_, _ = step.Run(ctx, "c", func(ctx context.Context) (string, error) {
 						<-time.After(delay)
 						return "c", nil
 					})
