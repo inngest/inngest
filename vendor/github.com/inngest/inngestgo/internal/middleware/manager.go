@@ -3,7 +3,7 @@ package middleware
 import (
 	"context"
 
-	"github.com/inngest/inngestgo/internal/types"
+	"github.com/inngest/inngestgo/internal/util"
 )
 
 // ensure that the MiddlewareManager implements Middleware at compile time.
@@ -13,7 +13,7 @@ var _ Middleware = &MiddlewareManager{}
 // each registered middleware.
 func New() *MiddlewareManager {
 	return &MiddlewareManager{
-		idempotentHooks: &types.Set[string]{},
+		idempotentHooks: &util.Set[string]{},
 		items:           []Middleware{},
 	}
 }
@@ -23,7 +23,7 @@ func New() *MiddlewareManager {
 type MiddlewareManager struct {
 	// idempotentHooks used to ensure idempotent hooks are only called once per
 	// request.
-	idempotentHooks *types.Set[string]
+	idempotentHooks *util.Set[string]
 
 	items []Middleware
 }

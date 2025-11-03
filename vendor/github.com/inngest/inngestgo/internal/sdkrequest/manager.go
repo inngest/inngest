@@ -6,17 +6,22 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/experimental"
+	"github.com/inngest/inngestgo/internal/checkpoint"
 	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/middleware"
-	"github.com/inngest/inngestgo/internal/types"
-	"github.com/inngest/inngestgo/pkg/interval"
+	"github.com/inngest/inngestgo/internal/opcode"
+	"github.com/inngest/inngestgo/internal/util"
 )
 
 type ControlHijack struct{}
+
+// GeneratorOpcode is an export of opcode.Step for backcompat.
+type GeneratorOpcode = opcode.Step
 
 // StepMode defines how steps should be executed
 type StepMode int
@@ -30,6 +35,9 @@ const (
 	// StepModeManual indicates that the manager should neither return nor checkpoint the
 	// ops as they happen, and that we should instead leave handling opcodes to the owner
 	// of the manager.
+	//
+	// This is used for sync functions in REST API endpoints, as checkpointing is NOT an
+	// SDKManager concern.
 	StepModeManual
 )
 
@@ -104,9 +112,22 @@ func NewManager(opts Opts) InvocationManager {
 		opts.Cancel = func() {}
 	}
 
-	unseen := types.Set[string]{}
+	// Normalize step
+	if opts.Request.CallCtx.StepID == "step" {
+		opts.Request.CallCtx.StepID = ""
+	}
+
+	unseen := util.Set[string]{}
 	for k := range opts.Request.Steps {
 		unseen.Add(k)
+	}
+
+	// If the step mode is StepModeYield but the function contains checkpoint config,
+	// enable checkpointing.
+	var checkpointConfig checkpoint.Config
+	if opts.Mode == StepModeYield && opts.Fn != nil && opts.Fn.Config().CheckpointConfig != nil {
+		opts.Mode = StepModeCheckpoint
+		checkpointConfig = *opts.Fn.Config().CheckpointConfig
 	}
 
 	return &requestCtxManager{
@@ -121,6 +142,13 @@ func NewManager(opts Opts) InvocationManager {
 		unseen:     &unseen,
 		mw:         opts.Middleware,
 		mode:       opts.Mode,
+		checkpointer: checkpoint.New(checkpoint.Opts{
+			RunID:        opts.Request.CallCtx.RunID,
+			FnID:         opts.Request.CallCtx.FunctionID,
+			QueueItemRef: opts.Request.CallCtx.QueueItemRef,
+			SigningKey:   opts.SigningKey,
+			Config:       checkpointConfig,
+		}),
 	}
 }
 
@@ -157,9 +185,13 @@ type requestCtxManager struct {
 	seen     map[string]struct{}
 	seenLock *sync.RWMutex
 
-	unseen *types.Set[string]
+	unseen *util.Set[string]
 
 	mw *middleware.MiddlewareManager
+
+	// checkpointer stores the reference to the invocation's checkpointer,
+	// allowing us to checkpoint step.runs and continue execution.,
+	checkpointer checkpoint.Checkpointer
 }
 
 func (r *requestCtxManager) SigningKey() string {
@@ -167,6 +199,9 @@ func (r *requestCtxManager) SigningKey() string {
 }
 
 func (r *requestCtxManager) SetRequest(req *Request) {
+	if req.CallCtx.StepID == "step" {
+		req.CallCtx.StepID = ""
+	}
 	r.request = req
 }
 
@@ -185,6 +220,10 @@ func (r *requestCtxManager) Err() error {
 func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 	r.l.Lock()
 	defer r.l.Unlock()
+
+	if r.cancel == nil {
+		r.cancel = func() {} // normalization.
+	}
 
 	// Always add the current parallelism mode to the opcode we're appending.
 	op.SetParallelMode(ParallelMode(ctx))
@@ -206,10 +245,14 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 	// (either the http handler or the async handler) as the executor must take
 	// over from here.
 	if r.isAsyncOp(op.Op) {
-		if r.cancel != nil {
-			r.cancel()
-		}
+		r.cancel()
+		panic(ControlHijack{})
+	}
 
+	// NOTE: We can never checkpoint if we have a target step to run, as we always
+	// need to execute specifically - and only - that step.
+	if r.request.CallCtx.StepID != "" {
+		r.cancel()
 		panic(ControlHijack{})
 	}
 
@@ -219,6 +262,27 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 		// then return control to the handler.
 		r.cancel()
 		panic(ControlHijack{})
+	case StepModeCheckpoint:
+		// When checkpointing, ensure that we only checkpoint step.run opcodes.
+		if op.Op != enums.OpcodeStepRun {
+			r.cancel()
+			panic(ControlHijack{})
+		}
+
+		r.checkpointer.WithStep(ctx, op, func(done []opcode.Step, err error) {
+			if err == nil {
+				// Remove each step that's checkpointed from our buffer.  The manager's buffer
+				// is used as the response data, and given these steps have already been checkpointed
+				// we no longer need to send them in the SDK response.
+				for _, op := range done {
+					r.ops = slices.DeleteFunc(r.ops, func(f opcode.Step) bool {
+						return op.ID == f.ID
+					})
+				}
+				return
+			}
+			// TODO: Log
+		})
 	default:
 		// Do nothing else.
 	}
@@ -370,103 +434,9 @@ func (u UnhashedOp) MustHash() string {
 	return h
 }
 
-func (u UnhashedOp) Userland() *OpUserland {
-	return &OpUserland{
+func (u UnhashedOp) Userland() *opcode.OpUserland {
+	return &opcode.OpUserland{
 		ID:    u.ID,
 		Index: int(u.Pos),
 	}
-}
-
-// GeneratorOpcode is a reexport of inngest/state.GeneratorOpcode
-type GeneratorOpcode struct {
-	// Op represents the type of operation invoked in the function.
-	Op enums.Opcode `json:"op"`
-	// ID represents a hashed unique ID for the operation.  This acts
-	// as the generated step ID for the state store.
-	ID string `json:"id"`
-	// Name represents the name of the step, or the sleep duration for
-	// sleeps.
-	Name string `json:"name"`
-	// Opts indicate options for the operation, eg. matching expressions
-	// when setting up async event listeners via `waitForEvent`, or retry
-	// policies for steps.
-	Opts any `json:"opts"`
-	// Data is the resulting data from the operation, eg. the step
-	// output. Note that for gateway requests, this is initially the
-	// request input.
-	Data json.RawMessage `json:"data"`
-	// Error is the failing result from the operation, e.g. an error thrown
-	// from a step.  This MUST be in the shape of OpcodeError.
-	Error *UserError `json:"error"`
-	// SDK versions < 3.?.? don't respond with the display name.
-	DisplayName *string `json:"displayName"`
-	// Timing represents the start and end time for the opcode, in terms of processing.
-	Timing interval.Interval `json:"timing"`
-	// Userland wraps user-defined ID and generated index fields.
-	Userland *OpUserland `json:"userland,omitempty"`
-}
-
-type OpUserland struct {
-	ID    string `json:"id"`              // User-defined ID
-	Index int    `json:"index,omitempty"` // Autogenerated index for repeated IDs
-}
-
-func (g *GeneratorOpcode) SetParallelMode(mode enums.ParallelMode) {
-	if mode != enums.ParallelModeRace {
-		// No need to do anything since "race" is opt-in.
-		return
-	}
-
-	opts, ok := g.Opts.(map[string]any)
-	if !ok {
-		var err error
-		opts, err = types.StructToMap(g.Opts)
-		if err != nil {
-			// Unreachable
-			return
-		}
-	}
-	if opts == nil {
-		opts = make(map[string]any)
-	}
-	opts[enums.OptKeyParallelMode.String()] = mode.String()
-	g.Opts = opts
-}
-
-// UserError is a reexport of inngest/state.UserError
-type UserError struct {
-	Name    string `json:"name"`
-	Message string `json:"message"`
-	Stack   string `json:"stack,omitempty"`
-
-	// Data allows for multiple return values in eg. Golang.  If provided,
-	// the SDK MAY choose to store additional data for its own purposes here.
-	Data json.RawMessage `json:"data,omitempty"`
-
-	// NoRetry is set when parsing the opcode via the retry header.
-	// It is NOT set via the SDK.
-	NoRetry bool `json:"noRetry,omitempty"`
-
-	// Cause allows nested errors to be passed back to the SDK.
-	Cause *UserError `json:"cause,omitempty"`
-}
-
-// HasAsyncOps is a utility that checks whether the slice of GeneratorOpcdodes
-// has at least one async op.
-//
-// NOTE: Step errors are only async if the attempt is less than the max.
-// For example, with zero retries, we can happily re-throw the step error
-// to see if it's caught, then continue to the next step if so.
-func HasAsyncOps(ops []GeneratorOpcode, attempt, retries int) bool {
-	for _, o := range ops {
-		if o.Op == enums.OpcodeStepError && attempt == retries {
-			// This is not async due to the attempt being the same as the retry
-			// count;  we can return the error and continue on.
-			continue
-		}
-		if enums.OpcodeIsAsync(o.Op) {
-			return true
-		}
-	}
-	return false
 }
