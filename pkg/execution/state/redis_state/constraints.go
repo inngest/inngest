@@ -119,6 +119,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		FunctionID:     *shadowPart.FunctionID,
 		CurrentTime:    now,
 		Duration:       QueueLeaseDuration,
+		ResourceKind:   constraintapi.LeaseResourceQueueItem,
 		// TODO: Build config
 		Configuration: constraintapi.ConstraintConfig{},
 		// TODO: Supply capacity
@@ -224,10 +225,12 @@ func (q *queue) itemLeaseConstraintCheck(
 		// TODO: Double check if the item ID works for idempotency:
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?
-		IdempotencyKey: idempotencyKey,
-		FunctionID:     *partition.FunctionID,
-		CurrentTime:    now,
-		Duration:       QueueLeaseDuration,
+		IdempotencyKey:       idempotencyKey,
+		ResourceKind:         constraintapi.LeaseResourceQueueItem,
+		LeaseIdempotencyKeys: []string{idempotencyKey},
+		FunctionID:           *partition.FunctionID,
+		CurrentTime:          now,
+		Duration:             QueueLeaseDuration,
 		// TODO: Build config
 		Configuration: constraintapi.ConstraintConfig{},
 		// TODO: Supply constraints

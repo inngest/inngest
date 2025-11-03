@@ -267,18 +267,20 @@ func CheckConstraints(
 	var accountConcurrency int
 
 	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID:         req.AccountID,
-		IdempotencyKey:    idempotencyKey,
-		EnvID:             req.WorkspaceID,
-		FunctionID:        req.Function.ID,
-		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
-		Constraints:       constraints,
-		Amount:            1,
-		CurrentTime:       time.Now(),
-		Duration:          ScheduleLeaseDuration,
-		MaximumLifetime:   5 * time.Minute, // This lease should be short!
-		Source:            source,
-		BlockingThreshold: 0, // Disable this for now
+		AccountID:            req.AccountID,
+		IdempotencyKey:       idempotencyKey,
+		ResourceKind:         constraintapi.LeaseResourceEvent,
+		LeaseIdempotencyKeys: []string{idempotencyKey},
+		EnvID:                req.WorkspaceID,
+		FunctionID:           req.Function.ID,
+		Configuration:        queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
+		Constraints:          constraints,
+		Amount:               1,
+		CurrentTime:          time.Now(),
+		Duration:             ScheduleLeaseDuration,
+		MaximumLifetime:      5 * time.Minute, // This lease should be short!
+		Source:               source,
+		BlockingThreshold:    0, // Disable this for now
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr)
