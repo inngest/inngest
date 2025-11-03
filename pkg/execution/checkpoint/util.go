@@ -9,7 +9,7 @@ import (
 )
 
 func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID ulid.ULID) *meta.SerializableAttrs {
-	attrs.Merge(
+	return attrs.Merge(
 		meta.NewAttrSet(
 			meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
 			meta.Attr(meta.Attrs.RunID, &runID),
@@ -19,11 +19,10 @@ func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID
 			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
 		),
 	)
-	return attrs
 }
 
 func stepErrorAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID ulid.ULID, status enums.StepStatus) *meta.SerializableAttrs {
-	attrs.Merge(
+	return attrs.Merge(
 		meta.NewAttrSet(
 			meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
 			meta.Attr(meta.Attrs.RunID, &runID),
@@ -33,5 +32,4 @@ func stepErrorAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, run
 			meta.Attr(meta.Attrs.DynamicStatus, &status),
 		),
 	)
-	return attrs
 }
