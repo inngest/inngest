@@ -258,16 +258,6 @@ export default async function Page() {
               displayValue: kbyteDisplayValue(entitlements.eventSize.limit),
             }}
           />
-          <EntitlementListItem
-            increaseInHigherPlan={false}
-            planName={currentPlan.name}
-            title="Dedicated execution capacity"
-            description="Dedicated infrastructure for the lowest latency and highest throughput"
-            entitlement={{
-              currentValue: false,
-              displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
-            }}
-          />
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
             <Button
