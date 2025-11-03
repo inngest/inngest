@@ -40,8 +40,6 @@ export function SchemaExplorer() {
     [renderSharedAdornment, entries]
   );
 
-  // Render entries inline to keep this component simple
-
   return (
     <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4" ref={containerRef}>
       {SHOW_SCHEMA_SEARCH && (
