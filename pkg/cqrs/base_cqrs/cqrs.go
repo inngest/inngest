@@ -232,7 +232,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
-				if strings.HasPrefix(name, "executor.") {
+				if strings.HasPrefix(name, "executor.") || name == meta.SpanNameMetadata {
 					newSpan.Name = name
 				}
 			}

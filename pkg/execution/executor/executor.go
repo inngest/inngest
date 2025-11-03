@@ -1417,7 +1417,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		// For most executions, we now set the status of the execution span.
+		//For most executions, we now set the status of the execution span.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
@@ -1443,6 +1443,37 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
 			return nil, err
+		}
+
+		for _, opcode := range resp.Generator {
+			opcode.Metadata = map[string]map[string]json.RawMessage{
+				"user": {
+					"foo": []byte(`"bar"`),
+				},
+			}
+
+			for category, metadata := range opcode.Metadata {
+				_, err = e.tracerProvider.CreateSpan(
+					ctx,
+					meta.SpanNameMetadata,
+					&tracing.CreateSpanOptions{
+						Debug:     &tracing.SpanDebugData{Location: "executor.ExecutePostMetadata"},
+						Parent:    instance.execSpan,
+						Metadata:  &md,
+						QueueItem: &item,
+						Attributes: tracing.RawMetadataAttrs(
+							category,
+							metadata,
+							"merge",
+						),
+						StartTime: time.Now(),
+						EndTime:   time.Now(),
+					},
+				)
+				if err != nil {
+					l.Warn("error creating metadata span", "error", err)
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
@@ -2671,7 +2702,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		copied := *op
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
-			// parellel step individually.
+			// parallel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {

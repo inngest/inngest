@@ -25,6 +25,7 @@ const (
 	DiscoveryStepSpanName    = "Discovery step"
 	GenericExecutionSpanName = "Execution"
 	FinalizationSpanName     = "Finalization"
+	MetadataSpanName         = "Metadata"
 )
 
 var ErrSkipSuccess = fmt.Errorf("skip success span")
@@ -211,12 +212,13 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			ServiceName:  span.Attributes.UserlandServiceName,
 			SpanAttrs:    &filteredAttrsStr,
 		}
-
 	}
 
 	name := span.GetStepName()
 	if isUserland {
 		name = *userlandSpan.SpanName
+	} else if span.Name == meta.SpanNameMetadata {
+		name = MetadataSpanName
 	}
 
 	gqlSpan := &models.RunTraceSpan{
@@ -477,21 +479,13 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		// pass to ensure we filter out internal-looking span names.
 		switch gqlSpan.Name {
 		case meta.SpanNameRun:
-			{
-				gqlSpan.Name = RunSpanName
-			}
+			gqlSpan.Name = RunSpanName
 		case meta.SpanNameStep:
-			{
-				gqlSpan.Name = UnknownStepSpanName
-			}
+			gqlSpan.Name = UnknownStepSpanName
 		case meta.SpanNameStepDiscovery:
-			{
-				gqlSpan.Name = DiscoveryStepSpanName
-			}
+			gqlSpan.Name = DiscoveryStepSpanName
 		case meta.SpanNameExecution:
-			{
-				gqlSpan.Name = GenericExecutionSpanName
-			}
+			gqlSpan.Name = GenericExecutionSpanName
 		}
 	}
 
@@ -507,7 +501,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
-	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland {
+	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland || gqlSpan.Name == MetadataSpanName {
 		startedAt := span.GetStartedAtTime()
 		endedAt := span.GetEndedAtTime()
 		if startedAt != nil && endedAt != nil {

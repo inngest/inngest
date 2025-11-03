@@ -3,6 +3,7 @@
 package meta
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -79,4 +80,7 @@ type ExtractedValues struct {
 	DebugRunID *ulid.ULID
 	AIRequestMetadata *aigateway.ParsedInferenceRequest
 	AIResponseMetadata *aigateway.ParsedInferenceResponse
+	Metadata *map[string]json.RawMessage
+	MetadataCategory *string
+	MetadataOp *string
 }
