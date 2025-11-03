@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -10,11 +11,16 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+var (
+	ErrNoOpenAIChoicesError = errors.New("no choices returned in openai api response")
+)
+
 // ParsedRequest represents the parsed request data for a given inference request.
 //
 // Note that this is not stored, and instead is computed just in time for each input
 // depending on the UI.
 type ParsedInferenceRequest struct {
+	// FIXME: URL is weird here as it marshals wonkily
 	URL                 url.URL  `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
@@ -199,7 +205,7 @@ func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error
 				ID:        r.ID,
 				TokensIn:  int32(r.Usage.PromptTokens),
 				TokensOut: int32(r.Usage.CompletionTokens),
-			}, fmt.Errorf("no choices returned in openai api response")
+			}, ErrNoOpenAIChoicesError
 		}
 
 		choice := r.Choices[0]

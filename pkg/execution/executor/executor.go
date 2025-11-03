@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -1453,7 +1454,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				},
 			}
 
-			for category, metadata := range opcode.Metadata {
+			for kind, metadata := range opcode.Metadata {
 				_, err = e.tracerProvider.CreateSpan(
 					ctx,
 					meta.SpanNameMetadata,
@@ -1463,7 +1464,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						Metadata:  &md,
 						QueueItem: &item,
 						Attributes: tracing.RawMetadataAttrs(
-							category,
+							kind,
 							metadata,
 							"merge",
 						),
@@ -3381,6 +3382,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 }
 
 func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	log.Println("AI GATEWAY START")
 	input, err := gen.AIGatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
@@ -3398,6 +3400,34 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
 
+	{
+		log.Println("AI GATEWAY")
+		// Parse the request
+		if parsed, err := aigateway.ParseInput(input); err != nil {
+			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
+		} else {
+			// TODO: name kind properly
+			kind := "inngest.ai.input"
+			attrs, err := tracing.MetadataAttrs(kind, parsed, "merge")
+			if err != nil {
+				e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+
+			_, err = e.tracerProvider.CreateSpan(ctx,
+				meta.SpanNameMetadata,
+				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayRequestMetadata"},
+					Parent:     runCtx.ExecutionSpan(),
+					Metadata:   metadata,
+					QueueItem:  &lifecycleItem,
+					Attributes: attrs,
+				})
+			if err != nil {
+				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+		}
+	}
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
@@ -3413,6 +3443,36 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	runCtx.SetStatusCode(resp.StatusCode)
+
+	// Emit metadata spans
+	{
+		// And parse the response.
+		if parsed, err := aigateway.ParseOutput(input.Format, gen.Data); err != nil && !errors.Is(err, aigateway.ErrNoOpenAIChoicesError) {
+			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
+		} else {
+			// TODO: name kind properly
+			kind := "inngest.ai.output"
+			attrs, err := tracing.MetadataAttrs(kind, parsed, "merge")
+			if err != nil {
+				e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+
+			_, err = e.tracerProvider.CreateSpan(ctx,
+				meta.SpanNameMetadata,
+				&tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayResponseMetadata"},
+					Parent:     runCtx.ExecutionSpan(),
+					Metadata:   metadata,
+					QueueItem:  &lifecycleItem,
+					Attributes: attrs,
+					StartTime:  time.Now(),
+					EndTime:    time.Now(),
+				})
+			if err != nil {
+				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+		}
+	}
 
 	// Handle errors individually, here.
 	if failure {
@@ -3444,55 +3504,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
 		}
 
-		// Emit metadata spans
-		{
-			req, _ := gen.AIGatewayOpts()
-			// Parse the request
-			if parsed, err := aigateway.ParseInput(req); err == nil {
-				// TODO: name category properly
-				category := "inngest.ai.input"
-				attrs, err := tracing.MetadataAttrs(category, parsed, "merge")
-				if err != nil {
-
-					e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
-				}
-
-				_, err = e.tracerProvider.CreateSpan(ctx,
-					meta.SpanNameMetadata,
-					&tracing.CreateSpanOptions{
-						Parent:     runCtx.ExecutionSpan(),
-						Metadata:   metadata,
-						QueueItem:  &lifecycleItem,
-						Attributes: attrs,
-					})
-				if err != nil {
-					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
-				}
-			}
-			// And parse the response.
-			if parsed, err := aigateway.ParseOutput(req.Format, gen.Data); err == nil {
-				// TODO: name category properly
-				category := "inngest.ai.output"
-				attrs, err := tracing.MetadataAttrs(category, parsed, "merge")
-				if err != nil {
-
-					e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
-				}
-
-				_, err = e.tracerProvider.CreateSpan(ctx,
-					meta.SpanNameMetadata,
-					&tracing.CreateSpanOptions{
-						Parent:     runCtx.ExecutionSpan(),
-						Metadata:   metadata,
-						QueueItem:  &lifecycleItem,
-						Attributes: attrs,
-					})
-				if err != nil {
-					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
-				}
-			}
-		}
-
+		// TODO: maybe handle failure
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
 		// an error on output.
