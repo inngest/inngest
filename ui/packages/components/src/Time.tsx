@@ -21,7 +21,7 @@ type Props = {
 };
 
 function formatDate(date: Date) {
-  return format(date, 'dd MMM yyyy, HH:mm:ss');
+  return format(date, 'dd MMM yyyy, hh:mm:ss a');
 }
 
 function formatUTCDate(date: Date) {
@@ -67,15 +67,15 @@ export function Time({ className, format, value, copyable = true }: Props) {
           {copyable && <RiFileCopyLine className="text-subtle hidden h-3 w-3 group-hover:block" />}
         </time>
       </TooltipTrigger>
-      <TooltipContent side="right" className="w-64 max-w-64 px-0">
-        <div className="mb-[6px] ml-3 mr-4 mt-1.5 flex items-center justify-between gap-2 text-sm">
-          <div className="text-light flex items-center gap-1">
+      <TooltipContent side="right" className="w-auto px-0">
+        <div className="mb-[6px] ml-3 mr-4 mt-1.5 flex items-center gap-2 whitespace-nowrap text-sm">
+          <div className="text-light flex w-16 items-center gap-1">
             <RiTimeLine className="h-[14px] w-[14px]" /> UTC
           </div>
           <time className="text-onContrast">{utcTimeString}</time>
         </div>
-        <div className="mb-[6px] ml-3 mr-4 flex items-center justify-between gap-5 text-sm">
-          <div className="text-light flex items-center gap-1">
+        <div className="mb-[6px] ml-3 mr-4 flex items-center gap-2 whitespace-nowrap text-sm">
+          <div className="text-light flex w-16 items-center gap-1">
             <RiUserSmileLine className="h-[14px] w-[14px]" /> Local
           </div>
           <time className="text-onContrast">{localTimeString}</time>

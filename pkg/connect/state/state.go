@@ -67,7 +67,7 @@ type GatewayManager interface {
 
 type RequestStateManager interface {
 	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (leaseID *ulid.ULID, err error)
+	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration, executorIP net.IP) (leaseID *ulid.ULID, err error)
 
 	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 	// the current lease does not match the passed leaseID (ErrRequestLeased).
@@ -344,7 +344,11 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			req.Header.Set("X-Inngest-Env", initialReq.GetEnvironment())
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		client := &http.Client{
+			Timeout: time.Minute,
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("error making sync request: %w", err)
 		}

@@ -229,7 +229,7 @@ func (h *ExpressionHandler) MatchEventExpressions(ctx context.Context, evt event
 				return fmt.Errorf("error initializing expression evaluator for event: %w", err)
 			}
 
-			ok, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": data}))
+			ok, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": data}))
 			if err != nil {
 				// if there's an error, it likely means the data being matched is not of the same structure
 				// map[string]any vs int64
@@ -286,7 +286,7 @@ func (h *ExpressionHandler) MatchOutputExpressions(ctx context.Context, output [
 				return fmt.Errorf("error initializing expression evaluator for output: %w", err)
 			}
 
-			ok, _, err := eval.Evaluate(ctx, expressions.NewData(data))
+			ok, err := eval.Evaluate(ctx, expressions.NewData(data))
 			if err != nil {
 				// if there's an error, it likely means the data being matched is not of the same structure
 				// map[string]any vs int64

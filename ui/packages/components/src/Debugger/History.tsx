@@ -1,5 +1,5 @@
-import { useRouter } from 'next/navigation';
 import { RiLightbulbLine } from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { Button } from '../Button';
@@ -36,7 +36,7 @@ export const EmptyHistory = () => {
 
 export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) => {
   const { pathCreator } = usePathCreator();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -73,7 +73,7 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
       debugSessionID,
     });
 
-    router.push(debuggerPath);
+    navigate({ to: debuggerPath });
   };
 
   const columnHelper = createColumnHelper<HistoryTable>();
@@ -159,14 +159,14 @@ export const History = ({ functionSlug, debugSessionID, runID }: HistoryProps) =
         noHeader={true}
         onRowClick={(row) =>
           row.original &&
-          router.push(
-            pathCreator.debugger({
+          navigate({
+            to: pathCreator.debugger({
               functionSlug,
               runID,
               debugSessionID: runID,
               debugRunID: row.original.debugRunID,
-            })
-          )
+            }),
+          })
         }
         data={(data.debugRuns ?? []).sort(
           (a, b) =>

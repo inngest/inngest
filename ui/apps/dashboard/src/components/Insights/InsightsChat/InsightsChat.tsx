@@ -8,7 +8,6 @@ import { Conversation, ConversationContent } from './Conversation';
 import { EmptyState } from './EmptyState';
 import { useInsightsChatProvider } from './InsightsChatProvider';
 import { LoadingIndicator } from './LoadingIndicator';
-import { ChatHeader } from './header/ChatHeader';
 import { ResponsivePromptInput } from './input/InputField';
 import { AssistantMessage } from './messages/AssistantMessage';
 import { ToolMessage } from './messages/ToolMessage';
@@ -39,15 +38,12 @@ function getLoadingMessage(flags: {
   return 'Thinking…';
 }
 
-export function InsightsChat({
-  agentThreadId,
-  onToggleChat,
-  className,
-}: {
+type InsightsChatProps = {
   agentThreadId: string;
-  onToggleChat: () => void;
   className?: string;
-}) {
+};
+
+export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   // Read required data from the Insights state context
   const {
     query: currentSql,
@@ -64,7 +60,6 @@ export function InsightsChat({
     messages,
     status,
     currentThreadId,
-    clearThreadMessages,
     sendMessageToThread,
     getThreadFlags,
     getLatestGeneratedSql,
@@ -142,11 +137,6 @@ export function InsightsChat({
     ]
   );
 
-  const handleClearThread = useCallback(() => {
-    if (messages.length === 0 || status !== 'ready') return;
-    clearThreadMessages(agentThreadId);
-  }, [messages.length, status, clearThreadMessages, agentThreadId]);
-
   const loadingText = getLoadingMessage({
     networkActive,
     textStreaming,
@@ -162,8 +152,6 @@ export function InsightsChat({
       }`}
     >
       <div className="bg-surfaceBase flex h-full w-full flex-col">
-        <ChatHeader onClearThread={handleClearThread} onToggleChat={onToggleChat} />
-
         <Conversation>
           <ConversationContent>
             {messages.length === 0 ? (

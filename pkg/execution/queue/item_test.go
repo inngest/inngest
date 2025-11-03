@@ -1,9 +1,15 @@
 package queue
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLatency(t *testing.T) {
@@ -165,4 +171,322 @@ func TestDelay(t *testing.T) {
 			require.Equal(t, test.expectedLeaseDelay, test.qi.LeaseDelay(test.now))
 		})
 	}
+}
+
+func TestConvertToConstraintConfiguration(t *testing.T) {
+	tests := []struct {
+		name               string
+		accountConcurrency int
+		fn                 inngest.Function
+		expected           constraintapi.ConstraintConfig
+	}{
+		{
+			name:               "minimal function",
+			accountConcurrency: 100,
+			fn: inngest.Function{
+				FunctionVersion: 1,
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    100,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with rate limit",
+			accountConcurrency: 50,
+			fn: inngest.Function{
+				FunctionVersion: 2,
+				RateLimit: &inngest.RateLimit{
+					Limit:  10,
+					Period: "60s",
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 2,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						Scope:             enums.RateLimitScopeFn,
+						Limit:             10,
+						KeyExpressionHash: util.XXHash(""),
+					},
+				},
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    50,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with rate limit and key",
+			accountConcurrency: 50,
+			fn: inngest.Function{
+				FunctionVersion: 2,
+				RateLimit: &inngest.RateLimit{
+					Limit:  10,
+					Period: "60s",
+					Key:    stringPtr("event.user.id"),
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 2,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						Scope:             enums.RateLimitScopeFn,
+						Limit:             10,
+						KeyExpressionHash: util.XXHash("event.user.id"),
+					},
+				},
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    50,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with basic concurrency",
+			accountConcurrency: 100,
+			fn: inngest.Function{
+				FunctionVersion: 3,
+				Concurrency: &inngest.ConcurrencyLimits{
+					Limits: []inngest.Concurrency{
+						{
+							Limit: 5,
+							Scope: enums.ConcurrencyScopeFn,
+						},
+					},
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 3,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    100,
+					FunctionConcurrency:   5,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with custom concurrency limits",
+			accountConcurrency: 200,
+			fn: inngest.Function{
+				FunctionVersion: 4,
+				Concurrency: &inngest.ConcurrencyLimits{
+					Limits: []inngest.Concurrency{
+						{
+							Limit: 10,
+							Scope: enums.ConcurrencyScopeFn,
+						},
+						{
+							Limit: 3,
+							Key:   stringPtr("event.user.id"),
+							Scope: enums.ConcurrencyScopeAccount,
+							Hash:  "user-key-hash",
+						},
+						{
+							Limit: 2,
+							Key:   stringPtr("event.organization.id"),
+							Scope: enums.ConcurrencyScopeEnv,
+							Hash:  "org-key-hash",
+						},
+					},
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 4,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  200,
+					FunctionConcurrency: 10,
+					CustomConcurrencyKeys: []constraintapi.CustomConcurrencyLimit{
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeAccount,
+							Limit:             3,
+							KeyExpressionHash: "user-key-hash",
+						},
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeEnv,
+							Limit:             2,
+							KeyExpressionHash: "org-key-hash",
+						},
+					},
+				},
+				Throttle: nil,
+			},
+		},
+		{
+			name:               "function with throttle",
+			accountConcurrency: 100,
+			fn: inngest.Function{
+				FunctionVersion: 5,
+				Throttle: &inngest.Throttle{
+					Limit:  20,
+					Burst:  5,
+					Period: 60 * time.Second,
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 5,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    100,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:                     20,
+						Burst:                     5,
+						Period:                    60,
+						Scope:                     enums.ThrottleScopeFn,
+						ThrottleKeyExpressionHash: util.XXHash(""),
+					},
+				},
+			},
+		},
+		{
+			name:               "function with throttle and key",
+			accountConcurrency: 100,
+			fn: inngest.Function{
+				FunctionVersion: 6,
+				Throttle: &inngest.Throttle{
+					Limit:  15,
+					Burst:  3,
+					Period: 30 * time.Second,
+					Key:    stringPtr("event.tenant.id"),
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 6,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    100,
+					FunctionConcurrency:   0,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:                     15,
+						Burst:                     3,
+						Period:                    30,
+						Scope:                     enums.ThrottleScopeFn,
+						ThrottleKeyExpressionHash: util.XXHash("event.tenant.id"),
+					},
+				},
+			},
+		},
+		{
+			name:               "complete function configuration",
+			accountConcurrency: 500,
+			fn: inngest.Function{
+				FunctionVersion: 7,
+				RateLimit: &inngest.RateLimit{
+					Limit:  25,
+					Period: "120s",
+					Key:    stringPtr("event.api_key"),
+				},
+				Concurrency: &inngest.ConcurrencyLimits{
+					Limits: []inngest.Concurrency{
+						{
+							Limit: 20,
+							Scope: enums.ConcurrencyScopeFn,
+						},
+						{
+							Limit: 5,
+							Key:   stringPtr("event.user.id"),
+							Scope: enums.ConcurrencyScopeAccount,
+							Hash:  "complete-user-hash",
+						},
+					},
+				},
+				Throttle: &inngest.Throttle{
+					Limit:  50,
+					Burst:  10,
+					Period: 90 * time.Second,
+					Key:    stringPtr("event.organization.slug"),
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 7,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						Scope:             enums.RateLimitScopeFn,
+						Limit:             25,
+						KeyExpressionHash: util.XXHash("event.api_key"),
+					},
+				},
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  500,
+					FunctionConcurrency: 20,
+					CustomConcurrencyKeys: []constraintapi.CustomConcurrencyLimit{
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeAccount,
+							Limit:             5,
+							KeyExpressionHash: "complete-user-hash",
+						},
+					},
+				},
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Limit:                     50,
+						Burst:                     10,
+						Period:                    90,
+						Scope:                     enums.ThrottleScopeFn,
+						ThrottleKeyExpressionHash: util.XXHash("event.organization.slug"),
+					},
+				},
+			},
+		},
+		{
+			name:               "empty account concurrency",
+			accountConcurrency: 0,
+			fn: inngest.Function{
+				FunctionVersion: 8,
+				Concurrency: &inngest.ConcurrencyLimits{
+					Limits: []inngest.Concurrency{
+						{
+							Limit: 1,
+							Scope: enums.ConcurrencyScopeFn,
+						},
+					},
+				},
+			},
+			expected: constraintapi.ConstraintConfig{
+				FunctionVersion: 8,
+				RateLimit:       nil,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:    0,
+					FunctionConcurrency:   1,
+					CustomConcurrencyKeys: nil,
+				},
+				Throttle: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConvertToConstraintConfiguration(tt.accountConcurrency, tt.fn)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Helper function to create string pointers
+func stringPtr(s string) *string {
+	return &s
 }

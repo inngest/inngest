@@ -69,11 +69,26 @@ func Command() *cli.Command {
 				Value: devserver.DefaultConnectGatewayPort,
 				Usage: "Port to expose connect gateway endpoint",
 			},
+			&cli.IntFlag{
+				Name:  "connect-gateway-grpc-port",
+				Value: devserver.DefaultConnectGatewayGRPCPort,
+				Usage: "Port to expose connect gateway grpc endpoint",
+			},
+			&cli.IntFlag{
+				Name:  "connect-executor-grpc-port",
+				Value: devserver.DefaultConnectExecutorGRPCPort,
+				Usage: "Port to expose connect executor grpc endpoint",
+			},
 			&cli.BoolFlag{
 				Name:   "in-memory",
 				Value:  true,
 				Usage:  "Use in memory sqlite db",
 				Hidden: true,
+			},
+			&cli.IntFlag{
+				Name:  "debug-api-port",
+				Value: devserver.DefaultDebugAPIPort,
+				Usage: "Port to expose the debug api endpoint",
 			},
 		},
 	}

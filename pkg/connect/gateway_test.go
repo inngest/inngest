@@ -37,6 +37,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var testExecutorIP = net.ParseIP("127.0.0.1")
+
 func TestConnectionEstablished(t *testing.T) {
 	res := createTestingGateway(t)
 
@@ -77,7 +79,7 @@ func TestLeaseRenewal(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -155,7 +157,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -260,7 +262,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 
 	requestID := "test-req"
 
-	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5, testExecutorIP)
 	require.NoError(t, err)
 
 	expectedPayload := &connect.GatewayExecutorRequestData{
@@ -1239,7 +1241,7 @@ func TestHandleSdkReply(t *testing.T) {
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	ch := &connectionHandler{
-		svc:  res.svc,
+		svc: res.svc,
 		conn: &state.Connection{
 			EnvID: res.envID,
 		},
@@ -1297,7 +1299,7 @@ func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
 	handshake(t, res)
 
 	ch := &connectionHandler{
-		svc:  res.svc,
+		svc: res.svc,
 		conn: &state.Connection{
 			EnvID: res.envID,
 			Data: &connect.WorkerConnectRequestData{
@@ -1330,12 +1332,12 @@ func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
 
 	// Test WORKER_REQUEST_EXTEND_LEASE with invalid lease ID
 	extendLeaseData := &connect.WorkerRequestExtendLeaseData{
-		RequestId:      "test-req",
-		AccountId:      res.accountID.String(),
-		EnvId:          res.envID.String(),
-		AppId:          res.appID.String(),
-		FunctionSlug:   "test-fn",
-		LeaseId:        "invalid-ulid",
+		RequestId:    "test-req",
+		AccountId:    res.accountID.String(),
+		EnvId:        res.envID.String(),
+		AppId:        res.appID.String(),
+		FunctionSlug: "test-fn",
+		LeaseId:      "invalid-ulid",
 	}
 	extendLeaseBytes, err := proto.Marshal(extendLeaseData)
 	require.NoError(t, err)
@@ -1360,7 +1362,7 @@ func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := &connectionHandler{
-		svc:  res.svc,
+		svc: res.svc,
 		conn: &state.Connection{
 			EnvID: res.envID,
 			Data: &connect.WorkerConnectRequestData{
@@ -1405,7 +1407,7 @@ func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
 	handshake(t, res)
 
 	ch := &connectionHandler{
-		svc:  res.svc,
+		svc: res.svc,
 		conn: &state.Connection{
 			EnvID: res.envID,
 			Data: &connect.WorkerConnectRequestData{
@@ -1632,25 +1634,21 @@ func TestCloseWithConnectError(t *testing.T) {
 
 	// Send connect message that will fail auth
 	sendWorkerConnectMessage(t, testingResources{
-		ws:       ws2,
-		reqData:  res2.reqData,
-		connID:   res2.connID,
-		envID:    res2.envID,
+		ws:        ws2,
+		reqData:   res2.reqData,
+		connID:    res2.connID,
+		envID:     res2.envID,
 		accountID: res2.accountID,
-		appID:    res2.appID,
-		syncID:   res2.syncID,
-		fnID:     res2.fnID,
-		appName:  res2.appName,
-		fnName:   res2.fnName,
-		fnSlug:   res2.fnSlug,
-		runID:    res2.runID,
+		appID:     res2.appID,
+		syncID:    res2.syncID,
+		fnID:      res2.fnID,
+		appName:   res2.appName,
+		fnName:    res2.fnName,
+		fnSlug:    res2.fnSlug,
+		runID:     res2.runID,
 	})
 
 	status, reason := awaitClosure(t, ws2, 2*time.Second)
 	require.Equal(t, websocket.StatusPolicyViolation, status)
 	require.Equal(t, syscode.CodeConnectAuthFailed, reason)
 }
-
-
-
-

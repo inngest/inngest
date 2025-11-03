@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -95,6 +96,10 @@ type QueueItem struct {
 	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
+
+	// CapacityLeaseID is the optional capacity lease for this queue item.
+	// This is set when the Constraint API feature flag is enabled and the item was refilled.
+	CapacityLeaseID *ulid.ULID `json:"clid,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -591,7 +596,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	var throttleExpr string
 	if throttle.Key != nil {
-		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
+		val, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)
@@ -652,4 +657,68 @@ func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency 
 	}
 
 	return keys
+}
+
+func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) constraintapi.ConstraintConfig {
+	var rateLimit []constraintapi.RateLimitConfig
+	if fn.RateLimit != nil {
+		var rateLimitKey string
+		if fn.RateLimit.Key != nil {
+			rateLimitKey = *fn.RateLimit.Key
+		}
+
+		rateLimit = append(rateLimit, constraintapi.RateLimitConfig{
+			Scope:             enums.RateLimitScopeFn,
+			Limit:             int(fn.RateLimit.Limit),
+			KeyExpressionHash: util.XXHash(rateLimitKey),
+		})
+	}
+
+	var customConcurrency []constraintapi.CustomConcurrencyLimit
+	if fn.Concurrency != nil {
+		for _, c := range fn.Concurrency.Limits {
+			if !c.IsCustomLimit() {
+				continue
+			}
+
+			customConcurrency = append(customConcurrency, constraintapi.CustomConcurrencyLimit{
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             c.Scope,
+				Limit:             c.Limit,
+				KeyExpressionHash: c.Hash,
+			})
+		}
+	}
+
+	var throttles []constraintapi.ThrottleConfig
+	if fn.Throttle != nil {
+		var throttleKey string
+		if fn.Throttle.Key != nil {
+			throttleKey = *fn.Throttle.Key
+		}
+
+		throttles = append(throttles, constraintapi.ThrottleConfig{
+			Limit:                     int(fn.Throttle.Limit),
+			Burst:                     int(fn.Throttle.Burst),
+			Period:                    int(fn.Throttle.Period.Seconds()),
+			Scope:                     enums.ThrottleScopeFn,
+			ThrottleKeyExpressionHash: util.XXHash(throttleKey),
+		})
+	}
+
+	functionConcurrency := 0
+	if fn.Concurrency != nil {
+		functionConcurrency = fn.Concurrency.PartitionConcurrency()
+	}
+
+	return constraintapi.ConstraintConfig{
+		FunctionVersion: fn.FunctionVersion,
+		RateLimit:       rateLimit,
+		Concurrency: constraintapi.ConcurrencyConfig{
+			AccountConcurrency:    accountConcurrency,
+			FunctionConcurrency:   functionConcurrency,
+			CustomConcurrencyKeys: customConcurrency,
+		},
+		Throttle: throttles,
+	}
 }

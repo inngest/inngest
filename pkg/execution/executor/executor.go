@@ -16,6 +16,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -79,6 +80,28 @@ var (
 
 	PauseHandleConcurrency = 100
 )
+
+// ScheduleStatus returns a string status category for a Schedule error.
+// This is useful for metrics and observability to categorize schedule attempts.
+func ScheduleStatus(err error) string {
+	switch {
+	case err == nil:
+		return "success"
+	case errors.Is(err, ErrFunctionRateLimited):
+		return "rate_limited"
+	case errors.Is(err, ErrFunctionDebounced):
+		return "debounced"
+	case errors.Is(err, ErrFunctionSkipped):
+		return "skipped"
+	case errors.Is(err, redis_state.ErrQueueItemExists), errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
+		return "idempotency"
+	case err != nil:
+		return "error"
+	default:
+		// should be unreachable
+		return "unknown"
+	}
+}
 
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
@@ -253,6 +276,20 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
+func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).capacityManager = cm
+		return nil
+	}
+}
+
+func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).useConstraintAPI = uca
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -363,11 +400,15 @@ type executor struct {
 	pm   pauses.Manager
 	smv2 sv2.RunService
 
-	rateLimiter         ratelimit.RateLimiter
-	queue               queue.Queue
-	debouncer           debounce.Debouncer
-	batcher             batch.BatchManager
-	singletonMgr        singleton.Singleton
+	rateLimiter  ratelimit.RateLimiter
+	queue        queue.Queue
+	debouncer    debounce.Debouncer
+	batcher      batch.BatchManager
+	singletonMgr singleton.Singleton
+
+	capacityManager  constraintapi.CapacityManager
+	useConstraintAPI constraintapi.UseConstraintAPIFn
+
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler       execution.FinalizePublisher
@@ -588,8 +629,33 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 	return nil
 }
 
-// Schedule schedules a new workflow run.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	// Check constraints and acquire lease
+	return WithConstraints(
+		ctx,
+		e.capacityManager,
+		e.useConstraintAPI,
+		req,
+		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+			return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+		})
+}
+
+// Execute loads a workflow and the current run state, then executes the
+// function's step via the necessary driver.
+//
+// If this function has a debounce config, this will return ErrFunctionDebounced instead
+// of an identifier as the function is not scheduled immediately.
+func (e *executor) schedule(
+	ctx context.Context,
+	req execution.ScheduleRequest,
+	// performChecks determines whether constraint checks must be performed
+	// This may be false when the Constraint API was used to enforce constraints.
+	performChecks bool,
+	// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
+	// failed (and we don't know if it succeeded on the API)
+	fallbackIdempotencyKey string,
+) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
 	}
@@ -603,27 +669,34 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
-	// Attempt to rate-limit the incoming function.
-	if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
-		evtMap := req.Events[0].GetEvent().Map()
-		key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
-		switch err {
-		case nil:
-			limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
-			if err != nil {
-				return nil, fmt.Errorf("could not check rate limit: %w", err)
-			}
+	if performChecks {
+		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
+		_ = fallbackIdempotencyKey
 
-			if limited {
-				// Do nothing.
-				return nil, ErrFunctionRateLimited
+		// Attempt to rate-limit the incoming function.
+		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
+			evtMap := req.Events[0].GetEvent().Map()
+			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+			switch err {
+			case nil:
+				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+				if err != nil {
+					return nil, fmt.Errorf("could not check rate limit: %w", err)
+				}
+
+				if limited {
+					// Do nothing.
+					return nil, ErrFunctionRateLimited
+				}
+			case ratelimit.ErrNotRateLimited:
+				// no-op: proceed with function run as usual
+			default:
+				return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
 			}
-		case ratelimit.ErrNotRateLimited:
-			// no-op: proceed with function run as usual
-		default:
-			return nil, fmt.Errorf("could not evaluate rate limit: %w", err)
 		}
 	}
+
+	// NOTE: From this point, we are guaranteed to operate within user constraints.
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
@@ -1839,7 +1912,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 					return
 				}
 
-				val, _, err := expr.Evaluate(ctx, data)
+				val, err := expr.Evaluate(ctx, data)
 				if err != nil {
 					l.Warn("error evaluating pause expression", "error", err)
 					return
@@ -4139,6 +4212,14 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		FunctionPausedAt: opts.FunctionPausedAt,
 		// Batching does not work with rate limiting
 		PreventRateLimit: true,
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "batch",
+			"status": ScheduleStatus(err),
+		},
 	})
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
