@@ -3487,7 +3487,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 						Attributes: attrs,
 					})
 				if err != nil {
-					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
+					e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
 				}
 			}
 		}
