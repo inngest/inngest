@@ -187,7 +187,7 @@ func (nonRetryable) Retryable() bool { return false }
 // AlwaysRetryError always retries, ignoring max retry counts
 // This will not increase the job's attempt count
 func AlwaysRetryError(err error) error {
-	return &alwaysRetry{error: err}
+	return alwaysRetry{error: err}
 }
 
 type alwaysRetry struct {
@@ -197,7 +197,7 @@ type alwaysRetry struct {
 func (a alwaysRetry) AlwaysRetryable() {}
 
 func IsAlwaysRetryable(err error) bool {
-	var ar *alwaysRetry
+	var ar alwaysRetry
 	return errors.As(err, &ar)
 }
 

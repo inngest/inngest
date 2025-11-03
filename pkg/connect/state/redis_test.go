@@ -2690,7 +2690,7 @@ func TestWorkerCapacityManager_DocumentedTimingBugs(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
 		require.Equal(t, int64(0), caps.Available)
-		require.Equal(t, int64(1), caps.Total-int64(len(caps.CurrentLeases)))
+		require.Equal(t, int64(1), int64(len(caps.CurrentLeases)))
 
 	})
 }
