@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -19,20 +17,13 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
-	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
-	"github.com/inngest/inngest/pkg/execution/executor/queueref"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngestgo"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/oklog/ulid/v2"
 )
@@ -75,7 +66,7 @@ type RunOutputReader interface {
 // CheckpointAPIOpts represents options for the checkpoint API.
 type CheckpointAPIOpts struct {
 	// CheckpointMetrics records metrics for checkpoints.
-	CheckpointMetrics CheckpointMetricsProvider
+	CheckpointMetrics checkpoint.MetricsProvider
 	// RunOutputReader is the reader used to fetch run outputs for checkpoint APIs.
 	RunOutputReader RunOutputReader
 	// RunJWTSecret is the secret for signing run claim JWTs, allowing sync APIs
@@ -85,9 +76,11 @@ type CheckpointAPIOpts struct {
 
 // checkpointAPI is the base implementation.
 type checkpointAPI struct {
+	// API opts
 	Opts
-
 	chi.Router
+
+	checkpointer checkpoint.Checkpointer
 
 	// upserted tracks fn IDs and their associated config in memory once upserted, allowing
 	// us to prevent DB queries from hitting the DB each time a sync fn begins.
@@ -96,15 +89,17 @@ type checkpointAPI struct {
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
 	outputReader RunOutputReader
-	// m records metrics, eg. for runs and so on.
-	m CheckpointMetricsProvider
 }
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
-	metrics := o.CheckpointOpts.CheckpointMetrics
-	if metrics == nil {
-		metrics = nilCheckpointMetrics{}
-	}
+	c := checkpoint.New(checkpoint.Opts{
+		State:           o.State,
+		FnReader:        o.FunctionReader,
+		Executor:        o.Executor,
+		TracerProvider:  o.TracerProvider,
+		Queue:           o.Queue,
+		MetricsProvider: o.CheckpointOpts.CheckpointMetrics,
+	})
 
 	api := checkpointAPI{
 		Router:          chi.NewRouter(),
@@ -112,7 +107,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
 		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
 		outputReader:    o.CheckpointOpts.RunOutputReader,
-		m:               metrics,
+		checkpointer:    c,
 	}
 
 	api.Post("/", api.CheckpointNewRun)             // sync, API-based fns
@@ -198,7 +193,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	switch err {
 	case nil:
 
-		go a.m.OnFnScheduled(ctx, CheckpointMetrics{
+		go a.checkpointer.Metrics().OnFnScheduled(ctx, checkpoint.MetricCardinality{
 			AccountID: auth.AccountID(),
 			EnvID:     auth.WorkspaceID(),
 			AppID:     appID,
@@ -207,16 +202,34 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 		var jwt string
 		if len(input.Steps) > 0 {
-			jwt = a.checkpointSyncSteps(ctx, checkpointSyncSteps{
+			err := a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
 				RunID:     input.RunID,
 				FnID:      fn.ID,
 				AppID:     appID,
 				AccountID: auth.AccountID(),
 				EnvID:     auth.WorkspaceID(),
 				Steps:     input.Steps,
+				Metadata:  md,
+			})
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
+			}
 
-				md: md,
-			}, w)
+			async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
+				return enums.OpcodeIsAsync(s.Op)
+			})
+			if async {
+				// Create a token that can be used for viewing this particular run.
+				claim, err := apiv1auth.CreateRunJWT(
+					a.runClaimsSecret,
+					md.ID.Tenant.EnvID,
+					md.ID.RunID,
+				)
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
+				}
+				jwt = claim
+			}
 		}
 
 		_ = WriteResponse(w, CheckpointNewRunResponse{
@@ -254,250 +267,22 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 
 	// checkpoint those steps by writing to state.
 	input := checkpointSyncSteps{}
-
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
 
-	input.AccountID = auth.AccountID()
-	input.EnvID = auth.WorkspaceID()
-
-	a.checkpointSyncSteps(ctx, input, w)
-}
-
-// checkpointSyncSteps handles the checkpointing of new steps.
-//
-// this accepts all opcodes in the current request, then handles trace pipelines and optional
-// state updates in the state store for resumability.
-//
-// NOTE:  In order to power seamless APIs, we have to detect whether there are async ops in
-// the first checkpoint.  If so, we produce a token which allows arbitrary users to request
-// access to the run's output;  this token is used when redirecting in the sync fns that started
-// the checkpoint.
-func (a checkpointAPI) checkpointSyncSteps(ctx context.Context, input checkpointSyncSteps, w http.ResponseWriter) string {
-	var jwt string
-
-	if input.md == nil {
-		md, err := a.State.LoadMetadata(ctx, sv2.ID{
-			RunID:      input.RunID,
-			FunctionID: input.FnID,
-			Tenant: sv2.Tenant{
-				AccountID: input.AccountID,
-				EnvID:     input.EnvID,
-				AppID:     input.AppID,
-			},
-		})
-		if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
-			// Handle run not found with 404
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
-			return ""
-		}
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error loading state for background checkpoint steps", "error", err)
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
-			return ""
-		}
-		input.md = &md
-	}
-
-	l := logger.StdlibLogger(ctx).With("run_id", input.md.ID.RunID)
-
-	// Load the function config.
-	fn, err := a.fn(ctx, input.md.ID.FunctionID)
+	err = a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+		RunID:     input.RunID,
+		FnID:      input.FnID,
+		AppID:     input.AppID,
+		AccountID: auth.AccountID(),
+		EnvID:     auth.WorkspaceID(),
+		Steps:     input.Steps,
+	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn("error loading fn for background checkpoint steps", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading function config"))
-		return ""
+		logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
 	}
-
-	runCtx := a.runContext(ctx, *input.md, fn)
-
-	// If the opcodes contain a function finished op, we don't need to bother serializing
-	// to the state store.  We only care about serializing state if we switch from sync -> async,
-	// as the state will be used for resuming functions.
-	complete := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-		return s.Op == enums.OpcodeRunComplete
-	})
-
-	async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-		return enums.OpcodeIsAsync(s.Op)
-	})
-
-	if async {
-		// Create a token that can be used for viewing this particular run.
-		claim, err := apiv1auth.CreateRunJWT(
-			a.runClaimsSecret,
-			input.md.ID.Tenant.EnvID,
-			input.md.ID.RunID,
-		)
-		if err != nil {
-			logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
-		}
-		jwt = claim
-	}
-
-	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
-	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
-	// at some point in the future.
-	for _, op := range input.Steps {
-		attrs := tracing.GeneratorAttrs(&op)
-		tracing.AddMetadataTenantAttrs(attrs, input.md.ID)
-
-		switch op.Op {
-		case enums.OpcodeStepRun, enums.OpcodeStep:
-			// Steps are checkpointed after they execute.  We only need to store traces here, then
-			// continune; we do not need to handle anything within the executor.
-
-			output, err := op.Output()
-			if err != nil {
-				l.Error("error fetching checkpoint step output", "error", err)
-			}
-
-			if !complete {
-				// Checkpointing happens in this API when either the function finishes or we move to
-				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
-				// as all complete functions will never re-enter.
-				_, err := a.State.SaveStep(ctx, input.md.ID, op.ID, []byte(output))
-				if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-					// Ignore.
-					l.Warn("duplicate checkpoint step", "id", input.md.ID)
-					continue
-				}
-				if err != nil {
-					l.Error("error saving checkpointed step state", "error", err)
-				}
-			}
-
-			max := fn.MaxAttempts()
-			_, err = a.TracerProvider.CreateSpan(
-				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-					Identifier:  input.md.ID,
-					Attempt:     runCtx.AttemptCount(),
-					MaxAttempts: &max,
-				}),
-				meta.SpanNameStep,
-				&tracing.CreateSpanOptions{
-					Parent:    tracing.RunSpanRefFromMetadata(input.md),
-					StartTime: op.Timing.Start(),
-					EndTime:   op.Timing.End(),
-					Attributes: attrs.Merge(
-						meta.NewAttrSet(
-							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
-							meta.Attr(meta.Attrs.RunID, &input.RunID),
-							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
-							meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
-						),
-					),
-				},
-			)
-			if err != nil {
-				// We should never hit a blocker creating a span.  If so, warn loudly.
-				l.Error("error saving span for checkpoint op", "error", err)
-			}
-
-			go a.m.OnStepFinished(ctx, CheckpointMetrics{
-				AccountID: input.AccountID,
-				EnvID:     input.EnvID,
-				AppID:     input.AppID,
-				FnID:      input.FnID,
-			}, enums.StepStatusCompleted)
-
-		case enums.OpcodeStepError, enums.OpcodeStepFailed:
-			// StepErrors are unique.  Firstly, we must always store traces.  However, if
-			// we retry the step, we move from sync -> async, requiring jobs to be scheduled.
-			//
-			// If steps only have one attempt, however, we can assume that the SDK handles
-			// step errors and continues
-			status := enums.StepStatusErrored
-			max := fn.MaxAttempts()
-			_, err = a.TracerProvider.CreateSpan(
-				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-					Identifier:  input.md.ID,
-					Attempt:     runCtx.AttemptCount(),
-					MaxAttempts: &max,
-				}),
-				meta.SpanNameStep,
-				&tracing.CreateSpanOptions{
-					Parent:    tracing.RunSpanRefFromMetadata(input.md),
-					StartTime: op.Timing.Start(),
-					EndTime:   op.Timing.End(),
-					Attributes: attrs.Merge(
-						meta.NewAttrSet(
-							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
-							meta.Attr(meta.Attrs.RunID, &input.RunID),
-							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
-							meta.Attr(meta.Attrs.DynamicStatus, &status),
-						),
-					),
-				},
-			)
-			if err != nil {
-				// We should never hit a blocker creating a span.  If so, warn loudly.
-				l.Error("error saving span for checkpoint step error op", "error", err)
-			}
-
-			err := a.Executor.HandleGenerator(ctx, runCtx, op)
-			if errors.Is(err, executor.ErrHandledStepError) {
-				// In the executor, returning an error bubbles up to the queue to requeue.
-				jobID := fmt.Sprintf("%s-%s-sync-retry", runCtx.Metadata().IdempotencyKey(), op.ID)
-				now := time.Now()
-				nextItem := queue.Item{
-					JobID:                 &jobID,
-					WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
-					Kind:                  queue.KindEdge,
-					Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
-					PriorityFactor:        runCtx.PriorityFactor(),
-					CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
-					Attempt:               1, // This is now the next attempt.
-					MaxAttempts:           runCtx.MaxAttempts(),
-					Payload:               queue.PayloadEdge{Edge: inngest.SourceEdge}, // doesn't matter for sync functions.
-					Metadata:              make(map[string]any),
-					ParallelMode:          enums.ParallelModeWait,
-				}
-
-				// Continue checking this particular error.
-				if err = a.Opts.Queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{}); err != nil {
-					l.Error("error enqueueing step error in checkpoint", "error", err, "opcode", op.Op)
-				}
-			}
-			if err != nil {
-				l.Error("error handlign step error in checkpoint", "error", err, "opcode", op.Op)
-			}
-
-		case enums.OpcodeRunComplete:
-			result := struct {
-				Data APIResult `json:"data"`
-			}{}
-			if err := json.Unmarshal(op.Data, &result); err != nil {
-				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
-			}
-
-			go a.m.OnFnFinished(ctx, CheckpointMetrics{
-				AccountID: input.AccountID,
-				EnvID:     input.EnvID,
-				AppID:     input.AppID,
-				FnID:      input.FnID,
-			}, enums.RunStatusCompleted)
-
-			// Call finalize and process the entire op.
-			if err := a.finalize(ctx, *input.md, result.Data); err != nil {
-				l.Error("error finalizing sync run", "error", err)
-			}
-
-		default:
-			if err := a.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
-				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
-			}
-		}
-	}
-
-	l.Info("handled sync checkpoint", "ops", len(input.Steps), "complete", complete)
-	return jwt
 }
 
 // CheckpointAsyncSteps is used to checkpoint from background functions (async functions).
@@ -524,112 +309,18 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
-	input.AccountID = auth.AccountID()
-	input.EnvID = auth.WorkspaceID()
 
-	l := logger.StdlibLogger(ctx).With(
-		"run_id", input.RunID,
-		"account_id", input.AccountID,
-		"env_id", input.EnvID,
-	)
-
-	md, err := a.State.LoadMetadata(ctx, sv2.ID{
-		RunID:      input.RunID,
-		FunctionID: input.FnID,
-		Tenant: sv2.Tenant{
-			AccountID: input.AccountID,
-			EnvID:     input.EnvID,
-		},
+	err = a.checkpointer.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
+		RunID:        input.RunID,
+		FnID:         input.FnID,
+		Steps:        input.Steps,
+		QueueItemRef: input.QueueItemRef,
+		AccountID:    auth.AccountID(),
+		EnvID:        auth.WorkspaceID(),
 	})
-	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
-		// Handle run not found with 404
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
-		return
-	}
 	if err != nil {
-		l.Error("error loading state for background checkpoint steps", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
-		return
-	}
-
-	// NOTE: This should never contain async steps, because checkpointing is only used
-	// when sync steps are found.  Here, though, we check to see if there are async steps
-	// and track warnings if so.  It could still *technically* work, but is not the paved path
-	// that we want, and so is unimplemented.
-	async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-		return enums.OpcodeIsAsync(s.Op)
-	})
-	if async {
-		l.Error("found async steps in async checkpoint")
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "cannot checkpoint async steps"))
-	}
-
-	for _, op := range input.Steps {
-		attrs := tracing.GeneratorAttrs(&op)
-		tracing.AddMetadataTenantAttrs(attrs, md.ID)
-
-		switch op.Op {
-		case enums.OpcodeStepRun, enums.OpcodeStep:
-			// Checkpointing is also always used while runs are in progress.  These must always
-			// be stored in the state store.
-			output, err := op.Output()
-			if err != nil {
-				l.Error("error fetching checkpoint step output", "error", err)
-			}
-
-			_, err = a.State.SaveStep(ctx, md.ID, op.ID, []byte(output))
-			if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-				// Ignore.
-				l.Warn("duplicate checkpoint step", "id", md.ID)
-				continue
-			}
-			if err != nil {
-				l.Error("error saving checkpointed step state", "error", err)
-			}
-
-			_, err = a.TracerProvider.CreateSpan(
-				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
-					Identifier: md.ID,
-					Attempt:    0,
-					// XXX: MaxAttempts isn't stored here, as we don't have that info at this time.,
-				}),
-				meta.SpanNameStep,
-				&tracing.CreateSpanOptions{
-					Parent:    tracing.RunSpanRefFromMetadata(&md),
-					StartTime: op.Timing.Start(),
-					EndTime:   op.Timing.End(),
-					Attributes: attrs.Merge(
-						meta.NewAttrSet(
-							meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
-							meta.Attr(meta.Attrs.RunID, &input.RunID),
-							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
-							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
-							meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
-						),
-					),
-				},
-			)
-			if err != nil {
-				// We should never hit a blocker creating a span.  If so, warn loudly.
-				l.Error("error saving span for checkpoint op", "error", err)
-			}
-		default:
-			// Return an error
-			l.Error("unimplemented checkpoint op", "op", op.Op)
-			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "cannot checkpoint opcode: %s", op.Op))
-		}
-	}
-
-	// Decode the queue item ID into its shard and job ID.
-	ref := queueref.Decode(input.QueueItemRef)
-	if ref[0] == "" {
-		return
-	}
-
-	if err := a.Opts.Queue.ResetAttemptsByJobID(ctx, ref.ShardID(), ref.JobID()); err != nil {
-		l.Error("error resetting queue item attempts", "error", err)
-		return
+		logger.StdlibLogger(ctx).Error("error checkpointing async steps", "error", err)
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusBadRequest, "Failed to checkpoint steps"))
 	}
 }
 
@@ -667,26 +358,6 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("content-type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
-}
-
-// finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
-// work has finished, and eg. step.Defer items are not running.
-func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
-	httpHeader := http.Header{}
-	for k, v := range result.Headers {
-		httpHeader[k] = []string{v}
-	}
-
-	return a.Executor.Finalize(ctx, execution.FinalizeOpts{
-		Metadata: md,
-		RunMode:  enums.RunModeSync,
-		Response: state.DriverResponse{
-			Output:     result.Body,
-			Header:     httpHeader,
-			StatusCode: result.StatusCode,
-		},
-		Optional: execution.FinalizeOptional{},
-	})
 }
 
 // upsertSyncData adds apps and functions to the backing datastore the first time
@@ -784,38 +455,4 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
 		"app_id", app.ID,
 	)
-}
-
-func (a checkpointAPI) runContext(ctx context.Context, md sv2.Metadata, fn *inngest.Function) execution.RunContext {
-	// Create a run context specifically for each op;  we need this for any
-	// async op, such as the step error and what not.
-	client := exechttp.Client(exechttp.SecureDialerOpts{})
-	httpClient := &client
-
-	// Create the run context with simplified data
-	return &checkpointRunContext{
-		md:         md,
-		httpClient: httpClient,
-		events:     []json.RawMessage{}, // Empty for checkpoint context
-		groupID:    uuid.New().String(),
-
-		// Sync checkpoints always have a 0 attempt index, as this API
-		// endpoint is only for sync functions that have not yet re-entered,
-		// ie. first attempts at teps.
-		attemptCount: 0,
-
-		maxAttempts:     fn.MaxAttempts(),
-		priorityFactor:  nil,                         // Use default priority
-		concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
-		parallelMode:    enums.ParallelModeWait,      // Default to serial
-	}
-}
-
-func (a checkpointAPI) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
-	// Load the function config.
-	cfn, err := a.Opts.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
-	if err != nil {
-		return nil, fmt.Errorf("error loading function: %w", err)
-	}
-	return cfn.InngestFunction()
 }
