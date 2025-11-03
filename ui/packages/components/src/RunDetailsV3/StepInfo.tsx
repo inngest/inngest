@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/Button';
+import { Button as NewButton } from '@inngest/components/Button/NewButton';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
@@ -11,6 +12,7 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
+import { RerunModal as NewRerunModal } from '../Rerun/NewRerunModal';
 import { RerunModal } from '../Rerun/RerunModal';
 import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
@@ -32,7 +34,7 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, useStepSelection, type StepInfoType } from './utils';
+import { maybeBooleanToString, type StepInfoType } from './utils';
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
@@ -128,18 +130,19 @@ export const StepInfo = ({
   pollInterval: initialPollInterval,
   tracesPreviewEnabled,
   debug = false,
+  newStack = false,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
   tracesPreviewEnabled?: boolean;
   debug?: boolean;
+  newStack?: boolean;
 }) => {
   const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
   const [pollInterval, setPollInterval] = useState(initialPollInterval);
-  const { selectStep } = useStepSelection({ runID });
   const { loading, data: result } = useGetTraceResult({
     traceID: trace.outputID,
     refetchInterval: pollInterval ? pollInterval : undefined,
@@ -195,24 +198,45 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {!debug && runID && trace.stepID && (!cloud || prettyInput) && (
-          <>
-            <Button
-              kind="primary"
-              appearance="outlined"
-              size="medium"
-              label="Rerun from step"
-              onClick={() => setRerunModalOpen(true)}
-            />
-            <RerunModal
-              open={rerunModalOpen}
-              setOpen={setRerunModalOpen}
-              runID={runID}
-              stepID={trace.stepID}
-              input={prettyInput || result?.input || ''}
-            />
-          </>
-        )}
+        {!debug &&
+          runID &&
+          trace.stepID &&
+          (!cloud || prettyInput) &&
+          (newStack ? (
+            <>
+              <NewButton
+                kind="primary"
+                appearance="outlined"
+                size="medium"
+                label="Rerun from step"
+                onClick={() => setRerunModalOpen(true)}
+              />
+              <NewRerunModal
+                open={rerunModalOpen}
+                setOpen={setRerunModalOpen}
+                runID={runID}
+                stepID={trace.stepID}
+                input={prettyInput || result?.input || ''}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                kind="primary"
+                appearance="outlined"
+                size="medium"
+                label="Rerun from step"
+                onClick={() => setRerunModalOpen(true)}
+              />
+              <RerunModal
+                open={rerunModalOpen}
+                setOpen={setRerunModalOpen}
+                runID={runID}
+                stepID={trace.stepID}
+                input={prettyInput || result?.input || ''}
+              />
+            </>
+          ))}
       </div>
 
       {expanded && (

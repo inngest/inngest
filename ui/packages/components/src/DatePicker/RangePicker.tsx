@@ -183,13 +183,15 @@ export const RangePicker = ({
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <TriggerComponent {...props}>
-          {displayValue ? (
-            displayValue
-          ) : (
-            <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
-          )}
-        </TriggerComponent>
+        <div>
+          <TriggerComponent {...props}>
+            {displayValue ? (
+              displayValue
+            ) : (
+              <span className="text-disabled">{placeholder ? placeholder : 'Select dates'}</span>
+            )}
+          </TriggerComponent>
+        </div>
       </PopoverTrigger>
       <PopoverContent align="start" className="border-subtle shadow-primary">
         <div className="bg-canvasBase flex flex-row">
