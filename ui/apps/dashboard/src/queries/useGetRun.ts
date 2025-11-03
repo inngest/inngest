@@ -77,21 +77,6 @@ const query = graphql(`
                 ...TraceDetails
                 childrenSpans {
                   ...TraceDetails
-                  childrenSpans {
-                    ...TraceDetails
-                    childrenSpans {
-                      ...TraceDetails
-                      childrenSpans {
-                        ...TraceDetails
-                        childrenSpans {
-                          ...TraceDetails
-                          childrenSpans {
-                            ...TraceDetails
-                          }
-                        }
-                      }
-                    }
-                  }
                 }
               }
             }
