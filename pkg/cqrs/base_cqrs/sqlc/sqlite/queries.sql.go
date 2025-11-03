@@ -1070,7 +1070,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = ?
-GROUP BY dynamic_span_id
+GROUP BY trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time
 `
 
