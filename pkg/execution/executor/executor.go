@@ -2735,6 +2735,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		// This is fine.
+		// XXX: we should totally attach a warning to the function run here.
 		return nil
 	}
 
@@ -2751,6 +2752,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// trace -> exec -> cleanup flow handles individual steps.
 	//
 	// In this case, we MUST retroactively record spans for each past step.
+	//
+	// XXX: (feat: checkpoint) We also only want to enqueue one discovery step per request,
+	// if this isn't in parallelism.
 	if emitCheckpointTraces(ctx) {
 		attrs := tracing.GeneratorAttrs(&gen)
 		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)

@@ -114,8 +114,8 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		m:               metrics,
 	}
 
-	api.Post("/", api.CheckpointNewRun)
-	api.Post("/{runID}/steps", api.CheckpointSteps)
+	api.Post("/", api.CheckpointNewRun)             // sync, API-based fns
+	api.Post("/{runID}/steps", api.CheckpointSteps) // sync, API-based fns
 	api.Post("/{runID}/async", api.CheckpointAsyncSteps)
 	api.HandleFunc("/{runID}/output", api.Output)
 
