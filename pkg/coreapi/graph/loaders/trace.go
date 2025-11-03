@@ -385,9 +385,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				}
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
-
-					gqlSpan.EndedAt = child.EndedAt
-					gqlSpan.Status = child.Status
+					// Don't copy status from userland spans to preserve step status
+					if !child.IsUserland {
+						gqlSpan.EndedAt = child.EndedAt
+						gqlSpan.Status = child.Status
+					}
 
 					if isFirstChild {
 						isFirstChild = false

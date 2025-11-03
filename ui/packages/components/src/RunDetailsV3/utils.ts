@@ -42,7 +42,9 @@ export function traceHasChildren(depth: number, trace: Trace) {
   }
 
   if (depth == 1 && trace.childrenSpans?.length === 1) {
-    return false;
+    if (!trace.childrenSpans[0]?.isUserland) {
+      return false;
+    }
   }
 
   return (trace.childrenSpans?.length ?? 0) > 0;
