@@ -1137,9 +1137,7 @@ func TestProxyGRPCBufferedResponse(t *testing.T) {
 }
 
 // mockFailingGatewayGRPCManager is a mock that always fails forwards
-type mockFailingGatewayGRPCManager struct {
-	mu sync.Mutex
-}
+type mockFailingGatewayGRPCManager struct {}
 
 func (m *mockFailingGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	return fmt.Errorf("mock forward error")

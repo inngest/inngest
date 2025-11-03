@@ -1451,7 +1451,7 @@ func TestEstablishConnectionInvalidMessages(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 
 	// Wait for hello message
 	msg := awaitNextMessage(t, ws, 2*time.Second)
@@ -1473,7 +1473,7 @@ func TestEstablishConnectionInvalidConnectMessage(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 
 	// Wait for hello message
 	msg := awaitNextMessage(t, ws, 2*time.Second)
@@ -1500,7 +1500,7 @@ func TestEstablishConnectionInvalidPayload(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 
 	// Wait for hello message
 	msg := awaitNextMessage(t, ws, 2*time.Second)
@@ -1528,7 +1528,7 @@ func TestEstablishConnectionInvalidConnectionId(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 
 	// Wait for hello message
 	msg := awaitNextMessage(t, ws, 2*time.Second)
@@ -1569,7 +1569,7 @@ func TestEstablishConnectionMissingInstanceId(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 
 	// Wait for hello message
 	msg := awaitNextMessage(t, ws, 2*time.Second)
@@ -1627,7 +1627,7 @@ func TestCloseWithConnectError(t *testing.T) {
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
-	defer ws2.CloseNow()
+	defer func() { _ = ws2.CloseNow() }()
 
 	msg = awaitNextMessage(t, ws2, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
