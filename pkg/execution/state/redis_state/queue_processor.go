@@ -1169,7 +1169,7 @@ func (q *queue) process(
 					return
 				}
 
-				// TODO: Check if this idempotency key makes sense
+				// This idempotency key will change with every refreshed lease, which makes sense.
 				idempotencyKey := capacityLeaseID.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{

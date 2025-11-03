@@ -110,13 +110,11 @@ func WithConstraints[T any](
 	leaseID := checkResult.leaseID
 	leaseIDLock := sync.Mutex{}
 
-	// TODO: Extend lease while we're processing this function (until we return or commit/rollback)
 	go func() {
 		for {
 			select {
 			// Stop extending lease
 			case <-ctx.Done():
-				// TODO: Should we do a best-effort rollback here lease is still active?
 				return
 			case <-time.After(ScheduleLeaseExtension):
 			}
@@ -130,9 +128,13 @@ func WithConstraints[T any](
 			lID := *leaseID
 			leaseIDLock.Unlock()
 
+			// Use previous lease as idempotency key
+			// This works because each lease is expected to extend once, after which a new lease
+			// is generated. This means idempotency can be used for graceful retries.
+			idempotencyKey := lID.String()
+
 			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-				// TODO: Generate idempotency key.
-				IdempotencyKey: "",
+				IdempotencyKey: idempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
 			})
@@ -166,12 +168,14 @@ func WithConstraints[T any](
 			// required.
 			lID := *leaseID
 
+			// Use previous lease as idempotency key
+			idempotencyKey := lID.String()
+
 			go func() {
-				_, internalErr := capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
-					AccountID: req.AccountID,
-					LeaseID:   lID,
-					// TODO: Generate idempotency key
-					IdempotencyKey: "",
+				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
+					AccountID:      req.AccountID,
+					LeaseID:        lID,
+					IdempotencyKey: idempotencyKey,
 				})
 				if internalErr != nil {
 					l.Error("failed to release capacity", "err", internalErr)
@@ -242,7 +246,7 @@ func CheckConstraints(
 	// Retrieve idempotency key to acquire lease
 	// NOTE: To allow for retries between multiple executors, this should be
 	// consistent between calls to CheckConstraints
-	var idempotencyKey string
+	idempotencyKey := req.Events[0].GetInternalID().String()
 	if req.IdempotencyKey != nil {
 		idempotencyKey = *req.IdempotencyKey
 	}
