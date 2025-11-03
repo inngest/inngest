@@ -617,4 +617,29 @@ func TestBlockstoreDelete(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("delete with exact block timestamp is inclusive", func(t *testing.T) {
+		// Test with the exact block index timestamp (latest pause timestamp)
+		blockIndexTimestamp := now.Add(time.Second) // This is what the block is indexed under
+		
+		// First, test blockIDForTimestamp directly to ensure it finds the block
+		blockstore := store.(*blockstore)
+		blockID, err := blockstore.blockIDForTimestamp(ctx, index, blockIndexTimestamp)
+		require.NoError(t, err)
+		require.NotNil(t, blockID, "blockIDForTimestamp should find block with exact index timestamp match")
+
+		// Now test the full Delete functionality
+		exactTimestampPause := state.Pause{
+			ID:        uuid.New(),
+			CreatedAt: blockIndexTimestamp, // Same timestamp as block index
+		}
+
+		err = store.Delete(ctx, index, exactTimestampPause)
+		require.NoError(t, err)
+
+		deleteKey := blockDeleteKey(index)
+		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(exactTimestampPause.ID.String()).Build()).AsBool()
+		require.NoError(t, err)
+		require.True(t, exists, "pause with exact block index timestamp should be marked for deletion")
+	})
+
 }
