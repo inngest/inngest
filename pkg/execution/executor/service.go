@@ -248,6 +248,10 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 		return false
 	}
 
+	if queue.IsAlwaysRetryable(err) {
+		return false
+	}
+
 	return true
 }
 
@@ -295,7 +299,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if s.isUnexpectedRunError(err) {
-			s.log.Error("error handling queue item", "error", err, "item_kind", item.Kind, "item_id", item.JobID)
+			s.log.Error("error handling queue item", "error", fmt.Sprintf("%#v", err), "item_kind", item.Kind)
 		}
 
 		return queue.RunResult{

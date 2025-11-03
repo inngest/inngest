@@ -175,7 +175,7 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 		span.RecordError(err)
 
 		syscodeError := &syscode.Error{}
-		if errors.As(err, &syscodeError) {
+		if errors.As(err, &syscodeError) || errors.As(err, syscodeError) {
 			sysErr = syscodeError
 		}
 	}
