@@ -21,10 +21,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type Metadata = map[string]json.RawMessage
+type RawMetadata = map[string]json.RawMessage
+type Metadata = map[string]any
 type MetadataOp string
 
-func RawMetadataAttrs(category string, metadata Metadata, op MetadataOp) *meta.SerializableAttrs {
+func RawMetadataAttrs(category string, metadata RawMetadata, op MetadataOp) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
 	meta.AddAttr(rawAttrs, meta.Attrs.MetadataCategory, &category)
@@ -33,6 +34,29 @@ func RawMetadataAttrs(category string, metadata Metadata, op MetadataOp) *meta.S
 	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &opStr)
 
 	return rawAttrs
+}
+
+func MetadataAttrs(category string, metadata any, op MetadataOp) (*meta.SerializableAttrs, error) {
+	rawAttrs := meta.NewAttrSet()
+
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataCategory, &category)
+
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	var rawMetadata RawMetadata
+	err = json.Unmarshal(data, &rawMetadata)
+	if err != nil {
+		return nil, err
+	}
+
+	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &rawMetadata)
+	opStr := string(op)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &opStr)
+
+	return rawAttrs, nil
 }
 
 func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {
