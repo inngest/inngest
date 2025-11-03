@@ -99,6 +99,12 @@ type CapacityAcquireRequest struct {
 	// in case the original lease expired by the time the respective item starts processing.
 	LeaseIdempotencyKeys []string
 
+	// ResourceKind specifies the resource kind associated with the lease.
+	//
+	// For run scheduling, this will be an event.
+	// For queue constraints, this will be one or more queue items.
+	ResourceKind LeaseResourceKind
+
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
 	//
@@ -176,6 +182,18 @@ const (
 	RunProcessingModeBackground RunProcessingMode = iota
 	// RunProcessingModeSync is used for requests sent by the Checkpointing API/Project Zero.
 	RunProcessingModeSync
+)
+
+// LeaseResourceKind specifies the resource associated with the capacity lease.
+//
+// For run scheduling, this is usually an event.
+// For queue constraints, this is one or more queue items.
+type LeaseResourceKind int
+
+const (
+	LeaseResourceUnknown LeaseResourceKind = iota
+	LeaseResourceEvent
+	LeaseResourceQueueItem
 )
 
 type LeaseLocation int

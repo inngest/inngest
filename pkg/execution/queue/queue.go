@@ -51,6 +51,11 @@ type EnqueueOpts struct {
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string
+	// IdempotencyPerioud allows customizing the idempotency period for this queue
+	// item.  For example, after a debounce queue has been consumed we want to remove
+	// the idempotency key immediately;  the same debounce key should become available
+	// for another debounced function run.
+	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
 }
 
 type Producer interface {

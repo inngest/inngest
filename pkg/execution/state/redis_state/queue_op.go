@@ -135,6 +135,10 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	if q.idempotencyTTLFunc != nil {
 		idempotency = q.idempotencyTTLFunc(ctx, i)
 	}
+	// If custom idempotency period is set on the queue item, use that
+	if i.IdempotencyPeriod != nil {
+		idempotency = *i.IdempotencyPeriod
+	}
 
 	args, err := StrSlice([]any{
 		i.ID,

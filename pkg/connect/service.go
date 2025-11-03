@@ -66,6 +66,7 @@ type connectGatewaySvc struct {
 	pb.ConnectGatewayServer
 
 	gatewayPublicPort int
+	grpcConfig        connectConfig.ConnectGRPCConfig
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
@@ -166,6 +167,12 @@ func WithGatewayPublicPort(port int) gatewayOpt {
 	}
 }
 
+func WithGRPCConfig(config connectConfig.ConnectGRPCConfig) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.grpcConfig = config
+	}
+}
+
 func WithApiBaseUrl(url string) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.apiBaseUrl = url
@@ -208,6 +215,11 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+		grpcConfig: connectConfig.NewGRPCConfig(
+			context.Background(),
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectGatewayGRPCPort,
+			grpc.DefaultConnectGRPCIP, grpc.DefaultConnectExecutorGRPCPort,
+		),
 
 		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
@@ -275,7 +287,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
-	c.ipAddress = connectConfig.Gateway(ctx).GRPCIP
+	c.ipAddress = c.grpcConfig.Gateway.IP
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -428,10 +440,8 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return err
 	})
 
-	connectConfig := connectConfig.Gateway(ctx)
-
 	eg.Go(func() error {
-		addr := fmt.Sprintf(":%d", connectConfig.GRPCPort)
+		addr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
 
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -550,7 +560,7 @@ func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uui
 	}
 	executorIP := ip.String()
 
-	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", c.grpcConfig.Executor.Port))
 
 	return c.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 }

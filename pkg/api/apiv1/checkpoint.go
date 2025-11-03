@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
@@ -174,6 +175,14 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		RunMode:     enums.RunModeSync,
 		Events:      []event.TrackedEvent{evt},
 		URL:         input.URL(),
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "api_checkpoint",
+			"status": executor.ScheduleStatus(err),
+		},
 	})
 
 	switch err {
@@ -368,6 +377,7 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 							meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 							meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
+							meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
 						),
 					),
 				},

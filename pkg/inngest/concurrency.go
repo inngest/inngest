@@ -144,7 +144,7 @@ func (c Concurrency) Evaluate(ctx context.Context, input map[string]any) string 
 	evaluated := ""
 	if c.Key != nil {
 		// The input data is always wrapped in an event variable, for event.data.foo
-		val, _, _ := expressions.Evaluate(ctx, *c.Key, map[string]any{"event": input})
+		val, _ := expressions.Evaluate(ctx, *c.Key, map[string]any{"event": input})
 		switch v := val.(type) {
 		case string:
 			evaluated = v

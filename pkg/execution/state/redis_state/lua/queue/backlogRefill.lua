@@ -85,6 +85,8 @@ local enableKeyQueues = tonumber(ARGV[16])
 
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
+local fallbackIdempotencyKey = ARGV[18]
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -259,8 +261,15 @@ if refill > 0 then
     local itemScore = tonumber(itemScores[i])
     local itemData = potentiallyMissingQueueItems[i]
 
+    -- If queue item does not exist in backlog, skip
+    local missingInBacklog = itemScore == nil
+
     -- If queue item does not exist in hash, delete from backlog
-    if itemData == false or itemData == nil or itemData == "" then
+    local missingInHash = itemData == false or itemData == nil or itemData == ""
+
+    if missingInBacklog then
+      -- no-op
+    elseif missingInHash then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
       hasRemove = true
     else

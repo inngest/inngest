@@ -66,7 +66,7 @@ type Evaluator interface {
 	//
 	// Attributes that are present within the expression but missing from the
 	// data should be treated as null values;  the expression must not error.
-	Evaluate(ctx context.Context, data *Data) (interface{}, *time.Time, error)
+	Evaluate(ctx context.Context, data *Data) (interface{}, error)
 
 	// UsedAttributes returns the attributes that are referenced within the
 	// expression.
@@ -85,7 +85,7 @@ type BooleanEvaluator interface {
 	//
 	// Attributes that are present within the expression but missing from the
 	// data should be treated as null values;  the expression must not error.
-	Evaluate(ctx context.Context, data *Data) (bool, *time.Time, error)
+	Evaluate(ctx context.Context, data *Data) (bool, error)
 
 	// UsedAttributes returns the attributes that are referenced within the
 	// expression.
@@ -102,25 +102,25 @@ func ExprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) 
 		return false, err
 	}
 	data := NewData(input)
-	ok, _, err := eval.Evaluate(ctx, data)
+	ok, err := eval.Evaluate(ctx, data)
 	return ok, err
 }
 
 // Evaluate is a helper function to create a new, cached expression evaluator to evaluate
 // the given data immediately.
-func Evaluate(ctx context.Context, expression string, input map[string]interface{}) (interface{}, *time.Time, error) {
+func Evaluate(ctx context.Context, expression string, input map[string]interface{}) (interface{}, error) {
 	eval, err := NewExpressionEvaluator(ctx, expression)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	data := NewData(input)
 	return eval.Evaluate(ctx, data)
 }
 
-func EvaluateBoolean(ctx context.Context, expression string, input map[string]interface{}) (bool, *time.Time, error) {
+func EvaluateBoolean(ctx context.Context, expression string, input map[string]interface{}) (bool, error) {
 	eval, err := NewBooleanEvaluator(ctx, expression)
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 	data := NewData(input)
 	return eval.Evaluate(ctx, data)
@@ -204,16 +204,16 @@ type booleanEvaluator struct {
 	Evaluator
 }
 
-func (b booleanEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *time.Time, error) {
-	val, time, err := b.Evaluator.Evaluate(ctx, data)
+func (b booleanEvaluator) Evaluate(ctx context.Context, data *Data) (bool, error) {
+	val, err := b.Evaluator.Evaluate(ctx, data)
 	if err != nil {
-		return false, time, err
+		return false, err
 	}
 	result, ok := val.(bool)
 	if !ok {
-		return false, nil, errors.Wrapf(ErrInvalidResult, "returned type %T (%s)", val, val)
+		return false, errors.Wrapf(ErrInvalidResult, "returned type %T (%s)", val, val)
 	}
-	return result, time, err
+	return result, err
 }
 
 type expressionEvaluator struct {
@@ -240,9 +240,9 @@ type expressionEvaluator struct {
 // Evaluate compiles an expression string against a set of variables, returning whether the
 // expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
 // compared), and any errors.
-func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interface{}, *time.Time, error) {
+func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interface{}, error) {
 	if data == nil {
-		return false, nil, nil
+		return false, nil
 	}
 
 	if len(e.liftedVars) > 0 {
@@ -255,7 +255,7 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 
 	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return eval(program, act)

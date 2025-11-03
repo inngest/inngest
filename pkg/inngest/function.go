@@ -471,7 +471,7 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 
-	val, _, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
+	val, err := expr.Evaluate(ctx, expressions.NewData(map[string]any{"event": event}))
 	if err != nil {
 		return 0, fmt.Errorf("Priority.Run expression errored: %s", err)
 	}

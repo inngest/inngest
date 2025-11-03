@@ -59,7 +59,7 @@ func (m *maintenanceApi) setup() {
 			}
 			w.WriteHeader(http.StatusTooEarly)
 		})
-		
+
 		r.Post("/activate", m.activateGateway)
 	})
 }
