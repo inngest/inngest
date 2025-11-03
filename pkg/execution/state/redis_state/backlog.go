@@ -36,7 +36,7 @@ var (
 // BacklogManager defines the interface for backlog operations
 type BacklogManager interface {
 	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error)
-	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error)
+	BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig, options ...backlogRefillOptionFn) (*BacklogRefillResult, error)
 	ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog
 	ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition
 }
@@ -603,8 +603,33 @@ type BacklogRefillResult struct {
 	RetryAt           time.Time
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, refillItems []string, latestConstraints PartitionConstraintConfig) (*BacklogRefillResult, error) {
+type backlogRefillOptions struct {
+	fallbackIdempotencyKey string
+}
+
+type backlogRefillOptionFn func(o *backlogRefillOptions)
+
+func WithBacklogRefillFallbackIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
+	return func(o *backlogRefillOptions) {
+		o.fallbackIdempotencyKey = idempotencyKey
+	}
+}
+
+func (q *queue) BacklogRefill(
+	ctx context.Context,
+	b *QueueBacklog,
+	sp *QueueShadowPartition,
+	refillUntil time.Time,
+	refillItems []string,
+	latestConstraints PartitionConstraintConfig,
+	options ...backlogRefillOptionFn,
+) (*BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
+
+	o := &backlogRefillOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
@@ -700,6 +725,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		kg.QueuePrefix(),
 		enableKeyQueuesVal,
 		shouldSpotCheckActiveSet,
+
+		// constraint API rollout
+		o.fallbackIdempotencyKey,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

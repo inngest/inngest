@@ -225,6 +225,28 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 	}
 }
 
+func LeaseResourceKindToProto(kind LeaseResourceKind) pb.ConstraintApiLeaseResourceKind {
+	switch kind {
+	case LeaseResourceEvent:
+		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT
+	case LeaseResourceQueueItem:
+		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM
+	default:
+		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED
+	}
+}
+
+func LeaseResourceKindFromProto(kind pb.ConstraintApiLeaseResourceKind) LeaseResourceKind {
+	switch kind {
+	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT:
+		return LeaseResourceEvent
+	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM:
+		return LeaseResourceQueueItem
+	default:
+		return LeaseResourceUnknown
+	}
+}
+
 func RateLimitConfigToProto(config RateLimitConfig) *pb.RateLimitConfig {
 	return &pb.RateLimitConfig{
 		Scope:             RateLimitScopeToProto(config.Scope),
@@ -517,8 +539,6 @@ func CapacityLeaseFromProto(pbLease *pb.CapacityLease) (CapacityLease, error) {
 	}, nil
 }
 
-
-
 func LeaseSourceToProto(source LeaseSource) *pb.LeaseSource {
 	return &pb.LeaseSource{
 		Service:           LeaseServiceToProto(source.Service),
@@ -646,19 +666,20 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 	}
 
 	return &pb.CapacityAcquireRequest{
-		IdempotencyKey:         req.IdempotencyKey,
-		AccountId:              req.AccountID.String(),
-		EnvId:                  req.EnvID.String(),
-		FunctionId:             req.FunctionID.String(),
-		Configuration:          ConstraintConfigToProto(req.Configuration),
-		Constraints:            constraints,
-		Amount:                 int32(req.Amount),
-		LeaseIdempotencyKeys:   req.LeaseIdempotencyKeys,
-		CurrentTime:            timestamppb.New(req.CurrentTime),
-		Duration:               durationpb.New(req.Duration),
-		MaximumLifetime:        durationpb.New(req.MaximumLifetime),
-		BlockingThreshold:      durationpb.New(req.BlockingThreshold),
-		Source:                 LeaseSourceToProto(req.Source),
+		IdempotencyKey:       req.IdempotencyKey,
+		AccountId:            req.AccountID.String(),
+		EnvId:                req.EnvID.String(),
+		FunctionId:           req.FunctionID.String(),
+		Configuration:        ConstraintConfigToProto(req.Configuration),
+		Constraints:          constraints,
+		Amount:               int32(req.Amount),
+		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
+		ResourceKind:         LeaseResourceKindToProto(req.ResourceKind),
+		CurrentTime:          timestamppb.New(req.CurrentTime),
+		Duration:             durationpb.New(req.Duration),
+		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
+		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
+		Source:               LeaseSourceToProto(req.Source),
 	}
 }
 
@@ -708,19 +729,20 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 	}
 
 	return &CapacityAcquireRequest{
-		IdempotencyKey:         pbReq.IdempotencyKey,
-		AccountID:              accountID,
-		EnvID:                  envID,
-		FunctionID:             functionID,
-		Configuration:          ConstraintConfigFromProto(pbReq.Configuration),
-		Constraints:            constraints,
-		Amount:                 int(pbReq.Amount),
-		LeaseIdempotencyKeys:   pbReq.LeaseIdempotencyKeys,
-		CurrentTime:            currentTime,
-		Duration:               duration,
-		MaximumLifetime:        maximumLifetime,
-		BlockingThreshold:      blockingThreshold,
-		Source:                 LeaseSourceFromProto(pbReq.Source),
+		IdempotencyKey:       pbReq.IdempotencyKey,
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           functionID,
+		Configuration:        ConstraintConfigFromProto(pbReq.Configuration),
+		Constraints:          constraints,
+		Amount:               int(pbReq.Amount),
+		LeaseIdempotencyKeys: pbReq.LeaseIdempotencyKeys,
+		ResourceKind:         LeaseResourceKindFromProto(pbReq.ResourceKind),
+		CurrentTime:          currentTime,
+		Duration:             duration,
+		MaximumLifetime:      maximumLifetime,
+		BlockingThreshold:    blockingThreshold,
+		Source:               LeaseSourceFromProto(pbReq.Source),
 	}, nil
 }
 
