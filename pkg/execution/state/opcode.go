@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngest/pkg/util/interval"
@@ -53,8 +54,7 @@ type GeneratorOpcode struct {
 	Metadata GeneratorMetadata `json:"metadata,omitempty"`
 }
 
-// FIXME: real type here
-type GeneratorMetadata = map[string]map[string]json.RawMessage
+type GeneratorMetadata = map[meta.MetadataKind]meta.RawMetadata
 
 func (g GeneratorOpcode) Validate() error {
 	if input, _ := g.Input(); input != "" && len(input) > consts.MaxStepInputSize {

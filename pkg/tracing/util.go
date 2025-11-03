@@ -21,42 +21,28 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type RawMetadata = map[string]json.RawMessage
-type Metadata = map[string]any
-type MetadataOp string
-
-func RawMetadataAttrs(category string, metadata RawMetadata, op MetadataOp) *meta.SerializableAttrs {
+func RawMetadataAttrs(kind meta.MetadataKind, metadata meta.RawMetadata, op meta.MetadataOp) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &category)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
 	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &metadata)
-	opStr := string(op)
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &opStr)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &op)
 
 	return rawAttrs
 }
 
-func MetadataAttrs(kind string, metadata any, op MetadataOp) (*meta.SerializableAttrs, error) {
+func MetadataAttrs(metadata meta.StructuredMetadata, op meta.MetadataOp) (*meta.SerializableAttrs, error) {
 	rawAttrs := meta.NewAttrSet()
 
+	kind := metadata.Kind()
 	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
 
-	data, err := json.Marshal(metadata)
+	rawMetadata, err := metadata.Serialize()
 	if err != nil {
 		return nil, err
 	}
 
-	var rawMetadata RawMetadata
-	err = json.Unmarshal(data, &rawMetadata)
-	if err != nil {
-		return nil, err
-	}
-
-	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &rawMetadata)
-	opStr := string(op)
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &opStr)
-
-	return rawAttrs, nil
+	return RawMetadataAttrs(kind, rawMetadata, op), nil
 }
 
 func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {

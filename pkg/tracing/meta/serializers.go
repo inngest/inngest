@@ -213,6 +213,23 @@ func StringAttr(key string) attr[*string] {
 	}
 }
 
+func StringishAttr[T ~string](key string) attr[*T] {
+	return attr[*T]{
+		key: withPrefix(key),
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			return attribute.String(withPrefix(key), string(*v))
+		},
+		deserialize: func(v any) (*T, bool) {
+			s, ok := v.(T)
+			return &s, ok
+		},
+	}
+}
+
 func StringSliceAttr(key string) attr[*[]string] {
 	return attr[*[]string]{
 		key: withPrefix(key),

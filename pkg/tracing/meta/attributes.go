@@ -1,7 +1,6 @@
 package meta
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -131,9 +130,9 @@ var Attrs = struct {
 	AIRequestMetadata  attr[*aigateway.ParsedInferenceRequest]
 	AIResponseMetadata attr[*aigateway.ParsedInferenceResponse]
 
-	Metadata     attr[*map[string]json.RawMessage]
-	MetadataKind attr[*string]
-	MetadataOp   attr[*string]
+	Metadata     attr[*RawMetadata]
+	MetadataKind attr[*MetadataKind]
+	MetadataOp   attr[*MetadataOp]
 }{
 	internalError: StringAttr("internal.error"),
 
@@ -201,7 +200,7 @@ var Attrs = struct {
 	DebugSessionID:                     ULIDAttr("debug.session.id"),
 	DebugRunID:                         ULIDAttr("debug.run.id"),
 
-	Metadata:     JsonAttr[map[string]json.RawMessage]("metadata"),
-	MetadataKind: StringAttr("metadata.category"),
-	MetadataOp:   StringAttr("metadata.op"),
+	Metadata:     JsonAttr[RawMetadata]("metadata"),
+	MetadataKind: StringishAttr[MetadataKind]("metadata.category"),
+	MetadataOp:   StringishAttr[MetadataOp]("metadata.op"),
 }

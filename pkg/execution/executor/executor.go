@@ -1447,12 +1447,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 
 		for _, opcode := range resp.Generator {
-			opcode.Metadata = map[string]map[string]json.RawMessage{
-				"user": {
-					"foo": []byte(`"bar"`),
-				},
-			}
-
 			for kind, metadata := range opcode.Metadata {
 				_, err = e.tracerProvider.CreateSpan(
 					ctx,
@@ -3404,8 +3398,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
 		} else {
 			// TODO: name kind properly
-			kind := "inngest.ai.input"
-			attrs, err := tracing.MetadataAttrs(kind, parsed, "merge")
+			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.input", parsed), "merge")
 			if err != nil {
 				e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
@@ -3448,8 +3441,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
 		} else {
 			// TODO: name kind properly
-			kind := "inngest.ai.output"
-			attrs, err := tracing.MetadataAttrs(kind, parsed, "merge")
+			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.output", parsed), "merge")
 			if err != nil {
 				e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
