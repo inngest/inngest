@@ -8,7 +8,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngestgo/internal/checkpoint"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/xhit/go-str2duration/v2"
 )
 
