@@ -28,7 +28,7 @@ type MetadataOp string
 func RawMetadataAttrs(category string, metadata RawMetadata, op MetadataOp) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataCategory, &category)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &category)
 	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &metadata)
 	opStr := string(op)
 	meta.AddAttr(rawAttrs, meta.Attrs.MetadataOp, &opStr)
@@ -36,10 +36,10 @@ func RawMetadataAttrs(category string, metadata RawMetadata, op MetadataOp) *met
 	return rawAttrs
 }
 
-func MetadataAttrs(category string, metadata any, op MetadataOp) (*meta.SerializableAttrs, error) {
+func MetadataAttrs(kind string, metadata any, op MetadataOp) (*meta.SerializableAttrs, error) {
 	rawAttrs := meta.NewAttrSet()
 
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataCategory, &category)
+	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
 
 	data, err := json.Marshal(metadata)
 	if err != nil {

@@ -131,9 +131,9 @@ var Attrs = struct {
 	AIRequestMetadata  attr[*aigateway.ParsedInferenceRequest]
 	AIResponseMetadata attr[*aigateway.ParsedInferenceResponse]
 
-	Metadata         attr[*map[string]json.RawMessage]
-	MetadataCategory attr[*string]
-	MetadataOp       attr[*string]
+	Metadata     attr[*map[string]json.RawMessage]
+	MetadataKind attr[*string]
+	MetadataOp   attr[*string]
 }{
 	internalError: StringAttr("internal.error"),
 
@@ -201,7 +201,7 @@ var Attrs = struct {
 	DebugSessionID:                     ULIDAttr("debug.session.id"),
 	DebugRunID:                         ULIDAttr("debug.run.id"),
 
-	Metadata:         JsonAttr[map[string]json.RawMessage]("metadata"),
-	MetadataCategory: StringAttr("metadata.category"),
-	MetadataOp:       StringAttr("metadata.op"),
+	Metadata:     JsonAttr[map[string]json.RawMessage]("metadata"),
+	MetadataKind: StringAttr("metadata.category"),
+	MetadataOp:   StringAttr("metadata.op"),
 }
