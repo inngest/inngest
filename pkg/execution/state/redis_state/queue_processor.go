@@ -850,22 +850,7 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
-	if p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil {
-		// If Constraint API should be used, check constraints before leasing partition
-		useAPI, _ := q.useConstraintAPI(ctx, p.AccountID)
-		if useAPI {
-			res, _, err := q.capacityManager.Check(ctx, &constraintapi.CapacityCheckRequest{
-				AccountID: p.AccountID,
-				// TODO: Supply constraint items
-			})
-			if err != nil {
-				return fmt.Errorf("could not check capacity: %w", err)
-			}
-
-			// TODO: Check capacity
-			_ = res
-		}
-	}
+	disableLeaseChecks := p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
@@ -880,7 +865,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
 	_, err := duration(ctx, q.primaryQueueShard.Name, "partition_lease", q.clock.Now(), func(ctx context.Context) (int, error) {
-		l, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration)
+		l, capacity, err := q.PartitionLease(ctx, p, PartitionLeaseDuration, PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks))
 		p.LeaseID = l
 		return capacity, err
 	})
@@ -1795,18 +1780,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	partition := p.queue.ItemShadowPartition(ctx, *item)
 	constraints := p.queue.partitionConstraintConfigGetter(ctx, partition.Identifier())
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, constraints, item, p.staticTime)
+	leaseOptions := []leaseOptionFn{
+		LeaseBacklog(backlog),
+		LeaseShadowPartition(partition),
+		LeaseConstraints(constraints),
+	}
+
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, &backlog, constraints, item, p.staticTime)
 	if err != nil {
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})
 
 		return fmt.Errorf("could not check constraints to lease item: %w", err)
-	}
-
-	leaseOptions := []leaseOptionFn{
-		LeaseBacklog(backlog),
-		LeaseShadowPartition(partition),
-		LeaseConstraints(constraints),
 	}
 
 	if constraintRes.fallbackIdempotencyKey != "" {

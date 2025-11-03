@@ -2432,12 +2432,34 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
 }
 
+type partitionLeaseOptions struct {
+	disableLeaseChecks bool
+}
+
+type partitionLeaseOpt func(o *partitionLeaseOptions)
+
+func PartitionLeaseOptionDisableLeaseChecks(disableLeaseChecks bool) partitionLeaseOpt {
+	return func(o *partitionLeaseOptions) {
+		o.disableLeaseChecks = disableLeaseChecks
+	}
+}
+
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.
 //
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
-func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error) {
+func (q *queue) PartitionLease(
+	ctx context.Context,
+	p *QueuePartition,
+	duration time.Duration,
+	options ...partitionLeaseOpt,
+) (*ulid.ULID, int, error) {
+	o := &partitionLeaseOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionLease"), redis_telemetry.ScopeQueue)
 
 	shard := q.primaryQueueShard
@@ -2472,6 +2494,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	disableLeaseChecks := p.IsSystem() && q.disableLeaseChecksForSystemQueues
 	if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
 		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
+	}
+	if o.disableLeaseChecks {
+		disableLeaseChecks = o.disableLeaseChecks
 	}
 
 	disableLeaseChecksVal := "0"

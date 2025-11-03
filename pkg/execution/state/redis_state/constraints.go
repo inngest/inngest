@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -98,7 +99,6 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	// TODO: Extract this
 	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
 	if !useAPI {
 		return &backlogRefillConstraintCheckResult{
@@ -113,17 +113,15 @@ func (q *queue) backlogRefillConstraintCheck(
 	idempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID:      *shadowPart.AccountID,
-		EnvID:          *shadowPart.EnvID,
-		IdempotencyKey: idempotencyKey,
-		FunctionID:     *shadowPart.FunctionID,
-		CurrentTime:    now,
-		Duration:       QueueLeaseDuration,
-		ResourceKind:   constraintapi.LeaseResourceQueueItem,
-		// TODO: Build config
-		Configuration: constraintapi.ConstraintConfig{},
-		// TODO: Supply capacity
-		Constraints:          []constraintapi.ConstraintItem{},
+		AccountID:            *shadowPart.AccountID,
+		EnvID:                *shadowPart.EnvID,
+		IdempotencyKey:       idempotencyKey,
+		FunctionID:           *shadowPart.FunctionID,
+		CurrentTime:          now,
+		Duration:             QueueLeaseDuration,
+		ResourceKind:         constraintapi.LeaseResourceQueueItem,
+		Configuration:        constraintConfigFromConstraints(constraints),
+		Constraints:          constraintItemsFromBacklog(backlog),
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
 		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
@@ -188,10 +186,13 @@ type itemLeaseConstraintCheckResult struct {
 func (q *queue) itemLeaseConstraintCheck(
 	ctx context.Context,
 	partition QueuePartition,
+	backlog *QueueBacklog,
 	constraints PartitionConstraintConfig,
 	item *osqueue.QueueItem,
 	now time.Time,
 ) (*itemLeaseConstraintCheckResult, error) {
+	l := logger.StdlibLogger(ctx)
+
 	if partition.AccountID == uuid.Nil ||
 		partition.EnvID == nil ||
 		partition.FunctionID == nil {
@@ -231,12 +232,10 @@ func (q *queue) itemLeaseConstraintCheck(
 		FunctionID:           *partition.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
-		// TODO: Build config
-		Configuration: constraintapi.ConstraintConfig{},
-		// TODO: Supply constraints
-		Constraints:     []constraintapi.ConstraintItem{},
-		Amount:          1,
-		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
+		Configuration:        constraintConfigFromConstraints(constraints),
+		Constraints:          constraintItemsFromBacklog(backlog),
+		Amount:               1,
+		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.LeaseLocationItemLease,
@@ -244,6 +243,8 @@ func (q *queue) itemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
+		l.Error("could not acquire capacity lease", "err", err)
+
 		if !fallback {
 			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
@@ -272,4 +273,89 @@ func (q *queue) itemLeaseConstraintCheck(
 		leaseID:              &capacityLeaseID,
 		skipConstraintChecks: true,
 	}, nil
+}
+
+func constraintConfigFromConstraints(
+	constraints PartitionConstraintConfig,
+) constraintapi.ConstraintConfig {
+	config := constraintapi.ConstraintConfig{
+		FunctionVersion: constraints.FunctionVersion,
+		Concurrency: constraintapi.ConcurrencyConfig{
+			AccountConcurrency:     constraints.Concurrency.AccountConcurrency,
+			FunctionConcurrency:    constraints.Concurrency.FunctionConcurrency,
+			AccountRunConcurrency:  constraints.Concurrency.AccountRunConcurrency,
+			FunctionRunConcurrency: constraints.Concurrency.FunctionRunConcurrency,
+		},
+	}
+
+	if len(constraints.Concurrency.CustomConcurrencyKeys) > 0 {
+		constraints.Concurrency.CustomConcurrencyKeys = make([]CustomConcurrencyLimit, len(constraints.Concurrency.CustomConcurrencyKeys))
+
+		for i, ccl := range constraints.Concurrency.CustomConcurrencyKeys {
+			config.Concurrency.CustomConcurrencyKeys[i] = constraintapi.CustomConcurrencyLimit{
+				Mode:              ccl.Mode,
+				Scope:             ccl.Scope,
+				Limit:             ccl.Limit,
+				KeyExpressionHash: ccl.HashedKeyExpression,
+			}
+		}
+	}
+
+	if constraints.Throttle != nil {
+		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
+			Limit:                     constraints.Throttle.Limit,
+			Burst:                     constraints.Throttle.Burst,
+			Period:                    constraints.Throttle.Period,
+			ThrottleKeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
+		})
+	}
+
+	return config
+}
+
+func constraintItemsFromBacklog(backlog *QueueBacklog) []constraintapi.ConstraintItem {
+	constraints := []constraintapi.ConstraintItem{
+		// Account concurrency (always set)
+		{
+			Kind: constraintapi.ConstraintKindConcurrency,
+			Concurrency: &constraintapi.ConcurrencyConstraint{
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeAccount,
+			},
+		},
+		// Function concurrency (always set - falls back to account concurrency)
+		{
+			Kind: constraintapi.ConstraintKindConcurrency,
+			Concurrency: &constraintapi.ConcurrencyConstraint{
+				Mode:  enums.ConcurrencyModeStep,
+				Scope: enums.ConcurrencyScopeFn,
+			},
+		},
+	}
+
+	if backlog.Throttle != nil {
+		constraints = append(constraints, constraintapi.ConstraintItem{
+			Kind: constraintapi.ConstraintKindThrottle,
+			Throttle: &constraintapi.ThrottleConstraint{
+				KeyExpressionHash: backlog.Throttle.ThrottleKeyExpressionHash,
+				EvaluatedKeyHash:  backlog.Throttle.ThrottleKey,
+			},
+		})
+	}
+
+	if len(backlog.ConcurrencyKeys) > 0 {
+		for _, bck := range backlog.ConcurrencyKeys {
+			constraints = append(constraints, constraintapi.ConstraintItem{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Mode:              bck.ConcurrencyMode,
+					Scope:             bck.Scope,
+					KeyExpressionHash: bck.HashedKeyExpression,
+					EvaluatedKeyHash:  bck.HashedValue,
+				},
+			})
+		}
+	}
+
+	return constraints
 }
