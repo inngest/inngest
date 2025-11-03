@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from 'urql';
 
+import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
@@ -26,14 +27,16 @@ export default function InsightsPage() {
   return (
     <StoredQueriesProvider tabManagerActions={actions}>
       <TabManagerProvider actions={actions}>
-        <div className="flex h-full w-full flex-1 overflow-hidden">
-          {isQueryHelperPanelVisible && (
-            <div className="w-[240px] flex-shrink-0">
-              <QueryHelperPanel activeSavedQueryId={activeSavedQueryId} />
-            </div>
-          )}
-          <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
-        </div>
+        <SchemasProvider>
+          <div className="flex h-full w-full flex-1 overflow-hidden">
+            {isQueryHelperPanelVisible && (
+              <div className="w-[240px] flex-shrink-0">
+                <QueryHelperPanel activeSavedQueryId={activeSavedQueryId} />
+              </div>
+            )}
+            <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+          </div>
+        </SchemasProvider>
       </TabManagerProvider>
     </StoredQueriesProvider>
   );
