@@ -649,7 +649,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func (e *executor) schedule(
 	ctx context.Context,
 	req execution.ScheduleRequest,
+	// performChecks determines whether constraint checks must be performed
+	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
+	// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
+	// failed (and we don't know if it succeeded on the API)
 	fallbackIdempotencyKey string,
 ) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {

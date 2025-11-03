@@ -29,7 +29,15 @@ func WithConstraints[T any](
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
-	fn func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (T, error),
+	fn func(
+		ctx context.Context,
+		// performChecks determines whether constraint checks must be performed
+		// This may be false when the Constraint API was used to enforce constraints.
+		performChecks bool,
+		// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
+		// failed (and we don't know if it succeeded on the API)
+		fallbackIdempotencyKey string,
+	) (T, error),
 ) (T, error) {
 	l := logger.StdlibLogger(ctx)
 
