@@ -178,12 +178,14 @@ func TestConsumePause(t *testing.T) {
 
 func createTestPauses(count int) []*state.Pause {
 	pauses := make([]*state.Pause, count)
+	baseTime := time.Now()
 	for i := 0; i < count; i++ {
 		eventName := "test.event"
 		pauses[i] = &state.Pause{
 			ID:          uuid.New(),
 			WorkspaceID: uuid.New(),
 			Event:       &eventName,
+			CreatedAt:   baseTime.Add(time.Duration(i) * time.Second),
 		}
 	}
 	return pauses
