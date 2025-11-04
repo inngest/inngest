@@ -1,7 +1,7 @@
 import type { TransformCase } from '../types';
 
 export const UNKNOWN_VALUE_CASE: TransformCase = {
-  name: 'should mark scalars without type as unknown',
+  name: 'should mark schemas without type as unknown',
   schema: {
     title: 'mystery',
   },
