@@ -88,3 +88,9 @@ func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
 func (r redisAdapter) BufferLen(ctx context.Context, i Index) (int64, error) {
 	return r.rsm.PauseLen(ctx, i.WorkspaceID, i.EventName)
 }
+
+// PausesSinceWithCreatedAt loads up to limit pauses for a given index since a given time,
+// ordered by creation time, with createdAt populated from Redis sorted set scores.
+func (r redisAdapter) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	return r.rsm.PausesByEventSinceWithCreatedAt(ctx, index.WorkspaceID, index.EventName, since, limit)
+}

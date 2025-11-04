@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -447,6 +448,170 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 	// Clean up
 	_, err = mgr.Delete(ctx, createdState.Identifier())
 	require.NoError(t, err)
+}
+
+func TestPauseCreatedAt(t *testing.T) {
+	// Setup miniredis
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	mgr, err := New(
+		context.Background(),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	workspaceID := uuid.New()
+	eventName := "test.event"
+	pauseID := uuid.New()
+	runID := ulid.Make()
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			FunctionID: uuid.New(),
+			AccountID:  uuid.New(),
+		},
+		Event:   &eventName,
+		Expires: state.Time(time.Now().Add(time.Hour)),
+	}
+
+	_, err = mgr.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	createdAt, err := mgr.PauseCreatedAt(ctx, workspaceID, eventName, pauseID)
+	require.NoError(t, err)
+	require.False(t, createdAt.IsZero(), "created at timestamp should not be zero")
+
+	// The timestamp should be reasonably recent (within the last minute)
+	require.True(t, time.Since(createdAt) < time.Minute, "timestamp should be recent")
+
+	// Test with non-existent pause
+	nonExistentPauseID := uuid.New()
+	_, err = mgr.PauseCreatedAt(ctx, workspaceID, eventName, nonExistentPauseID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "pause timestamp not found")
+
+	// Clean up
+	r.FlushAll()
+}
+
+func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	mgr, err := New(
+		context.Background(),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	workspaceID := uuid.New()
+	eventName := "test.event"
+
+	baseTime := time.Now().Add(-time.Hour)
+	
+	for range 15 {
+		pause := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: workspaceID,
+			Identifier: state.PauseIdentifier{
+				RunID:      ulid.Make(),
+				FunctionID: uuid.New(),
+				AccountID:  uuid.New(),
+			},
+			Event:   &eventName,
+			Expires: state.Time(time.Now().Add(time.Hour)),
+		}
+		
+		time.Sleep(10 * time.Millisecond)
+		_, err = mgr.SavePause(ctx, pause)
+		require.NoError(t, err)
+	}
+
+	t.Run("returns pause iterator", func(t *testing.T) {
+		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
+		require.NoError(t, err)
+		require.NotNil(t, iter)
+
+		count := 0
+		for iter.Next(ctx) {
+			pause := iter.Val(ctx)
+			require.NotNil(t, pause)
+			count++
+		}
+		require.Equal(t, 15, count)
+	})
+
+	t.Run("pauses have CreatedAt populated", func(t *testing.T) {
+		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 1000)
+		require.NoError(t, err)
+
+		for iter.Next(ctx) {
+			pause := iter.Val(ctx)
+			require.NotNil(t, pause)
+			require.False(t, pause.CreatedAt.IsZero())
+			require.True(t, pause.CreatedAt.After(baseTime))
+		}
+	})
+
+	t.Run("respects limit parameter", func(t *testing.T) {
+		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, baseTime, 5)
+		require.NoError(t, err)
+
+		count := 0
+		for iter.Next(ctx) {
+			pause := iter.Val(ctx)
+			require.NotNil(t, pause)
+			count++
+		}
+		require.Equal(t, 5, count)
+	})
+
+	t.Run("since time is inclusive", func(t *testing.T) {
+		midTime := time.Now().Add(-30 * time.Minute)
+		
+		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, midTime, 1000)
+		require.NoError(t, err)
+
+		count := 0
+		for iter.Next(ctx) {
+			pause := iter.Val(ctx)
+			require.NotNil(t, pause)
+			require.True(t, pause.CreatedAt.After(midTime) || pause.CreatedAt.Equal(midTime))
+			count++
+		}
+		require.Greater(t, count, 0)
+	})
+
+	r.FlushAll()
 }
 
 func BenchmarkNew(b *testing.B) {

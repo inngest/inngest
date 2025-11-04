@@ -34,6 +34,12 @@ const (
 	// DefaultCompactionSample gives us a 10% chance of running compactions after
 	// a delete.
 	DefaultCompactionSample = 0.1
+
+	// DefaultFetchMargin provides a safety buffer when pre-fetching pause IDs.
+	// Used with the block size to ensure enough ordered results are returned,
+	// even if some pauses were deleted in the meantime as we can’t rely on
+	// an unordered scan for flushing blocks.
+	DefaultFetchMargin = DefaultPausesPerBlock / 4
 )
 
 // Block represents a block of pauses.
@@ -59,6 +65,8 @@ type BlockstoreOpts struct {
 	Leaser BlockLeaser
 	// BlockSize is the number of pauses to store in a single block.
 	BlockSize int
+	// FetchMargin is the number of additional pauses to pre-fetch ids for when block flushing.
+	FetchMargin int
 	// CompactionLimit is the total number of pauses that should trigger a compaction.
 	// Note that this doesnt always trigger a compaction;
 	CompactionLimit int
@@ -96,10 +104,14 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	if opts.CompactionSample == 0 {
 		opts.CompactionSample = DefaultCompactionSample
 	}
+	if opts.FetchMargin == 0 {
+		opts.FetchMargin = DefaultFetchMargin
+	}
 
 	return &blockstore{
 		rc:               opts.RC,
 		blocksize:        opts.BlockSize,
+		fetchMargin:      opts.FetchMargin,
 		compactionLimit:  opts.CompactionLimit,
 		compactionSample: opts.CompactionSample,
 		buf:              opts.Bufferer,
@@ -112,6 +124,9 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 type blockstore struct {
 	// size is the size of blocks when writing
 	blocksize int
+
+	// fetchMargin is the number of additional pauses to pre-fetch ids for when block flushing.
+	fetchMargin int
 
 	// compactionLimit is the number of pauses that have to be deleted from
 	// a block to compact it.  This prevents us from rewriting pauses on every
@@ -191,11 +206,15 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// buffer flushes that may not have had corresponding deletes (as deletes)
 	// happen in goroutines best-effort.
 	var since time.Time
-	if lastBlock, err := b.LastBlockMetadata(ctx, index); err == nil {
+	lastBlock, err := b.LastBlockMetadata(ctx, index)
+	if err == nil && lastBlock != nil {
 		since = lastBlock.LastTimestamp()
 	}
 
-	iter, err := b.buf.PausesSince(ctx, index, since)
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "since", since.UnixMilli())
+	l.Debug("flushing block index")
+
+	iter, err := b.buf.PausesSinceWithCreatedAt(ctx, index, since, int64(b.blocksize+b.fetchMargin))
 	if err != nil {
 		return fmt.Errorf("failed to load pauses from buffer: %w", err)
 	}
@@ -206,9 +225,28 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	}
 
 	n := 0
+	deleted := 0
 	for iter.Next(ctx) {
 		item := iter.Val(ctx)
 		if item == nil {
+			deleted = deleted + 1
+			continue
+		}
+
+		if item.CreatedAt.IsZero() {
+			// Old pauses don't have the time embedded in the pause item but the iterator should have
+			// injected it from the pause index when prefetching IDs/scores.
+
+			// We cannot allow this because we lose the creation timestamp as soon as the pause
+			// is deleted after block flushing.
+			l.ReportError(
+				errors.New("pause without creation time"),
+				"encountered pause without creation time when flushing, this should never happen",
+				logger.WithErrorReportTags(map[string]string{
+					"pause_id":     item.ID.String(),
+					"workspace_id": item.WorkspaceID.String(),
+				}),
+			)
 			continue
 		}
 
@@ -221,19 +259,46 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		}
 	}
 
-	if iter.Error() != nil {
+	// A cancelled context in iterator while the parent is still
+	// not done just means that we are done scanning...
+	if iter.Error() != nil && iter.Error() != context.Canceled && ctx.Err() == nil {
 		return fmt.Errorf("error iterating over buffered pauses: %w", iter.Error())
 	}
 
 	// Trim any pauses that are nil.
 	block.Pauses = block.Pauses[:n]
 
-	if n < b.blocksize || SkipFlushing(index, block.Pauses) {
-		// We didn't find enough non-nil pauses to fill the block.  Log a warning
-		// and return.  This shouldn't happen, as we shouldn't return nil pauses
-		// from iterators often;  this only happens in a race where the iterator
-		// has pauses in-memory which are then deleted while iterating, leading to
-		// a race condition.
+	skipFlush := SkipFlushing(index, block.Pauses)
+	if n < b.blocksize || skipFlush {
+		var cause string
+
+		if skipFlush {
+			cause = "skipped"
+		} else if iter.Count() < b.blocksize {
+			// Pauses in buffer were deleted in the timeframe of enqueuing the flush job
+			// and starting it
+			cause = "pauses_deleted_normal"
+
+		} else if deleted >= b.fetchMargin {
+			// We didn't find enough non-nil pauses to fill the block.  Log a warning
+			// and return.  This shouldn't happen, as we shouldn't return nil pauses
+			// from iterators often;  this only happens in a race where the iterator
+			// has pauses in-memory which are then deleted while iterating, leading to
+			// a race condition. We do have fetchMargin that we additionnaly prefetch
+			// which should help but not in all cases.
+			cause = "pauses_deleted_race"
+		} else {
+			// XXX: Temporary situation until full rollout:
+			// This can also occur during the gradual rollout of the feature when pauses are not
+			// deleted from the buffer after being flushed to a block. The buffer stays near the
+			// threshold and keeps triggering flush jobs, but we still can’t find enough new pauses
+			// since the last block.
+			cause = "rollout"
+		}
+
+		metrics.IncrPausesBlockFlushExpectedFail(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"cause": cause}})
+		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses), "cause", cause)
+
 		return nil
 	}
 
@@ -268,6 +333,10 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// NOTE: This can happen in the background as we pick flushing up from the
 	// last block written.
 	go func() {
+		// Otherwise the job will end and we won't be able to finish deleting
+		ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+		defer cancel()
+
 		if b.deleteAfterFlush(ctx, index.WorkspaceID) {
 			start := time.Now()
 			var deleted int64
@@ -280,6 +349,9 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
+
+			l.Debug("deleted pauses after flush", "len", deleted)
+
 			metrics.HistogramPauseDeleteLatencyAfterBlockFlush(ctx, time.Since(start), metrics.HistogramOpt{
 				PkgName: pkgName,
 				Tags:    map[string]any{},
@@ -294,6 +366,8 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		// XXX: We should add an N% chance of loading all pauses from 0 -> wm.Epoch
 		// in case any deletions in a previous flush failed.
 	}()
+
+	l.Debug("flushed block index", "duration", time.Since(start).Milliseconds(), "len", len(block.Pauses), "block_key", key)
 
 	metrics.HistogramPauseBlockFlushLatency(ctx, time.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
@@ -347,6 +421,7 @@ func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Tim
 
 func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error) {
 	key := b.BlockKey(index, blockID)
+	logger.StdlibLogger(ctx).Debug("reading block", "block_key", key)
 	byt, err := b.bucket.ReadAll(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading block from index '%s': id '%s': %w", index, blockID, err)
@@ -360,12 +435,16 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// Check which blocks this pause exists in, then delete from the block index.
-	ts, err := b.buf.PauseTimestamp(ctx, index, pause)
-	if err != nil {
-		return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
+	var err error
+	ts := pause.CreatedAt
+	if ts.IsZero() {
+		ts, err = b.buf.PauseTimestamp(ctx, index, pause)
+		if err != nil || ts.IsZero() {
+			return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
+		}
 	}
 
+	// Check if atleast one block may contain the pause.
 	blockID, err := b.blockIDForTimestamp(ctx, index, ts)
 	if err != nil {
 		return fmt.Errorf("error fetching block for timestamp: %w", err)
@@ -419,14 +498,21 @@ func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*block
 		Limit(0, 1).
 		Build()
 
-	id, err := b.rc.Do(ctx, cmd).ToString()
-	if rueidis.IsRedisNil(err) {
-		// Doesn't exist.
-		return nil, nil
-	}
+	ids, err := b.rc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// Doesn't exist.
+			return nil, nil
+		}
 		return nil, fmt.Errorf("error looking up last block metadata write: %w", err)
 	}
+
+	if len(ids) == 0 {
+		// No blocks exist for this index.
+		return nil, nil
+	}
+
+	id := ids[0]
 
 	cmd = b.rc.B().Hget().Key(blockMetadataKey(index)).Field(id).Build()
 
@@ -461,7 +547,7 @@ func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time
 	score := strconv.Itoa(int(ts.UnixMilli()))
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min("("+score).Max("+inf").Byscore().Limit(0, 1).Build(),
+		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 1).Build(),
 	).AsStrSlice()
 	if len(ids) == 1 {
 		id, err := ulid.Parse(ids[0])
@@ -473,16 +559,18 @@ func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time
 	return nil, err
 }
 
-// blockMetadata loads metadata for the givne block.  It reads timestamps for the first and last
-// pauses (as these aren't embedded in the pause) to create the correct start and end timestamps.
+// blockMetadata creates metadata for the given block. It expects all pauses
+// to include valid creation timestamps and uses them to determine the block’s
+// start and end times.
 func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block) (*blockMetadata, error) {
-	earliest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[0])
-	if err != nil {
-		return nil, fmt.Errorf("error fetching earliest pause time: %w", err)
+	earliest := block.Pauses[0].CreatedAt
+	if earliest.IsZero() {
+		return nil, errors.New("block earliest boundary is not set")
 	}
-	latest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[len(block.Pauses)-1])
-	if err != nil {
-		return nil, fmt.Errorf("error fetching latest pause time: %w", err)
+
+	latest := block.Pauses[len(block.Pauses)-1].CreatedAt
+	if latest.IsZero() {
+		return nil, errors.New("block latest boundary is not set")
 	}
 
 	if earliest.Equal(latest) {
