@@ -10,8 +10,11 @@ export type ObjectRowProps = { node: ObjectNode };
 
 export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
+
   const open = isExpanded(node.path);
   const hasChildren = node.children.length > 0;
+  const keyCount = node.children.length;
+  const keysLabel = keyCount === 1 ? '1 key' : `${keyCount} keys`;
 
   return (
     <div className="flex flex-col gap-1">
@@ -25,7 +28,12 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
           <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />
         )}
         <div className="-ml-0.5">
-          <ValueRow boldName={open} node={makeFauxValueNode(node)} typeLabelOverride={'{}'} />
+          <ValueRow
+            boldName={open}
+            node={makeFauxValueNode(node)}
+            typeLabelOverride={''}
+            typePillOverride={hasChildren ? keysLabel : 'object'}
+          />
         </div>
       </div>
       {open && (
