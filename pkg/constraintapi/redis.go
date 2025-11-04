@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
@@ -12,6 +13,9 @@ import (
 type redisCapacityManager struct {
 	client rueidis.Client
 	clock  clockwork.Clock
+
+	rateLimitKeyPrefix  string
+	queueStateKeyPrefix string
 }
 
 type redisCapacityManagerOption func(m *redisCapacityManager)
@@ -25,6 +29,18 @@ func WithClient(client rueidis.Client) redisCapacityManagerOption {
 func WithClock(clock clockwork.Clock) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.clock = clock
+	}
+}
+
+func WithRateLimitKeyPrefix(prefix string) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.rateLimitKeyPrefix = prefix
+	}
+}
+
+func WithQueueStateKeyPrefix(prefix string) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.queueStateKeyPrefix = prefix
 	}
 }
 
@@ -48,9 +64,54 @@ func NewRedisCapacityManager(
 	return manager, nil
 }
 
+func (r *redisCapacityManager) leasesHash(prefix string, accountID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:%s:leases", prefix, accountID)
+}
+
+// keyPrefix returns the Lua key prefix for the first stage of the Constraint API.
+//
+// Since we are colocating lease data with the existing state, we will have to use the
+// same Redis hash tag to avoid Lua errors and inconsistencies on the old and new scripts.
+//
+// This is essentially required for backward- and forward-compatibility.
+func (r *redisCapacityManager) keyPrefix(
+	constraints []ConstraintItem,
+) (string, error) {
+	var hasRateLimit bool
+	var hasQueueConstraint bool
+
+	for _, ci := range constraints {
+		switch ci.Kind {
+		case ConstraintKindConcurrency, ConstraintKindThrottle:
+			hasQueueConstraint = true
+		case ConstraintKindRateLimit:
+			hasRateLimit = true
+		default:
+
+		}
+	}
+
+	if hasRateLimit && hasQueueConstraint {
+		return "", fmt.Errorf("mixed constraints are not allowed during the first stage")
+	}
+
+	if hasRateLimit {
+		return r.rateLimitKeyPrefix, nil
+	}
+
+	return r.queueStateKeyPrefix, nil
+}
+
 // Acquire implements CapacityManager.
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
-	keys := []string{}
+	keyPrefix, err := r.keyPrefix(req.Constraints)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
+	}
+
+	keys := []string{
+		r.leasesHash(keyPrefix, req.AccountID),
+	}
 
 	args, err := strSlice([]any{})
 	if err != nil {

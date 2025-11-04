@@ -56,13 +56,36 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing resource kind"))
 	}
 
+	if len(r.LeaseIdempotencyKeys) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency keys"))
+	}
+
 	// TODO: Validate configuration
 
 	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must request capacity"))
 	}
 
-	// TODO: Validate constraints
+	// NOTE: This validation is only enforced as long as existing constraint state
+	// and the new lease-related data are colocated.
+	//
+	// Once we move all constraint state to a dedicated store, we will be able to
+	// mix constraints of different stages.
+	var hasRateLimit bool
+	var hasQueueConstraint bool
+	for _, ci := range r.Constraints {
+		if ci.Kind.IsQueueConstraint() {
+			hasQueueConstraint = true
+		}
+
+		if ci.Kind == ConstraintKindRateLimit {
+			hasRateLimit = true
+		}
+	}
+
+	if hasRateLimit && hasQueueConstraint {
+		errs = multierror.Append(errs, fmt.Errorf("cannot mix queue and rate limit constraints for first stage"))
+	}
 
 	return errs
 }
