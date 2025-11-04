@@ -256,6 +256,18 @@ func TestNextScheduleCalculation(t *testing.T) {
 			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
 			expected: time.Time{}, // Zero time - never executes
 		},
+		{
+			name:     "valid cron 31st of current month",
+			cronExpr: "0 0 31 * *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "valid cron skips 31st on short months",
+			cronExpr: "0 0 31 * *",
+			from:     time.Date(2023, 2, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 3, 31, 0, 0, 0, 0, time.UTC),
+		},
 	}
 
 	for _, tt := range tests {
