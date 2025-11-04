@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gocloud.dev/blob/memblob"
 )
@@ -99,13 +100,20 @@ func TestBlockFlusher(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
-	// Create a mock bufferer that returns some test pauses
-	pause := &state.Pause{
-		ID: uuid.New(),
+	// Create a mock bufferer that returns some test pauses with different timestamps
+	now := time.Now()
+	pause1 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now,
+	}
+	pause2 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now.Add(time.Second),
 	}
 	mockBufferer := &mockBufferer{
 		pauses: []*state.Pause{
-			pause,
+			pause1,
+			pause2,
 		},
 	}
 
@@ -115,7 +123,7 @@ func TestBlockFlusher(t *testing.T) {
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
-		BlockSize:        1, // Small block size for testing
+		BlockSize:        2, // Small block size for testing
 		CompactionLimit:  1,
 		CompactionSample: 0.1,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
@@ -138,24 +146,21 @@ func TestBlockFlusher(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, blocks, 1)
 
-	// Verify the buffer has deleted the pause.
-	mockBufferer.mu.RLock()
-	pausesLen := len(mockBufferer.pauses)
-	mockBufferer.mu.RUnlock()
-	require.Equal(t, 0, pausesLen)
-
 	// Read the block back
 	block, err := store.ReadBlock(ctx, index, blocks[0])
 	require.NoError(t, err)
 	require.NotNil(t, block)
-	require.Len(t, block.Pauses, 1)
-	require.Equal(t, pause.ID, block.Pauses[0].ID)
+	require.Len(t, block.Pauses, 2)
+	require.Equal(t, pause1.ID, block.Pauses[0].ID)
+	require.Equal(t, pause2.ID, block.Pauses[1].ID)
 
-	// Verify that the pauses are not in the buffer
-	mockBufferer.mu.RLock()
-	pausesLen = len(mockBufferer.pauses)
-	mockBufferer.mu.RUnlock()
-	require.Equal(t, 0, pausesLen, "pauses should be removed from buffer after flushing")
+	// Verify that the pauses are removed from the buffer after flushing
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		mockBufferer.mu.RLock()
+		pausesLen := len(mockBufferer.pauses)
+		mockBufferer.mu.RUnlock()
+		assert.Equal(t, 0, pausesLen, "pauses should be removed from buffer after flushing")
+	}, 5*time.Second, 200*time.Millisecond)
 }
 
 func TestBlockMetadata_SameTimestamps(t *testing.T) {
@@ -177,8 +182,8 @@ func TestBlockMetadata_SameTimestamps(t *testing.T) {
 	mockBufferer := &mockBuffererSameTimestamp{
 		timestamp: sameTime,
 		pauses: []*state.Pause{
-			{ID: uuid.New()},
-			{ID: uuid.New()},
+			{ID: uuid.New(), CreatedAt: sameTime},
+			{ID: uuid.New(), CreatedAt: sameTime},
 		},
 	}
 
@@ -221,6 +226,15 @@ func (m *mockBufferer) Write(ctx context.Context, index Index, pauses ...*state.
 }
 
 func (m *mockBufferer) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	// Create a copy of pauses to avoid race conditions
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	return &mockPauseIterator{pauses: pausesCopy}, nil
+}
+
+func (m *mockBufferer) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	// Create a copy of pauses to avoid race conditions
@@ -347,6 +361,14 @@ func (m *mockBuffererSameTimestamp) PausesSince(ctx context.Context, index Index
 	return &mockPauseIterator{pauses: pausesCopy}, nil
 }
 
+func (m *mockBuffererSameTimestamp) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	return &mockPauseIterator{pauses: pausesCopy}, nil
+}
+
 func (m *mockBuffererSameTimestamp) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
 	// Always return the same timestamp - this is what triggers the error condition
 	return m.timestamp, nil
@@ -397,4 +419,227 @@ func (m *mockBuffererSameTimestamp) IndexExists(ctx context.Context, i Index) (b
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.pauses) > 0, nil
+}
+
+func TestLastBlockMetadata(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	now := time.Now()
+	mockBufferer := &mockBufferer{
+		pauses: []*state.Pause{
+			{ID: uuid.New(), CreatedAt: now},
+			{ID: uuid.New(), CreatedAt: now.Add(time.Second)},
+		},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         mockBufferer,
+		Leaser:           leaser,
+		BlockSize:        2,
+		CompactionLimit:  1,
+		CompactionSample: 0.1,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+	ctx := context.Background()
+
+	t.Run("should return nil when no blocks exist", func(t *testing.T) {
+		metadata, err := store.LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.Nil(t, metadata)
+	})
+
+	t.Run("should return metadata after creating first block", func(t *testing.T) {
+		err := store.FlushIndexBlock(ctx, index)
+		require.NoError(t, err)
+
+		metadata, err := store.LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, metadata)
+		require.Equal(t, 2, metadata.Len)
+		require.False(t, metadata.FirstTimestamp().IsZero())
+		require.False(t, metadata.LastTimestamp().IsZero())
+
+		// Verify timestamps match the CreatedAt we set
+		require.Equal(t, now.UnixMilli(), metadata.FirstTimestamp().UnixMilli())
+		require.Equal(t, now.Add(time.Second).UnixMilli(), metadata.LastTimestamp().UnixMilli())
+	})
+
+	t.Run("should return latest block metadata after creating second block", func(t *testing.T) {
+		// Wait for buffer to be empty after first flush
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			mockBufferer.mu.RLock()
+			pausesLen := len(mockBufferer.pauses)
+			mockBufferer.mu.RUnlock()
+			assert.Equal(t, 0, pausesLen, "buffer should be empty after first flush")
+		}, 5*time.Second, 200*time.Millisecond)
+
+		// Add two more pauses to trigger a second block
+		mockBufferer.mu.Lock()
+		laterTime := now.Add(2 * time.Second)
+		mockBufferer.pauses = append(mockBufferer.pauses,
+			&state.Pause{ID: uuid.New(), CreatedAt: laterTime},
+			&state.Pause{ID: uuid.New(), CreatedAt: laterTime.Add(time.Second)})
+		mockBufferer.mu.Unlock()
+
+		// Get metadata from first block
+		firstMetadata, err := store.LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, firstMetadata)
+
+		// Create second block
+		err = store.FlushIndexBlock(ctx, index)
+		require.NoError(t, err)
+
+		// Should now return the second block's metadata
+		secondMetadata, err := store.LastBlockMetadata(ctx, index)
+		require.NoError(t, err)
+		require.NotNil(t, secondMetadata)
+		require.Equal(t, 2, secondMetadata.Len)
+
+		// Second block should have later timestamp than first
+		require.True(t, secondMetadata.LastTimestamp().After(firstMetadata.LastTimestamp()))
+
+		// Verify second block timestamps match the CreatedAt we set
+		require.Equal(t, laterTime.UnixMilli(), secondMetadata.FirstTimestamp().UnixMilli())
+		require.Equal(t, laterTime.Add(time.Second).UnixMilli(), secondMetadata.LastTimestamp().UnixMilli())
+	})
+}
+
+func TestBlockstoreDelete(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	now := time.Now()
+	pause1 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now,
+	}
+	pause2 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now.Add(time.Second),
+	}
+
+	mockBufferer := &mockBufferer{
+		pauses: []*state.Pause{pause1, pause2},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         mockBufferer,
+		Leaser:           leaser,
+		BlockSize:        2,
+		CompactionLimit:  3,
+		CompactionSample: 1.0,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+	ctx := context.Background()
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	t.Run("delete with CreatedAt timestamp", func(t *testing.T) {
+		err := store.Delete(ctx, index, *pause1)
+		require.NoError(t, err)
+
+		deleteKey := blockDeleteKey(index)
+		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pause1.ID.String()).Build()).AsBool()
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("delete without CreatedAt falls back to bufferer", func(t *testing.T) {
+		pauseWithoutTime := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+		}
+
+		err := store.Delete(ctx, index, pauseWithoutTime)
+		require.NoError(t, err)
+
+		deleteKey := blockDeleteKey(index)
+		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pauseWithoutTime.ID.String()).Build()).AsBool()
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("delete nonexistent pause returns without error", func(t *testing.T) {
+		futureTime := now.Add(10 * time.Minute)
+		futurePause := state.Pause{
+			ID:        uuid.New(),
+			CreatedAt: futureTime,
+		}
+
+		err := store.Delete(ctx, index, futurePause)
+		require.NoError(t, err)
+	})
+
+	t.Run("delete with exact block timestamp is inclusive", func(t *testing.T) {
+		// Test with the exact block index timestamp (latest pause timestamp)
+		blockIndexTimestamp := now.Add(time.Second) // This is what the block is indexed under
+		
+		// First, test blockIDForTimestamp directly to ensure it finds the block
+		blockstore := store.(*blockstore)
+		blockID, err := blockstore.blockIDForTimestamp(ctx, index, blockIndexTimestamp)
+		require.NoError(t, err)
+		require.NotNil(t, blockID, "blockIDForTimestamp should find block with exact index timestamp match")
+
+		// Now test the full Delete functionality
+		exactTimestampPause := state.Pause{
+			ID:        uuid.New(),
+			CreatedAt: blockIndexTimestamp, // Same timestamp as block index
+		}
+
+		err = store.Delete(ctx, index, exactTimestampPause)
+		require.NoError(t, err)
+
+		deleteKey := blockDeleteKey(index)
+		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(exactTimestampPause.ID.String()).Build()).AsBool()
+		require.NoError(t, err)
+		require.True(t, exists, "pause with exact block index timestamp should be marked for deletion")
+	})
+
 }

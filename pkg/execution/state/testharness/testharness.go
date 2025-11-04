@@ -591,6 +591,8 @@ func checkDeletePause(t *testing.T, m state.Manager) {
 
 	p := iter.Val(ctx)
 	p.Expires = state.Time(p.Expires.Time().UTC())
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = p.CreatedAt
 	require.EqualValues(t, pause, *p)
 
 	t.Run("Deleting a pause works", func(t *testing.T) {
@@ -993,7 +995,10 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 	require.True(t, iter.Next(ctx))
-	require.EqualValues(t, &pause, iter.Val(ctx))
+	val := iter.Val(ctx)
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = val.CreatedAt
+	require.EqualValues(t, &pause, val)
 	require.False(t, iter.Next(ctx))
 }
 
@@ -1343,6 +1348,8 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		for iter.Next(ctx) {
 			n++
 			val := iter.Val(ctx)
+			// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+			p2.CreatedAt = val.CreatedAt
 			require.EqualValues(t, p2, *val)
 		}
 
@@ -1371,6 +1378,8 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 
 	found, err := m.PauseByID(ctx, pause.ID)
 	require.Nil(t, err)
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	pause.CreatedAt = found.CreatedAt
 	require.EqualValues(t, pause, *found)
 
 	<-time.After(time.Second * 3)
@@ -1434,6 +1443,8 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 	found, err := m.PausesByID(ctx, a.ID)
 	require.Nil(t, err)
 	require.EqualValues(t, 1, len(found))
+	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
+	a.CreatedAt = found[0].CreatedAt
 	require.EqualValues(t, a, *found[0])
 
 	<-time.After(time.Second * 3)

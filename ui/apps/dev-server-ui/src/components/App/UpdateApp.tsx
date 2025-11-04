@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { cn } from '@inngest/components/utils/classNames';
@@ -10,7 +10,11 @@ import { toast } from 'sonner';
 import { useUpdateAppMutation, type GetAppsQuery } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 
-export default function UpdateApp({ app }: { app: GetAppsQuery['apps'][number] }) {
+export default function UpdateApp({
+  app,
+}: {
+  app: GetAppsQuery['apps'][number];
+}) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

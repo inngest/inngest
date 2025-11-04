@@ -53,8 +53,10 @@ export default async function Page() {
     tooltipContent: 'A single durable function execution.',
   };
 
+  const isExecutionBasedPlan =
+    currentPlan.slug === 'pro-2025-08-08' || currentPlan.slug === 'pro-2025-06-04';
   const steps: Data = {
-    title: 'Steps',
+    title: isExecutionBasedPlan ? 'Executions' : 'Steps',
     description: `${
       entitlements.runCount.overageAllowed && !legacyNoRunsPlan
         ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'

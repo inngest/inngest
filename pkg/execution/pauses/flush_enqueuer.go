@@ -31,6 +31,10 @@ type flushQueue struct {
 }
 
 func (f flushQueue) Enqueue(ctx context.Context, index Index) error {
+	// It's fine to enqueue another flush job as soon as the last one
+	// was done but we can't do less than a second as Redis expiration.
+	blockFlushIdempotencyPeriod := time.Second * 1
+
 	jid := fmt.Sprintf("%s-%s-flush", index.WorkspaceID, index.EventName)
 	return f.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jid,
@@ -40,7 +44,9 @@ func (f flushQueue) Enqueue(ctx context.Context, index Index) error {
 			EventName: index.EventName,
 		},
 		QueueName: &BlockFlushQueueName,
-	}, time.Now(), queue.EnqueueOpts{})
+	}, time.Now(), queue.EnqueueOpts{
+		IdempotencyPeriod: &blockFlushIdempotencyPeriod,
+	})
 }
 
 type flushInProcess struct {

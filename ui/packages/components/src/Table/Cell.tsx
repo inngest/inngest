@@ -50,7 +50,7 @@ export function PillCell({
 export function TimeCell({ date, format }: { date: Date | string; format?: 'relative' }) {
   return (
     <span className={cn(cellStyles, 'text-muted font-medium')}>
-      <Time value={date} format={format} copyable={false} />
+      <Time value={date} format={format} copyable={true} />
     </span>
   );
 }

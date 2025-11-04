@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
@@ -44,10 +44,11 @@ export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props
     started: toMaybeDate(trace.startedAt)?.getTime() ?? null,
   });
 
-  //
-  // when a span has step (not userland) children then we construct the span from them
-  const stepChildren = trace.childrenSpans?.filter((s) => !s.isUserland) || [];
-  const spans = !trace.isRoot && stepChildren.length ? stepChildren : [];
+  // For steps with userland children, render the step itself to show proper background color
+  const children = trace.childrenSpans || [];
+  const hasUserlandChildren = depth === 1 && children.some((s) => s.isUserland);
+  const spans = !trace.isRoot && children.length && !hasUserlandChildren ? children : [];
+  const shouldRenderParentOverlay = spans.length > 0 && !trace.isUserland;
 
   return (
     <Tooltip open={open}>
@@ -66,7 +67,7 @@ export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props
           ref={spanRef}
         >
           <TooltipTrigger className="flex w-full flex-row">
-            {spans.length > 0 && (
+            {shouldRenderParentOverlay && (
               <GroupSpan
                 depth={depth}
                 status={trace.status}
@@ -74,17 +75,9 @@ export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props
               />
             )}
             {spans.length ? (
-              spans.map((span) => {
-                return (
-                  <Span
-                    isInline
-                    key={span.spanID}
-                    maxTime={maxTime}
-                    minTime={minTime}
-                    span={span}
-                  />
-                );
-              })
+              spans.map((span) => (
+                <Span isInline key={span.spanID} maxTime={maxTime} minTime={minTime} span={span} />
+              ))
             ) : (
               <Span isInline key={trace.spanID} maxTime={maxTime} minTime={minTime} span={trace} />
             )}
