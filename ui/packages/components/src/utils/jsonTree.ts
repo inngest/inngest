@@ -1,11 +1,18 @@
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import tailwindConfig from '../../tailwind.config';
-import { resolveColor } from './colors';
+import { resolveColor as resolver } from './colors';
 
 const {
   theme: { backgroundColor, textColor },
 } = resolveConfig(tailwindConfig);
+
+const defaultColor = '#f6f6f6'; // carbon 50
+
+export const resolveColor = (colorValue: any, isDark: boolean): string =>
+  !colorValue || typeof colorValue !== 'string'
+    ? defaultColor
+    : resolver(colorValue, isDark, defaultColor);
 
 export const jsonTreeTheme = (dark: boolean): Record<string, any> => ({
   base00: resolveColor(backgroundColor.codeEditor, dark),

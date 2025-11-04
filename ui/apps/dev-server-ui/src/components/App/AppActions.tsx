@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,10 +34,18 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+          <Button
+            kind="secondary"
+            appearance="outlined"
+            size="medium"
+            icon={<RiMore2Line />}
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem className="text-error" onSelect={() => setIsAlertModalOpen(true)}>
+          <DropdownMenuItem
+            className="text-error"
+            onSelect={() => setIsAlertModalOpen(true)}
+          >
             <RiDeleteBinLine className="h-4 w-4" />
             Delete
           </DropdownMenuItem>
