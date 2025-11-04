@@ -160,13 +160,6 @@ export const RunDetailsV3 = ({
     refetchInterval: pollInterval,
   });
 
-  runData?.trace.status &&
-    updateDynamicRunData({
-      runID,
-      status: runData.trace.status,
-      endedAt: runData.trace.endedAt ?? undefined,
-    });
-
   const outputID = runData?.trace?.outputID;
   const {
     data: resultData,
@@ -193,6 +186,15 @@ export const RunDetailsV3 = ({
       setPollInterval(undefined);
     }, RESIDUAL_POLL_INTERVAL);
   }
+
+  useEffect(() => {
+    runData?.trace.status &&
+      updateDynamicRunData({
+        runID,
+        status: runData.trace.status,
+        endedAt: runData.trace.endedAt ?? undefined,
+      });
+  }, [runData?.trace.endedAt, runData?.trace.status]);
 
   const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
   const showError = waiting ? false : runError || resultError;
