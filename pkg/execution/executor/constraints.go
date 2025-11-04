@@ -29,6 +29,7 @@ func WithConstraints[T any](
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	idempotencyKey string,
 	fn func(
 		ctx context.Context,
 		// performChecks determines whether constraint checks must be performed
@@ -72,6 +73,7 @@ func WithConstraints[T any](
 		capacityManager,
 		useConstraintAPI,
 		req,
+		idempotencyKey,
 		fallback,
 		constraints,
 	)
@@ -237,28 +239,11 @@ func CheckConstraints(
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	idempotencyKey string,
 	fallback bool,
 	constraints []constraintapi.ConstraintItem,
 ) (checkResult, error) {
 	l := logger.StdlibLogger(ctx)
-
-	// Retrieve idempotency key to acquire lease
-	// NOTE: To allow for retries between multiple executors, this should be
-	// consistent between calls to CheckConstraints
-	idempotencyKey := req.Events[0].GetInternalID().String()
-	if req.IdempotencyKey != nil {
-		idempotencyKey = *req.IdempotencyKey
-	}
-
-	// Log missing idempotency key
-	if idempotencyKey == "" {
-		l.Warn("missing idempotency key in schedule call", "req", req)
-
-		// Do not send request to Constraint API
-		return checkResult{
-			mustCheck: true,
-		}, nil
-	}
 
 	// NOTE: Schedule may be called from within new-runs or the API
 	// In case of the API, we want to ensure the source is properly reflected in constraint checks
