@@ -6,18 +6,30 @@ import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
 import { ValueRow } from './ValueRow';
 
-export type ObjectRowProps = { node: ObjectNode };
+export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
 
-export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
+export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
+
   const open = isExpanded(node.path);
+  const hasChildren = node.children.length > 0;
+  const keyCount = node.children.length;
+  const keysLabel = keyCount === 1 ? '1 key' : `${keyCount} keys`;
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex cursor-pointer items-center" onClick={() => toggle(node.path)}>
-        <CollapsibleRowWidget open={open} />
+      <div
+        className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
+        onClick={hasChildren ? () => toggle(node.path) : undefined}
+      >
+        {hasChildren ? <CollapsibleRowWidget open={open} /> : <CollapsibleIconPlaceholder />}
         <div className="-ml-0.5">
-          <ValueRow boldName={open} node={makeFauxValueNode(node)} typeLabelOverride={'{}'} />
+          <ValueRow
+            boldName={open}
+            node={makeFauxValueNode(node)}
+            typeLabelOverride={typeLabelOverride ?? ''}
+            typePillOverride={hasChildren ? keysLabel : 'Object'}
+          />
         </div>
       </div>
       {open && (
@@ -31,6 +43,10 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
       )}
     </div>
   );
+}
+
+function CollapsibleIconPlaceholder() {
+  return <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />;
 }
 
 function makeFauxValueNode(node: SchemaNode): ValueNode {
