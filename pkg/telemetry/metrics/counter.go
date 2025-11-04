@@ -653,3 +653,12 @@ func IncrPausesDeletedAfterBlockFlush(ctx context.Context, value int64, opts Cou
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrPausesBlockFlushExpectedFail(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_blocks_flush_expected_fail_total",
+		Description: "Total number of pauses block flush failures",
+		Tags:        opts.Tags,
+	})
+}

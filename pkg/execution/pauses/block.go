@@ -225,9 +225,11 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	}
 
 	n := 0
+	deleted := 0
 	for iter.Next(ctx) {
 		item := iter.Val(ctx)
 		if item == nil {
+			deleted = deleted + 1
 			continue
 		}
 
@@ -266,23 +268,37 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// Trim any pauses that are nil.
 	block.Pauses = block.Pauses[:n]
 
-	if n < b.blocksize || SkipFlushing(index, block.Pauses) {
-		// We didn't find enough non-nil pauses to fill the block.  Log a warning
-		// and return.  This shouldn't happen, as we shouldn't return nil pauses
-		// from iterators often;  this only happens in a race where the iterator
-		// has pauses in-memory which are then deleted while iterating, leading to
-		// a race condition.
+	skipFlush := SkipFlushing(index, block.Pauses)
+	if n < b.blocksize || skipFlush {
+		var cause string
 
-		// Another case where this could happen is during rollout when we are not
-		// deleting pauses from the buffer after flushing to a block which will
-		// make it that we trigger flush jobs because the buffer is always at the
-		// threshold but we can't find enough pauses since the last block.
+		if skipFlush {
+			cause = "skipped"
+		} else if iter.Count() < b.blocksize {
+			// Pauses in buffer were deleted in the timeframe of enqueuing the flush job
+			// and starting it
+			cause = "pauses_deleted_normal"
 
-		// Yet another potential case is pauses being deleted too fast while fetching
-		// them from the buffer, we do have fetchMargin that we additionnaly prefetch
-		// so we should consider increasing that if this happening a lot.
+		} else if deleted >= b.fetchMargin {
+			// We didn't find enough non-nil pauses to fill the block.  Log a warning
+			// and return.  This shouldn't happen, as we shouldn't return nil pauses
+			// from iterators often;  this only happens in a race where the iterator
+			// has pauses in-memory which are then deleted while iterating, leading to
+			// a race condition. We do have fetchMargin that we additionnaly prefetch
+			// which should help but not in all cases.
+			cause = "pauses_deleted_race"
+		} else {
+			// XXX: Temporary situation until full rollout:
+			// This can also occur during the gradual rollout of the feature when pauses are not
+			// deleted from the buffer after being flushed to a block. The buffer stays near the
+			// threshold and keeps triggering flush jobs, but we still can’t find enough new pauses
+			// since the last block.
+			cause = "rollout"
+		}
 
-		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses))
+		metrics.IncrPausesBlockFlushExpectedFail(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"cause": cause}})
+		l.Warn("could not find enough pauses to flush into buffer", "len", len(block.Pauses), "cause", cause)
+
 		return nil
 	}
 
