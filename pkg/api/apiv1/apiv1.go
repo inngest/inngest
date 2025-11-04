@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
 // Opts represents options for the APIv1 router.
@@ -66,6 +67,8 @@ type Opts struct {
 
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
+
+	ExtendedTraceMetadataExtractor meta.OTELMetadataExtractor
 }
 
 // AddRoutes adds a new API handler to the given router.

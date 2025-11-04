@@ -151,7 +151,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					err := a.commitSpan(res, ss.Scope, s)
+					err := a.commitSpan(ctx, res, ss.Scope, s)
 					if err != nil {
 						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
@@ -167,7 +167,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -207,6 +207,8 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
+	// TODO: include StepID attrs
+
 	ourAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.IsUserland, &isUserland),
 		meta.Attr(meta.Attrs.UserlandSpanID, &spanID),
@@ -236,7 +238,7 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		}
 	}
 
-	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
+	span, err := a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
@@ -245,6 +247,38 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create span: %w", err)
+	}
+
+	// TODO:feature flag this at the account level
+	if a.opts.ExtendedTraceMetadataExtractor != nil {
+		metadata, err := a.opts.ExtendedTraceMetadataExtractor.ExtractMetadata(ctx, s)
+		if err != nil {
+			// TODO: emit warning metadata span
+		} else {
+			var errs []error
+			for _, m := range metadata {
+				attrs, err := tracing.MetadataAttrs(m)
+				if err != nil {
+					// TODO: log
+					errs = append(errs, err)
+					continue
+				}
+
+				// TODO: include StepID attrs
+				_, err = a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameMetadata, &tracing.CreateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan.metadata"},
+					StartTime:  time.Unix(0, int64(s.StartTimeUnixNano)),
+					EndTime:    time.Unix(0, int64(s.EndTimeUnixNano)),
+					Parent:     span,
+					Attributes: attrs,
+				})
+				if err != nil {
+					// TODO: log
+					errs = append(errs, err)
+					continue
+				}
+			}
+		}
 	}
 
 	return nil
