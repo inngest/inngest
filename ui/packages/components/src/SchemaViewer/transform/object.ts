@@ -11,7 +11,7 @@ export function buildObjectChildren(
     .map(([propName, propDef]) =>
       buildNodeFromDef(propDef, propName, `${path}.${propName}`, buildNode)
     )
-    .filter((node) => node !== undefined);
+    .filter((node) => node !== undefined) as SchemaNode[];
 
   // TODO: Handle processing of additional properties if this is used for authored JSON Schemas.
   // For now, it's unnecessary because schemas are derived from concrete instances.
