@@ -424,7 +424,11 @@ func checkCapacity(ctx context.Context, stateManager state.StateManager, envID u
 	}
 	if workerCap.IsAtCapacity() {
 		// Worker has a capacity limit set and is at capacity
-		log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available, "worker_active_leases", workerCap.CurrentLeases)
+		if log.Level() <= logger.LevelTrace {
+			// get active leases only if trace level is enabled
+			activeLeases, _ := stateManager.GetAllActiveWorkerRequests(ctx, envID, conn.InstanceId, workerCap.IsUnlimited())
+			log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available, "worker_active_leases", activeLeases)
+		}
 		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 
