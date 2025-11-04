@@ -225,28 +225,6 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 	}
 }
 
-func LeaseResourceKindToProto(kind LeaseResourceKind) pb.ConstraintApiLeaseResourceKind {
-	switch kind {
-	case LeaseResourceEvent:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT
-	case LeaseResourceQueueItem:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM
-	default:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED
-	}
-}
-
-func LeaseResourceKindFromProto(kind pb.ConstraintApiLeaseResourceKind) LeaseResourceKind {
-	switch kind {
-	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT:
-		return LeaseResourceEvent
-	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM:
-		return LeaseResourceQueueItem
-	default:
-		return LeaseResourceUnknown
-	}
-}
-
 func RateLimitConfigToProto(config RateLimitConfig) *pb.RateLimitConfig {
 	return &pb.RateLimitConfig{
 		Scope:             RateLimitScopeToProto(config.Scope),
@@ -674,7 +652,6 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		Constraints:          constraints,
 		Amount:               int32(req.Amount),
 		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
-		ResourceKind:         LeaseResourceKindToProto(req.ResourceKind),
 		CurrentTime:          timestamppb.New(req.CurrentTime),
 		Duration:             durationpb.New(req.Duration),
 		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
@@ -737,7 +714,6 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		Constraints:          constraints,
 		Amount:               int(pbReq.Amount),
 		LeaseIdempotencyKeys: pbReq.LeaseIdempotencyKeys,
-		ResourceKind:         LeaseResourceKindFromProto(pbReq.ResourceKind),
 		CurrentTime:          currentTime,
 		Duration:             duration,
 		MaximumLifetime:      maximumLifetime,

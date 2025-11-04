@@ -321,48 +321,6 @@ func TestLeaseServiceConversion(t *testing.T) {
 	}
 }
 
-func TestLeaseResourceKindConversion(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    LeaseResourceKind
-		expected pb.ConstraintApiLeaseResourceKind
-	}{
-		{
-			name:     "unknown resource kind",
-			input:    LeaseResourceUnknown,
-			expected: pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED,
-		},
-		{
-			name:     "event resource kind",
-			input:    LeaseResourceEvent,
-			expected: pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT,
-		},
-		{
-			name:     "queue item resource kind",
-			input:    LeaseResourceQueueItem,
-			expected: pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM,
-		},
-		{
-			name:     "invalid resource kind (fallback to unspecified)",
-			input:    LeaseResourceKind(999),
-			expected: pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := LeaseResourceKindToProto(tt.input)
-			assert.Equal(t, tt.expected, result)
-
-			// Test round trip
-			backConverted := LeaseResourceKindFromProto(result)
-			if tt.input != LeaseResourceKind(999) { // Skip round trip for invalid input
-				assert.Equal(t, tt.input, backConverted)
-			}
-		})
-	}
-}
-
 func TestRateLimitConfigConversion(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1343,13 +1301,12 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 						Kind: kindConcurrency,
 					},
 				},
-				Amount:                 3,
-				LeaseIdempotencyKeys:   []string{"lease-key-1", "lease-key-2", "lease-key-3"},
-				ResourceKind:           LeaseResourceEvent,
-				CurrentTime:       currentTime,
-				Duration:          5 * time.Minute,
-				MaximumLifetime:   30 * time.Minute,
-				BlockingThreshold: 10 * time.Second,
+				Amount:               3,
+				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"},
+				CurrentTime:          currentTime,
+				Duration:             5 * time.Minute,
+				MaximumLifetime:      30 * time.Minute,
+				BlockingThreshold:    10 * time.Second,
 				Source: LeaseSource{
 					Service:           ServiceExecutor,
 					Location:          LeaseLocationItemLease,
@@ -1381,13 +1338,12 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 						Kind: pb.ConstraintApiConstraintKind_CONSTRAINT_API_CONSTRAINT_KIND_CONCURRENCY,
 					},
 				},
-				Amount:                  3,
-				LeaseIdempotencyKeys:    []string{"lease-key-1", "lease-key-2", "lease-key-3"},
-				ResourceKind:            pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT,
-				CurrentTime:       timestamppb.New(currentTime),
-				Duration:          durationpb.New(5 * time.Minute),
-				MaximumLifetime:   durationpb.New(30 * time.Minute),
-				BlockingThreshold: durationpb.New(10 * time.Second),
+				Amount:               3,
+				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"},
+				CurrentTime:          timestamppb.New(currentTime),
+				Duration:             durationpb.New(5 * time.Minute),
+				MaximumLifetime:      durationpb.New(30 * time.Minute),
+				BlockingThreshold:    durationpb.New(10 * time.Second),
 				Source: &pb.LeaseSource{
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_EXECUTOR,
 					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
@@ -1411,7 +1367,6 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				},
 				Constraints: []ConstraintItem{},
 				Amount:      0,
-				ResourceKind: LeaseResourceUnknown,
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
@@ -1426,9 +1381,8 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					},
 					Throttle: []*pb.ThrottleConfig{},
 				},
-				Constraints: []*pb.ConstraintItem{},
-				Amount:      0,
-				ResourceKind: pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED,
+				Constraints:       []*pb.ConstraintItem{},
+				Amount:            0,
 				CurrentTime:       timestamppb.New(time.Time{}),
 				Duration:          durationpb.New(0),
 				MaximumLifetime:   durationpb.New(0),
@@ -1880,8 +1834,7 @@ func TestRoundTripConversions(t *testing.T) {
 					Kind: kindConcurrency,
 				},
 			},
-			Amount: 3,
-			ResourceKind: LeaseResourceEvent,
+			Amount:            3,
 			CurrentTime:       currentTime,
 			Duration:          5 * time.Minute,
 			MaximumLifetime:   30 * time.Minute,
@@ -1954,4 +1907,3 @@ func TestEdgeCases(t *testing.T) {
 		assert.Equal(t, req.Duration, result.Duration)
 	})
 }
-
