@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -35,6 +36,8 @@ func TestCronItem(t *testing.T) {
 }
 
 func TestNext(t *testing.T) {
+	curYear := time.Now().Year()
+	sixYearsFromNow := curYear + 6
 	tests := []struct {
 		name        string
 		cronExpr    string
@@ -127,6 +130,26 @@ func TestNext(t *testing.T) {
 		{
 			name:        "invalid expression - invalid day of week",
 			cronExpr:    "0 0 * * 8",
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 6 field format",
+			cronExpr:    "* * * * * *",
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format",
+			cronExpr:    "0 30 9 * * ? *",
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format with cur year",
+			cronExpr:    fmt.Sprintf("0 30 9 * * ? %d", curYear),
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format with future year",
+			cronExpr:    fmt.Sprintf("0 30 9 * * ? %d", sixYearsFromNow),
 			expectError: true,
 		},
 		{
