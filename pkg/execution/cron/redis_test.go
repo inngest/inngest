@@ -800,6 +800,27 @@ func TestRedisCronManager(t *testing.T) {
 			}
 		})
 
+		t.Run("valid expr but never ticks", func(t *testing.T) {
+			testCases := []struct {
+				name       string
+				expression string
+			}{
+				{"Feb 30", "0 0 30 2 *"},
+				{"Nov 31", "0 0 31 11 *"},
+			}
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					cronItem := createCronItem(enums.CronOpProcess)
+					cronItem.Expression = tc.expression
+
+					nextItem, err := cm.ScheduleNext(ctx, cronItem)
+					assert.NoError(t, err)
+					assert.Nil(t, nextItem)
+				})
+			}
+		})
+
 		t.Run("all operations should use item timestamp directly", func(t *testing.T) {
 			baseTime := time.Date(2025, 12, 25, 0, 59, 0, 0, time.UTC) // 12:59AM
 
