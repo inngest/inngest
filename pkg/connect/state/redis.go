@@ -1043,7 +1043,6 @@ func (r *redisConnectionStateManager) WorkerCapacityOnHeartbeat(ctx context.Cont
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 
-	// This is really long (like 2 hours and includes function timeout)
 	capacityTTL := consts.ConnectWorkerCapacityManagerTTL
 	keys := []string{capacityKey, workerRequestsKey}
 	args := []string{fmt.Sprintf("%d", int64(capacityTTL.Seconds()))}
