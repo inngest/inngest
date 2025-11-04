@@ -807,6 +807,7 @@ func TestRedisCronManager(t *testing.T) {
 			}{
 				{"Feb 30", "0 0 30 2 *"},
 				{"Nov 31", "0 0 31 11 *"},
+				{"31st on short months", "0 0 31 2,4,6,9,11 *"},
 			}
 
 			for _, tc := range testCases {

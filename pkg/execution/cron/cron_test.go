@@ -39,6 +39,7 @@ func TestNext(t *testing.T) {
 		name        string
 		cronExpr    string
 		expectError bool
+		nextIsZero  bool
 	}{
 		{
 			name:        "valid minute expression",
@@ -78,6 +79,24 @@ func TestNext(t *testing.T) {
 		{
 			name:        "valid descriptor @yearly",
 			cronExpr:    "@yearly",
+			expectError: false,
+		},
+		{
+			name:        "valid but never ticks",
+			cronExpr:    "0 0 30 2 *",
+			expectError: false,
+			nextIsZero:  true,
+		},
+		{
+			name:        "valid but never ticks",
+			cronExpr:    "0 0 31 11 *",
+			expectError: false,
+			nextIsZero:  true,
+		},
+		{
+			name:        "valid but never ticks",
+			cronExpr:    "0 0 31 2,4,6,9,11 *",
+			nextIsZero:  true,
 			expectError: false,
 		},
 		{
@@ -137,8 +156,11 @@ func TestNext(t *testing.T) {
 				assert.Contains(t, err.Error(), "error parsing cron expression")
 			} else {
 				assert.NoError(t, err)
-				assert.False(t, next.IsZero())
-				assert.True(t, next.After(from))
+				if !tt.nextIsZero {
+					assert.False(t, next.IsZero())
+					assert.True(t, next.After(from))
+				}
+
 			}
 		})
 	}
@@ -192,6 +214,24 @@ func TestNextScheduleCalculation(t *testing.T) {
 			cronExpr: "0 0 * * 1",
 			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC), // Sunday
 			expected: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC),  // Monday
+		},
+		{
+			name:     "valid but never ticks Feb30",
+			cronExpr: "0 0 30 2 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
+		},
+		{
+			name:     "valid but never ticks Nov31",
+			cronExpr: "0 0 31 11 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
+		},
+		{
+			name:     "valid but never ticks 31 on short months",
+			cronExpr: "0 0 31 2,4,6,9,11 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
 		},
 	}
 
