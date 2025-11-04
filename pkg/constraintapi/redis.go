@@ -3,11 +3,16 @@ package constraintapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
+)
+
+const (
+	MaximumAllowedRequestDelay = time.Second
 )
 
 type redisCapacityManager struct {
@@ -16,6 +21,8 @@ type redisCapacityManager struct {
 
 	rateLimitKeyPrefix  string
 	queueStateKeyPrefix string
+
+	numScavengerShards int
 }
 
 type redisCapacityManagerOption func(m *redisCapacityManager)
@@ -44,6 +51,12 @@ func WithQueueStateKeyPrefix(prefix string) redisCapacityManagerOption {
 	}
 }
 
+func WithNumScavengerShards(numShards int) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.numScavengerShards = numShards
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...redisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
@@ -64,8 +77,48 @@ func NewRedisCapacityManager(
 	return manager, nil
 }
 
-func (r *redisCapacityManager) leasesHash(prefix string, accountID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:%s:leases", prefix, accountID)
+/*
+*
+* Key structure:
+*
+* Global:
+*
+* - {prefix}:css:<number> Sharded scavenger entrypoints
+*
+* Per Account:
+*
+* Lease management:
+* 	- {prefix}:{account}:reqh: {idempotencyKey} -> request json: Request details (config, constraints, allowed capacity, metadata)
+* 	- {prefix}:{account}:reql:{idempotencyKey} -> ULID: current lease ID for the idempotency key
+* 		- Expires with the lease expiry
+* 	- {prefix}:{account}:leaseq -> sorted set of idempotencyKey tied to the expiry
+*
+* - {prefix}:{account}:ik:op:{operation}:{idempotencyKey} -> return whether the operation recently succeeded
+*
+ */
+
+// scavengerShard represents the top-level sharded sorted set containing individual accounts
+func (r *redisCapacityManager) scavengerShard(prefix string, shard int) string {
+	return fmt.Sprintf("{%s}:css:%d", prefix, shard)
+}
+
+// accountLeases represents active leases for the account
+func (r *redisCapacityManager) accountLeases(prefix string, accountID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:%s:leaseq", prefix, accountID)
+}
+
+// requestsHash returns the key to the hash storing request information
+func (r *redisCapacityManager) requestsHash(prefix string, accountID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:%s:reqh", prefix, accountID)
+}
+
+// requestLease returns the key to the mapping key connecting an idempotency key to its current lease ID
+func (r *redisCapacityManager) requestLease(prefix string, accountID uuid.UUID, idempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:reql:%s", prefix, accountID, idempotencyKey)
+}
+
+func (r *redisCapacityManager) operationIdempotencyKey(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, idempotencyKey)
 }
 
 // keyPrefix returns the Lua key prefix for the first stage of the Constraint API.
@@ -87,7 +140,6 @@ func (r *redisCapacityManager) keyPrefix(
 		case ConstraintKindRateLimit:
 			hasRateLimit = true
 		default:
-
 		}
 	}
 
@@ -104,6 +156,16 @@ func (r *redisCapacityManager) keyPrefix(
 
 // Acquire implements CapacityManager.
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	// TODO: Add metric for this
+	// NOTE: This will include request latency (marshaling, network delays),
+	// and it might not work for retries, as those retain the same CurrentTime value.
+	// TODO: Ensure retries have the updated CurrentTime
+	requestLatency := r.clock.Now().Sub(req.CurrentTime)
+	if requestLatency > MaximumAllowedRequestDelay {
+		// TODO : Set proper error code
+		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
+	}
+
 	keyPrefix, err := r.keyPrefix(req.Constraints)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
@@ -111,6 +173,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	keys := []string{
 		r.leasesHash(keyPrefix, req.AccountID),
+		r.operationIdempotencyKey(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 	}
 
 	args, err := strSlice([]any{})
