@@ -19,7 +19,7 @@ import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
-import { useStepSelection } from './utils';
+import { useDynamicRunData, useStepSelection } from './utils';
 
 //
 // userland traces can land after the run is completed
@@ -65,8 +65,8 @@ export const RunDetailsV3 = ({
     false
   );
   const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { dynamicRunData, updateDynamicRunData } = useDynamicRunData({ runID });
 
-  const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
@@ -157,8 +157,15 @@ export const RunDetailsV3 = ({
     preview: tracesPreviewEnabled,
     //
     // TODO: enable this for cloud once we're sure we can handle the load
-    refetchInterval: cloud ? 0 : pollInterval,
+    refetchInterval: pollInterval,
   });
+
+  runData?.trace.status &&
+    updateDynamicRunData({
+      runID,
+      status: runData.trace.status,
+      endedAt: runData.trace.endedAt ?? undefined,
+    });
 
   const outputID = runData?.trace?.outputID;
   const {
