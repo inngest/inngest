@@ -72,7 +72,7 @@ type RequestStateManager interface {
 	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 	// the current lease does not match the passed leaseID (ErrRequestLeased).
 	// It also refreshes the worker instance's lease by updating the worker instance's last heartbeat.
-	ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityLimited bool) (newLeaseID *ulid.ULID, err error)
+	ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (newLeaseID *ulid.ULID, err error)
 
 	// IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
 	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID string) (bool, error)
@@ -83,8 +83,8 @@ type RequestStateManager interface {
 	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
 	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
 
-	// GetRequestWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
-	GetRequestWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
+	// GetAssignedWorkerID retrieves the instance ID of the worker that is assigned to the request.
+	GetAssignedWorkerID(ctx context.Context, envID uuid.UUID, requestID string) (string, error)
 
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
@@ -120,9 +120,9 @@ type WorkerCapacityManager interface {
 	// DeleteRequestFromWorker decrements the active lease count for a worker instance.
 	DeleteRequestFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error
 
-	// WorkerCapcityOnHeartbeat refreshes the TTL on the worker capacity key.
+	// WorkerCapacityOnHeartbeat refreshes the TTL on the worker capacity key.
 	// Called on heartbeat to keep the capacity limit alive while worker is active.
-	WorkerCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
+	WorkerCapacityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
 }
 
 type AuthContext struct {

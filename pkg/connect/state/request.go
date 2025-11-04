@@ -112,7 +112,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
-		fmt.Sprintf("%d", int(consts.ConnectWorkerCapacityManagerTTL.Seconds())),     // Set TTL
+		fmt.Sprintf("%d", int(consts.ConnectWorkerCapacityManagerTTL.Seconds())),        // Set TTL
 		fmt.Sprintf("%d", int(consts.ConnectWorkerRequestToWorkerMappingTTL.Seconds())), // Request TTL
 		instanceID,
 		fmt.Sprintf("%t", isWorkerCapacityUnlimited),
@@ -209,8 +209,8 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	return lease.ExecutorIP, nil
 }
 
-// GetRequestWorkerInstanceID retrieves the instance ID of the worker that is assigned to the request.
-func (r *redisConnectionStateManager) GetRequestWorkerInstanceID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+// GetAssignedWorkerID retrieves the instance ID of the worker that is assigned to the request.
+func (r *redisConnectionStateManager) GetAssignedWorkerID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
 	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(requestWorkerKey).Build()).ToString()

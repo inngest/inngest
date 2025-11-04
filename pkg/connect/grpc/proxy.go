@@ -399,11 +399,11 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 		routedInstanceID = route.InstanceID
 		// Assign the request lease to the worker for capacity tracking
-		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, route.InstanceID, opts.Data.RequestId); err != nil {
+		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); err != nil {
 			// if the instance ID is not set, we log the error and skip for now
 			span.RecordError(err)
 			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
-				"instance_id": route.InstanceID,
+				"instance_id": routedInstanceID,
 				"request_id":  opts.Data.RequestId,
 				"gateway_id":  route.GatewayID.String(),
 			}))
@@ -419,7 +419,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 
 		// Trace the request lease assignment
-		l.Trace("assigned request lease to worker", "instance_id", route.InstanceID, "request_id", opts.Data.RequestId, "gateway_id", route.GatewayID.String())
+		l.Trace("assigned request lease to worker", "instance_id", routedInstanceID, "request_id", opts.Data.RequestId, "gateway_id", route.GatewayID.String())
 
 		transport := "grpc"
 
@@ -530,8 +530,10 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	}
 }
 
+// cleanupWorkerRequestOrLogError cleans up the worker request and logs an error if it fails
+// even if the clean up fails the TTL of the data would make sure that the data is cleaned up eventually
 func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID string, requestID string, l logger.Logger, message string) {
-	//
+	// log the cleanup of the worker request
 	l.Trace("cleaning up worker lease", "instance_id", instanceID, "request_id", requestID, "env_id", envID.String())
 
 	// if the instance ID is not set, we need to return an error

@@ -1006,9 +1006,6 @@ func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Contex
 		return nil
 	}
 
-	// refresh the TTL on the worker requests set (ignore the error for this)
-	_ = r.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
-
 	// Use Lua script to atomically remove from set, manage TTL, and cleanup
 	workerTotalCapacityKey := r.workerCapacityKey(envID, instanceID)
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
@@ -1034,10 +1031,10 @@ func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Contex
 	return nil
 }
 
-// WorkerCapcityOnHeartbeat refreshes the TTL on the worker capacity key and leases set.
+// WorkerCapacityOnHeartbeat refreshes the TTL on the worker capacity key and leases set.
 // Called on heartbeat to keep the capacity limit alive if it exists while worker is active.
 // Set TTL is also refreshed to keep active leases from expiring while the worker is active.
-func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
+func (r *redisConnectionStateManager) WorkerCapacityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error {
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 

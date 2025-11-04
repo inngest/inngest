@@ -1325,14 +1325,14 @@ func TestAssignRequestToWorker(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	t.Run("handles nil envID gracefully", func(t *testing.T) {
+	t.Run("error on nil envID", func(t *testing.T) {
 		err := mgr.AssignRequestToWorker(ctx, uuid.Nil, "test-instance", "req-1")
-		require.NoError(t, err) // Should not error for no-limit case
+		require.Error(t, err) // Should not error for no-limit case
 	})
 
-	t.Run("handles empty instanceID gracefully", func(t *testing.T) {
+	t.Run("error on handles empty instanceID", func(t *testing.T) {
 		err := mgr.AssignRequestToWorker(ctx, envID, "", "req-1")
-		require.NoError(t, err) // Should not error for no-limit case
+		require.Error(t, err) // Should not error for no-limit case
 	})
 
 	t.Run("handles empty requestID gracefully", func(t *testing.T) {
@@ -1641,7 +1641,7 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 	})
 }
 
-func TestWorkerCapcityOnHeartbeat(t *testing.T) {
+func TestWorkerCapacityOnHeartbeat(t *testing.T) {
 	r := miniredis.RunT(t)
 	fakeClock := clockwork.NewFakeClock()
 
@@ -1659,18 +1659,18 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 	envID := uuid.New()
 
 	t.Run("handles nil envID gracefully", func(t *testing.T) {
-		err := mgr.WorkerCapcityOnHeartbeat(ctx, uuid.Nil, "test-instance")
+		err := mgr.WorkerCapacityOnHeartbeat(ctx, uuid.Nil, "test-instance")
 		require.NoError(t, err) // Should be no-op
 	})
 
 	t.Run("handles empty instanceID gracefully", func(t *testing.T) {
-		err := mgr.WorkerCapcityOnHeartbeat(ctx, envID, "")
+		err := mgr.WorkerCapacityOnHeartbeat(ctx, envID, "")
 		require.NoError(t, err) // Should be no-op
 	})
 
 	t.Run("no-op when no capacity set", func(t *testing.T) {
 		instanceID := "test-instance-no-cap"
-		err := mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
+		err := mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 	})
 
@@ -1684,7 +1684,7 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		fakeClock.Advance(consts.ConnectWorkerRequestLeaseDuration)
 
 		// Refresh TTL
-		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check TTL is reset
@@ -1707,7 +1707,7 @@ func TestWorkerCapcityOnHeartbeat(t *testing.T) {
 		fakeClock.Advance(consts.ConnectWorkerCapacityManagerTTL / 4)
 
 		// Refresh TTL
-		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// Check both TTLs are reset
@@ -1824,7 +1824,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		require.False(t, r.Exists(requestWorkerKey))
 
 		for i := 0; i < 6; i++ {
-			err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
+			err = mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
 			// TODO: extend lease for req-2
 			require.NoError(t, err)
 			r.FastForward(consts.ConnectWorkerRequestLeaseDuration / 2)
@@ -1893,7 +1893,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 	})
 }
 
-func TestGetRequestWorkerInstanceID(t *testing.T) {
+func TestGetAssignedWorkerID(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1908,7 +1908,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 	envID := uuid.New()
 
 	t.Run("returns empty when no mapping exists", func(t *testing.T) {
-		instanceID, err := mgr.GetRequestWorkerInstanceID(ctx, envID, "non-existent-request")
+		instanceID, err := mgr.GetAssignedWorkerID(ctx, envID, "non-existent-request")
 		require.NoError(t, err)
 		require.Equal(t, "", instanceID)
 	})
@@ -1926,7 +1926,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get worker instance ID
-		retrievedInstance, err := mgr.GetRequestWorkerInstanceID(ctx, envID, requestID)
+		retrievedInstance, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
 		require.NoError(t, err)
 		require.Equal(t, workerInstance, retrievedInstance)
 	})
@@ -1942,7 +1942,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify mapping exists
-		retrievedInstance, err := mgr.GetRequestWorkerInstanceID(ctx, envID, requestID)
+		retrievedInstance, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
 		require.NoError(t, err)
 		require.Equal(t, workerInstance, retrievedInstance)
 
@@ -1951,7 +1951,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Mapping should be deleted
-		retrievedInstance, err = mgr.GetRequestWorkerInstanceID(ctx, envID, requestID)
+		retrievedInstance, err = mgr.GetAssignedWorkerID(ctx, envID, requestID)
 		require.NoError(t, err)
 		require.Equal(t, "", retrievedInstance)
 	})
@@ -1973,11 +1973,11 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check mappings
-		retrieved1, err := mgr.GetRequestWorkerInstanceID(ctx, envID, request1)
+		retrieved1, err := mgr.GetAssignedWorkerID(ctx, envID, request1)
 		require.NoError(t, err)
 		require.Equal(t, worker1, retrieved1)
 
-		retrieved2, err := mgr.GetRequestWorkerInstanceID(ctx, envID, request2)
+		retrieved2, err := mgr.GetAssignedWorkerID(ctx, envID, request2)
 		require.NoError(t, err)
 		require.Equal(t, worker2, retrieved2)
 	})
@@ -2009,7 +2009,7 @@ func TestGetRequestWorkerInstanceID(t *testing.T) {
 		require.NoError(t, err)
 
 		// No mapping should exist
-		retrievedInstance, err := mgr.GetRequestWorkerInstanceID(ctx, envID, requestID)
+		retrievedInstance, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
 		require.NoError(t, err)
 		require.Equal(t, "", retrievedInstance)
 	})
@@ -2381,7 +2381,7 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		fakeClock.Advance(partialTTLForward)
 
 		// Do a heartbeat to refresh TTL
-		err = mgr.WorkerCapcityOnHeartbeat(ctx, envID, instanceID)
+		err = mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
 		require.NoError(t, err)
 
 		// FastForward past the original TTL expiration time
@@ -2579,6 +2579,10 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 		nearExpiration := consts.ConnectWorkerCapacityManagerTTL - 5*time.Second
 		r.FastForward(nearExpiration)
 		fakeClock.Advance(nearExpiration)
+
+		// perform a heartbeat to refresh the TTL
+		err = mgr.WorkerCapacityOnHeartbeat(ctx, envID, instanceID)
+		require.NoError(t, err)
 
 		// Delete the request, which should refresh TTL
 		err = mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")

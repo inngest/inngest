@@ -91,7 +91,7 @@ end
 redis.call("ZADD", workerRequestsKey, currentTime + requestLeaseDuration, requestID)
 redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 
--- Update the request-worker mapping
-redis.call("SET", requestWorkerKey, instanceID, "EX", requestWorkerMappingTTL)
+-- Update the request-worker mapping with the new TTL
+redis.call("EXPIRE", requestWorkerKey, requestWorkerMappingTTL)
 
 return 1

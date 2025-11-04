@@ -29,9 +29,6 @@ end
 redis.call("EXPIRE", workerTotalCapacityKey, workerTotalCapacityTTL)
 
 -- Refresh set key TTL
---local setExists = redis.call("EXISTS", workerRequestsKey)
--- if setExists == 1 then
 redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL) -- incase the set doesn't exist, it' returns -2 but we ignore output
---end
 
 return 1

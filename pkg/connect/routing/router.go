@@ -139,7 +139,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		return nil, ErrNoHealthyConnection
 	}
 
-	healthy := make([]connWithGroup, 0, len(conns))
+	candidates := make([]connWithGroup, 0, len(conns))
 	capacityCache := make(map[string]*checkCapacityRes)
 	workerCapacityAvailable := false
 	hasHealthyConnections := false
@@ -159,7 +159,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		// check if the connection is healthy and has worker capacity
 		if res.isHealthy && capacityCache[conn.InstanceId].hasWorkerCapacity {
 			workerCapacityAvailable = true
-			healthy = append(healthy, connWithGroup{
+			candidates = append(candidates, connWithGroup{
 				conn:  conn,
 				group: res.workerGroup,
 			})
@@ -185,11 +185,11 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		return nil, ErrAllWorkersAtCapacity
 	}
 
-	if len(healthy) == 1 {
-		return healthy[0].conn, nil
+	if len(candidates) == 1 {
+		return candidates[0].conn, nil
 	}
 
-	return pickConnection(healthy, rnd)
+	return pickConnection(candidates, rnd)
 }
 
 func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.ConnMetadata, log logger.Logger) {
