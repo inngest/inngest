@@ -52,10 +52,6 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing source location"))
 	}
 
-	if r.ResourceKind == LeaseResourceUnknown {
-		errs = multierror.Append(errs, fmt.Errorf("missing resource kind"))
-	}
-
 	if len(r.LeaseIdempotencyKeys) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency keys"))
 	}

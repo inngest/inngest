@@ -62,12 +62,6 @@ enum ConstraintApiLeaseService {
   CONSTRAINT_API_LEASE_SERVICE_API = 3;
 }
 
-enum ConstraintApiLeaseResourceKind {
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED = 0;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT = 1;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM = 2;
-}
-
 // Message definitions
 message RateLimitConfig {
   ConstraintApiRateLimitScope scope = 1;
@@ -178,12 +172,11 @@ message CapacityAcquireRequest {
   repeated ConstraintItem constraints = 6;
   int32 amount = 7;
   repeated string lease_idempotency_keys = 8;
-  ConstraintApiLeaseResourceKind resource_kind = 9;
-  google.protobuf.Timestamp current_time = 10;
-  google.protobuf.Duration duration = 11;
-  google.protobuf.Duration maximum_lifetime = 12;
-  google.protobuf.Duration blocking_threshold = 13;
-  LeaseSource source = 14;
+  google.protobuf.Timestamp current_time = 9;
+  google.protobuf.Duration duration = 10;
+  google.protobuf.Duration maximum_lifetime = 11;
+  google.protobuf.Duration blocking_threshold = 12;
+  LeaseSource source = 13;
 }
 
 message CapacityAcquireResponse {
