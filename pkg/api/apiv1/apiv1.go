@@ -68,6 +68,7 @@ type Opts struct {
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
 
+	// MetadataExtractor groups metadata extractors for multiple metadata sources.
 	MetadataExtractor meta.MetadataExtractor
 }
 
