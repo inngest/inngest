@@ -10,6 +10,10 @@ const (
 	ConstraintKindThrottle    ConstraintKind = "throttle"
 )
 
+func (k ConstraintKind) IsQueueConstraint() bool {
+	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle
+}
+
 type RateLimitConstraint struct {
 	Scope enums.RateLimitScope
 
