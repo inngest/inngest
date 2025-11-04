@@ -81,9 +81,6 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	if opts.RC == nil {
 		return nil, fmt.Errorf("redis client is required")
 	}
-	if opts.Bucket == nil {
-		return nil, fmt.Errorf("bucket is required")
-	}
 	if opts.Bufferer == nil {
 		return nil, fmt.Errorf("bufferer is required")
 	}
@@ -420,6 +417,9 @@ func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Tim
 }
 
 func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error) {
+	if b.bucket == nil {
+		return nil, fmt.Errorf("error bucket is not setup")
+	}
 	key := b.BlockKey(index, blockID)
 	logger.StdlibLogger(ctx).Debug("reading block", "block_key", key)
 	byt, err := b.bucket.ReadAll(ctx, key)
