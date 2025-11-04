@@ -127,7 +127,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 //
 // In the future, this will manage flow control for API-based runs.
 func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := context.WithoutCancel(r.Context())
 	auth, err := a.AuthFinder(ctx)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Unauthorized"))
@@ -258,7 +258,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 //
 // This updates state and o11y around the executing steps.
 func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := context.WithoutCancel(r.Context())
 	auth, err := a.AuthFinder(ctx)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Unauthorized"))
@@ -296,7 +296,7 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 //
 // For now, though, we assume that this only contains sync steps.
 func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := context.WithoutCancel(r.Context())
 	auth, err := a.AuthFinder(ctx)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Unauthorized"))
