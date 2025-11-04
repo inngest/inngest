@@ -82,19 +82,19 @@ func TestNext(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "valid but never ticks",
+			name:        "valid but never ticks Feb30",
 			cronExpr:    "0 0 30 2 *",
 			expectError: false,
 			nextIsZero:  true,
 		},
 		{
-			name:        "valid but never ticks",
+			name:        "valid but never ticks Nov31",
 			cronExpr:    "0 0 31 11 *",
 			expectError: false,
 			nextIsZero:  true,
 		},
 		{
-			name:        "valid but never ticks",
+			name:        "valid but never ticks 31st short months",
 			cronExpr:    "0 0 31 2,4,6,9,11 *",
 			nextIsZero:  true,
 			expectError: false,
