@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
 import { toMaybeDate } from '@inngest/components/utils/date';
