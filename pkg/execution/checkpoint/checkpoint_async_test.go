@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCheckpointAsyncSteps_ThreeStepRuns asserts that checkpointing three separate steps attempts
+// to save state and traces with the right data (via mock providers).
 func TestCheckpointAsyncSteps_ThreeStepRuns(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
@@ -91,6 +93,10 @@ func TestCheckpointAsyncSteps_ThreeStepRuns(t *testing.T) {
 		require.NotNil(capture.options.StartTime, "Span %d should have start time", i+1)
 		require.NotNil(capture.options.EndTime, "Span %d should have end time", i+1)
 		require.NotNil(capture.attributes, "Span %d should have attributes", i+1)
+
+		// Assert that the completed attribute is set in tracing.
+		require.NotNil(capture.attributes.Get(meta.Attrs.DynamicStatus.Key()))
+		require.EqualValues("Completed", capture.attributes.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus).String())
 	}
 
 	// ASSERTIONS: Verify queue reset is called
@@ -282,6 +288,11 @@ type mockQueue struct {
 
 func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID, jobID string) error {
 	args := m.Called(ctx, shardID, jobID)
+	return args.Error(0)
+}
+
+func (m *mockQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
+	args := m.Called(ctx, item, at, opts)
 	return args.Error(0)
 }
 
