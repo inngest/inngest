@@ -48,7 +48,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
-			fmt.Sprintf("%d", now.UnixMilli()),
+			fmt.Sprintf("%d", now.Unix()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -75,7 +75,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
-			fmt.Sprintf("%d", now.UnixMilli()),
+			fmt.Sprintf("%d", now.Unix()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -101,7 +101,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
-			fmt.Sprintf("%d", now.UnixMilli()),
+			fmt.Sprintf("%d", now.Unix()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -151,7 +151,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
-				fmt.Sprintf("%d", now.UnixMilli()),
+				fmt.Sprintf("%d", now.Unix()),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -193,7 +193,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 			instanceID,
 			requestID,
 			fmt.Sprintf("%d", expirationTime),
-			fmt.Sprintf("%d", now.UnixMilli()),
+			fmt.Sprintf("%d", now.Unix()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -438,7 +438,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
-				fmt.Sprintf("%d", now.UnixMilli()),
+				fmt.Sprintf("%d", now.Unix()),
 			}
 
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -461,7 +461,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			instanceID,
 			"req-overflow",
 			fmt.Sprintf("%d", expirationTime),
-			fmt.Sprintf("%d", now.UnixMilli()),
+			fmt.Sprintf("%d", now.Unix()),
 		}
 
 		result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
@@ -514,7 +514,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
-				fmt.Sprintf("%d", now.UnixMilli()),
+				fmt.Sprintf("%d", now.Unix()),
 			}
 			_, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
@@ -545,7 +545,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 				instanceID,
 				requestID,
 				fmt.Sprintf("%d", expirationTime),
-				fmt.Sprintf("%d", now.UnixMilli()),
+				fmt.Sprintf("%d", now.Unix()),
 			}
 			result, err := scripts["incr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)

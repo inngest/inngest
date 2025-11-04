@@ -9,7 +9,7 @@ ARGV[2]: Request lease duration in seconds
 ARGV[3]: Instance ID of the worker
 ARGV[4]: Request ID
 ARGV[5]: Expiration time as Unix timestamp (score for sorted set)
-ARGV[6]: Current time as Unix timestamp in milliseconds
+ARGV[6]: Current time as Unix timestamp in seconds
 ]]
 
 local workerTotalCapacityKey = KEYS[1]
@@ -41,7 +41,7 @@ capacity = tonumber(capacity)
 -- Get current time to filter out expired leases
 -- previous second, this makes us very sensitive to time changes
 -- Should we use the logical clock instead?
-local currentTimeUnix = tonumber(currentTime) / 1000
+local currentTimeUnix = tonumber(currentTime)
 
 -- Remove expired leases from the set first
 redis.call("ZREMRANGEBYSCORE", workerRequestsKey, "-inf", tostring(currentTimeUnix))

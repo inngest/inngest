@@ -54,7 +54,9 @@ if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > cu
 	return -2
 end
 
--- this field is only set if worker capacity is limited
+-- this field is only set if worker capacity is limited, this value represents whether we have enabled or
+-- disabled worker capacity tracking. If we have unlimited capacity, we don't track requests.
+-- If we have limited capacity, we track requests and we need to check if the request is still assigned to the worker.
 if workerCapUnlimitedBool == false then
 	local workerInstanceID = redis.call("GET", requestWorkerKey)
 	if workerInstanceID ~= instanceID then

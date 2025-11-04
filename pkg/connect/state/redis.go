@@ -975,7 +975,7 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 		instanceID,
 		requestID,
 		fmt.Sprintf("%d", expirationTime),
-		fmt.Sprintf("%d", now.UnixMilli()),
+		fmt.Sprintf("%d", now.Unix()),
 	}
 
 	result, err := scripts["incr_worker_requests"].Exec(ctx, r.client, keys, args).AsInt64()
