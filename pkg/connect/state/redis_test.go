@@ -1104,14 +1104,14 @@ func TestSetWorkerTotalCapacity(t *testing.T) {
 	envID := uuid.New()
 	instanceID := "test-instance-1"
 
-	t.Run("handles nil envID gracefully", func(t *testing.T) {
+	t.Run("fails when envID is nil", func(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, uuid.Nil, "test-instance", 5)
-		require.NoError(t, err) // Should not error, but won't be usable
+		require.Error(t, err) // Should error when env ID doesn't exist
 	})
 
-	t.Run("handles empty instanceID gracefully", func(t *testing.T) {
+	t.Run("fails when instanceID is empty", func(t *testing.T) {
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, "", 5)
-		require.NoError(t, err) // Should not error, but won't be usable
+		require.Error(t, err) // Should error when instance ID doesn't exist
 	})
 
 	t.Run("sets capacity with positive value", func(t *testing.T) {
@@ -1193,15 +1193,15 @@ func TestGetWorkerTotalCapacity(t *testing.T) {
 	envID := uuid.New()
 	instanceID := "test-instance-1"
 
-	t.Run("handles nil envID gracefully", func(t *testing.T) {
+	t.Run("fails when envID is nil", func(t *testing.T) {
 		capacity, err := mgr.GetWorkerTotalCapacity(ctx, uuid.Nil, "test-instance")
-		require.NoError(t, err)
+		require.Error(t, err) // Should error when env ID doesn't exist
 		require.Equal(t, int64(0), capacity)
 	})
 
-	t.Run("handles empty instanceID gracefully", func(t *testing.T) {
+	t.Run("fails when instanceID is empty", func(t *testing.T) {
 		capacity, err := mgr.GetWorkerTotalCapacity(ctx, envID, "")
-		require.NoError(t, err)
+		require.Error(t, err) // Should error when instance ID doesn't exist
 		require.Equal(t, int64(0), capacity)
 	})
 
@@ -1250,7 +1250,7 @@ func TestGetWorkerCapacities(t *testing.T) {
 		require.Nil(t, caps)
 	})
 
-	t.Run("returns ConnectNoWorkerCapacity when no limit set", func(t *testing.T) {
+	t.Run("returns unlimited capacity when no limit set", func(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
@@ -1440,14 +1440,14 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	t.Run("handles nil envID gracefully", func(t *testing.T) {
+	t.Run("fails when envID is nil", func(t *testing.T) {
 		err := mgr.DeleteRequestFromWorker(ctx, uuid.Nil, "test-instance", "req-1")
-		require.NoError(t, err) // Should be no-op for no-limit case
+		require.Error(t, err) // Should error when env ID doesn't exist
 	})
 
-	t.Run("handles empty instanceID gracefully", func(t *testing.T) {
+	t.Run("fails when instanceID is empty", func(t *testing.T) {
 		err := mgr.DeleteRequestFromWorker(ctx, envID, "", "req-1")
-		require.NoError(t, err) // Should be no-op for no-limit case
+		require.Error(t, err) // Should error when instance ID doesn't exist
 	})
 
 	t.Run("handles empty requestID gracefully", func(t *testing.T) {

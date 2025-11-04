@@ -42,6 +42,8 @@ var (
 	ErrWorkerRequestsSetDoesNotExists = fmt.Errorf("worker leases set does not exist")
 	// ErrRequestWorkerDoesNotExist is returned when the lease worker does not exist
 	ErrRequestWorkerDoesNotExist = fmt.Errorf("lease worker does not exist")
+	ErrEnvIDCannotBeNil          = fmt.Errorf("envID cannot be nil")
+	ErrInstanceIDCannotBeEmpty   = fmt.Errorf("instanceID cannot be empty")
 )
 
 func init() {
@@ -840,6 +842,13 @@ func (r *redisConnectionStateManager) GetAllGatewayIDs(ctx context.Context) ([]s
 // SetWorkerTotalCapacity registers a worker instance with its maximum concurrency limit.
 // If maxConcurrentLeases is 0 or negative, no limit is enforced for this worker.
 func (r *redisConnectionStateManager) SetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string, maxConcurrentLeases int64) error {
+	if envID == uuid.Nil {
+		return ErrEnvIDCannotBeNil
+	}
+	if instanceID == "" {
+		return ErrInstanceIDCannotBeEmpty
+	}
+
 	capacityKey := r.workerCapacityKey(envID, instanceID)
 
 	// If maxConcurrentLeases is <= 0, delete any existing capacity limit and counter
@@ -866,6 +875,13 @@ func (r *redisConnectionStateManager) SetWorkerTotalCapacity(ctx context.Context
 // GetWorkerTotalCapacity returns the current capacity limit for a worker instance.
 // Returns 0 if no limit is set.
 func (r *redisConnectionStateManager) GetWorkerTotalCapacity(ctx context.Context, envID uuid.UUID, instanceID string) (int64, error) {
+	if envID == uuid.Nil {
+		return 0, ErrEnvIDCannotBeNil
+	}
+	if instanceID == "" {
+		return 0, ErrInstanceIDCannotBeEmpty
+	}
+
 	key := r.workerCapacityKey(envID, instanceID)
 
 	capacity, err := r.client.Do(ctx, r.client.B().Get().Key(key).Build()).AsInt64()
@@ -891,10 +907,10 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	}
 
 	if envID == uuid.Nil {
-		return nil, fmt.Errorf("envID cannot be nil")
+		return nil, ErrEnvIDCannotBeNil
 	}
 	if strings.TrimSpace(instanceID) == "" {
-		return nil, fmt.Errorf("instanceID cannot be empty")
+		return nil, ErrInstanceIDCannotBeEmpty
 	}
 
 	// If no limit is set, return 0 (unlimited) and skip everything else
@@ -971,6 +987,13 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 
 // DeleteRequestFromWorker removes a lease from the worker's sorted set.
 func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Context, envID uuid.UUID, instanceID string, requestID string) error {
+	if envID == uuid.Nil {
+		return ErrEnvIDCannotBeNil
+	}
+	if instanceID == "" {
+		return ErrInstanceIDCannotBeEmpty
+	}
+
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
@@ -1033,11 +1056,11 @@ func (r *redisConnectionStateManager) WorkerCapcityOnHeartbeat(ctx context.Conte
 
 func (r *redisConnectionStateManager) getAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
 	if envID == uuid.Nil {
-		return nil, fmt.Errorf("envID cannot be nil")
+		return nil, ErrEnvIDCannotBeNil
 	}
 
 	if strings.TrimSpace(instanceID) == "" {
-		return nil, fmt.Errorf("instanceID cannot be empty")
+		return nil, ErrInstanceIDCannotBeEmpty
 	}
 
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
