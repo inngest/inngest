@@ -7,6 +7,23 @@ import (
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+var DefaultMetadataExtractor = MetadataExtractor{
+
+	ExtendedTrace: SpanMetadataExtractors{
+		SpanMetadataExtractorFunc(func(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
+			return []StructuredMetadata{
+				AnyStructuredMetadata(
+					"example",
+					map[string]any{
+						"key": "value",
+					},
+					MetadataOpMerge,
+				),
+			}, nil
+		}),
+	},
+}
+
 type RawMetadata map[string]json.RawMessage
 
 type StructuredMetadata interface {
