@@ -253,7 +253,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 		require.Equal(t, int64(2), result, "should return 2 when set doesn't exist")
 	})
 
-	t.Run("returns 0 and deletes set when removing last member", func(t *testing.T) {
+	t.Run("returns 1 when removing last member of set", func(t *testing.T) {
 		// Set up set with one member
 		requestID := "req-last"
 		expTime := time.Now().Add(consts.ConnectWorkerRequestToWorkerMappingTTL).Unix()
@@ -271,7 +271,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 
 		result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 		require.NoError(t, err)
-		require.Equal(t, int64(0), result, "should return 0 when set becomes empty")
+		require.Equal(t, int64(1), result, "should return 1 when set becomes empty")
 
 		// Verify set was deleted
 		require.False(t, r.Exists(workerRequestsKey), "set should be deleted when empty")
@@ -481,11 +481,13 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 			result, err := scripts["decr_worker_requests"].Exec(ctx, rc, keys, args).AsInt64()
 			require.NoError(t, err)
 
+			message := "decrement should return 1"
+			expectedResult := int64(1)
 			if i == 1 {
-				require.Equal(t, int64(0), result, "last decrement should return 0")
-			} else {
-				require.Equal(t, int64(1), result, "decrement should return 1")
+				message = "last decrement should return 1"
+				expectedResult = int64(1)
 			}
+			require.Equal(t, expectedResult, result, message)
 		}
 
 		// Verify set is deleted

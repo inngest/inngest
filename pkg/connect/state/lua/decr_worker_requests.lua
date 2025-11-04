@@ -3,7 +3,7 @@
 Removes a lease from the worker's sorted set and manages TTL/cleanup.
 
 Output:
-  0: Successfully removed, set deleted (empty)
+  0: Successfully removed, set deleted (empty) -- This return code is no longer used
   1: Successfully removed, set still active
   2: Set doesn't exist, nothing to remove
   3: Instance ID mismatch, operation denied
@@ -43,20 +43,11 @@ end
 
 -- Remove the specific request ID from the set
 redis.call("ZREM", workerRequestsKey, requestID)
-
--- Check if set is now empty and delete it
-local remainingCount = redis.call("ZCARD", workerRequestsKey)
-if remainingCount == 0 then
-  -- Set is empty, delete it and the mapping
-  redis.call("DEL", workerRequestsKey)
-  redis.call("DEL", requestWorkerKey)
-  return 0
-end
-
--- Set still has leases, refresh TTL
-redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
--- Refresh capacity TTL
-redis.call("EXPIRE", workerTotalCapacityKey, workerTotalCapacityTTL)
 -- Delete the specific request's worker mapping
 redis.call("DEL", requestWorkerKey)
+-- Refresh capacity TTL
+redis.call("EXPIRE", workerTotalCapacityKey, workerTotalCapacityTTL)
+-- Refresh TTL (if it's empty/has zero members, then redis will ignore it since empty sets in redis are cleaned up automatically)
+redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
+
 return 1
