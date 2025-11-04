@@ -64,19 +64,19 @@ const (
 	MetadataOpAdd    MetadataOp = "add"
 )
 
-type OTELMetadataExtractor interface {
+type SpanMetadataExtractor interface {
 	ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error)
 }
 
-type OTELMetadataExtractorFunc func(context.Context, *tracev1.Span) ([]StructuredMetadata, error)
+type SpanMetadataExtractorFunc func(context.Context, *tracev1.Span) ([]StructuredMetadata, error)
 
-func (f OTELMetadataExtractorFunc) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
+func (f SpanMetadataExtractorFunc) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
 	return f(ctx, span)
 }
 
-type OTELMetadataExtractors []OTELMetadataExtractor
+type SpanMetadataExtractors []SpanMetadataExtractor
 
-func (me OTELMetadataExtractors) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
+func (me SpanMetadataExtractors) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
 	var metadata []StructuredMetadata
 	for _, extractor := range me {
 		subMetadata, err := extractor.ExtractMetadata(ctx, span)
@@ -88,4 +88,8 @@ func (me OTELMetadataExtractors) ExtractMetadata(ctx context.Context, span *trac
 	}
 
 	return metadata, nil
+}
+
+type MetadataExtractor struct {
+	ExtendedTrace SpanMetadataExtractor
 }

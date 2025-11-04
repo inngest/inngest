@@ -250,8 +250,8 @@ func (a router) commitSpan(ctx context.Context, res *resource.Resource, scope *c
 	}
 
 	// TODO:feature flag this at the account level
-	if a.opts.ExtendedTraceMetadataExtractor != nil {
-		metadata, err := a.opts.ExtendedTraceMetadataExtractor.ExtractMetadata(ctx, s)
+	if a.opts.MetadataExtractor.ExtendedTrace != nil {
+		metadata, err := a.opts.MetadataExtractor.ExtendedTrace.ExtractMetadata(ctx, s)
 		if err != nil {
 			// TODO: emit warning metadata span
 		} else {

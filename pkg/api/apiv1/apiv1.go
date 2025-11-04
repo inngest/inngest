@@ -68,7 +68,7 @@ type Opts struct {
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
 
-	ExtendedTraceMetadataExtractor meta.OTELMetadataExtractor
+	MetadataExtractor meta.MetadataExtractor
 }
 
 // AddRoutes adds a new API handler to the given router.
