@@ -6,9 +6,9 @@ import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
 import { ValueRow } from './ValueRow';
 
-export type ObjectRowProps = { node: ObjectNode };
+export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
 
-export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
+export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
 
   const open = isExpanded(node.path);
@@ -22,17 +22,13 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
         className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
         onClick={hasChildren ? () => toggle(node.path) : undefined}
       >
-        {hasChildren ? (
-          <CollapsibleRowWidget open={open} />
-        ) : (
-          <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />
-        )}
+        {hasChildren ? <CollapsibleRowWidget open={open} /> : <CollapsibleIconPlaceholder />}
         <div className="-ml-0.5">
           <ValueRow
             boldName={open}
             node={makeFauxValueNode(node)}
-            typeLabelOverride={''}
-            typePillOverride={hasChildren ? keysLabel : 'object'}
+            typeLabelOverride={typeLabelOverride ?? ''}
+            typePillOverride={hasChildren ? keysLabel : 'Object'}
           />
         </div>
       </div>
@@ -47,6 +43,10 @@ export function ObjectRow({ node }: ObjectRowProps): React.ReactElement {
       )}
     </div>
   );
+}
+
+function CollapsibleIconPlaceholder() {
+  return <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />;
 }
 
 function makeFauxValueNode(node: SchemaNode): ValueNode {
