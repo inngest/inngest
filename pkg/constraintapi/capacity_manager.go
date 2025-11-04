@@ -186,7 +186,7 @@ const (
 
 // LeaseResourceKind specifies the resource associated with the capacity lease.
 //
-// For run scheduling, this is usually an event.
+// For run scheduling, this is usually an event (unless the user specified a custom idempotency key).
 // For queue constraints, this is one or more queue items.
 type LeaseResourceKind int
 
@@ -194,6 +194,7 @@ const (
 	LeaseResourceUnknown LeaseResourceKind = iota
 	LeaseResourceEvent
 	LeaseResourceQueueItem
+	LeaseResourceCustomIdempotencyKey
 )
 
 type LeaseLocation int
