@@ -1,33 +1,44 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
 import { SHOW_SCHEMA_SEARCH } from '@/components/Insights/temp-flags';
-import { useSchemas } from './useSchemas';
+import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
+import { useSchemas } from './SchemasContext/SchemasContext';
 
 export function SchemaExplorer() {
-  const { schemas } = useSchemas();
   const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { entries, isLoading, isFetchingNextPage, error } = useSchemas({ search });
 
-  // TODO: Make more resilient, an event type could be named "event"
-  const renderAdornment = useCallback((node: ValueNode) => {
-    if (node.path === 'event') {
-      return (
-        <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
-          Shared schema
-        </Pill>
-      );
-    }
-
-    return null;
+  const renderSharedAdornment = useCallback((node: ValueNode) => {
+    if (node.path !== 'event') return null;
+    return (
+      <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
+        Shared schema
+      </Pill>
+    );
   }, []);
 
+  const renderEntry = useCallback(
+    (entry: (typeof entries)[number], idx: number) => (
+      <SchemaViewer
+        key={entry.key || `${entry.displayName}:${idx}`}
+        computeType={entry.key === 'common:event' ? computeSharedEventSchemaType : undefined}
+        defaultExpandedPaths={entry.isShared ? ['event'] : undefined}
+        node={entry.node}
+        renderAdornment={entry.isShared ? renderSharedAdornment : undefined}
+      />
+    ),
+    [renderSharedAdornment, entries]
+  );
+
   return (
-    <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4">
+    <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4" ref={containerRef}>
       {SHOW_SCHEMA_SEARCH && (
         <>
           <div className="text-light text-xs font-medium uppercase">All Schemas</div>
@@ -39,25 +50,21 @@ export function SchemaExplorer() {
           />
         </>
       )}
-
-      <div>
-        {schemas.map((schema) => (
-          <SchemaViewer
-            key={schema.name}
-            computeType={computeType}
-            defaultExpandedPaths={['event']}
-            hide={Boolean(search) && !schema.name.startsWith(search)}
-            node={schema}
-            renderAdornment={renderAdornment}
-          />
-        ))}
-      </div>
+      <>
+        <SchemaExplorerSwitcher
+          entries={entries}
+          error={error}
+          isLoading={isLoading}
+          isFetchingNextPage={isFetchingNextPage}
+          renderEntry={renderEntry}
+        />
+        {/* TODO: Add infinite scroll trigger */}
+      </>
     </div>
   );
 }
 
-// TODO: Make more resilient, an event type could be named "event"
-const computeType = (node: ValueNode, baseLabel: string): string => {
+function computeSharedEventSchemaType(node: ValueNode, baseLabel: string): string {
   if (node.path === 'event.data' && baseLabel === 'string') return 'JSON';
   return baseLabel;
-};
+}
