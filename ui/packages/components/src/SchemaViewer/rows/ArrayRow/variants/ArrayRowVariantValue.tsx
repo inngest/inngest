@@ -1,5 +1,6 @@
 'use client';
 
+import { valueTypeLabel } from '../../../typeUtil';
 import type { ArrayNode, ValueNode } from '../../../types';
 import { ValueRow } from '../../ValueRow';
 
@@ -16,12 +17,8 @@ export function ArrayRowVariantValue({ node }: { node: ArrayNode }): React.React
 
 function buildArrayValueLabel(element: ValueNode): string {
   if (Array.isArray(element.type)) {
-    const parts = element.type.map(capitalize).sort((a, b) => a.localeCompare(b));
-    return parts.length > 1 ? `[](${parts.join(' | ')})` : `[]${parts[0]}`;
+    const base = valueTypeLabel(element);
+    return element.type.length > 1 ? `[](${base})` : `[]${base}`;
   }
-  return `[]${capitalize(element.type)}`;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return `[]${valueTypeLabel(element)}`;
 }

@@ -6,9 +6,9 @@ import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
 import { ValueRow } from './ValueRow';
 
-export type TupleRowProps = { node: TupleNode };
+export type TupleRowProps = { node: TupleNode; typeLabelOverride?: string };
 
-export function TupleRow({ node }: TupleRowProps): React.ReactElement {
+export function TupleRow({ node, typeLabelOverride }: TupleRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
   const open = isExpanded(node.path);
 
@@ -17,7 +17,11 @@ export function TupleRow({ node }: TupleRowProps): React.ReactElement {
       <div className="flex cursor-pointer items-center" onClick={() => toggle(node.path)}>
         <CollapsibleRowWidget open={open} />
         <div className="-ml-0.5">
-          <ValueRow boldName={open} node={makeFauxValueNode(node)} typeLabelOverride={'[]'} />
+          <ValueRow
+            boldName={open}
+            node={makeFauxValueNode(node)}
+            typeLabelOverride={typeLabelOverride ?? '[]'}
+          />
         </div>
       </div>
       {open && (
