@@ -1862,7 +1862,7 @@ func (i *keyIter) init(ctx context.Context, keys []string, scores []float64, chu
 	i.keys = keys
 	i.chunk = chunk
 	i.scores = scores
-	i.hasScores = len(scores) > 0
+	i.hasScores = len(scores) == len(keys)
 	err := i.fetch(ctx)
 	if err == errScanDone {
 		return nil
