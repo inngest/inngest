@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -14,8 +15,40 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	t.Run("test empty partition", func(t *testing.T) {
+		r.FlushAll()
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithClock(clock),
+		)
+
+		_, err := q.ItemsByPartition(ctx, defaultShard, "i-dont-exist", time.Time{}, clock.Now().Add(time.Minute),
+			WithQueueItemIterBatchSize(150),
+		)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, rueidis.Nil))
+	})
+
+}
 
 func TestItemsByPartition(t *testing.T) {
 	r, rc := initRedis(t)
