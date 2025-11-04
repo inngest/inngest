@@ -31,18 +31,13 @@ func RawMetadataAttrs(kind meta.MetadataKind, metadata meta.RawMetadata, op meta
 	return rawAttrs
 }
 
-func MetadataAttrs(metadata meta.StructuredMetadata, op meta.MetadataOp) (*meta.SerializableAttrs, error) {
-	rawAttrs := meta.NewAttrSet()
-
-	kind := metadata.Kind()
-	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
-
+func MetadataAttrs(metadata meta.StructuredMetadata) (*meta.SerializableAttrs, error) {
 	rawMetadata, err := metadata.Serialize()
 	if err != nil {
 		return nil, err
 	}
 
-	return RawMetadataAttrs(kind, rawMetadata, op), nil
+	return RawMetadataAttrs(metadata.Kind(), rawMetadata, metadata.Op()), nil
 }
 
 func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {
