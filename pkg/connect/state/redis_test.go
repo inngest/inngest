@@ -1574,10 +1574,11 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 
 		// get the capacities
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.Equal(t, int64(0), caps.Available)
 		require.Equal(t, int64(2), caps.Total)
-		require.Equal(t, []string{"req-1", "req-2"}, caps.CurrentLeases)
+		require.Equal(t, []string{"req-1", "req-2"}, currentLeases)
 		require.NoError(t, err)
 
 		// Should reject
@@ -2016,6 +2017,7 @@ func TestGetAssignedWorkerID(t *testing.T) {
 }
 
 func TestGetAllActiveWorkerRequests(t *testing.T) {
+	isWorkerCapacityUnlimited := false
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -2031,28 +2033,28 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 
 	t.Run("returns error for nil envID", func(t *testing.T) {
 		instanceID := "test-instance"
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, uuid.Nil, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, uuid.Nil, instanceID, isWorkerCapacityUnlimited)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "envID cannot be nil")
 		require.Nil(t, leases)
 	})
 
 	t.Run("returns error for empty instanceID", func(t *testing.T) {
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, "")
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, "", isWorkerCapacityUnlimited)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "instanceID cannot be empty")
 		require.Nil(t, leases)
 
 		// Test with whitespace-only instanceID
-		leases, err = mgr.getAllActiveWorkerRequests(ctx, envID, "   ")
+		leases, err = mgr.GetAllActiveWorkerRequests(ctx, envID, "   ", isWorkerCapacityUnlimited)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "instanceID cannot be empty")
 		require.Nil(t, leases)
 	})
 
-	t.Run("returns empty slice when no leases exist", func(t *testing.T) {
+	t.Run("returns empty slice when unlimited capacity", func(t *testing.T) {
 		instanceID := "non-existent-instance"
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, true)
 		require.NoError(t, err)
 		require.NotNil(t, leases)
 		require.Equal(t, []string{}, leases)
@@ -2073,7 +2075,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "lease-3")
 		require.NoError(t, err)
 
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases, 3)
 		require.Contains(t, leases, "lease-1")
@@ -2097,7 +2099,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		pastTime := time.Now().Add(-90 * time.Second).Unix()
 		_, _ = r.ZAdd(setKey, float64(pastTime), "expired-lease")
 
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases, 1)
 		require.Contains(t, leases, "active-lease")
@@ -2124,7 +2126,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		_, _ = r.ZAdd(setKey, float64(pastTime1), "expired-1")
 		_, _ = r.ZAdd(setKey, float64(pastTime2), "expired-2")
 
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases, 2)
 		require.Contains(t, leases, "active-1")
@@ -2150,7 +2152,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		_, _ = r.ZAdd(setKey, float64(futureTime), "")    // empty string
 		_, _ = r.ZAdd(setKey, float64(futureTime), "   ") // whitespace only
 
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases, 1)
 		require.Contains(t, leases, "valid-lease")
@@ -2172,7 +2174,7 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		leases, err := mgr.getAllActiveWorkerRequests(ctx, envID, instanceID)
+		leases, err := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases, 100)
 
@@ -2205,17 +2207,17 @@ func TestGetAllActiveWorkerRequests(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify isolation
-		leases1, err := mgr.getAllActiveWorkerRequests(ctx, envID1, instanceID1)
+		leases1, err := mgr.GetAllActiveWorkerRequests(ctx, envID1, instanceID1, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases1, 1)
 		require.Contains(t, leases1, "env1-inst1-lease1")
 
-		leases2, err := mgr.getAllActiveWorkerRequests(ctx, envID1, instanceID2)
+		leases2, err := mgr.GetAllActiveWorkerRequests(ctx, envID1, instanceID2, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases2, 1)
 		require.Contains(t, leases2, "env1-inst2-lease1")
 
-		leases3, err := mgr.getAllActiveWorkerRequests(ctx, envID2, instanceID1)
+		leases3, err := mgr.GetAllActiveWorkerRequests(ctx, envID2, instanceID1, isWorkerCapacityUnlimited)
 		require.NoError(t, err)
 		require.Len(t, leases3, 1)
 		require.Contains(t, leases3, "env2-inst1-lease1")
@@ -2271,8 +2273,9 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		// Check capacity again - first request should have expired
 		caps, err = mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
 		// DISCOVERED BUG: Timing inconsistency affects expiration detection
-		t.Logf("After expiration: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, caps.CurrentLeases)
+		t.Logf("After expiration: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, currentLeases)
 		require.True(t, caps.Available >= 0, "Capacity should not be negative")
 	})
 
@@ -2350,7 +2353,8 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		// Due to a boundary condiiton on time we allow both
-		t.Logf("At exact boundary: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, caps.CurrentLeases)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("At exact boundary: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, currentLeases)
 		// The request might not be expired due to boundary condition bug
 		require.True(t, caps.Available >= 0, "Capacity should not be negative")
 
@@ -2465,7 +2469,8 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		// DISCOVERED BUG: Stress test reveals timing inconsistencies
-		t.Logf("After stress test expiration: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, caps.CurrentLeases)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("After stress test expiration: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, currentLeases)
 		require.True(t, caps.Available >= 0 && caps.Available <= 3, "Capacity should be reasonable")
 	})
 }
@@ -2525,7 +2530,8 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 
 		// The request should be considered expired now
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), caps.Available)
 
@@ -2551,19 +2557,22 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 
 		// All should be assigned successfully
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), caps.Available)
 
 		// FastForward past the first request expiration
-		r.FastForward(consts.ConnectWorkerRequestToWorkerMappingTTL - 4*time.Second)
-		fakeClock.Advance(consts.ConnectWorkerRequestToWorkerMappingTTL - 4*time.Second)
+		r.FastForward(consts.ConnectWorkerRequestToWorkerMappingTTL - 5*time.Second)
+		fakeClock.Advance(consts.ConnectWorkerRequestToWorkerMappingTTL - 5*time.Second)
 
 		// First request should have expired, others still active
 		caps, err = mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ = mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.Equal(t, int64(1), caps.Available) // One should have expired
+		require.Equal(t, currentLeases, []string{"req-1", "req-2"})
 	})
 
 	t.Run("TTL refresh timing with FastForward during operations", func(t *testing.T) {
@@ -2594,7 +2603,8 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 
 		// Capacity should still be available because delete refreshed TTL
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), caps.Total) // Should still exist due to TTL refresh
 	})
@@ -2622,9 +2632,10 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 
 		// Should now be available
 		caps, err = mgr.GetWorkerCapacities(ctx, envID, instanceID)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
 		require.NoError(t, err)
 		// DISCOVERED BUG: Timing precision issues with boundary conditions
-		t.Logf("After millisecond precision test: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, caps.CurrentLeases)
+		t.Logf("After millisecond precision test: Available=%d, Total=%d, CurrentLeases=%v", caps.Available, caps.Total, currentLeases)
 		require.True(t, caps.Available >= 0, "Capacity should not be negative")
 	})
 
@@ -2655,7 +2666,8 @@ func TestWorkerCapacityManager_TimeHandlingEdgeCases(t *testing.T) {
 		fakeClock.Advance(consts.ConnectWorkerRequestToWorkerMappingTTL + time.Second)
 		// All should be expired
 		caps, err = mgr.GetWorkerCapacities(ctx, envID, instanceID)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), caps.Available)
 	})
@@ -2678,7 +2690,7 @@ func TestWorkerCapacityManager_DocumentedTimingBugs(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()
 
-	t.Run("getAllActiveWorkerRequests vs Lua script consistency", func(t *testing.T) {
+	t.Run("GetAllActiveWorkerRequests vs Lua script consistency", func(t *testing.T) {
 		instanceID := "bug-query-inconsistency"
 		err := mgr.SetWorkerTotalCapacity(ctx, envID, instanceID, 1)
 		require.NoError(t, err)
@@ -2692,9 +2704,10 @@ func TestWorkerCapacityManager_DocumentedTimingBugs(t *testing.T) {
 
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, caps.CurrentLeases, caps.Total, caps.Available)
+		currentLeases, _ := mgr.GetAllActiveWorkerRequests(ctx, envID, instanceID, caps.IsUnlimited())
+		t.Logf("Instance: %v, Current Leases: %v, Total: %v, Available: %v", instanceID, currentLeases, caps.Total, caps.Available)
 		require.Equal(t, int64(0), caps.Available)
-		require.Equal(t, int64(1), int64(len(caps.CurrentLeases)))
+		require.Equal(t, int64(1), int64(len(currentLeases)))
 
 	})
 }

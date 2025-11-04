@@ -914,7 +914,8 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	}
 
 	// If no limit is set, return 0 (unlimited) and skip everything else
-	if totalCapacity == 0 {
+	isWorkerCapacityUnlimited := totalCapacity == 0
+	if isWorkerCapacityUnlimited {
 		return &WorkerCapacity{
 			Total:     totalCapacity,
 			Available: consts.ConnectWorkerNoConcurrencyLimitForRequests,
@@ -922,18 +923,22 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	}
 
 	// if the worker has limited capacity, we need to check the leases set
-	allActiveLeases, err := r.getAllActiveWorkerRequests(ctx, envID, instanceID)
-	if err != nil { // this shouldn't be redis error
-		return nil, fmt.Errorf("failed to get all active worker leases: %w", err)
+	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
+	currentTime := r.c.Now().Unix()
+
+	// Count active leases (requests that haven't expired yet)
+	activeLeaseCount, err := r.client.Do(ctx, r.client.B().Zcount().Key(workerRequestsKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()).AsInt64()
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return nil, fmt.Errorf("failed to count active worker leases: %w", err)
 	}
+	// in case of redis error, we assume there are no active leases, so activeLeaseCount is 0
 
 	// Ensure available capacity is never negative (since -1 is reserved for unlimited capacity)
-	availableCapacity := max(0, totalCapacity-int64(len(allActiveLeases)))
+	availableCapacity := max(0, totalCapacity-activeLeaseCount)
 
 	return &WorkerCapacity{
-		Total:         totalCapacity,
-		Available:     availableCapacity,
-		CurrentLeases: allActiveLeases,
+		Total:     totalCapacity,
+		Available: availableCapacity,
 	}, nil
 
 }
@@ -1051,7 +1056,13 @@ func (r *redisConnectionStateManager) WorkerCapacityOnHeartbeat(ctx context.Cont
 	return nil
 }
 
-func (r *redisConnectionStateManager) getAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string) ([]string, error) {
+func (r *redisConnectionStateManager) GetAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string, isWorkerCapacityUnlimited bool) ([]string, error) {
+
+	// if the worker capacity is unlimited, return an empty slice, we don't track leases for unlimited capacity
+	if isWorkerCapacityUnlimited {
+		return []string{}, nil
+	}
+
 	if envID == uuid.Nil {
 		return nil, ErrEnvIDCannotBeNil
 	}

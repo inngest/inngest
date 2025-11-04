@@ -123,6 +123,9 @@ type WorkerCapacityManager interface {
 	// WorkerCapacityOnHeartbeat refreshes the TTL on the worker capacity key.
 	// Called on heartbeat to keep the capacity limit alive while worker is active.
 	WorkerCapacityOnHeartbeat(ctx context.Context, envID uuid.UUID, instanceID string) error
+
+	// GetAllActiveWorkerRequests returns all active requests for a worker instance.
+	GetAllActiveWorkerRequests(ctx context.Context, envID uuid.UUID, instanceID string, isWorkerCapacityUnlimited bool) ([]string, error)
 }
 
 type AuthContext struct {
@@ -411,9 +414,8 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 }
 
 type WorkerCapacity struct {
-	Total         int64
-	Available     int64
-	CurrentLeases []string
+	Total     int64
+	Available int64
 }
 
 func (w *WorkerCapacity) IsUnlimited() bool {
