@@ -1381,11 +1381,12 @@ type CapacityAcquireRequest struct {
 	Constraints          []*ConstraintItem      `protobuf:"bytes,6,rep,name=constraints,proto3" json:"constraints,omitempty"`
 	Amount               int32                  `protobuf:"varint,7,opt,name=amount,proto3" json:"amount,omitempty"`
 	LeaseIdempotencyKeys []string               `protobuf:"bytes,8,rep,name=lease_idempotency_keys,json=leaseIdempotencyKeys,proto3" json:"lease_idempotency_keys,omitempty"`
-	CurrentTime          *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=current_time,json=currentTime,proto3" json:"current_time,omitempty"`
-	Duration             *durationpb.Duration   `protobuf:"bytes,10,opt,name=duration,proto3" json:"duration,omitempty"`
-	MaximumLifetime      *durationpb.Duration   `protobuf:"bytes,11,opt,name=maximum_lifetime,json=maximumLifetime,proto3" json:"maximum_lifetime,omitempty"`
-	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,12,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
-	Source               *LeaseSource           `protobuf:"bytes,13,opt,name=source,proto3" json:"source,omitempty"`
+	LeaseRunIds          []string               `protobuf:"bytes,9,rep,name=lease_run_ids,json=leaseRunIds,proto3" json:"lease_run_ids,omitempty"`
+	CurrentTime          *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=current_time,json=currentTime,proto3" json:"current_time,omitempty"`
+	Duration             *durationpb.Duration   `protobuf:"bytes,11,opt,name=duration,proto3" json:"duration,omitempty"`
+	MaximumLifetime      *durationpb.Duration   `protobuf:"bytes,12,opt,name=maximum_lifetime,json=maximumLifetime,proto3" json:"maximum_lifetime,omitempty"`
+	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
+	Source               *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1472,6 +1473,13 @@ func (x *CapacityAcquireRequest) GetAmount() int32 {
 func (x *CapacityAcquireRequest) GetLeaseIdempotencyKeys() []string {
 	if x != nil {
 		return x.LeaseIdempotencyKeys
+	}
+	return nil
+}
+
+func (x *CapacityAcquireRequest) GetLeaseRunIds() []string {
+	if x != nil {
+		return x.LeaseRunIds
 	}
 	return nil
 }
@@ -1859,7 +1867,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x15CapacityCheckResponse\x12-\n" +
 	"\x12available_capacity\x18\x01 \x01(\x05R\x11availableCapacity\x12S\n" +
 	"\x14limiting_constraints\x18\x02 \x03(\v2 .constraintapi.v1.ConstraintItemR\x13limitingConstraints\x127\n" +
-	"\x05usage\x18\x03 \x03(\v2!.constraintapi.v1.ConstraintUsageR\x05usage\"\xb1\x05\n" +
+	"\x05usage\x18\x03 \x03(\v2!.constraintapi.v1.ConstraintUsageR\x05usage\"\xd5\x05\n" +
 	"\x16CapacityAcquireRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -1870,13 +1878,14 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\rconfiguration\x18\x05 \x01(\v2\".constraintapi.v1.ConstraintConfigR\rconfiguration\x12B\n" +
 	"\vconstraints\x18\x06 \x03(\v2 .constraintapi.v1.ConstraintItemR\vconstraints\x12\x16\n" +
 	"\x06amount\x18\a \x01(\x05R\x06amount\x124\n" +
-	"\x16lease_idempotency_keys\x18\b \x03(\tR\x14leaseIdempotencyKeys\x12=\n" +
-	"\fcurrent_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\vcurrentTime\x125\n" +
-	"\bduration\x18\n" +
-	" \x01(\v2\x19.google.protobuf.DurationR\bduration\x12D\n" +
-	"\x10maximum_lifetime\x18\v \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
-	"\x12blocking_threshold\x18\f \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
-	"\x06source\x18\r \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"\xe4\x01\n" +
+	"\x16lease_idempotency_keys\x18\b \x03(\tR\x14leaseIdempotencyKeys\x12\"\n" +
+	"\rlease_run_ids\x18\t \x03(\tR\vleaseRunIds\x12=\n" +
+	"\fcurrent_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vcurrentTime\x125\n" +
+	"\bduration\x18\v \x01(\v2\x19.google.protobuf.DurationR\bduration\x12D\n" +
+	"\x10maximum_lifetime\x18\f \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
+	"\x12blocking_threshold\x18\r \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
+	"\x06source\x18\x0e \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\"\xe4\x01\n" +
 	"\x17CapacityAcquireResponse\x127\n" +
 	"\x06leases\x18\x01 \x03(\v2\x1f.constraintapi.v1.CapacityLeaseR\x06leases\x12S\n" +
 	"\x14limiting_constraints\x18\x02 \x03(\v2 .constraintapi.v1.ConstraintItemR\x13limitingConstraints\x12;\n" +

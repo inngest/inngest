@@ -645,6 +645,11 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		constraints[i] = ConstraintItemToProto(item)
 	}
 
+	leaseRunIDs := make([]string, len(req.LeaseRunIDs))
+	for i := range req.LeaseRunIDs {
+		leaseRunIDs[i] = req.LeaseRunIDs[i].String()
+	}
+
 	return &pb.CapacityAcquireRequest{
 		IdempotencyKey:       req.IdempotencyKey,
 		AccountId:            req.AccountID.String(),
@@ -654,6 +659,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		Constraints:          constraints,
 		Amount:               int32(req.Amount),
 		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
+		LeaseRunIds:          leaseRunIDs,
 		CurrentTime:          timestamppb.New(req.CurrentTime),
 		Duration:             durationpb.New(req.Duration),
 		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
@@ -707,6 +713,15 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		blockingThreshold = pbReq.BlockingThreshold.AsDuration()
 	}
 
+	leaseRunIDs := make([]ulid.ULID, len(pbReq.LeaseRunIds))
+	for i, v := range pbReq.LeaseRunIds {
+		parsed, err := ulid.Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid run ID: %w", err)
+		}
+		leaseRunIDs[i] = parsed
+	}
+
 	return &CapacityAcquireRequest{
 		IdempotencyKey:       pbReq.IdempotencyKey,
 		AccountID:            accountID,
@@ -716,6 +731,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		Constraints:          constraints,
 		Amount:               int(pbReq.Amount),
 		LeaseIdempotencyKeys: pbReq.LeaseIdempotencyKeys,
+		LeaseRunIDs:          leaseRunIDs,
 		CurrentTime:          currentTime,
 		Duration:             duration,
 		MaximumLifetime:      maximumLifetime,
