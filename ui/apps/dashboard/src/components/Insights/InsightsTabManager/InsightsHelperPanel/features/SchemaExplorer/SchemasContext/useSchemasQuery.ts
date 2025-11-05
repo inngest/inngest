@@ -31,10 +31,10 @@ export function useSchemasQuery(search: string) {
 
   return {
     entries,
-    error: null,
-    fetchNextPage: () => {},
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    isLoading: false,
+    error: query.error?.message ?? null,
+    fetchNextPage: query.fetchNextPage,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    isLoading: query.isFetching,
   };
 }

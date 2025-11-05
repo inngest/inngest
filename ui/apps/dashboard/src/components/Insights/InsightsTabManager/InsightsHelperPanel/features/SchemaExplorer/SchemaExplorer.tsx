@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Pill } from '@inngest/components/Pill/Pill';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
@@ -12,7 +13,9 @@ import { useSchemas } from './SchemasContext/SchemasContext';
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { entries } = useSchemas({ search });
+  const { entries, hasNextPage, fetchNextPage, isLoading, isFetchingNextPage } = useSchemas({
+    search,
+  });
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'event') return null;
@@ -51,8 +54,14 @@ export function SchemaExplorer() {
       )}
       <div className="flex flex-col gap-1">
         {entries.map(renderEntry)}
-        {/* TODO: Handle infinite scroll and loading, error states */}
-        {/* TODO: Add infinite scroll trigger */}
+        {/* TODO: Handle loading and error states */}
+        <InfiniteScrollTrigger
+          onIntersect={fetchNextPage}
+          hasMore={hasNextPage ?? false}
+          isLoading={isLoading || isFetchingNextPage}
+          root={containerRef.current}
+          rootMargin="50px"
+        />
       </div>
     </div>
   );
