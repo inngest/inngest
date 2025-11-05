@@ -576,16 +576,40 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 	for time.Now().Before(until) {
 		output, err := a.outputReader.RunOutput(r.Context(), claims.Env, claims.RunID)
+		if err != nil {
+			time.Sleep(CheckpointPollInterval)
+			continue
+		}
 
-		if err == nil {
-			// XXX: (tonyhb) add status code handling here.
+		if len(output) == 0 {
+			// XXX: should never happen as the APIResult struct is marshalled.
+			return
+		}
+
+		// We expect that the output is a wrapped {"data":APIRsult} type.  Check to see the first token
+		// is an object, else this will be encrypted.
+		if output[1] != '{' {
 			_, _ = w.Write(output)
 			return
 		}
-		time.Sleep(CheckpointPollInterval)
+
+		res := struct {
+			Data checkpoint.APIResult `json:"data"`
+		}{}
+		if err := json.Unmarshal(output, &res); err == nil {
+			for k, v := range res.Data.Headers {
+				w.Header().Set(k, v)
+			}
+			w.WriteHeader(res.Data.StatusCode)
+			_, _ = w.Write(res.Data.Body)
+			return
+		}
+
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write(output)
+		return
 	}
 
-	w.Header().Set("content-type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
 }
 
