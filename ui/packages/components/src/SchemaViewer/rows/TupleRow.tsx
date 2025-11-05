@@ -19,7 +19,7 @@ export function TupleRow({ node, typeLabelOverride }: TupleRowProps): React.Reac
         className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
         onClick={hasChildren ? () => toggle(node.path) : undefined}
       >
-        {hasChildren ? <CollapsibleRowWidget open={open} /> : <CollapsibleIconPlaceholder />}
+        {hasChildren ? <CollapsibleRowWidget open={open} /> : null}
         <div className="-ml-0.5">
           <ValueRow
             boldName={open}
@@ -44,8 +44,4 @@ export function TupleRow({ node, typeLabelOverride }: TupleRowProps): React.Reac
 
 function makeFauxValueNode(node: TupleNode): ValueNode {
   return { kind: 'value', name: node.name, path: node.path, type: 'array' };
-}
-
-function CollapsibleIconPlaceholder() {
-  return <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />;
 }

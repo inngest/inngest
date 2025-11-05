@@ -22,7 +22,7 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
         className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
         onClick={hasChildren ? () => toggle(node.path) : undefined}
       >
-        {hasChildren ? <CollapsibleRowWidget open={open} /> : <CollapsibleIconPlaceholder />}
+        {hasChildren ? <CollapsibleRowWidget open={open} /> : null}
         <div className="-ml-0.5">
           <ValueRow
             boldName={open}
@@ -43,10 +43,6 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
       )}
     </div>
   );
-}
-
-function CollapsibleIconPlaceholder() {
-  return <span className="text-muted -mb-0.5 inline-flex h-4 w-4 items-center justify-center" />;
 }
 
 function makeFauxValueNode(node: SchemaNode): ValueNode {
