@@ -7,7 +7,7 @@ import { Row } from '../../Row';
 import { TupleRow } from '../../TupleRow';
 import { ValueRow } from '../../ValueRow';
 
-export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.ReactElement {
+export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.ReactElement | null {
   const info = computeNestedTerminal(node.element);
 
   switch (info.terminal) {
@@ -45,7 +45,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
       );
     }
     default:
-      return <Row node={node.element} />;
+      return null;
   }
 }
 
