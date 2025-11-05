@@ -162,6 +162,146 @@ func (c ConstraintItem) ToSerializedConstraintItem() SerializedConstraintItem {
 	return serialized
 }
 
+// SerializedConstraintConfig represents a minimal, Lua-friendly version of ConstraintConfig
+// with short JSON field names and integer enums to reduce Redis storage size.
+type SerializedConstraintConfig struct {
+	// v = FunctionVersion
+	FunctionVersion int `json:"v,omitempty"`
+
+	// r = RateLimit configs
+	RateLimit []SerializedRateLimitConfig `json:"r,omitempty"`
+
+	// c = Concurrency config
+	Concurrency SerializedConcurrencyConfig `json:"c,omitempty"`
+
+	// t = Throttle configs
+	Throttle []SerializedThrottleConfig `json:"t,omitempty"`
+}
+
+// SerializedRateLimitConfig represents a minimal version of RateLimitConfig
+type SerializedRateLimitConfig struct {
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// l = Limit
+	Limit int `json:"l,omitempty"`
+
+	// p = Period
+	Period string `json:"p,omitempty"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+}
+
+// SerializedConcurrencyConfig represents a minimal version of ConcurrencyConfig
+type SerializedConcurrencyConfig struct {
+	// ac = AccountConcurrency
+	AccountConcurrency int `json:"ac,omitempty"`
+
+	// fc = FunctionConcurrency
+	FunctionConcurrency int `json:"fc,omitempty"`
+
+	// arc = AccountRunConcurrency
+	AccountRunConcurrency int `json:"arc,omitempty"`
+
+	// frc = FunctionRunConcurrency
+	FunctionRunConcurrency int `json:"frc,omitempty"`
+
+	// cck = CustomConcurrencyKeys
+	CustomConcurrencyKeys []SerializedCustomConcurrencyLimit `json:"cck,omitempty"`
+}
+
+// SerializedCustomConcurrencyLimit represents a minimal version of CustomConcurrencyLimit
+type SerializedCustomConcurrencyLimit struct {
+	// m = Mode as integer: 0=Step, 1=Run
+	Mode int `json:"m,omitempty"`
+
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// l = Limit
+	Limit int `json:"l,omitempty"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+}
+
+// SerializedThrottleConfig represents a minimal version of ThrottleConfig
+type SerializedThrottleConfig struct {
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// l = Limit
+	Limit int `json:"l,omitempty"`
+
+	// b = Burst
+	Burst int `json:"b,omitempty"`
+
+	// p = Period
+	Period int `json:"p,omitempty"`
+
+	// h = ThrottleKeyExpressionHash
+	ThrottleKeyExpressionHash string `json:"h,omitempty"`
+}
+
+// ToSerializedConstraintConfig converts a ConstraintConfig to a SerializedConstraintConfig
+// for efficient storage in Redis and easy consumption in Lua scripts.
+func (c ConstraintConfig) ToSerializedConstraintConfig() SerializedConstraintConfig {
+	serialized := SerializedConstraintConfig{
+		FunctionVersion: c.FunctionVersion,
+	}
+
+	// Convert RateLimit configs
+	if len(c.RateLimit) > 0 {
+		serialized.RateLimit = make([]SerializedRateLimitConfig, len(c.RateLimit))
+		for i, rl := range c.RateLimit {
+			serialized.RateLimit[i] = SerializedRateLimitConfig{
+				Scope:             int(rl.Scope),
+				Limit:             rl.Limit,
+				Period:            rl.Period,
+				KeyExpressionHash: rl.KeyExpressionHash,
+			}
+		}
+	}
+
+	// Convert Concurrency config
+	serialized.Concurrency = SerializedConcurrencyConfig{
+		AccountConcurrency:     c.Concurrency.AccountConcurrency,
+		FunctionConcurrency:    c.Concurrency.FunctionConcurrency,
+		AccountRunConcurrency:  c.Concurrency.AccountRunConcurrency,
+		FunctionRunConcurrency: c.Concurrency.FunctionRunConcurrency,
+	}
+
+	// Convert CustomConcurrencyKeys
+	if len(c.Concurrency.CustomConcurrencyKeys) > 0 {
+		serialized.Concurrency.CustomConcurrencyKeys = make([]SerializedCustomConcurrencyLimit, len(c.Concurrency.CustomConcurrencyKeys))
+		for i, cck := range c.Concurrency.CustomConcurrencyKeys {
+			serialized.Concurrency.CustomConcurrencyKeys[i] = SerializedCustomConcurrencyLimit{
+				Mode:              int(cck.Mode),
+				Scope:             int(cck.Scope),
+				Limit:             cck.Limit,
+				KeyExpressionHash: cck.KeyExpressionHash,
+			}
+		}
+	}
+
+	// Convert Throttle configs
+	if len(c.Throttle) > 0 {
+		serialized.Throttle = make([]SerializedThrottleConfig, len(c.Throttle))
+		for i, t := range c.Throttle {
+			serialized.Throttle[i] = SerializedThrottleConfig{
+				Scope:                     int(t.Scope),
+				Limit:                     t.Limit,
+				Burst:                     t.Burst,
+				Period:                    t.Period,
+				ThrottleKeyExpressionHash: t.ThrottleKeyExpressionHash,
+			}
+		}
+	}
+
+	return serialized
+}
+
 func strSlice(args []any) ([]string, error) {
 	res := make([]string, len(args))
 	for i, item := range args {
