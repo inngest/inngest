@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -306,7 +307,8 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 	// to the state store.  We only care about serializing state if we switch from sync -> async,
 	// as the state will be used for resuming functions.
 	complete := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-		return s.Op == enums.OpcodeRunComplete
+		// OpcodeRunComplete is here for legacy reasons and to catch misbehaving SDKs on the offchance.
+		return s.Op == enums.OpcodeRunComplete || s.Op == enums.OpcodeSyncRunComplete
 	})
 
 	async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
@@ -458,9 +460,10 @@ func (a checkpointAPI) checkpoint(ctx context.Context, input checkpointSteps, w 
 				l.Error("error handlign step error in checkpoint", "error", err, "opcode", op.Op)
 			}
 
-		case enums.OpcodeRunComplete:
+		case enums.OpcodeRunComplete, enums.OpcodeSyncRunComplete:
+			// Both opcodes in a sync fn cehckpoint should always return this shape of data.
 			result := struct {
-				Data APIResult `json:"data"`
+				Data checkpoint.APIResult `json:"data"`
 			}{}
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
@@ -509,10 +512,10 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 	}
 
 	input := struct {
-		RunID  ulid.ULID `json:"run_id"`
-		FnID   uuid.UUID `json:"fn_id"`
-		AppID  uuid.UUID `json:"app_id"`
-		Result APIResult `json:"result"`
+		RunID  ulid.ULID            `json:"run_id"`
+		FnID   uuid.UUID            `json:"fn_id"`
+		AppID  uuid.UUID            `json:"app_id"`
+		Result checkpoint.APIResult `json:"result"`
 	}{}
 
 	// Load the state from the state store.
@@ -588,7 +591,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
 // work has finished, and eg. step.Defer items are not running.
-func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
+func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result checkpoint.APIResult) error {
 	httpHeader := http.Header{}
 	for k, v := range result.Headers {
 		httpHeader[k] = []string{v}
@@ -596,11 +599,9 @@ func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result API
 
 	return a.Executor.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: md,
-		RunMode:  enums.RunModeSync,
-		Response: state.DriverResponse{
-			Output:     result.Body,
-			Header:     httpHeader,
-			StatusCode: result.StatusCode,
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseAPI,
+			APIResponse: result,
 		},
 		Optional: execution.FinalizeOptional{},
 	})

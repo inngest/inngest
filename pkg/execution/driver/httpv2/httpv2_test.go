@@ -323,7 +323,7 @@ func TestParseOpcodes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ops, err := parseOpcodes(tt.input)
+			ops, err := parseOpcodes(tt.input, 200)
 
 			if tt.expectedError != "" {
 				require.NotNil(t, err)

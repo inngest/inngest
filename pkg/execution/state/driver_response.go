@@ -297,6 +297,11 @@ func (r *DriverResponse) IsFunctionResult() bool {
 		if op.Op != enums.OpcodeNone {
 			return false
 		}
+
+		// Always a result...
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			return true
+		}
 	}
 	return true
 }
@@ -349,9 +354,24 @@ func (r *DriverResponse) IsGatewayRequest() bool {
 
 // GetWrappedFunctionOutput returns the serialized output of the function if this
 // response represents a function result. The output could also be an error.
+//
+// NOTE: This always returns a wrapped response: {"data":T} or {"error":T}.  We
+// ALWAYS wrap trace data.
 func (r *DriverResponse) GetWrappedFunctionOutput() (*string, error) {
 	if !r.IsFunctionResult() {
 		return nil, nil
+	}
+
+	// Firstly, we are standardizing on an enums.OpcodeRunComplete opcode
+	// for this.  If this exists, return that data.
+	for _, op := range r.Generator {
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			// op.Data is always a json.RawMessage, and we want to always return data
+			// wrapped in a {"data": T} message in the same way as steps.  This saves
+			// us from unmarshalling and remarshalling.
+			data := fmt.Sprintf(`{"data":%s}`, op.Data)
+			return &data, nil
+		}
 	}
 
 	output := r.Err
