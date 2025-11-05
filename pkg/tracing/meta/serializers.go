@@ -136,6 +136,21 @@ func (r *SerializableAttrs) Serialize() []attribute.KeyValue {
 	return attrs
 }
 
+func (r *SerializableAttrs) TimedAttr(a attr[*time.Duration], start time.Time) func() *SerializableAttrs {
+	return func() *SerializableAttrs {
+		dur := time.Since(start)
+
+		return &SerializableAttrs{
+			es:    r.es,
+			Attrs: append(r.Attrs, Attr(a, &dur)),
+		}
+	}
+}
+
+func (r *SerializableAttrs) HasAttrs() bool {
+	return len(r.Attrs) > 0
+}
+
 type Serializer interface {
 	Key() string
 	SerializeValue(any) (attribute.KeyValue, bool)

@@ -2765,7 +2765,27 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
+	qi := runCtx.LifecycleItem()
+	updateOpts := &tracing.UpdateSpanOptions{
+		TargetSpan: runCtx.ExecutionSpan(),
+		Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorStep"},
+		Metadata:   runCtx.Metadata(),
+		QueueItem:  &qi,
+		Attributes: meta.NewAttrSet(),
+	}
+	defer func() {
+		if !updateOpts.Attributes.HasAttrs() {
+			return
+		}
+
+		if spanTimingsErr := e.tracerProvider.UpdateSpan(updateOpts); spanTimingsErr != nil {
+			e.log.Debug("error updating span with internal timings", "error", spanTimingsErr)
+		}
+	}()
+
+	endTimer := updateOpts.Attributes.TimedAttr(meta.Attrs.StateSaveDuration, time.Now())
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	updateOpts.Attributes = endTimer()
 	if err != nil {
 		return err
 	}
@@ -2814,7 +2834,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 			e.log.Debug("error creating span for next step after Step", "error", err)
 		}
 
+		endTimer = updateOpts.Attributes.TimedAttr(meta.Attrs.EnqueueDuration, time.Now())
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		updateOpts.Attributes = endTimer()
 		if err != nil {
 			span.Drop()
 
