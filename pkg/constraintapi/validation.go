@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 func (r *CapacityAcquireRequest) Valid() error {
@@ -97,6 +98,10 @@ func (r *CapacityAcquireRequest) Valid() error {
 func (ci ConstraintItem) Valid() error {
 	switch ci.Kind {
 	case ConstraintKindConcurrency:
+		// TODO: Implement run level concurrency and remove this validation
+		if ci.Concurrency.Mode == enums.ConcurrencyModeRun {
+			return fmt.Errorf("run level concurrency is not implemented yet")
+		}
 		if ci.Concurrency != nil && ci.Concurrency.InProgressItemKey == "" {
 			return fmt.Errorf("concurrency constraint must specify InProgressItemKey")
 		}
