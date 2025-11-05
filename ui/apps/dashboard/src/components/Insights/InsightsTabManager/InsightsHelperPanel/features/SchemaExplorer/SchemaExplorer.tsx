@@ -59,13 +59,13 @@ export function SchemaExplorer() {
           error={error}
           isLoading={isLoading}
           isFetchingNextPage={isFetchingNextPage}
-          hasNextPage={hasNextPage ?? false}
+          hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
           renderEntry={renderEntry}
         />
         <InfiniteScrollTrigger
           onIntersect={fetchNextPage}
-          hasMore={(hasNextPage ?? false) && !error}
+          hasMore={hasNextPage && !error}
           isLoading={isLoading || isFetchingNextPage}
           root={containerRef.current}
           rootMargin="50px"

@@ -33,7 +33,7 @@ export function useSchemasQuery(search: string) {
     entries,
     error: query.error,
     fetchNextPage: query.fetchNextPage,
-    hasNextPage: query.hasNextPage ?? false,
+    hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isLoading: query.isPending,
   };
