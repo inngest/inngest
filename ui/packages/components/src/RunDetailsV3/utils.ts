@@ -187,9 +187,12 @@ const dynamicRunDataEmitter = {
   },
 };
 
+//
+// This is a way for the detail trace data (which we poll) to emit updates to statuses and
+// run end times so we can immediately reflect those changes in the run list.
+// This exists because we can't currently, easily poll the run list to get realtime updates there.
 export const useDynamicRunData = ({ runID }: { runID?: string }) => {
   const [dynamicRunData, setDynamicRunData] = useState<DynamicRunData | undefined>(undefined);
-  const previousDataRef = useRef<DynamicRunData | undefined>(undefined);
 
   useEffect(() => {
     const cleanup = dynamicRunDataEmitter.subscribe(setDynamicRunData, runID);
@@ -199,10 +202,7 @@ export const useDynamicRunData = ({ runID }: { runID?: string }) => {
   }, [runID]);
 
   const updateDynamicRunData = useCallback((data: DynamicRunData | undefined) => {
-    if (JSON.stringify(previousDataRef.current) !== JSON.stringify(data)) {
-      previousDataRef.current = data;
-      dynamicRunDataEmitter.emit(data);
-    }
+    dynamicRunDataEmitter.emit(data);
   }, []);
 
   return { dynamicRunData, updateDynamicRunData };
