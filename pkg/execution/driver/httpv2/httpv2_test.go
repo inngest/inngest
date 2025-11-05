@@ -317,7 +317,7 @@ func TestParseOpcodes(t *testing.T) {
 		{
 			name:          "invalid JSON",
 			input:         []byte(`invalid json`),
-			expectedError: "error reading SDK responses as steps",
+			expectedError: "SDK returned an unexpected response",
 		},
 	}
 
