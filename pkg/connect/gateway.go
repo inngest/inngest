@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -160,13 +161,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
-		var closeReasonLock sync.Mutex
-		setCloseReason := func(reason string) {
-			closeReasonLock.Lock()
-			defer closeReasonLock.Unlock()
+		var closeReasonPtr atomic.Pointer[string]
+		closeReasonPtr.Store(&closeReason)
 
+		setCloseReason := func(reason string) {
 			if reason != connectpb.WorkerDisconnectReason_UNEXPECTED.String() {
-				closeReason = reason
+				closeReasonPtr.Store(&reason)
 			}
 		}
 
@@ -174,7 +174,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
-			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
+			ch.log.Debug("Closing WebSocket connection", "reason", *closeReasonPtr.Load())
 			c.logger.Trace("worker disconnected")
 
 			closed = true
@@ -296,7 +296,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			for _, lifecycle := range c.lifecycles {
-				lifecycle.OnDisconnected(context.Background(), conn, closeReason)
+				lifecycle.OnDisconnected(context.Background(), conn, *closeReasonPtr.Load())
 			}
 		}()
 

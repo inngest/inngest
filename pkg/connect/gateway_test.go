@@ -1415,6 +1415,7 @@ func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
 
 	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
 	require.NotNil(t, serr)
+	t.Logf("serr: %+v", serr)
 	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
 	require.Contains(t, serr.Msg, "missing instanceId")
 
