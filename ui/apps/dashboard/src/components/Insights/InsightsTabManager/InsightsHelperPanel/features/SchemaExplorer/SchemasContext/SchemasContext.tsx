@@ -9,8 +9,8 @@ import { useSchemasQuery } from './useSchemasQuery';
 const SchemasContext = createContext<SchemasContextValue | undefined>(undefined);
 
 export function SchemasProvider({ children }: { children: ReactNode }) {
-  const [, setSearch] = useState('');
-  const query = useSchemasQuery();
+  const [search, setSearch] = useState('');
+  const query = useSchemasQuery(search);
 
   return (
     <SchemasContext.Provider value={{ ...query, setSearch }}>{children}</SchemasContext.Provider>
