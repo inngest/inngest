@@ -83,10 +83,10 @@ func (q *queue) backlogRefillConstraintCheck(
 	kg QueueKeyGenerator,
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
-	itemRunIDs := make([]ulid.ULID, len(items))
+	itemRunIDs := make(map[string]ulid.ULID)
 	for i, item := range items {
 		itemIDs[i] = item.ID
-		itemRunIDs = append(itemRunIDs, item.Data.Identifier.RunID)
+		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
 	if q.capacityManager == nil || q.useConstraintAPI == nil {
@@ -232,14 +232,16 @@ func (q *queue) itemLeaseConstraintCheck(
 		// - Do we need to re-evaluate per retry?
 		IdempotencyKey:       idempotencyKey,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
-		LeaseRunIDs:          []ulid.ULID{item.Data.Identifier.RunID},
-		FunctionID:           *partition.FunctionID,
-		CurrentTime:          now,
-		Duration:             QueueLeaseDuration,
-		Configuration:        constraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, kg),
-		Amount:               1,
-		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
+		LeaseRunIDs: map[string]ulid.ULID{
+			idempotencyKey: item.Data.Identifier.RunID,
+		},
+		FunctionID:      *partition.FunctionID,
+		CurrentTime:     now,
+		Duration:        QueueLeaseDuration,
+		Configuration:   constraintConfigFromConstraints(constraints),
+		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, kg),
+		Amount:          1,
+		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.LeaseLocationItemLease,
