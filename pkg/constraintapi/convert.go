@@ -392,6 +392,7 @@ func ConcurrencyConstraintToProto(constraint ConcurrencyConstraint) *pb.Concurre
 		Scope:             ConcurrencyScopeToProto(constraint.Scope),
 		KeyExpressionHash: constraint.KeyExpressionHash,
 		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+		InProgressItemKey: constraint.InProgressItemKey,
 	}
 }
 
@@ -404,6 +405,7 @@ func ConcurrencyConstraintFromProto(pbConstraint *pb.ConcurrencyConstraint) Conc
 		Scope:             ConcurrencyScopeFromProto(pbConstraint.Scope),
 		KeyExpressionHash: pbConstraint.KeyExpressionHash,
 		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+		InProgressItemKey: pbConstraint.InProgressItemKey,
 	}
 }
 

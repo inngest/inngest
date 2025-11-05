@@ -490,7 +490,7 @@ func (q *queue) processShadowPartitionBacklog(
 		return nil, false, nil
 	}
 
-	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items)
+	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, q.primaryQueueShard.RedisClient.KeyGenerator())
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
 	}

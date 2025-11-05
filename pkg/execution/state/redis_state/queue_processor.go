@@ -1798,7 +1798,16 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, &backlog, constraints, item, p.staticTime)
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(
+		ctx,
+		*p.partition,
+		&partition,
+		&backlog,
+		constraints,
+		item,
+		p.staticTime,
+		p.queue.primaryQueueShard.RedisClient.KeyGenerator(),
+	)
 	if err != nil {
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})

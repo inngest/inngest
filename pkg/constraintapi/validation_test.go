@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1183,6 +1184,152 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				for _, expectedMsg := range tt.errMsgs {
 					assert.Contains(t, err.Error(), expectedMsg)
 				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestConstraintItemValid(t *testing.T) {
+	tests := []struct {
+		name        string
+		constraint  ConstraintItem
+		wantErr     bool
+		expectedMsg string
+	}{
+		{
+			name: "valid concurrency constraint with InProgressItemKey",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Mode:              enums.ConcurrencyModeStep,
+					Scope:             enums.ConcurrencyScopeFn,
+					KeyExpressionHash: "test-key",
+					EvaluatedKeyHash:  "eval-key",
+					InProgressItemKey: "redis:concurrency:item:key123",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid concurrency constraint missing InProgressItemKey",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Mode:              enums.ConcurrencyModeStep,
+					Scope:             enums.ConcurrencyScopeFn,
+					KeyExpressionHash: "test-key",
+					EvaluatedKeyHash:  "eval-key",
+					InProgressItemKey: "", // Missing required field
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "concurrency constraint must specify InProgressItemKey",
+		},
+		{
+			name: "valid throttle constraint with EvaluatedKeyHash",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "throttle-key",
+					EvaluatedKeyHash:  "eval-throttle",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid throttle constraint missing EvaluatedKeyHash",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					Scope:             enums.ThrottleScopeFn,
+					KeyExpressionHash: "throttle-key",
+					EvaluatedKeyHash:  "", // Missing required field
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "throttle constraint must include EvaluatedKeyHash",
+		},
+		{
+			name: "valid rate limit constraint with EvaluatedKeyHash",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "rate-key",
+					EvaluatedKeyHash:  "eval-rate",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid rate limit constraint missing EvaluatedKeyHash",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindRateLimit,
+				RateLimit: &RateLimitConstraint{
+					Scope:             enums.RateLimitScopeFn,
+					KeyExpressionHash: "rate-key",
+					EvaluatedKeyHash:  "", // Missing required field
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "rate limit constraint must include EvaluatedKeyHash",
+		},
+		{
+			name: "concurrency constraint with nil struct is valid",
+			constraint: ConstraintItem{
+				Kind:        ConstraintKindConcurrency,
+				Concurrency: nil, // nil constraint object
+			},
+			wantErr: false,
+		},
+		{
+			name: "throttle constraint with nil struct is valid",
+			constraint: ConstraintItem{
+				Kind:     ConstraintKindThrottle,
+				Throttle: nil, // nil constraint object
+			},
+			wantErr: false,
+		},
+		{
+			name: "rate limit constraint with nil struct is valid",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindRateLimit,
+				RateLimit: nil, // nil constraint object
+			},
+			wantErr: false,
+		},
+		{
+			name: "concurrency constraint with empty string InProgressItemKey",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Mode:              enums.ConcurrencyModeRun,
+					Scope:             enums.ConcurrencyScopeAccount,
+					InProgressItemKey: "", // Explicitly empty
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "concurrency constraint must specify InProgressItemKey",
+		},
+		{
+			name: "unknown constraint kind is valid (no specific validation)",
+			constraint: ConstraintItem{
+				Kind: ConstraintKind("unknown"),
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.constraint.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedMsg)
 			} else {
 				assert.NoError(t, err)
 			}

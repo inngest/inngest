@@ -62,6 +62,13 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("must request capacity"))
 	}
 
+	// Validate individual constraint items
+	for i, ci := range r.Constraints {
+		if err := ci.Valid(); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("invalid constraint %d: %w", i, err))
+		}
+	}
+
 	// NOTE: This validation is only enforced as long as existing constraint state
 	// and the new lease-related data are colocated.
 	//
@@ -84,4 +91,23 @@ func (r *CapacityAcquireRequest) Valid() error {
 	}
 
 	return errs
+}
+
+// Valid validates a ConstraintItem ensuring required fields are present
+func (ci ConstraintItem) Valid() error {
+	switch ci.Kind {
+	case ConstraintKindConcurrency:
+		if ci.Concurrency != nil && ci.Concurrency.InProgressItemKey == "" {
+			return fmt.Errorf("concurrency constraint must specify InProgressItemKey")
+		}
+	case ConstraintKindThrottle:
+		if ci.Throttle != nil && ci.Throttle.EvaluatedKeyHash == "" {
+			return fmt.Errorf("throttle constraint must include EvaluatedKeyHash")
+		}
+	case ConstraintKindRateLimit:
+		if ci.RateLimit != nil && ci.RateLimit.EvaluatedKeyHash == "" {
+			return fmt.Errorf("rate limit constraint must include EvaluatedKeyHash")
+		}
+	}
+	return nil
 }

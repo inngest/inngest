@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/redis/rueidis"
 )
 
@@ -99,6 +100,12 @@ type SerializedConcurrencyConstraint struct {
 
 	// l = Limit (embedded from config)
 	Limit int `json:"l,omitempty"`
+
+	// InProgressLeaseKey represents the Redis key holding the ZSET for this constraint
+	InProgressLeaseKey string `json:"ilk"`
+
+	// InProgressItemKey represents the in progress item (concurrency) ZSET key for this constraint
+	InProgressItemKey string `json:"iik"`
 }
 
 // SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
@@ -143,7 +150,13 @@ type SerializedRateLimitConstraint struct {
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
 // for efficient storage in Redis and easy consumption in Lua scripts.
 // The config parameter is used to embed matching configuration limits directly into the constraint.
-func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) SerializedConstraintItem {
+func (c ConstraintItem) ToSerializedConstraintItem(
+	config ConstraintConfig,
+	accountID uuid.UUID,
+	envID uuid.UUID,
+	functionID uuid.UUID,
+	keyPrefix string,
+) SerializedConstraintItem {
 	serialized := SerializedConstraintItem{}
 
 	// Convert ConstraintKind to integer
@@ -156,7 +169,7 @@ func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) Seri
 				KeyExpressionHash: c.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  c.RateLimit.EvaluatedKeyHash,
 			}
-			
+
 			// Find matching rate limit config
 			for _, rlConfig := range config.RateLimit {
 				if rlConfig.Scope == c.RateLimit.Scope && rlConfig.KeyExpressionHash == c.RateLimit.KeyExpressionHash {
@@ -165,26 +178,28 @@ func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) Seri
 					break
 				}
 			}
-			
+
 			serialized.RateLimit = rateLimitConstraint
 		}
 	case ConstraintKindConcurrency:
 		serialized.Kind = 2
 		if c.Concurrency != nil {
 			concurrencyConstraint := &SerializedConcurrencyConstraint{
-				Mode:              int(c.Concurrency.Mode),
-				Scope:             int(c.Concurrency.Scope),
-				KeyExpressionHash: c.Concurrency.KeyExpressionHash,
-				EvaluatedKeyHash:  c.Concurrency.EvaluatedKeyHash,
+				Mode:               int(c.Concurrency.Mode),
+				Scope:              int(c.Concurrency.Scope),
+				KeyExpressionHash:  c.Concurrency.KeyExpressionHash,
+				EvaluatedKeyHash:   c.Concurrency.EvaluatedKeyHash,
+				InProgressItemKey:  c.Concurrency.InProgressItemKey,
+				InProgressLeaseKey: c.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
 			}
-			
+
 			// Embed appropriate limit based on scope and mode
 			if c.Concurrency.KeyExpressionHash != "" {
 				// Custom concurrency key - find matching custom limit
 				for _, customLimit := range config.Concurrency.CustomConcurrencyKeys {
-					if customLimit.Mode == c.Concurrency.Mode && 
-					   customLimit.Scope == c.Concurrency.Scope && 
-					   customLimit.KeyExpressionHash == c.Concurrency.KeyExpressionHash {
+					if customLimit.Mode == c.Concurrency.Mode &&
+						customLimit.Scope == c.Concurrency.Scope &&
+						customLimit.KeyExpressionHash == c.Concurrency.KeyExpressionHash {
 						concurrencyConstraint.Limit = customLimit.Limit
 						break
 					}
@@ -206,7 +221,7 @@ func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) Seri
 					}
 				}
 			}
-			
+
 			serialized.Concurrency = concurrencyConstraint
 		}
 	case ConstraintKindThrottle:
@@ -217,7 +232,7 @@ func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) Seri
 				KeyExpressionHash: c.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  c.Throttle.EvaluatedKeyHash,
 			}
-			
+
 			// Find matching throttle config
 			for _, tConfig := range config.Throttle {
 				if tConfig.Scope == c.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == c.Throttle.KeyExpressionHash {
@@ -227,14 +242,13 @@ func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) Seri
 					break
 				}
 			}
-			
+
 			serialized.Throttle = throttleConstraint
 		}
 	}
 
 	return serialized
 }
-
 
 func strSlice(args []any) ([]string, error) {
 	res := make([]string, len(args))

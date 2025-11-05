@@ -112,6 +112,7 @@ message ConcurrencyConstraint {
   ConstraintApiConcurrencyScope scope = 2;
   string key_expression_hash = 3;
   string evaluated_key_hash = 4;
+  string in_progress_item_key = 5; 
 }
 
 message ThrottleConstraint {

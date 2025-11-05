@@ -186,7 +186,7 @@ type redisRequestState struct {
 	MaximumLifetimeMillis int64 `json:"l,omitempty"`
 }
 
-func buildRequestState(req *CapacityAcquireRequest) *redisRequestState {
+func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) *redisRequestState {
 	state := &redisRequestState{
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
@@ -206,7 +206,13 @@ func buildRequestState(req *CapacityAcquireRequest) *redisRequestState {
 
 	serialized := make([]SerializedConstraintItem, len(constraints))
 	for i := range constraints {
-		serialized[i] = constraints[i].ToSerializedConstraintItem(req.Configuration)
+		serialized[i] = constraints[i].ToSerializedConstraintItem(
+			req.Configuration,
+			req.AccountID,
+			req.EnvID,
+			req.FunctionID,
+			keyPrefix,
+		)
 	}
 
 	state.SortedConstraints = serialized
@@ -236,7 +242,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		r.operationIdempotencyKey(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 	}
 
-	requestState := buildRequestState(req)
+	requestState := buildRequestState(req, keyPrefix)
 
 	args, err := strSlice([]any{
 		// This will be marshaled
