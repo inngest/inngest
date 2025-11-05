@@ -1,5 +1,3 @@
-'use client';
-
 import type { ValueNode } from './types';
 
 export function capitalize(s: string): string {
