@@ -1,6 +1,6 @@
 'use client';
 
-import { valueTypeLabel } from '../../../typeUtil';
+import { makeValueTypeLabel } from '../../../typeUtil';
 import type { ArrayNode, ValueNode } from '../../../types';
 import { ValueRow } from '../../ValueRow';
 
@@ -17,8 +17,8 @@ export function ArrayRowVariantValue({ node }: { node: ArrayNode }): React.React
 
 function buildArrayValueLabel(element: ValueNode): string {
   if (Array.isArray(element.type)) {
-    const base = valueTypeLabel(element);
+    const base = makeValueTypeLabel(element);
     return element.type.length > 1 ? `[](${base})` : `[]${base}`;
   }
-  return `[]${valueTypeLabel(element)}`;
+  return `[]${makeValueTypeLabel(element)}`;
 }

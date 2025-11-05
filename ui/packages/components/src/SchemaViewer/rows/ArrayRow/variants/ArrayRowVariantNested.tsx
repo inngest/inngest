@@ -1,6 +1,6 @@
 'use client';
 
-import { repeatArrayBrackets, valueTypeLabel } from '../../../typeUtil';
+import { makeValueTypeLabel, repeatArrayBrackets } from '../../../typeUtil';
 import type { ArrayNode, ObjectNode, SchemaNode, TupleNode, ValueNode } from '../../../types';
 import { ObjectRow } from '../../ObjectRow';
 import { Row } from '../../Row';
@@ -71,7 +71,7 @@ function computeNestedTerminal(element: SchemaNode): {
 }
 
 function labelForNestedValue(bracketLayers: number, value: ValueNode): string {
-  const base = valueTypeLabel(value);
+  const base = makeValueTypeLabel(value);
   return `${repeatArrayBrackets(bracketLayers)}${base}`;
 }
 
