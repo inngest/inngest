@@ -372,8 +372,8 @@ type RunStepInfo struct {
 func (RunStepInfo) IsStepInfo() {}
 
 type RunTraceSpanMetadata struct {
-	Kind  string                  `json:"kind"`
-	Pairs []*RunTraceSpanMetadata `json:"pairs"`
+	Kind   string                  `json:"kind"`
+	Values []*RunTraceSpanMetadata `json:"values"`
 }
 
 type RunTraceSpanMetadataKv struct {

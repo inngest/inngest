@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -161,6 +162,8 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// ordered map is required by subsequent gql mapping
 	spanMap := orderedmap.NewOrderedMap[string, *cqrs.OtelSpan]()
 
+	metadataByParent := make(map[string][]*cqrs.SpanMetadata)
+
 	// A map of dynamic span IDs to the specific span ID that contains I/O
 	dynamicRefs := make(map[string]*IODynamicRef)
 
@@ -227,13 +230,20 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			outputSpanID *string
 			inputSpanID  *string
 			fragments    []map[string]interface{}
+
+			isMetadata bool
 		)
 		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
+	fragmentLoop:
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
-				if strings.HasPrefix(name, "executor.") || name == meta.SpanNameMetadata {
+				switch {
+				case strings.HasPrefix(name, "executor."):
 					newSpan.Name = name
+				case name == meta.SpanNameMetadata:
+					isMetadata = true
+					break fragmentLoop
 				}
 			}
 
@@ -264,6 +274,21 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 					}
 				}
 			}
+		}
+
+		if isMetadata {
+			if parentSpanIDPtr == nil {
+				continue
+			}
+
+			metadata, err := rollupSpanMetadataFromFragments(ctx, fragments)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
+				continue
+			}
+
+			metadataByParent[*parentSpanIDPtr] = append(metadataByParent[*parentSpanIDPtr], metadata)
+			continue
 		}
 
 		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
@@ -364,6 +389,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 				"parentSpanID", span.ParentSpanID,
 			)
 		}
+
+		if metadata, ok := metadataByParent[span.SpanID]; ok {
+			span.Metadata = metadata
+		}
 	}
 
 	if root == nil {
@@ -373,6 +402,66 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	sorter(root)
 
 	return root, nil
+}
+
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any) (*cqrs.SpanMetadata, error) {
+	ret := &cqrs.SpanMetadata{
+		Values: meta.RawMetadata{},
+	}
+
+	for _, fragment := range fragments {
+		attrs, ok := fragment["attributes"].(string)
+		if !ok {
+			// TODO: log
+			continue
+		}
+
+		var fragmentAttr struct {
+			Kind   *meta.MetadataKind `json:"_inngest.metadata.kind"`
+			Op     *meta.MetadataOp   `json:"_inngest.metadata.op"`
+			Values *string            `json:"_inngest.metadata"`
+		}
+		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
+			return nil, err
+		}
+
+		switch {
+		case fragmentAttr.Kind == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
+		case fragmentAttr.Op == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span op")
+			continue
+		case fragmentAttr.Values == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span metadata")
+			continue
+		}
+
+		if ret.Kind == "" && *fragmentAttr.Kind != "" {
+			ret.Kind = *fragmentAttr.Kind
+		} else if ret.Kind != *fragmentAttr.Kind {
+			// TODO: log
+			continue
+		}
+
+		var fragmentMetadata meta.RawMetadata
+		err := json.Unmarshal([]byte(*fragmentAttr.Values), &fragmentMetadata)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error unmarshalling span metadata", "error", err)
+			return nil, err
+		}
+
+		err = ret.Values.Combine(fragmentMetadata, *fragmentAttr.Op)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span metadata", "error", err)
+			return nil, err
+		}
+	}
+
+	spew.Dump(ret)
+
+	return ret, nil
 }
 
 func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {

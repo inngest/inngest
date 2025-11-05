@@ -3,10 +3,14 @@ package meta
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
+
+var ErrInvalidMetadataOp = errors.New("invalid metadata op")
 
 var DefaultMetadataExtractor = MetadataExtractor{
 	ExtendedTrace: SpanMetadataExtractors{
@@ -25,6 +29,28 @@ var DefaultMetadataExtractor = MetadataExtractor{
 }
 
 type RawMetadata map[string]json.RawMessage
+
+func (m RawMetadata) Combine(o RawMetadata, op MetadataOp) error {
+	switch op {
+	case MetadataOpMerge:
+		maps.Copy(m, o)
+		return nil
+	case MetadataOpDelete:
+		for k := range o {
+			delete(m, k)
+		}
+		return nil
+	case MetadataOpAdd:
+		// TODO: this
+		return nil
+	case MetadataOpSet:
+		clear(m)
+		maps.Copy(m, o)
+		return nil
+	default:
+		return fmt.Errorf("unrecognized op %q: %w", op, ErrInvalidMetadataOp)
+	}
+}
 
 type StructuredMetadata interface {
 	Kind() MetadataKind
@@ -72,7 +98,7 @@ func (m anyStructuredMetadata) Op() MetadataOp {
 
 type MetadataKind string
 
-type MetadataOp string // TODO real enum
+type MetadataOp string // TODO: real enum
 
 const (
 	MetadataOpMerge  MetadataOp = "merge"

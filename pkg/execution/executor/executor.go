@@ -4697,7 +4697,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		ctx,
 		meta.SpanNameMetadata,
 		&tracing.CreateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayRequestMetadata"},
+			Debug:      &tracing.SpanDebugData{Location: location},
 			Parent:     parent,
 			Metadata:   runCtx.Metadata(),
 			QueueItem:  util.ToPtr(runCtx.LifecycleItem()),
