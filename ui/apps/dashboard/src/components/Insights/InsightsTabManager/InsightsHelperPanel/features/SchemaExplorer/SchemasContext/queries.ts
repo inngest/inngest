@@ -17,13 +17,16 @@ export function buildSchemaEntriesFromQueryData(
     node: transformJSONSchema(EVENT_SCHEMA_JSON),
   });
 
-  const pages = data?.pages ?? [];
-  const items = pages.flatMap((p) => p.events ?? []);
-  for (const evt of items) {
-    const entry = buildEntryFromLatestSchema(evt.latestSchema, evt.name);
-    if (entry !== null) list.push(entry);
+  try {
+    const pages = data?.pages ?? [];
+    const items = pages.flatMap((p) => p.events);
+    for (const evt of items) {
+      const entry = buildEntryFromLatestSchema(evt.latestSchema, evt.name);
+      if (entry !== null) list.push(entry);
+    }
+  } catch {
+    console.error('Error building schema entries from query data.');
   }
-
   return list;
 }
 

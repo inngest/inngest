@@ -14,8 +14,10 @@ export function useSchemasQuery(search: string) {
     queryKey: ['schema-explorer', { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ archived: false, cursor: pageParam, nameSearch: search || null }),
-    getNextPageParam: (lastPage) =>
-      lastPage?.pageInfo?.hasNextPage ? lastPage.pageInfo.endCursor : undefined,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.pageInfo.hasNextPage) return undefined;
+      return lastPage.pageInfo.endCursor;
+    },
     refetchOnMount: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
