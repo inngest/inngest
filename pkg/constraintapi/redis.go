@@ -79,41 +79,22 @@ func NewRedisCapacityManager(
 	return manager, nil
 }
 
-/*
-*
-* Key structure:
-*
-* Global:
-*
-* - {prefix}:css:<number> Sharded scavenger entrypoints
-*
-* Per Account:
-*
-* Lease management:
-* 	- {prefix}:{account}:reqh: {idempotencyKey} -> request json: Request details (config, constraints, allowed capacity, metadata)
-* 	- {prefix}:{account}:reql:{idempotencyKey} -> ULID: current lease ID for the idempotency key
-* 		- Expires with the lease expiry
-* 	- {prefix}:{account}:leaseq -> sorted set of idempotencyKey tied to the expiry
-*
-* - {prefix}:{account}:ik:op:{operation}:{idempotencyKey} -> return whether the operation recently succeeded
-*
- */
-
-// scavengerShard represents the top-level sharded sorted set containing individual accounts
+// keyScavengerShard represents the top-level sharded sorted set containing individual accounts
 func (r *redisCapacityManager) keyScavengerShard(prefix string, shard int) string {
 	return fmt.Sprintf("{%s}:css:%d", prefix, shard)
 }
 
-// accountLeases represents active leases for the account
+// keyAccountLeases represents active leases for the account
 func (r *redisCapacityManager) keyAccountLeases(prefix string, accountID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:%s:leaseq", prefix, accountID)
 }
 
-// requestsHash returns the key storing per-operation request details
+// keyRequestState returns the key storing per-operation request details
 func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, operationIdempotencyKey string) string {
 	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, operationIdempotencyKey)
 }
 
+// keyOperationIdempotency returns the operation idempotency key for retries
 func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
 	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, idempotencyKey)
 }
@@ -245,13 +226,17 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
 	}
 
+	// Retrieve key prefix for current constraints
+	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix, err := r.keyPrefix(req.Constraints)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
 	}
 
+	// TODO: Should we get the current time again/cancel if too much time passed up until here?
 	leaseExpiry := now.Add(req.Duration)
 
+	// Generate lease IDs
 	initialLeaseIDs := make([]ulid.ULID, len(req.LeaseIdempotencyKeys))
 	for i := range req.LeaseIdempotencyKeys {
 		leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
