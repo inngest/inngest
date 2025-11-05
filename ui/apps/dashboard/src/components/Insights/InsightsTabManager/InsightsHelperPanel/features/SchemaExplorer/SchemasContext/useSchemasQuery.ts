@@ -15,7 +15,7 @@ export function useSchemasQuery(search: string) {
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ archived: false, cursor: pageParam, nameSearch: search || null }),
     getNextPageParam: (lastPage) => {
-      if (!lastPage || !lastPage.pageInfo.hasNextPage) return undefined;
+      if (!lastPage.pageInfo.hasNextPage) return undefined;
       return lastPage.pageInfo.endCursor;
     },
     refetchOnMount: false,
