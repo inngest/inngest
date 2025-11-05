@@ -67,6 +67,101 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 	}
 }
 
+// SerializedConstraintItem represents a minimal, Lua-friendly version of ConstraintItem
+// with short JSON field names and integer enums to reduce Redis storage size.
+type SerializedConstraintItem struct {
+	// k = Kind as integer: 1=rate_limit, 2=concurrency, 3=throttle
+	Kind int `json:"k"`
+
+	// Concurrency constraint (only populated when Kind=2)
+	Concurrency *SerializedConcurrencyConstraint `json:"c,omitempty"`
+
+	// Throttle constraint (only populated when Kind=3)
+	Throttle *SerializedThrottleConstraint `json:"t,omitempty"`
+
+	// RateLimit constraint (only populated when Kind=1)
+	RateLimit *SerializedRateLimitConstraint `json:"r,omitempty"`
+}
+
+// SerializedConcurrencyConstraint represents a minimal version of ConcurrencyConstraint
+type SerializedConcurrencyConstraint struct {
+	// m = Mode as integer: 0=Step, 1=Run
+	Mode int `json:"m,omitempty"`
+
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+
+	// eh = EvaluatedKeyHash
+	EvaluatedKeyHash string `json:"eh,omitempty"`
+}
+
+// SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
+type SerializedThrottleConstraint struct {
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+
+	// eh = EvaluatedKeyHash
+	EvaluatedKeyHash string `json:"eh,omitempty"`
+}
+
+// SerializedRateLimitConstraint represents a minimal version of RateLimitConstraint
+type SerializedRateLimitConstraint struct {
+	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
+	Scope int `json:"s,omitempty"`
+
+	// h = KeyExpressionHash
+	KeyExpressionHash string `json:"h,omitempty"`
+
+	// eh = EvaluatedKeyHash
+	EvaluatedKeyHash string `json:"eh,omitempty"`
+}
+
+// ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
+// for efficient storage in Redis and easy consumption in Lua scripts.
+func (c ConstraintItem) ToSerializedConstraintItem() SerializedConstraintItem {
+	serialized := SerializedConstraintItem{}
+
+	// Convert ConstraintKind to integer
+	switch c.Kind {
+	case ConstraintKindRateLimit:
+		serialized.Kind = 1
+		if c.RateLimit != nil {
+			serialized.RateLimit = &SerializedRateLimitConstraint{
+				Scope:             int(c.RateLimit.Scope),
+				KeyExpressionHash: c.RateLimit.KeyExpressionHash,
+				EvaluatedKeyHash:  c.RateLimit.EvaluatedKeyHash,
+			}
+		}
+	case ConstraintKindConcurrency:
+		serialized.Kind = 2
+		if c.Concurrency != nil {
+			serialized.Concurrency = &SerializedConcurrencyConstraint{
+				Mode:              int(c.Concurrency.Mode),
+				Scope:             int(c.Concurrency.Scope),
+				KeyExpressionHash: c.Concurrency.KeyExpressionHash,
+				EvaluatedKeyHash:  c.Concurrency.EvaluatedKeyHash,
+			}
+		}
+	case ConstraintKindThrottle:
+		serialized.Kind = 3
+		if c.Throttle != nil {
+			serialized.Throttle = &SerializedThrottleConstraint{
+				Scope:             int(c.Throttle.Scope),
+				KeyExpressionHash: c.Throttle.KeyExpressionHash,
+				EvaluatedKeyHash:  c.Throttle.EvaluatedKeyHash,
+			}
+		}
+	}
+
+	return serialized
+}
+
 func strSlice(args []any) ([]string, error) {
 	res := make([]string, len(args))
 	for i, item := range args {

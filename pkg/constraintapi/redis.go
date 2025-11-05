@@ -160,15 +160,14 @@ func (r *redisCapacityManager) keyPrefix(
 // NOTE: This does not represent one individual lease but is used by
 // all leases generated in the Acquire call.
 type redisRequestState struct {
-	OperationIdempotencyKey string `json:"k,omitempty"`
-	EnvID uuid.UUID `json:"e,omitempty"`
-	FunctionID uuid.UUID `json:"f,omitempty"`
+	OperationIdempotencyKey string    `json:"k,omitempty"`
+	EnvID                   uuid.UUID `json:"e,omitempty"`
+	FunctionID              uuid.UUID `json:"f,omitempty"`
 
 	// SortedConstraints represents the list of constraints
 	// included in the request sorted to execute in the expected
 	// order.
-	// TODO: Minify constraint item
-	SortedConstraints []ConstraintItem
+	SortedConstraints []SerializedConstraintItem `json:"c"`
 
 	// RequestedAmount represents the Amount field in the Acquire request
 	RequestedAmount int `json:"r,omitempty"`
@@ -202,7 +201,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	}
 
 	keys := []string{
-		r.leasesHash(keyPrefix, req.AccountID),
+		// r.leasesHash(keyPrefix, req.AccountID),
 		r.operationIdempotencyKey(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 	}
 
@@ -221,7 +220,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "unexpected status code %v", status)
 	}
 }
-
 
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
