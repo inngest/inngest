@@ -29,12 +29,17 @@ local keyAccountLeases = KEYS[4]
 local requestDetails = cjson.decode(ARGV[1])
 
 local nowMS = tonumber(ARGV[2])
+
 local leaseExpiryMS = tonumber(ARGV[3])
 
+local keyPrefix = ARGV[4]
+
 ---@type string[]
-local leaseIdempotencyKeys = cjson.decode(ARGV[4])
----@type string[]
-local leaseRunIDs = cjson.decode(ARGV[5])
+local initialLeaseIDs = cjson.decode(ARGV[5])
+
+local operationIdempotencyKey = ARGV[6]
+
+local accountID = ARGV[7]
 
 ---@param key string
 local function getConcurrencyCount(key)
@@ -125,15 +130,48 @@ for index, value in ipairs(constraints) do
 end
 
 -- TODO: Handle fairness between other lease sources! Don't allow consuming entire capacity unfairly
+local fairnessReduction = 0
+-- TODO: How can we track and gracefully handle end to end that we ran out of capacity because for fairness?
+availableCapacity = availableCapacity - fairnessReduction
 
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
-if availableCapacity == 0 then
+if availableCapacity <= 0 then
 	return { 2, limitingConstraint }
 end
 
 local granted = availableCapacity
 
--- TODO: Generate leases
+-- Update constraints
+for i = 1, granted, 1 do
+	local leaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = requestDetails.lri[leaseIdempotencyKey]
+	local initialLeaseID = initialLeaseIDs[i]
+
+	for _, value in ipairs(constraints) do
+		-- Retrieve constraint capacity
+		local constraintCapacity = 0
+		if skipGCRA then
+		-- noop
+		elseif value.k == 1 then
+			-- rate limit
+			gcraUpdate(value.r.h, value.r.p, value.r.l, 0, 1)
+		elseif value.k == 2 then
+			-- concurrency
+			redis.call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
+		elseif value.k == 3 then
+			-- throttle
+			gcraUpdate(value.t.h, value.t.p, value.t.l, value.t.b, 1)
+		end
+	end
+
+	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, leaseIdempotencyKey)
+
+	-- Store lease details (current lease ID, associated run ID, operation idempotency key for request details)
+	redis.call("HSET", keyLeaseDetails, "lid", initialLeaseID, "rid", leaseRunID, "oik", operationIdempotencyKey)
+
+	-- Add lease to scavenger set of account leases
+	redis.call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), leaseIdempotencyKey)
+end
 
 -- For step concurrency, add the lease idempotency keys to the new in progress leases sets using the lease expiry as score
 -- For run concurrency, add the runID to the in progress runs set and the lease idempotency key to the dynamic run in progress leases set
@@ -149,7 +187,10 @@ redis.call("SET", keyRequestState, cjson.encode(requestDetails))
 
 -- TODO: Bulk-Set lease idempotency keys: foreach lease: lease idempotency key -> leaseID without idempotency period (that is set on Release)
 
--- TODO: Bulk-Add leases to active leases for account (and account pointer to set to scavenger shard)
+local accountScore = redis.call("ZSCORE", keyScavengerShard, accountID)
+if accountScore == nil or accountScore == false or tonumber(accountScore) > leaseExpiryMS then
+	redis.call("ZADD", keyScavengerShard, tonumber(leaseExpiryMS), accountID)
+end
 
 -- TODO: Set operation idempotency key
 

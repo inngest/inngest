@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -99,26 +100,21 @@ func NewRedisCapacityManager(
  */
 
 // scavengerShard represents the top-level sharded sorted set containing individual accounts
-func (r *redisCapacityManager) scavengerShard(prefix string, shard int) string {
+func (r *redisCapacityManager) keyScavengerShard(prefix string, shard int) string {
 	return fmt.Sprintf("{%s}:css:%d", prefix, shard)
 }
 
 // accountLeases represents active leases for the account
-func (r *redisCapacityManager) accountLeases(prefix string, accountID uuid.UUID) string {
+func (r *redisCapacityManager) keyAccountLeases(prefix string, accountID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:%s:leaseq", prefix, accountID)
 }
 
-// requestsHash returns the key to the hash storing request information
-func (r *redisCapacityManager) requestsHash(prefix string, accountID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:%s:reqh", prefix, accountID)
+// requestsHash returns the key storing per-operation request details
+func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, operationIdempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, operationIdempotencyKey)
 }
 
-// requestLease returns the key to the mapping key connecting an idempotency key to its current lease ID
-func (r *redisCapacityManager) requestLease(prefix string, accountID uuid.UUID, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:reql:%s", prefix, accountID, idempotencyKey)
-}
-
-func (r *redisCapacityManager) operationIdempotencyKey(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
+func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
 	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, idempotencyKey)
 }
 
@@ -232,11 +228,18 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) *redisRequ
 
 // Acquire implements CapacityManager.
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	// Validate request
+	if err := req.Valid(); err != nil {
+		return nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
+
+	now := r.clock.Now()
+
 	// TODO: Add metric for this
 	// NOTE: This will include request latency (marshaling, network delays),
 	// and it might not work for retries, as those retain the same CurrentTime value.
 	// TODO: Ensure retries have the updated CurrentTime
-	requestLatency := r.clock.Now().Sub(req.CurrentTime)
+	requestLatency := now.Sub(req.CurrentTime)
 	if requestLatency > MaximumAllowedRequestDelay {
 		// TODO : Set proper error code
 		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
@@ -247,16 +250,40 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
 	}
 
-	keys := []string{
-		// r.leasesHash(keyPrefix, req.AccountID),
-		r.operationIdempotencyKey(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+	leaseExpiry := now.Add(req.Duration)
+
+	initialLeaseIDs := make([]ulid.ULID, len(req.LeaseIdempotencyKeys))
+	for i := range req.LeaseIdempotencyKeys {
+		leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+		if err != nil {
+			return nil, errs.Wrap(0, true, "failed to generate lease IDs: %w", err)
+		}
+		initialLeaseIDs[i] = leaseID
 	}
 
 	requestState := buildRequestState(req, keyPrefix)
 
+	// TODO: Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := 0
+
+	// Build Lua request
+
+	keys := []string{
+		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyScavengerShard(keyPrefix, scavengerShard),
+		r.keyAccountLeases(keyPrefix, req.AccountID),
+	}
+
 	args, err := strSlice([]any{
 		// This will be marshaled
 		requestState,
+		now.UnixMilli(),
+		leaseExpiry.UnixMilli(),
+		keyPrefix,
+		initialLeaseIDs,
+		req.IdempotencyKey,
+		req.AccountID,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
@@ -332,71 +359,3 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "unexpected status code %v", status)
 	}
 }
-
-/*
-*	local requestData
-*	local latestConfig
-*
-* handleIdempotency()
-*		... might return if request was successfully completed within idempotency TTL
-*
-*	local reserved = {
-*
-*
-*	}
-*
-*
-* if requestData.rateLimit {
-*			local remainingCapacity = (limit(latestConfig, "accountConcurrency") - current("accountConcurrency"))
-*		reserved["accountConcurrency"] = remainingCapacity
-*
-	* }
-*
-*
-* if requestData.throttle {
-*			local remainingCapacity = (limit(latestConfig, "accountConcurrency") - current("accountConcurrency"))
-*		reserved["accountConcurrency"] = remainingCapacity
-*
-	* }
-*
-* if requestData.accountConcurrency {
-*			local remainingCapacity = (limit(latestConfig, "accountConcurrency") - current("accountConcurrency"))
-*		reserved["accountConcurrency"] = remainingCapacity
-*
-	* }
-*
-*
-* if requestData.functionConcurrency {
-*			local remainingCapacity = (limit(latestConfig, "accountConcurrency") - current("accountConcurrency"))
-*		reserved["accountConcurrency"] = remainingCapacity
-*
-	* }
-*
-*
-* if requestData.customConcurrency {
-*			local remainingCapacity = (limit(latestConfig, "accountConcurrency") - current("accountConcurrency"))
-*		reserved["accountConcurrency"] = remainingCapacity
-*
-	* }
-*
-*
-*
-* if isEmpty(reserved) {
-*		// return "no capacity left, please wait for a bit"
-* }
-*
-* -- At this point, we know that the request reserved _some_ capacity
-*
-*	redis.call("ZADD", leasesSet, leaseID, leaseExpiry)
-*
-*	redis.call("HSET", leasesHash, leaseID, requestData)
-*	redis.call("HSET", leaseReserved, leaseID, reserved )
-*
-*	return {
-*		leaseID,
-*		reserved, -- client should know how much capacity was _actually_ reserved
-*
-*	}
-*
-*
-*/
