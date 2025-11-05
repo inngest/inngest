@@ -166,11 +166,11 @@ type redisRequestState struct {
 
 	// SortedConstraints represents the list of constraints
 	// included in the request sorted to execute in the expected
-	// order.
+	// order. Configuration limits are now embedded directly in each constraint.
 	SortedConstraints []SerializedConstraintItem `json:"s"`
 
-	// Configuration represents the current configuration provided by the request
-	Configuration SerializedConstraintConfig `json:"c"`
+	// ConfigVersion represents the function version used for this request
+	ConfigVersion int `json:"cv,omitempty"`
 
 	// RequestedAmount represents the Amount field in the Acquire request
 	RequestedAmount int `json:"r,omitempty"`
@@ -193,21 +193,20 @@ func buildRequestState(req *CapacityAcquireRequest) *redisRequestState {
 		FunctionID:              req.FunctionID,
 		RequestedAmount:         req.Amount,
 		MaximumLifetimeMillis:   req.MaximumLifetime.Milliseconds(),
+		ConfigVersion:           req.Configuration.FunctionVersion,
 
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
 	}
 
-	state.Configuration = req.Configuration.ToSerializedConstraintConfig()
-
-	// Sort and minify constraints
+	// Sort and serialize constraints with embedded configuration limits
 	constraints := req.Constraints
 	sortConstraints(constraints)
 
 	serialized := make([]SerializedConstraintItem, len(constraints))
 	for i := range constraints {
-		serialized[i] = constraints[i].ToSerializedConstraintItem()
+		serialized[i] = constraints[i].ToSerializedConstraintItem(req.Configuration)
 	}
 
 	state.SortedConstraints = serialized

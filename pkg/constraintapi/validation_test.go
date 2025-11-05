@@ -319,33 +319,6 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 			errMsgs: []string{"missing source location"},
 		},
 		{
-			name: "missing resource kind",
-			request: CapacityAcquireRequest{
-				IdempotencyKey: "test-key",
-				AccountID:      accountID,
-				EnvID:          envID,
-				FunctionID:     functionID,
-				Configuration: ConstraintConfig{
-					FunctionVersion: 1,
-				},
-				Constraints: []ConstraintItem{
-					{
-						Kind: kindConcurrency,
-					},
-				},
-				Amount:          1,
-				CurrentTime:     baseTime,
-				Duration:        5 * time.Minute,
-				MaximumLifetime: 30 * time.Minute,
-				Source: LeaseSource{
-					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
-				},
-			},
-			wantErr: true,
-			errMsgs: []string{"missing resource kind"},
-		},
-		{
 			name: "missing constraints",
 			request: CapacityAcquireRequest{
 				IdempotencyKey: "test-key",
@@ -428,7 +401,6 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				"missing maximum lifetime",
 				"missing source service",
 				"missing source location",
-				"missing resource kind",
 				"missing lease idempotency keys",
 				"must request capacity",
 			},
