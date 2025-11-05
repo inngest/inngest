@@ -4,17 +4,28 @@
 -- -
 --
 
+---@type string
 local keyRequestState = KEYS[1]
+---@type string
 local keyOperationIdempotency = KEYS[2]
+---@type string
 local keyScavengerShard = KEYS[3]
+---@type string
 local keyAccountLeases = KEYS[4]
 
+---@type string
 local accountScopedKeyPrefix = ARGV[1]
 
+---@type { k: string, e: string, f: string, s: {}[], c: {}, r: integer?, g: integer?, a: integer?, l: integer? }
 local requestDetails = cjson.decode(ARGV[2])
 
+---@type integer
 local requested = requestDetails.r
+
+---@type { v: integer?, r: { s: integer?, l: integer?, p: string?, h: string? }[]?, c: { ac: integer?, fc: integer?, arc: integer?, frc: integer?, cck: { m: integer?, s: integer?, l: integer?, h: string? }[]? }?, t: { s: integer?, l: integer?, b: integer?, p: integer?, h: string? }[]? }
 local config = requestDetails.c
+
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string? }?, t: { s: integer?, h: string?, eh: string? }?, r: { s: integer?, h: string?, eh: string? }? }[]
 local constraints = requestDetails.s
 
 local envID = requestDetails.e
