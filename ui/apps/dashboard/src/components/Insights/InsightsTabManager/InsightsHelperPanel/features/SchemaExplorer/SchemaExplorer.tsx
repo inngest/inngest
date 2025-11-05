@@ -33,7 +33,7 @@ export function SchemaExplorer() {
         renderAdornment={entry.isShared ? renderSharedAdornment : undefined}
       />
     ),
-    [renderSharedAdornment, entries]
+    [renderSharedAdornment]
   );
 
   return (
