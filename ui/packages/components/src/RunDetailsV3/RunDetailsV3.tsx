@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
@@ -19,7 +18,7 @@ import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
-import { useStepSelection } from './utils';
+import { useDynamicRunData, useStepSelection } from './utils';
 
 //
 // userland traces can land after the run is completed
@@ -65,8 +64,8 @@ export const RunDetailsV3 = ({
     false
   );
   const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { updateDynamicRunData } = useDynamicRunData({ runID });
 
-  const { cloud } = useShared();
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
@@ -157,7 +156,7 @@ export const RunDetailsV3 = ({
     preview: tracesPreviewEnabled,
     //
     // TODO: enable this for cloud once we're sure we can handle the load
-    refetchInterval: cloud ? 0 : pollInterval,
+    refetchInterval: pollInterval,
   });
 
   const outputID = runData?.trace?.outputID;
@@ -186,6 +185,18 @@ export const RunDetailsV3 = ({
       setPollInterval(undefined);
     }, RESIDUAL_POLL_INTERVAL);
   }
+
+  useEffect(() => {
+    if (!runData?.trace.status || runData?.trace.status === initialRunData?.status) {
+      return;
+    }
+
+    updateDynamicRunData({
+      runID,
+      status: runData.trace.status,
+      endedAt: runData.trace.endedAt ?? undefined,
+    });
+  }, [runData?.trace.endedAt, runData?.trace.status]);
 
   const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
   const showError = waiting ? false : runError || resultError;
