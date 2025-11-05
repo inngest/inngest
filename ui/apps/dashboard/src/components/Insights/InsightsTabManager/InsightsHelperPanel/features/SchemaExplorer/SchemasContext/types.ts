@@ -14,7 +14,7 @@ export type SchemaEntry = {
 
 export type UseSchemasReturn = {
   entries: SchemaEntry[];
-  error: string | null;
+  error: Error | null;
   fetchNextPage: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;

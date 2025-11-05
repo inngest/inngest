@@ -8,12 +8,13 @@ import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
 import { SHOW_SCHEMA_SEARCH } from '@/components/Insights/temp-flags';
+import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
 
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { entries, hasNextPage, fetchNextPage, isLoading, isFetchingNextPage } = useSchemas({
+  const { entries, error, hasNextPage, fetchNextPage, isLoading, isFetchingNextPage } = useSchemas({
     search,
   });
 
@@ -53,11 +54,18 @@ export function SchemaExplorer() {
         </>
       )}
       <div className="flex flex-col gap-1">
-        {entries.map(renderEntry)}
-        {/* TODO: Handle loading and error states */}
+        <SchemaExplorerSwitcher
+          entries={entries}
+          error={error}
+          isLoading={isLoading}
+          isFetchingNextPage={isFetchingNextPage}
+          hasNextPage={hasNextPage ?? false}
+          fetchNextPage={fetchNextPage}
+          renderEntry={renderEntry}
+        />
         <InfiniteScrollTrigger
           onIntersect={fetchNextPage}
-          hasMore={hasNextPage ?? false}
+          hasMore={(hasNextPage ?? false) && !error}
           isLoading={isLoading || isFetchingNextPage}
           root={containerRef.current}
           rootMargin="50px"
