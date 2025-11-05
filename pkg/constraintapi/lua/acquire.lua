@@ -25,10 +25,40 @@ local keyScavengerShard = KEYS[3]
 ---@type string
 local keyAccountLeases = KEYS[4]
 
----@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer? }
+---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(ARGV[1])
 
-local nowMS = tonumber(KEYS[4])
+local nowMS = tonumber(ARGV[2])
+local leaseExpiryMS = tonumber(ARGV[3])
+
+---@type string[]
+local leaseIdempotencyKeys = cjson.decode(ARGV[4])
+---@type string[]
+local leaseRunIDs = cjson.decode(ARGV[5])
+
+---@param key string
+local function getConcurrencyCount(key)
+	local count = redis.call("ZCOUNT", key, tostring(nowMS), "+inf")
+	return count
+end
+
+---@param key string
+---@param period integer
+---@param limit integer
+---@param burst integer
+local function gcraCapacity(key, period, limit, burst)
+	-- TODO: Implement GCRA capacity (reuse existing)
+	return 0
+end
+
+---@param key string
+---@param period integer
+---@param limit integer
+---@param burst integer
+---@param capacity integer
+local function gcraUpdate(key, period, limit, burst, capacity)
+	return 0
+end
 
 ---@type integer
 local requested = requestDetails.r
@@ -50,8 +80,6 @@ end
 
 -- TODO: Verify no far newer config was seen (reduce driftt)
 
--- TODO: Handle constraint idempotency (do we need to skip GCRA? only for single leases with valid idempotency)
-
 -- TODO: Compute constraint capacity
 local availableCapacity = requested
 local limitingConstraint = -1
@@ -59,19 +87,8 @@ local limitingConstraint = -1
 -- TODO: Can we generate a list of updates to apply in batch?
 -- local updates = {}
 
----@param key string
-local function getConcurrencyCount(key)
-	local count = redis.call("ZCOUNT", key, tostring(nowMS), "+inf")
-	return count
-end
-
----@param key string
----@param period integer
----@param burst integer
-local function gcraCapacity(key, period, burst)
-	-- TODO: Implement GCRA capacity (reuse existing)
-	return 0
-end
+-- TODO: Handle constraint idempotency (do we need to skip GCRA? only for single leases with valid idempotency)
+local skipGCRA = false
 
 -- TODO: Extract constraint capacity calculation into testable function
 for index, value in ipairs(constraints) do
@@ -83,9 +100,12 @@ for index, value in ipairs(constraints) do
 
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
-	if value.k == 1 then
+	if skipGCRA then
+		-- noop
+		constraintCapacity = availableCapacity
+	elseif value.k == 1 then
 		-- rate limit
-		constraintCapacity = gcraCapacity(value.r.h, value.r.p, 0)
+		constraintCapacity = gcraCapacity(value.r.h, value.r.p, value.r.l, 0)
 	elseif value.k == 2 then
 		-- concurrency
 		local inProgressItems = getConcurrencyCount(value.c.iik)
@@ -94,7 +114,7 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
 		-- throttle
-		constraintCapacity = gcraCapacity(value.t.h, value.t.p, value.t.b)
+		constraintCapacity = gcraCapacity(value.t.h, value.t.p, value.t.l, value.t.b)
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
@@ -111,8 +131,10 @@ if availableCapacity == 0 then
 	return { 2, limitingConstraint }
 end
 
--- TODO: Update constraint state with granted capacity
--- For throttle and rate limit, update the same GCRA key
+local granted = availableCapacity
+
+-- TODO: Generate leases
+
 -- For step concurrency, add the lease idempotency keys to the new in progress leases sets using the lease expiry as score
 -- For run concurrency, add the runID to the in progress runs set and the lease idempotency key to the dynamic run in progress leases set
 

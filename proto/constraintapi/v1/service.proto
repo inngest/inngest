@@ -173,7 +173,7 @@ message CapacityAcquireRequest {
   repeated ConstraintItem constraints = 6;
   int32 amount = 7;
   repeated string lease_idempotency_keys = 8;
-  repeated string lease_run_ids = 9;
+  map<string, string> lease_run_ids = 9;
   google.protobuf.Timestamp current_time = 10;
   google.protobuf.Duration duration = 11;
   google.protobuf.Duration maximum_lifetime = 12;

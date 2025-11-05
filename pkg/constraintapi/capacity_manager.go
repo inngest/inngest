@@ -102,8 +102,9 @@ type CapacityAcquireRequest struct {
 	// LeaseRunIDs represent individual run IDs associated with the leases.
 	// This may be empty in case the operation is not related to a run.
 	//
+	//
 	// This may include duplicates: We may be acquiring leases for multiple items of the same run in parallel.
-	LeaseRunIDs []ulid.ULID
+	LeaseRunIDs map[string]ulid.ULID
 
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
