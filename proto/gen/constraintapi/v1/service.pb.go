@@ -861,6 +861,7 @@ type ConcurrencyConstraint struct {
 	Scope             ConstraintApiConcurrencyScope `protobuf:"varint,2,opt,name=scope,proto3,enum=constraintapi.v1.ConstraintApiConcurrencyScope" json:"scope,omitempty"`
 	KeyExpressionHash string                        `protobuf:"bytes,3,opt,name=key_expression_hash,json=keyExpressionHash,proto3" json:"key_expression_hash,omitempty"`
 	EvaluatedKeyHash  string                        `protobuf:"bytes,4,opt,name=evaluated_key_hash,json=evaluatedKeyHash,proto3" json:"evaluated_key_hash,omitempty"`
+	InProgressItemKey string                        `protobuf:"bytes,5,opt,name=in_progress_item_key,json=inProgressItemKey,proto3" json:"in_progress_item_key,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -919,6 +920,13 @@ func (x *ConcurrencyConstraint) GetKeyExpressionHash() string {
 func (x *ConcurrencyConstraint) GetEvaluatedKeyHash() string {
 	if x != nil {
 		return x.EvaluatedKeyHash
+	}
+	return ""
+}
+
+func (x *ConcurrencyConstraint) GetInProgressItemKey() string {
+	if x != nil {
+		return x.InProgressItemKey
 	}
 	return ""
 }
@@ -1807,12 +1815,13 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x13RateLimitConstraint\x12C\n" +
 	"\x05scope\x18\x01 \x01(\x0e2-.constraintapi.v1.ConstraintApiRateLimitScopeR\x05scope\x12.\n" +
 	"\x13key_expression_hash\x18\x02 \x01(\tR\x11keyExpressionHash\x12,\n" +
-	"\x12evaluated_key_hash\x18\x03 \x01(\tR\x10evaluatedKeyHash\"\x80\x02\n" +
+	"\x12evaluated_key_hash\x18\x03 \x01(\tR\x10evaluatedKeyHash\"\xb1\x02\n" +
 	"\x15ConcurrencyConstraint\x12B\n" +
 	"\x04mode\x18\x01 \x01(\x0e2..constraintapi.v1.ConstraintApiConcurrencyModeR\x04mode\x12E\n" +
 	"\x05scope\x18\x02 \x01(\x0e2/.constraintapi.v1.ConstraintApiConcurrencyScopeR\x05scope\x12.\n" +
 	"\x13key_expression_hash\x18\x03 \x01(\tR\x11keyExpressionHash\x12,\n" +
-	"\x12evaluated_key_hash\x18\x04 \x01(\tR\x10evaluatedKeyHash\"\xb6\x01\n" +
+	"\x12evaluated_key_hash\x18\x04 \x01(\tR\x10evaluatedKeyHash\x12/\n" +
+	"\x14in_progress_item_key\x18\x05 \x01(\tR\x11inProgressItemKey\"\xb6\x01\n" +
 	"\x12ThrottleConstraint\x12B\n" +
 	"\x05scope\x18\x01 \x01(\x0e2,.constraintapi.v1.ConstraintApiThrottleScopeR\x05scope\x12.\n" +
 	"\x13key_expression_hash\x18\x02 \x01(\tR\x11keyExpressionHash\x12,\n" +

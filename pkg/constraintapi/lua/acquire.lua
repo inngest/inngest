@@ -25,7 +25,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: string? }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: string? }? }[]
 local constraints = requestDetails.s
 
 local envID = requestDetails.e
@@ -46,6 +46,19 @@ end
 
 -- TODO: Compute constraint capacity
 local granted = requested
+
+-- TODO: Can we generate a list of updates to apply in batch?
+local updates = {}
+
+for index, value in ipairs(constraints) do
+	if value.k == 1 then
+	-- rate limit
+	elseif value.k == 2 then
+	-- concurrency
+	elseif value.k == 3 then
+		-- throttle
+	end
+end
 
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
 if granted == 0 then

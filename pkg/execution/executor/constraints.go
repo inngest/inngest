@@ -265,7 +265,6 @@ func CheckConstraints(
 	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
-		ResourceKind:         constraintapi.LeaseResourceEvent,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
 		EnvID:                req.WorkspaceID,
 		FunctionID:           req.Function.ID,
