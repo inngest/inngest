@@ -28,9 +28,9 @@ export function SchemaExplorer() {
       <SchemaViewer
         key={entry.key || `${entry.displayName}:${idx}`}
         computeType={entry.key === 'common:event' ? computeSharedEventSchemaType : undefined}
-        defaultExpandedPaths={entry.isShared ? ['event'] : undefined}
+        defaultExpandedPaths={entry.key === 'common:event' ? ['event'] : undefined}
         node={entry.node}
-        renderAdornment={entry.isShared ? renderSharedAdornment : undefined}
+        renderAdornment={entry.key === 'common:event' ? renderSharedAdornment : undefined}
       />
     ),
     [renderSharedAdornment]
