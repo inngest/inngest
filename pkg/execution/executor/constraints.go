@@ -266,16 +266,21 @@ func CheckConstraints(
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
-		EnvID:                req.WorkspaceID,
-		FunctionID:           req.Function.ID,
-		Configuration:        queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
-		Constraints:          constraints,
-		Amount:               1,
-		CurrentTime:          time.Now(),
-		Duration:             ScheduleLeaseDuration,
-		MaximumLifetime:      5 * time.Minute, // This lease should be short!
-		Source:               source,
-		BlockingThreshold:    0, // Disable this for now
+		// NOTE: We cannot provide a run ID at this point because
+		// we may be retrying a previous Schedule() attempt which
+		// already set a run ID. This will only be known after
+		// the create state call within schedule().
+		// LeaseRunIDs: []ulid.ULID,
+		EnvID:             req.WorkspaceID,
+		FunctionID:        req.Function.ID,
+		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
+		Constraints:       constraints,
+		Amount:            1,
+		CurrentTime:       time.Now(),
+		Duration:          ScheduleLeaseDuration,
+		MaximumLifetime:   5 * time.Minute, // This lease should be short!
+		Source:            source,
+		BlockingThreshold: 0, // Disable this for now
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr)
