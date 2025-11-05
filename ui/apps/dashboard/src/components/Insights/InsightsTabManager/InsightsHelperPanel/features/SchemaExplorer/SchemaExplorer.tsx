@@ -7,13 +7,12 @@ import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
 import { SHOW_SCHEMA_SEARCH } from '@/components/Insights/temp-flags';
-import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
 
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { entries, isLoading, isFetchingNextPage, error } = useSchemas({ search });
+  const { entries } = useSchemas({ search });
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'event') return null;
@@ -51,13 +50,8 @@ export function SchemaExplorer() {
         </>
       )}
       <>
-        <SchemaExplorerSwitcher
-          entries={entries}
-          error={error}
-          isLoading={isLoading}
-          isFetchingNextPage={isFetchingNextPage}
-          renderEntry={renderEntry}
-        />
+        {entries.map(renderEntry)}
+        {/* TODO: Handle infinite scroll and loading, error states */}
         {/* TODO: Add infinite scroll trigger */}
       </>
     </div>
