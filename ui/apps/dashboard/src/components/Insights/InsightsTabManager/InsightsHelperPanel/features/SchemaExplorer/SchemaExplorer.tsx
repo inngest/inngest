@@ -24,9 +24,9 @@ export function SchemaExplorer() {
   }, []);
 
   const renderEntry = useCallback(
-    (entry: (typeof entries)[number], idx: number) => (
+    (entry: (typeof entries)[number]) => (
       <SchemaViewer
-        key={entry.key || `${entry.displayName}:${idx}`}
+        key={entry.key}
         computeType={entry.key === 'common:event' ? computeSharedEventSchemaType : undefined}
         defaultExpandedPaths={entry.key === 'common:event' ? ['event'] : undefined}
         node={entry.node}
