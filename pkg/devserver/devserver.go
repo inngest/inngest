@@ -79,14 +79,16 @@ import (
 )
 
 const (
-	DefaultTick                    = 150
-	DefaultTickDuration            = time.Millisecond * DefaultTick
-	DefaultPollInterval            = 5
-	DefaultQueueWorkers            = 100
+	DefaultTick         = 150
+	DefaultTickDuration = time.Millisecond * DefaultTick
+	DefaultPollInterval = 5
+	DefaultQueueWorkers = 100
+
 	DefaultConnectGatewayPort      = 8289
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
-	DefaultDebugAPIPort            = 7777
+
+	DefaultDebugAPIPort = 7777
 )
 
 var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
