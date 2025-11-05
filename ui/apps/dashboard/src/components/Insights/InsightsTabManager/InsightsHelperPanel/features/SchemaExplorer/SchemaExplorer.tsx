@@ -49,11 +49,11 @@ export function SchemaExplorer() {
           />
         </>
       )}
-      <>
+      <div className="flex flex-col gap-1">
         {entries.map(renderEntry)}
         {/* TODO: Handle infinite scroll and loading, error states */}
         {/* TODO: Add infinite scroll trigger */}
-      </>
+      </div>
     </div>
   );
 }
