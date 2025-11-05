@@ -39,12 +39,16 @@ export function ValueRow({
         {node.name}
       </span>
       {Boolean(typeText) && (
-        <span className="text-quaternary-warmerxIntense font-mono text-xs capitalize">
+        <span className="text-quaternary-warmerxIntense whitespace-nowrap font-mono text-xs capitalize">
           {typeText}
         </span>
       )}
       {Boolean(typePillOverride) && (
-        <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
+        <Pill
+          appearance="outlined"
+          className="border-subtle text-subtle whitespace-nowrap"
+          kind="secondary"
+        >
           {typePillOverride}
         </Pill>
       )}
