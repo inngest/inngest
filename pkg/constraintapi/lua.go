@@ -144,7 +144,7 @@ type SerializedRateLimitConstraint struct {
 	Limit int `json:"l,omitempty"`
 
 	// p = Period (embedded from config)
-	Period string `json:"p,omitempty"`
+	Period int `json:"p,omitempty"`
 }
 
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem

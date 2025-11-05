@@ -13,6 +13,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/xhit/go-str2duration/v2"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -672,7 +673,7 @@ func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency 
 	return keys
 }
 
-func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) constraintapi.ConstraintConfig {
+func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Function) (constraintapi.ConstraintConfig, error) {
 	var rateLimit []constraintapi.RateLimitConfig
 	if fn.RateLimit != nil {
 		var rateLimitKey string
@@ -680,9 +681,15 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			rateLimitKey = *fn.RateLimit.Key
 		}
 
+		dur, err := str2duration.ParseDuration(fn.RateLimit.Period)
+		if err != nil {
+			return constraintapi.ConstraintConfig{}, fmt.Errorf("invalid rate limit period: %w", err)
+		}
+
 		rateLimit = append(rateLimit, constraintapi.RateLimitConfig{
 			Scope:             enums.RateLimitScopeFn,
 			Limit:             int(fn.RateLimit.Limit),
+			Period:            int(dur.Seconds()),
 			KeyExpressionHash: util.XXHash(rateLimitKey),
 		})
 	}
@@ -733,5 +740,5 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			CustomConcurrencyKeys: customConcurrency,
 		},
 		Throttle: throttles,
-	}
+	}, nil
 }

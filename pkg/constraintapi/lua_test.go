@@ -23,7 +23,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 			{
 				Scope:             enums.RateLimitScopeAccount,
 				Limit:             100,
-				Period:            "1m",
+				Period:            60,
 				KeyExpressionHash: "test-key-hash",
 			},
 		},
@@ -115,7 +115,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 			serialized := tt.input.ToSerializedConstraintItem(testConfig, accountID, envID, functionID, keyPrefix)
 			jsonBytes, err := json.Marshal(serialized)
 			require.NoError(t, err)
-			
+
 			assert.JSONEq(t, tt.expected, string(jsonBytes))
 		})
 	}
@@ -158,13 +158,11 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 	t.Logf("Original JSON (%d bytes): %s", len(originalJson), string(originalJson))
 	t.Logf("Optimized JSON (%d bytes): %s", len(optimizedJson), string(optimizedJson))
 
-	// The optimized version uses shorter field names and integer enums, though 
+	// The optimized version uses shorter field names and integer enums, though
 	// the addition of InProgressLeaseKey may make the overall size larger.
 	// We test that the optimized version is valid and contains the expected structure.
 	assert.NotEmpty(t, optimizedJson)
-	assert.Contains(t, string(optimizedJson), `"k":2`) // Kind as integer
+	assert.Contains(t, string(optimizedJson), `"k":2`)  // Kind as integer
 	assert.Contains(t, string(optimizedJson), `"ilk":`) // InProgressLeaseKey
 	assert.Contains(t, string(optimizedJson), `"iik":`) // InProgressItemKey
 }
-
-

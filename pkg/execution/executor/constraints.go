@@ -262,6 +262,11 @@ func CheckConstraints(
 	// TODO: Fetch account concurrency
 	var accountConcurrency int
 
+	configuration, err := queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function)
+	if err != nil {
+		return checkResult{}, fmt.Errorf("could not create configuration for acquire: %w", err)
+	}
+
 	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
@@ -273,7 +278,7 @@ func CheckConstraints(
 		// LeaseRunIDs: []ulid.ULID,
 		EnvID:             req.WorkspaceID,
 		FunctionID:        req.Function.ID,
-		Configuration:     queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
+		Configuration:     configuration,
 		Constraints:       constraints,
 		Amount:            1,
 		CurrentTime:       time.Now(),

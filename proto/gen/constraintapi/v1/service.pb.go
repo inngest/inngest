@@ -442,7 +442,7 @@ type RateLimitConfig struct {
 	state             protoimpl.MessageState      `protogen:"open.v1"`
 	Scope             ConstraintApiRateLimitScope `protobuf:"varint,1,opt,name=scope,proto3,enum=constraintapi.v1.ConstraintApiRateLimitScope" json:"scope,omitempty"`
 	Limit             int32                       `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Period            string                      `protobuf:"bytes,3,opt,name=period,proto3" json:"period,omitempty"`
+	Period            int32                       `protobuf:"varint,3,opt,name=period,proto3" json:"period,omitempty"`
 	KeyExpressionHash string                      `protobuf:"bytes,4,opt,name=key_expression_hash,json=keyExpressionHash,proto3" json:"key_expression_hash,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -492,11 +492,11 @@ func (x *RateLimitConfig) GetLimit() int32 {
 	return 0
 }
 
-func (x *RateLimitConfig) GetPeriod() string {
+func (x *RateLimitConfig) GetPeriod() int32 {
 	if x != nil {
 		return x.Period
 	}
-	return ""
+	return 0
 }
 
 func (x *RateLimitConfig) GetKeyExpressionHash() string {
@@ -1795,7 +1795,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x0fRateLimitConfig\x12C\n" +
 	"\x05scope\x18\x01 \x01(\x0e2-.constraintapi.v1.ConstraintApiRateLimitScopeR\x05scope\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06period\x18\x03 \x01(\tR\x06period\x12.\n" +
+	"\x06period\x18\x03 \x01(\x05R\x06period\x12.\n" +
 	"\x13key_expression_hash\x18\x04 \x01(\tR\x11keyExpressionHash\"\xe9\x01\n" +
 	"\x16CustomConcurrencyLimit\x12B\n" +
 	"\x04mode\x18\x01 \x01(\x0e2..constraintapi.v1.ConstraintApiConcurrencyModeR\x04mode\x12E\n" +

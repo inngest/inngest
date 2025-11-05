@@ -34,7 +34,9 @@ func TestRedisCapacityManager(t *testing.T) {
 	// to cover edge cases.
 
 	t.Run("Acquire", func(t *testing.T) {
-		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{})
+		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
+			CurrentTime: clock.Now(),
+		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 	})
