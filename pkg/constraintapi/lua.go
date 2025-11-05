@@ -96,6 +96,9 @@ type SerializedConcurrencyConstraint struct {
 
 	// eh = EvaluatedKeyHash
 	EvaluatedKeyHash string `json:"eh,omitempty"`
+
+	// l = Limit (embedded from config)
+	Limit int `json:"l,omitempty"`
 }
 
 // SerializedThrottleConstraint represents a minimal version of ThrottleConstraint
@@ -108,6 +111,15 @@ type SerializedThrottleConstraint struct {
 
 	// eh = EvaluatedKeyHash
 	EvaluatedKeyHash string `json:"eh,omitempty"`
+
+	// l = Limit (embedded from config)
+	Limit int `json:"l,omitempty"`
+
+	// b = Burst (embedded from config)
+	Burst int `json:"b,omitempty"`
+
+	// p = Period (embedded from config)
+	Period int `json:"p,omitempty"`
 }
 
 // SerializedRateLimitConstraint represents a minimal version of RateLimitConstraint
@@ -120,11 +132,18 @@ type SerializedRateLimitConstraint struct {
 
 	// eh = EvaluatedKeyHash
 	EvaluatedKeyHash string `json:"eh,omitempty"`
+
+	// l = Limit (embedded from config)
+	Limit int `json:"l,omitempty"`
+
+	// p = Period (embedded from config)
+	Period string `json:"p,omitempty"`
 }
 
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
 // for efficient storage in Redis and easy consumption in Lua scripts.
-func (c ConstraintItem) ToSerializedConstraintItem() SerializedConstraintItem {
+// The config parameter is used to embed matching configuration limits directly into the constraint.
+func (c ConstraintItem) ToSerializedConstraintItem(config ConstraintConfig) SerializedConstraintItem {
 	serialized := SerializedConstraintItem{}
 
 	// Convert ConstraintKind to integer
@@ -132,175 +151,90 @@ func (c ConstraintItem) ToSerializedConstraintItem() SerializedConstraintItem {
 	case ConstraintKindRateLimit:
 		serialized.Kind = 1
 		if c.RateLimit != nil {
-			serialized.RateLimit = &SerializedRateLimitConstraint{
+			rateLimitConstraint := &SerializedRateLimitConstraint{
 				Scope:             int(c.RateLimit.Scope),
 				KeyExpressionHash: c.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  c.RateLimit.EvaluatedKeyHash,
 			}
+			
+			// Find matching rate limit config
+			for _, rlConfig := range config.RateLimit {
+				if rlConfig.Scope == c.RateLimit.Scope && rlConfig.KeyExpressionHash == c.RateLimit.KeyExpressionHash {
+					rateLimitConstraint.Limit = rlConfig.Limit
+					rateLimitConstraint.Period = rlConfig.Period
+					break
+				}
+			}
+			
+			serialized.RateLimit = rateLimitConstraint
 		}
 	case ConstraintKindConcurrency:
 		serialized.Kind = 2
 		if c.Concurrency != nil {
-			serialized.Concurrency = &SerializedConcurrencyConstraint{
+			concurrencyConstraint := &SerializedConcurrencyConstraint{
 				Mode:              int(c.Concurrency.Mode),
 				Scope:             int(c.Concurrency.Scope),
 				KeyExpressionHash: c.Concurrency.KeyExpressionHash,
 				EvaluatedKeyHash:  c.Concurrency.EvaluatedKeyHash,
 			}
+			
+			// Embed appropriate limit based on scope and mode
+			if c.Concurrency.KeyExpressionHash != "" {
+				// Custom concurrency key - find matching custom limit
+				for _, customLimit := range config.Concurrency.CustomConcurrencyKeys {
+					if customLimit.Mode == c.Concurrency.Mode && 
+					   customLimit.Scope == c.Concurrency.Scope && 
+					   customLimit.KeyExpressionHash == c.Concurrency.KeyExpressionHash {
+						concurrencyConstraint.Limit = customLimit.Limit
+						break
+					}
+				}
+			} else {
+				// Standard concurrency limits based on scope and mode
+				switch c.Concurrency.Scope {
+				case 0: // Function scope
+					if c.Concurrency.Mode == 0 { // Step mode
+						concurrencyConstraint.Limit = config.Concurrency.FunctionConcurrency
+					} else { // Run mode
+						concurrencyConstraint.Limit = config.Concurrency.FunctionRunConcurrency
+					}
+				case 2: // Account scope
+					if c.Concurrency.Mode == 0 { // Step mode
+						concurrencyConstraint.Limit = config.Concurrency.AccountConcurrency
+					} else { // Run mode
+						concurrencyConstraint.Limit = config.Concurrency.AccountRunConcurrency
+					}
+				}
+			}
+			
+			serialized.Concurrency = concurrencyConstraint
 		}
 	case ConstraintKindThrottle:
 		serialized.Kind = 3
 		if c.Throttle != nil {
-			serialized.Throttle = &SerializedThrottleConstraint{
+			throttleConstraint := &SerializedThrottleConstraint{
 				Scope:             int(c.Throttle.Scope),
 				KeyExpressionHash: c.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  c.Throttle.EvaluatedKeyHash,
 			}
+			
+			// Find matching throttle config
+			for _, tConfig := range config.Throttle {
+				if tConfig.Scope == c.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == c.Throttle.KeyExpressionHash {
+					throttleConstraint.Limit = tConfig.Limit
+					throttleConstraint.Burst = tConfig.Burst
+					throttleConstraint.Period = tConfig.Period
+					break
+				}
+			}
+			
+			serialized.Throttle = throttleConstraint
 		}
 	}
 
 	return serialized
 }
 
-// SerializedConstraintConfig represents a minimal, Lua-friendly version of ConstraintConfig
-// with short JSON field names and integer enums to reduce Redis storage size.
-type SerializedConstraintConfig struct {
-	// v = FunctionVersion
-	FunctionVersion int `json:"v,omitempty"`
-
-	// r = RateLimit configs
-	RateLimit []SerializedRateLimitConfig `json:"r,omitempty"`
-
-	// c = Concurrency config
-	Concurrency SerializedConcurrencyConfig `json:"c,omitempty"`
-
-	// t = Throttle configs
-	Throttle []SerializedThrottleConfig `json:"t,omitempty"`
-}
-
-// SerializedRateLimitConfig represents a minimal version of RateLimitConfig
-type SerializedRateLimitConfig struct {
-	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
-	Scope int `json:"s,omitempty"`
-
-	// l = Limit
-	Limit int `json:"l,omitempty"`
-
-	// p = Period
-	Period string `json:"p,omitempty"`
-
-	// h = KeyExpressionHash
-	KeyExpressionHash string `json:"h,omitempty"`
-}
-
-// SerializedConcurrencyConfig represents a minimal version of ConcurrencyConfig
-type SerializedConcurrencyConfig struct {
-	// ac = AccountConcurrency
-	AccountConcurrency int `json:"ac,omitempty"`
-
-	// fc = FunctionConcurrency
-	FunctionConcurrency int `json:"fc,omitempty"`
-
-	// arc = AccountRunConcurrency
-	AccountRunConcurrency int `json:"arc,omitempty"`
-
-	// frc = FunctionRunConcurrency
-	FunctionRunConcurrency int `json:"frc,omitempty"`
-
-	// cck = CustomConcurrencyKeys
-	CustomConcurrencyKeys []SerializedCustomConcurrencyLimit `json:"cck,omitempty"`
-}
-
-// SerializedCustomConcurrencyLimit represents a minimal version of CustomConcurrencyLimit
-type SerializedCustomConcurrencyLimit struct {
-	// m = Mode as integer: 0=Step, 1=Run
-	Mode int `json:"m,omitempty"`
-
-	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
-	Scope int `json:"s,omitempty"`
-
-	// l = Limit
-	Limit int `json:"l,omitempty"`
-
-	// h = KeyExpressionHash
-	KeyExpressionHash string `json:"h,omitempty"`
-}
-
-// SerializedThrottleConfig represents a minimal version of ThrottleConfig
-type SerializedThrottleConfig struct {
-	// s = Scope as integer: 0=Fn, 1=Env, 2=Account
-	Scope int `json:"s,omitempty"`
-
-	// l = Limit
-	Limit int `json:"l,omitempty"`
-
-	// b = Burst
-	Burst int `json:"b,omitempty"`
-
-	// p = Period
-	Period int `json:"p,omitempty"`
-
-	// h = ThrottleKeyExpressionHash
-	ThrottleKeyExpressionHash string `json:"h,omitempty"`
-}
-
-// ToSerializedConstraintConfig converts a ConstraintConfig to a SerializedConstraintConfig
-// for efficient storage in Redis and easy consumption in Lua scripts.
-func (c ConstraintConfig) ToSerializedConstraintConfig() SerializedConstraintConfig {
-	serialized := SerializedConstraintConfig{
-		FunctionVersion: c.FunctionVersion,
-	}
-
-	// Convert RateLimit configs
-	if len(c.RateLimit) > 0 {
-		serialized.RateLimit = make([]SerializedRateLimitConfig, len(c.RateLimit))
-		for i, rl := range c.RateLimit {
-			serialized.RateLimit[i] = SerializedRateLimitConfig{
-				Scope:             int(rl.Scope),
-				Limit:             rl.Limit,
-				Period:            rl.Period,
-				KeyExpressionHash: rl.KeyExpressionHash,
-			}
-		}
-	}
-
-	// Convert Concurrency config
-	serialized.Concurrency = SerializedConcurrencyConfig{
-		AccountConcurrency:     c.Concurrency.AccountConcurrency,
-		FunctionConcurrency:    c.Concurrency.FunctionConcurrency,
-		AccountRunConcurrency:  c.Concurrency.AccountRunConcurrency,
-		FunctionRunConcurrency: c.Concurrency.FunctionRunConcurrency,
-	}
-
-	// Convert CustomConcurrencyKeys
-	if len(c.Concurrency.CustomConcurrencyKeys) > 0 {
-		serialized.Concurrency.CustomConcurrencyKeys = make([]SerializedCustomConcurrencyLimit, len(c.Concurrency.CustomConcurrencyKeys))
-		for i, cck := range c.Concurrency.CustomConcurrencyKeys {
-			serialized.Concurrency.CustomConcurrencyKeys[i] = SerializedCustomConcurrencyLimit{
-				Mode:              int(cck.Mode),
-				Scope:             int(cck.Scope),
-				Limit:             cck.Limit,
-				KeyExpressionHash: cck.KeyExpressionHash,
-			}
-		}
-	}
-
-	// Convert Throttle configs
-	if len(c.Throttle) > 0 {
-		serialized.Throttle = make([]SerializedThrottleConfig, len(c.Throttle))
-		for i, t := range c.Throttle {
-			serialized.Throttle[i] = SerializedThrottleConfig{
-				Scope:                     int(t.Scope),
-				Limit:                     t.Limit,
-				Burst:                     t.Burst,
-				Period:                    t.Period,
-				ThrottleKeyExpressionHash: t.ThrottleKeyExpressionHash,
-			}
-		}
-	}
-
-	return serialized
-}
 
 func strSlice(args []any) ([]string, error) {
 	res := make([]string, len(args))
