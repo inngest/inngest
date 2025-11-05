@@ -100,7 +100,7 @@ func DriverResponseAttrs(
 		meta.AddAttr(rawAttrs, meta.Attrs.DropSpan, &dropSpan)
 	}
 
-	fnOutput, err := resp.GetWrappedFunctionOutput()
+	fnOutput, err := resp.GetTraceFunctionOutput()
 	if err != nil {
 		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
 	} else if fnOutput != nil {

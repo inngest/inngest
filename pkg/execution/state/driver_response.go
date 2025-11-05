@@ -357,7 +357,7 @@ func (r *DriverResponse) IsGatewayRequest() bool {
 //
 // NOTE: This always returns a wrapped response: {"data":T} or {"error":T}.  We
 // ALWAYS wrap trace data.
-func (r *DriverResponse) GetWrappedFunctionOutput() (*string, error) {
+func (r *DriverResponse) GetTraceFunctionOutput() (*string, error) {
 	if !r.IsFunctionResult() {
 		return nil, nil
 	}

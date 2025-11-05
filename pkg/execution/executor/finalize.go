@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
@@ -269,7 +270,8 @@ func apiAttributes(res checkpoint.APIResult) *meta.SerializableAttrs {
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &h)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(string(res.Body)))
+	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(res.Body)))
 
 	return rawAttrs
 }
@@ -280,7 +282,8 @@ func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
 	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200)) // Must be to have this code.  It's an async fn.
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(gen.Data)))
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(string(gen.Data)))
+	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
 
 	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
 
