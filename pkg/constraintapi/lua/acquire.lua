@@ -28,9 +28,6 @@ local configVersion = requestDetails.cv
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: string? }? }[]
 local constraints = requestDetails.s
 
-local envID = requestDetails.e
-local functionID = requestDetails.f
-
 -- TODO: Handle operation idempotency (was this request seen before?)
 local opIdempotency = redis.call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
@@ -45,31 +42,52 @@ end
 -- TODO: Handle constraint idempotency (do we need to skip GCRA? only for single leases with valid idempotency)
 
 -- TODO: Compute constraint capacity
-local granted = requested
+local availableCapacity = requested
+local limitingConstraint = -1
 
 -- TODO: Can we generate a list of updates to apply in batch?
-local updates = {}
+-- local updates = {}
 
 for index, value in ipairs(constraints) do
+	-- Exit checks early if no more capacity is available (e.g. no need to check fn
+	-- concurrency if account concurrency is used up)
+	if availableCapacity <= 0 then
+		break
+	end
+
+	-- Retrieve constraint capacity
+	local constraintCapacity = 0
 	if value.k == 1 then
 	-- rate limit
+	-- TODO: Check GCRA capacity against value.r.eh
 	elseif value.k == 2 then
 	-- concurrency
+	-- TODO: Check value.c.iik
+	-- TODO: Check value.c.ilk
 	elseif value.k == 3 then
 		-- throttle
+		-- TODO: Check GCRA capacity against value.t.eh
+	end
+
+	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
+	if constraintCapacity < availableCapacity then
+		availableCapacity = constraintCapacity
+		limitingConstraint = index
 	end
 end
 
+-- TODO: Handle fairness between other lease sources! Don't allow consuming entire capacity unfairly
+
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
-if granted == 0 then
-	return { 2 }
+if availableCapacity == 0 then
+	return { 2, limitingConstraint }
 end
 
 -- TODO: Update constraint state with granted capacity
 
 -- Populate request details
-requestDetails.g = granted
-requestDetails.a = granted
+requestDetails.g = availableCapacity
+requestDetails.a = availableCapacity
 
 -- Store request details
 -- TODO: Should this have a TTL just in case? e.g. 24h?
