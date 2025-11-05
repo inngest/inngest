@@ -347,9 +347,9 @@ func (r *DriverResponse) IsGatewayRequest() bool {
 	return false
 }
 
-// GetFunctionOutput returns the serialized output of the function if this
+// GetWrappedFunctionOutput returns the serialized output of the function if this
 // response represents a function result. The output could also be an error.
-func (r *DriverResponse) GetFunctionOutput() (*string, error) {
+func (r *DriverResponse) GetWrappedFunctionOutput() (*string, error) {
 	if !r.IsFunctionResult() {
 		return nil, nil
 	}

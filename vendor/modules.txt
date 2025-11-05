@@ -772,10 +772,8 @@ github.com/inngest/inngestgo/internal/types
 github.com/inngest/inngestgo/pkg/env
 github.com/inngest/inngestgo/pkg/httputil
 github.com/inngest/inngestgo/pkg/interval
-github.com/inngest/inngestgo/pkg/version
 github.com/inngest/inngestgo/realtime
 github.com/inngest/inngestgo/step
-github.com/inngest/inngestgo/stephttp
 # github.com/jackc/pgpassfile v1.0.0
 ## explicit; go 1.12
 github.com/jackc/pgpassfile
