@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
@@ -65,7 +64,7 @@ export const RunDetailsV3 = ({
     false
   );
   const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
-  const { dynamicRunData, updateDynamicRunData } = useDynamicRunData({ runID });
+  const { updateDynamicRunData } = useDynamicRunData({ runID });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -188,12 +187,15 @@ export const RunDetailsV3 = ({
   }
 
   useEffect(() => {
-    runData?.trace.status &&
-      updateDynamicRunData({
-        runID,
-        status: runData.trace.status,
-        endedAt: runData.trace.endedAt ?? undefined,
-      });
+    if (!runData?.trace.status || runData?.trace.status === initialRunData?.status) {
+      return;
+    }
+
+    updateDynamicRunData({
+      runID,
+      status: runData.trace.status,
+      endedAt: runData.trace.endedAt ?? undefined,
+    });
   }, [runData?.trace.endedAt, runData?.trace.status]);
 
   const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
