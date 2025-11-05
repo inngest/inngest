@@ -8,7 +8,7 @@ import { ArrayRowVariantValue } from './variants/ArrayRowVariantValue';
 
 export type ArrayRowProps = { node: ArrayNode };
 
-export function ArrayRow({ node }: ArrayRowProps): React.ReactElement | null {
+export function ArrayRow({ node }: ArrayRowProps) {
   const element = node.element;
 
   switch (element.kind) {
