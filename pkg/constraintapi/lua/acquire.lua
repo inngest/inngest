@@ -48,6 +48,7 @@ local limitingConstraint = -1
 -- TODO: Can we generate a list of updates to apply in batch?
 -- local updates = {}
 
+-- TODO: Extract constraint capacity calculation into testable function
 for index, value in ipairs(constraints) do
 	-- Exit checks early if no more capacity is available (e.g. no need to check fn
 	-- concurrency if account concurrency is used up)
