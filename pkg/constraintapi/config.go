@@ -23,8 +23,8 @@ type RateLimitConfig struct {
 	// Limit is how often the function can be called within the specified period
 	Limit int
 
-	// Period represents the time period for throttling the function
-	Period string
+	// Period represents the time period for throttling the function in seconds
+	Period int
 
 	KeyExpressionHash string
 }

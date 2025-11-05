@@ -66,7 +66,7 @@ enum ConstraintApiLeaseService {
 message RateLimitConfig {
   ConstraintApiRateLimitScope scope = 1;
   int32 limit = 2;
-  string period = 3;
+  int32 period = 3;
   string key_expression_hash = 4;
 }
 

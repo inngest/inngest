@@ -229,7 +229,7 @@ func RateLimitConfigToProto(config RateLimitConfig) *pb.RateLimitConfig {
 	return &pb.RateLimitConfig{
 		Scope:             RateLimitScopeToProto(config.Scope),
 		Limit:             int32(config.Limit),
-		Period:            config.Period,
+		Period:            int32(config.Period),
 		KeyExpressionHash: config.KeyExpressionHash,
 	}
 }
@@ -241,7 +241,7 @@ func RateLimitConfigFromProto(pbConfig *pb.RateLimitConfig) RateLimitConfig {
 	return RateLimitConfig{
 		Scope:             RateLimitScopeFromProto(pbConfig.Scope),
 		Limit:             int(pbConfig.Limit),
-		Period:            pbConfig.Period,
+		Period:            int(pbConfig.Period),
 		KeyExpressionHash: pbConfig.KeyExpressionHash,
 	}
 }

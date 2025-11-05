@@ -4,6 +4,18 @@
 -- -
 --
 
+---@module 'cjson'
+local cjson = cjson
+
+---@module 'redis'
+local redis = redis
+
+---@type string[]
+local KEYS = KEYS
+
+---@type string[]
+local ARGV = ARGV
+
 ---@type string
 local keyRequestState = KEYS[1]
 ---@type string
@@ -13,11 +25,10 @@ local keyScavengerShard = KEYS[3]
 ---@type string
 local keyAccountLeases = KEYS[4]
 
----@type string
-local accountScopedKeyPrefix = ARGV[1]
-
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer? }
-local requestDetails = cjson.decode(ARGV[2])
+local requestDetails = cjson.decode(ARGV[1])
+
+local nowMS = tonumber(KEYS[4])
 
 ---@type integer
 local requested = requestDetails.r
@@ -25,7 +36,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: string? }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: integer? }? }[]
 local constraints = requestDetails.s
 
 -- TODO: Handle operation idempotency (was this request seen before?)
@@ -48,6 +59,20 @@ local limitingConstraint = -1
 -- TODO: Can we generate a list of updates to apply in batch?
 -- local updates = {}
 
+---@param key string
+local function getConcurrencyCount(key)
+	local count = redis.call("ZCOUNT", key, tostring(nowMS), "+inf")
+	return count
+end
+
+---@param key string
+---@param period integer
+---@param burst integer
+local function gcraCapacity(key, period, burst)
+	-- TODO: Implement GCRA capacity (reuse existing)
+	return 0
+end
+
 -- TODO: Extract constraint capacity calculation into testable function
 for index, value in ipairs(constraints) do
 	-- Exit checks early if no more capacity is available (e.g. no need to check fn
@@ -59,15 +84,17 @@ for index, value in ipairs(constraints) do
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	if value.k == 1 then
-	-- rate limit
-	-- TODO: Check GCRA capacity against value.r.eh
+		-- rate limit
+		constraintCapacity = gcraCapacity(value.r.h, value.r.p, 0)
 	elseif value.k == 2 then
-	-- concurrency
-	-- TODO: Check value.c.iik
-	-- TODO: Check value.c.ilk
+		-- concurrency
+		local inProgressItems = getConcurrencyCount(value.c.iik)
+		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		local inProgressTotal = inProgressItems + inProgressLeases
+		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
 		-- throttle
-		-- TODO: Check GCRA capacity against value.t.eh
+		constraintCapacity = gcraCapacity(value.t.h, value.t.p, value.t.b)
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint

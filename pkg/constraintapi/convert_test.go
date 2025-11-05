@@ -332,13 +332,13 @@ func TestRateLimitConfigConversion(t *testing.T) {
 			input: RateLimitConfig{
 				Scope:             enums.RateLimitScopeAccount,
 				Limit:             100,
-				Period:            "1m",
+				Period:            60,
 				KeyExpressionHash: "hash123",
 			},
 			expected: &pb.RateLimitConfig{
 				Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT,
 				Limit:             100,
-				Period:            "1m",
+				Period:            60,
 				KeyExpressionHash: "hash123",
 			},
 		},
@@ -351,7 +351,7 @@ func TestRateLimitConfigConversion(t *testing.T) {
 			expected: &pb.RateLimitConfig{
 				Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION,
 				Limit:             0,
-				Period:            "",
+				Period:            0,
 				KeyExpressionHash: "",
 			},
 		},
@@ -583,7 +583,7 @@ func TestConstraintConfigConversion(t *testing.T) {
 					{
 						Scope:             enums.RateLimitScopeAccount,
 						Limit:             100,
-						Period:            "1h",
+						Period:            3600,
 						KeyExpressionHash: "rate_hash",
 					},
 				},
@@ -615,7 +615,7 @@ func TestConstraintConfigConversion(t *testing.T) {
 					{
 						Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_ACCOUNT,
 						Limit:             100,
-						Period:            "1h",
+						Period:            3600,
 						KeyExpressionHash: "rate_hash",
 					},
 				},
@@ -1295,7 +1295,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 						{
 							Scope:             enums.RateLimitScopeFn,
 							Limit:             10,
-							Period:            "1m",
+							Period:            60,
 							KeyExpressionHash: "hash1",
 						},
 					},
@@ -1332,7 +1332,7 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 						{
 							Scope:             pb.ConstraintApiRateLimitScope_CONSTRAINT_API_RATE_LIMIT_SCOPE_FUNCTION,
 							Limit:             10,
-							Period:            "1m",
+							Period:            60,
 							KeyExpressionHash: "hash1",
 						},
 					},
@@ -1783,7 +1783,7 @@ func TestRoundTripConversions(t *testing.T) {
 				{
 					Scope:             0, // RateLimitScopeFn
 					Limit:             100,
-					Period:            "1h",
+					Period:            3600,
 					KeyExpressionHash: "hash123",
 				},
 			},
