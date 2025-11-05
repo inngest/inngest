@@ -178,6 +178,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       searchError={searchError}
       error={paginationError}
+      pollInterval={DEFAULT_POLL_INTERVAL}
       infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
           onIntersect={loadMore}

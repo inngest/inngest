@@ -248,6 +248,13 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 
+	// We use robfig cron library to find the next time this cron is supposed to run. If there is no time in the next 5 years this cron will run, robfig.cron.Next returns a zero time.
+	// Since we don't allow specifying year as part of the cron expression, these expressions will never run. It is therefore safe to return without scheduling the next run.
+	if next.IsZero() {
+		l.Warn("next schedule is zero, returning")
+		return nil, nil
+	}
+
 	// We want only one cron loop to exist for a {FnID, FnVersion, CronExpr} combination. This jobID helps achieve that idempotency.
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 

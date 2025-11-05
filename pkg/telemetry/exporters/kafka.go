@@ -179,12 +179,20 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 		rec := &kgo.Record{Value: byt}
 		switch e.key {
+		case "workflow_id", "wf_id", "function_id", "fn_id":
+			if id.GetFunctionId() != "" {
+				rec.Key = []byte(id.GetFunctionId())
+				break
+			}
+			fallthrough
+		case "workspace_id", "ws_id", "env_id":
+			if id.GetEnvId() != "" {
+				rec.Key = []byte(id.GetEnvId())
+				break
+			}
+			fallthrough
 		case "account_id", "acct_id":
 			rec.Key = []byte(id.GetAccountId())
-		case "workspace_id", "ws_id", "env_id":
-			rec.Key = []byte(id.GetEnvId())
-		case "workflow_id", "wf_id", "function_id", "fn_id":
-			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
 			switch {
 			case id.GetRunId() != "":
@@ -201,6 +209,7 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 			default:
 				l.Error("missing run_id, no other identifier to fallback to", "span", sp)
 			}
+
 		}
 
 		e.client.Produce(ctx, rec, func(r *kgo.Record, err error) {
