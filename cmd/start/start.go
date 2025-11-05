@@ -10,6 +10,8 @@ import (
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -116,10 +118,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
 	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url")
 
+	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
+	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
+	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
+
 	opts := devserver.StartOpts{
 		Config:                  *conf,
 		ConnectGatewayHost:      conf.CoreAPI.Addr,
-		ConnectGatewayPort:      localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort),
+		ConnectGatewayPort:      connectGatewayPort,
 		EventKeys:               eventKeys,
 		InMemory:                false,
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
@@ -137,6 +143,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		SQLiteDir:               sqliteDir,
 		Tick:                    time.Duration(tick) * time.Millisecond,
 		URLs:                    sdkURLs,
+		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
+			ctx,
+			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
+			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+		),
 	}
 
 	err = devserver.New(ctx, opts)
