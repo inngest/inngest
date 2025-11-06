@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/sashabaranov/go-openai"
@@ -21,10 +20,10 @@ var (
 // depending on the UI.
 type ParsedInferenceRequest struct {
 	// FIXME: URL is weird here as it marshals wonkily
-	URL                 url.URL  `json:"url"`
+	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
-	Temprature          float32  `json:"temperature,omitempty"`
+	Temperature         float32  `json:"temperature,omitempty"`
 	TopP                float32  `json:"top_p,omitempty"`
 	MaxTokens           int      `json:"max_tokens,omitempty"`
 	MaxCompletionTokens int      `json:"max_completion_tokens,omitempty"`
@@ -131,9 +130,10 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 		}
 
 		return ParsedInferenceRequest{
+			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
-			Temprature:          rf.Temperature,
+			Temperature:         rf.Temperature,
 			TopP:                rf.TopP,
 			MaxTokens:           rf.MaxTokens,
 			MaxCompletionTokens: rf.MaxCompletionTokens,
