@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -407,6 +408,20 @@ type checkCapacityRes struct {
 	hasWorkerCapacity bool
 }
 
+type activeLeasesLogger struct {
+	stateManager       state.StateManager
+	ctx                context.Context
+	envID              uuid.UUID
+	instanceID         string
+	workerCapUnlimited bool
+}
+
+// this is a redis call that we only want enabled at trace level
+func (a activeLeasesLogger) LogValue() slog.Value {
+	activeLeases, _ := a.stateManager.GetAllActiveWorkerRequests(a.ctx, a.envID, a.instanceID, a.workerCapUnlimited)
+	return slog.AnyValue(activeLeases)
+}
+
 func checkCapacity(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log logger.Logger) *checkCapacityRes {
 
 	// Check worker capacity
@@ -424,11 +439,9 @@ func checkCapacity(ctx context.Context, stateManager state.StateManager, envID u
 	}
 	if workerCap.IsAtCapacity() {
 		// Worker has a capacity limit set and is at capacity
-		if log.Level() <= logger.LevelTrace {
-			// get active leases only if trace level is enabled
-			activeLeases, _ := stateManager.GetAllActiveWorkerRequests(ctx, envID, conn.InstanceId, workerCap.IsUnlimited())
-			log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available, "worker_active_leases", activeLeases)
-		}
+		log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available,
+			"worker_active_leases", activeLeasesLogger{stateManager: stateManager, ctx: ctx, envID: envID, instanceID: conn.InstanceId, workerCapUnlimited: workerCap.IsUnlimited()})
+
 		return &checkCapacityRes{hasWorkerCapacity: false}
 	}
 
