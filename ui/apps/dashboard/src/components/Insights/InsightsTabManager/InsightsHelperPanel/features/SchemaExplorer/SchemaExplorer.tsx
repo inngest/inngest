@@ -7,7 +7,6 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
-import { SHOW_SCHEMA_SEARCH } from '@/components/Insights/temp-flags';
 import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
 
@@ -54,17 +53,15 @@ export function SchemaExplorer() {
 
   return (
     <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4" ref={containerRef}>
-      {SHOW_SCHEMA_SEARCH && (
-        <>
-          <div className="text-light text-xs font-medium uppercase">All Schemas</div>
-          <Search
-            inngestSize="base"
-            onUpdate={setSearch}
-            placeholder="Search event type"
-            value={search}
-          />
-        </>
-      )}
+      <>
+        <div className="text-light text-xs font-medium uppercase">All Schemas</div>
+        <Search
+          inngestSize="base"
+          onUpdate={setSearch}
+          placeholder="Search event type"
+          value={search}
+        />
+      </>
       <div className="flex flex-col gap-1">
         <SchemaExplorerSwitcher
           entries={entries}
