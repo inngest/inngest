@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useEventTypes } from '@/components/EventTypes/useEventTypes';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
 
@@ -11,9 +12,12 @@ import type { SchemaEntry } from './types';
 const MAX_SCHEMA_ITEMS = 800;
 
 export function useSchemasQuery(search: string) {
+  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
+
   const getEventTypes = useEventTypes();
 
   const query = useInfiniteQuery({
+    enabled: isSchemaWidgetEnabled.value,
     gcTime: 0,
     queryKey: ['schema-explorer', { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
