@@ -59,7 +59,7 @@ export function SupportForm({
         ) : null}
       </>
     ),
-    disabled: o.enterpriseOnly ? !isEnterprise : o.paidOnly ? !isPaid : false,
+    disabled: o.enterpriseOnly ? !isEnterprise : o.paidOnly ? !isPaid || !isEnterprise : false,
   }));
 
   function clearForm() {
