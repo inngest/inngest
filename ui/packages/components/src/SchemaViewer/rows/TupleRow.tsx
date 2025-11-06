@@ -1,20 +1,17 @@
 'use client';
 
 import { useExpansion } from '../ExpansionContext';
-import type { ObjectNode, SchemaNode, ValueNode } from '../types';
+import type { TupleNode, ValueNode } from '../types';
 import { CollapsibleRowWidget } from './CollapsibleRowWidget';
 import { Row } from './Row';
 import { ValueRow } from './ValueRow';
 
-export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
+export type TupleRowProps = { node: TupleNode; typeLabelOverride?: string };
 
-export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.ReactElement {
+export function TupleRow({ node, typeLabelOverride }: TupleRowProps): React.ReactElement {
   const { isExpanded, toggle } = useExpansion();
-
   const open = isExpanded(node.path);
-  const hasChildren = node.children.length > 0;
-  const keyCount = node.children.length;
-  const keysLabel = keyCount === 1 ? '1 key' : `${keyCount} keys`;
+  const hasChildren = node.elements.length > 0;
 
   return (
     <div className="flex flex-col gap-1">
@@ -28,14 +25,14 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
             boldName={open}
             node={makeFauxValueNode(node)}
             typeLabelOverride={typeLabelOverride ?? ''}
-            typePillOverride={hasChildren ? keysLabel : 'Object'}
+            typePillOverride={hasChildren ? `${node.elements.length} item tuple` : 'Tuple'}
           />
         </div>
       </div>
       {open && (
         <div className="border-subtle ml-2 border-l pl-3">
           <div className="flex flex-col gap-1">
-            {node.children.map((child) => (
+            {node.elements.map((child) => (
               <Row key={child.path} node={child} />
             ))}
           </div>
@@ -45,6 +42,6 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
   );
 }
 
-function makeFauxValueNode(node: SchemaNode): ValueNode {
-  return { kind: 'value', name: node.name, path: node.path, type: 'object' };
+function makeFauxValueNode(node: TupleNode): ValueNode {
+  return { kind: 'value', name: node.name, path: node.path, type: 'array' };
 }
