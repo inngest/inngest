@@ -16,6 +16,7 @@ export type UseSchemasReturn = {
   entries: SchemaEntry[];
   error: Error | null;
   fetchNextPage: () => void;
+  hasFetchedMax: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   isLoading: boolean;

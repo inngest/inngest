@@ -12,6 +12,7 @@ type Props = {
   error: Error | null;
   isLoading: boolean; // initial load only
   isFetchingNextPage: boolean;
+  hasFetchedMax: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
   renderEntry: (entry: SchemaEntry, idx: number) => ReactElement;
@@ -22,6 +23,7 @@ export function SchemaExplorerSwitcher({
   error,
   isLoading,
   isFetchingNextPage,
+  hasFetchedMax,
   hasNextPage,
   fetchNextPage,
   renderEntry,
@@ -33,10 +35,11 @@ export function SchemaExplorerSwitcher({
     <Fragment>
       <div className="flex flex-col gap-1">{entries.map(renderEntry)}</div>
       {showShimmers && <LoadingShimmers />}
-      {showError && (
-        <Alert
-          button={
-            hasNextPage ? (
+      {!showShimmers && showError && (
+        <Alert className="mt-2 text-xs" severity="error">
+          <div className="flex flex-row gap-2">
+            <div>Failed to load schemas</div>
+            {hasNextPage && (
               <Button
                 appearance="outlined"
                 kind="secondary"
@@ -44,11 +47,13 @@ export function SchemaExplorerSwitcher({
                 label="Retry"
                 onClick={fetchNextPage}
               />
-            ) : undefined
-          }
-          severity="error"
-        >
-          Failed to load schemas
+            )}
+          </div>
+        </Alert>
+      )}
+      {!error && !showShimmers && hasFetchedMax && (
+        <Alert severity="info" className="mt-2 text-xs">
+          Please use search to target schemas.
         </Alert>
       )}
     </Fragment>

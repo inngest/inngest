@@ -14,7 +14,15 @@ import { useSchemas } from './SchemasContext/SchemasContext';
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { entries, error, hasNextPage, fetchNextPage, isLoading, isFetchingNextPage } = useSchemas({
+  const {
+    entries,
+    error,
+    hasFetchedMax,
+    hasNextPage,
+    fetchNextPage,
+    isLoading,
+    isFetchingNextPage,
+  } = useSchemas({
     search,
   });
 
@@ -63,13 +71,14 @@ export function SchemaExplorer() {
           error={error}
           isLoading={isLoading}
           isFetchingNextPage={isFetchingNextPage}
+          hasFetchedMax={hasFetchedMax}
           hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
           renderEntry={renderEntry}
         />
         <InfiniteScrollTrigger
           onIntersect={fetchNextPage}
-          hasMore={hasNextPage && !error}
+          hasMore={hasNextPage && !error && !hasFetchedMax}
           isLoading={isLoading || isFetchingNextPage}
           root={containerRef.current}
           rootMargin="50px"

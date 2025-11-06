@@ -1,11 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useEventTypes } from '@/components/EventTypes/useEventTypes';
 import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
+
+// Hard cap to guard against excessive auto-fetching.
+const MAX_SCHEMA_ITEMS = 800;
 
 export function useSchemasQuery(search: string) {
   const getEventTypes = useEventTypes();
@@ -30,11 +33,23 @@ export function useSchemasQuery(search: string) {
     [query.data]
   );
 
+  const remoteCount = useMemo(() => entries.filter((e) => !e.isShared).length, [entries]);
+  const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
+
+  const guardedFetchNextPage = useCallback(() => {
+    if (hasFetchedMax) {
+      console.error('Max schemas fetched.');
+      return;
+    }
+    query.fetchNextPage();
+  }, [hasFetchedMax, query]);
+
   return {
     entries,
     error: query.error,
-    fetchNextPage: query.fetchNextPage,
+    fetchNextPage: guardedFetchNextPage,
     hasNextPage: query.hasNextPage,
+    hasFetchedMax,
     isFetchingNextPage: query.isFetchingNextPage,
     isLoading: query.isPending,
   };
