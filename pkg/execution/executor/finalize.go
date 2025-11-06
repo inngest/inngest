@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"strings"
+	"net/http"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -16,6 +19,8 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -81,8 +86,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.FinalizeOpts) {
 	l := logger.StdlibLogger(ctx)
 
-	// e.assignedQueueShard ??
-
+	// XXX: can we use e.assignedQueueShard here?
 	shard, err := e.shardFinder(
 		ctx,
 		opts.Metadata.ID.Tenant.AccountID,
@@ -202,6 +206,11 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		copied.InvokeCorrelationID = invokeID
 		data := copied.Map()
 
+		// Add a status field.
+		data[consts.InngestEventDataPrefix] = map[string]any{
+			"status": opts.Status(),
+		}
+
 		// Add an `inngest/function.finished` event.
 		freshEvents = append(freshEvents, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
@@ -210,26 +219,22 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			Data:      data,
 		})
 
-		if opts.Response.Err != nil {
+		switch opts.Status() {
+		case enums.StepStatusCancelled:
+			freshEvents = append(freshEvents, event.Event{
+				ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
+				Name:      event.FnCancelledName,
+				Timestamp: now.UnixMilli(),
+				Data:      data,
+			})
+		case enums.StepStatusFailed:
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
-			if !strings.Contains(*opts.Response.Err, state.ErrFunctionCancelled.Error()) {
-				freshEvents = append(freshEvents, event.Event{
-					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
-					Name:      event.FnFailedName,
-					Timestamp: now.UnixMilli(),
-					Data:      data,
-				})
-			}
-
-			// Add function cancelled event
-			if *opts.Response.Err == state.ErrFunctionCancelled.Error() {
-				freshEvents = append(freshEvents, event.Event{
-					ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
-					Name:      event.FnCancelledName,
-					Timestamp: now.UnixMilli(),
-					Data:      data,
-				})
-			}
+			freshEvents = append(freshEvents, event.Event{
+				ID:        opts.Metadata.ID.RunID.String(), // using the RunID as the ID prevents duped runs for parallel steps
+				Name:      event.FnFailedName,
+				Timestamp: now.UnixMilli(),
+				Data:      data,
+			})
 		}
 	}
 
@@ -241,5 +246,46 @@ func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
 	// `nil` instead. We do this because we need to be setting the function
 	// output twice - once for the execution itself and once for the run span -
 	// in order to appropriately filter this in Cloud and other data stores.
-	return tracing.DriverResponseAttrs(&f.Response, nil)
+
+	switch f.Response.Type {
+	case execution.FinalizeResponseAPI:
+		return apiAttributes(f.Response.APIResponse)
+	case execution.FinalizeResponseRunComplete:
+		return runCompleteAttrs(f.Response.RunComplete)
+	case execution.FinalizeResponseDriver:
+		return tracing.DriverResponseAttrs(&f.Response.DriverResponse, nil)
+	}
+
+	panic("unknown finalize response type")
+}
+
+func apiAttributes(res checkpoint.APIResult) *meta.SerializableAttrs {
+	h := http.Header{}
+	for k, v := range res.Headers {
+		h.Set(k, v)
+	}
+
+	rawAttrs := meta.NewAttrSet()
+	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &h)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
+	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(res.Body)))
+
+	return rawAttrs
+}
+
+func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200)) // Must be to have this code.  It's an async fn.
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(gen.Data)))
+	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
+
+	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
+
+	return rawAttrs
 }
