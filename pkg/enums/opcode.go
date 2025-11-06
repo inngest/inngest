@@ -19,15 +19,19 @@ const (
 	OpcodeWaitForSignal
 	OpcodeRunComplete
 	OpcodeStepFailed
+	// OpcodeSyncRunComplete represents a sync API-based function completion.  This is
+	// distinct from OpcodeRunComplete as it always contains a specific shape of data.
+	OpcodeSyncRunComplete
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
 // Every other opcode is async by default, and this is always a subset.
 var opcodeSyncMap = map[Opcode]struct{}{
-	OpcodeStep:        {},
-	OpcodeStepRun:     {},
-	OpcodeRunComplete: {},
-	OpcodeStepFailed:  {},
+	OpcodeStep:            {},
+	OpcodeStepRun:         {},
+	OpcodeRunComplete:     {},
+	OpcodeSyncRunComplete: {},
+	OpcodeStepFailed:      {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This

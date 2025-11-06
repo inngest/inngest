@@ -76,7 +76,7 @@ export function Notch({
 }
 
 function buildCrossAxisSizeClass(orientation: Orientation): string {
-  return orientation === 'vertical' ? 'h-6' : 'w-6';
+  return orientation === 'vertical' ? 'h-2' : 'w-2';
 }
 
 function buildDividerClasses(orientation: Orientation): string {

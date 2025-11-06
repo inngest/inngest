@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -1494,8 +1495,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					Metadata: i.md,
 					// Always, when called from the executor, as this handles async
 					// finalization.
-					RunMode:  enums.RunModeAsync,
-					Response: *i.resp,
+					Response: execution.FinalizeResponse{
+						Type:           execution.FinalizeResponseDriver,
+						DriverResponse: *i.resp,
+					},
 					Optional: execution.FinalizeOptional{
 						FnSlug:        i.f.GetSlug(),
 						InputEvents:   i.events,
@@ -1551,8 +1554,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			Metadata: i.md,
 			// Always, when called from the executor, as this handles async
 			// finalization.
-			RunMode:  enums.RunModeAsync,
-			Response: *i.resp,
+			Response: execution.FinalizeResponse{
+				Type:           execution.FinalizeResponseDriver,
+				DriverResponse: *i.resp,
+			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
 				InputEvents:   i.events,
@@ -1579,8 +1584,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			Metadata: i.md,
 			// Always, when called from the executor, as this handles async
 			// finalization.
-			RunMode:  enums.RunModeAsync,
-			Response: *i.resp,
+			Response: execution.FinalizeResponse{
+				Type:           execution.FinalizeResponseDriver,
+				DriverResponse: *i.resp,
+			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
 				InputEvents:   i.events,
@@ -1610,15 +1617,28 @@ type functionFinishedData struct {
 	InvokeCorrelationID *string        `json:"correlation_id,omitempty"`
 }
 
-func (f *functionFinishedData) setResponse(r state.DriverResponse) {
-	if r.Err != nil {
-		f.Error = r.StandardError()
-	}
-	if r.UserError != nil {
-		f.Error = r.UserError
-	}
-	if r.Output != nil {
-		f.Result = r.Output
+func (f *functionFinishedData) setResponse(resp execution.FinalizeResponse) {
+	switch resp.Type {
+
+	case execution.FinalizeResponseRunComplete:
+		// NOTE: This should never be wrapped with a `{"data":T}` field because
+		// run complete is always raw data.
+		f.Result = resp.RunComplete.Data
+
+	case execution.FinalizeResponseAPI:
+		f.Result = resp.APIResponse
+
+	case execution.FinalizeResponseDriver:
+		r := resp.DriverResponse
+		if r.Err != nil {
+			f.Error = r.StandardError()
+		}
+		if r.UserError != nil {
+			f.Error = r.UserError
+		}
+		if r.Output != nil {
+			f.Result = r.Output
+		}
 	}
 }
 
@@ -2227,19 +2247,18 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
-	fnCancelledErr := state.ErrFunctionCancelled.Error()
-
 	if err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: md,
 		// Always, when called from the executor, as this handles async
 		// finalization.
-		RunMode: enums.RunModeAsync,
-		Response: state.DriverResponse{
-			Err: &fnCancelledErr,
+		Response: execution.FinalizeResponse{
+			Type:           execution.FinalizeResponseDriver,
+			DriverResponse: state.DriverResponse{}, // empty.
 		},
 		Optional: execution.FinalizeOptional{
 			FnSlug:      f.Function.GetSlug(),
 			InputEvents: evts,
+			Cancel:      true,
 			Reason:      "cancel",
 		},
 	}); err != nil {
@@ -2757,8 +2776,12 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
 	case enums.OpcodeRunComplete:
-		// TODO: Handle finalization
-		return fmt.Errorf("run complete not implemented")
+		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
+	case enums.OpcodeSyncRunComplete:
+		// This is an API-based function executed synchronously that had
+		// an async conversion.  The result must always be in the shape of
+		// checkpoint.APIResult
+		return e.handleGeneratorSyncFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepFailed:
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	}
@@ -3048,6 +3071,46 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	return nil
+}
+
+func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// In this case, we've reported that the function has finished.  It's an async
+	// function.  In this case, we always want to update the span ourselves to mark
+	// the function as finished, and add the output here.
+	return e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *runCtx.Metadata(),
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseRunComplete,
+			RunComplete: gen,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: runCtx.Events(),
+		},
+	})
+}
+
+func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// An API-based function went async and finished.  This must always be a checkpoint.APIResult.
+	// Both opcodes in a sync fn cehckpoint should always return this shape of data.
+	result := struct {
+		Data checkpoint.APIResult `json:"data"`
+	}{}
+	if err := json.Unmarshal(gen.Data, &result); err != nil {
+		// This should never happen with well-formed SDKs.  The SDK should always send the sync run complete
+		// opcode with well-formed data.
+		logger.StdlibLogger(ctx).Error("error unmarshalling api result from sync RunComplete op", "error", err)
+		return err
+	}
+	return e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *runCtx.Metadata(),
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseAPI,
+			APIResponse: result.Data,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: runCtx.Events(),
+		},
+	})
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {

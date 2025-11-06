@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
 
+import { useDynamicRunData } from '../RunDetailsV3/utils';
+
 const cellStyles = 'text-basis text-sm';
 
 export function IDCell({ children }: React.PropsWithChildren) {
@@ -68,6 +70,45 @@ export function StatusCell({
       <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
         {label || status}
       </p>
+    </div>
+  );
+}
+
+export function RunStatusCell({
+  runID,
+  status,
+  size,
+}: React.PropsWithChildren<{
+  runID: string;
+  status: string;
+  size?: StatusDotProps['size'];
+}>) {
+  const { dynamicRunData } = useDynamicRunData({ runID });
+  const colorClass = getStatusTextClass(dynamicRunData?.status || status);
+
+  return (
+    <div className={cn(cellStyles, 'flex items-center gap-2.5 font-medium')}>
+      <StatusDot status={dynamicRunData?.status || status} size={size} />
+      <p className={cn('text-nowrap lowercase first-letter:capitalize', colorClass)}>
+        {dynamicRunData?.status || status}
+      </p>
+    </div>
+  );
+}
+
+export function EndedAtCell({
+  runID,
+  endedAt,
+}: React.PropsWithChildren<{
+  runID: string;
+  endedAt?: string | null;
+}>) {
+  const { dynamicRunData } = useDynamicRunData({ runID });
+  const time = dynamicRunData?.endedAt || endedAt;
+
+  return (
+    <div className="flex items-center">
+      {time ? <TimeCell date={new Date(time)} /> : <TextCell>-</TextCell>}
     </div>
   );
 }

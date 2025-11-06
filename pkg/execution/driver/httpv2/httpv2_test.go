@@ -317,13 +317,13 @@ func TestParseOpcodes(t *testing.T) {
 		{
 			name:          "invalid JSON",
 			input:         []byte(`invalid json`),
-			expectedError: "error reading SDK responses as steps",
+			expectedError: "SDK returned an unexpected response",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ops, err := parseOpcodes(tt.input)
+			ops, err := parseOpcodes(tt.input, 200)
 
 			if tt.expectedError != "" {
 				require.NotNil(t, err)

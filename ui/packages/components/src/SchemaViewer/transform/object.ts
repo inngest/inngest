@@ -11,7 +11,7 @@ export function buildObjectChildren(
     .map(([propName, propDef]) =>
       buildNodeFromDef(propDef, propName, `${path}.${propName}`, buildNode)
     )
-    .filter((node) => node !== undefined);
+    .filter((node) => node !== undefined) as SchemaNode[];
 
   // TODO: Handle processing of additional properties if this is used for authored JSON Schemas.
   // For now, it's unnecessary because schemas are derived from concrete instances.
@@ -25,9 +25,13 @@ function buildNodeFromDef(
   path: string,
   buildNode: (schema: JSONSchema, name: string, path: string) => SchemaNode
 ): SchemaNode | undefined {
-  // TODO: Handle processing of boolean schemas.
-  // For now, it's unnecessary because schemas are derived from concrete instances.
-  if (typeof def === 'boolean') return undefined;
+  if (typeof def === 'boolean') {
+    // Property can be any type.
+    if (def) return { kind: 'value', name, path, type: 'unknown' };
+
+    // Remove property that has no valid type.
+    return undefined;
+  }
 
   return buildNode(def, name, path);
 }

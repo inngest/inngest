@@ -10,15 +10,11 @@ export function determineKind(schema: JSONSchema): 'array' | 'object' | 'value' 
   }
 
   if (Array.isArray(t)) {
-    const set = new Set(t);
-
-    if (set.has('object') && (set.size === 1 || (set.size === 2 && set.has('null')))) {
-      return 'object';
-    } else if (set.has('array') && (set.size === 1 || (set.size === 2 && set.has('null')))) {
-      return 'array';
-    } else {
-      return 'value';
+    // Choose the first structural type encountered in order; otherwise value
+    for (const typ of t) {
+      if (typ === 'array' || typ === 'object') return typ;
     }
+    return 'value';
   }
 
   return mapSingleType(t);

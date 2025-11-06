@@ -6,7 +6,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownLine } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { useStickToBottom } from '@/components/Insights/InsightsChat/hooks/use-stick-to-bottom';
+import { useStickToBottom } from './hooks/use-stick-to-bottom';
 
 export const Conversation = ({ className, ...props }: ComponentProps<'div'>) => {
   const { scrollRef, isAtBottom, scrollToBottom } = useStickToBottom();

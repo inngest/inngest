@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -35,10 +36,13 @@ func TestCronItem(t *testing.T) {
 }
 
 func TestNext(t *testing.T) {
+	curYear := time.Now().Year()
+	sixYearsFromNow := curYear + 6
 	tests := []struct {
 		name        string
 		cronExpr    string
 		expectError bool
+		nextIsZero  bool
 	}{
 		{
 			name:        "valid minute expression",
@@ -81,6 +85,24 @@ func TestNext(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "valid but never ticks Feb30",
+			cronExpr:    "0 0 30 2 *",
+			expectError: false,
+			nextIsZero:  true,
+		},
+		{
+			name:        "valid but never ticks Nov31",
+			cronExpr:    "0 0 31 11 *",
+			expectError: false,
+			nextIsZero:  true,
+		},
+		{
+			name:        "valid but never ticks 31st short months",
+			cronExpr:    "0 0 31 2,4,6,9,11 *",
+			nextIsZero:  true,
+			expectError: false,
+		},
+		{
 			name:        "invalid expression - too few fields",
 			cronExpr:    "0 0 *",
 			expectError: true,
@@ -111,6 +133,26 @@ func TestNext(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:        "invalid expression - 6 field format",
+			cronExpr:    "* * * * * *",
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format",
+			cronExpr:    "0 30 9 * * ? *",
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format with cur year",
+			cronExpr:    fmt.Sprintf("0 30 9 * * ? %d", curYear),
+			expectError: true,
+		},
+		{
+			name:        "invalid expression - 7 field format with future year",
+			cronExpr:    fmt.Sprintf("0 30 9 * * ? %d", sixYearsFromNow),
+			expectError: true,
+		},
+		{
 			name:        "empty expression",
 			cronExpr:    "",
 			expectError: true,
@@ -137,8 +179,11 @@ func TestNext(t *testing.T) {
 				assert.Contains(t, err.Error(), "error parsing cron expression")
 			} else {
 				assert.NoError(t, err)
-				assert.False(t, next.IsZero())
-				assert.True(t, next.After(from))
+				if !tt.nextIsZero {
+					assert.False(t, next.IsZero())
+					assert.True(t, next.After(from))
+				}
+
 			}
 		})
 	}
@@ -192,6 +237,36 @@ func TestNextScheduleCalculation(t *testing.T) {
 			cronExpr: "0 0 * * 1",
 			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC), // Sunday
 			expected: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC),  // Monday
+		},
+		{
+			name:     "valid but never ticks Feb30",
+			cronExpr: "0 0 30 2 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
+		},
+		{
+			name:     "valid but never ticks Nov31",
+			cronExpr: "0 0 31 11 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
+		},
+		{
+			name:     "valid but never ticks 31 on short months",
+			cronExpr: "0 0 31 2,4,6,9,11 *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Time{}, // Zero time - never executes
+		},
+		{
+			name:     "valid cron 31st of current month",
+			cronExpr: "0 0 31 * *",
+			from:     time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 1, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "valid cron skips 31st on short months",
+			cronExpr: "0 0 31 * *",
+			from:     time.Date(2023, 2, 1, 10, 0, 0, 0, time.UTC),
+			expected: time.Date(2023, 3, 31, 0, 0, 0, 0, time.UTC),
 		},
 	}
 

@@ -190,65 +190,64 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		},
 	})
 
-	switch err {
-	case nil:
+	if err != nil {
+		switch err {
+		case state.ErrIdentifierExists:
+			_ = publicerr.WriteHTTP(w, publicerr.Errorf(http.StatusConflict, "Run already exists"))
+			return
+		case executor.ErrFunctionRateLimited:
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusTooManyRequests, "Rate limits exceeded"))
+			return
+		default:
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Failed to schedule run"))
+			return
+		}
+	}
 
-		go a.checkpointer.Metrics().OnFnScheduled(ctx, checkpoint.MetricCardinality{
+	go a.checkpointer.Metrics().OnFnScheduled(ctx, checkpoint.MetricCardinality{
+		AccountID: auth.AccountID(),
+		EnvID:     auth.WorkspaceID(),
+		AppID:     appID,
+		FnID:      fn.ID,
+	})
+
+	var jwt string
+	if len(input.Steps) > 0 {
+		err := a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
+			RunID:     input.RunID,
+			FnID:      fn.ID,
+			AppID:     appID,
 			AccountID: auth.AccountID(),
 			EnvID:     auth.WorkspaceID(),
-			AppID:     appID,
-			FnID:      fn.ID,
+			Steps:     input.Steps,
+			Metadata:  md,
 		})
-
-		var jwt string
-		if len(input.Steps) > 0 {
-			err := a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
-				RunID:     input.RunID,
-				FnID:      fn.ID,
-				AppID:     appID,
-				AccountID: auth.AccountID(),
-				EnvID:     auth.WorkspaceID(),
-				Steps:     input.Steps,
-				Metadata:  md,
-			})
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
-			}
-
-			async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-				return enums.OpcodeIsAsync(s.Op)
-			})
-			if async {
-				// Create a token that can be used for viewing this particular run.
-				claim, err := apiv1auth.CreateRunJWT(
-					a.runClaimsSecret,
-					md.ID.Tenant.EnvID,
-					md.ID.RunID,
-				)
-				if err != nil {
-					logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
-				}
-				jwt = claim
-			}
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
 		}
-
-		_ = WriteResponse(w, CheckpointNewRunResponse{
-			RunID: md.ID.RunID.String(),
-			FnID:  fn.ID,
-			AppID: appID,
-			Token: jwt,
+		async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
+			return enums.OpcodeIsAsync(s.Op)
 		})
-		return
-	case state.ErrIdentifierExists:
-		_ = publicerr.WriteHTTP(w, publicerr.Errorf(http.StatusConflict, "Run already exists"))
-		return
-	case executor.ErrFunctionRateLimited:
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusTooManyRequests, "Rate limits exceeded"))
-		return
-	default:
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Failed to schedule run"))
-		return
+		if async {
+			// Create a token that can be used for viewing this particular run.
+			claim, err := apiv1auth.CreateRunJWT(
+				a.runClaimsSecret,
+				md.ID.Tenant.EnvID,
+				md.ID.RunID,
+			)
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
+			}
+			jwt = claim
+		}
 	}
+
+	_ = WriteResponse(w, CheckpointNewRunResponse{
+		RunID: md.ID.RunID.String(),
+		FnID:  fn.ID,
+		AppID: appID,
+		Token: jwt,
+	})
 }
 
 // CheckpointSteps is called from the SDK to checkpoint steps in the background.  The SDK
@@ -347,16 +346,40 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 
 	for time.Now().Before(until) {
 		output, err := a.outputReader.RunOutput(r.Context(), claims.Env, claims.RunID)
+		if err != nil {
+			time.Sleep(CheckpointPollInterval)
+			continue
+		}
 
-		if err == nil {
-			// XXX: (tonyhb) add status code handling here.
+		if len(output) == 0 {
+			// XXX: should never happen as the APIResult struct is marshalled.
+			return
+		}
+
+		// We expect that the output is a wrapped {"data":APIRsult} type.  Check to see the first token
+		// is an object, else this will be encrypted.
+		if output[1] != '{' {
 			_, _ = w.Write(output)
 			return
 		}
-		time.Sleep(CheckpointPollInterval)
+
+		res := struct {
+			Data checkpoint.APIResult `json:"data"`
+		}{}
+		if err := json.Unmarshal(output, &res); err == nil {
+			for k, v := range res.Data.Headers {
+				w.Header().Set(k, v)
+			}
+			w.WriteHeader(res.Data.StatusCode)
+			_, _ = w.Write(res.Data.Body)
+			return
+		}
+
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write(output)
+		return
 	}
 
-	w.Header().Set("content-type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
 }
 

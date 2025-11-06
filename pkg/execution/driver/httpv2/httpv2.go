@@ -89,6 +89,7 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 	req.Header.Add("X-Run-ID", opts.Metadata.ID.RunID.String())
 
 	resp, err := d.Client.DoRequest(ctx, req)
+
 	if errors.Is(err, exechttp.ErrBodyTooLarge) {
 		// This is a user error.
 		return nil, errs.WrapUser(0, false, "SDK response too large: %w", err), nil
@@ -118,7 +119,7 @@ func (d httpv2) sync(ctx context.Context, opts driver.V2RequestOpts) (*state.Dri
 	// We always expect opcodes from the API endpoint.  Whenever we re-enter a sync function,
 	// the API becomes, to effect, an async function and each HTTP request we make should always
 	// result in well-formed ops.
-	ops, userErr := parseOpcodes(resp.Body)
+	ops, userErr := parseOpcodes(resp.Body, resp.StatusCode)
 	if userErr != nil {
 		return nil, userErr, nil
 	}
@@ -151,10 +152,11 @@ func (d httpv2) async(ctx context.Context, opts driver.V2RequestOpts) (*state.Dr
 	return nil, nil, errs.Wrap(0, false, "async v2 http driver not implemneted")
 }
 
-func parseOpcodes(byt []byte) ([]*state.GeneratorOpcode, errs.UserError) {
+func parseOpcodes(byt []byte, status int) ([]*state.GeneratorOpcode, errs.UserError) {
 	gen := []*state.GeneratorOpcode{}
 	if err := json.Unmarshal(byt, &gen); err != nil {
-		return nil, errs.WrapUser(0, true, "error reading SDK responses as steps: %w", err)
+		// TODO: ADD UNIT TESTS ASSERTING THAT THE USER ERROR CONTAINS OUR RESPONSE BODY.
+		return nil, NewNonGeneratorError(byt, status)
 	}
 
 	if len(gen) == 0 {

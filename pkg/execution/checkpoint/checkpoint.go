@@ -390,11 +390,9 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result AP
 
 	return c.Executor.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: md,
-		RunMode:  enums.RunModeSync,
-		Response: state.DriverResponse{
-			Output:     result.Body,
-			Header:     httpHeader,
-			StatusCode: result.StatusCode,
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseAPI,
+			APIResponse: result,
 		},
 		Optional: execution.FinalizeOptional{},
 	})
