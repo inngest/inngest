@@ -459,19 +459,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
 		}
 
-		// If we only have a single child, this span isn't a userland span,
-		// but the single child is, return its children.
-		//
-		// We do this because userland spans are always underneath an
-		// `"inngest.execution"` span created by an SDK, which houses useful
-		// information about the environment, versions, scope, etc.
-		//
-		// Critically, this means we also ignore the `"inggest.execution"`
-		// span itself, as we never want to display it to the user.
-		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
-			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
-		}
-
 		// For the run span, the start is the first child span's start
 		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
 			if (gqlSpan.StartedAt == nil || !haveSetRunStartTime) && gqlSpan.ChildrenSpans[0].StartedAt != nil {
@@ -481,17 +468,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			if gqlSpan.EndedAt != nil && gqlSpan.StartedAt != nil {
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
-			}
-		}
-
-		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
-		if isStep {
-			// Step spans should not show attempts if they only have one and
-			// have resolved
-			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
-				// However, we preserve any userland spans from the
-				// successful execution if we have any.
-				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
 			}
 		}
 
