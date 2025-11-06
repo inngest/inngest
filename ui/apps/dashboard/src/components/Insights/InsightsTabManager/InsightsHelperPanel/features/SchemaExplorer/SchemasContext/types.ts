@@ -1,11 +1,11 @@
 import type { SchemaNode } from '@inngest/components/SchemaViewer/types';
+import type { PageInfo } from '@inngest/components/types/eventType';
 
 export type UseSchemasArgs = {
   search: string;
 };
 
 export type SchemaEntry = {
-  displayName: string;
   isShared: boolean;
   key: string;
   node: SchemaNode;
@@ -13,8 +13,9 @@ export type SchemaEntry = {
 
 export type UseSchemasReturn = {
   entries: SchemaEntry[];
-  error: string | null;
+  error: Error | null;
   fetchNextPage: () => void;
+  hasFetchedMax: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   isLoading: boolean;
@@ -22,4 +23,14 @@ export type UseSchemasReturn = {
 
 export type SchemasContextValue = UseSchemasReturn & {
   setSearch: (value: string) => void;
+};
+
+export type SchemaEvent = {
+  name: string;
+  schema: string;
+};
+
+export type SchemaEventPage = {
+  events: SchemaEvent[];
+  pageInfo: PageInfo;
 };

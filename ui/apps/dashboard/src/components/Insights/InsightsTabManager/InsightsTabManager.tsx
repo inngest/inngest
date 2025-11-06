@@ -13,7 +13,7 @@ import type { QuerySnapshot, QueryTemplate, Tab } from '@/components/Insights/ty
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
-import { SHOW_DOCS_CONTROL_PANEL_BUTTON, SHOW_SCHEMA_CONTROL_PANEL_BUTTON } from '../temp-flags';
+import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
 import {
   InsightsHelperPanelControl,
@@ -64,6 +64,7 @@ export function useInsightsTabManager(
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
+  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -156,6 +157,7 @@ export function useInsightsTabManager(
         isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
         isInsightsAgentEnabled={isInsightsAgentEnabled.value}
+        isSchemaWidgetEnabled={isSchemaWidgetEnabled.value}
       />
     ),
     [
@@ -167,6 +169,7 @@ export function useInsightsTabManager(
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
       isInsightsAgentEnabled.value,
+      isSchemaWidgetEnabled.value,
     ]
   );
 
@@ -182,6 +185,7 @@ interface InsightsTabManagerInternalProps {
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
   isInsightsAgentEnabled: boolean;
+  isSchemaWidgetEnabled: boolean;
 }
 
 // TODO: Remove check on isInsightsAgentEnabled to determine whether to render InsightsHelperPanelControl.
@@ -195,6 +199,7 @@ function InsightsTabManagerInternal({
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
   isInsightsAgentEnabled,
+  isSchemaWidgetEnabled,
 }: InsightsTabManagerInternalProps) {
   const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
 
@@ -230,7 +235,7 @@ function InsightsTabManagerInternal({
       });
     }
 
-    if (SHOW_SCHEMA_CONTROL_PANEL_BUTTON) {
+    if (isSchemaWidgetEnabled) {
       items.push({
         title: SCHEMA_EXPLORER,
         icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
@@ -246,7 +251,7 @@ function InsightsTabManagerInternal({
     });
 
     return items;
-  }, [handleSelectHelper, isInsightsAgentEnabled]);
+  }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
   // Provide shared transport/connection for all descendant useAgents hooks
   const { user } = useUser();
   const transport = useMemo(
@@ -305,7 +310,7 @@ function InsightsTabManagerInternal({
                   />
                 )}
               </div>
-              {isQueryTab(tab.id) && isInsightsAgentEnabled ? (
+              {isQueryTab(tab.id) && hasMoreThanOneHelperPanelFeatureEnabled(helperItems) ? (
                 <InsightsHelperPanelControl items={helperItems} activeTitle={activeHelper} />
               ) : null}
             </div>
@@ -344,6 +349,12 @@ function InsightsTabManagerInternal({
       </div>
     </div>
   );
+}
+
+// This ensures the user has support + at least one of AI, Documentation, or Schema Explorer enabled.
+// Otherwise, we just hide the helper panel because only showing support is not useful.
+function hasMoreThanOneHelperPanelFeatureEnabled(features: HelperItem[]): boolean {
+  return features.length > 1;
 }
 
 function getNewActiveTabAfterClose(
