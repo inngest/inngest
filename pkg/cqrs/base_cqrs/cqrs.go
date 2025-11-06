@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -461,8 +460,6 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			return nil, err
 		}
 	}
-
-	spew.Dump(ret)
 
 	return ret, nil
 }

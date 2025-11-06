@@ -457,6 +457,7 @@ type ComplexityRoot struct {
 		FunctionID     func(childComplexity int) int
 		IsRoot         func(childComplexity int) int
 		IsUserland     func(childComplexity int) int
+		Metadata       func(childComplexity int) int
 		Name           func(childComplexity int) int
 		OutputID       func(childComplexity int) int
 		ParentSpan     func(childComplexity int) int
@@ -480,7 +481,7 @@ type ComplexityRoot struct {
 		Values func(childComplexity int) int
 	}
 
-	RunTraceSpanMetadataKV struct {
+	RunTraceSpanMetadataValue struct {
 		Key   func(childComplexity int) int
 		Value func(childComplexity int) int
 	}
@@ -2708,6 +2709,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.IsUserland(childComplexity), true
 
+	case "RunTraceSpan.metadata":
+		if e.complexity.RunTraceSpan.Metadata == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.Metadata(childComplexity), true
+
 	case "RunTraceSpan.name":
 		if e.complexity.RunTraceSpan.Name == nil {
 			break
@@ -2834,19 +2842,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpanMetadata.Values(childComplexity), true
 
-	case "RunTraceSpanMetadataKV.key":
-		if e.complexity.RunTraceSpanMetadataKV.Key == nil {
+	case "RunTraceSpanMetadataValue.key":
+		if e.complexity.RunTraceSpanMetadataValue.Key == nil {
 			break
 		}
 
-		return e.complexity.RunTraceSpanMetadataKV.Key(childComplexity), true
+		return e.complexity.RunTraceSpanMetadataValue.Key(childComplexity), true
 
-	case "RunTraceSpanMetadataKV.value":
-		if e.complexity.RunTraceSpanMetadataKV.Value == nil {
+	case "RunTraceSpanMetadataValue.value":
+		if e.complexity.RunTraceSpanMetadataValue.Value == nil {
 			break
 		}
 
-		return e.complexity.RunTraceSpanMetadataKV.Value(childComplexity), true
+		return e.complexity.RunTraceSpanMetadataValue.Value(childComplexity), true
 
 	case "RunTraceSpanOutput.data":
 		if e.complexity.RunTraceSpanOutput.Data == nil {
@@ -4112,15 +4120,15 @@ type RunTraceSpan {
   debugSessionID: ULID
   debugPaused: Boolean!
 
-  # metadata: [RunTraceSpanMetadata!]
+  metadata: [RunTraceSpanMetadata!]!
 }
 
 type RunTraceSpanMetadata {
   kind: String!
-  values: [RunTraceSpanMetadata!]!
+  values: [RunTraceSpanMetadataValue!]!
 }
 
-type RunTraceSpanMetadataKV {
+type RunTraceSpanMetadataValue {
   key: String!
   value: Unknown!
 }
@@ -7493,6 +7501,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -12388,6 +12398,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -15128,6 +15140,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18379,6 +18393,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18728,6 +18744,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			case "debugPaused":
 				return ec.fieldContext_RunTraceSpan_debugPaused(ctx, field)
+			case "metadata":
+				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18962,6 +18980,56 @@ func (ec *executionContext) fieldContext_RunTraceSpan_debugPaused(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_metadata(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Metadata, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.RunTraceSpanMetadata)
+	fc.Result = res
+	return ec.marshalNRunTraceSpanMetadata2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "kind":
+				return ec.fieldContext_RunTraceSpanMetadata_kind(ctx, field)
+			case "values":
+				return ec.fieldContext_RunTraceSpanMetadata_values(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpanMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpanMetadata_kind(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanMetadata) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpanMetadata_kind(ctx, field)
 	if err != nil {
@@ -19032,9 +19100,9 @@ func (ec *executionContext) _RunTraceSpanMetadata_values(ctx context.Context, fi
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*models.RunTraceSpanMetadata)
+	res := resTmp.([]*models.RunTraceSpanMetadataValue)
 	fc.Result = res
-	return ec.marshalNRunTraceSpanMetadata2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataᚄ(ctx, field.Selections, res)
+	return ec.marshalNRunTraceSpanMetadataValue2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataValueᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_RunTraceSpanMetadata_values(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -19045,19 +19113,19 @@ func (ec *executionContext) fieldContext_RunTraceSpanMetadata_values(ctx context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "kind":
-				return ec.fieldContext_RunTraceSpanMetadata_kind(ctx, field)
-			case "values":
-				return ec.fieldContext_RunTraceSpanMetadata_values(ctx, field)
+			case "key":
+				return ec.fieldContext_RunTraceSpanMetadataValue_key(ctx, field)
+			case "value":
+				return ec.fieldContext_RunTraceSpanMetadataValue_value(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpanMetadata", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpanMetadataValue", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _RunTraceSpanMetadataKV_key(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanMetadataKv) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunTraceSpanMetadataKV_key(ctx, field)
+func (ec *executionContext) _RunTraceSpanMetadataValue_key(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanMetadataValue) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanMetadataValue_key(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -19087,9 +19155,9 @@ func (ec *executionContext) _RunTraceSpanMetadataKV_key(ctx context.Context, fie
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_RunTraceSpanMetadataKV_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_RunTraceSpanMetadataValue_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "RunTraceSpanMetadataKV",
+		Object:     "RunTraceSpanMetadataValue",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -19100,8 +19168,8 @@ func (ec *executionContext) fieldContext_RunTraceSpanMetadataKV_key(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _RunTraceSpanMetadataKV_value(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanMetadataKv) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunTraceSpanMetadataKV_value(ctx, field)
+func (ec *executionContext) _RunTraceSpanMetadataValue_value(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpanMetadataValue) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpanMetadataValue_value(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -19131,9 +19199,9 @@ func (ec *executionContext) _RunTraceSpanMetadataKV_value(ctx context.Context, f
 	return ec.marshalNUnknown2interface(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_RunTraceSpanMetadataKV_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_RunTraceSpanMetadataValue_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "RunTraceSpanMetadataKV",
+		Object:     "RunTraceSpanMetadataValue",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -27626,6 +27694,13 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "metadata":
+
+			out.Values[i] = ec._RunTraceSpan_metadata(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -27672,26 +27747,26 @@ func (ec *executionContext) _RunTraceSpanMetadata(ctx context.Context, sel ast.S
 	return out
 }
 
-var runTraceSpanMetadataKVImplementors = []string{"RunTraceSpanMetadataKV"}
+var runTraceSpanMetadataValueImplementors = []string{"RunTraceSpanMetadataValue"}
 
-func (ec *executionContext) _RunTraceSpanMetadataKV(ctx context.Context, sel ast.SelectionSet, obj *models.RunTraceSpanMetadataKv) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, runTraceSpanMetadataKVImplementors)
+func (ec *executionContext) _RunTraceSpanMetadataValue(ctx context.Context, sel ast.SelectionSet, obj *models.RunTraceSpanMetadataValue) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runTraceSpanMetadataValueImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("RunTraceSpanMetadataKV")
+			out.Values[i] = graphql.MarshalString("RunTraceSpanMetadataValue")
 		case "key":
 
-			out.Values[i] = ec._RunTraceSpanMetadataKV_key(ctx, field, obj)
+			out.Values[i] = ec._RunTraceSpanMetadataValue_key(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
 		case "value":
 
-			out.Values[i] = ec._RunTraceSpanMetadataKV_value(ctx, field, obj)
+			out.Values[i] = ec._RunTraceSpanMetadataValue_value(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -29702,6 +29777,60 @@ func (ec *executionContext) marshalNRunTraceSpanMetadata2ᚖgithubᚗcomᚋinnge
 		return graphql.Null
 	}
 	return ec._RunTraceSpanMetadata(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRunTraceSpanMetadataValue2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataValueᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunTraceSpanMetadataValue) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunTraceSpanMetadataValue2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataValue(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRunTraceSpanMetadataValue2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanMetadataValue(ctx context.Context, sel ast.SelectionSet, v *models.RunTraceSpanMetadataValue) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RunTraceSpanMetadataValue(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNRunTraceSpanOutput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanOutput(ctx context.Context, sel ast.SelectionSet, v models.RunTraceSpanOutput) graphql.Marshaler {

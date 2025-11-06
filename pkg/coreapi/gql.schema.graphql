@@ -597,15 +597,15 @@ type RunTraceSpan {
   debugSessionID: ULID
   debugPaused: Boolean!
 
-  # metadata: [RunTraceSpanMetadata!]
+  metadata: [RunTraceSpanMetadata!]!
 }
 
 type RunTraceSpanMetadata {
   kind: String!
-  values: [RunTraceSpanMetadata!]!
+  values: [RunTraceSpanMetadataValue!]!
 }
 
-type RunTraceSpanMetadataKV {
+type RunTraceSpanMetadataValue {
   key: String!
   value: Unknown!
 }

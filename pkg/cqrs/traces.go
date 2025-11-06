@@ -352,11 +352,6 @@ type SpanMetadata struct {
 	Values meta.RawMetadata  `json:"values"`
 }
 
-type SpanMetadataEntry struct {
-	ParentSpanID string
-	Metadata     []SpanMetadata
-}
-
 // TraceRun represents a function run backed by a trace
 type TraceRun struct {
 	AccountID    uuid.UUID       `json:"account_id"`

@@ -1,9 +1,11 @@
 package loader
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -217,8 +219,26 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	name := span.GetStepName()
 	if isUserland {
 		name = *userlandSpan.SpanName
-	} else if span.Name == meta.SpanNameMetadata {
-		name = MetadataSpanName
+	}
+
+	var metadata []*models.RunTraceSpanMetadata
+	for _, md := range span.Metadata {
+		gqlMetadata := &models.RunTraceSpanMetadata{
+			Kind: string(md.Kind),
+		}
+
+		for key, val := range md.Values {
+			gqlMetadata.Values = append(gqlMetadata.Values, &models.RunTraceSpanMetadataValue{
+				Key:   key,
+				Value: val,
+			})
+		}
+
+		slices.SortFunc(gqlMetadata.Values, func(a, b *models.RunTraceSpanMetadataValue) int {
+			return cmp.Compare(a.Key, b.Key)
+		})
+
+		metadata = append(metadata, gqlMetadata)
 	}
 
 	gqlSpan := &models.RunTraceSpan{
@@ -241,6 +261,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		SpanTypeName:   span.Name,
 		IsUserland:     isUserland,
 		UserlandSpan:   userlandSpan,
+		Metadata:       metadata,
 	}
 
 	// If this was a discovery span, we may not want to show it.
