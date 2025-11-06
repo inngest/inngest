@@ -34,13 +34,21 @@ export function useSchemasQuery(search: string) {
     initialPageParam: null,
   });
 
-  const entries = useMemo<SchemaEntry[]>(
+  const entriesWithFails = useMemo<(null | SchemaEntry)[]>(
     () => buildSchemaEntriesFromQueryData(query.data),
     [query.data]
   );
 
-  const remoteCount = useMemo(() => entries.filter((e) => !e.isShared).length, [entries]);
+  const remoteCount = useMemo(
+    () => entriesWithFails.filter((e) => !e?.isShared).length,
+    [entriesWithFails]
+  );
   const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
+
+  const entries: SchemaEntry[] = useMemo(
+    () => entriesWithFails.filter((e) => e !== null),
+    [entriesWithFails]
+  );
 
   const guardedFetchNextPage = useCallback(() => {
     if (hasFetchedMax) {

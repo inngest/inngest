@@ -7,8 +7,8 @@ import type { SchemaEntry, SchemaEventPage } from './types';
 
 export function buildSchemaEntriesFromQueryData(
   data: InfiniteData<SchemaEventPage> | undefined
-): SchemaEntry[] {
-  const list: SchemaEntry[] = [];
+): (null | SchemaEntry)[] {
+  const list: (null | SchemaEntry)[] = [];
 
   list.push({
     key: 'common:events',
@@ -21,11 +21,12 @@ export function buildSchemaEntriesFromQueryData(
     const items = pages.flatMap((p) => p.events);
     for (const evt of items) {
       const entry = buildEntryFromLatestSchema(evt.schema, evt.name);
-      if (entry !== null) list.push(entry);
+      list.push(entry);
     }
   } catch {
     console.error('Error building schema entries from query data.');
   }
+
   return list;
 }
 
