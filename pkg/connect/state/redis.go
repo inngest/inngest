@@ -1075,7 +1075,7 @@ func (r *redisConnectionStateManager) GetAllActiveWorkerRequests(ctx context.Con
 
 	// Query for leases that expire in the future (currentTime or later)
 	// Use currentTime instead of currentTime-1 for more precise timing
-	cmd := r.client.B().Zrangebyscore().Key(workerRequestsKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Build()
+	cmd := r.client.B().Zrange().Key(workerRequestsKey).Min(fmt.Sprintf("%d", currentTime)).Max("+inf").Byscore().Build()
 
 	result, err := r.client.Do(ctx, cmd).AsStrSlice()
 	// Handle Redis errors more specifically

@@ -44,10 +44,12 @@ capacity = tonumber(capacity)
 local currentTimeUnix = tonumber(currentTime)
 
 -- Remove expired leases from the set first
-redis.call("ZREMRANGEBYSCORE", workerRequestsKey, "-inf", tostring(currentTimeUnix))
+-- with a "(" prefix, we would remove all leases inf < leases <= currentTimeUnix
+redis.call("ZREMRANGEBYSCORE", workerRequestsKey, "-inf", "("..currentTimeUnix)
 
--- Get current number of active leases (those with expiration time > current time)
-local currentLeases = redis.call("ZCOUNT", workerRequestsKey, tostring(currentTimeUnix + 1), "+inf")
+-- Get current number of active leases (those with expiration time >= current time)
+-- without a "(" prefix we do currentTimeUnix < lease < +inf
+local currentLeases = redis.call("ZCOUNT", workerRequestsKey, tostring(currentTimeUnix), "+inf")
 
 -- Check if at capacity
 if currentLeases >= capacity then
