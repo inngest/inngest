@@ -46,7 +46,7 @@ export function useSchemasQuery(search: string) {
   const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
 
   const entries: SchemaEntry[] = useMemo(
-    () => entriesWithFails.filter((e) => e !== null),
+    () => entriesWithFails.filter((e) => e !== null) as SchemaEntry[],
     [entriesWithFails]
   );
 
