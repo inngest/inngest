@@ -72,3 +72,19 @@ type StateLoader interface {
 	// StreamState returns all state without loading in-memory
 	// StreamState(ctx context.Context, id ID) (io.Reader, error)
 }
+
+//
+// Re-exports for compat.
+//
+
+type (
+	GeneratorOpcode = state.GeneratorOpcode
+	UserError       = state.UserError
+	DriverResponse  = state.DriverResponse
+)
+
+var (
+	ErrRunNotFound        = state.ErrRunNotFound
+	ErrIdempotentResponse = state.ErrIdempotentResponse
+	ErrDuplicateResponse  = state.ErrDuplicateResponse
+)
