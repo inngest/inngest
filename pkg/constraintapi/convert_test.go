@@ -1601,16 +1601,18 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 		{
 			name: "valid request",
 			input: &CapacityExtendLeaseRequest{
-				IdempotencyKey: "extend-key",
-				AccountID:      accountID,
-				LeaseID:        leaseID,
-				Duration:       15 * time.Minute,
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            15 * time.Minute,
 			},
 			expected: &pb.CapacityExtendLeaseRequest{
-				IdempotencyKey: "extend-key",
-				AccountId:      accountID.String(),
-				LeaseId:        leaseID.String(),
-				Duration:       durationpb.New(15 * time.Minute),
+				IdempotencyKey:      "extend-key",
+				AccountId:           accountID.String(),
+				LeaseId:             leaseID.String(),
+				Duration:            durationpb.New(15 * time.Minute),
+				LeaseIdempotencyKey: "lease-extend-key",
 			},
 		},
 		{
@@ -1716,14 +1718,16 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 		{
 			name: "valid request",
 			input: &CapacityReleaseRequest{
-				IdempotencyKey: "commit-key",
-				AccountID:      accountID,
-				LeaseID:        leaseID,
+				IdempotencyKey:      "commit-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-commit-key",
+				LeaseID:             leaseID,
 			},
 			expected: &pb.CapacityReleaseRequest{
-				IdempotencyKey: "commit-key",
-				AccountId:      accountID.String(),
-				LeaseId:        leaseID.String(),
+				IdempotencyKey:      "commit-key",
+				AccountId:           accountID.String(),
+				LeaseId:             leaseID.String(),
+				LeaseIdempotencyKey: "lease-commit-key",
 			},
 		},
 		{

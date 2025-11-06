@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1330,6 +1331,233 @@ func TestConstraintItemValid(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCapacityExtendLeaseRequestValid(t *testing.T) {
+	accountID := uuid.New()
+	leaseID := ulid.Make()
+
+	tests := []struct {
+		name    string
+		request CapacityExtendLeaseRequest
+		wantErr bool
+		errMsgs []string
+	}{
+		{
+			name: "valid request",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            15 * time.Minute,
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing idempotency key",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            15 * time.Minute,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing idempotency key"},
+		},
+		{
+			name: "missing account ID",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           uuid.Nil,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            15 * time.Minute,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing accountID"},
+		},
+		{
+			name: "missing lease idempotency key",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "",
+				LeaseID:             leaseID,
+				Duration:            15 * time.Minute,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing lease idempotency key"},
+		},
+		{
+			name: "missing lease ID",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             ulid.ULID{},
+				Duration:            15 * time.Minute,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing lease ID"},
+		},
+		{
+			name: "invalid duration - zero",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            0,
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid duration: must be positive"},
+		},
+		{
+			name: "invalid duration - negative",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "extend-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-extend-key",
+				LeaseID:             leaseID,
+				Duration:            -5 * time.Minute,
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid duration: must be positive"},
+		},
+		{
+			name: "multiple validation errors",
+			request: CapacityExtendLeaseRequest{
+				IdempotencyKey:      "",
+				AccountID:           uuid.Nil,
+				LeaseIdempotencyKey: "",
+				LeaseID:             ulid.ULID{},
+				Duration:            0,
+			},
+			wantErr: true,
+			errMsgs: []string{
+				"missing idempotency key",
+				"missing accountID",
+				"missing lease idempotency key",
+				"missing lease ID",
+				"invalid duration: must be positive",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				for _, expectedMsg := range tt.errMsgs {
+					assert.Contains(t, err.Error(), expectedMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCapacityReleaseRequestValid(t *testing.T) {
+	accountID := uuid.New()
+	leaseID := ulid.Make()
+
+	tests := []struct {
+		name    string
+		request CapacityReleaseRequest
+		wantErr bool
+		errMsgs []string
+	}{
+		{
+			name: "valid request",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "release-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-release-key",
+				LeaseID:             leaseID,
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing idempotency key",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-release-key",
+				LeaseID:             leaseID,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing idempotency key"},
+		},
+		{
+			name: "missing account ID",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "release-key",
+				AccountID:           uuid.Nil,
+				LeaseIdempotencyKey: "lease-release-key",
+				LeaseID:             leaseID,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing accountID"},
+		},
+		{
+			name: "missing lease idempotency key",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "release-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "",
+				LeaseID:             leaseID,
+			},
+			wantErr: true,
+			errMsgs: []string{"missing lease idempotency key"},
+		},
+		{
+			name: "missing lease ID",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "release-key",
+				AccountID:           accountID,
+				LeaseIdempotencyKey: "lease-release-key",
+				LeaseID:             ulid.ULID{},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing lease ID"},
+		},
+		{
+			name: "multiple validation errors",
+			request: CapacityReleaseRequest{
+				IdempotencyKey:      "",
+				AccountID:           uuid.Nil,
+				LeaseIdempotencyKey: "",
+				LeaseID:             ulid.ULID{},
+			},
+			wantErr: true,
+			errMsgs: []string{
+				"missing idempotency key",
+				"missing accountID",
+				"missing lease idempotency key",
+				"missing lease ID",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				for _, expectedMsg := range tt.errMsgs {
+					assert.Contains(t, err.Error(), expectedMsg)
+				}
 			} else {
 				assert.NoError(t, err)
 			}
