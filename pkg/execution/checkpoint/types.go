@@ -1,6 +1,5 @@
 package checkpoint
 
-<<<<<<< HEAD
 import (
 	"context"
 	"time"
