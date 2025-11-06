@@ -312,6 +312,7 @@ LOOP:
 				// have capacity to run at least MinWorkersFree concurrent
 				// QueueItems.  This reduces latency of enqueued items when
 				// there are lots of enqueued and available jobs.
+				l.Warn("all workers busy, early exiting scan", "worker_capacity", q.capacity())
 				continue
 			}
 
@@ -626,6 +627,12 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 			"peek_until", peekUntil.Format(time.StampMilli),
 			"partition", len(partitions),
 		)
+	} else {
+		q.log.Debug("partition_peek yielded no partitions",
+			"partition_key", partitionKey,
+			"peek_until", peekUntil.Format(time.StampMilli),
+			"partition", len(partitions),
+		)
 	}
 
 	eg := errgroup.Group{}
@@ -713,6 +720,7 @@ func (q *queue) scan(ctx context.Context) error {
 		}
 
 		if len(peekedAccounts) == 0 {
+			q.log.Debug("account_peek yielded no accounts")
 			return nil
 		}
 
@@ -1611,9 +1619,14 @@ func durationWithTags[T any](ctx context.Context, queueShardName string, op stri
 	}
 
 	res, err := f(ctx)
+
+	d := time.Since(start)
+	if d > time.Second {
+		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
+	}
 	metrics.HistogramQueueOperationDuration(
 		ctx,
-		time.Since(start).Milliseconds(),
+		d.Milliseconds(),
 		metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags:    finalTags,
