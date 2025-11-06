@@ -35,7 +35,7 @@ export function SchemaExplorerSwitcher({
     <Fragment>
       <div className="flex flex-col gap-1">{entries.map(renderEntry)}</div>
       {showShimmers && <LoadingShimmers />}
-      {!showShimmers && showError && (
+      {showError && (
         <Alert className="mt-2 text-xs" severity="error">
           <div className="flex flex-row gap-2">
             <div>Failed to load schemas</div>
@@ -51,7 +51,7 @@ export function SchemaExplorerSwitcher({
           </div>
         </Alert>
       )}
-      {!error && !showShimmers && hasFetchedMax && (
+      {!showError && !showShimmers && hasFetchedMax && (
         <Alert severity="info" className="mt-2 text-xs">
           Please use search to target schemas.
         </Alert>
