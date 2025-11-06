@@ -36,13 +36,13 @@ export function SchemaExplorer() {
 
   const renderEntry = useCallback(
     (entry: (typeof entries)[number]) => {
-      const isCommonEventSchema = entry.key === 'common:event';
+      const isCommonEventSchema = entry.key === 'common:events';
 
       return (
         <SchemaViewer
           key={entry.key}
           computeType={isCommonEventSchema ? computeSharedEventSchemaType : undefined}
-          defaultExpandedPaths={isCommonEventSchema ? ['event'] : undefined}
+          defaultExpandedPaths={isCommonEventSchema ? ['events'] : undefined}
           node={entry.node}
           renderAdornment={isCommonEventSchema ? renderSharedAdornment : undefined}
         />
@@ -86,6 +86,6 @@ export function SchemaExplorer() {
 }
 
 function computeSharedEventSchemaType(node: ValueNode, baseLabel: string): string {
-  if (node.path === 'event.data' && baseLabel === 'string') return 'JSON';
+  if (node.path === 'events.data' && baseLabel === 'string') return 'JSON';
   return baseLabel;
 }

@@ -6,7 +6,6 @@ export type UseSchemasArgs = {
 };
 
 export type SchemaEntry = {
-  displayName: string;
   isShared: boolean;
   key: string;
   node: SchemaNode;

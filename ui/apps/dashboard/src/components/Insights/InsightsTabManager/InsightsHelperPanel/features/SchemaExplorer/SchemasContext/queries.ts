@@ -11,8 +11,7 @@ export function buildSchemaEntriesFromQueryData(
   const list: SchemaEntry[] = [];
 
   list.push({
-    key: 'common:event',
-    displayName: 'event',
+    key: 'common:events',
     isShared: true,
     node: transformJSONSchema(EVENT_SCHEMA_JSON),
   });
@@ -43,7 +42,6 @@ export function buildEntryFromLatestSchema(
 
     return {
       key: `fetched:${eventName}`,
-      displayName: eventName,
       isShared: false,
       node: transformJSONSchema({ ...dataSchema, title: eventName }),
     };
