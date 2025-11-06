@@ -26,10 +26,8 @@ export type SchemasContextValue = UseSchemasReturn & {
 };
 
 export type SchemaEvent = {
-  archived: boolean;
-  functions: { id: string; slug: string; name: string }[];
-  latestSchema: string;
   name: string;
+  schema: string;
 };
 
 export type SchemaEventPage = {

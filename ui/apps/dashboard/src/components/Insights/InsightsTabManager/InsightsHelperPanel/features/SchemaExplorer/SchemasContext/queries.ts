@@ -20,7 +20,7 @@ export function buildSchemaEntriesFromQueryData(
     const pages = data?.pages ?? [];
     const items = pages.flatMap((p) => p.events);
     for (const evt of items) {
-      const entry = buildEntryFromLatestSchema(evt.latestSchema, evt.name);
+      const entry = buildEntryFromLatestSchema(evt.schema, evt.name);
       if (entry !== null) list.push(entry);
     }
   } catch {

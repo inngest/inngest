@@ -3,10 +3,11 @@
 import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
-import { useEventTypes } from '@/components/EventTypes/useEventTypes';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
+import { useEventTypeSchemas } from './useEventTypeSchemas';
 
 // Hard cap to guard against excessive auto-fetching.
 const MAX_SCHEMA_ITEMS = 800;
@@ -14,14 +15,15 @@ const MAX_SCHEMA_ITEMS = 800;
 export function useSchemasQuery(search: string) {
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
-  const getEventTypes = useEventTypes();
+  const getEventTypes = useEventTypeSchemas();
+  const env = useEnvironment();
 
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
     gcTime: 0,
-    queryKey: ['schema-explorer-event-types', { nameSearch: search || null }],
+    queryKey: ['schema-explorer-event-types', env.id, { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
-      getEventTypes({ archived: false, cursor: pageParam, nameSearch: search || null }),
+      getEventTypes({ cursor: pageParam, nameSearch: search || null }),
     getNextPageParam: (lastPage) => {
       if (!lastPage.pageInfo.hasNextPage) return undefined;
       return lastPage.pageInfo.endCursor;
