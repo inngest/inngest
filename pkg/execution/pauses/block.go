@@ -163,6 +163,7 @@ func (b blockstore) BlockSize() int {
 // and writing to a block.
 func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
+		logger.StdlibLogger(ctx).Warn("skipping block flush", "block_size", b.blocksize, "buf_set", b.buf != nil, "bucket_set", b.bucket != nil)
 		return nil
 	}
 
