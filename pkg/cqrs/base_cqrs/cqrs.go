@@ -412,7 +412,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	for _, fragment := range fragments {
 		attrs, ok := fragment["attributes"].(string)
 		if !ok {
-			// TODO: log
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind, no attributes")
 			continue
 		}
 
@@ -441,7 +441,10 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		if ret.Kind == "" && *fragmentAttr.Kind != "" {
 			ret.Kind = *fragmentAttr.Kind
 		} else if ret.Kind != *fragmentAttr.Kind {
-			// TODO: log
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata kind during rollup, skipping",
+				"kinds", []meta.MetadataKind{ret.Kind, *fragmentAttr.Kind},
+			)
 			continue
 		}
 
