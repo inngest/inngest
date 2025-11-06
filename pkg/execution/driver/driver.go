@@ -52,6 +52,10 @@ type V2RequestOpts struct {
 	// specific SDK implementations.
 	Index int
 
+	// QueueRef is the executor.QueueRef encoded as a string, used when checkpointing
+	// async functions so that the API knows which queue item to reset.
+	QueueRef string
+
 	// StepID is an optional step ID that we're specifically executing.
 	//
 	// This happens in the case of StepPlanned ops, which request an explicit step ID
@@ -95,6 +99,7 @@ func MarshalV1(
 	env string,
 	attempt int,
 	maxAttempts int,
+	queueItemRef string,
 ) ([]byte, error) {
 	rawEvts, err := sl.LoadEvents(ctx, md.ID)
 	if err != nil {
@@ -120,11 +125,12 @@ func MarshalV1(
 		Events:  evts,
 		Actions: map[string]any{},
 		Context: &SDKRequestContext{
-			UseAPI:     true,
-			FunctionID: md.ID.FunctionID,
-			Env:        env,
-			StepID:     step.ID,
-			RunID:      md.ID.RunID,
+			UseAPI:       true,
+			FunctionID:   md.ID.FunctionID,
+			Env:          env,
+			StepID:       step.ID,
+			RunID:        md.ID.RunID,
+			QueueItemRef: queueItemRef,
 			Stack: &FunctionStack{
 				Stack:   md.Stack,
 				Current: stackIndex,

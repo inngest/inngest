@@ -28,15 +28,19 @@ export function SchemaExplorer() {
   }, []);
 
   const renderEntry = useCallback(
-    (entry: (typeof entries)[number]) => (
-      <SchemaViewer
-        key={entry.key}
-        computeType={entry.key === 'common:event' ? computeSharedEventSchemaType : undefined}
-        defaultExpandedPaths={entry.key === 'common:event' ? ['event'] : undefined}
-        node={entry.node}
-        renderAdornment={entry.key === 'common:event' ? renderSharedAdornment : undefined}
-      />
-    ),
+    (entry: (typeof entries)[number]) => {
+      const isCommonEventSchema = entry.key === 'common:event';
+
+      return (
+        <SchemaViewer
+          key={entry.key}
+          computeType={isCommonEventSchema ? computeSharedEventSchemaType : undefined}
+          defaultExpandedPaths={isCommonEventSchema ? ['event'] : undefined}
+          node={entry.node}
+          renderAdornment={isCommonEventSchema ? renderSharedAdornment : undefined}
+        />
+      );
+    },
     [renderSharedAdornment]
   );
 

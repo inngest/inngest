@@ -45,7 +45,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20250827210420-250dd9c460ad
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
-	github.com/inngest/inngestgo v0.14.2-0.20251027185638-062a493891af
+	github.com/inngest/inngestgo v0.14.2-0.20251103042514-df5395833dc9
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
@@ -255,6 +255,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect

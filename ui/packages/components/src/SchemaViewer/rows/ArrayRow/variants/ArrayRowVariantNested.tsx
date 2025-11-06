@@ -3,17 +3,16 @@
 import { makeValueTypeLabel, repeatArrayBrackets } from '../../../typeUtil';
 import type { ArrayNode, ObjectNode, SchemaNode, TupleNode, ValueNode } from '../../../types';
 import { ObjectRow } from '../../ObjectRow';
-import { Row } from '../../Row';
 import { TupleRow } from '../../TupleRow';
 import { ValueRow } from '../../ValueRow';
 
+// Renders an array of arrays (nested arrays), delegating to the terminal row type
 export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.ReactElement | null {
   const info = computeNestedTerminal(node.element);
 
-  switch (info.terminal) {
+  switch (info.terminal?.kind) {
     case 'object': {
-      const object = info.object;
-      if (!object) return <Row node={node.element} />;
+      const object = info.terminal;
 
       return (
         <ObjectRow
@@ -23,8 +22,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
       );
     }
     case 'tuple': {
-      const tuple = info.tuple;
-      if (!tuple) return <Row node={node.element} />;
+      const tuple = info.terminal;
 
       return (
         <TupleRow
@@ -34,8 +32,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
       );
     }
     case 'value': {
-      const value = info.value;
-      if (!value) return <Row node={node.element} />;
+      const value = info.terminal;
 
       return (
         <ValueRow
@@ -51,10 +48,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
 
 function computeNestedTerminal(element: SchemaNode): {
   bracketLayers: number;
-  terminal: 'value' | 'object' | 'tuple' | null;
-  value?: ValueNode;
-  object?: ObjectNode;
-  tuple?: TupleNode;
+  terminal: ObjectNode | TupleNode | ValueNode | null;
 } {
   let bracketLayers = 1;
   let cursor: SchemaNode | undefined = element;
@@ -62,9 +56,9 @@ function computeNestedTerminal(element: SchemaNode): {
   while (cursor && cursor.kind === 'array') {
     cursor = cursor.element;
     bracketLayers += 1;
-    if (cursor.kind === 'value') return { bracketLayers, terminal: 'value', value: cursor };
-    if (cursor.kind === 'object') return { bracketLayers, terminal: 'object', object: cursor };
-    if (cursor.kind === 'tuple') return { bracketLayers, terminal: 'tuple', tuple: cursor };
+    if (cursor.kind !== 'array') {
+      return { bracketLayers, terminal: cursor };
+    }
   }
 
   return { bracketLayers, terminal: null };

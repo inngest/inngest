@@ -3,9 +3,11 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -401,17 +403,38 @@ func (h HandlePauseResult) Handled() int32 {
 type FinalizeOpts struct {
 	// Metadata is the run metadata.
 	Metadata sv2.Metadata
-	// RunMode indicates whether this was an async or sync function.  The
-	// sync run mode is always determined by calling Finalize via the
-	// checkpoint APIs.
-	RunMode enums.RunMode
-	// Response is the final run output.
-	Response state.DriverResponse
+	// Response is the final run output, either an opcode, API result, or
+	// driver response.
+	Response FinalizeResponse
 	// Optional represents optional fields that improve performance of the
 	// finalize call, requiring less data calls to fetch associated information
 	// when finalizing.  Where possible, if already loaded in memory these fields
 	// should be supplied.
 	Optional FinalizeOptional
+}
+
+type FinalizeResponseType int
+
+const (
+	FinalizeResponseRunComplete FinalizeResponseType = iota
+	FinalizeResponseAPI
+	FinalizeResponseDriver
+)
+
+// FinalizeResponse is a union containing one of:
+// 1. an enums.OpcodeRunComplete (for async fns),
+// 2. or a apiresult.APIResponse (for sync fns)
+// 3. A DriverResponse for SDKs not using opcode responses.
+type FinalizeResponse struct {
+	// Type indicates the field to use.
+	Type FinalizeResponseType
+	// OpcodeResponse exists with an enums.OpcodeRunComplete enum.
+	RunComplete state.GeneratorOpcode
+	// DriverResponse is the old response for <= V4 TS SDKs which don't respond
+	// with FunctionRunResponse opcodes.
+	DriverResponse state.DriverResponse
+	// APIResponse exists for HTTP-based sync functions.
+	APIResponse apiresult.APIResult
 }
 
 // FinalizeOptional represents optional fields that improve performance of the
@@ -429,15 +452,38 @@ type FinalizeOptional struct {
 	OutputSpanRef *meta.SpanReference
 	// Reason is the tag used in finalization counters to track in metrics.
 	Reason string
+	// Cancel indicates if we've cancelled the function.  This has no output
+	// and defaults to false.
+	Cancel bool
 }
 
 func (f FinalizeOpts) Status() enums.StepStatus {
-	if f.Optional.Reason == "cancel" {
+	if f.Optional.Cancel {
 		return enums.StepStatusCancelled
 	}
 
-	if f.Response.Error() != "" {
-		return enums.StepStatusFailed
+	switch f.Response.Type {
+	case FinalizeResponseRunComplete:
+		return enums.StepStatusCompleted
+	case FinalizeResponseAPI:
+		// XXX: all statuses are currently completed except for 5XX
+		if f.Response.APIResponse.StatusCode >= 500 {
+			return enums.StepStatusFailed
+		}
+		return enums.StepStatusCompleted
+	case FinalizeResponseDriver:
+
+		dr := f.Response.DriverResponse
+
+		if dr.Error() != "" {
+			return enums.StepStatusFailed
+		}
+
+		if dr.Err != nil && strings.Contains(*dr.Err, state.ErrFunctionCancelled.Error()) {
+			return enums.StepStatusCancelled
+		}
+
 	}
+
 	return enums.StepStatusCompleted
 }

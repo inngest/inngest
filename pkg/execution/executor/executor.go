@@ -22,11 +22,13 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -47,6 +49,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -1492,8 +1495,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					Metadata: i.md,
 					// Always, when called from the executor, as this handles async
 					// finalization.
-					RunMode:  enums.RunModeAsync,
-					Response: *i.resp,
+					Response: execution.FinalizeResponse{
+						Type:           execution.FinalizeResponseDriver,
+						DriverResponse: *i.resp,
+					},
 					Optional: execution.FinalizeOptional{
 						FnSlug:        i.f.GetSlug(),
 						InputEvents:   i.events,
@@ -1549,8 +1554,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			Metadata: i.md,
 			// Always, when called from the executor, as this handles async
 			// finalization.
-			RunMode:  enums.RunModeAsync,
-			Response: *i.resp,
+			Response: execution.FinalizeResponse{
+				Type:           execution.FinalizeResponseDriver,
+				DriverResponse: *i.resp,
+			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
 				InputEvents:   i.events,
@@ -1577,8 +1584,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			Metadata: i.md,
 			// Always, when called from the executor, as this handles async
 			// finalization.
-			RunMode:  enums.RunModeAsync,
-			Response: *i.resp,
+			Response: execution.FinalizeResponse{
+				Type:           execution.FinalizeResponseDriver,
+				DriverResponse: *i.resp,
+			},
 			Optional: execution.FinalizeOptional{
 				FnSlug:        i.f.GetSlug(),
 				InputEvents:   i.events,
@@ -1608,15 +1617,28 @@ type functionFinishedData struct {
 	InvokeCorrelationID *string        `json:"correlation_id,omitempty"`
 }
 
-func (f *functionFinishedData) setResponse(r state.DriverResponse) {
-	if r.Err != nil {
-		f.Error = r.StandardError()
-	}
-	if r.UserError != nil {
-		f.Error = r.UserError
-	}
-	if r.Output != nil {
-		f.Result = r.Output
+func (f *functionFinishedData) setResponse(resp execution.FinalizeResponse) {
+	switch resp.Type {
+
+	case execution.FinalizeResponseRunComplete:
+		// NOTE: This should never be wrapped with a `{"data":T}` field because
+		// run complete is always raw data.
+		f.Result = resp.RunComplete.Data
+
+	case execution.FinalizeResponseAPI:
+		f.Result = resp.APIResponse
+
+	case execution.FinalizeResponseDriver:
+		r := resp.DriverResponse
+		if r.Err != nil {
+			f.Error = r.StandardError()
+		}
+		if r.UserError != nil {
+			f.Error = r.UserError
+		}
+		if r.Output != nil {
+			f.Result = r.Output
+		}
 	}
 }
 
@@ -1696,6 +1718,7 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 		Attempt:    run.AttemptCount(),
 		Index:      run.stackIndex,
 		StepID:     &run.edge.Outgoing,
+		QueueRef:   queueref.StringFromCtx(ctx),
 		URL:        url,
 	})
 
@@ -2224,19 +2247,18 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		return fmt.Errorf("unable to load function: %w", err)
 	}
 
-	fnCancelledErr := state.ErrFunctionCancelled.Error()
-
 	if err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: md,
 		// Always, when called from the executor, as this handles async
 		// finalization.
-		RunMode: enums.RunModeAsync,
-		Response: state.DriverResponse{
-			Err: &fnCancelledErr,
+		Response: execution.FinalizeResponse{
+			Type:           execution.FinalizeResponseDriver,
+			DriverResponse: state.DriverResponse{}, // empty.
 		},
 		Optional: execution.FinalizeOptional{
 			FnSlug:      f.Function.GetSlug(),
 			InputEvents: evts,
+			Cancel:      true,
 			Reason:      "cancel",
 		},
 	}); err != nil {
@@ -2649,6 +2671,22 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
+	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1)
+	// which contained a step.run.  However, with checkpointing we can batch step.run
+	// outputs into one single HTTP response.
+	//
+	// When this happens, we ALWAYS need to create a trace for each step.
+	//
+	// We pass this down in context, unfortunately.
+	if len(resp.Generator) > 1 {
+		for _, op := range resp.Generator {
+			if op.Op == enums.OpcodeStepRun {
+				ctx = setEmitCheckpointTraces(ctx)
+				break
+			}
+		}
+	}
+
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -2738,8 +2776,12 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
 	case enums.OpcodeRunComplete:
-		// TODO: Handle finalization
-		return fmt.Errorf("run complete not implemented")
+		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
+	case enums.OpcodeSyncRunComplete:
+		// This is an API-based function executed synchronously that had
+		// an async conversion.  The result must always be in the shape of
+		// apiresult.APIResult
+		return e.handleGeneratorSyncFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepFailed:
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
 	}
@@ -2766,8 +2808,54 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// This is fine.
+		// XXX: we should totally attach a warning to the function run here.
+		return nil
+	}
+
 	if err != nil {
 		return err
+	}
+
+	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
+	// then returned as an async response because the checkpooint batch time was greater than
+	// the run execution.  In this case, all opcodes are returned to the executor via the async
+	// response, and we have to retroactively save traces for each step.
+	//
+	// Again, we ONLY create new traces if the steps were batched, otherwise the standard
+	// trace -> exec -> cleanup flow handles individual steps.
+	//
+	// In this case, we MUST retroactively record spans for each past step.
+	//
+	// XXX: (feat: checkpoint) We also only want to enqueue one discovery step per request,
+	// if this isn't in parallelism.
+	if emitCheckpointTraces(ctx) {
+		attrs := tracing.GeneratorAttrs(&gen)
+		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
+		_, err := e.tracerProvider.CreateSpan(
+			ctx,
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+				StartTime: gen.Timing.Start(),
+				EndTime:   gen.Timing.End(),
+				Attributes: attrs.Merge(
+					meta.NewAttrSet(
+						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(gen.UserDefinedName())),
+						meta.Attr(meta.Attrs.RunID, &runCtx.Metadata().ID.RunID),
+						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
+						meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
+					),
+				),
+			},
+		)
+		if err != nil {
+			// We should never hit a blocker creating a span.  If so, warn loudly.
+			logger.StdlibLogger(ctx).Error("error saving span for checkpoint op", "error", err)
+		}
 	}
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
@@ -2983,6 +3071,46 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	return nil
+}
+
+func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// In this case, we've reported that the function has finished.  It's an async
+	// function.  In this case, we always want to update the span ourselves to mark
+	// the function as finished, and add the output here.
+	return e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *runCtx.Metadata(),
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseRunComplete,
+			RunComplete: gen,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: runCtx.Events(),
+		},
+	})
+}
+
+func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// An API-based function went async and finished.  This must always be a apiresult.APIResult.
+	// Both opcodes in a sync fn cehckpoint should always return this shape of data.
+	result := struct {
+		Data apiresult.APIResult `json:"data"`
+	}{}
+	if err := json.Unmarshal(gen.Data, &result); err != nil {
+		// This should never happen with well-formed SDKs.  The SDK should always send the sync run complete
+		// opcode with well-formed data.
+		logger.StdlibLogger(ctx).Error("error unmarshalling api result from sync RunComplete op", "error", err)
+		return err
+	}
+	return e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *runCtx.Metadata(),
+		Response: execution.FinalizeResponse{
+			Type:        execution.FinalizeResponseAPI,
+			APIResponse: result.Data,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: runCtx.Events(),
+		},
+	})
 }
 
 func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
@@ -4487,4 +4615,19 @@ func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Me
 	}
 
 	return parentRef
+}
+
+// Checkpoint traces configures hwehter we should emit traces after recording steps.
+
+type traceStepsValT struct{}
+
+var traceStepsVal = traceStepsValT{}
+
+func setEmitCheckpointTraces(ctx context.Context) context.Context {
+	return context.WithValue(ctx, traceStepsVal, true)
+}
+
+func emitCheckpointTraces(ctx context.Context) bool {
+	ok, _ := ctx.Value(traceStepsVal).(bool)
+	return ok
 }

@@ -23,19 +23,32 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type jobIDValType struct{}
+type jobIDValType struct{ int }
 
-var jobCtxVal = jobIDValType{}
+var (
+	jobCtxVal   = jobIDValType{0}
+	shardCtxVal = jobIDValType{1}
+)
 
 // WithJobID returns a context that stores the given job ID inside.
 func WithJobID(ctx context.Context, jobID string) context.Context {
 	return context.WithValue(ctx, jobCtxVal, jobID)
 }
 
+// WithShardID returns a context that stores the shard ID for the current job.
+func WithShardID(ctx context.Context, shardID string) context.Context {
+	return context.WithValue(ctx, shardCtxVal, shardID)
+}
+
 // JobIDFromContext returns the job ID given the current context, or an
 // empty string if there's no job ID.
 func JobIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(jobCtxVal).(string)
+	return str
+}
+
+func ShardIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(shardCtxVal).(string)
 	return str
 }
 

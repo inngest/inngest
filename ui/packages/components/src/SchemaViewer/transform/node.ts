@@ -32,6 +32,8 @@ function resolveSelectors(schema: JSONSchema): JSONSchema {
     const structural = selectFirstStructuralSchema(concrete);
     if (structural) return resolveSelectors(structural);
 
+    // TODO: Instead of selecting the first scalar (or null), merge them.
+
     const scalar = selectFirstScalarExcludingNull(concrete);
     if (scalar) return resolveSelectors(scalar);
 
