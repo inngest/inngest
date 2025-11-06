@@ -307,6 +307,11 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 
 // ExtendLease implements CapacityManager.
 func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
+	// Validate request
+	if err := req.Valid(); err != nil {
+		return nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
+
 	keys := []string{}
 
 	args, err := strSlice([]any{})
@@ -327,6 +332,11 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 
 // Release implements CapacityManager.
 func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
+	// Validate request
+	if err := req.Valid(); err != nil {
+		return nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
+
 	keys := []string{}
 
 	args, err := strSlice([]any{})

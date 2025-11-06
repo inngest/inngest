@@ -116,3 +116,51 @@ func (ci ConstraintItem) Valid() error {
 	}
 	return nil
 }
+
+func (r *CapacityExtendLeaseRequest) Valid() error {
+	var errs error
+
+	if r.IdempotencyKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing idempotency key"))
+	}
+
+	if r.AccountID == uuid.Nil {
+		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
+	}
+
+	if r.LeaseIdempotencyKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
+	}
+
+	if r.LeaseID.String() == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing lease ID"))
+	}
+
+	if r.Duration <= 0 {
+		errs = multierror.Append(errs, fmt.Errorf("invalid duration: must be positive"))
+	}
+
+	return errs
+}
+
+func (r *CapacityReleaseRequest) Valid() error {
+	var errs error
+
+	if r.IdempotencyKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing idempotency key"))
+	}
+
+	if r.AccountID == uuid.Nil {
+		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
+	}
+
+	if r.LeaseIdempotencyKey == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
+	}
+
+	if r.LeaseID.String() == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing lease ID"))
+	}
+
+	return errs
+}

@@ -798,10 +798,11 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		return nil
 	}
 	return &pb.CapacityExtendLeaseRequest{
-		IdempotencyKey: req.IdempotencyKey,
-		AccountId:      req.AccountID.String(),
-		LeaseId:        req.LeaseID.String(),
-		Duration:       durationpb.New(req.Duration),
+		IdempotencyKey:      req.IdempotencyKey,
+		AccountId:           req.AccountID.String(),
+		LeaseId:             req.LeaseID.String(),
+		Duration:            durationpb.New(req.Duration),
+		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
 	}
 }
 
@@ -826,10 +827,11 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 	}
 
 	return &CapacityExtendLeaseRequest{
-		IdempotencyKey: pbReq.IdempotencyKey,
-		AccountID:      accountID,
-		LeaseID:        leaseID,
-		Duration:       duration,
+		IdempotencyKey:      pbReq.IdempotencyKey,
+		AccountID:           accountID,
+		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
+		LeaseID:             leaseID,
+		Duration:            duration,
 	}, nil
 }
 
@@ -873,9 +875,10 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		return nil
 	}
 	return &pb.CapacityReleaseRequest{
-		IdempotencyKey: req.IdempotencyKey,
-		AccountId:      req.AccountID.String(),
-		LeaseId:        req.LeaseID.String(),
+		IdempotencyKey:      req.IdempotencyKey,
+		AccountId:           req.AccountID.String(),
+		LeaseId:             req.LeaseID.String(),
+		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
 	}
 }
 
@@ -895,9 +898,10 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 	}
 
 	return &CapacityReleaseRequest{
-		IdempotencyKey: pbReq.IdempotencyKey,
-		AccountID:      accountID,
-		LeaseID:        leaseID,
+		IdempotencyKey:      pbReq.IdempotencyKey,
+		AccountID:           accountID,
+		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
+		LeaseID:             leaseID,
 	}, nil
 }
 

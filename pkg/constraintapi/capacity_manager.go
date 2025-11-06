@@ -155,10 +155,15 @@ type CapacityAcquireResponse struct {
 }
 
 type CapacityExtendLeaseRequest struct {
+	// IdempotencyKey is the operation idempotency key
 	IdempotencyKey string
 
 	AccountID uuid.UUID
-	LeaseID   ulid.ULID
+
+	// LeaseIdempotencyKey is the idempotency key for the lease
+	LeaseIdempotencyKey string
+	// LeaseID is the current lease ID
+	LeaseID ulid.ULID
 
 	Duration time.Duration
 }
@@ -168,10 +173,16 @@ type CapacityExtendLeaseResponse struct {
 }
 
 type CapacityReleaseRequest struct {
+	// IdempotencyKey is the operation idempotency key
 	IdempotencyKey string
 
 	AccountID uuid.UUID
-	LeaseID   ulid.ULID
+
+	// LeaseIdempotencyKey is the idempotency key for the lease
+	LeaseIdempotencyKey string
+
+	// LeaseID is the current lease ID
+	LeaseID ulid.ULID
 }
 
 type CapacityReleaseResponse struct{}
