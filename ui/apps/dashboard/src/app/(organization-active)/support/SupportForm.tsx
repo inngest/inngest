@@ -46,6 +46,7 @@ export function SupportForm({
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
   const { user, isSignedIn } = useUser();
   const { organization } = useOrganization();
+  const isPaidOrEnterprise = isPaid || isEnterprise;
 
   const availableSeverityOptions = severityOptions.map((o) => ({
     ...o,
@@ -59,7 +60,7 @@ export function SupportForm({
         ) : null}
       </>
     ),
-    disabled: o.enterpriseOnly ? !isEnterprise : o.paidOnly ? !isPaid || !isEnterprise : false,
+    disabled: o.enterpriseOnly ? !isEnterprise : o.paidOnly ? !isPaidOrEnterprise : false,
   }));
 
   function clearForm() {

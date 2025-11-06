@@ -43,8 +43,8 @@ export default function Page() {
   });
 
   const plan = data?.account.plan;
-  const isPaid = (plan?.amount || 0) > 0;
   const isEnterprise = plan ? isEnterprisePlan(plan) : false;
+  const isPaid = (plan?.amount || 0) > 0 || isEnterprise;
   const preselectedTicketType = searchParams.get('q') as TicketType;
 
   return (
