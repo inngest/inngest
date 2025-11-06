@@ -11,7 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
-	"github.com/inngest/inngest/pkg/execution/checkpoint"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -259,7 +259,7 @@ func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
 	panic("unknown finalize response type")
 }
 
-func apiAttributes(res checkpoint.APIResult) *meta.SerializableAttrs {
+func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 	h := http.Header{}
 	for k, v := range res.Headers {
 		h.Set(k, v)

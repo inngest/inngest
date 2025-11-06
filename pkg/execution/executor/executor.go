@@ -22,9 +22,9 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
-	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -2780,7 +2780,7 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeSyncRunComplete:
 		// This is an API-based function executed synchronously that had
 		// an async conversion.  The result must always be in the shape of
-		// checkpoint.APIResult
+		// apiresult.APIResult
 		return e.handleGeneratorSyncFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepFailed:
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
@@ -3090,10 +3090,10 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// An API-based function went async and finished.  This must always be a checkpoint.APIResult.
+	// An API-based function went async and finished.  This must always be a apiresult.APIResult.
 	// Both opcodes in a sync fn cehckpoint should always return this shape of data.
 	result := struct {
-		Data checkpoint.APIResult `json:"data"`
+		Data apiresult.APIResult `json:"data"`
 	}{}
 	if err := json.Unmarshal(gen.Data, &result); err != nil {
 		// This should never happen with well-formed SDKs.  The SDK should always send the sync run complete

@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -364,7 +365,7 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 		}
 
 		res := struct {
-			Data checkpoint.APIResult `json:"data"`
+			Data apiresult.APIResult `json:"data"`
 		}{}
 		if err := json.Unmarshal(output, &res); err == nil {
 			for k, v := range res.Data.Headers {

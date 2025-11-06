@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -225,7 +226,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 		case enums.OpcodeRunComplete:
 			result := struct {
-				Data APIResult `json:"data"`
+				Data apiresult.APIResult `json:"data"`
 			}{}
 			if err := json.Unmarshal(op.Data, &result); err != nil {
 				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
@@ -382,7 +383,7 @@ func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execut
 
 // finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
 // work has finished, and eg. step.Defer items are not running.
-func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result APIResult) error {
+func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result apiresult.APIResult) error {
 	httpHeader := http.Header{}
 	for k, v := range result.Headers {
 		httpHeader[k] = []string{v}

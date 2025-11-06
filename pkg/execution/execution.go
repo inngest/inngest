@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/batch"
-	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 
@@ -423,7 +423,7 @@ const (
 
 // FinalizeResponse is a union containing one of:
 // 1. an enums.OpcodeRunComplete (for async fns),
-// 2. or a checkpoint.APIResponse (for sync fns)
+// 2. or a apiresult.APIResponse (for sync fns)
 // 3. A DriverResponse for SDKs not using opcode responses.
 type FinalizeResponse struct {
 	// Type indicates the field to use.
@@ -434,7 +434,7 @@ type FinalizeResponse struct {
 	// with FunctionRunResponse opcodes.
 	DriverResponse state.DriverResponse
 	// APIResponse exists for HTTP-based sync functions.
-	APIResponse checkpoint.APIResult
+	APIResponse apiresult.APIResult
 }
 
 // FinalizeOptional represents optional fields that improve performance of the
