@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -47,6 +48,12 @@ type FunctionOpts struct {
 	ID string
 	// Name represents a human-readable function name.
 	Name string
+
+	// CheckpointConfig configues checkpointing for the current function.  Checkpointing
+	// allows each step.Run result to be stored via an API call, lowering latency between
+	// steps.
+	CheckpointConfig *checkpoint.Config
+
 	// Priority allows you to specify priority options for the function.
 	Priority *Priority
 	// Concurrency allows you to specify concurrency options.

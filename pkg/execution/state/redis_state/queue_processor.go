@@ -1217,6 +1217,10 @@ func (q *queue) process(
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
+	//
+	// NOTE: It is important that we keep this here for every job;  the exeuctor uses this to pass
+	// along the job ID as metadata to the SDK.  We also need to pass in shard information.
+	jobCtx = osqueue.WithShardID(jobCtx, q.primaryQueueShard.Name)
 	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
 	// Same with the group ID, if it exists.
 	if qi.Data.GroupID != "" {

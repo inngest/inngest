@@ -107,6 +107,9 @@ type Function struct {
 }
 
 func (f Function) MaxAttempts() int {
+	if len(f.Steps) == 0 {
+		return consts.DefaultRetryCount
+	}
 	// TODO: Improve this please...
 	return f.Steps[0].RetryCount() + 1
 }

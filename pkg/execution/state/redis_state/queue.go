@@ -169,12 +169,14 @@ type QueueManager interface {
 	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
+	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
+	// checkpointing;  a single job becomes shared amongst many  steps.
+	ResetAttemptsByJobID(ctx context.Context, shard string, jobID string) error
+
 	// ItemsByPartition returns a queue item iterator for a function within a specific time range
 	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
-
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
 	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
-
 	// BacklogsByPartition returns an iterator for the partition's backlogs
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
@@ -1291,7 +1293,7 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 
 	ckeys := i.Data.GetConcurrencyKeys()
 	if len(ckeys) == 0 {
-		return
+		return fnPartition, customConcurrencyKey1, customConcurrencyKey2
 	}
 
 	// Up to 2 concurrency keys.
@@ -1334,7 +1336,7 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 		}
 	}
 
-	return
+	return fnPartition, customConcurrencyKey1, customConcurrencyKey2
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
@@ -1937,6 +1939,51 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		qi.Data.JobID = &qi.ID
 		return qi, false, nil
 	})
+}
+
+func (q *queue) ResetAttemptsByJobID(ctx context.Context, shardName string, jobID string) error {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("queue shard not found %q", shardName)
+	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ResetAttemptsByJobID"), redis_telemetry.ScopeQueue)
+
+	if queueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
+	}
+
+	// NOTE: We expect that the job ID is the hashed, stored ID in the queue already.
+
+	keys := []string{
+		queueShard.RedisClient.kg.QueueItem(),
+	}
+
+	args, err := StrSlice([]any{jobID})
+	if err != nil {
+		return err
+	}
+	status, err := scripts["queue/resetAttempts"].Exec(
+		redis_telemetry.WithScriptName(ctx, "requeueByID"),
+		queueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		q.log.Error("error requeueing queue item by JobID",
+			"error", err,
+			"job_id", jobID,
+		)
+		return fmt.Errorf("error requeueing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case -1:
+		return ErrQueueItemNotFound
+	default:
+		return fmt.Errorf("unknown requeue by id response: %d", status)
+	}
 }
 
 // RequeueByJobID requeues a job for a specific time given a partition name and job ID.

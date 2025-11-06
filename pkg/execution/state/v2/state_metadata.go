@@ -362,6 +362,9 @@ func (c *Config) NewSetFunctionTrace(carrier *meta.SpanReference) {
 
 // RootSpanFromConfig is deprecated.  Use tracing.RunSpanRefFromMetadata.
 func (c *Config) RootSpanFromConfig() *meta.SpanReference {
+	if c == nil || c.mu == nil {
+		return nil
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

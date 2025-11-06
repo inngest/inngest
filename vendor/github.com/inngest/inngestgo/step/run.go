@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/middleware"
+	"github.com/inngest/inngestgo/internal/opcode"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/pkg/interval"
 )
@@ -100,11 +101,10 @@ func Run[T any](
 		marshalled, _ := json.Marshal(mutated)
 
 		// Determine opcode based on retry eligibility
-		opcode := enums.OpcodeStepError
+		kind := enums.OpcodeStepError
 		errorName := "Step error"
-
 		if isNoRetry || maxAttemptsReached {
-			opcode = enums.OpcodeStepFailed
+			kind = enums.OpcodeStepFailed
 			errorName = "Step failed"
 		}
 
@@ -112,9 +112,9 @@ func Run[T any](
 
 		mgr.AppendOp(ctx, sdkrequest.GeneratorOpcode{
 			ID:   hashedID,
-			Op:   opcode,
+			Op:   kind,
 			Name: id,
-			Error: &sdkrequest.UserError{
+			Error: &opcode.UserError{
 				Name:    errorName,
 				Message: err.Error(),
 				Data:    marshalled,

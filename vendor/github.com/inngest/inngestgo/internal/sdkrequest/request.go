@@ -1,6 +1,10 @@
 package sdkrequest
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
 
 // Request represents an incoming invoke request used to call functions from Inngest.
 type Request struct {
@@ -24,11 +28,12 @@ type Request struct {
 type CallCtx struct {
 	DisableImmediateExecution bool      `json:"disable_immediate_execution"`
 	Env                       string    `json:"env"`
-	FunctionID                string    `json:"fn_id"`
+	FunctionID                uuid.UUID `json:"fn_id"`
 	RunID                     string    `json:"run_id"`
 	StepID                    string    `json:"step_id"`
 	Stack                     CallStack `json:"stack"`
 	Attempt                   int       `json:"attempt"`
+	QueueItemRef              string    `json:"qi_id"`
 	MaxAttempts               *int      `json:"max_attempts"`
 }
 

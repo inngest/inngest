@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -9,15 +8,9 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/exechttp"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -29,25 +22,6 @@ type CheckpointMetrics struct {
 	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	FnID      uuid.UUID
-}
-
-// CheckpointMetricsProvider represents an interface for recording metrics
-// on checkpoint APIs.
-type CheckpointMetricsProvider interface {
-	OnFnScheduled(ctx context.Context, m CheckpointMetrics)
-	OnStepFinished(ctx context.Context, m CheckpointMetrics, status enums.StepStatus)
-	OnFnFinished(ctx context.Context, m CheckpointMetrics, status enums.RunStatus)
-}
-
-type nilCheckpointMetrics struct{}
-
-func (nilCheckpointMetrics) OnFnScheduled(ctx context.Context, m CheckpointMetrics) {
-}
-
-func (nilCheckpointMetrics) OnStepFinished(ctx context.Context, m CheckpointMetrics, status enums.StepStatus) {
-}
-
-func (nilCheckpointMetrics) OnFnFinished(ctx context.Context, m CheckpointMetrics, status enums.RunStatus) {
 }
 
 // NewAPIRunData represents event data stored and used to create new API-based
@@ -217,126 +191,18 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	return evt
 }
 
-type checkpointSteps struct {
+type checkpointAsyncSteps struct {
+	RunID ulid.ULID `json:"run_id"`
+	FnID  uuid.UUID `json:"fn_id"`
+	// QueueItemRef represents the queue item ID that's currently leased while
+	// executing the SDK.
+	QueueItemRef string                  `json:"qi_id"`
+	Steps        []state.GeneratorOpcode `json:"steps"`
+}
+
+type checkpointSyncSteps struct {
 	RunID ulid.ULID               `json:"run_id"`
 	FnID  uuid.UUID               `json:"fn_id"`
 	AppID uuid.UUID               `json:"app_id"`
 	Steps []state.GeneratorOpcode `json:"steps"`
-
-	// Plus auth data added from auth.
-	AccountID uuid.UUID `json:"-"`
-	EnvID     uuid.UUID `json:"-"`
-
-	// Optional metadata.
-	md *sv2.Metadata
-}
-
-// checkpointRunContext implements execution.RunContext for use in checkpoint API calls
-type checkpointRunContext struct {
-	md         sv2.Metadata
-	httpClient exechttp.RequestExecutor
-	events     []json.RawMessage
-
-	// Data from queue.Item that we actually need
-	groupID         string
-	attemptCount    int
-	maxAttempts     int
-	priorityFactor  *int64
-	concurrencyKeys []state.CustomConcurrency
-	parallelMode    enums.ParallelMode
-}
-
-func (c *checkpointRunContext) Metadata() *sv2.Metadata {
-	return &c.md
-}
-
-func (c *checkpointRunContext) Events() []json.RawMessage {
-	return c.events
-}
-
-func (c *checkpointRunContext) HTTPClient() exechttp.RequestExecutor {
-	return c.httpClient
-}
-
-func (c *checkpointRunContext) GroupID() string {
-	return c.groupID
-}
-
-func (c *checkpointRunContext) AttemptCount() int {
-	return c.attemptCount
-}
-
-func (c *checkpointRunContext) MaxAttempts() *int {
-	return &c.maxAttempts
-}
-
-func (c *checkpointRunContext) ShouldRetry() bool {
-	return c.attemptCount < (c.maxAttempts - 1)
-}
-
-func (c *checkpointRunContext) IncrementAttempt() {
-	c.attemptCount++
-}
-
-func (c *checkpointRunContext) PriorityFactor() *int64 {
-	// TODO
-	return c.priorityFactor
-}
-
-func (c *checkpointRunContext) ConcurrencyKeys() []state.CustomConcurrency {
-	// TODO
-	return c.concurrencyKeys
-}
-
-func (c *checkpointRunContext) ParallelMode() enums.ParallelMode {
-	// TODO
-	return c.parallelMode
-}
-
-func (c *checkpointRunContext) LifecycleItem() queue.Item {
-	// For checkpoint context, we create a minimal queue.Item for lifecycle events
-	// This is the one place we still need to construct a queue.Item, but it's much simpler
-	return queue.Item{
-		Identifier: state.Identifier{
-			WorkspaceID: c.md.ID.Tenant.EnvID,
-			AppID:       c.md.ID.Tenant.AppID,
-			WorkflowID:  c.md.ID.FunctionID,
-			RunID:       c.md.ID.RunID,
-		},
-		WorkspaceID:           c.md.ID.Tenant.EnvID,
-		GroupID:               c.groupID,
-		Attempt:               c.attemptCount,
-		PriorityFactor:        c.priorityFactor,
-		CustomConcurrencyKeys: c.concurrencyKeys,
-		ParallelMode:          c.parallelMode,
-		Payload:               queue.PayloadEdge{
-			// TODO
-		},
-	}
-}
-
-func (c *checkpointRunContext) SetStatusCode(code int) {
-	// this is a noop.
-}
-
-func (c *checkpointRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {
-	// this is a noop.
-}
-
-func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {
-	// this is a noop.
-}
-
-func (c *checkpointRunContext) SetError(err error) {
-	// this is a noop.
-}
-
-func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
-	// this is currently a noop.  we may need to implement
-	// this in the future.
-	return nil
-}
-
-func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
-	return tracing.RunSpanRefFromMetadata(&c.md)
 }

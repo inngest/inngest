@@ -98,6 +98,13 @@ func (r *SerializableAttrs) AddErr(err error) {
 	r.es.Add(err)
 }
 
+func (r *SerializableAttrs) Get(name string) any {
+	if idx, ok := r.keyMap[name]; ok {
+		return r.Attrs[idx].value
+	}
+	return nil
+}
+
 func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
 	es := r.es
 	o := other
@@ -107,9 +114,17 @@ func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
 		es = r.es.Merge(o.es)
 	}
 
+	// Merge the attributes and rebuild the keyMap
+	mergedAttrs := append(r.Attrs, o.Attrs...)
+	keyMap := make(map[string]int)
+	for i, attr := range mergedAttrs {
+		keyMap[attr.key] = i
+	}
+
 	return &SerializableAttrs{
-		es:    es,
-		Attrs: append(r.Attrs, o.Attrs...),
+		es:     es,
+		Attrs:  mergedAttrs,
+		keyMap: keyMap,
 	}
 }
 
