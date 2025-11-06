@@ -3,12 +3,12 @@ package meta
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var DefaultMetadataExtractor = MetadataExtractor{
-
 	ExtendedTrace: SpanMetadataExtractors{
 		SpanMetadataExtractorFunc(func(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
 			return []StructuredMetadata{
@@ -109,4 +109,8 @@ func (me SpanMetadataExtractors) ExtractMetadata(ctx context.Context, span *trac
 
 type MetadataExtractor struct {
 	ExtendedTrace SpanMetadataExtractor
+}
+
+func MetadataSpanIDSeed(parentID string, kind MetadataKind) []byte {
+	return fmt.Appendf(nil, "%s-metadata-%s", parentID, kind)
 }

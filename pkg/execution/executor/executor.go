@@ -1450,23 +1450,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 
 		for _, opcode := range resp.Generator {
-			for kind, metadata := range opcode.Metadata {
-				_, err = e.tracerProvider.CreateSpan(
+			for _, metadata := range opcode.Metadata {
+				_, err := e.createMetadataSpan(
 					ctx,
-					meta.SpanNameMetadata,
-					&tracing.CreateSpanOptions{
-						Debug:     &tracing.SpanDebugData{Location: "executor.ExecutePostMetadata"},
-						Parent:    instance.execSpan,
-						Metadata:  &md,
-						QueueItem: &item,
-						Attributes: tracing.RawMetadataAttrs(
-							kind,
-							metadata,
-							meta.MetadataOpMerge,
-						),
-						StartTime: time.Now(),
-						EndTime:   time.Now(),
-					},
+					&instance,
+					"executor.ExecutePostMetadata",
+					// TODO: non-adhoc metadata
+					metadata,
 				)
 				if err != nil {
 					l.Warn("error creating metadata span", "error", err)
@@ -3525,21 +3515,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		if parsed, err := aigateway.ParseInput(input); err != nil {
 			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
 		} else {
-			// TODO: name kind properly
-			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.input", parsed), meta.MetadataOpMerge)
-			if err != nil {
-				e.log.Debug("error marshalling input metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
-			}
-
-			_, err = e.tracerProvider.CreateSpan(ctx,
-				meta.SpanNameMetadata,
-				&tracing.CreateSpanOptions{
-					Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayRequestMetadata"},
-					Parent:     runCtx.ExecutionSpan(),
-					Metadata:   metadata,
-					QueueItem:  &lifecycleItem,
-					Attributes: attrs,
-				})
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorAIGatewayRequestMetadata",
+				// TODO: non-adhoc metadata
+				meta.AnyStructuredMetadata("inngest.ai.input", parsed, meta.MetadataOpMerge),
+			)
 			if err != nil {
 				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
@@ -3568,23 +3550,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		if parsed, err := aigateway.ParseOutput(input.Format, resp.Body); err != nil && !errors.Is(err, aigateway.ErrNoOpenAIChoicesError) {
 			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
 		} else {
-			// TODO: name kind properly
-			attrs, err := tracing.MetadataAttrs(meta.AnyStructuredMetadata("inngest.ai.output", parsed), meta.MetadataOpMerge)
-			if err != nil {
-				e.log.Debug("error marshalling output metadata for successful gateway request during handleGeneratorAIGateway", "error", err)
-			}
-
-			_, err = e.tracerProvider.CreateSpan(ctx,
-				meta.SpanNameMetadata,
-				&tracing.CreateSpanOptions{
-					Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayResponseMetadata"},
-					Parent:     runCtx.ExecutionSpan(),
-					Metadata:   metadata,
-					QueueItem:  &lifecycleItem,
-					Attributes: attrs,
-					StartTime:  time.Now(),
-					EndTime:    time.Now(),
-				})
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorAIGatewayResponseMetadata",
+				// TODO: non-adhoc metadata
+				meta.AnyStructuredMetadata("inngest.ai.output", parsed, meta.MetadataOpMerge),
+			)
 			if err != nil {
 				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
 			}
@@ -4712,4 +4684,26 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, metadata meta.StructuredMetadata) (*meta.SpanReference, error) {
+	attrs, err := tracing.MetadataAttrs(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	parent := runCtx.ExecutionSpan()
+	return e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameMetadata,
+		&tracing.CreateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGatewayRequestMetadata"},
+			Parent:     parent,
+			Metadata:   runCtx.Metadata(),
+			QueueItem:  util.ToPtr(runCtx.LifecycleItem()),
+			Attributes: attrs,
+
+			DynamicSeed: meta.MetadataSpanIDSeed(parent.DynamicSpanID, metadata.Kind()),
+		},
+	)
 }

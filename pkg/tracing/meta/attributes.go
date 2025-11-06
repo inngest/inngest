@@ -201,6 +201,6 @@ var Attrs = struct {
 	DebugRunID:                         ULIDAttr("debug.run.id"),
 
 	Metadata:     JsonAttr[RawMetadata]("metadata"),
-	MetadataKind: StringishAttr[MetadataKind]("metadata.category"),
+	MetadataKind: StringishAttr[MetadataKind]("metadata.kind"),
 	MetadataOp:   StringishAttr[MetadataOp]("metadata.op"),
 }
