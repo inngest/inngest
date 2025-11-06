@@ -3,6 +3,7 @@
 import type { ArrayNode } from '../../../types';
 import { ObjectRow } from '../../ObjectRow';
 
+// Renders an array of objects
 export function ArrayRowVariantObject({ node }: { node: ArrayNode }) {
   const { element } = node;
   if (element.kind !== 'object') return null;

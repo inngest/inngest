@@ -4,6 +4,7 @@ import { makeValueTypeLabel } from '../../../typeUtil';
 import type { ArrayNode, ValueNode } from '../../../types';
 import { ValueRow } from '../../ValueRow';
 
+// Renders an array of values
 export function ArrayRowVariantValue({ node }: { node: ArrayNode }): React.ReactElement | null {
   if (node.element.kind !== 'value') return null;
 

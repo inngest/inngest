@@ -13,13 +13,13 @@ export function ArrayRow({ node }: ArrayRowProps) {
 
   switch (element.kind) {
     case 'array':
-      return <ArrayRowVariantNested node={node} />;
+      return <ArrayRowVariantNested node={node} />; // Array of arrays
     case 'object':
-      return <ArrayRowVariantObject node={node} />;
+      return <ArrayRowVariantObject node={node} />; // Array of objects
     case 'tuple':
-      return <ArrayRowVariantTuple node={node} />;
+      return <ArrayRowVariantTuple node={node} />; // Array of tuples
     case 'value':
-      return <ArrayRowVariantValue node={node} />;
+      return <ArrayRowVariantValue node={node} />; // Array of values
     default:
       return null;
   }
