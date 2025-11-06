@@ -46,6 +46,7 @@ export function ArrayRowVariantNested({ node }: { node: ArrayNode }): React.Reac
   }
 }
 
+// Identifies the first non-array schema node.
 function computeNestedTerminal(element: SchemaNode): {
   bracketLayers: number;
   terminal: ObjectNode | TupleNode | ValueNode | null;
