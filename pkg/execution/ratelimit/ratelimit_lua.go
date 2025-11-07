@@ -26,7 +26,7 @@ func newLuaGCRARateLimiter(ctx context.Context, r rueidis.Client, prefix string)
 func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, now time.Time) (bool, time.Duration, error) {
 	dur, err := str2duration.ParseDuration(c.Period)
 	if err != nil {
-		return true, -1, err  // limited = true on error
+		return true, -1, err // limited = true on error
 	}
 
 	burst := int(c.Limit / 10)
@@ -34,9 +34,10 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 	periodNS := dur.Nanoseconds()
 	limit := c.Limit
 
-	keys := []string{}
-	args := []string{
+	keys := []string{
 		l.prefix + key,
+	}
+	args := []string{
 		fmt.Sprintf("%d", nowNS),
 		fmt.Sprintf("%d", periodNS),
 		fmt.Sprintf("%d", limit),
@@ -45,11 +46,11 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 
 	res, err := scripts["ratelimit"].Exec(ctx, l.r, keys, args).AsIntSlice()
 	if err != nil {
-		return true, 0, fmt.Errorf("could not invoke rate limit: %w", err)  // limited = true on error
+		return true, 0, fmt.Errorf("could not invoke rate limit: %w", err) // limited = true on error
 	}
 
 	if len(res) != 2 {
-		return true, 0, fmt.Errorf("invalid rate limit response: %w", err)  // limited = true on error
+		return true, 0, fmt.Errorf("invalid rate limit response: %w", err) // limited = true on error
 	}
 
 	switch res[0] {
@@ -59,11 +60,11 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 		if retryAfterNS < 0 {
 			retryAfterNS = 0
 		}
-		return true, time.Duration(retryAfterNS), nil  // limited = true
+		return true, time.Duration(retryAfterNS), nil // limited = true
 		// ok
 	case 1:
-		return false, 0, nil  // limited = false
+		return false, 0, nil // limited = false
 	default:
-		return true, 0, fmt.Errorf("invalid return status %v", res[0])  // limited = true on error
+		return true, 0, fmt.Errorf("invalid return status %v", res[0]) // limited = true on error
 	}
 }
