@@ -7,6 +7,7 @@ import { useEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
+import { useEventTypeSchemas } from './useEventTypeSchemas';
 
 // Hard cap to guard against excessive auto-fetching.
 const MAX_SCHEMA_ITEMS = 800;

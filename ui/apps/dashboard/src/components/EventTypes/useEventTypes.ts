@@ -17,7 +17,6 @@ const query = graphql(`
         edges {
           node {
             name
-            latestSchema
             functions {
               edges {
                 node {
@@ -75,7 +74,7 @@ export function useEventTypes() {
       const eventTypesData = result.data.environment.eventTypesV2;
       const events = eventTypesData.edges.map(({ node }) => ({
         name: node.name,
-        latestSchema: node.latestSchema || '',
+        latestSchema: '',
         functions: node.functions.edges.map((f) => f.node),
         archived,
       }));
@@ -163,7 +162,6 @@ const eventTypeQuery = graphql(`
     environment: workspace(id: $envID) {
       eventType(name: $eventName) {
         name
-        latestSchema
         functions {
           edges {
             node {
@@ -212,7 +210,6 @@ export const allEventTypesQuery = graphql(`
         edges {
           node {
             name
-            latestSchema
           }
         }
       }
@@ -241,7 +238,7 @@ export function useAllEventTypes() {
     const events = eventsData.edges.map(({ node }) => ({
       id: node.name,
       name: node.name,
-      latestSchema: node.latestSchema || '',
+      latestSchema: '',
     }));
 
     return events;
