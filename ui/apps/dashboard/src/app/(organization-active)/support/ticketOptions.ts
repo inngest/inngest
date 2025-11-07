@@ -80,4 +80,4 @@ export const severityOptions: SeverityOption[] = [
   },
 ];
 export type BugSeverity = (typeof severityOptions)[number]['value'];
-export const DEFAULT_BUG_SEVERITY_LEVEL = '4';
+export const DEFAULT_BUG_SEVERITY_LEVEL = '3';
