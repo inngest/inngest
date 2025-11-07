@@ -67,12 +67,11 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	end
 
 	-- Match throttled library calculations exactly
-	-- emissionInterval = quota.MaxRate.period
+	-- emissionInterval = quota.MaxRate.period / limit
 	local emission_interval = period_ns / limit
 	
-	-- delayVariationTolerance = emission_interval * (total_capacity)
-	-- In throttled: total immediate capacity = MaxBurst + 1
-	-- Where MaxBurst = limit/10, so total = (limit/10) + 1
+	-- delayVariationTolerance = emission_interval * (maxBurst + 1)
+	-- In throttled: immediate capacity = MaxBurst + 1
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
 
@@ -99,8 +98,8 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	local diff = now_ns - allow_at
 
 	if diff < 0 then
-		-- We are rate limited
-		-- Return absolute timestamp when the request will be allowed (allowAt)
+		-- We are rate limited - calculate retry time
+		-- RetryAfter = -diff (when diff is negative)
 		return { 0, allow_at }
 	else
 		-- Not rate limited - calculate remaining capacity

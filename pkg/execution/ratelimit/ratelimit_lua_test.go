@@ -52,11 +52,11 @@ func TestLuaRateLimit_BasicFunctionality(t *testing.T) {
 			Period: "1h",
 		}
 
-		// First request should be allowed
+		// First request should be allowed (not limited)
 		r.SetTime(clock.Now())
-		allowed, retryAfter, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
+		limited, retryAfter, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
 		require.NoError(t, err)
-		require.True(t, allowed)
+		require.False(t, limited)
 		require.Equal(t, time.Duration(0), retryAfter)
 
 		// Should have created a key in Redis
@@ -74,15 +74,15 @@ func TestLuaRateLimit_BasicFunctionality(t *testing.T) {
 			Period: "1h",
 		}
 
-		// First request should be allowed
-		allowed, _, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
+		// First request should be allowed (not limited)
+		limited, _, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
 		require.NoError(t, err)
-		require.True(t, allowed)
+		require.False(t, limited)
 
 		// Second request should be rate limited
-		allowed, retryAfter, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
+		limited, retryAfter, err := limiter.RateLimit(ctx, "test-key", config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed)
+		require.True(t, limited)
 		require.Greater(t, retryAfter, time.Duration(0))
 	})
 
@@ -105,16 +105,16 @@ func TestLuaRateLimit_BasicFunctionality(t *testing.T) {
 		// So for limit=10: maxBurst=1, capacity=2 total (1 burst + 1 base)
 		for i := 0; i < 2; i++ {
 			r.SetTime(clock.Now())
-			allowed, _, err := limiter.RateLimit(ctx, key, config, clock.Now())
+			limited, _, err := limiter.RateLimit(ctx, key, config, clock.Now())
 			require.NoError(t, err)
-			require.True(t, allowed, "request %d should be allowed", i+1)
+			require.False(t, limited, "request %d should be allowed (not limited)", i+1)
 		}
 
 		// Next request should be rate limited
 		r.SetTime(clock.Now())
-		allowed, retryAfter, err := limiter.RateLimit(ctx, key, config, clock.Now())
+		limited, retryAfter, err := limiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed)
+		require.True(t, limited)
 		require.Greater(t, retryAfter, time.Duration(0))
 	})
 }
@@ -166,23 +166,20 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				t.Logf("Request %d: lua(allowed=%v, retry=%v) vs throttled(allowed=%v, retry=%v)",
+				t.Logf("Request %d: lua(limited=%v, retry=%v) vs throttled(limited=%v, retry=%v)",
 					i+1, luaAllowed, luaRetry, throttledAllowed, throttledRetry)
 
-				// Results should match - but note that rateLimit returns "limited" (true if rate limited)
-				// while luaLimiter.RateLimit returns "allowed" (true if allowed)
-				// So we need to invert one of them for comparison
-				throttledLimitedStatus := throttledAllowed // true if limited
-				luaAllowedStatus := luaAllowed             // true if allowed
+				// Results should match - both implementations now return "limited" (true if rate limited)
+				throttledLimitedStatus := throttledAllowed // true if limited  
+				luaLimitedStatus := luaAllowed             // true if limited
 
-				// They should be opposite
-				require.Equal(t, !throttledLimitedStatus, luaAllowedStatus,
-					"request %d: allowed status should match (throttled_limited=%v, lua_allowed=%v)",
-					i+1, throttledLimitedStatus, luaAllowedStatus)
+				// Both should have same semantics now
+				require.Equal(t, throttledLimitedStatus, luaLimitedStatus,
+					"request %d: limited status should match (throttled_limited=%v, lua_limited=%v)",
+					i+1, throttledLimitedStatus, luaLimitedStatus)
 
 				// If rate limited, both should have similar retry times (within tolerance)
-				// Note: throttledAllowed=true means limited, luaAllowed=false means limited
-				if throttledAllowed && !luaAllowed {
+				if throttledAllowed && luaAllowed {
 					// Both are rate limited - compare retry times
 					// throttledRetry might be -1 if not rate limited, so check for positive values
 					if throttledRetry > 0 && luaRetry > 0 {
@@ -252,10 +249,10 @@ func TestLuaRateLimit_StateMigration(t *testing.T) {
 		// Create state with Lua implementation using same prefix as throttled
 		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
 		r.SetTime(clock.Now())
-		luaAllowed, _, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		luaLimited, _, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.True(t, luaAllowed) // true means allowed
-		t.Logf("Lua limiter created state: allowed=%v", luaAllowed)
+		require.False(t, luaLimited) // false means not limited (allowed)
+		t.Logf("Lua limiter created state: limited=%v", luaLimited)
 
 		// Now switch to throttled implementation and continue
 		throttledLimited, _, err := rateLimit(ctx, throttledStore, key, config)
