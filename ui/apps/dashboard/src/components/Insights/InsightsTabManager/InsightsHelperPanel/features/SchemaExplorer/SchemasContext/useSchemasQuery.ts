@@ -20,7 +20,6 @@ export function useSchemasQuery(search: string) {
 
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
-    gcTime: 0,
     queryKey: ['schema-explorer-event-types', env.id, { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ cursor: pageParam, nameSearch: search || null }),
