@@ -36,7 +36,7 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 
 	keys := []string{}
 	args := []string{
-		key,
+		l.prefix + key,
 		fmt.Sprintf("%d", nowNS),
 		fmt.Sprintf("%d", periodNS),
 		fmt.Sprintf("%d", limit),
@@ -55,7 +55,11 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 	switch res[0] {
 	// rate limited
 	case 0:
-		return false, time.Until(time.Unix(0, res[1])), nil
+		retryAfterNS := res[1] - nowNS
+		if retryAfterNS < 0 {
+			retryAfterNS = 0
+		}
+		return false, time.Duration(retryAfterNS), nil
 		// ok
 	case 1:
 		return true, 0, nil

@@ -70,10 +70,11 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	-- emissionInterval = quota.MaxRate.period
 	local emission_interval = period_ns / limit
 	
-	-- delayVariationTolerance = quota.MaxRate.period * (quota.MaxBurst + 1)
-	-- In throttled library: limit = quota.MaxBurst + 1, so burst = limit - 1
-	-- But we receive burst as the actual burst value, so we use burst + 1 to match
-	local delay_variation_tolerance = emission_interval * (burst + 1)
+	-- delayVariationTolerance = emission_interval * (total_capacity)
+	-- In throttled: total immediate capacity = MaxBurst + 1
+	-- Where MaxBurst = limit/10, so total = (limit/10) + 1
+	local total_capacity = burst + 1
+	local delay_variation_tolerance = emission_interval * total_capacity
 
 	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
@@ -99,9 +100,8 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 
 	if diff < 0 then
 		-- We are rate limited
-		-- Calculate retry after time: -diff (when allowAt becomes <= now)
-		local retry_after_ns = -diff
-		return { 0, now_ns + retry_after_ns }
+		-- Return absolute timestamp when the request will be allowed (allowAt)
+		return { 0, allow_at }
 	else
 		-- Not rate limited - calculate remaining capacity
 		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
