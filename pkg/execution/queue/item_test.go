@@ -480,7 +480,8 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ConvertToConstraintConfiguration(tt.accountConcurrency, tt.fn)
+			result, err := ConvertToConstraintConfiguration(tt.accountConcurrency, tt.fn)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
