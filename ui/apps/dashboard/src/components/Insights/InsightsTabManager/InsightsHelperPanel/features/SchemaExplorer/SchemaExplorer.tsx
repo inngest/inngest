@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Pill } from '@inngest/components/Pill/Pill';
@@ -24,6 +24,9 @@ export function SchemaExplorer() {
   } = useSchemas({
     search,
   });
+
+  // TODO: Introduce useSchemasInUse hook.
+  const schemasInUse = useMemo(() => [], []);
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'events') return null;
@@ -54,6 +57,12 @@ export function SchemaExplorer() {
   return (
     <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4" ref={containerRef}>
       <>
+        {schemasInUse.length > 0 && (
+          <div className="mb-3 flex flex-col gap-2">
+            <div className="text-light text-xs font-medium uppercase">Schemas in Use</div>
+            <div className="flex flex-col gap-1">{schemasInUse.map(renderEntry)}</div>
+          </div>
+        )}
         <div className="text-light text-xs font-medium uppercase">All Schemas</div>
         <Search
           inngestSize="base"
