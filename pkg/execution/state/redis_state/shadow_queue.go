@@ -132,7 +132,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 
 		// Check paused status with a timeout
-		dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+		dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
 		info := q.partitionPausedGetter(dbCtx, *shadowPart.FunctionID)
 		dbCtxCancel()
 

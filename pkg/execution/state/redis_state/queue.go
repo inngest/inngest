@@ -78,6 +78,10 @@ const (
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
 	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
 
+	// dbReadTimeout is the maximum time to wait for database/config getter operations
+	// like checking paused status or fetching partition constraints.
+	dbReadTimeout = 30 * time.Second
+
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 5 * time.Minute
 	BacklogDefaultRequeueExtension                       = 2 * time.Second
@@ -2518,7 +2522,7 @@ func (q *queue) PartitionLease(
 	kg := shard.RedisClient.kg
 
 	// Fetch partition constraints with a timeout
-	dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+	dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
 	constraints := q.partitionConstraintConfigGetter(dbCtx, p.Identifier())
 	dbCtxCancel()
 
@@ -2943,7 +2947,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// Check paused status from database with a timeout
 			// PartitionPausedGetter does not return errors and simply returns a zero value of
 			// info.Paused = false when it encounters an error.
-			dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+			dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
 			info := q.partitionPausedGetter(dbCtx, *item.FunctionID)
 			dbCtxCancel()
 
