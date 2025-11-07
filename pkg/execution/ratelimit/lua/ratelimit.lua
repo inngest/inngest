@@ -19,9 +19,14 @@ local burst = tonumber(ARGV[5])
 ---@param limit integer
 ---@param capacity integer
 local function gcraUpdate(key, now_ns, period_ns, limit, capacity)
+	-- Handle zero limit case - no update needed since we always rate limit
+	if limit == 0 then
+		return
+	end
+
 	-- calculate emission interval (tau) - time between each token
 	-- This matches throttled library: quota.MaxRate.period
-	local emission_interval = period_ns / math.max(limit, 1)
+	local emission_interval = period_ns / limit
 
 	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
@@ -56,9 +61,14 @@ end
 ---@param burst integer
 ---@return integer[]
 local function gcraCapacity(key, now_ns, period_ns, limit, burst)
+	-- Handle zero limit case - immediately rate limit
+	if limit == 0 then
+		return { 0, now_ns + period_ns }
+	end
+
 	-- Match throttled library calculations exactly
 	-- emissionInterval = quota.MaxRate.period
-	local emission_interval = period_ns / math.max(limit, 1)
+	local emission_interval = period_ns / limit
 	
 	-- delayVariationTolerance = quota.MaxRate.period * (quota.MaxBurst + 1)
 	-- In throttled library: limit = quota.MaxBurst + 1, so burst = limit - 1
@@ -106,7 +116,7 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 end
 
 local res = gcraCapacity(key, now_ns, period_ns, limit, burst)
-if res[1] == 0 then
+if res[2] == 0 then
 	-- Not rate limited, perform the update
 	gcraUpdate(key, now_ns, period_ns, limit, 1)
 	return { 1, 0 }
