@@ -2937,8 +2937,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		if item.FunctionID != nil {
-			// Check paused status from database
-			if info := q.partitionPausedGetter(ctx, *item.FunctionID); info.Paused {
+			// Check paused status from database with a timeout
+			// PartitionPausedGetter does not return errors and simply returns a zero value of
+			// info.Paused = false when it encounters an error.
+			dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+			info := q.partitionPausedGetter(dbCtx, *item.FunctionID)
+			dbCtxCancel()
+
+			if info.Paused {
 				// Only push back partition if the partition is marked as paused in the database.
 				// If the in-memory cache is stale, we don't want to accidentally push back the partition
 				// in case the function was unpaused in the last 60s.

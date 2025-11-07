@@ -621,19 +621,11 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
 	}
 
-	if len(partitions) > 0 {
-		q.log.Trace("processing partitions",
-			"partition_key", partitionKey,
-			"peek_until", peekUntil.Format(time.StampMilli),
-			"partition", len(partitions),
-		)
-	} else {
-		q.log.Debug("partition_peek yielded no partitions",
-			"partition_key", partitionKey,
-			"peek_until", peekUntil.Format(time.StampMilli),
-			"partition", len(partitions),
-		)
-	}
+	q.log.Trace("processing partitions",
+		"partition_key", partitionKey,
+		"peek_until", peekUntil.Format(time.StampMilli),
+		"partition", len(partitions),
+	)
 
 	eg := errgroup.Group{}
 
@@ -720,7 +712,7 @@ func (q *queue) scan(ctx context.Context) error {
 		}
 
 		if len(peekedAccounts) == 0 {
-			q.log.Debug("account_peek yielded no accounts")
+			q.log.Trace("account_peek yielded no accounts")
 			return nil
 		}
 
