@@ -7,7 +7,10 @@ import type { SchemaEntry } from './SchemasContext/types';
 export function useSchemasInUse(entries: SchemaEntry[]): { schemasInUse: SchemaEntry[] } {
   const { possibleEventNames } = useDetectPossibleEvents();
 
-  const schemasInUse = useMemo(() => entries.slice(0, 5), [entries]);
+  const schemasInUse = useMemo(
+    () => entries.filter((entry) => possibleEventNames.includes(entry.node.name)),
+    [entries, possibleEventNames]
+  );
   return { schemasInUse };
 }
 
