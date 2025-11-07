@@ -306,18 +306,18 @@ func TestLuaRateLimit_MigrationUnderLoad(t *testing.T) {
 
 		for i := 0; i < remainingRequests; i++ {
 			r.SetTime(clock.Now())
-			allowed, retry, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+			limited, retry, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 			require.NoError(t, err)
-			luaResults = append(luaResults, allowed)
+			luaResults = append(luaResults, limited)
 			luaRetryTimes = append(luaRetryTimes, retry)
-			t.Logf("Lua request %d: allowed=%v, retry=%v", i+1, allowed, retry)
+			t.Logf("Lua request %d: limited=%v, retry=%v", i+1, limited, retry)
 		}
 
 		// Verify that we hit rate limits during the Lua phase
 		// (since we already consumed capacity during throttled phase)
 		rateLimitedCount := 0
-		for _, allowed := range luaResults {
-			if !allowed {
+		for _, limited := range luaResults {
+			if limited {
 				rateLimitedCount++
 			}
 		}
@@ -331,8 +331,8 @@ func TestLuaRateLimit_MigrationUnderLoad(t *testing.T) {
 			}
 		}
 		totalAllowedLua := 0
-		for _, allowed := range luaResults {
-			if allowed { // lua semantics: true = allowed
+		for _, limited := range luaResults {
+			if !limited { // lua semantics: false = not limited (allowed)
 				totalAllowedLua++
 			}
 		}
@@ -432,11 +432,11 @@ func TestLuaRateLimit_ExistingVsFreshState(t *testing.T) {
 		var freshResults []bool
 		for i := 0; i < 5; i++ { // Try enough to hit limits
 			r1.SetTime(clock1.Now())
-			allowed, retry, err := luaLimiterFresh.RateLimit(ctx, keyFresh, config, clock1.Now())
+			limited, retry, err := luaLimiterFresh.RateLimit(ctx, keyFresh, config, clock1.Now())
 			require.NoError(t, err)
-			freshResults = append(freshResults, allowed)
-			t.Logf("Fresh state - request %d: allowed=%v, retry=%v", i+1, allowed, retry)
-			if !allowed {
+			freshResults = append(freshResults, !limited) // Store as "allowed" for logic consistency
+			t.Logf("Fresh state - request %d: limited=%v, retry=%v", i+1, limited, retry)
+			if limited {
 				break // Stop at first rate limit
 			}
 		}
@@ -457,20 +457,20 @@ func TestLuaRateLimit_ExistingVsFreshState(t *testing.T) {
 
 		// Pre-consume 1 request to create existing state
 		r2.SetTime(clock2.Now())
-		preAllowed, _, err := luaLimiterExisting.RateLimit(ctx, keyExisting, config, clock2.Now())
+		preLimited, _, err := luaLimiterExisting.RateLimit(ctx, keyExisting, config, clock2.Now())
 		require.NoError(t, err)
-		require.True(t, preAllowed)
+		require.False(t, preLimited)
 		t.Logf("Pre-consumed 1 request to create existing state")
 
 		// Now test how many MORE requests this existing state allows
 		var existingResults []bool
 		for i := 0; i < 5; i++ { // Try enough to hit limits
 			r2.SetTime(clock2.Now())
-			allowed, retry, err := luaLimiterExisting.RateLimit(ctx, keyExisting, config, clock2.Now())
+			limited, retry, err := luaLimiterExisting.RateLimit(ctx, keyExisting, config, clock2.Now())
 			require.NoError(t, err)
-			existingResults = append(existingResults, allowed)
-			t.Logf("Existing state - request %d: allowed=%v, retry=%v", i+1, allowed, retry)
-			if !allowed {
+			existingResults = append(existingResults, !limited) // Store as "allowed" for logic consistency
+			t.Logf("Existing state - request %d: limited=%v, retry=%v", i+1, limited, retry)
+			if limited {
 				break // Stop at first rate limit
 			}
 		}
@@ -581,9 +581,9 @@ func TestLuaRateLimit_PreciseTimingMigration(t *testing.T) {
 		// Migrate to Lua and check the same rate limited request
 		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
 		r.SetTime(clock.Now())
-		luaAllowed, luaRetry, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		luaLimited, luaRetry, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, luaAllowed) // Should also be rate limited
+		require.True(t, luaLimited) // Should also be rate limited
 		luaRetryTime := clock.Now().Add(luaRetry)
 
 		// Timing should be very close (within 10ms due to test execution time)
@@ -619,9 +619,9 @@ func TestLuaRateLimit_PreciseTimingMigration(t *testing.T) {
 		// Migrate to Lua and test same boundary condition
 		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
 		r.SetTime(clock.Now())
-		allowed3, retry3, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		limited3, retry3, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed3) // Should also be rate limited
+		require.True(t, limited3) // Should also be rate limited
 		t.Logf("Lua at boundary: retry=%v", retry3)
 
 		// Both should be rate limited with similar retry times
@@ -786,9 +786,9 @@ func TestLuaRateLimit_BurstCapacityMigration(t *testing.T) {
 		// Migrate to Lua - should also be rate limited immediately
 		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
 		r.SetTime(clock.Now())
-		allowed1, retry1, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		limited1, retry1, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed1)
+		require.True(t, limited1)
 		require.Greater(t, retry1, time.Duration(0))
 
 		t.Logf("Overflow protection: both implementations rate limit when capacity exhausted")
@@ -825,9 +825,9 @@ func TestLuaRateLimit_TimeBasedRecoveryMigration(t *testing.T) {
 		// Migrate to Lua and verify same recovery timing
 		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
 		r.SetTime(clock.Now())
-		allowed4, retry4, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		limited4, retry4, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed4)
+		require.True(t, limited4)
 		luaRecoveryTime := clock.Now().Add(retry4)
 
 		// Recovery times should be very similar
@@ -847,9 +847,9 @@ func TestLuaRateLimit_TimeBasedRecoveryMigration(t *testing.T) {
 		require.True(t, limited5)
 
 		r.SetTime(clock.Now())
-		allowed6, retry6, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
+		limited6, retry6, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed6)
+		require.True(t, limited6)
 
 		// Both should have shorter retry times now
 		require.Less(t, retry5, retry3, "Throttled retry should be shorter after partial recovery")
@@ -881,17 +881,17 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 
 		// First request should be allowed
 		r.SetTime(clock.Now())
-		allowed1, retry1, err := limiter.RateLimit(ctx, key, config, clock.Now())
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.True(t, allowed1)
+		require.False(t, limited1)
 		require.Equal(t, time.Duration(0), retry1)
 
 		// Second request should be rate limited with retryAfter
 		startTime := clock.Now()
 		r.SetTime(clock.Now())
-		allowed2, retry2, err := limiter.RateLimit(ctx, key, config, clock.Now())
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed2)
+		require.True(t, limited2)
 		require.Greater(t, retry2, time.Duration(0))
 
 		t.Logf("Rate limited with retryAfter: %v", retry2)
@@ -910,9 +910,9 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 
 		// Request should still be rate limited (slightly early)
 		r.SetTime(clock.Now())
-		allowed3, retry3, err := limiter.RateLimit(ctx, key, config, clock.Now())
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.False(t, allowed3)
+		require.True(t, limited3)
 		require.Greater(t, retry3, time.Duration(0))
 		require.Less(t, retry3, 100*time.Millisecond, "Should have very short retryAfter")
 
@@ -920,9 +920,9 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		clock.Advance(100 * time.Millisecond)
 		r.FastForward(100 * time.Millisecond)
 		r.SetTime(clock.Now())
-		allowed4, retry4, err := limiter.RateLimit(ctx, key, config, clock.Now())
+		limited4, retry4, err := limiter.RateLimit(ctx, key, config, clock.Now())
 		require.NoError(t, err)
-		require.True(t, allowed4)
+		require.False(t, limited4)
 		require.Equal(t, time.Duration(0), retry4)
 
 		// Verify total elapsed time is reasonable
