@@ -94,9 +94,14 @@ func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUI
 	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, operationIdempotencyKey)
 }
 
-// keyOperationIdempotency returns the operation idempotency key for retries
+// keyOperationIdempotency returns the operation idempotency key for operation retries
 func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
 	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, idempotencyKey)
+}
+
+// keyConstraintCheckIdempotency returns the operation idempotency key for constraint check retries
+func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, accountID uuid.UUID, idempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, idempotencyKey)
 }
 
 // keyPrefix returns the Lua key prefix for the first stage of the Constraint API.
@@ -256,6 +261,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	keys := []string{
 		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}
