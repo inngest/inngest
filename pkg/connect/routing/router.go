@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -27,10 +28,12 @@ const (
 )
 
 var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
+var ErrAllWorkersAtCapacity = fmt.Errorf("all connect workers at capacity")
 
 type RouteResult struct {
 	GatewayID    ulid.ULID
 	ConnectionID ulid.ULID
+	InstanceID   string
 }
 
 func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
@@ -61,17 +64,29 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	defer span.End()
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
-	if err != nil && !errors.Is(err, ErrNoHealthyConnection) {
+
+	if err != nil && !errors.Is(err, ErrNoHealthyConnection) && !errors.Is(err, ErrAllWorkersAtCapacity) {
 		return nil, fmt.Errorf("could not retrieve suitable connection: %w", err)
 	}
 
 	if routeTo == nil {
-		log.Warn("no healthy connections")
-		metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgNameRouter,
-		})
+		// no healthy connections
+		if errors.Is(err, ErrNoHealthyConnection) {
+			log.Warn("no healthy connections")
+			metrics.IncrConnectRouterNoHealthyConnectionCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgNameRouter,
+			})
 
-		return nil, ErrNoHealthyConnection
+			return nil, ErrNoHealthyConnection
+		}
+		// all workers at capacity
+		if errors.Is(err, ErrAllWorkersAtCapacity) {
+			log.Warn("no worker capacity available")
+			metrics.IncrConnectRouterAllWorkersAtCapacityCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgNameRouter,
+			})
+			return nil, ErrAllWorkersAtCapacity
+		}
 	}
 
 	gatewayId, err := ulid.Parse(routeTo.GatewayId)
@@ -91,6 +106,10 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
 	}
 
+	if routeTo.InstanceId == "" {
+		return nil, fmt.Errorf("failed to get instance ID for connection: %q: %w", routeTo.Id, state.ErrNoInstanceIDFound)
+	}
+
 	// Set app name: This is important to help the SDK find the respective function to invoke
 	data.AppName = group.AppName
 
@@ -102,6 +121,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	return &RouteResult{
 		GatewayID:    gatewayId,
 		ConnectionID: connId,
+		InstanceID:   routeTo.InstanceId,
 	}, nil
 }
 
@@ -120,11 +140,27 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		return nil, ErrNoHealthyConnection
 	}
 
-	healthy := make([]connWithGroup, 0, len(conns))
+	candidates := make([]connWithGroup, 0, len(conns))
+	capacityCache := make(map[string]*checkCapacityRes)
+	workerCapacityAvailable := false
+	hasHealthyConnections := false
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
+		// avoid duplicate calls to check capacity for same instance
+		if _, ok := capacityCache[conn.InstanceId]; !ok {
+			capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
+			capacityCache[conn.InstanceId] = capacityRes
+		}
+
+		// Track if we have any healthy connections
 		if res.isHealthy {
-			healthy = append(healthy, connWithGroup{
+			hasHealthyConnections = true
+		}
+
+		// check if the connection is healthy and has worker capacity
+		if res.isHealthy && capacityCache[conn.InstanceId].hasWorkerCapacity {
+			workerCapacityAvailable = true
+			candidates = append(candidates, connWithGroup{
 				conn:  conn,
 				group: res.workerGroup,
 			})
@@ -140,15 +176,21 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 		}
 	}
 
-	if len(healthy) == 0 {
+	// If no healthy connections at all, return ErrNoHealthyConnection
+	if !hasHealthyConnections {
 		return nil, ErrNoHealthyConnection
 	}
 
-	if len(healthy) == 1 {
-		return healthy[0].conn, nil
+	// If we have healthy connections but none have capacity available, return ErrAllWorkersAtCapacity
+	if !workerCapacityAvailable {
+		return nil, ErrAllWorkersAtCapacity
 	}
 
-	return pickConnection(healthy, rnd)
+	if len(candidates) == 1 {
+		return candidates[0].conn, nil
+	}
+
+	return pickConnection(candidates, rnd)
 }
 
 func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.ConnMetadata, log logger.Logger) {
@@ -360,4 +402,48 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		isHealthy:   true,
 		workerGroup: group,
 	}
+}
+
+type checkCapacityRes struct {
+	hasWorkerCapacity bool
+}
+
+type activeLeasesLogger struct {
+	stateManager       state.StateManager
+	ctx                context.Context
+	envID              uuid.UUID
+	instanceID         string
+	workerCapUnlimited bool
+}
+
+// this is a redis call that we only want enabled at trace level
+func (a activeLeasesLogger) LogValue() slog.Value {
+	activeLeases, _ := a.stateManager.GetAllActiveWorkerRequests(a.ctx, a.envID, a.instanceID, a.workerCapUnlimited)
+	return slog.AnyValue(activeLeases)
+}
+
+func checkCapacity(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log logger.Logger) *checkCapacityRes {
+
+	// Check worker capacity
+	if conn.InstanceId == "" {
+		// This should never happen
+		log.Error("connection has no instance ID", "conn_id", conn.Id)
+		return &checkCapacityRes{hasWorkerCapacity: false}
+	}
+
+	workerCap, err := stateManager.GetWorkerCapacities(ctx, envID, conn.InstanceId)
+	if err != nil {
+		log.Error("could not get worker available capacity", "instance_id", conn.InstanceId, "err", err)
+		// Fail the health check if we can't get capacity - err on side of safety to prevent executions
+		return &checkCapacityRes{hasWorkerCapacity: false}
+	}
+	if workerCap.IsAtCapacity() {
+		// Worker has a capacity limit set and is at capacity
+		log.Trace("worker at capacity", "instance_id", conn.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available,
+			"worker_active_leases", activeLeasesLogger{stateManager: stateManager, ctx: ctx, envID: envID, instanceID: conn.InstanceId, workerCapUnlimited: workerCap.IsUnlimited()})
+
+		return &checkCapacityRes{hasWorkerCapacity: false}
+	}
+
+	return &checkCapacityRes{hasWorkerCapacity: true}
 }

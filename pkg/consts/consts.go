@@ -148,10 +148,15 @@ const (
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
 
+	// ConnectWorkerNoConcurrencyLimitForRequests is used to indicate that a worker has no capacity limit.
+	ConnectWorkerNoConcurrencyLimitForRequests = -1
+
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
 )
 
 var (
+	ConnectWorkerRequestToWorkerMappingTTL  = 6 * ConnectWorkerRequestLeaseDuration  // 2 minutes so in case of gateway failure, we don't lose the mapping for too long
+	ConnectWorkerCapacityManagerTTL         = 45 * ConnectWorkerRequestLeaseDuration // 15 minutes
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
 	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions

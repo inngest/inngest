@@ -89,9 +89,11 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
+		r.workerRequestsKey(envID, instanceID),
+		r.requestWorkerKey(envID, requestID),
 	}
 
 	now := r.c.Now()
@@ -110,6 +112,11 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		newLeaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
+		fmt.Sprintf("%d", int(consts.ConnectWorkerCapacityManagerTTL.Seconds())),        // Set TTL
+		fmt.Sprintf("%d", int(consts.ConnectWorkerRequestToWorkerMappingTTL.Seconds())), // Request TTL
+		instanceID,
+		fmt.Sprintf("%t", isWorkerCapacityUnlimited),
+		requestID,
 	}
 
 	status, err := scripts["extend_lease"].Exec(
@@ -118,11 +125,14 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		keys,
 		args,
 	).AsInt64()
+
 	if err != nil {
 		return nil, fmt.Errorf("could not execute lease script: %w", err)
 	}
 
 	switch status {
+	case -3:
+		return nil, ErrRequestWorkerDoesNotExist
 	case -2:
 		return nil, ErrRequestLeased
 	case -1:
@@ -197,6 +207,22 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	}
 
 	return lease.ExecutorIP, nil
+}
+
+// GetAssignedWorkerID retrieves the instance ID of the worker that is assigned to the request.
+func (r *redisConnectionStateManager) GetAssignedWorkerID(ctx context.Context, envID uuid.UUID, requestID string) (string, error) {
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
+
+	instanceID, err := r.client.Do(ctx, r.client.B().Get().Key(requestWorkerKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			// No mapping exists - request may not have a worker capacity lease
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get worker instance ID: %w", err)
+	}
+
+	return instanceID, nil
 }
 
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up

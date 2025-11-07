@@ -249,6 +249,10 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 		return false
 	}
 
+	if queue.IsAlwaysRetryable(err) {
+		return false
+	}
+
 	return true
 }
 
@@ -296,7 +300,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if s.isUnexpectedRunError(err) {
-			s.log.Error("error handling queue item", "error", err)
+			s.log.Error("error handling queue item", "error", err, "item_kind", item.Kind)
 		}
 
 		return queue.RunResult{
@@ -328,6 +332,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	}
 
 	if errors.Is(err, state.ErrFunctionPaused) {
+		return false, queue.AlwaysRetryError(err)
+	}
+
+	// connect worker capacity errors should be retried
+	if errors.Is(err, state.ErrConnectWorkerCapacity) {
 		return false, queue.AlwaysRetryError(err)
 	}
 

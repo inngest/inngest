@@ -1231,3 +1231,391 @@ func freePort() int {
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
 }
+
+// TestHandleSdkReply tests the handleSdkReply function which currently has 0% coverage
+func TestHandleSdkReply(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	requestID := "test-req"
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	sdkResponse := &connect.SDKResponse{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		Status:         connect.SDKResponseStatus_DONE,
+		Body:           []byte("test response"),
+		NoRetry:        false,
+		RetryAfter:     nil,
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		SystemTraceCtx: nil,
+		UserTraceCtx:   nil,
+		RunId:          runID.String(),
+	}
+
+	responseBytes, err := proto.Marshal(sdkResponse)
+	require.NoError(t, err)
+
+	// Send WORKER_REPLY message through the websocket (simulating SDK sending response)
+	err = wsproto.Write(context.Background(), res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY,
+		Payload: responseBytes,
+	})
+	require.NoError(t, err)
+
+	// Should receive a reply ack message
+	ackMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REPLY_ACK, ackMsg.Kind)
+
+	ackData := &connect.WorkerReplyAckData{}
+	err = proto.Unmarshal(ackMsg.Payload, ackData)
+	require.NoError(t, err)
+	require.Equal(t, requestID, ackData.RequestId)
+
+	// Verify the response was saved
+	savedResponse, err := res.stateManager.GetResponse(context.Background(), res.envID, requestID)
+	require.NoError(t, err)
+	require.NotNil(t, savedResponse)
+	require.Equal(t, requestID, savedResponse.RequestId)
+	require.Equal(t, connect.SDKResponseStatus_DONE, savedResponse.Status)
+}
+
+// TestHandleIncomingWebSocketMessageInvalidPayloads tests error handling for invalid message payloads
+func TestHandleIncomingWebSocketMessageInvalidPayloads(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "test-instance",
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
+	}
+
+	// Test WORKER_REQUEST_ACK with invalid payload
+	msg := &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_ACK,
+		Payload: []byte("invalid protobuf"),
+	}
+
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestAckInvalidPayload, serr.SysCode)
+
+	// Test WORKER_REQUEST_EXTEND_LEASE with invalid payload
+	msg = &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
+		Payload: []byte("invalid protobuf"),
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
+
+	// Test WORKER_REQUEST_EXTEND_LEASE with invalid lease ID
+	extendLeaseData := &connect.WorkerRequestExtendLeaseData{
+		RequestId:    "test-req",
+		AccountId:    res.accountID.String(),
+		EnvId:        res.envID.String(),
+		AppId:        res.appID.String(),
+		FunctionSlug: "test-fn",
+		LeaseId:      "invalid-ulid",
+	}
+	extendLeaseBytes, err := proto.Marshal(extendLeaseData)
+	require.NoError(t, err)
+
+	msg = &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
+		Payload: extendLeaseBytes,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload, serr.SysCode)
+}
+
+// TestHandleIncomingWebSocketMessageDraining tests message handling when gateway is draining
+func TestHandleIncomingWebSocketMessageDraining(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	// Start draining
+	err := res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "test-instance",
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
+	}
+
+	// Test WORKER_READY while draining
+	msg := &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_READY,
+	}
+
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+
+	// Test WORKER_HEARTBEAT while draining
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+
+	// Test WORKER_PAUSE while draining
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_PAUSE,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, ErrDraining.SysCode, serr.SysCode)
+}
+
+// TestHandleIncomingWebSocketMessageMissingInstanceId tests error handling for missing instance ID
+func TestHandleIncomingWebSocketMessageMissingInstanceId(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	ch := &connectionHandler{
+		svc: res.svc,
+		conn: &state.Connection{
+			EnvID: res.envID,
+			Data: &connect.WorkerConnectRequestData{
+				InstanceId: "", // Empty instance ID
+			},
+		},
+		ws:  res.ws,
+		log: res.svc.logger,
+	}
+
+	// Test WORKER_READY with missing instance ID
+	msg := &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_READY,
+	}
+
+	serr := ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	t.Logf("serr: %+v", serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "missing instanceId")
+
+	// Test WORKER_HEARTBEAT with missing instance ID
+	msg = &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	}
+
+	serr = ch.handleIncomingWebSocketMessage(context.Background(), msg)
+	require.NotNil(t, serr)
+	require.Equal(t, syscode.CodeConnectInternal, serr.SysCode)
+	require.Contains(t, serr.Msg, "missing instanceId")
+}
+
+// TestEstablishConnectionInvalidConnectMessage tests invalid connect messages
+func TestEstablishConnectionInvalidConnectMessage(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send wrong message type
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT, // Wrong message type
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidMsg, reason)
+}
+
+// TestEstablishConnectionInvalidPayload tests invalid protobuf payload
+func TestEstablishConnectionInvalidPayload(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send invalid protobuf payload
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: []byte("invalid protobuf"),
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestEstablishConnectionInvalidConnectionId tests invalid connection ID
+func TestEstablishConnectionInvalidConnectionId(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send connect message with invalid connection ID
+	reqData := &connect.WorkerConnectRequestData{
+		ConnectionId: "invalid-ulid", // Invalid ULID
+		InstanceId:   "test-worker",
+		AuthData: &connect.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+		Apps: []*connect.AppConfiguration{},
+	}
+
+	connectMsg, err := proto.Marshal(reqData)
+	require.NoError(t, err)
+
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestEstablishConnectionMissingInstanceId tests missing instance ID
+func TestEstablishConnectionMissingInstanceId(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws.CloseNow() }()
+
+	// Wait for hello message
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	// Send connect message with missing instance ID
+	reqData := &connect.WorkerConnectRequestData{
+		ConnectionId: connID.String(),
+		InstanceId:   "", // Missing instance ID
+		AuthData: &connect.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+		Apps: []*connect.AppConfiguration{},
+	}
+
+	connectMsg, err := proto.Marshal(reqData)
+	require.NoError(t, err)
+
+	err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
+		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
+}
+
+// TestCloseWithConnectError tests the closeWithConnectError function
+func TestCloseWithConnectError(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		noConnect: true,
+	})
+
+	ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+
+	// Test closeWithConnectError by triggering it through auth failure
+	msg := awaitNextMessage(t, ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Create a disallowed connection to trigger closeWithConnectError
+	res2 := createTestingGateway(t, testingParameters{
+		disallowConnection: true,
+		noConnect:          true,
+	})
+
+	ws2, _, err := websocket.Dial(context.Background(), res2.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.NoError(t, err)
+	defer func() { _ = ws2.CloseNow() }()
+
+	msg = awaitNextMessage(t, ws2, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	// Send connect message that will fail auth
+	sendWorkerConnectMessage(t, testingResources{
+		ws:        ws2,
+		reqData:   res2.reqData,
+		connID:    res2.connID,
+		envID:     res2.envID,
+		accountID: res2.accountID,
+		appID:     res2.appID,
+		syncID:    res2.syncID,
+		fnID:      res2.fnID,
+		appName:   res2.appName,
+		fnName:    res2.fnName,
+		fnSlug:    res2.fnSlug,
+		runID:     res2.runID,
+	})
+
+	status, reason := awaitClosure(t, ws2, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectAuthFailed, reason)
+}

@@ -203,7 +203,8 @@ type alwaysRetry struct {
 func (a alwaysRetry) AlwaysRetryable() {}
 
 func IsAlwaysRetryable(err error) bool {
-	return errors.Is(err, alwaysRetry{})
+	var ar alwaysRetry
+	return errors.As(err, &ar)
 }
 
 type JobResponse struct {
