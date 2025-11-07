@@ -26,7 +26,7 @@ export function SchemaExplorer() {
     search,
   });
 
-  const { schemasInUse } = useSchemasInUse(entries);
+  const { schemasInUse } = useSchemasInUse();
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'events') return null;
