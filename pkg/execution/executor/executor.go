@@ -682,7 +682,7 @@ func (e *executor) schedule(
 			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit, time.Now())
 				if err != nil {
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
