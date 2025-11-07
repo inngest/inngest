@@ -4,19 +4,19 @@ local key = KEYS[1]
 
 --- now_ns is the current time in nanoseconds
 ---@type integer
-local now_ns = tonumber(ARGV[2])
+local now_ns = tonumber(ARGV[1])
 
 --- period_ns is the rate limiting period in nanoseconds
 ---@type integer
-local period_ns = tonumber(ARGV[3])
+local period_ns = tonumber(ARGV[2])
 
 --- limit is the number of allowed requests within the period
 ---@type integer
-local limit = tonumber(ARGV[4])
+local limit = tonumber(ARGV[3])
 
 --- burst is the optional burst capacity
 ---@type integer
-local burst = tonumber(ARGV[5])
+local burst = tonumber(ARGV[4])
 
 --- gcraCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
 ---@param key string
