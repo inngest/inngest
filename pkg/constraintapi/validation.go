@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 func (r *CapacityAcquireRequest) Valid() error {
@@ -99,7 +100,7 @@ func (ci ConstraintItem) Valid() error {
 	switch ci.Kind {
 	case ConstraintKindConcurrency:
 		// TODO: Implement run level concurrency and remove this validation
-		if ci.Concurrency.Mode == enums.ConcurrencyModeRun {
+		if ci.Concurrency != nil && ci.Concurrency.Mode == enums.ConcurrencyModeRun {
 			return fmt.Errorf("run level concurrency is not implemented yet")
 		}
 		if ci.Concurrency != nil && ci.Concurrency.InProgressItemKey == "" {
@@ -132,7 +133,7 @@ func (r *CapacityExtendLeaseRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
 	}
 
-	if r.LeaseID.String() == "" {
+	if r.LeaseID == ulid.Zero {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease ID"))
 	}
 
@@ -158,7 +159,7 @@ func (r *CapacityReleaseRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
 	}
 
-	if r.LeaseID.String() == "" {
+	if r.LeaseID == ulid.Zero {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease ID"))
 	}
 

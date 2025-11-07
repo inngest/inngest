@@ -67,7 +67,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "eval-hash",
 				},
 			},
-			expected: `{"k":1,"r":{"s":2,"h":"test-key-hash","eh":"eval-hash","l":100,"p":60}}`,
+			expected: `{"k":1,"r":{"s":2,"h":"test-key-hash","eh":"eval-hash","l":100,"p":60000000000}}`,
 		},
 		{
 			name: "Concurrency constraint with custom key",
