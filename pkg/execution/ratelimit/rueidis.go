@@ -41,7 +41,7 @@ type rueidisStore struct {
 	prefix string
 }
 
-func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, time.Duration, error) {
+func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, now time.Time) (bool, time.Duration, error) {
 	return rateLimit(ctx, r, key, c)
 }
 

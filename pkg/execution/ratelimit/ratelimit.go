@@ -21,7 +21,7 @@ var (
 )
 
 type RateLimiter interface {
-	RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, time.Duration, error)
+	RateLimit(ctx context.Context, key string, c inngest.RateLimit, now time.Time) (bool, time.Duration, error)
 }
 
 // RateLimitKey returns the rate limiting key given a function ID, rate limit config,
