@@ -318,8 +318,6 @@ for i = 1, granted, 1 do
 	local initialLeaseID = initialLeaseIDs[i]
 
 	for _, value in ipairs(constraints) do
-		-- Retrieve constraint capacity
-		local constraintCapacity = 0
 		if skipGCRA then
 		-- noop
 		elseif value.k == 1 then
@@ -330,7 +328,7 @@ for i = 1, granted, 1 do
 			redis.call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
 		elseif value.k == 3 then
 			-- throttle
-			throttleUpdate(value.t.h, nowMS, value.t.p, value.t.l, value.t.b, 1)
+			throttleUpdate(value.t.h, nowMS, value.t.p, value.t.l, 1)
 		end
 	end
 
