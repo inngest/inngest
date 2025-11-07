@@ -263,7 +263,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	args, err := strSlice([]any{
 		// This will be marshaled
 		requestState,
-		now.UnixMilli(),
+		now.UnixMilli(), // current time in milliseconds for throttle
+		now.UnixNano(),  // current time in nanoseconds for rate limiting
 		leaseExpiry.UnixMilli(),
 		keyPrefix,
 		initialLeaseIDs,

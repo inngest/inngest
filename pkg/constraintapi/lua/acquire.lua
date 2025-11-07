@@ -201,9 +201,8 @@ end
 ---@param now_ms integer
 ---@param period_ms integer
 ---@param limit integer
----@param burst integer
 ---@param capacity integer
-local function throttleUpdate(key, now_ms, period_ms, limit, burst, capacity)
+local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	-- calculate emission interval (tau) - time between each token
 	local emission = period_ms / math.max(limit, 1)
 
