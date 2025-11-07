@@ -78,6 +78,10 @@ const (
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
 	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
 
+	// dbReadTimeout is the maximum time to wait for database/config getter operations
+	// like checking paused status or fetching partition constraints.
+	dbReadTimeout = 30 * time.Second
+
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 5 * time.Minute
 	BacklogDefaultRequeueExtension                       = 2 * time.Second
@@ -2517,7 +2521,20 @@ func (q *queue) PartitionLease(
 
 	kg := shard.RedisClient.kg
 
-	constraints := q.partitionConstraintConfigGetter(ctx, p.Identifier())
+	// Fetch partition constraints with a timeout
+	dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
+	constraints := q.partitionConstraintConfigGetter(dbCtx, p.Identifier())
+
+	if dbCtx.Err() == context.DeadlineExceeded {
+		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "partition_constraint_config_getter",
+			},
+		})
+	}
+
+	dbCtxCancel()
 
 	var accountLimit, functionLimit int
 	if p.IsSystem() {
@@ -2937,8 +2954,24 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		if item.FunctionID != nil {
-			// Check paused status from database
-			if info := q.partitionPausedGetter(ctx, *item.FunctionID); info.Paused {
+			// Check paused status from database with a timeout
+			// PartitionPausedGetter does not return errors and simply returns a zero value of
+			// info.Paused = false when it encounters an error.
+			dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
+			info := q.partitionPausedGetter(dbCtx, *item.FunctionID)
+
+			if dbCtx.Err() == context.DeadlineExceeded {
+				metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"operation": "partition_paused_getter",
+					},
+				})
+			}
+
+			dbCtxCancel()
+
+			if info.Paused {
 				// Only push back partition if the partition is marked as paused in the database.
 				// If the in-memory cache is stale, we don't want to accidentally push back the partition
 				// in case the function was unpaused in the last 60s.
