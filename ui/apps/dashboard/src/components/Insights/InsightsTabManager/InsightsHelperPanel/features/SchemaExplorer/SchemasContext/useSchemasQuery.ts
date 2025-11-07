@@ -12,7 +12,7 @@ import { useEventTypeSchemas } from './useEventTypeSchemas';
 // Hard cap to guard against excessive fetching and to encourage the use of search.
 const MAX_SCHEMA_ITEMS = 800;
 
-// 30 * 40 = 1200 items, so this should never be hit, given that the MAX_SCHEMA_ITEMS is 800.
+// 30 * 40 = 1200 items. As a result, this should never be hit since MAX_SCHEMA_ITEMS is 800.
 // This is just a fallback to fully guard against runaway fetching or schema-processing issues.
 const MAX_PAGES = 30;
 
