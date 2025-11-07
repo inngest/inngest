@@ -662,3 +662,12 @@ func IncrPausesBlockFlushExpectedFail(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueDatabaseContextTimeoutCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_database_context_timeout_total",
+		Description: "Total number of database context timeouts in queue operations",
+		Tags:        opts.Tags,
+	})
+}

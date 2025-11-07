@@ -2524,6 +2524,16 @@ func (q *queue) PartitionLease(
 	// Fetch partition constraints with a timeout
 	dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
 	constraints := q.partitionConstraintConfigGetter(dbCtx, p.Identifier())
+
+	if dbCtx.Err() == context.DeadlineExceeded {
+		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"operation": "partition_constraint_config_getter",
+			},
+		})
+	}
+
 	dbCtxCancel()
 
 	var accountLimit, functionLimit int
@@ -2949,6 +2959,16 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			// info.Paused = false when it encounters an error.
 			dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
 			info := q.partitionPausedGetter(dbCtx, *item.FunctionID)
+
+			if dbCtx.Err() == context.DeadlineExceeded {
+				metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"operation": "partition_paused_getter",
+					},
+				})
+			}
+
 			dbCtxCancel()
 
 			if info.Paused {
