@@ -1,7 +1,13 @@
 package constraintapi
 
 import (
+	"embed"
 	"encoding/json"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,6 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//go:embed lua/*
+var testFS embed.FS
 
 func TestSerializedConstraintItem(t *testing.T) {
 	// Test UUIDs
@@ -165,4 +174,70 @@ func TestSerializedConstraintItem_SizeReduction(t *testing.T) {
 	assert.Contains(t, string(optimizedJson), `"k":2`)  // Kind as integer
 	assert.Contains(t, string(optimizedJson), `"ilk":`) // InProgressLeaseKey
 	assert.Contains(t, string(optimizedJson), `"iik":`) // InProgressItemKey
+}
+
+func TestLuaScriptSnapshots(t *testing.T) {
+	// Read all Lua scripts from the embedded filesystem
+	entries, err := testFS.ReadDir("lua")
+	require.NoError(t, err)
+
+	scripts := make(map[string]string)
+	collectLuaScripts(t, "lua", entries, scripts)
+
+	// Test each script
+	for scriptName, rawContent := range scripts {
+		t.Run(scriptName, func(t *testing.T) {
+			// Process the script
+			processedContent, err := processLuaScript(scriptName, rawContent, testFS)
+			require.NoError(t, err)
+
+			// Read expected snapshot from fixture file
+			snapshotPath := filepath.Join("testdata", "snapshots", scriptName+".lua")
+			expectedBytes, err := os.ReadFile(snapshotPath)
+			if os.IsNotExist(err) {
+				// Generate snapshot file if it doesn't exist
+				err := os.MkdirAll(filepath.Dir(snapshotPath), 0755)
+				require.NoError(t, err)
+				
+				err = os.WriteFile(snapshotPath, []byte(processedContent), 0644)
+				require.NoError(t, err)
+				
+				t.Logf("Generated snapshot for %s at %s", scriptName, snapshotPath)
+				return
+			}
+			require.NoError(t, err)
+
+			expected := string(expectedBytes)
+			
+			// Compare with expected snapshot
+			require.Equal(t, expected, processedContent, 
+				"Script %s processed content differs from snapshot at %s. "+
+				"If this is intentional, delete the snapshot file to regenerate it", 
+				scriptName, snapshotPath)
+		})
+	}
+}
+
+func collectLuaScripts(t *testing.T, path string, entries []fs.DirEntry, scripts map[string]string) {
+	for _, e := range entries {
+		if e.IsDir() {
+			subEntries, err := testFS.ReadDir(fmt.Sprintf("%s/%s", path, e.Name()))
+			require.NoError(t, err)
+			collectLuaScripts(t, path+"/"+e.Name(), subEntries, scripts)
+			continue
+		}
+
+		if !strings.HasSuffix(e.Name(), ".lua") {
+			continue
+		}
+
+		byt, err := testFS.ReadFile(fmt.Sprintf("%s/%s", path, e.Name()))
+		require.NoError(t, err)
+
+		name := path + "/" + e.Name()
+		name = strings.TrimPrefix(name, "lua/")
+		name = strings.TrimSuffix(name, ".lua")
+		
+		scripts[name] = string(byt)
+	}
 }

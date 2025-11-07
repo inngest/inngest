@@ -21,6 +21,9 @@ var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	langServerAnnotation = regexp.MustCompile(`(?m)^---@.*$|---@[^\n]*`)
+	comments = regexp.MustCompile(`(?m)^--.*$|--[^\n]*`)
+	emptyLines = regexp.MustCompile(`(?m)^\s*$`)
 )
 
 func init() {
@@ -30,6 +33,41 @@ func init() {
 		panic(fmt.Errorf("error reading redis lua dir: %w", err))
 	}
 	readRedisScripts("lua", entries)
+}
+
+// processLuaScript processes a single Lua script by handling includes, removing language server annotations, comments, and empty lines
+func processLuaScript(name, content string, fs embed.FS) (string, error) {
+	val := content
+	
+	// Add any includes.
+	items := include.FindAllStringSubmatch(val, -1)
+	if len(items) > 0 {
+		// Replace each include
+		for _, include := range items {
+			byt, err := fs.ReadFile(fmt.Sprintf("lua/%s", include[1]))
+			if err != nil {
+				return "", fmt.Errorf("error reading redis lua include: %w", err)
+			}
+			val = strings.ReplaceAll(val, include[0], string(byt))
+		}
+	}
+	
+	// Remove language server annotations (lines starting with ---@)
+	val = langServerAnnotation.ReplaceAllString(val, "")
+	
+	// Remove comments (lines starting with --)
+	val = comments.ReplaceAllString(val, "")
+	
+	// Remove empty lines
+	val = emptyLines.ReplaceAllString(val, "")
+	
+	// Clean up multiple consecutive newlines
+	val = regexp.MustCompile(`\n\n+`).ReplaceAllString(val, "\n")
+	
+	// Trim leading/trailing whitespace
+	val = strings.TrimSpace(val)
+	
+	return val, nil
 }
 
 func readRedisScripts(path string, entries []fs.DirEntry) {
@@ -51,21 +89,13 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		name := path + "/" + e.Name()
 		name = strings.TrimPrefix(name, "lua/")
 		name = strings.TrimSuffix(name, ".lua")
-		val := string(byt)
-
-		// Add any includes.
-		items := include.FindAllStringSubmatch(val, -1)
-		if len(items) > 0 {
-			// Replace each include
-			for _, include := range items {
-				byt, err = embedded.ReadFile(fmt.Sprintf("lua/%s", include[1]))
-				if err != nil {
-					panic(fmt.Errorf("error reading redis lua include: %w", err))
-				}
-				val = strings.ReplaceAll(val, include[0], string(byt))
-			}
+		
+		processedScript, err := processLuaScript(name, string(byt), embedded)
+		if err != nil {
+			panic(fmt.Errorf("error processing lua script %s: %w", name, err))
 		}
-		scripts[name] = rueidis.NewLuaScript(val)
+		
+		scripts[name] = rueidis.NewLuaScript(processedScript)
 	}
 }
 
