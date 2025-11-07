@@ -151,7 +151,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					err := a.commitSpan(res, ss.Scope, s)
+					err := a.commitSpan(ctx, auth, res, ss.Scope, s)
 					if err != nil {
 						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
@@ -167,7 +167,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -207,6 +207,20 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
+	run, err := a.opts.FunctionRunReader.GetFunctionRun(ctx, auth.AccountID(), auth.WorkspaceID(), runID)
+	if err != nil {
+		return fmt.Errorf("function run not found: %w", err)
+	}
+	functionID := run.FunctionID
+
+	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
+	if err != nil {
+		return fmt.Errorf("function not found: %w", err)
+	}
+	if fn.IsArchived() {
+		return fmt.Errorf("function is archived: %s", functionID)
+	}
+
 	ourAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.IsUserland, &isUserland),
 		meta.Attr(meta.Attrs.UserlandSpanID, &spanID),
@@ -218,6 +232,8 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		meta.Attr(meta.Attrs.UserlandServiceName, &resourceServiceName),
 		meta.Attr(meta.Attrs.UserlandScopeName, &scope.Name),
 		meta.Attr(meta.Attrs.UserlandScopeVersion, &scope.Version),
+		meta.Attr(meta.Attrs.AppID, &fn.AppID),
+		meta.Attr(meta.Attrs.FunctionID, &functionID),
 	)
 
 	// Add some additional attributes on top
