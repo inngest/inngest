@@ -9,23 +9,27 @@ import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
 import { useEventTypeSchemas } from './useEventTypeSchemas';
 
-// Hard cap to guard against excessive auto-fetching.
+// Hard cap to guard against excessive fetching and to encourage the use of search.
 const MAX_SCHEMA_ITEMS = 800;
+
+// 30 * 40 = 1200 items. As a result, this should never be hit since MAX_SCHEMA_ITEMS is 800.
+// This is just a fallback to fully guard against runaway fetching or schema-processing issues.
+const MAX_PAGES = 30;
 
 export function useSchemasQuery(search: string) {
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
-  const getEventTypes = useEventTypeSchemas();
+  const getEventTypeSchemas = useEventTypeSchemas();
   const env = useEnvironment();
 
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
-    gcTime: 0,
     queryKey: ['schema-explorer-event-types', env.id, { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
-      getEventTypes({ cursor: pageParam, nameSearch: search || null }),
-    getNextPageParam: (lastPage) => {
+      getEventTypeSchemas({ cursor: pageParam, nameSearch: search || null }),
+    getNextPageParam: (lastPage, allPages) => {
       if (!lastPage.pageInfo.hasNextPage) return undefined;
+      if (allPages.length >= MAX_PAGES) return undefined;
       return lastPage.pageInfo.endCursor;
     },
     refetchOnMount: false,
@@ -34,21 +38,13 @@ export function useSchemasQuery(search: string) {
     initialPageParam: null,
   });
 
-  const entriesWithFails = useMemo<(null | SchemaEntry)[]>(
+  const entries = useMemo<SchemaEntry[]>(
     () => buildSchemaEntriesFromQueryData(query.data),
     [query.data]
   );
 
-  const remoteCount = useMemo(
-    () => entriesWithFails.filter((e) => !e?.isShared).length,
-    [entriesWithFails]
-  );
+  const remoteCount = useMemo(() => entries.filter((e) => !e.isShared).length, [entries]);
   const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
-
-  const entries: SchemaEntry[] = useMemo(
-    () => entriesWithFails.filter((e) => e !== null) as SchemaEntry[],
-    [entriesWithFails]
-  );
 
   const guardedFetchNextPage = useCallback(() => {
     if (hasFetchedMax) {

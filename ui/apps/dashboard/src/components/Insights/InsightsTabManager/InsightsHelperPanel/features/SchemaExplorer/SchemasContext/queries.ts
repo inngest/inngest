@@ -7,8 +7,8 @@ import type { SchemaEntry, SchemaEventPage } from './types';
 
 export function buildSchemaEntriesFromQueryData(
   data: InfiniteData<SchemaEventPage> | undefined
-): (null | SchemaEntry)[] {
-  const list: (null | SchemaEntry)[] = [];
+): SchemaEntry[] {
+  const list: SchemaEntry[] = [];
 
   list.push({
     key: 'common:events',
@@ -16,18 +16,28 @@ export function buildSchemaEntriesFromQueryData(
     node: transformJSONSchema(EVENT_SCHEMA_JSON),
   });
 
-  try {
-    const pages = data?.pages ?? [];
-    const items = pages.flatMap((p) => p.events);
-    for (const evt of items) {
-      const entry = buildEntryFromLatestSchema(evt.schema, evt.name);
+  const pages = data?.pages ?? [];
+  const items = pages.flatMap((p) => p.events);
+  for (const evt of items) {
+    const entry = buildEntryFromLatestSchema(evt.schema, evt.name);
+    if (entry === null) {
+      list.push(makeUnknownSchemaEntry(evt.name));
+    } else {
       list.push(entry);
     }
-  } catch {
-    console.error('Error building schema entries from query data.');
   }
 
   return list;
+}
+
+// If the schema fails to parse, we still want to show the event name in the list.
+// In this case, we'll just treat it as an "Unknown" schema.
+function makeUnknownSchemaEntry(eventName: string): SchemaEntry {
+  return {
+    key: `fetched:${eventName}`,
+    isShared: false,
+    node: transformJSONSchema({ title: eventName }),
+  };
 }
 
 export function buildEntryFromLatestSchema(
