@@ -26,7 +26,7 @@ export function SchemaExplorer() {
   });
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
-    if (node.path !== 'event') return null;
+    if (node.path !== 'events') return null;
     return (
       <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
         Shared schema
