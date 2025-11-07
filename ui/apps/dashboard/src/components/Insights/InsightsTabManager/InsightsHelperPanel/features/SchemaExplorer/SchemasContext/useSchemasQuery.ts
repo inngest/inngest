@@ -15,14 +15,14 @@ const MAX_SCHEMA_ITEMS = 800;
 export function useSchemasQuery(search: string) {
   const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
-  const getEventTypes = useEventTypeSchemas();
+  const getEventTypeSchemas = useEventTypeSchemas();
   const env = useEnvironment();
 
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
     queryKey: ['schema-explorer-event-types', env.id, { nameSearch: search || null }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
-      getEventTypes({ cursor: pageParam, nameSearch: search || null }),
+      getEventTypeSchemas({ cursor: pageParam, nameSearch: search || null }),
     getNextPageParam: (lastPage) => {
       if (!lastPage.pageInfo.hasNextPage) return undefined;
       return lastPage.pageInfo.endCursor;
