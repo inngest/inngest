@@ -15,7 +15,7 @@ type Props = {
   hasFetchedMax: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
-  renderEntry: (entry: SchemaEntry, idx: number) => ReactElement;
+  renderEntry: (entry: SchemaEntry, preventExpand?: boolean) => ReactElement;
 };
 
 export function SchemaExplorerSwitcher({
@@ -33,7 +33,7 @@ export function SchemaExplorerSwitcher({
 
   return (
     <Fragment>
-      <div className="flex flex-col gap-1">{entries.map(renderEntry)}</div>
+      <div className="flex flex-col gap-1">{entries.map((entry) => renderEntry(entry))}</div>
       {showShimmers && <LoadingShimmers />}
       {showError && (
         <Alert className="mt-2 text-xs" severity="error">

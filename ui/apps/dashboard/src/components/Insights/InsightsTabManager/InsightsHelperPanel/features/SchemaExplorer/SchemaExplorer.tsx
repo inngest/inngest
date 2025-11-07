@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { Pill } from '@inngest/components/Pill/Pill';
@@ -9,6 +9,7 @@ import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
 import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
+import { useSchemasInUse } from './useSchemasInUse';
 
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
@@ -25,8 +26,7 @@ export function SchemaExplorer() {
     search,
   });
 
-  // TODO: Introduce useSchemasInUse hook.
-  const schemasInUse = useMemo(() => [], []);
+  const { schemasInUse } = useSchemasInUse(entries);
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'events') return null;
@@ -38,14 +38,16 @@ export function SchemaExplorer() {
   }, []);
 
   const renderEntry = useCallback(
-    (entry: (typeof entries)[number]) => {
+    (entry: (typeof entries)[number], preventExpand: boolean = false) => {
       const isCommonEventSchema = entry.key === 'common:events';
 
       return (
         <SchemaViewer
           key={entry.key}
           computeType={isCommonEventSchema ? computeSharedEventSchemaType : undefined}
-          defaultExpandedPaths={isCommonEventSchema ? ['events'] : undefined}
+          defaultExpandedPaths={
+            preventExpand ? undefined : isCommonEventSchema ? ['events'] : undefined
+          }
           node={entry.node}
           renderAdornment={isCommonEventSchema ? renderSharedAdornment : undefined}
         />
@@ -60,7 +62,9 @@ export function SchemaExplorer() {
         {schemasInUse.length > 0 && (
           <div className="mb-3 flex flex-col gap-2">
             <div className="text-light text-xs font-medium uppercase">Schemas in Use</div>
-            <div className="flex flex-col gap-1">{schemasInUse.map(renderEntry)}</div>
+            <div className="flex flex-col gap-1">
+              {schemasInUse.map((schema) => renderEntry(schema, true))}
+            </div>
           </div>
         )}
         <div className="text-light text-xs font-medium uppercase">All Schemas</div>
