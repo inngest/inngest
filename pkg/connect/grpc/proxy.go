@@ -371,12 +371,21 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	}()
 
 	// Forward message to the gateway if the request wasn't already running
+	var routedInstanceID string
 	if leaseID != nil {
 		// Determine the most suitable connection
 		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "failed to route message")
+
+			// Check if this is a capacity error
+			if errors.Is(err, routing.ErrAllWorkersAtCapacity) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectAllWorkersAtCapacity,
+					Message: "All workers are at capacity",
+				}
+			}
 
 			if errors.Is(err, routing.ErrNoHealthyConnection) {
 				return nil, syscode.Error{
@@ -387,6 +396,30 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			return nil, fmt.Errorf("failed to route message: %w", err)
 		}
+
+		routedInstanceID = route.InstanceID
+		// Assign the request lease to the worker for capacity tracking
+		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); err != nil {
+			// if the instance ID is not set, we log the error and skip for now
+			span.RecordError(err)
+			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
+				"instance_id": routedInstanceID,
+				"request_id":  opts.Data.RequestId,
+				"gateway_id":  route.GatewayID.String(),
+			}))
+
+			// Check if this is a capacity error, this will happen when two in parallel
+			// checked for worker capacity earlier but now one got to this point first
+			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+					Message: "Assigned worker reached capacity before request was assigned",
+				}
+			}
+		}
+
+		// Trace the request lease assignment
+		l.Trace("assigned request lease to worker", "instance_id", routedInstanceID, "request_id", opts.Data.RequestId, "gateway_id", route.GatewayID.String())
 
 		transport := "grpc"
 
@@ -406,6 +439,10 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
 
+			// Clean up worker lease if forwarding failed
+			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+				l, "could not clean up worker lease after forward failure")
+
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
@@ -419,9 +456,17 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 	select {
 	case <-ctx.Done():
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on context cancellation")
+
 		return nil, fmt.Errorf("parent context was closed unexpectedly")
 	// Handle maximum function timeout
 	case <-time.After(consts.MaxFunctionTimeout):
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on timeout")
+
 		return nil, syscode.Error{
 			Code:    syscode.CodeRequestTooLong,
 			Message: "The worker took longer than the maximum request duration to respond to the request.",
@@ -439,6 +484,10 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			l.ReportError(err, "could not delete lease")
 		}
+
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease after context finished")
 
 		if reply.RequestId == "" {
 			span.SetStatus(codes.Error, "missing response")
@@ -461,9 +510,39 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	case <-leaseCtx.Done():
 		span.SetStatus(codes.Error, "lease expired")
 
+		// in the case of instance contention for concurrency, the executor gets multiple leases
+		// however workers have reached capacity and there's no routedInstanceID
+		if routedInstanceID == "" {
+			return nil, syscode.Error{
+				Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+				Message: "Lease expired because it wasn't not assigned to a worker.",
+			}
+		}
+
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on lease expiry")
+
 		return nil, syscode.Error{
 			Code:    syscode.CodeConnectWorkerStoppedResponding,
 			Message: "The worker stopped responding to the request.",
 		}
+	}
+}
+
+// cleanupWorkerRequestOrLogError cleans up the worker request and logs an error if it fails
+// even if the clean up fails the TTL of the data would make sure that the data is cleaned up eventually
+func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID string, requestID string, l logger.Logger, message string) {
+	// log the cleanup of the worker request
+	l.Trace("cleaning up worker lease", "instance_id", instanceID, "request_id", requestID, "env_id", envID.String())
+
+	// if the instance ID is not set, we need to return an error
+	if instanceID == "" {
+		l.ReportError(state.ErrNoInstanceIDFound, message)
+		return
+	}
+
+	if err := stateManager.DeleteRequestFromWorker(ctx, envID, instanceID, requestID); err != nil {
+		l.ReportError(err, message)
 	}
 }

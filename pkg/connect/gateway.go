@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -160,13 +161,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
-		var closeReasonLock sync.Mutex
-		setCloseReason := func(reason string) {
-			closeReasonLock.Lock()
-			defer closeReasonLock.Unlock()
+		var closeReasonPtr atomic.Pointer[string]
+		closeReasonPtr.Store(&closeReason)
 
+		setCloseReason := func(reason string) {
 			if reason != connectpb.WorkerDisconnectReason_UNEXPECTED.String() {
-				closeReason = reason
+				closeReasonPtr.Store(&reason)
 			}
 		}
 
@@ -174,7 +174,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
-			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
+			ch.log.Debug("Closing WebSocket connection", "reason", *closeReasonPtr.Load())
 			c.logger.Trace("worker disconnected")
 
 			closed = true
@@ -296,7 +296,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			for _, lifecycle := range c.lifecycles {
-				lifecycle.OnDisconnected(context.Background(), conn, closeReason)
+				lifecycle.OnDisconnected(context.Background(), conn, *closeReasonPtr.Load())
 			}
 		}()
 
@@ -641,6 +641,29 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 		}
 
+		// Refresh worker capacity TTL if set
+		if c.conn.Data.InstanceId == "" {
+			// No instance ID, no capacity TTL to refresh
+			return &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "missing instanceId for connect message",
+			}
+		}
+
+		// Refresh worker capacity TTL if capacity is set
+		if err := c.svc.stateManager.WorkerCapacityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
+			// Log but don't fail the heartbeat if TTL refresh fails
+			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
+				logger.WithErrorReportTags(map[string]string{
+					"instance_id":   c.conn.Data.InstanceId,
+					"env_id":        c.conn.EnvID.String(),
+					"account_id":    c.conn.AccountID.String(),
+					"gateway_id":    c.conn.GatewayId.String(),
+					"connection_id": c.conn.ConnectionId.String(),
+				}))
+		}
+
 		for _, l := range c.svc.lifecycles {
 			go l.OnReady(context.Background(), c.conn)
 		}
@@ -659,6 +682,29 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "could not update connection status",
 			}
+		}
+
+		// Refresh worker capacity TTL if set
+		if c.conn.Data.InstanceId == "" {
+			// No instance ID, no capacity TTL to refresh
+			return &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "missing instanceId for connect message",
+			}
+		}
+
+		// Refresh worker capacity TTL if capacity is set
+		if err := c.svc.stateManager.WorkerCapacityOnHeartbeat(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId); err != nil {
+			// Log but don't fail the heartbeat if TTL refresh fails
+			c.log.ReportError(err, "failed to refresh worker capacity TTL on heartbeat",
+				logger.WithErrorReportTags(map[string]string{
+					"instance_id":   c.conn.Data.InstanceId,
+					"env_id":        c.conn.EnvID.String(),
+					"account_id":    c.conn.AccountID.String(),
+					"gateway_id":    c.conn.GatewayId.String(),
+					"connection_id": c.conn.ConnectionId.String(),
+				}))
 		}
 
 		for _, l := range c.svc.lifecycles {
@@ -690,6 +736,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				Msg:        "could not update connection status",
 			}
 		}
+
+		// For pauses, worker capacity is not tracked and it will expire
 
 		for _, l := range c.svc.lifecycles {
 			go l.OnStartDraining(context.Background(), c.conn)
@@ -781,14 +829,32 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			// get worker capacity to check if we have worker limits to enforce
+			workerCap, err := c.svc.stateManager.GetWorkerCapacities(ctx, c.conn.EnvID, c.conn.Data.InstanceId)
+			c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
+			if err != nil {
+				c.log.ReportError(err, "failed to get worker available capacity",
+					logger.WithErrorReportTags(map[string]string{
+						"instance_id": c.conn.Data.InstanceId,
+						"env_id":      c.conn.EnvID.String(),
+					}))
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "failed to get total worker capacity",
+				}
+			}
+			// extend lease with worker capacity limit if set
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, c.conn.Data.InstanceId,
+				data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration, workerCap.IsUnlimited())
 			if err != nil {
 				switch {
 				case errors.Is(err, state.ErrRequestLeaseExpired),
 					errors.Is(err, state.ErrRequestLeased),
-					errors.Is(err, state.ErrRequestLeaseNotFound):
+					errors.Is(err, state.ErrRequestLeaseNotFound),
+					errors.Is(err, state.ErrRequestWorkerDoesNotExist):
 
-					c.log.ReportError(err, "lease was claimed by other worker or expired",
+					c.log.ReportError(err, "lease was claimed by other worker, expired, or worker does not exist",
 						logger.WithErrorReportTags(map[string]string{
 							"req_id":   data.RequestId,
 							"lease_id": leaseID.String(),
@@ -1163,6 +1229,32 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				Msg:        "connection not stored",
 			}
 		}
+
+		// if the instance ID is not set, we return an error
+		if initialMessageData.InstanceId == "" {
+			return nil, &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "instance ID is required",
+			}
+		}
+
+		// Set worker capacity limit
+		// If MaxWorkerConcurrency is 0, this will clear any existing capacity limit
+		maxConcurrency := int64(0)
+		if initialMessageData.MaxWorkerConcurrency != nil {
+			maxConcurrency = *initialMessageData.MaxWorkerConcurrency
+		}
+		if err := c.svc.stateManager.SetWorkerTotalCapacity(context.Background(), authResp.EnvID, initialMessageData.InstanceId, maxConcurrency); err != nil {
+			log.ReportError(err, "failed to set worker capacity")
+			return nil, &connecterrors.SocketError{
+				SysCode:    syscode.CodeConnectInternal,
+				StatusCode: websocket.StatusInternalError,
+				Msg:        "worker capacity not enforced",
+			}
+		}
+
+		log.Trace("worker capacity set", "account_id", authResp.AccountID, "env_id", authResp.EnvID, "instance_id", initialMessageData.InstanceId, "max_concurrency", maxConcurrency)
 
 		// TODO Connection should not be marked as ready to receive traffic until the read loop is set up, sync is handled, and the client optionally sent a ready signal
 		for _, l := range c.svc.lifecycles {

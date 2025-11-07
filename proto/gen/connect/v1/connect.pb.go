@@ -445,6 +445,7 @@ type WorkerConnectRequestData struct {
 	SdkVersion               string                 `protobuf:"bytes,11,opt,name=sdk_version,json=sdkVersion,proto3" json:"sdk_version,omitempty"`
 	SdkLanguage              string                 `protobuf:"bytes,12,opt,name=sdk_language,json=sdkLanguage,proto3" json:"sdk_language,omitempty"`
 	StartedAt                *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	MaxWorkerConcurrency     *int64                 `protobuf:"varint,14,opt,name=max_worker_concurrency,json=maxWorkerConcurrency,proto3,oneof" json:"max_worker_concurrency,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -568,6 +569,13 @@ func (x *WorkerConnectRequestData) GetStartedAt() *timestamppb.Timestamp {
 		return x.StartedAt
 	}
 	return nil
+}
+
+func (x *WorkerConnectRequestData) GetMaxWorkerConcurrency() int64 {
+	if x != nil && x.MaxWorkerConcurrency != nil {
+		return *x.MaxWorkerConcurrency
+	}
+	return 0
 }
 
 type GatewayConnectionReadyData struct {
@@ -1825,7 +1833,7 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"\bAuthData\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12\x1d\n" +
 	"\n" +
-	"sync_token\x18\x02 \x01(\tR\tsyncToken\"\xf5\x04\n" +
+	"sync_token\x18\x02 \x01(\tR\tsyncToken\"\xcb\x05\n" +
 	"\x18WorkerConnectRequestData\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
 	"\vinstance_id\x18\x02 \x01(\tR\n" +
@@ -1843,9 +1851,11 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"sdkVersion\x12!\n" +
 	"\fsdk_language\x18\f \x01(\tR\vsdkLanguage\x129\n" +
 	"\n" +
-	"started_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAtB\x0e\n" +
+	"started_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x129\n" +
+	"\x16max_worker_concurrency\x18\x0e \x01(\x03H\x02R\x14maxWorkerConcurrency\x88\x01\x01B\x0e\n" +
 	"\f_environmentB\v\n" +
-	"\t_platform\"\x7f\n" +
+	"\t_platformB\x19\n" +
+	"\x17_max_worker_concurrency\"\x7f\n" +
 	"\x1aGatewayConnectionReadyData\x12-\n" +
 	"\x12heartbeat_interval\x18\x01 \x01(\tR\x11heartbeatInterval\x122\n" +
 	"\x15extend_lease_interval\x18\x02 \x01(\tR\x13extendLeaseInterval\"\xbe\x03\n" +

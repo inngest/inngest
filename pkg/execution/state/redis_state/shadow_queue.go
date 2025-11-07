@@ -131,7 +131,22 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			}
 		}
 
-		if info := q.partitionPausedGetter(ctx, *shadowPart.FunctionID); info.Paused {
+		// Check paused status with a timeout
+		dbCtx, dbCtxCancel := context.WithTimeout(ctx, dbReadTimeout)
+		info := q.partitionPausedGetter(dbCtx, *shadowPart.FunctionID)
+
+		if dbCtx.Err() == context.DeadlineExceeded {
+			metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation": "shadow_partition_paused_getter",
+				},
+			})
+		}
+
+		dbCtxCancel()
+
+		if info.Paused {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
 			if !info.Stale {
