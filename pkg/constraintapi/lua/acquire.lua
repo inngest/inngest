@@ -53,6 +53,8 @@ end
 ---@param burst integer
 ---@return integer[]
 local function gcraCapacity(key, period, limit, burst)
+	-- TODO: Reuse shared script
+
 	-- calculate emission interval (tau) - time between each token
 	local emission = period_ms / math.max(limit, 1)
 
