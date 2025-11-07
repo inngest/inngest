@@ -36,6 +36,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -63,6 +66,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -90,6 +96,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -117,6 +126,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -144,6 +156,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -171,6 +186,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -198,6 +216,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -225,6 +246,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -252,6 +276,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -279,6 +306,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -306,6 +336,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -356,6 +389,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -420,6 +456,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -479,6 +518,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -506,6 +548,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -533,6 +578,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -560,6 +608,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:          1,
@@ -587,6 +638,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -614,6 +668,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -641,6 +698,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -668,6 +728,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -695,6 +758,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -753,6 +819,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -780,6 +849,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -807,6 +879,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -834,6 +909,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -861,6 +939,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -888,6 +969,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -946,6 +1030,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -973,6 +1060,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -1000,6 +1090,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
 					},
 				},
 				Amount:               1,
@@ -1047,7 +1140,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "valid - only concurrency constraint",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 			},
 			wantErr: false,
 		},
@@ -1068,7 +1166,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "valid - multiple queue constraints (concurrency + throttle)",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 				{Kind: ConstraintKindThrottle},
 			},
 			wantErr: false,
@@ -1076,8 +1179,18 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "valid - multiple concurrency constraints",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key-1",
+					},
+				},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key-2",
+					},
+				},
 			},
 			wantErr: false,
 		},
@@ -1101,7 +1214,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			name: "invalid - rate limit + concurrency",
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
@@ -1118,7 +1236,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "invalid - concurrency + rate limit",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 				{Kind: ConstraintKindRateLimit},
 			},
 			wantErr: true,
@@ -1136,7 +1259,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "invalid - all three constraint types",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 				{Kind: ConstraintKindThrottle},
 				{Kind: ConstraintKindRateLimit},
 			},
@@ -1147,7 +1275,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			name: "invalid - multiple mixed constraints",
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindConcurrency},
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						InProgressItemKey: "test-key",
+					},
+				},
 				{Kind: ConstraintKindRateLimit},
 				{Kind: ConstraintKindThrottle},
 			},
@@ -1307,13 +1440,26 @@ func TestConstraintItemValid(t *testing.T) {
 			constraint: ConstraintItem{
 				Kind: ConstraintKindConcurrency,
 				Concurrency: &ConcurrencyConstraint{
-					Mode:              enums.ConcurrencyModeRun,
+					Mode:              enums.ConcurrencyModeStep,
 					Scope:             enums.ConcurrencyScopeAccount,
 					InProgressItemKey: "", // Explicitly empty
 				},
 			},
 			wantErr:     true,
 			expectedMsg: "concurrency constraint must specify InProgressItemKey",
+		},
+		{
+			name: "concurrency constraint with run mode is invalid",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Mode:              enums.ConcurrencyModeRun,
+					Scope:             enums.ConcurrencyScopeAccount,
+					InProgressItemKey: "test-key", // Valid key but mode is run
+				},
+			},
+			wantErr:     true,
+			expectedMsg: "run level concurrency is not implemented yet",
 		},
 		{
 			name: "unknown constraint kind is valid (no specific validation)",
