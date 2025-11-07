@@ -2,10 +2,10 @@
 local key = ARGV[1]
 
 ---@type integer
-local now_ms = tonumber(ARGV[2])
+local now_ns = tonumber(ARGV[2])
 
 ---@type integer
-local period_ms = tonumber(ARGV[3])
+local period_ns = tonumber(ARGV[3])
 
 ---@type integer
 local limit = tonumber(ARGV[4])
@@ -14,78 +14,103 @@ local limit = tonumber(ARGV[4])
 local burst = tonumber(ARGV[5])
 
 ---@param key string
----@param now_ms integer
----@param period_ms integer
+---@param now_ns integer
+---@param period_ns integer
 ---@param limit integer
 ---@param capacity integer
-local function gcraUpdate(key, now_ms, period_ms, limit, capacity)
+local function gcraUpdate(key, now_ns, period_ns, limit, capacity)
 	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / math.max(limit, 1)
+	-- This matches throttled library: quota.MaxRate.period
+	local emission_interval = period_ns / math.max(limit, 1)
 
 	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
 	if not tat then
-		tat = now_ms
+		tat = now_ns
 	else
 		tat = tonumber(tat)
 	end
 
 	-- calculate next theoretical arrival time
-	local new_tat = tat + (math.max(capacity, 1) * emission)
+	-- This matches throttled library logic: tat.Add(increment) where increment = quantity * emissionInterval
+	local increment = math.max(capacity, 1) * emission_interval
+	local new_tat
+	if now_ns > tat then
+		new_tat = now_ns + increment
+	else
+		new_tat = tat + increment
+	end
 
 	if capacity > 0 then
-		local expiry = string.format("%d", period_ms / 1000)
-		redis.call("SET", key, new_tat, "EX", expiry)
+		-- Calculate TTL like throttled library: ttl = newTat.Sub(now)
+		local ttl_ns = new_tat - now_ns
+		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
+		redis.call("SET", key, new_tat, "EX", ttl_seconds)
 	end
 end
 
 ---@param key string
----@param now_ms integer
----@param period_ms integer
+---@param now_ns integer
+---@param period_ns integer
 ---@param limit integer
 ---@param burst integer
 ---@return integer[]
-local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / math.max(limit, 1)
-
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
+local function gcraCapacity(key, now_ns, period_ns, limit, burst)
+	-- Match throttled library calculations exactly
+	-- emissionInterval = quota.MaxRate.period
+	local emission_interval = period_ns / math.max(limit, 1)
+	
+	-- delayVariationTolerance = quota.MaxRate.period * (quota.MaxBurst + 1)
+	-- In throttled library: limit = quota.MaxBurst + 1, so burst = limit - 1
+	-- But we receive burst as the actual burst value, so we use burst + 1 to match
+	local delay_variation_tolerance = emission_interval * (burst + 1)
 
 	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
 	if not tat then
-		tat = now_ms
+		tat = now_ns
 	else
 		tat = tonumber(tat)
 	end
 
-	-- remaining capacity in time units
-	local time_capacity_remain = now_ms + total_capacity_time - tat
-
-	-- Convert the remaining time budget back into a number of tokens.
-	local capacity = math.floor(time_capacity_remain / emission)
-
-	-- The capacity cannot exceed the defined limit + burst.
-	local final_capacity = math.min(capacity, limit + burst)
-
-	if final_capacity < 1 then
-		-- We are throttled. Calculate the time when the capacity will be >= 1.
-		-- This is the point where enough time has passed to "earn" one token.
-		-- The formula is derived from solving for the future time `t` where capacity becomes 1.
-		local next_available_at_ms = tat - total_capacity_time + emission
-		return { final_capacity, math.ceil(next_available_at_ms) }
+	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
+	local increment = 1 * emission_interval
+	local new_tat
+	if now_ns > tat then
+		new_tat = now_ns + increment
 	else
-		-- Not throttled, so there is no "next available time" to report.
-		return { final_capacity, 0 }
+		new_tat = tat + increment
+	end
+
+	-- Block the request if the next permitted time is in the future
+	-- allowAt = newTat.Add(-delayVariationTolerance)
+	local allow_at = new_tat - delay_variation_tolerance
+	local diff = now_ns - allow_at
+
+	if diff < 0 then
+		-- We are rate limited
+		-- Calculate retry after time: -diff (when allowAt becomes <= now)
+		local retry_after_ns = -diff
+		return { 0, now_ns + retry_after_ns }
+	else
+		-- Not rate limited - calculate remaining capacity
+		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
+		local ttl = new_tat - now_ns
+		local next = delay_variation_tolerance - ttl
+		local remaining = 0
+		if next > -emission_interval then
+			remaining = math.floor(next / emission_interval)
+		end
+		return { remaining, 0 }
 	end
 end
 
-local res = gcraCapacity(key, now_ms, period_ms, limit, burst)
-if res[0] == 0 then
-	return { 0, res[1] }
+local res = gcraCapacity(key, now_ns, period_ns, limit, burst)
+if res[1] == 0 then
+	-- Not rate limited, perform the update
+	gcraUpdate(key, now_ns, period_ns, limit, 1)
+	return { 1, 0 }
+else
+	-- Rate limited, return retry time
+	return { 0, res[2] }
 end
-
-gcraUpdate(key, now_ms, period_ms, limit, 1)
-
-return { 1, 0 }
