@@ -148,27 +148,19 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 // GetStartedAtTime gets the time that the span started. Note that this is not necessarily
 // when the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
-	if s.Attributes == nil || s.Attributes.StartedAt == nil {
-		// Fall abck to s.StartTime
-		if !s.StartTime.IsZero() {
-			return &s.StartTime
-		}
-		return nil
+	if s.Attributes != nil && s.Attributes.StartedAt != nil {
+		return s.Attributes.StartedAt
 	}
-	return s.Attributes.StartedAt
+	return nil
 }
 
 // GetEndedAtTime gets the time that the span ended. Note that this is not necessarily
 // when the span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
-	if s.Attributes == nil || s.Attributes.EndedAt == nil {
-		// Fall abck to s.EndTime
-		if !s.EndTime.IsZero() {
-			return &s.EndTime
-		}
-		return nil
+	if s.Attributes != nil && s.Attributes.EndedAt != nil {
+		return s.Attributes.EndedAt
 	}
-	return s.Attributes.EndedAt
+	return nil
 }
 
 // Span represents an distributed span in a function execution flow
