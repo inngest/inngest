@@ -2517,7 +2517,10 @@ func (q *queue) PartitionLease(
 
 	kg := shard.RedisClient.kg
 
-	constraints := q.partitionConstraintConfigGetter(ctx, p.Identifier())
+	// Fetch partition constraints with a timeout
+	dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+	constraints := q.partitionConstraintConfigGetter(dbCtx, p.Identifier())
+	dbCtxCancel()
 
 	var accountLimit, functionLimit int
 	if p.IsSystem() {
