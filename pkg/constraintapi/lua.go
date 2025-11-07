@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/rueidis"
@@ -174,7 +175,8 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 			for _, rlConfig := range config.RateLimit {
 				if rlConfig.Scope == c.RateLimit.Scope && rlConfig.KeyExpressionHash == c.RateLimit.KeyExpressionHash {
 					rateLimitConstraint.Limit = rlConfig.Limit
-					rateLimitConstraint.Period = rlConfig.Period
+					// Ensure rate limiting period is encoded as nanoseconds
+					rateLimitConstraint.Period = int((time.Duration(rlConfig.Period) * time.Second).Nanoseconds())
 					break
 				}
 			}
