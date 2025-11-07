@@ -43,8 +43,8 @@ export function useSchemasInUse(): { schemasInUse: SchemaEntry[] } {
   return { schemasInUse };
 }
 
-// Matches occurrences of name = '<event_name>' (single quotes only),
-// allowing optional whitespace around the equals sign, and captures the event name.
+// Matches occurrences of name = '<event_name>' (single quotes only), allowing
+// optional whitespace around the equals sign, and capturing the event name.
 const POSSIBLE_EVENT_NAME_REGEX = /name\s*=\s*'([^']+)'/g;
 
 function useDetectPossibleEvents(): { possibleEventNames: string[] } {
