@@ -286,13 +286,11 @@ func TestLuaRateLimit_MigrationUnderLoad(t *testing.T) {
 		// burst = 10/10 = 1, so total capacity = 10 + 1 = 11
 		requestsToMake := 5 // Consume about half the capacity
 		var throttledResults []bool
-		var throttledRetryTimes []time.Duration
 
 		for i := 0; i < requestsToMake; i++ {
 			limited, retry, err := rateLimit(ctx, throttledStore, key, config)
 			require.NoError(t, err)
 			throttledResults = append(throttledResults, limited)
-			throttledRetryTimes = append(throttledRetryTimes, retry)
 			t.Logf("Throttled request %d: limited=%v, retry=%v", i+1, limited, retry)
 		}
 
@@ -302,14 +300,12 @@ func TestLuaRateLimit_MigrationUnderLoad(t *testing.T) {
 		// Continue making requests with Lua implementation
 		remainingRequests := 8 // Should hit limits sooner due to existing state
 		var luaResults []bool
-		var luaRetryTimes []time.Duration
 
 		for i := 0; i < remainingRequests; i++ {
 			r.SetTime(clock.Now())
 			limited, retry, err := luaLimiter.RateLimit(ctx, key, config, clock.Now())
 			require.NoError(t, err)
 			luaResults = append(luaResults, limited)
-			luaRetryTimes = append(luaRetryTimes, retry)
 			t.Logf("Lua request %d: limited=%v, retry=%v", i+1, limited, retry)
 		}
 
