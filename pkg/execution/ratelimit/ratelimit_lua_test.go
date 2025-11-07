@@ -152,20 +152,12 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 
 			key := "test-key"
 
-			// Track results from both implementations
-			var luaResults []bool
-			var throttledResults []bool
-			var luaRetryTimes []time.Duration
-			var throttledRetryTimes []time.Duration
-
 			// Make requests to both implementations
 			for i := 0; i < tc.requests; i++ {
 				// Test Lua implementation
 				r2.SetTime(clock2.Now())
 				luaAllowed, luaRetry, err := luaLimiter.RateLimit(ctx, key, config, clock2.Now())
 				require.NoError(t, err)
-				luaResults = append(luaResults, luaAllowed)
-				luaRetryTimes = append(luaRetryTimes, luaRetry)
 
 				// Test throttled implementation (uses original interface)
 				throttledAllowed, throttledRetry, err := rateLimit(ctx, throttledStore, key, config)
@@ -173,8 +165,6 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 					t.Logf("Throttled implementation error: %v", err)
 				}
 				require.NoError(t, err)
-				throttledResults = append(throttledResults, throttledAllowed)
-				throttledRetryTimes = append(throttledRetryTimes, throttledRetry)
 
 				t.Logf("Request %d: lua(allowed=%v, retry=%v) vs throttled(allowed=%v, retry=%v)",
 					i+1, luaAllowed, luaRetry, throttledAllowed, throttledRetry)
