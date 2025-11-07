@@ -131,7 +131,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			}
 		}
 
-		if info := q.partitionPausedGetter(ctx, *shadowPart.FunctionID); info.Paused {
+		// Check paused status with a timeout
+		dbCtx, dbCtxCancel := context.WithTimeout(ctx, 30*time.Second)
+		info := q.partitionPausedGetter(dbCtx, *shadowPart.FunctionID)
+		dbCtxCancel()
+
+		if info.Paused {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
 			if !info.Stale {
