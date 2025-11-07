@@ -184,7 +184,7 @@ for i = 1, granted, 1 do
 	leaseObject["lik"] = leaseIdempotencyKey
 	table.insert(grantedLeases, leaseObject)
 end
-call("SET", keyConstraintCheckIdempotency, tostring(nowMS))
+call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 requestDetails.g = availableCapacity
 requestDetails.a = availableCapacity
 call("SET", keyRequestState, cjson.encode(requestDetails))
@@ -197,5 +197,5 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 local encoded = cjson.encode(result)
-call("SET", keyOperationIdempotency, encoded, "EX", {})
+call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return { 3, encoded }
