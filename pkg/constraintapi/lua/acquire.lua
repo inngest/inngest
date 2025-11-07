@@ -51,9 +51,44 @@ end
 ---@param period integer
 ---@param limit integer
 ---@param burst integer
+---@return integer[]
 local function gcraCapacity(key, period, limit, burst)
-	-- TODO: Implement GCRA capacity (reuse existing)
-	return 0
+	-- calculate emission interval (tau) - time between each token
+	local emission = period_ms / math.max(limit, 1)
+
+	-- calculate total capacity in time units
+	local total_capacity_time = emission * (limit + burst)
+
+	-- retrieve theoretical arrival time
+	local tat = redis.call("GET", key)
+	if not tat then
+		tat = now_ms
+	else
+		tat = tonumber(tat)
+	end
+
+	-- remaining capacity in time units
+	local time_capacity_remain = now_ms + total_capacity_time - tat
+
+	-- convert time capacity to token capacity
+	local capacity = math.floor(time_capacity_remain / emission)
+
+	-- Convert the remaining time budget back into a number of tokens.
+	local capacity = math.floor(time_capacity_remain / emission)
+
+	-- The capacity cannot exceed the defined limit + burst.
+	local final_capacity = math.min(capacity, limit + burst)
+
+	if final_capacity < 1 then
+		-- We are throttled. Calculate the time when the capacity will be >= 1.
+		-- This is the point where enough time has passed to "earn" one token.
+		-- The formula is derived from solving for the future time `t` where capacity becomes 1.
+		local next_available_at_ms = tat - total_capacity_time + emission
+		return { final_capacity, math.ceil(next_available_at_ms) }
+	else
+		-- Not throttled, so there is no "next available time" to report.
+		return { final_capacity, 0 }
+	end
 end
 
 ---@param key string
@@ -88,6 +123,7 @@ end
 -- TODO: Compute constraint capacity
 local availableCapacity = requested
 local limitingConstraint = -1
+local retryAt = 0
 
 -- TODO: Can we generate a list of updates to apply in batch?
 -- local updates = {}
@@ -105,12 +141,15 @@ for index, value in ipairs(constraints) do
 
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
+	local constraintRetryAfter = 0
 	if skipGCRA then
 		-- noop
 		constraintCapacity = availableCapacity
 	elseif value.k == 1 then
 		-- rate limit
-		constraintCapacity = gcraCapacity(value.r.h, value.r.p, value.r.l, 0)
+		local gcraRes = gcraCapacity(value.r.h, value.r.p, value.r.l, 0)
+		constraintCapacity = gcraRes[0]
+		constraintRetryAfter = gcraRes[1]
 	elseif value.k == 2 then
 		-- concurrency
 		local inProgressItems = getConcurrencyCount(value.c.iik)
@@ -119,13 +158,20 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
 		-- throttle
-		constraintCapacity = gcraCapacity(value.t.h, value.t.p, value.t.l, value.t.b)
+		local gcraRes = gcraCapacity(value.t.h, value.t.p, value.t.l, value.t.b)
+		constraintCapacity = gcraRes[0]
+		constraintRetryAfter = gcraRes[1]
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if constraintCapacity < availableCapacity then
 		availableCapacity = constraintCapacity
 		limitingConstraint = index
+
+		-- if the constraint must be retried later than the initial/last constraint, update retryAfter
+		if constraintRetryAfter > retryAt then
+			retryAt = constraintRetryAfter
+		end
 	end
 end
 
