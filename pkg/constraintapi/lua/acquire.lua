@@ -362,7 +362,7 @@ for i = 1, granted, 1 do
 	table.insert(grantedLeases, leaseObject)
 end
 
-call("SET", keyConstraintCheckIdempotency, tostring(nowMS))
+call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 
 -- For step concurrency, add the lease idempotency keys to the new in progress leases sets using the lease expiry as score
 -- For run concurrency, add the runID to the in progress runs set and the lease idempotency key to the dynamic run in progress leases set
@@ -392,6 +392,6 @@ result["l"] = grantedLeases
 local encoded = cjson.encode(result)
 
 -- Set operation idempotency TTL
-call("SET", keyOperationIdempotency, encoded, "EX", {})
+call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 
 return { 3, encoded }
