@@ -67,8 +67,6 @@ local function debug(...)
 	end
 end
 
-debug("hello world")
-
 ---@param key string
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
