@@ -3,8 +3,10 @@ package constraintapi
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,9 @@ func TestRedisCapacityManager(t *testing.T) {
 	cm, err := NewRedisCapacityManager(
 		WithClient(rc),
 		WithClock(clock),
+		WithNumScavengerShards(4),
+		WithQueueStateKeyPrefix("q:v1"),
+		WithRateLimitKeyPrefix("rl"),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cm)
@@ -34,11 +39,60 @@ func TestRedisCapacityManager(t *testing.T) {
 	// to cover edge cases.
 
 	t.Run("Acquire", func(t *testing.T) {
+		enableDebugLogs = true
+		accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
-			CurrentTime: clock.Now(),
+			AccountID:            accountID,
+			EnvID:                envID,
+			FunctionID:           fnID,
+			Amount:               1,
+			LeaseIdempotencyKeys: []string{"event1"},
+			IdempotencyKey:       "event1",
+			LeaseRunIDs:          nil,
+			Duration:             5 * time.Second,
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          LeaseLocationScheduleRun,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
+			Configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						KeyExpressionHash: "expr-hash",
+						Limit:             120,
+						Period:            60,
+					},
+				},
+			},
+			Constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "test-value",
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			MaximumLifetime: time.Minute,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
+
+		// internal state should match
+		t.Log(resp.internalDebugState.Debug)
+		require.Equal(t, 3, resp.internalDebugState.Status)
+		require.Equal(t, 1, resp.internalDebugState.Granted)
+
+		// One lease should have been granted
+		require.Len(t, resp.Leases, 1)
+
+		// Don't expect limiting constraint
+		require.Nil(t, resp.LimitingConstraints)
+
+		// RetryAfter should not be set
+		require.Zero(t, resp.RetryAfter)
 	})
 
 	t.Run("Check", func(t *testing.T) {

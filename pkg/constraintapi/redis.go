@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,8 +15,12 @@ import (
 )
 
 const (
-	MaximumAllowedRequestDelay = time.Second
+	MaximumAllowedRequestDelay    = time.Second
+	OperationIdempotencyTTL       = 1 * time.Minute
+	ConstraintCheckIdempotencyTTL = 5 * time.Minute
 )
+
+var enableDebugLogs = false
 
 type redisCapacityManager struct {
 	client rueidis.Client
@@ -212,6 +217,19 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) *redisRequ
 	return state
 }
 
+type acquireScriptResponse struct {
+	Status        int `json:"s"`
+	Requested     int `json:"r"`
+	Granted       int `json:"g"`
+	GrantedLeases []struct {
+		LeaseID             ulid.ULID `json:"lid"`
+		LeaseIdempotencyKey string    `json:"lik"`
+	} `json:"l"`
+	LimitingConstraint int      `json:"lc"`
+	RetryAt            int      `json:"ra"`
+	Debug              []string `json:"d"`
+}
+
 // Acquire implements CapacityManager.
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	// Validate request
@@ -266,29 +284,76 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}
 
+	enableDebugLogsVal := "0"
+	if enableDebugLogs {
+		enableDebugLogsVal = "1"
+	}
+
 	args, err := strSlice([]any{
 		// This will be marshaled
 		requestState,
+		req.AccountID,
 		now.UnixMilli(), // current time in milliseconds for throttle
 		now.UnixNano(),  // current time in nanoseconds for rate limiting
+
 		leaseExpiry.UnixMilli(),
 		keyPrefix,
 		initialLeaseIDs,
+
 		req.IdempotencyKey,
-		req.AccountID,
+		int(OperationIdempotencyTTL.Seconds()),
+		int(ConstraintCheckIdempotencyTTL.Seconds()),
+
+		enableDebugLogsVal,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	status, err := scripts["acquire"].Exec(ctx, r.client, keys, args).AsInt64()
+	rawRes, err := scripts["acquire"].Exec(ctx, r.client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
 	}
 
-	switch status {
+	parsedResponse := acquireScriptResponse{}
+	err = json.Unmarshal(rawRes, &parsedResponse)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+
+	leases := make([]CapacityLease, len(parsedResponse.GrantedLeases))
+	for i, v := range parsedResponse.GrantedLeases {
+		leases[i] = CapacityLease{
+			LeaseID:        v.LeaseID,
+			IdempotencyKey: v.LeaseIdempotencyKey,
+		}
+	}
+
+	var limitingConstraints []ConstraintItem
+	if parsedResponse.LimitingConstraint > 0 {
+		limitingConstraints = append(limitingConstraints, req.Constraints[parsedResponse.LimitingConstraint-1])
+	}
+
+	switch parsedResponse.Status {
+	case 1, 3:
+		// success or idempotency
+		return &CapacityAcquireResponse{
+			Leases:              leases,
+			LimitingConstraints: limitingConstraints,
+			internalDebugState:  parsedResponse,
+		}, nil
+
+	case 2:
+		// lacking capacity
+		return &CapacityAcquireResponse{
+			Leases:              leases,
+			LimitingConstraints: limitingConstraints,
+			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			internalDebugState:  parsedResponse,
+		}, nil
+
 	default:
-		return nil, errs.Wrap(0, false, "unexpected status code %v", status)
+		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
 
