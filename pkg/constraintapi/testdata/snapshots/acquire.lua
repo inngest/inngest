@@ -1,6 +1,6 @@
 local cjson = cjson
 local function call(command, ...)
-	redis.call(command, unpack(arg))
+	return redis.call(command, unpack(arg))
 end
 local KEYS = KEYS
 local ARGV = ARGV
@@ -19,6 +19,14 @@ local initialLeaseIDs = cjson.decode(ARGV[7])
 local operationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
+local enableDebugLogs = tonumber(ARGV[11]) == 1
+local debugLogs = {}
+local function debug(...)
+	if enableDebugLogs then
+		table.insert(debugLogs, table.concat(arg, " "))
+	end
+end
+debug("hello world")
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
 	return count
@@ -119,35 +127,50 @@ local configVersion = requestDetails.cv
 local constraints = requestDetails.s
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
-	return { 1, opIdempotency }
+	debug("hit operation idempotency")
+	return opIdempotency
 end
 local availableCapacity = requested
-local limitingConstraint = -1
+local limitingConstraint = nil
 local retryAt = 0
-local skipGCRA = false
+local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 for index, value in ipairs(constraints) do
 	if availableCapacity <= 0 then
 		break
 	end
+	debug("checking constraint " .. index)
 	local constraintCapacity = 0
 	local constraintRetryAfter = 0
-	if skipGCRA then
+	if skipGCRA and (value.k == 1 or value.k == 3) then
 		constraintCapacity = availableCapacity
+		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
-		local gcraRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, 0)
-		constraintCapacity = gcraRes[0]
-		constraintRetryAfter = gcraRes[1]
+		local burst = math.floor(value.r.l / 10) 
+		local rlRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, burst)
+		constraintCapacity = rlRes[1]
+		constraintRetryAfter = rlRes[2] / 1000000 
 	elseif value.k == 2 then
+		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
-		local gcraRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
-		constraintCapacity = gcraRes[0]
-		constraintRetryAfter = gcraRes[1]
+		debug("evaluating throttle")
+		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
+		constraintCapacity = throttleRes[1]
+		constraintRetryAfter = throttleRes[2] 
 	end
 	if constraintCapacity < availableCapacity then
+		debug(
+			"constraint has less capacity",
+			"c",
+			index,
+			"cc",
+			tostring(constraintCapacity),
+			"ac",
+			tostring(availableCapacity)
+		)
 		availableCapacity = constraintCapacity
 		limitingConstraint = index
 		if constraintRetryAfter > retryAt then
@@ -158,13 +181,18 @@ end
 local fairnessReduction = 0
 availableCapacity = availableCapacity - fairnessReduction
 if availableCapacity <= 0 then
-	return { 2, limitingConstraint }
+	local res = {}
+	res["s"] = 2
+	res["lc"] = limitingConstraint
+	res["ra"] = retryAt
+	res["d"] = debugLogs
+	return cjson.encode(res)
 end
 local granted = availableCapacity
 local grantedLeases = {}
 for i = 1, granted, 1 do
 	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = requestDetails.lri[leaseIdempotencyKey]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 	for _, value in ipairs(constraints) do
 		if skipGCRA then
@@ -193,9 +221,12 @@ if accountScore == nil or accountScore == false or tonumber(accountScore) > leas
 	call("ZADD", keyScavengerShard, tonumber(leaseExpiryMS), accountID)
 end
 local result = {}
+result["s"] = 3
 result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
+result["lc"] = limitingConstraint
+result["d"] = debugLogs
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
-return { 3, encoded }
+return encoded

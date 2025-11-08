@@ -152,6 +152,8 @@ type CapacityAcquireResponse struct {
 	LimitingConstraints []ConstraintItem
 
 	RetryAfter time.Time
+
+	internalDebugState acquireScriptResponse
 }
 
 type CapacityExtendLeaseRequest struct {

@@ -10,7 +10,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	redis.call(command, unpack(arg))
+	return redis.call(command, unpack(arg))
 end
 
 ---@type string[]
@@ -55,6 +55,19 @@ local operationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
+
+local enableDebugLogs = tonumber(ARGV[11]) == 1
+
+---@type string[]
+local debugLogs = {}
+---@param message string
+local function debug(...)
+	if enableDebugLogs then
+		table.insert(debugLogs, table.concat(arg, " "))
+	end
+end
+
+debug("hello world")
 
 ---@param key string
 local function getConcurrencyCount(key)
@@ -247,26 +260,26 @@ local constraints = requestDetails.s
 -- TODO: Handle operation idempotency (was this request seen before?)
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
+	debug("hit operation idempotency")
+
 	-- Return idempotency state to user (same as initial response)
-	return { 1, opIdempotency }
+	return opIdempotency
 end
 
 -- TODO: Is the operation related to a single idempotency key that is still valid? Return that
 
 -- TODO: Verify no far newer config was seen (reduce driftt)
 
--- TODO: Compute constraint capacity
+-- Compute constraint capacity
 local availableCapacity = requested
-local limitingConstraint = -1
+
+---@type integer?
+local limitingConstraint = nil
 local retryAt = 0
 
--- TODO: Can we generate a list of updates to apply in batch?
--- local updates = {}
+-- Skip GCRA if constraint check idempotency key is present
+local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 
--- TODO: Handle constraint idempotency (do we need to skip GCRA? only for single leases with valid idempotency)
-local skipGCRA = false
-
--- TODO: Extract constraint capacity calculation into testable function
 for index, value in ipairs(constraints) do
 	-- Exit checks early if no more capacity is available (e.g. no need to check fn
 	-- concurrency if account concurrency is used up)
@@ -274,32 +287,48 @@ for index, value in ipairs(constraints) do
 		break
 	end
 
+	debug("checking constraint " .. index)
+
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	local constraintRetryAfter = 0
-	if skipGCRA then
+	if skipGCRA and (value.k == 1 or value.k == 3) then
 		-- noop
 		constraintCapacity = availableCapacity
+		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
 		-- rate limit
-		local gcraRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, 0)
-		constraintCapacity = gcraRes[0]
-		constraintRetryAfter = gcraRes[1]
+		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
+		local rlRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, burst)
+		constraintCapacity = rlRes[1]
+		constraintRetryAfter = rlRes[2] / 1000000 -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
+		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		local inProgressTotal = inProgressItems + inProgressLeases
 		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
 		-- throttle
-		local gcraRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
-		constraintCapacity = gcraRes[0]
-		constraintRetryAfter = gcraRes[1]
+		debug("evaluating throttle")
+		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
+		constraintCapacity = throttleRes[1]
+		constraintRetryAfter = throttleRes[2] -- already in ms
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
 	if constraintCapacity < availableCapacity then
+		debug(
+			"constraint has less capacity",
+			"c",
+			index,
+			"cc",
+			tostring(constraintCapacity),
+			"ac",
+			tostring(availableCapacity)
+		)
+
 		availableCapacity = constraintCapacity
 		limitingConstraint = index
 
@@ -317,7 +346,13 @@ availableCapacity = availableCapacity - fairnessReduction
 
 -- TODO: If missing capacity, exit early (return limiting constraint and details)
 if availableCapacity <= 0 then
-	return { 2, limitingConstraint }
+	local res = {}
+	res["s"] = 2
+	res["lc"] = limitingConstraint
+	res["ra"] = retryAt
+	res["d"] = debugLogs
+
+	return cjson.encode(res)
 end
 
 local granted = availableCapacity
@@ -328,7 +363,7 @@ local grantedLeases = {}
 -- Update constraints
 for i = 1, granted, 1 do
 	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = requestDetails.lri[leaseIdempotencyKey]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 
 	for _, value in ipairs(constraints) do
@@ -382,16 +417,19 @@ end
 
 -- Construct result
 
----@type { r: integer, g: integer, l: { lid: string, lik: string }[] }
+---@type { s: integer, lc: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
 local result = {}
 
+result["s"] = 3
 result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
+result["lc"] = limitingConstraint
+result["d"] = debugLogs
 
 local encoded = cjson.encode(result)
 
 -- Set operation idempotency TTL
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 
-return { 3, encoded }
+return encoded
