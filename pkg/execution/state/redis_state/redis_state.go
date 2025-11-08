@@ -1027,14 +1027,12 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 	}
 
-	for _, k := range keys {
-		result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Del().Key(k).Build()
-		})
+	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Del().Key(keys...).Build()
+	})
 
-		if err := result.Error(); err != nil {
-			return err
-		}
+	if err := result.Error(); err != nil {
+		return err
 	}
 
 	return nil

@@ -614,6 +614,56 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	r.FlushAll()
 }
 
+func TestDeleteCleansUpAllKeys(t *testing.T) {
+	ctx := context.Background()
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	sm, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	require.NoError(t, err)
+	mgr := sm.(*mgr)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{AccountID: acctID, WorkspaceID: wsID, AppID: appID, WorkflowID: fnID, RunID: runID}
+
+	createdState, err := mgr.New(ctx, state.Input{
+		Identifier:     id,
+		EventBatchData: []map[string]any{{"test": "event"}},
+		Steps:          []state.MemoizedStep{{ID: "step1", Data: "data"}},
+	})
+	require.NoError(t, err)
+
+	fnRunState := mgr.shardedMgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, acctID, runID)
+	idempotencyKey := fnRunState.kg.Idempotency(ctx, isSharded, id)
+
+	keysBefore, _ := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Keys().Pattern("*").Build()
+	}).AsStrSlice()
+
+	err = sm.Delete(ctx, createdState.Identifier())
+	require.NoError(t, err)
+
+	keysAfter, _ := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Keys().Pattern("*").Build()
+	}).AsStrSlice()
+
+	assert.Greater(t, len(keysBefore), len(keysAfter))
+	assert.Equal(t, 1, len(keysAfter)) // only idempotency key should remain
+	assert.Equal(t, idempotencyKey, keysAfter[0])
+}
+
 func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
 
