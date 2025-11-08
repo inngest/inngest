@@ -391,7 +391,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) (bool, error)
+	Delete(ctx context.Context, i Identifier) error
 
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.

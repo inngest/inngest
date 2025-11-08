@@ -446,7 +446,7 @@ func TestLoadStackStepInputsStepsWithIDs(t *testing.T) {
 	})
 
 	// Clean up
-	_, err = mgr.Delete(ctx, createdState.Identifier())
+	err = mgr.Delete(ctx, createdState.Identifier())
 	require.NoError(t, err)
 }
 
@@ -537,7 +537,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	eventName := "test.event"
 
 	baseTime := time.Now().Add(-time.Hour)
-	
+
 	for range 15 {
 		pause := state.Pause{
 			ID:          uuid.New(),
@@ -550,7 +550,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 			Event:   &eventName,
 			Expires: state.Time(time.Now().Add(time.Hour)),
 		}
-		
+
 		time.Sleep(10 * time.Millisecond)
 		_, err = mgr.SavePause(ctx, pause)
 		require.NoError(t, err)
@@ -597,7 +597,7 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 
 	t.Run("since time is inclusive", func(t *testing.T) {
 		midTime := time.Now().Add(-30 * time.Minute)
-		
+
 		iter, err := mgr.PausesByEventSinceWithCreatedAt(ctx, workspaceID, eventName, midTime, 1000)
 		require.NoError(t, err)
 

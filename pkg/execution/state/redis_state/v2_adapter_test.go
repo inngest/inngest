@@ -257,9 +257,8 @@ func TestV2Adapter(t *testing.T) {
 		})
 
 		t.Run("Delete works", func(t *testing.T) {
-			deleted, err := v2svc.Delete(ctx, createdState.Metadata.ID)
+			err := v2svc.Delete(ctx, createdState.Metadata.ID)
 			require.NoError(t, err)
-			assert.True(t, deleted)
 
 			// Verify deletion
 			exists, err := v2svc.Exists(ctx, createdState.Metadata.ID)
@@ -352,7 +351,7 @@ func TestV2Adapter(t *testing.T) {
 		})
 
 		t.Run("Delete with non-existent ID succeeds", func(t *testing.T) {
-			_, err := v2svc.Delete(ctx, nonExistentID)
+			err := v2svc.Delete(ctx, nonExistentID)
 			assert.NoError(t, err)
 			// Delete may return true even for non-existent IDs in this implementation
 			// The actual behavior depends on the underlying Redis operations
