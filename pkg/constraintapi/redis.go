@@ -15,8 +15,11 @@ import (
 )
 
 const (
-	MaximumAllowedRequestDelay    = time.Second
-	OperationIdempotencyTTL       = 1 * time.Minute
+	MaximumAllowedRequestDelay = time.Second
+	// OperationIdempotencyTTL represents the time the same response will be returned after a successful request.
+	// Depending on the operation, this should be low (Otherwise, Acquire may return an already expired lease)
+	// TODO: Figure out a reasonable operation idempotency TTL (maybe per-operation)
+	OperationIdempotencyTTL       = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
 )
 
@@ -412,7 +415,6 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	scavengerShard := 0
 
 	keys := []string{
-		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
@@ -431,6 +433,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	args, err := strSlice([]any{
+		keyPrefix,
 		req.AccountID,
 		req.LeaseIdempotencyKey,
 		req.LeaseID.String(),
@@ -444,9 +447,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["acquire"].Exec(ctx, r.client, keys, args).AsBytes()
+	rawRes, err := scripts["extend"].Exec(ctx, r.client, keys, args).AsBytes()
 	if err != nil {
-		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
+		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
 	}
 
 	parsedResponse := extendLeaseScriptResponse{}
@@ -455,7 +458,20 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
 	}
 
+	res := &CapacityExtendLeaseResponse{
+		internalDebugState: parsedResponse,
+	}
+	if parsedResponse.LeaseID != ulid.Zero {
+		res.LeaseID = &parsedResponse.LeaseID
+	}
+
 	switch parsedResponse.Status {
+	case 1, 2, 3, 4:
+		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
+		return res, nil
+	case 5:
+		// TODO: track success
+		return res, nil
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
