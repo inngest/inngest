@@ -1320,7 +1320,6 @@ func TestRedisCronManager(t *testing.T) {
 	})
 
 	t.Run("EnqueueHealthCheck", func(t *testing.T) {
-
 		t.Run("not idempotent", func(t *testing.T) {
 			r.FlushAll()
 			cronItem := createCronItem(enums.CronHealthCheck)
@@ -1333,7 +1332,7 @@ func TestRedisCronManager(t *testing.T) {
 			cmd := rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
 			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
 
-			// Call enqueue should succeed (second time - should be idempotent)
+			// Call enqueue should succeed: second time - should enqueue another item
 			err = cm.EnqueueHealthCheck(ctx, cronItem)
 			assert.NoError(t, err)
 
