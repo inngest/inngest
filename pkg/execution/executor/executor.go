@@ -1139,7 +1139,7 @@ func (e *executor) schedule(
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
-		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
+		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
@@ -1301,7 +1301,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if v.stopWithoutRetry {
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
-		_, err := e.smv2.Delete(ctx, md.ID)
+		err := e.smv2.Delete(ctx, md.ID)
 		return nil, err
 	}
 
