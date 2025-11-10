@@ -4,6 +4,7 @@ import type { InfiniteData } from '@tanstack/react-query';
 
 import { EVENT_SCHEMA_JSON } from './commonSchemas';
 import type { SchemaEntry, SchemaEventPage } from './types';
+import { makeTitleOnlyEntry } from './utils';
 
 export function buildSchemaEntriesFromQueryData(
   data: InfiniteData<SchemaEventPage> | undefined
@@ -21,23 +22,13 @@ export function buildSchemaEntriesFromQueryData(
   for (const evt of items) {
     const entry = buildEntryFromLatestSchema(evt.schema, evt.name);
     if (entry === null) {
-      list.push(makeUnknownSchemaEntry(evt.name));
+      list.push(makeTitleOnlyEntry(evt.name));
     } else {
       list.push(entry);
     }
   }
 
   return list;
-}
-
-// If the schema fails to parse, we still want to show the event name in the list.
-// In this case, we'll just treat it as an "Unknown" schema.
-function makeUnknownSchemaEntry(eventName: string): SchemaEntry {
-  return {
-    key: `fetched:${eventName}`,
-    isShared: false,
-    node: transformJSONSchema({ title: eventName }),
-  };
 }
 
 export function buildEntryFromLatestSchema(
