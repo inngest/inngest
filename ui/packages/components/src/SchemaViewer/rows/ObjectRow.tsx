@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '../../utils/classNames';
 import { useExpansion } from '../ExpansionContext';
 import type { ObjectNode, SchemaNode, ValueNode } from '../types';
 import { CollapsibleRowWidget } from './CollapsibleRowWidget';
@@ -12,15 +13,11 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
   const { isExpanded, toggle } = useExpansion();
 
   const open = isExpanded(node.path);
-  const hasChildren = node.children.length > 0;
 
   return (
     <div className="flex flex-col gap-1">
-      <div
-        className={`flex items-center ${hasChildren ? 'cursor-pointer' : ''}`}
-        onClick={hasChildren ? () => toggle(node.path) : undefined}
-      >
-        {hasChildren ? <CollapsibleRowWidget open={open} /> : null}
+      <div className="flex cursor-pointer items-center" onClick={() => toggle(node.path)}>
+        <CollapsibleRowWidget open={open} />
         <div className="-ml-0.5">
           <ValueRow
             boldName={open}
@@ -30,11 +27,19 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
         </div>
       </div>
       {open && (
-        <div className="border-subtle ml-2 border-l pl-3">
+        <div
+          className={cn(
+            'border-subtle pl-3',
+            node.children.length === 0 ? 'ml-1.5' : 'ml-2 border-l'
+          )}
+        >
           <div className="flex flex-col gap-1">
             {node.children.map((child) => (
               <Row key={child.path} node={child} />
             ))}
+            {node.children.length === 0 && (
+              <div className="text-light text-sm">No data to show</div>
+            )}
           </div>
         </div>
       )}
