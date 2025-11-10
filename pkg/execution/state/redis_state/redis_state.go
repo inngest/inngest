@@ -1047,7 +1047,11 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
-			_ = m.DeletePauseByID(ctx, pauseID)
+			err = m.DeletePauseByID(ctx, pauseID)
+			if err != nil {
+				// bubble the error up we can safely retry the whole process
+				return err
+			}
 		}
 	}
 
@@ -1057,16 +1061,15 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
-	if err == nil && pause != nil {
-		return m.DeletePause(ctx, *pause)
+	if err != nil {
+		if errors.Is(err, state.ErrPauseNotFound) {
+			// pause doesn't exist, nothing to delete
+			return nil
+		}
+		// bubble the error up we can safely retry the whole process
+		return err
 	}
-
-	// This won't delete event keys, invoke correlations, or signals nicely,
-	// but still gets the pause yeeted. Critically, this means a dangling
-	// signal in the DB.
-	return m.DeletePause(ctx, state.Pause{
-		ID: pauseID,
-	})
+	return m.DeletePause(ctx, *pause)
 }
 
 func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
