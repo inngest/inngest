@@ -13,8 +13,6 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
 
   const open = isExpanded(node.path);
   const hasChildren = node.children.length > 0;
-  const keyCount = node.children.length;
-  const keysLabel = keyCount === 1 ? '1 key' : `${keyCount} keys`;
 
   return (
     <div className="flex flex-col gap-1">
@@ -28,7 +26,6 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
             boldName={open}
             node={makeFauxValueNode(node)}
             typeLabelOverride={typeLabelOverride ?? ''}
-            typePillOverride={hasChildren ? keysLabel : 'Object'}
           />
         </div>
       </div>
