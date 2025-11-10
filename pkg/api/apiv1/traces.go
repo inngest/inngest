@@ -256,7 +256,10 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, res *resource.R
 	if a.opts.MetadataExtractor.ExtendedTrace != nil {
 		metadata, err := a.opts.MetadataExtractor.ExtendedTrace.ExtractMetadata(ctx, s)
 		if err != nil {
-			// TODO: emit warning metadata span
+			warnings := meta.ExtractWarningMetadata(err)
+			if len(warnings) > 0 {
+				metadata = append(metadata, warnings)
+			}
 		}
 
 		for _, m := range metadata {

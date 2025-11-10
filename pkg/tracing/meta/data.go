@@ -153,3 +153,61 @@ type MetadataExtractor struct {
 func MetadataSpanIDSeed(parentID string, kind MetadataKind) []byte {
 	return fmt.Appendf(nil, "%s-metadata-%s", parentID, kind)
 }
+
+type MetadataWarningError struct {
+	Key string
+	Err error
+}
+
+func (e *MetadataWarningError) Error() string {
+	return e.Err.Error()
+}
+
+type WarningMetadata map[string]error
+
+func (wm WarningMetadata) Kind() MetadataKind {
+	return "inngest.warnings"
+}
+
+func (wm WarningMetadata) Op() MetadataOp {
+	return MetadataOpMerge
+}
+
+func (wm WarningMetadata) Serialize() (RawMetadata, error) {
+	ret := make(RawMetadata)
+	for key, warning := range wm {
+		ret[key], _ = json.Marshal(warning.Error())
+	}
+
+	return ret, nil
+}
+
+func ExtractWarningMetadata(err error) WarningMetadata {
+	warnings := extractMetadataWarnings(err)
+
+	md := make(WarningMetadata)
+	for _, warnings := range warnings {
+		md[warnings.Key] = warnings.Err
+	}
+
+	return md
+}
+
+func extractMetadataWarnings(err error) []*MetadataWarningError {
+	var warning *MetadataWarningError
+	type joinedError interface{ Unwrap() []error }
+	var joinedErr joinedError
+	switch {
+	case errors.As(err, &joinedErr):
+		var ret []*MetadataWarningError
+		for _, err := range joinedErr.Unwrap() {
+			ret = append(ret, extractMetadataWarnings(err)...)
+		}
+
+		return ret
+	case errors.As(err, &warning):
+		return []*MetadataWarningError{warning}
+	default:
+		return nil
+	}
+}
