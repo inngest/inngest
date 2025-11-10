@@ -180,9 +180,6 @@ func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
 func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 	now := time.Now()
 
-	if (ci.AccountID != uuid.UUID{} && ci.FunctionID != uuid.UUID{}) {
-		return fmt.Errorf("validation failed")
-	}
 	maxAttempts := consts.MaxRetries + 1
 	kind := queue.KindCronHealthCheck
 
@@ -190,7 +187,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "now", now)
 
-	l.Error("enqueue", "jobID", jobID)
+	l.Debug("enqueueing adhoc cron health check", "jobID", jobID, "ci", ci)
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -202,10 +199,10 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	switch err {
 	case nil:
-		l.Trace("adhoc cron-health-check enqueued")
+		l.Error("adhoc cron-health-check enqueued")
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Trace("adhoc cron-health-check already exists")
+		l.Error("adhoc cron-health-check already exists")
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing adhoc cron-health-check job")
