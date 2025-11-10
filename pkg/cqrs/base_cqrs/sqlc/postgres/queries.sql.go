@@ -1086,7 +1086,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE debug_run_id = CAST($1 AS CHAR(26))
-GROUP BY trace_id, run_id, debug_session_id, dynamic_span_id
+GROUP BY trace_id, run_id, debug_session_id, parent_span_id
 ORDER BY start_time
 `
 
@@ -1152,7 +1152,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE debug_session_id = CAST($1 AS CHAR(26))
-GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id
+GROUP BY trace_id, run_id, debug_run_id, dynamic_span_id, parent_span_id
 ORDER BY start_time
 `
 
@@ -1217,7 +1217,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
-GROUP BY run_id, trace_id, dynamic_span_id
+GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time
 `
 

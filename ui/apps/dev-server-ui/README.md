@@ -8,6 +8,27 @@ In the root directory of this repository, start the CLI using the `dev` command.
 go run ./cmd dev -u http://localhost:3000/api/inngest
 ```
 
+By default, the dev server uses SQLite for persistence. To use PostgreSQL instead, you can either:
+
+1. Use the `--postgres-uri` flag:
+
+```sh
+go run ./cmd dev -u http://localhost:3000/api/inngest --postgres-uri postgres://user:password@localhost:5432/inngest
+```
+
+2. Or set the `INNGEST_POSTGRES_URI` environment variable:
+
+```sh
+INNGEST_POSTGRES_URI="postgres://user:password@localhost:5432/inngest" go run ./cmd dev -u http://localhost:3000/api/inngest
+```
+
+When `--postgres-uri` or `INNGEST_POSTGRES_URI` is provided, the dev server will use PostgreSQL instead of SQLite. You can also configure PostgreSQL connection pool settings with:
+
+- `--postgres-max-idle-conns` (default: 10)
+- `--postgres-max-open-conns` (default: 100)
+- `--postgres-conn-max-idle-time` (default: 5 minutes)
+- `--postgres-conn-max-lifetime` (default: 30 minutes)
+
 Then in this directory, run the UI in dev mode. This will run Tanstack Start and GraphQL codegen concurrently:
 
 ```sh

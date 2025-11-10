@@ -76,6 +76,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
 	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
 
+	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "")
+	postgresMaxIdleConns := localconfig.GetIntValue(cmd, "postgres-max-idle-conns", 10)
+	postgresMaxOpenConns := localconfig.GetIntValue(cmd, "postgres-max-open-conns", 100)
+	postgresConnMaxIdleTime := localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5)
+	postgresConnMaxLifetime := localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30)
+
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
@@ -121,8 +127,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
 			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
 		),
-		InMemory:     inMemory,
-		DebugAPIPort: debugAPIPort,
+		InMemory:                inMemory,
+		PostgresURI:             postgresURI,
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
+		PostgresConnMaxLifetime: postgresConnMaxLifetime,
+		DebugAPIPort:            debugAPIPort,
 	}
 
 	err = devserver.New(ctx, opts)
