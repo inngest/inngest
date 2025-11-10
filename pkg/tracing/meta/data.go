@@ -41,7 +41,20 @@ func (m RawMetadata) Combine(o RawMetadata, op MetadataOp) error {
 		}
 		return nil
 	case MetadataOpAdd:
-		// TODO: this
+		for k := range o {
+			var a float64
+			if err := json.Unmarshal(m[k], &a); err != nil {
+				m[k] = o[k]
+				continue
+			}
+
+			var b float64
+			if err := json.Unmarshal(o[k], &b); err != nil {
+				continue
+			}
+
+			m[k], _ = json.Marshal(a + b)
+		}
 		return nil
 	case MetadataOpSet:
 		clear(m)
