@@ -86,15 +86,17 @@ export default async function Page() {
         ))}
       </div>
       <div className="mt-4 text-center text-sm">
-        Want to cancel your plan?{' '}
+        Cancel your plan by selecting the downgrade option. If you are having trouble downgrading,
+        please{' '}
         <Link
           className="inline"
           target="_blank"
           size="small"
           href={pathCreator.support({ ref: 'app-billing-plans-footer' })}
         >
-          Contact us
+          contact us
         </Link>
+        .
       </div>
     </>
   );
