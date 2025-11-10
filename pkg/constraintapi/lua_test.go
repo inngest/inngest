@@ -76,7 +76,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 					EvaluatedKeyHash:  "eval-hash",
 				},
 			},
-			expected: `{"k":1,"r":{"s":2,"h":"test-key-hash","eh":"eval-hash","l":100,"p":60000000000}}`,
+			expected: `{"k":1,"r":{"s":2,"h":"test-key-hash","eh":"eval-hash","k":"test-prefixeval-hash","l":100,"p":60000000000}}`,
 		},
 		{
 			name: "Concurrency constraint with custom key",
@@ -198,21 +198,21 @@ func TestLuaScriptSnapshots(t *testing.T) {
 				// Generate snapshot file if it doesn't exist
 				err := os.MkdirAll(filepath.Dir(snapshotPath), 0755)
 				require.NoError(t, err)
-				
+
 				err = os.WriteFile(snapshotPath, []byte(processedContent), 0644)
 				require.NoError(t, err)
-				
+
 				t.Logf("Generated snapshot for %s at %s", scriptName, snapshotPath)
 				return
 			}
 			require.NoError(t, err)
 
 			expected := string(expectedBytes)
-			
+
 			// Compare with expected snapshot
-			require.Equal(t, expected, processedContent, 
+			require.Equal(t, expected, processedContent,
 				"Script %s processed content differs from snapshot at %s. "+
-				"If this is intentional, delete the snapshot file to regenerate it", 
+					"If this is intentional, delete the snapshot file to regenerate it",
 				scriptName, snapshotPath)
 		})
 	}
@@ -237,7 +237,7 @@ func collectLuaScripts(t *testing.T, path string, entries []fs.DirEntry, scripts
 		name := path + "/" + e.Name()
 		name = strings.TrimPrefix(name, "lua/")
 		name = strings.TrimSuffix(name, ".lua")
-		
+
 		scripts[name] = string(byt)
 	}
 }

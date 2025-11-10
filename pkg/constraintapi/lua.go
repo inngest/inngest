@@ -19,11 +19,11 @@ var embedded embed.FS
 
 var (
 	// scripts stores all embedded lua scripts on initialization
-	scripts = map[string]*rueidis.Lua{}
-	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+	scripts              = map[string]*rueidis.Lua{}
+	include              = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 	langServerAnnotation = regexp.MustCompile(`(?m)^---@.*$|---@[^\n]*`)
-	comments = regexp.MustCompile(`(?m)^--.*$|--[^\n]*`)
-	emptyLines = regexp.MustCompile(`(?m)^\s*$`)
+	comments             = regexp.MustCompile(`(?m)^--.*$|--[^\n]*`)
+	emptyLines           = regexp.MustCompile(`(?m)^\s*$`)
 )
 
 func init() {
@@ -38,7 +38,7 @@ func init() {
 // processLuaScript processes a single Lua script by handling includes, removing language server annotations, comments, and empty lines
 func processLuaScript(name, content string, fs embed.FS) (string, error) {
 	val := content
-	
+
 	// Add any includes.
 	items := include.FindAllStringSubmatch(val, -1)
 	if len(items) > 0 {
@@ -51,22 +51,22 @@ func processLuaScript(name, content string, fs embed.FS) (string, error) {
 			val = strings.ReplaceAll(val, include[0], string(byt))
 		}
 	}
-	
+
 	// Remove language server annotations (lines starting with ---@)
 	val = langServerAnnotation.ReplaceAllString(val, "")
-	
+
 	// Remove comments (lines starting with --)
 	val = comments.ReplaceAllString(val, "")
-	
+
 	// Remove empty lines
 	val = emptyLines.ReplaceAllString(val, "")
-	
+
 	// Clean up multiple consecutive newlines
 	val = regexp.MustCompile(`\n\n+`).ReplaceAllString(val, "\n")
-	
+
 	// Trim leading/trailing whitespace
 	val = strings.TrimSpace(val)
-	
+
 	return val, nil
 }
 
@@ -89,12 +89,12 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		name := path + "/" + e.Name()
 		name = strings.TrimPrefix(name, "lua/")
 		name = strings.TrimSuffix(name, ".lua")
-		
+
 		processedScript, err := processLuaScript(name, string(byt), embedded)
 		if err != nil {
 			panic(fmt.Errorf("error processing lua script %s: %w", name, err))
 		}
-		
+
 		scripts[name] = rueidis.NewLuaScript(processedScript)
 	}
 }
@@ -176,6 +176,9 @@ type SerializedRateLimitConstraint struct {
 
 	// p = Period (embedded from config)
 	Period int `json:"p,omitempty"`
+
+	// k = Key (evaluated key hash with prefix)
+	Key string `json:"k,omitempty"`
 }
 
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
@@ -199,6 +202,9 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(c.RateLimit.Scope),
 				KeyExpressionHash: c.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  c.RateLimit.EvaluatedKeyHash,
+				// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
+				// See ratelimit/ratelimit_lua.go for the rate limit implementation.
+				Key: fmt.Sprintf("{%s}:%s", keyPrefix, c.RateLimit.EvaluatedKeyHash),
 			}
 
 			// Find matching rate limit config
@@ -259,6 +265,7 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 	case ConstraintKindThrottle:
 		serialized.Kind = 3
 		if c.Throttle != nil {
+			// NOTE: Throttle keys do NOT use a prefix like ratelimit
 			throttleConstraint := &SerializedThrottleConstraint{
 				Scope:             int(c.Throttle.Scope),
 				KeyExpressionHash: c.Throttle.KeyExpressionHash,
