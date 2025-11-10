@@ -1314,6 +1314,34 @@ func TestRedisCronManager(t *testing.T) {
 
 	})
 
+	t.Run("EnqueueHealthCheck", func(t *testing.T) {
+
+		t.Run("should have only one of fnID or AcctID", func(t *testing.T) {
+			r.FlushAll()
+			cronItem := createCronItem(enums.CronHealthCheck)
+			cronItem.FunctionID = uuid.New()
+			cronItem.AccountID = uuid.New()
+
+			// Call enqueue should succeed
+			err := cm.EnqueueHealthCheck(ctx, cronItem)
+			assert.Error(t, err)
+			assert.Equal(t, err.Error(), "validation failed")
+
+		})
+
+		t.Run("ok to have empty fnID and acctID", func(t *testing.T) {
+			r.FlushAll()
+			cronItem := createCronItem(enums.CronHealthCheck)
+			cronItem.FunctionID = uuid.UUID{}
+			cronItem.AccountID = uuid.UUID{}
+
+			// Call enqueue should succeed
+			err := cm.EnqueueHealthCheck(ctx, cronItem)
+			assert.NoError(t, err)
+		})
+
+	})
+
 }
 
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {

@@ -175,6 +175,44 @@ func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
 	return next
 }
 
+// Enqueues an adhoc cron-health-check system job
+// This is triggered only from our internal dashboard inngest function
+func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
+	now := time.Now()
+
+	if (ci.AccountID != uuid.UUID{} && ci.FunctionID != uuid.UUID{}) {
+		return fmt.Errorf("validation failed")
+	}
+	maxAttempts := consts.MaxRetries + 1
+	kind := queue.KindCronHealthCheck
+
+	jobID := fmt.Sprintf("adhoc-%s", c.CronHealthCheckJobID(now))
+
+	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "now", now)
+
+	l.Error("enqueue", "jobID", jobID)
+	err := c.q.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		GroupID:     uuid.New().String(),
+		Kind:        kind,
+		MaxAttempts: &maxAttempts,
+		Payload:     ci,
+		QueueName:   &kind,
+	}, now, queue.EnqueueOpts{})
+
+	switch err {
+	case nil:
+		l.Trace("adhoc cron-health-check enqueued")
+		return nil
+	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		l.Trace("adhoc cron-health-check already exists")
+		return nil
+	default:
+		l.ReportError(err, "error enqueueing adhoc cron-health-check job")
+		return fmt.Errorf("error enqueueing adhoc cron-health-check job: %w", err)
+	}
+}
+
 // enqueues a cronItem{op:healthcheck} of {kind:cron-health-check} into system queue.
 func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 

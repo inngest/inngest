@@ -35,8 +35,12 @@ type CronHealthChecker interface {
 	// HealthCheck checks if a "cron" queue item exists in the system queue for the next expected schedule time
 	HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
 
-	// Enqueues a cron-health-check system job
+	// Enqueues the next periodic global cron-health-check system job
 	EnqueueNextHealthCheck(ctx context.Context) error
+
+	// Enqueues an ad-hoc cron-health-check system job *now*
+	// This could be for a specific function, a specific account or globally for all crons.
+	EnqueueHealthCheck(ctx context.Context, ci CronItem) error
 }
 
 // CronManager represents the handling of cron
