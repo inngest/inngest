@@ -436,24 +436,17 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	var err error
-	ts := pause.CreatedAt
-	if ts.IsZero() {
-		ts, err = b.buf.PauseTimestamp(ctx, index, pause)
-		if err != nil || ts.IsZero() {
-			return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
-		}
-	}
-
-	// Check if atleast one block may contain the pause.
-	blockID, err := b.blockIDForTimestamp(ctx, index, ts)
+	// Check which blocks may contain the pause.
+	blockIDs, err := b.blockIDsForTimestamp(ctx, index, pause.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("error fetching block for timestamp: %w", err)
+		return fmt.Errorf("error fetching blocks for timestamp: %w", err)
 	}
-	if blockID == nil {
+	if len(blockIDs) == 0 {
 		return nil
 	}
 
+	// For now, keep the existing behavior of tracking deletes at index level
+	// TODO: Change this to per-block tracking
 	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error tracking pause delete in block index: %w", err)
@@ -543,21 +536,49 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// 3. rewriting the block
 }
 
-// blockIDForTimestamp returns the block ID that contains pauses for the given timestamp.
-func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
+// blockIDsForTimestamp returns the block IDs that may contain pauses for the given timestamp.
+// Handles boundary cases where a pause with the same timestamp as a block boundary
+// might exist in both the ending and starting blocks.
+func (b *blockstore) blockIDsForTimestamp(ctx context.Context, idx Index, ts time.Time) ([]ulid.ULID, error) {
 	score := strconv.Itoa(int(ts.UnixMilli()))
+	
+	// Get first 2 blocks that could contain this timestamp
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 1).Build(),
+		b.rc.B().Zrevrangebyscore().Key(blockIndexKey(idx)).Max("+inf").Min(score).Limit(0, 2).Build(),
 	).AsStrSlice()
-	if len(ids) == 1 {
-		id, err := ulid.Parse(ids[0])
-		return &id, err
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return nil, err
 	}
-	if err == nil || rueidis.IsRedisNil(err) {
+	
+	if len(ids) == 0 {
 		return nil, nil
 	}
-	return nil, err
+	
+	// Always include the first block
+	result := make([]ulid.ULID, 0, 2)
+	firstID, err := ulid.Parse(ids[0])
+	if err != nil {
+		return nil, fmt.Errorf("error parsing first block ULID '%s': %w", ids[0], err)
+	}
+	result = append(result, firstID)
+	
+	// Check if we need the second block (boundary case)
+	if len(ids) == 2 {
+		secondID, err := ulid.Parse(ids[1])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing second block ULID '%s': %w", ids[1], err)
+		}
+		
+		// If pause timestamp equals the second block's last timestamp,
+		// the pause might exist in both blocks due to inclusive boundary
+		secondBlockLastTimestamp := ulid.Time(secondID.Time()).UnixMilli()
+		if ts.UnixMilli() == secondBlockLastTimestamp {
+			result = append(result, secondID)
+		}
+	}
+	
+	return result, nil
 }
 
 // blockMetadata creates metadata for the given block. It expects all pauses

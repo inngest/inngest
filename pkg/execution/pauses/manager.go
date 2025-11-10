@@ -3,6 +3,7 @@ package pauses
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -324,6 +325,22 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 	//
 	// This lets us skip deleting from the buffer, as this is a longer and more complex
 	// transaction than a single lookup.
+
+	blockFlushEnabled := m.blockFlushEnabled(ctx, pause.WorkspaceID)
+	if blockFlushEnabled && pause.CreatedAt.IsZero() {
+		// Try to get the pause's creation timestamp before deleting it from the buffer
+		ts, err := m.buf.PauseTimestamp(ctx, index, pause)
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return fmt.Errorf("unable to get creation timestamp while deleting pause: %w", err)
+		}
+		pause.CreatedAt = ts
+		if pause.CreatedAt.IsZero() {
+			// Creation timestamp unavailable — cannot determine which blocks contain this pause.
+			// We'll just warn and eventually mark it as deleted on all blocks present.
+			logger.StdlibLogger(ctx).Warn("pause deletion missing creation timestamp; marking as deleted on all blocks")
+		}
+	}
+
 	err := m.buf.Delete(ctx, index, pause)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
@@ -332,7 +349,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 	// We check the block flushing feature flag because block store delete will only
 	// just mark pauses as deleted in Redis. Without compaction it won't really do
 	// anything.
-	if m.bs == nil || !m.blockFlushEnabled(ctx, pause.WorkspaceID) {
+	if m.bs == nil || !blockFlushEnabled {
 		return nil
 	}
 
