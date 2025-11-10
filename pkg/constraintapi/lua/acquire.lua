@@ -255,7 +255,7 @@ local configVersion = requestDetails.cv
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: integer? }? }[]
 local constraints = requestDetails.s
 
--- TODO: Handle operation idempotency (was this request seen before?)
+-- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
@@ -349,6 +349,7 @@ if availableCapacity <= 0 then
 	res["lc"] = limitingConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
+	res["fr"] = fairnessReduction
 
 	return cjson.encode(res)
 end
@@ -415,7 +416,7 @@ end
 
 -- Construct result
 
----@type { s: integer, lc: integer[], r: integer, g: integer, l: { lid: string, lik: string }[] }
+---@type { s: integer, lc: integer[], fr: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
 local result = {}
 
 result["s"] = 3
@@ -424,6 +425,7 @@ result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
 result["d"] = debugLogs
+result["fr"] = fairnessReduction
 
 local encoded = cjson.encode(result)
 

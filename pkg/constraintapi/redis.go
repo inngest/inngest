@@ -226,6 +226,7 @@ type acquireScriptResponse struct {
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
 	LimitingConstraints []int    `json:"lc"`
+	FairnessReduction   int      `json:"fr"`
 	RetryAt             int      `json:"ra"`
 	Debug               []string `json:"d"`
 }
@@ -385,6 +386,13 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
+
+	// Retrieve key prefix for current constraints
+	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
+	keyPrefix, err := r.keyPrefix(req.Constraints)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
 	}
 
 	keys := []string{}
