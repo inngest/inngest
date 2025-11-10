@@ -65,34 +65,23 @@ local KEYS = KEYS
 ---@type string[]
 local ARGV = ARGV
 
----@type string
-local keyOperationIdempotency = KEYS[1]
+local keyRequestState = KEYS[1]
+local keyOperationIdempotency = KEYS[2]
+local keyScavengerShard = KEYS[3]
+local keyAccountLeases = KEYS[4]
+local keyLeaseDetails = KEYS[5]
 
----@type string
-local keyScavengerShard = KEYS[2]
-
----@type string
-local keyAccountLeases = KEYS[3]
+local accountID = ARGV[1]
+local leaseIdempotencyKey = ARGV[2]
+local currentLeaseID = ARGV[3]
+local newLeaseID = ARGV[4]
+local nowMS = tonumber(ARGV[5]) --[[@as integer]]
+local leaseExpiryMS = tonumber(ARGV[6])
+local operationIdempotencyTTL = tonumber(ARGV[7])--[[@as integer]]
+local enableDebugLogs = tonumber(ARGV[8]) == 1
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
-local requestDetails = cjson.decode(ARGV[1])
-
-local accountID = ARGV[2]
-
-local nowMS = tonumber(ARGV[3]) --[[@as integer]]
-
-local leaseExpiryMS = tonumber(ARGV[4])
-
-local keyPrefix = ARGV[5]
-
-local operationIdempotencyTTL = tonumber(ARGV[6])--[[@as integer]]
-
-local enableDebugLogs = tonumber(ARGV[7]) == 1
-
-local leaseIdempotencyKey = ARGV[8]
-
-local currentLeaseID = ARGV[9]
-local newLeaseID = ARGV[10]
+local requestDetails = cjson.decode(call("GET", keyRequestState))
 
 ---@type string[]
 local debugLogs = {}
@@ -111,8 +100,6 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	-- Return idempotency state to user (same as initial response)
 	return opIdempotency
 end
-
-local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, leaseIdempotencyKey)
 
 -- Check if current lease still matches
 local storedLeaseID = call("HGET", keyLeaseDetails, "lid")

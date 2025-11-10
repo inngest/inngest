@@ -1586,6 +1586,7 @@ type CapacityExtendLeaseRequest struct {
 	LeaseId             string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	Duration            *durationpb.Duration   `protobuf:"bytes,4,opt,name=duration,proto3" json:"duration,omitempty"`
 	LeaseIdempotencyKey string                 `protobuf:"bytes,5,opt,name=lease_idempotency_key,json=leaseIdempotencyKey,proto3" json:"lease_idempotency_key,omitempty"`
+	IsRateLimit         bool                   `protobuf:"varint,6,opt,name=is_rate_limit,json=isRateLimit,proto3" json:"is_rate_limit,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1655,6 +1656,13 @@ func (x *CapacityExtendLeaseRequest) GetLeaseIdempotencyKey() string {
 	return ""
 }
 
+func (x *CapacityExtendLeaseRequest) GetIsRateLimit() bool {
+	if x != nil {
+		return x.IsRateLimit
+	}
+	return false
+}
+
 type CapacityExtendLeaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LeaseId       *string                `protobuf:"bytes,1,opt,name=lease_id,json=leaseId,proto3,oneof" json:"lease_id,omitempty"`
@@ -1705,6 +1713,7 @@ type CapacityReleaseRequest struct {
 	AccountId           string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	LeaseId             string                 `protobuf:"bytes,3,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
 	LeaseIdempotencyKey string                 `protobuf:"bytes,4,opt,name=lease_idempotency_key,json=leaseIdempotencyKey,proto3" json:"lease_idempotency_key,omitempty"`
+	IsRateLimit         bool                   `protobuf:"varint,5,opt,name=is_rate_limit,json=isRateLimit,proto3" json:"is_rate_limit,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1765,6 +1774,13 @@ func (x *CapacityReleaseRequest) GetLeaseIdempotencyKey() string {
 		return x.LeaseIdempotencyKey
 	}
 	return ""
+}
+
+func (x *CapacityReleaseRequest) GetIsRateLimit() bool {
+	if x != nil {
+		return x.IsRateLimit
+	}
+	return false
 }
 
 type CapacityReleaseResponse struct {
@@ -1909,23 +1925,25 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x06leases\x18\x01 \x03(\v2\x1f.constraintapi.v1.CapacityLeaseR\x06leases\x12S\n" +
 	"\x14limiting_constraints\x18\x02 \x03(\v2 .constraintapi.v1.ConstraintItemR\x13limitingConstraints\x12;\n" +
 	"\vretry_after\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"retryAfter\"\xea\x01\n" +
+	"retryAfter\"\x8e\x02\n" +
 	"\x1aCapacityExtendLeaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
 	"\bduration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\bduration\x122\n" +
-	"\x15lease_idempotency_key\x18\x05 \x01(\tR\x13leaseIdempotencyKey\"J\n" +
+	"\x15lease_idempotency_key\x18\x05 \x01(\tR\x13leaseIdempotencyKey\x12\"\n" +
+	"\ris_rate_limit\x18\x06 \x01(\bR\visRateLimit\"J\n" +
 	"\x1bCapacityExtendLeaseResponse\x12\x1e\n" +
 	"\blease_id\x18\x01 \x01(\tH\x00R\aleaseId\x88\x01\x01B\v\n" +
-	"\t_lease_id\"\xaf\x01\n" +
+	"\t_lease_id\"\xd3\x01\n" +
 	"\x16CapacityReleaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x19\n" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x122\n" +
-	"\x15lease_idempotency_key\x18\x04 \x01(\tR\x13leaseIdempotencyKey\"\x19\n" +
+	"\x15lease_idempotency_key\x18\x04 \x01(\tR\x13leaseIdempotencyKey\x12\"\n" +
+	"\ris_rate_limit\x18\x05 \x01(\bR\visRateLimit\"\x19\n" +
 	"\x17CapacityReleaseResponse*\xd2\x01\n" +
 	"\x1bConstraintApiRateLimitScope\x12/\n" +
 	"+CONSTRAINT_API_RATE_LIMIT_SCOPE_UNSPECIFIED\x10\x00\x12,\n" +

@@ -132,12 +132,15 @@ func WithConstraints[T any](
 			// Use previous lease as idempotency key
 			// This works because each lease is expected to extend once, after which a new lease
 			// is generated. This means idempotency can be used for graceful retries.
-			idempotencyKey := lID.String()
+			operationIempotencyKey := lID.String()
 
 			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-				IdempotencyKey: idempotencyKey,
-				AccountID:      req.AccountID,
-				LeaseID:        lID,
+				IdempotencyKey:      operationIempotencyKey,
+				AccountID:           req.AccountID,
+				LeaseID:             lID,
+				IsRateLimit:         true,
+				LeaseIdempotencyKey: idempotencyKey,
+				Duration:            ScheduleLeaseDuration,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err)
@@ -170,13 +173,15 @@ func WithConstraints[T any](
 			lID := *leaseID
 
 			// Use previous lease as idempotency key
-			idempotencyKey := lID.String()
+			operationIdempotencyKey := lID.String()
 
 			go func() {
 				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-					AccountID:      req.AccountID,
-					LeaseID:        lID,
-					IdempotencyKey: idempotencyKey,
+					AccountID:           req.AccountID,
+					LeaseID:             lID,
+					IdempotencyKey:      operationIdempotencyKey,
+					IsRateLimit:         true,
+					LeaseIdempotencyKey: idempotencyKey,
 				})
 				if internalErr != nil {
 					l.Error("failed to release capacity", "err", internalErr)

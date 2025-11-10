@@ -109,6 +109,11 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, acco
 	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, idempotencyKey)
 }
 
+// keyLeaseDetails returns the key to the hash including the current lease ID, lease run ID, and operation idempotency key
+func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUID, leaseIdempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseIdempotencyKey)
+}
+
 // keyPrefix returns the Lua key prefix for the first stage of the Constraint API.
 //
 // Since we are colocating lease data with the existing state, we will have to use the
@@ -381,6 +386,12 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	}
 }
 
+type extendLeaseScriptResponse struct {
+	Status  int       `json:"s"`
+	Debug   []string  `json:"d"`
+	LeaseID ulid.ULID `json:"lid"`
+}
+
 // ExtendLease implements CapacityManager.
 func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
 	// Validate request
@@ -388,28 +399,65 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
+	now := r.clock.Now()
+
 	// Retrieve key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, err := r.keyPrefix(req.Constraints)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
+	keyPrefix := r.queueStateKeyPrefix
+	if req.IsRateLimit {
+		keyPrefix = r.rateLimitKeyPrefix
 	}
 
-	keys := []string{}
+	// TODO: Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := 0
 
-	args, err := strSlice([]any{})
+	keys := []string{
+		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyScavengerShard(keyPrefix, scavengerShard),
+		r.keyAccountLeases(keyPrefix, req.AccountID),
+		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseIdempotencyKey),
+	}
+
+	enableDebugLogsVal := "0"
+	if enableDebugLogs {
+		enableDebugLogsVal = "1"
+	}
+
+	leaseExpiry := now.Add(req.Duration)
+	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "failed to generate new lease ID: %w", err)
+	}
+
+	args, err := strSlice([]any{
+		req.AccountID,
+		req.LeaseIdempotencyKey,
+		req.LeaseID.String(),
+		newLeaseID.String(),
+		now.UnixMilli(), // current time in milliseconds for throttle
+		leaseExpiry.UnixMilli(),
+		int(OperationIdempotencyTTL.Seconds()),
+		enableDebugLogsVal,
+	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	status, err := scripts["extend"].Exec(ctx, r.client, keys, args).AsInt64()
+	rawRes, err := scripts["acquire"].Exec(ctx, r.client, keys, args).AsBytes()
 	if err != nil {
-		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
+		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
 	}
 
-	switch status {
+	parsedResponse := extendLeaseScriptResponse{}
+	err = json.Unmarshal(rawRes, &parsedResponse)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+
+	switch parsedResponse.Status {
 	default:
-		return nil, errs.Wrap(0, false, "unexpected status code %v", status)
+		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
 

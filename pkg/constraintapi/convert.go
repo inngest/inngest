@@ -803,6 +803,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		LeaseId:             req.LeaseID.String(),
 		Duration:            durationpb.New(req.Duration),
 		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
+		IsRateLimit:         req.IsRateLimit,
 	}
 }
 
@@ -832,6 +833,7 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
 		LeaseID:             leaseID,
 		Duration:            duration,
+		IsRateLimit:         pbReq.IsRateLimit,
 	}, nil
 }
 
@@ -879,6 +881,7 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		AccountId:           req.AccountID.String(),
 		LeaseId:             req.LeaseID.String(),
 		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
+		IsRateLimit:         req.IsRateLimit,
 	}
 }
 
@@ -902,6 +905,7 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		AccountID:           accountID,
 		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
 		LeaseID:             leaseID,
+		IsRateLimit:         pbReq.IsRateLimit,
 	}, nil
 }
 
