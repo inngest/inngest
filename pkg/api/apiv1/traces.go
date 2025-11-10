@@ -134,7 +134,6 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 		"workspace_id", auth.WorkspaceID(),
 	)
 
-	run, err := a.opts.FunctionRunReader.GetFunctionRun(ctx, auth.AccountID(), auth.WorkspaceID(), "")
 	for _, rs := range req.ResourceSpans {
 		res := convertResource(rs.Resource)
 
