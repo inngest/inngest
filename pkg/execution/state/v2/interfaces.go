@@ -39,7 +39,7 @@ type RunService interface {
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.
-	Delete(ctx context.Context, id ID) (bool, error)
+	Delete(ctx context.Context, id ID) error
 	// Exists checks whether a run exists given an ID
 	Exists(ctx context.Context, id ID) (bool, error)
 	// Update updates configuration on the state, eg. setting the execution

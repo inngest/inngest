@@ -61,7 +61,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	}
 
 	// Delete the function state in every case.
-	_, err = e.smv2.Delete(ctx, opts.Metadata.ID)
+	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	if err != nil {
 		l.Error(
 			"error deleting state in finalize",
