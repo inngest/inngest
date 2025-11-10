@@ -68,6 +68,11 @@ export const entitlementUsageDocument = graphql(`
         }
       }
       entitlements {
+        executions {
+          usage
+          limit
+          overageAllowed
+        }
         runCount {
           usage
           limit
