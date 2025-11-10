@@ -1025,7 +1025,7 @@ SELECT
   input,
   output
 FROM spans
-WHERE span_id IN ($1)
+WHERE span_id IN (SELECT UNNEST($1::TEXT[]))
 LIMIT 2
 `
 
@@ -1035,17 +1035,7 @@ type GetSpanOutputRow struct {
 }
 
 func (q *Queries) GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error) {
-	query := getSpanOutput
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, getSpanOutput, pq.Array(ids))
 	if err != nil {
 		return nil, err
 	}
