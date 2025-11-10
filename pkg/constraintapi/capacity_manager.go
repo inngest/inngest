@@ -177,7 +177,10 @@ type CapacityExtendLeaseRequest struct {
 }
 
 type CapacityExtendLeaseResponse struct {
+	// LeaseID is set to the next lease ID. If this is unset, the lease may have already expired.
 	LeaseID *ulid.ULID
+
+	internalDebugState extendLeaseScriptResponse
 }
 
 type CapacityReleaseRequest struct {

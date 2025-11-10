@@ -111,6 +111,8 @@ func TestRedisCapacityManager(t *testing.T) {
 	})
 
 	t.Run("Extend", func(t *testing.T) {
+		enableDebugLogs = true
+
 		// Simulate that 2s have passed
 		clock.Advance(2 * time.Second)
 		r.FastForward(2 * time.Second)
@@ -124,9 +126,18 @@ func TestRedisCapacityManager(t *testing.T) {
 			Duration:            5 * time.Second,
 			AccountID:           accountID,
 			LeaseID:             leaseID,
+			IsRateLimit:         true,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 5, resp.internalDebugState.Status, r.Dump())
+		require.NotEqual(t, ulid.Zero, resp.internalDebugState.LeaseID)
+
+		require.NotNil(t, resp.LeaseID)
+
+		// TODO: Verify all respective keys have been updated
 	})
 
 	t.Run("Release", func(t *testing.T) {
