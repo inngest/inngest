@@ -19,43 +19,24 @@ local KEYS = KEYS
 ---@type string[]
 local ARGV = ARGV
 
----@type string
 local keyRequestState = KEYS[1]
-
----@type string
 local keyOperationIdempotency = KEYS[2]
-
----@type string
 local keyConstraintCheckIdempotency = KEYS[3]
-
----@type string
 local keyScavengerShard = KEYS[4]
-
----@type string
 local keyAccountLeases = KEYS[5]
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(ARGV[1])
-
 local accountID = ARGV[2]
-
 local nowMS = tonumber(ARGV[3]) --[[@as integer]]
-
 local nowNS = tonumber(ARGV[4]) --[[@as integer]]
-
 local leaseExpiryMS = tonumber(ARGV[5])
-
 local keyPrefix = ARGV[6]
-
 ---@type string[]
 local initialLeaseIDs = cjson.decode(ARGV[7])
-
 local operationIdempotencyKey = ARGV[8]
-
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
-
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
-
 local enableDebugLogs = tonumber(ARGV[11]) == 1
 
 ---@type string[]
