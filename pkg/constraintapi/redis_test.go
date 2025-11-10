@@ -8,6 +8,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -38,15 +39,18 @@ func TestRedisCapacityManager(t *testing.T) {
 	// The following tests are essential functionality. We also have detailed test for each method,
 	// to cover edge cases.
 
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	var leaseID ulid.ULID
+	leaseIdempotencyKey := "event1"
+
 	t.Run("Acquire", func(t *testing.T) {
 		enableDebugLogs = true
-		accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
 			AccountID:            accountID,
 			EnvID:                envID,
 			FunctionID:           fnID,
 			Amount:               1,
-			LeaseIdempotencyKeys: []string{"event1"},
+			LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
 			IdempotencyKey:       "event1",
 			LeaseRunIDs:          nil,
 			Duration:             5 * time.Second,
@@ -95,6 +99,8 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.Zero(t, resp.RetryAfter)
 
 		// TODO: Verify all keys have been created as expected + TTLs set
+
+		leaseID = resp.Leases[0].LeaseID
 	})
 
 	t.Run("Check", func(t *testing.T) {
@@ -105,7 +111,20 @@ func TestRedisCapacityManager(t *testing.T) {
 	})
 
 	t.Run("Extend", func(t *testing.T) {
-		resp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{})
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		opIdempotencyKey := "extend-test"
+
+		resp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{
+			IdempotencyKey:      opIdempotencyKey,
+			LeaseIdempotencyKey: leaseIdempotencyKey,
+			Duration:            5 * time.Second,
+			AccountID:           accountID,
+			LeaseID:             leaseID,
+		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 	})

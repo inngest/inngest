@@ -26,7 +26,6 @@ local function debug(...)
 		table.insert(debugLogs, table.concat(arg, " "))
 	end
 end
-debug("hello world")
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
 	return count
@@ -131,7 +130,7 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 local availableCapacity = requested
-local limitingConstraint = nil
+local limitingConstraints = {}
 local retryAt = 0
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 for index, value in ipairs(constraints) do
@@ -172,7 +171,7 @@ for index, value in ipairs(constraints) do
 			tostring(availableCapacity)
 		)
 		availableCapacity = constraintCapacity
-		limitingConstraint = index
+		table.insert(limitingConstraints, index)
 		if constraintRetryAfter > retryAt then
 			retryAt = constraintRetryAfter
 		end
@@ -183,9 +182,10 @@ availableCapacity = availableCapacity - fairnessReduction
 if availableCapacity <= 0 then
 	local res = {}
 	res["s"] = 2
-	res["lc"] = limitingConstraint
+	res["lc"] = limitingConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
+	res["fr"] = fairnessReduction
 	return cjson.encode(res)
 end
 local granted = availableCapacity
@@ -225,8 +225,9 @@ result["s"] = 3
 result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
-result["lc"] = limitingConstraint
+result["lc"] = limitingConstraints
 result["d"] = debugLogs
+result["fr"] = fairnessReduction
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded
