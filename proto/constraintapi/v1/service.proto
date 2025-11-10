@@ -193,6 +193,7 @@ message CapacityExtendLeaseRequest {
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
   string lease_idempotency_key = 5;
+  bool is_rate_limit = 6;
 }
 
 message CapacityExtendLeaseResponse {
@@ -204,6 +205,7 @@ message CapacityReleaseRequest {
   string account_id = 2;
   string lease_id = 3;
   string lease_idempotency_key = 4;
+  bool is_rate_limit = 5;
 }
 
 message CapacityReleaseResponse {

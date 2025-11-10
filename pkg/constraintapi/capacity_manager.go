@@ -168,6 +168,12 @@ type CapacityExtendLeaseRequest struct {
 	LeaseID ulid.ULID
 
 	Duration time.Duration
+
+	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
+	// queue constraints.
+	//
+	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
+	IsRateLimit bool
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -185,6 +191,12 @@ type CapacityReleaseRequest struct {
 
 	// LeaseID is the current lease ID
 	LeaseID ulid.ULID
+
+	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
+	// queue constraints.
+	//
+	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
+	IsRateLimit bool
 }
 
 type CapacityReleaseResponse struct{}

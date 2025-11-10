@@ -1170,12 +1170,15 @@ func (q *queue) process(
 				}
 
 				// This idempotency key will change with every refreshed lease, which makes sense.
-				idempotencyKey := capacityLeaseID.String()
+				operationIdempotencyKey := capacityLeaseID.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
-					AccountID:      p.AccountID,
-					IdempotencyKey: idempotencyKey,
-					LeaseID:        *capacityLeaseID,
+					AccountID:           p.AccountID,
+					IdempotencyKey:      operationIdempotencyKey,
+					LeaseID:             *capacityLeaseID,
+					LeaseIdempotencyKey: qi.ID,
+					IsRateLimit:         false,
+					Duration:            QueueLeaseDuration,
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1345,9 +1348,11 @@ func (q *queue) process(
 	if capacityLeaseID != nil {
 		defer func() {
 			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
-				AccountID:      p.AccountID,
-				IdempotencyKey: qi.ID,
-				LeaseID:        *capacityLeaseID,
+				AccountID:           p.AccountID,
+				IdempotencyKey:      qi.ID,
+				LeaseID:             *capacityLeaseID,
+				LeaseIdempotencyKey: qi.ID,
+				IsRateLimit:         false,
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity")
