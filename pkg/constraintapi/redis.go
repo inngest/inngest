@@ -225,9 +225,9 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraint int      `json:"lc"`
-	RetryAt            int      `json:"ra"`
-	Debug              []string `json:"d"`
+	LimitingConstraints []int    `json:"lc"`
+	RetryAt             int      `json:"ra"`
+	Debug               []string `json:"d"`
 }
 
 // Acquire implements CapacityManager.
@@ -330,8 +330,11 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	}
 
 	var limitingConstraints []ConstraintItem
-	if parsedResponse.LimitingConstraint > 0 {
-		limitingConstraints = append(limitingConstraints, req.Constraints[parsedResponse.LimitingConstraint-1])
+	if len(parsedResponse.LimitingConstraints) > 0 {
+		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
+		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
+		}
 	}
 
 	switch parsedResponse.Status {

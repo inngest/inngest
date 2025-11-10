@@ -271,8 +271,8 @@ end
 -- Compute constraint capacity
 local availableCapacity = requested
 
----@type integer?
-local limitingConstraint = nil
+---@type integer[]
+local limitingConstraints = {}
 local retryAt = 0
 
 -- Skip GCRA if constraint check idempotency key is present
@@ -328,7 +328,7 @@ for index, value in ipairs(constraints) do
 		)
 
 		availableCapacity = constraintCapacity
-		limitingConstraint = index
+		table.insert(limitingConstraints, index)
 
 		-- if the constraint must be retried later than the initial/last constraint, update retryAfter
 		if constraintRetryAfter > retryAt then
@@ -346,7 +346,7 @@ availableCapacity = availableCapacity - fairnessReduction
 if availableCapacity <= 0 then
 	local res = {}
 	res["s"] = 2
-	res["lc"] = limitingConstraint
+	res["lc"] = limitingConstraints
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 
@@ -415,14 +415,14 @@ end
 
 -- Construct result
 
----@type { s: integer, lc: integer, r: integer, g: integer, l: { lid: string, lik: string }[] }
+---@type { s: integer, lc: integer[], r: integer, g: integer, l: { lid: string, lik: string }[] }
 local result = {}
 
 result["s"] = 3
 result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
-result["lc"] = limitingConstraint
+result["lc"] = limitingConstraints
 result["d"] = debugLogs
 
 local encoded = cjson.encode(result)
