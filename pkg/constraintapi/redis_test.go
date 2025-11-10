@@ -93,6 +93,8 @@ func TestRedisCapacityManager(t *testing.T) {
 
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
+
+		// TODO: Verify all keys have been created as expected + TTLs set
 	})
 
 	t.Run("Check", func(t *testing.T) {
