@@ -202,7 +202,9 @@ type CapacityReleaseRequest struct {
 	IsRateLimit bool
 }
 
-type CapacityReleaseResponse struct{}
+type CapacityReleaseResponse struct {
+	internalDebugState releaseScriptResponse
+}
 
 type RunProcessingMode int
 

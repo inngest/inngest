@@ -45,6 +45,7 @@ func TestRedisCapacityManager(t *testing.T) {
 
 	t.Run("Acquire", func(t *testing.T) {
 		enableDebugLogs = true
+		opIdempotencyKey := "event1"
 		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
 			AccountID:            accountID,
 			EnvID:                envID,
@@ -99,6 +100,13 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.Zero(t, resp.RetryAfter)
 
 		// TODO: Verify all keys have been created as expected + TTLs set
+		require.Len(t, r.Keys(), 7)
+		require.True(t, r.Exists("{rl}:test-value")) // rate limit state exists
+		require.True(t, r.Exists(cm.keyScavengerShard(cm.rateLimitKeyPrefix, 0)))
+		require.True(t, r.Exists(cm.keyAccountLeases(cm.rateLimitKeyPrefix, accountID)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(cm.rateLimitKeyPrefix, accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", opIdempotencyKey)))
 
 		leaseID = resp.Leases[0].LeaseID
 	})
@@ -138,12 +146,36 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.NotNil(t, resp.LeaseID)
 
 		// TODO: Verify all respective keys have been updated
+
+		leaseID = *resp.LeaseID
 	})
 
 	t.Run("Release", func(t *testing.T) {
-		resp, err := cm.Release(ctx, &CapacityReleaseRequest{})
+		enableDebugLogs = true
+
+		// Simulate that 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		opIdempotencyKey := "release-test"
+
+		resp, err := cm.Release(ctx, &CapacityReleaseRequest{
+			IdempotencyKey:      opIdempotencyKey,
+			LeaseIdempotencyKey: leaseIdempotencyKey,
+			AccountID:           accountID,
+			LeaseID:             leaseID,
+			IsRateLimit:         true,
+		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
+		t.Log(resp.internalDebugState.Debug)
+
+		require.Equal(t, 5, resp.internalDebugState.Status, r.Dump())
+		require.Equal(t, 0, resp.internalDebugState.Remaining)
+
+		// TODO: Verify all respective keys have been updated
+		require.Len(t, r.Keys(), 0, r.Dump())
 	})
 }
 

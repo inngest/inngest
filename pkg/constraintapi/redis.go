@@ -477,6 +477,15 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 }
 
+type releaseScriptResponse struct {
+	Status int      `json:"s"`
+	Debug  []string `json:"d"`
+
+	// Remaining specifies the number of remaining leases
+	// generated in the same Acquire operation
+	Remaining int `json:"r"`
+}
+
 // Release implements CapacityManager.
 func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
 	// Validate request
@@ -484,20 +493,63 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
-	keys := []string{}
+	// Retrieve key prefix for current constraints
+	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
+	keyPrefix := r.queueStateKeyPrefix
+	if req.IsRateLimit {
+		keyPrefix = r.rateLimitKeyPrefix
+	}
 
-	args, err := strSlice([]any{})
+	// TODO: Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := 0
+
+	keys := []string{
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyScavengerShard(keyPrefix, scavengerShard),
+		r.keyAccountLeases(keyPrefix, req.AccountID),
+		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseIdempotencyKey),
+	}
+
+	enableDebugLogsVal := "0"
+	if enableDebugLogs {
+		enableDebugLogsVal = "1"
+	}
+
+	args, err := strSlice([]any{
+		keyPrefix,
+		req.AccountID,
+		req.LeaseIdempotencyKey,
+		req.LeaseID.String(),
+		int(OperationIdempotencyTTL.Seconds()),
+		enableDebugLogsVal,
+	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	status, err := scripts["release"].Exec(ctx, r.client, keys, args).AsInt64()
+	rawRes, err := scripts["release"].Exec(ctx, r.client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "release script failed: %w", err)
 	}
 
-	switch status {
+	parsedResponse := releaseScriptResponse{}
+	err = json.Unmarshal(rawRes, &parsedResponse)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+
+	res := &CapacityReleaseResponse{
+		internalDebugState: parsedResponse,
+	}
+
+	switch parsedResponse.Status {
+	case 1, 2, 3, 4:
+		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
+		return res, nil
+	case 5:
+		// TODO: track success
+		return res, nil
 	default:
-		return nil, errs.Wrap(0, false, "unexpected status code %v", status)
+		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }

@@ -124,6 +124,7 @@ end
 local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 	-- Handle zero limit case - no update needed since we always rate limit
 	if limit == 0 then
+		debug("quitting early")
 		return
 	end
 
@@ -154,6 +155,7 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 		local ttl_ns = new_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
 		call("SET", key, new_tat, "EX", ttl_seconds)
+		debug("setting rl", key, tostring(ttl_seconds))
 	end
 end
 
@@ -233,7 +235,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string?, eh: string?, l: integer?, p: integer? }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string }? }[]
 local constraints = requestDetails.s
 
 -- Handle operation idempotency
@@ -278,7 +280,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 1 then
 		-- rate limit
 		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
-		local rlRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, burst)
+		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
 		constraintRetryAfter = rlRes[2] / 1000000 -- convert from ns to ms
 	elseif value.k == 2 then
@@ -350,8 +352,9 @@ for i = 1, granted, 1 do
 		if skipGCRA then
 		-- noop
 		elseif value.k == 1 then
+			debug("updating rate limit", value.r.h)
 			-- rate limit
-			rateLimitUpdate(value.r.h, nowNS, value.r.p, value.r.l, 1)
+			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1)
 		elseif value.k == 2 then
 			-- concurrency
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
