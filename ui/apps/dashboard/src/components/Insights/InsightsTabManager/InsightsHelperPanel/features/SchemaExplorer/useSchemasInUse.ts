@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useMemo, useState } from 'react';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
