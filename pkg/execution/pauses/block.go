@@ -436,37 +436,65 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// Check which blocks may contain the pause.
-	blockIDs, err := b.blockIDsForTimestamp(ctx, index, pause.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("error fetching blocks for timestamp: %w", err)
+	var blockIDs []ulid.ULID
+	var err error
+
+	if pause.CreatedAt.IsZero() {
+		// Legacy pauses without timestamps: add to all blocks in the index
+		blockIDs, err = b.BlocksSince(ctx, index, time.Time{})
+		if err != nil {
+			return fmt.Errorf("error fetching all blocks for legacy pause: %w", err)
+		}
+		metrics.IncrPausesLegacyDeletionCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+	} else {
+		// Normal pauses with timestamps: find specific blocks that may contain the pause
+		blockIDs, err = b.blockIDsForTimestamp(ctx, index, pause.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error fetching blocks for timestamp: %w", err)
+		}
 	}
+
 	if len(blockIDs) == 0 {
 		return nil
 	}
 
-	// For now, keep the existing behavior of tracking deletes at index level
-	// TODO: Change this to per-block tracking
-	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
-	if err != nil {
-		return fmt.Errorf("error tracking pause delete in block index: %w", err)
+	// Track deletion in each relevant block.
+	// This is typically 1 operation, except for:
+	// - Pauses on block boundaries (2 operations)
+	// - Legacy pauses without timestamps (all blocks)
+	for _, blockID := range blockIDs {
+		err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pause.ID.String()).Build()).Error()
+		if err != nil {
+			return fmt.Errorf("error tracking pause delete in block %s: %w", blockID, err)
+		}
 	}
 
-	// As an optimization, check how many deletes this index has and trigger compaction if over the
-	// compaction limit.
-	if rand.IntN(100) <= int(b.compactionSample*100) {
+	// As an optimization, check delete counts across all blocks and trigger compaction
+	// if any block exceeds the compaction limit.
+	// Legacy pauses get added to all blocks, so reduce compaction frequency to limit Redis overhead.
+	compactionSample := b.compactionSample
+	if pause.CreatedAt.IsZero() {
+		compactionSample = b.compactionSample * 0.1 // 10x lower chance for legacy pauses
+	}
+
+	if rand.IntN(100) <= int(compactionSample*100) {
 		go func() {
-			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(blockDeleteKey(index)).Build()).AsInt64()
-			if err != nil {
-				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err)
-				return
+			var maxDeletes int64
+			for _, blockID := range blockIDs {
+				size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err, "block_id", blockID)
+					continue
+				}
+				maxDeletes = max(maxDeletes, size)
 			}
-			if size < int64(b.compactionLimit) {
+
+			if maxDeletes < int64(b.compactionLimit) {
 				return
 			}
 
 			// Trigger a new compaction.
-			logger.StdlibLogger(ctx).Debug("compacting block deletes", "len", size, "index", index)
+			logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
 			b.Compact(ctx, index)
 		}()
 	}
@@ -541,20 +569,20 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 // might exist in both the ending and starting blocks.
 func (b *blockstore) blockIDsForTimestamp(ctx context.Context, idx Index, ts time.Time) ([]ulid.ULID, error) {
 	score := strconv.Itoa(int(ts.UnixMilli()))
-	
+
 	// Get first 2 blocks that could contain this timestamp
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrevrangebyscore().Key(blockIndexKey(idx)).Max("+inf").Min(score).Limit(0, 2).Build(),
+		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 2).Build(),
 	).AsStrSlice()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		return nil, err
 	}
-	
+
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	
+
 	// Always include the first block
 	result := make([]ulid.ULID, 0, 2)
 	firstID, err := ulid.Parse(ids[0])
@@ -562,22 +590,22 @@ func (b *blockstore) blockIDsForTimestamp(ctx context.Context, idx Index, ts tim
 		return nil, fmt.Errorf("error parsing first block ULID '%s': %w", ids[0], err)
 	}
 	result = append(result, firstID)
-	
+
 	// Check if we need the second block (boundary case)
 	if len(ids) == 2 {
 		secondID, err := ulid.Parse(ids[1])
 		if err != nil {
 			return nil, fmt.Errorf("error parsing second block ULID '%s': %w", ids[1], err)
 		}
-		
-		// If pause timestamp equals the second block's last timestamp,
+
+		// If pause timestamp equals the first block's last timestamp,
 		// the pause might exist in both blocks due to inclusive boundary
-		secondBlockLastTimestamp := ulid.Time(secondID.Time()).UnixMilli()
-		if ts.UnixMilli() == secondBlockLastTimestamp {
+		firstBlockLastTimestamp := ulid.Time(firstID.Time()).UnixMilli()
+		if ts.UnixMilli() == firstBlockLastTimestamp {
 			result = append(result, secondID)
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -671,10 +699,9 @@ func blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
-// blockDeleteKey tracks all deletes for a given index.
-// note that block
-func blockDeleteKey(idx Index) string {
-	return fmt.Sprintf("{estate}:blk:dels:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+// blockDeleteKey tracks all deletes for a specific block within an index.
+func blockDeleteKey(idx Index, blockID ulid.ULID) string {
+	return fmt.Sprintf("{estate}:blk:dels:%s:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
 }
 
 type blockMetadata struct {
