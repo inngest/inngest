@@ -685,6 +685,19 @@ func (e *executor) schedule(
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
+
+	key := idempotencyKey(req, runID)
+
 	if performChecks {
 		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
 		_ = fallbackIdempotencyKey
@@ -692,7 +705,7 @@ func (e *executor) schedule(
 		// Attempt to rate-limit the incoming function.
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
-			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
 				// Enable new pure Lua implementation on a per-account basis
@@ -700,7 +713,7 @@ func (e *executor) schedule(
 
 				limited, _, err := e.rateLimiter.RateLimit(
 					ctx,
-					key,
+					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
 					ratelimit.WithUseLuaImplementation(useLuaRL),
@@ -740,19 +753,6 @@ func (e *executor) schedule(
 		}
 		return nil, ErrFunctionDebounced
 	}
-
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	var runID ulid.ULID
-
-	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
-	} else {
-		runID = *req.RunID
-	}
-
-	key := idempotencyKey(req, runID)
 
 	if req.Context == nil {
 		req.Context = map[string]any{}
