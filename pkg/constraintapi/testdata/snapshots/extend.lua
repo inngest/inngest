@@ -50,20 +50,19 @@ local function decode_ulid_time(s)
 end
 local KEYS = KEYS
 local ARGV = ARGV
-local keyRequestState = KEYS[1]
-local keyOperationIdempotency = KEYS[2]
-local keyScavengerShard = KEYS[3]
-local keyAccountLeases = KEYS[4]
-local keyLeaseDetails = KEYS[5]
-local accountID = ARGV[1]
-local leaseIdempotencyKey = ARGV[2]
-local currentLeaseID = ARGV[3]
-local newLeaseID = ARGV[4]
-local nowMS = tonumber(ARGV[5]) 
-local leaseExpiryMS = tonumber(ARGV[6])
-local operationIdempotencyTTL = tonumber(ARGV[7])
-local enableDebugLogs = tonumber(ARGV[8]) == 1
-local requestDetails = cjson.decode(call("GET", keyRequestState))
+local keyOperationIdempotency = KEYS[1]
+local keyScavengerShard = KEYS[2]
+local keyAccountLeases = KEYS[3]
+local keyLeaseDetails = KEYS[4]
+local keyPrefix = ARGV[1]
+local accountID = ARGV[2]
+local leaseIdempotencyKey = ARGV[3]
+local currentLeaseID = ARGV[4]
+local newLeaseID = ARGV[5]
+local nowMS = tonumber(ARGV[6]) 
+local leaseExpiryMS = tonumber(ARGV[7])
+local operationIdempotencyTTL = tonumber(ARGV[8])
+local enableDebugLogs = tonumber(ARGV[9]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
@@ -75,15 +74,36 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 	return opIdempotency
 end
-local storedLeaseID = call("HGET", keyLeaseDetails, "lid")
-if storedLeaseID ~= currentLeaseID then
+local leaseDetails = call("HMGET", keyLeaseDetails, "lid", "oik")
+if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
 	local res = {}
 	res["s"] = 1
+	res["d"] = debugLogs
+	return cjson.encode(res)
+end
+local leaseDetailsCurrentLeaseID = leaseDetails[1]
+local leaseOperationIdempotencyKey = leaseDetails[2]
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, leaseOperationIdempotencyKey)
+local requestStateStr = call("GET", keyRequestState)
+if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
+	debug(keyRequestState)
+	local res = {}
+	res["s"] = 2
+	res["d"] = debugLogs
+	return cjson.encode(res)
+end
+local requestDetails = cjson.decode(requestStateStr)
+local storedLeaseID = leaseDetailsCurrentLeaseID
+if storedLeaseID == nil or storedLeaseID == false or storedLeaseID ~= currentLeaseID then
+	local res = {}
+	res["s"] = 3
+	res["d"] = debugLogs
 	return cjson.encode(res)
 end
 if decode_ulid_time(storedLeaseID) < nowMS then
 	local res = {}
-	res["s"] = 2
+	res["s"] = 4
+	res["d"] = debugLogs
 	return cjson.encode(res)
 end
 local constraints = requestDetails.s
@@ -98,8 +118,10 @@ local accountScore = call("ZSCORE", keyScavengerShard, accountID)
 if accountScore == nil or accountScore == false or tonumber(accountScore) > leaseExpiryMS then
 	call("ZADD", keyScavengerShard, tonumber(leaseExpiryMS), accountID)
 end
-local result = {}
-result["lid"] = newLeaseID
-local encoded = cjson.encode(result)
+local res = {}
+res["s"] = 5
+res["d"] = debugLogs
+res["lid"] = newLeaseID
+local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded
