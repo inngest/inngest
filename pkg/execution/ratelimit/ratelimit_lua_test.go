@@ -132,6 +132,8 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 		{"5 per hour", 5, "1h", 10},
 		{"10 per minute", 10, "1m", 15},
 		{"100 per hour with burst", 100, "1h", 110},
+		{"1 per minute", 1, "1m", 3},
+		{"1 per second", 1, "1s", 3},
 	}
 
 	for _, tc := range testCases {
