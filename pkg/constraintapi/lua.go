@@ -177,7 +177,7 @@ type SerializedRateLimitConstraint struct {
 	// p = Period (embedded from config)
 	Period int `json:"p,omitempty"`
 
-	// k = Key (evaluated key hash with prefix)
+	// k = Key (fully-qualified Redis key: concatenated evaluated key hash with prefix)
 	Key string `json:"k,omitempty"`
 }
 
