@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -1624,13 +1625,41 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 
 	for _, row := range rows {
 		if row.Input != nil {
-			so.Input = []byte(fmt.Append(nil, row.Input))
+			// Use reflection to extract bytes from pqtype.NullRawMessage
+			v := reflect.ValueOf(row.Input)
+			if v.Kind() == reflect.Struct {
+				rawMsg := v.FieldByName("RawMessage")
+				valid := v.FieldByName("Valid")
+				if rawMsg.IsValid() && valid.IsValid() && valid.Bool() {
+					if rawMsg.Kind() == reflect.Slice && rawMsg.Type().Elem().Kind() == reflect.Uint8 {
+						so.Input = rawMsg.Bytes()
+					}
+				}
+			}
+			// Fallback if reflection didn't work
+			if so.Input == nil {
+				so.Input = []byte(fmt.Append(nil, row.Input))
+			}
 		}
 
 		if row.Output != nil {
 			var m map[string]any
 
-			so.Data = []byte(fmt.Append(nil, row.Output))
+			// Use reflection to extract bytes from pqtype.NullRawMessage
+			v := reflect.ValueOf(row.Output)
+			if v.Kind() == reflect.Struct {
+				rawMsg := v.FieldByName("RawMessage")
+				valid := v.FieldByName("Valid")
+				if rawMsg.IsValid() && valid.IsValid() && valid.Bool() {
+					if rawMsg.Kind() == reflect.Slice && rawMsg.Type().Elem().Kind() == reflect.Uint8 {
+						so.Data = rawMsg.Bytes()
+					}
+				}
+			}
+			// Fallback if reflection didn't work
+			if so.Data == nil {
+				so.Data = []byte(fmt.Append(nil, row.Output))
+			}
 			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
 				// NOTE: By default, we wrap errors and data.  However, unforutnately
 				// step.waitForEvent is _not_ wrapped, so we check to see if there's
