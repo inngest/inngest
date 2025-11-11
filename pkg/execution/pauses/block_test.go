@@ -10,6 +10,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -585,8 +586,8 @@ func TestBlockstoreDelete(t *testing.T) {
 	t.Run("delete with CreatedAt timestamp", func(t *testing.T) {
 		// Test normal pause deletion in a specific block:
 		//
-		// Block 1: [0s ----------- 1s] 
-		// Block 2: [2s ----------- 3s] 
+		// Block 1: [0s ----------- 1s]
+		// Block 2: [2s ----------- 3s]
 		// Block 3: [4s ----------- 5s] ← pause gets marked here
 		// Block 4: [6s ----------- 7s]
 		//
@@ -638,7 +639,7 @@ func TestBlockstoreDelete(t *testing.T) {
 		err = store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
 
-		// Create pause that should be in block 3  
+		// Create pause that should be in block 3
 		testPause := state.Pause{
 			ID:        uuid.New(),
 			CreatedAt: now.Add(4*time.Second + 500*time.Millisecond),
@@ -930,4 +931,137 @@ func TestLegacyPauseDelete(t *testing.T) {
 		}
 	}
 	require.Equal(t, 3, foundCount)
+}
+
+func TestBlockFlushOrderingBug(t *testing.T) {
+	// Test that exposes ordering bug where pauses retrieved by Redis second-precision
+	// can be out of order when using millisecond-precision CreatedAt timestamps.
+	//
+	// Bug scenario:
+	// - Create 99 pauses within the same second (millisecond differences)
+	// - Create 1 pause after a few seconds (for proper block boundaries)
+
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	// Create Redis state manager with actual Redis backend
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	sm, err := redis_state.New(
+		ctx,
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+
+	baseTime := time.Now()
+	workspaceID := uuid.New()
+	index := Index{
+		WorkspaceID: workspaceID,
+		EventName:   "test.ordering",
+	}
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	expires := state.Time(baseTime.Add(time.Hour))
+	eventName := "test.ordering"
+
+	// Create 99 pauses within the same second with millisecond differences
+	for i := 0; i < 99; i++ {
+		pause := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: workspaceID,
+			CreatedAt:   baseTime.Add(time.Duration(i) * time.Millisecond),
+			Identifier: state.PauseIdentifier{
+				RunID:      runID,
+				AccountID:  workspaceID,
+				FunctionID: uuid.New(),
+			},
+			Outgoing: "start",
+			Incoming: "end",
+			StepName: fmt.Sprintf("pause-%d", i),
+			Expires:  expires,
+			Event:    &eventName,
+		}
+		_, err := sm.SavePause(ctx, pause)
+		require.NoError(t, err)
+	}
+
+	// Create the 100th pause after a few seconds for proper block boundaries
+	lastPause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		CreatedAt:   baseTime.Add(3 * time.Second),
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-last",
+		Expires:  expires,
+		Event:    &eventName,
+	}
+	_, err = sm.SavePause(ctx, lastPause)
+	require.NoError(t, err)
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	bufferer := StateBufferer(sm)
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         bufferer,
+		Leaser:           leaser,
+		BlockSize:        100,
+		CompactionLimit:  3,
+		CompactionSample: 1.0,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Get the created block
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	// Read the block back to check ordering
+	block, err := store.ReadBlock(ctx, index, blocks[0])
+	require.NoError(t, err)
+	require.NotNil(t, block)
+	require.Len(t, block.Pauses, 100)
+
+	firstPauseTime := block.Pauses[0].CreatedAt
+	lastPauseTime := block.Pauses[99].CreatedAt
+
+	// Last pause should be the one created 3 seconds later
+	require.Equal(t, baseTime.Add(3*time.Second).UnixMilli(), lastPauseTime.UnixMilli(),
+		"Last pause should be the one created 3 seconds later")
+
+	require.Equal(t, baseTime.UnixMilli(), firstPauseTime.UnixMilli(),
+		"First pause should have the earliest timestamp, but ordering is wrong due to Redis second-precision vs millisecond-precision mismatch")
+
+	// Verify all pauses are in chronological order
+	for i := 1; i < len(block.Pauses); i++ {
+		prevTime := block.Pauses[i-1].CreatedAt
+		currTime := block.Pauses[i].CreatedAt
+		require.True(t, !currTime.Before(prevTime),
+			"Pauses should be in chronological order, but pause %d (%v) comes before pause %d (%v)",
+			i, currTime.UnixMilli(), i-1, prevTime.UnixMilli())
+	}
 }
