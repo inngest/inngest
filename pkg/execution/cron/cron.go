@@ -49,6 +49,8 @@ type CronManager interface {
 
 	CronHealthChecker
 
+	CronProcessJobID(schedule time.Time, expr string, fnID uuid.UUID, fnVersion int) string
+
 	// ScheduleNext handles the scheduling of the next cron job
 	ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error)
 }
