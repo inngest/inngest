@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -299,6 +300,12 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 
 		return nil
 	}
+
+	// We have enough pauses at this point we can now sort them based on msec precision,
+	// the Redis iterator uses ZRANGE which guarantees order but at seconds precision.
+	slices.SortFunc(block.Pauses, func(a, b *state.Pause) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
+	})
 
 	metadata, err := b.blockMetadata(ctx, index, block)
 	if err != nil {
