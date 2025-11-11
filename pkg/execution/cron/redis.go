@@ -199,10 +199,10 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	switch err {
 	case nil:
-		l.Error("adhoc cron-health-check enqueued")
+		l.Debug("adhoc cron-health-check enqueued")
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Error("adhoc cron-health-check already exists")
+		l.Debug("adhoc cron-health-check already exists")
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing adhoc cron-health-check job")
