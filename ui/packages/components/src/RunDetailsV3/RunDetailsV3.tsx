@@ -187,16 +187,16 @@ export const RunDetailsV3 = ({
   }
 
   useEffect(() => {
-    if (!runData?.trace.status || runData?.trace.status === initialRunData?.status) {
+    if (!runData?.status || runData?.status === initialRunData?.status) {
       return;
     }
 
     updateDynamicRunData({
       runID,
-      status: runData.trace.status,
+      status: runData.status,
       endedAt: runData.trace.endedAt ?? undefined,
     });
-  }, [runData?.trace.endedAt, runData?.trace.status]);
+  }, [runData?.trace.endedAt, runData?.status]);
 
   const waiting = isWaiting(initialRunData?.status || runData?.status, runError, resultError);
   const showError = waiting ? false : runError || resultError;

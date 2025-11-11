@@ -178,18 +178,36 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		endTime := span.GetEndTime()
 		spanFragments := span.GetSpanFragments()
 
-		st := strings.Split(startTime.(string), " m=")[0]
-		parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
-			return nil, err
+		var parsedStartTime time.Time
+		switch v := startTime.(type) {
+		case time.Time:
+			parsedStartTime = v
+		case string:
+			st := strings.Split(v, " m=")[0]
+			parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
+				return nil, err
+			}
+			parsedStartTime = parsed
+		default:
+			return nil, fmt.Errorf("unexpected start time type: %T", startTime)
 		}
 
-		et := strings.Split(endTime.(string), " m=")[0]
-		parsedEndTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
-			return nil, err
+		var parsedEndTime time.Time
+		switch v := endTime.(type) {
+		case time.Time:
+			parsedEndTime = v
+		case string:
+			et := strings.Split(v, " m=")[0]
+			parsed, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
+				return nil, err
+			}
+			parsedEndTime = parsed
+		default:
+			return nil, fmt.Errorf("unexpected end time type: %T", endTime)
 		}
 
 		var parentSpanIDPtr *string
@@ -228,7 +246,20 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			inputSpanID  *string
 			fragments    []map[string]interface{}
 		)
-		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
+
+		var spanFragmentsBytes []byte
+		switch v := spanFragments.(type) {
+		case string:
+			spanFragmentsBytes = []byte(v)
+		case json.RawMessage:
+			spanFragmentsBytes = []byte(v)
+		case []byte:
+			spanFragmentsBytes = v
+		default:
+			return nil, fmt.Errorf("unexpected span fragments type: %T", spanFragments)
+		}
+
+		_ = json.Unmarshal(spanFragmentsBytes, &fragments)
 
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {

@@ -329,6 +329,8 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 
 func (r *GetSpansByRunIDRow) ToSQLite() (*sqlc.GetSpansByRunIDRow, error) {
 	return &sqlc.GetSpansByRunIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
 		DynamicSpanID: r.DynamicSpanID,
 		ParentSpanID:  r.ParentSpanID,
 		StartTime:     r.StartTime,
