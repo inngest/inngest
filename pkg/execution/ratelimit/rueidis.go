@@ -44,7 +44,7 @@ type rueidisStore struct {
 	luaRateLimiter RateLimiter
 }
 
-func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...rateLimitOptionFn) (bool, time.Duration, error) {
+func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error) {
 	o := &rateLimitOptions{}
 	for _, opt := range options {
 		opt(o)
