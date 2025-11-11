@@ -28,21 +28,21 @@ type rateLimitOptions struct {
 	idempotencyTTL time.Duration
 }
 
-type rateLimitOptionFn func(o *rateLimitOptions)
+type RateLimitOptionFn func(o *rateLimitOptions)
 
-func WithNow(now time.Time) rateLimitOptionFn {
+func WithNow(now time.Time) RateLimitOptionFn {
 	return func(o *rateLimitOptions) {
 		o.now = now
 	}
 }
 
-func WithUseLuaImplementation(useLuaImplementation bool) rateLimitOptionFn {
+func WithUseLuaImplementation(useLuaImplementation bool) RateLimitOptionFn {
 	return func(o *rateLimitOptions) {
 		o.useLuaImplementation = useLuaImplementation
 	}
 }
 
-func WithIdempotency(key string, ttl time.Duration) rateLimitOptionFn {
+func WithIdempotency(key string, ttl time.Duration) RateLimitOptionFn {
 	return func(o *rateLimitOptions) {
 		o.idempotencyKey = key
 		o.idempotencyTTL = ttl
@@ -50,7 +50,7 @@ func WithIdempotency(key string, ttl time.Duration) rateLimitOptionFn {
 }
 
 type RateLimiter interface {
-	RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...rateLimitOptionFn) (bool, time.Duration, error)
+	RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error)
 }
 
 // RateLimitKey returns the rate limiting key given a function ID, rate limit config,
