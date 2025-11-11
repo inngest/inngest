@@ -156,22 +156,22 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 			for i := 0; i < tc.requests; i++ {
 				// Test Lua implementation
 				r2.SetTime(clock2.Now())
-				luaAllowed, luaRetry, err := luaLimiter.RateLimit(ctx, key, config, clock2.Now())
+				luaRateLimited, luaRetry, err := luaLimiter.RateLimit(ctx, key, config, clock2.Now())
 				require.NoError(t, err)
 
 				// Test throttled implementation (uses original interface)
-				throttledAllowed, throttledRetry, err := rateLimit(ctx, throttledStore, key, config)
+				throttledRateLimited, throttledRetry, err := rateLimit(ctx, throttledStore, key, config)
 				if err != nil {
 					t.Logf("Throttled implementation error: %v", err)
 				}
 				require.NoError(t, err)
 
 				t.Logf("Request %d: lua(limited=%v, retry=%v) vs throttled(limited=%v, retry=%v)",
-					i+1, luaAllowed, luaRetry, throttledAllowed, throttledRetry)
+					i+1, luaRateLimited, luaRetry, throttledRateLimited, throttledRetry)
 
 				// Results should match - both implementations now return "limited" (true if rate limited)
-				throttledLimitedStatus := throttledAllowed // true if limited
-				luaLimitedStatus := luaAllowed             // true if limited
+				throttledLimitedStatus := throttledRateLimited // true if limited
+				luaLimitedStatus := luaRateLimited             // true if limited
 
 				// Both should have same semantics now
 				require.Equal(t, throttledLimitedStatus, luaLimitedStatus,
@@ -179,15 +179,12 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 					i+1, throttledLimitedStatus, luaLimitedStatus)
 
 				// If rate limited, both should have similar retry times (within tolerance)
-				if throttledAllowed && luaAllowed {
+				if throttledRateLimited && luaRateLimited {
 					// Both are rate limited - compare retry times
-					// throttledRetry might be -1 if not rate limited, so check for positive values
-					if throttledRetry > 0 && luaRetry > 0 {
-						timeDiff := abs(luaRetry - throttledRetry)
-						require.Less(t, timeDiff, time.Second,
-							"request %d: retry times should be similar (throttled=%v, lua=%v, diff=%v)",
-							i+1, throttledRetry, luaRetry, timeDiff)
-					}
+					timeDiff := abs(luaRetry - throttledRetry)
+					require.Less(t, timeDiff, time.Second,
+						"request %d: retry times should be similar (throttled=%v, lua=%v, diff=%v)",
+						i+1, throttledRetry, luaRetry, timeDiff)
 				}
 			}
 
