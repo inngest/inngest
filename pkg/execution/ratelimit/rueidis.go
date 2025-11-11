@@ -28,9 +28,10 @@ return 1
 
 func New(ctx context.Context, r rueidis.Client, prefix string) RateLimiter {
 	return &rueidisStore{
-		r:         r,
-		casScript: rueidis.NewLuaScript(redisCASScript),
-		prefix:    prefix,
+		r:              r,
+		casScript:      rueidis.NewLuaScript(redisCASScript),
+		prefix:         prefix,
+		luaRateLimiter: newLuaGCRARateLimiter(ctx, r, prefix),
 	}
 }
 
@@ -39,9 +40,21 @@ type rueidisStore struct {
 	casScript *rueidis.Lua
 
 	prefix string
+
+	luaRateLimiter RateLimiter
 }
 
-func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, time.Duration, error) {
+func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...rateLimitOptionFn) (bool, time.Duration, error) {
+	o := &rateLimitOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
+
+	// Dynamically switch to Lua implementation
+	if o.useLuaImplementation {
+		return r.luaRateLimiter.RateLimit(ctx, key, c, options...)
+	}
+
 	return rateLimit(ctx, r, key, c)
 }
 

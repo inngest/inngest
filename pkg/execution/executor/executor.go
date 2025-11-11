@@ -84,6 +84,10 @@ var (
 	PauseHandleConcurrency = 100
 )
 
+const (
+	RateLimitIdempotencyTTL = 30 * time.Minute
+)
+
 // ScheduleStatus returns a string status category for a Schedule error.
 // This is useful for metrics and observability to categorize schedule attempts.
 func ScheduleStatus(err error) string {
@@ -392,6 +396,13 @@ type ExecutorRealtimeConfig struct {
 	PublishURL string
 }
 
+func WithUseLuaRateLimitImplementation(fn func(ctx context.Context, accountID uuid.UUID) bool) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).useLuaRateLimitImplementation = fn
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -444,6 +455,8 @@ type executor struct {
 
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
+
+	useLuaRateLimitImplementation func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -682,7 +695,17 @@ func (e *executor) schedule(
 			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit)
+				// Enable new pure Lua implementation on a per-account basis
+				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
+
+				limited, _, err := e.rateLimiter.RateLimit(
+					ctx,
+					key,
+					*req.Function.RateLimit,
+					ratelimit.WithNow(time.Now()),
+					ratelimit.WithUseLuaImplementation(useLuaRL),
+					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
+				)
 				if err != nil {
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
