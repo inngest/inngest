@@ -23,14 +23,22 @@ func newLuaGCRARateLimiter(ctx context.Context, r rueidis.Client, prefix string)
 }
 
 // RateLimit implements RateLimiter, returning (limited, retryAfter, error).
-func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, now time.Time) (bool, time.Duration, error) {
+func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...rateLimitOptionFn) (bool, time.Duration, error) {
+	o := &rateLimitOptions{
+		now:                  time.Now(),
+		useLuaImplementation: true,
+	}
+	for _, opt := range options {
+		opt(o)
+	}
+
 	dur, err := str2duration.ParseDuration(c.Period)
 	if err != nil {
 		return true, -1, err // limited = true on error
 	}
 
 	burst := int(c.Limit / 10)
-	nowNS := now.UnixNano()
+	nowNS := o.now.UnixNano()
 	periodNS := dur.Nanoseconds()
 	limit := c.Limit
 
