@@ -6,7 +6,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/react';
+import { RiCloseLargeLine, RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
 
 import type { QuerySnapshot } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
@@ -32,7 +32,8 @@ export function QueryHelperPanelSectionItem({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const displayText = query.name;
-  const Icon = sectionType === 'history' ? RiHistoryLine : RiBookmarkLine;
+  const Icon =
+    sectionType === 'history' ? RiHistoryLine : sectionType === 'saved' ? RiSaveLine : RiCodeBlock;
 
   const isActiveTab =
     (sectionType === 'saved' || sectionType === 'shared') && activeSavedQueryId === query.id;
