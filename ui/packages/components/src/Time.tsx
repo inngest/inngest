@@ -51,20 +51,23 @@ export function Time({ className, format, value, copyable = true }: Props) {
         <time
           suppressHydrationWarning={true}
           className={cn(
-            'group flex items-center gap-1 whitespace-nowrap',
-            copyable && 'hover:bg-canvasSubtle  cursor-pointer pr-4 hover:pr-0',
+            'group flex cursor-default items-center gap-1 whitespace-nowrap',
+            copyable && 'hover:bg-canvasSubtle pr-4 hover:pr-0',
             className
           )}
           dateTime={date.toISOString()}
-          onClick={(e) => {
-            if (!copyable) return;
-            e.stopPropagation();
-            e.preventDefault();
-            copyToClipboard(date.toISOString());
-          }}
         >
           {dateString}
-          {copyable && <RiFileCopyLine className="text-subtle hidden h-3 w-3 group-hover:block" />}
+          {copyable && (
+            <RiFileCopyLine
+              className="text-subtle hidden h-3 w-3 cursor-pointer group-hover:block"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                copyToClipboard(date.toISOString());
+              }}
+            />
+          )}
         </time>
       </TooltipTrigger>
       <TooltipContent side="right" className="w-auto px-0">

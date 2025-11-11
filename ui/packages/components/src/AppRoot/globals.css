@@ -494,3 +494,13 @@ input[type='number'] {
   scrollbar-width: 10px;
   scrollbar-gutter: 10px;
 }
+
+/* Time elements inside links should show pointer cursor */
+/* Higher specificity to override cursor-default class */
+/* Account for TooltipTrigger wrapper between link and time element */
+a time.cursor-default,
+a * time.cursor-default,
+a .cursor-default time,
+a * .cursor-default time {
+  cursor: pointer !important;
+}
