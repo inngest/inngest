@@ -66,6 +66,7 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 end
 local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 	if limit == 0 then
+		debug("quitting early")
 		return
 	end
 	local emission_interval = period_ns / limit
@@ -86,6 +87,7 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 		local ttl_ns = new_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) 
 		call("SET", key, new_tat, "EX", ttl_seconds)
+		debug("setting rl", key, tostring(ttl_seconds))
 	end
 end
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
@@ -145,7 +147,7 @@ for index, value in ipairs(constraints) do
 		debug("skipping gcra" .. index)
 	elseif value.k == 1 then
 		local burst = math.floor(value.r.l / 10) 
-		local rlRes = rateLimitCapacity(value.r.h, nowNS, value.r.p, value.r.l, burst)
+		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
 		constraintRetryAfter = rlRes[2] / 1000000 
 	elseif value.k == 2 then
@@ -197,7 +199,8 @@ for i = 1, granted, 1 do
 	for _, value in ipairs(constraints) do
 		if skipGCRA then
 		elseif value.k == 1 then
-			rateLimitUpdate(value.r.h, nowNS, value.r.p, value.r.l, 1)
+			debug("updating rate limit", value.r.h)
+			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1)
 		elseif value.k == 2 then
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
 		elseif value.k == 3 then
