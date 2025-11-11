@@ -232,6 +232,16 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			continue
 		}
 
+		if !item.CreatedAt.After(since) {
+			// Since iterator query uses second precision but pause timestamps have millisecond precision,
+			// we may retrieve pauses that occurred slightly before the last block boundary.
+			// Skipping these prevents breaking the assumption that blocks are contiguous.
+			// Pauses before the boundary will remain in buffer indefinitely.
+			l.Warn("skipping pause before block boundary",
+				"pause_created_at", item.CreatedAt,
+				"block_boundary", since)
+		}
+
 		if item.CreatedAt.IsZero() {
 			// Old pauses don't have the time embedded in the pause item but the iterator should have
 			// injected it from the pause index when prefetching IDs/scores.
