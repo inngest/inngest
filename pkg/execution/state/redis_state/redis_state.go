@@ -984,25 +984,21 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-//
-// Returns a boolean indicating whether it performed deletion. If the run had
-// parallel steps then it may be false, since parallel steps cause the function
-// end to be reached multiple times in a single run
-func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
-	performedDeletion, err := m.shardedMgr.delete(ctx, ctx, i)
+func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+	err := m.shardedMgr.delete(ctx, ctx, i)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	err = m.deletePausesForRun(ctx, ctx, i)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return performedDeletion, nil
+	return nil
 }
 
-func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) (bool, error) {
+func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1031,26 +1027,15 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 	}
 
-	performedDeletion := false
-	for _, k := range keys {
-		result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Del().Key(k).Build()
-		})
+	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Del().Key(keys...).Build()
+	})
 
-		// We should check a single key rather than all keys, to avoid races.
-		// We'll somewhat arbitrarily pick RunMetadata
-		if k == fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID) {
-			if count, _ := result.ToInt64(); count > 0 {
-				performedDeletion = true
-			}
-		}
-
-		if err := result.Error(); err != nil {
-			return false, err
-		}
+	if err := result.Error(); err != nil {
+		return err
 	}
 
-	return performedDeletion, nil
+	return nil
 }
 
 func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
@@ -1062,7 +1047,11 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
 		for _, id := range pauseIDs {
 			pauseID, _ := uuid.Parse(id)
-			_ = m.DeletePauseByID(ctx, pauseID)
+			err = m.DeletePauseByID(ctx, pauseID)
+			if err != nil {
+				// bubble the error up we can safely retry the whole process
+				return err
+			}
 		}
 	}
 
@@ -1072,16 +1061,15 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
-	if err == nil && pause != nil {
-		return m.DeletePause(ctx, *pause)
+	if err != nil {
+		if errors.Is(err, state.ErrPauseNotFound) {
+			// pause doesn't exist, nothing to delete
+			return nil
+		}
+		// bubble the error up we can safely retry the whole process
+		return err
 	}
-
-	// This won't delete event keys, invoke correlations, or signals nicely,
-	// but still gets the pause yeeted. Critically, this means a dangling
-	// signal in the DB.
-	return m.DeletePause(ctx, state.Pause{
-		ID: pauseID,
-	})
+	return m.DeletePause(ctx, *pause)
 }
 
 func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
