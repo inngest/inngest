@@ -81,13 +81,6 @@ type QueriesResponse = {
 function limitQueriesByType(type: 'shared' | 'saved', queries: QueriesResponse) {
   return {
     ...queries,
-    data: queries.data?.filter((query) =>
-      type === 'shared' ? isSharedQuery(query) : !isSharedQuery(query)
-    ),
+    data: queries.data?.filter((query) => (type === 'shared' ? query.shared : !query.shared)),
   };
-}
-
-// TODO: Check against "shared" field when implemented.
-function isSharedQuery(_query: InsightsQueryStatement) {
-  return false;
 }
