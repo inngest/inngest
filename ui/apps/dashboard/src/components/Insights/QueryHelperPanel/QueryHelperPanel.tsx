@@ -43,6 +43,14 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={queries}
+          title="Shared queries"
+          sectionType="shared"
+        />
+        <QueryHelperPanelCollapsibleSection
+          activeSavedQueryId={activeSavedQueryId}
+          onQueryDelete={deleteQuery}
+          onQuerySelect={tabManagerActions.createTabFromQuery}
+          queries={queries}
           title="Saved queries"
           sectionType="saved"
         />

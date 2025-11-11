@@ -5,7 +5,7 @@ import { RiBookmarkLine, RiHistoryLine } from '@remixicon/react';
 type QueryHelperPanelSectionContentNoDataProps = {
   primary: string;
   secondary: string;
-  sectionType: 'history' | 'saved';
+  sectionType: 'history' | 'saved' | 'shared';
 };
 
 export function QueryHelperPanelSectionContentNoData({
