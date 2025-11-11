@@ -1800,6 +1800,11 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 			}.Serialize(execution.StateErrorKey)
 			response.Output = gracefulErr
 			response.Err = &serr.Code
+
+			// check for connect worker capacity errors after updating the UI response
+			if serr.Code == syscode.CodeConnectAllWorkersAtCapacity || serr.Code == syscode.CodeConnectRequestAssignWorkerReachedCapacity {
+				err = queue.AlwaysRetryError(state.ErrConnectWorkerCapacity)
+			}
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.

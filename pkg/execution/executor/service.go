@@ -335,11 +335,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 		return false, queue.AlwaysRetryError(err)
 	}
 
-	// connect worker capacity errors should be retried
-	if errors.Is(err, state.ErrConnectWorkerCapacity) {
-		return false, queue.AlwaysRetryError(err)
-	}
-
 	if errors.Is(err, ErrHandledStepError) {
 		// Retry any next steps.
 		return false, err
