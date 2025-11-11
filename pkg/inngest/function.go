@@ -114,6 +114,15 @@ func (f Function) MaxAttempts() int {
 	return f.Steps[0].RetryCount() + 1
 }
 
+func (f Function) HasCronExpression(cron string) bool {
+	for _, f := range f.Triggers {
+		if f.CronTrigger != nil && f.CronTrigger.Cron == cron {
+			return true
+		}
+	}
+	return false
+}
+
 type RateLimit struct {
 	// Limit is how often the function can be called within the specified period
 	Limit uint `json:"limit"`
