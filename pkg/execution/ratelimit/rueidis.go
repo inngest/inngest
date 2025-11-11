@@ -122,14 +122,6 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 		return 0, now, fmt.Errorf("failed to get key value: %w", err)
 	}
 
-	// We could not load the value for some reason
-
-	// Only continue for integer parsing errors, i/o timeouts should be retried properly
-	numErr := &strconv.NumError{}
-	if !errors.As(err, &numErr) || numErr.Err != strconv.ErrSyntax {
-		return 0, now, fmt.Errorf("failed to get key value: %w", err)
-	}
-
 	if r.disableGracefulScientificNotationParsing {
 		return 0, now, fmt.Errorf("unexpected scientific notation: %w", err)
 	}
