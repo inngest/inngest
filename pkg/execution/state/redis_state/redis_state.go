@@ -874,10 +874,13 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
 
-	now := time.Now()
-	nowUnixSeconds := now.Unix()
+	createdAt := p.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
 
-	p.CreatedAt = now
+	nowUnixSeconds := createdAt.Unix()
+	p.CreatedAt = createdAt
 
 	packed, err := json.Marshal(p)
 	if err != nil {
