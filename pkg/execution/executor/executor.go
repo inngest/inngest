@@ -48,6 +48,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -1420,7 +1421,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		// For most executions, we now set the status of the execution span.
+		//For most executions, we now set the status of the execution span.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
@@ -1446,6 +1447,21 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
 			return nil, err
+		}
+
+		for _, opcode := range resp.Generator {
+			for _, metadata := range opcode.Metadata {
+				_, err := e.createMetadataSpan(
+					ctx,
+					&instance,
+					"executor.ExecutePostMetadata",
+					// TODO: non-adhoc metadata
+					metadata,
+				)
+				if err != nil {
+					l.Warn("error creating metadata span", "error", err)
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
@@ -2709,7 +2725,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		copied := *op
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
-			// parellel step individually.
+			// parallel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {
@@ -3494,6 +3510,24 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
 
+	{
+		// Parse the request
+		if parsed, err := aigateway.ParseInput(input); err != nil {
+			e.log.Debug("error parsing gateway request during handleGeneratorAIGateway", "error", err)
+		} else {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorAIGatewayRequestMetadata",
+				// TODO: non-adhoc metadata
+				meta.AnyStructuredMetadata("inngest.ai.request", parsed, meta.MetadataOpMerge),
+			)
+			if err != nil {
+				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+		}
+	}
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
@@ -3509,6 +3543,25 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	runCtx.SetStatusCode(resp.StatusCode)
+
+	// Emit metadata spans
+	{
+		// And parse the response.
+		if parsed, err := aigateway.ParseOutput(input.Format, resp.Body); err != nil && !errors.Is(err, aigateway.ErrNoOpenAIChoicesError) {
+			e.log.Debug("error parsing gateway response during handleGeneratorAIGateway", "error", err)
+		} else {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorAIGatewayResponseMetadata",
+				// TODO: non-adhoc metadata
+				meta.AnyStructuredMetadata("inngest.ai.response", parsed, meta.MetadataOpMerge),
+			)
+			if err != nil {
+				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
+			}
+		}
+	}
 
 	// Handle errors individually, here.
 	if failure {
@@ -3540,6 +3593,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
 		}
 
+		// TODO: maybe handle failure
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
 		// an error on output.
@@ -4630,4 +4684,26 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, metadata meta.StructuredMetadata) (*meta.SpanReference, error) {
+	attrs, err := tracing.MetadataAttrs(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	parent := runCtx.ExecutionSpan()
+	return e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameMetadata,
+		&tracing.CreateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: location},
+			Parent:     parent,
+			Metadata:   runCtx.Metadata(),
+			QueueItem:  util.ToPtr(runCtx.LifecycleItem()),
+			Attributes: attrs,
+
+			DynamicSeed: meta.MetadataSpanIDSeed(parent.DynamicSpanID, metadata.Kind()),
+		},
+	)
 }

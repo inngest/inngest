@@ -151,7 +151,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					err := a.commitSpan(res, ss.Scope, s)
+					err := a.commitSpan(ctx, l, res, ss.Scope, s)
 					if err != nil {
 						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
@@ -167,7 +167,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, l logger.Logger, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -207,18 +207,22 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
+	// TODO: include Function/App ID attrs #3270
+	execAttrs := meta.NewAttrSet(
+		meta.Attr(meta.Attrs.RunID, &runID),
+	)
+
 	ourAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.IsUserland, &isUserland),
 		meta.Attr(meta.Attrs.UserlandSpanID, &spanID),
 		meta.Attr(meta.Attrs.DynamicSpanID, &spanID),
 		meta.Attr(meta.Attrs.UserlandName, &s.Name),
 		meta.Attr(meta.Attrs.DynamicStatus, &status),
-		meta.Attr(meta.Attrs.RunID, &runID),
 		meta.Attr(meta.Attrs.UserlandKind, &spanKind),
 		meta.Attr(meta.Attrs.UserlandServiceName, &resourceServiceName),
 		meta.Attr(meta.Attrs.UserlandScopeName, &scope.Name),
 		meta.Attr(meta.Attrs.UserlandScopeVersion, &scope.Version),
-	)
+	).Merge(execAttrs)
 
 	// Add some additional attributes on top
 	attrs = append(attrs, ourAttrs.Serialize()...)
@@ -236,7 +240,7 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 		}
 	}
 
-	_, err = a.opts.TracerProvider.CreateSpan(context.Background(), meta.SpanNameUserland, &tracing.CreateSpanOptions{
+	span, err := a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameUserland, &tracing.CreateSpanOptions{
 		Debug:              &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan"},
 		StartTime:          time.Unix(0, int64(s.StartTimeUnixNano)),
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
@@ -245,6 +249,37 @@ func (a router) commitSpan(res *resource.Resource, scope *commonv1.Instrumentati
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create span: %w", err)
+	}
+
+	// TODO: feature flag this at the account level
+	if a.opts.MetadataExtractor.ExtendedTrace != nil {
+		metadata, err := a.opts.MetadataExtractor.ExtendedTrace.ExtractMetadata(ctx, s)
+		if err != nil {
+			warnings := meta.ExtractWarningMetadata(err)
+			if len(warnings) > 0 {
+				metadata = append(metadata, warnings)
+			}
+		}
+
+		for _, m := range metadata {
+			attrs, err := tracing.MetadataAttrs(m)
+			if err != nil {
+				l.Error("failed to serialize metadata attributes", "err", err)
+				continue
+			}
+
+			_, err = a.opts.TracerProvider.CreateSpan(ctx, meta.SpanNameMetadata, &tracing.CreateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "apiv1.traces.commitSpan.metadata"},
+				StartTime:  time.Unix(0, int64(s.StartTimeUnixNano)),
+				EndTime:    time.Unix(0, int64(s.EndTimeUnixNano)),
+				Parent:     span,
+				Attributes: attrs.Merge(execAttrs),
+			})
+			if err != nil {
+				l.Error("failed to create metadata span", "err", err)
+				continue
+			}
+		}
 	}
 
 	return nil
