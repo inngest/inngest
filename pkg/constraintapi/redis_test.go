@@ -134,7 +134,9 @@ func TestRedisCapacityManager(t *testing.T) {
 			Duration:            5 * time.Second,
 			AccountID:           accountID,
 			LeaseID:             leaseID,
-			IsRateLimit:         true,
+			Migration: MigrationIdentifier{
+				IsRateLimit: true,
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -165,7 +167,9 @@ func TestRedisCapacityManager(t *testing.T) {
 			LeaseIdempotencyKey: leaseIdempotencyKey,
 			AccountID:           accountID,
 			LeaseID:             leaseID,
-			IsRateLimit:         true,
+			Migration: MigrationIdentifier{
+				IsRateLimit: true,
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)

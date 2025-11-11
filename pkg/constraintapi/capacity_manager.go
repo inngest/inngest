@@ -16,6 +16,17 @@ type CapacityManager interface {
 	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
 }
 
+// MigrationIdentifier includes hints for the Constraint API which will be removed
+// once all constraint state is moved to a dedicated data store
+type MigrationIdentifier struct {
+	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
+	// queue constraints.
+	//
+	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
+	IsRateLimit bool
+	QueueShard  string
+}
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -42,6 +53,8 @@ type CapacityCheckRequest struct {
 	//
 	// This design assumes that the other side _knows_ the current constraint.
 	Constraints []ConstraintItem
+
+	Migration MigrationIdentifier
 }
 
 type CapacityCheckResponse struct {
@@ -127,6 +140,8 @@ type CapacityAcquireRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes and to enforce fairness/avoid starvation.
 	Source LeaseSource
+
+	Migration MigrationIdentifier
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -169,11 +184,7 @@ type CapacityExtendLeaseRequest struct {
 
 	Duration time.Duration
 
-	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
-	// queue constraints.
-	//
-	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
-	IsRateLimit bool
+	Migration MigrationIdentifier
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -195,11 +206,7 @@ type CapacityReleaseRequest struct {
 	// LeaseID is the current lease ID
 	LeaseID ulid.ULID
 
-	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
-	// queue constraints.
-	//
-	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
-	IsRateLimit bool
+	Migration MigrationIdentifier
 }
 
 type CapacityReleaseResponse struct {

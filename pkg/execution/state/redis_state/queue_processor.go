@@ -1177,8 +1177,11 @@ func (q *queue) process(
 					IdempotencyKey:      operationIdempotencyKey,
 					LeaseID:             *capacityLeaseID,
 					LeaseIdempotencyKey: qi.ID,
-					IsRateLimit:         false,
-					Duration:            QueueLeaseDuration,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  q.primaryQueueShard.Name,
+					},
+					Duration: QueueLeaseDuration,
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1352,7 +1355,10 @@ func (q *queue) process(
 				IdempotencyKey:      qi.ID,
 				LeaseID:             *capacityLeaseID,
 				LeaseIdempotencyKey: qi.ID,
-				IsRateLimit:         false,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  q.primaryQueueShard.Name,
+				},
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity")

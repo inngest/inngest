@@ -135,10 +135,12 @@ func WithConstraints[T any](
 			operationIempotencyKey := lID.String()
 
 			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-				IdempotencyKey:      operationIempotencyKey,
-				AccountID:           req.AccountID,
-				LeaseID:             lID,
-				IsRateLimit:         true,
+				IdempotencyKey: operationIempotencyKey,
+				AccountID:      req.AccountID,
+				LeaseID:        lID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: true,
+				},
 				LeaseIdempotencyKey: idempotencyKey,
 				Duration:            ScheduleLeaseDuration,
 			})
@@ -177,10 +179,12 @@ func WithConstraints[T any](
 
 			go func() {
 				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-					AccountID:           req.AccountID,
-					LeaseID:             lID,
-					IdempotencyKey:      operationIdempotencyKey,
-					IsRateLimit:         true,
+					AccountID:      req.AccountID,
+					LeaseID:        lID,
+					IdempotencyKey: operationIdempotencyKey,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: true,
+					},
 					LeaseIdempotencyKey: idempotencyKey,
 				})
 				if internalErr != nil {
@@ -291,6 +295,9 @@ func CheckConstraints(
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
 		Source:            source,
 		BlockingThreshold: 0, // Disable this for now
+		Migration: constraintapi.MigrationIdentifier{
+			IsRateLimit: true,
+		},
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr)

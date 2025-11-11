@@ -184,7 +184,7 @@ type SerializedRateLimitConstraint struct {
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
 // for efficient storage in Redis and easy consumption in Lua scripts.
 // The config parameter is used to embed matching configuration limits directly into the constraint.
-func (c ConstraintItem) ToSerializedConstraintItem(
+func (ci ConstraintItem) ToSerializedConstraintItem(
 	config ConstraintConfig,
 	accountID uuid.UUID,
 	envID uuid.UUID,
@@ -194,22 +194,22 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 	serialized := SerializedConstraintItem{}
 
 	// Convert ConstraintKind to integer
-	switch c.Kind {
+	switch ci.Kind {
 	case ConstraintKindRateLimit:
 		serialized.Kind = 1
-		if c.RateLimit != nil {
+		if ci.RateLimit != nil {
 			rateLimitConstraint := &SerializedRateLimitConstraint{
-				Scope:             int(c.RateLimit.Scope),
-				KeyExpressionHash: c.RateLimit.KeyExpressionHash,
-				EvaluatedKeyHash:  c.RateLimit.EvaluatedKeyHash,
+				Scope:             int(ci.RateLimit.Scope),
+				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
 				// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
 				// See ratelimit/ratelimit_lua.go for the rate limit implementation.
-				Key: fmt.Sprintf("{%s}:%s", keyPrefix, c.RateLimit.EvaluatedKeyHash),
+				Key: fmt.Sprintf("{%s}:%s", keyPrefix, ci.RateLimit.EvaluatedKeyHash),
 			}
 
 			// Find matching rate limit config
 			for _, rlConfig := range config.RateLimit {
-				if rlConfig.Scope == c.RateLimit.Scope && rlConfig.KeyExpressionHash == c.RateLimit.KeyExpressionHash {
+				if rlConfig.Scope == ci.RateLimit.Scope && rlConfig.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
 					rateLimitConstraint.Limit = rlConfig.Limit
 					// Ensure rate limiting period is encoded as nanoseconds
 					rateLimitConstraint.Period = int((time.Duration(rlConfig.Period) * time.Second).Nanoseconds())
@@ -221,38 +221,38 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 		}
 	case ConstraintKindConcurrency:
 		serialized.Kind = 2
-		if c.Concurrency != nil {
+		if ci.Concurrency != nil {
 			concurrencyConstraint := &SerializedConcurrencyConstraint{
-				Mode:               int(c.Concurrency.Mode),
-				Scope:              int(c.Concurrency.Scope),
-				KeyExpressionHash:  c.Concurrency.KeyExpressionHash,
-				EvaluatedKeyHash:   c.Concurrency.EvaluatedKeyHash,
-				InProgressItemKey:  c.Concurrency.InProgressItemKey,
-				InProgressLeaseKey: c.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
+				Mode:               int(ci.Concurrency.Mode),
+				Scope:              int(ci.Concurrency.Scope),
+				KeyExpressionHash:  ci.Concurrency.KeyExpressionHash,
+				EvaluatedKeyHash:   ci.Concurrency.EvaluatedKeyHash,
+				InProgressItemKey:  ci.Concurrency.InProgressItemKey,
+				InProgressLeaseKey: ci.Concurrency.InProgressLeasesKey(keyPrefix, accountID, envID, functionID),
 			}
 
 			// Embed appropriate limit based on scope and mode
-			if c.Concurrency.KeyExpressionHash != "" {
+			if ci.Concurrency.KeyExpressionHash != "" {
 				// Custom concurrency key - find matching custom limit
 				for _, customLimit := range config.Concurrency.CustomConcurrencyKeys {
-					if customLimit.Mode == c.Concurrency.Mode &&
-						customLimit.Scope == c.Concurrency.Scope &&
-						customLimit.KeyExpressionHash == c.Concurrency.KeyExpressionHash {
+					if customLimit.Mode == ci.Concurrency.Mode &&
+						customLimit.Scope == ci.Concurrency.Scope &&
+						customLimit.KeyExpressionHash == ci.Concurrency.KeyExpressionHash {
 						concurrencyConstraint.Limit = customLimit.Limit
 						break
 					}
 				}
 			} else {
 				// Standard concurrency limits based on scope and mode
-				switch c.Concurrency.Scope {
+				switch ci.Concurrency.Scope {
 				case 0: // Function scope
-					if c.Concurrency.Mode == 0 { // Step mode
+					if ci.Concurrency.Mode == 0 { // Step mode
 						concurrencyConstraint.Limit = config.Concurrency.FunctionConcurrency
 					} else { // Run mode
 						concurrencyConstraint.Limit = config.Concurrency.FunctionRunConcurrency
 					}
 				case 2: // Account scope
-					if c.Concurrency.Mode == 0 { // Step mode
+					if ci.Concurrency.Mode == 0 { // Step mode
 						concurrencyConstraint.Limit = config.Concurrency.AccountConcurrency
 					} else { // Run mode
 						concurrencyConstraint.Limit = config.Concurrency.AccountRunConcurrency
@@ -264,17 +264,17 @@ func (c ConstraintItem) ToSerializedConstraintItem(
 		}
 	case ConstraintKindThrottle:
 		serialized.Kind = 3
-		if c.Throttle != nil {
+		if ci.Throttle != nil {
 			// NOTE: Throttle keys do NOT use a prefix like ratelimit
 			throttleConstraint := &SerializedThrottleConstraint{
-				Scope:             int(c.Throttle.Scope),
-				KeyExpressionHash: c.Throttle.KeyExpressionHash,
-				EvaluatedKeyHash:  c.Throttle.EvaluatedKeyHash,
+				Scope:             int(ci.Throttle.Scope),
+				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
 			}
 
 			// Find matching throttle config
 			for _, tConfig := range config.Throttle {
-				if tConfig.Scope == c.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == c.Throttle.KeyExpressionHash {
+				if tConfig.Scope == ci.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
 					throttleConstraint.Limit = tConfig.Limit
 					throttleConstraint.Burst = tConfig.Burst
 					throttleConstraint.Period = tConfig.Period
