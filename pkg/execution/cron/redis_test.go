@@ -1300,16 +1300,47 @@ func TestRedisCronManager(t *testing.T) {
 			// Call enqueue next first time
 			err := cm.EnqueueNextHealthCheck(ctx)
 			require.NoError(t, err)
-			keys1 := r.Keys()
+
+			// Get count of queue items in the partition
+			cmd := rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
+			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
 
 			// Call enqueue next second time (should be idempotent)
 			err = cm.EnqueueNextHealthCheck(ctx)
 			require.NoError(t, err)
-			keys2 := r.Keys()
+
+			// Get count of queue items in the partition
+			cmd = rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
+			queueItemCount2, _ := rc.Do(ctx, cmd).AsInt64()
 
 			// The number of keys should be the same (no duplicates created)
-			assert.ElementsMatch(t, keys1, keys2,
-				"keys should be identical after both enqueues")
+			assert.Equal(t, queueItemCount1, queueItemCount2, "queue item count should not increase")
+		})
+
+	})
+
+	t.Run("EnqueueHealthCheck", func(t *testing.T) {
+		t.Run("not idempotent", func(t *testing.T) {
+			r.FlushAll()
+			cronItem := createCronItem(enums.CronHealthCheck)
+
+			// Call enqueue should succeed
+			err := cm.EnqueueHealthCheck(ctx, cronItem)
+			assert.NoError(t, err)
+
+			// Get count of queue items in the partition
+			cmd := rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
+			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
+
+			// Call enqueue should succeed: second time - should enqueue another item
+			err = cm.EnqueueHealthCheck(ctx, cronItem)
+			assert.NoError(t, err)
+
+			// Get count of queue items in the partition
+			cmd = rc.B().Zcard().Key("{queue}:queue:sorted:cron-health-check").Build()
+			queueItemCount2, _ := rc.Do(ctx, cmd).AsInt64()
+
+			assert.Equal(t, queueItemCount1+1, queueItemCount2, "queue item count should increase by 1")
 		})
 
 	})
