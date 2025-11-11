@@ -102,7 +102,7 @@ const documents = {
     "\n  mutation UnpauseFunction($fnID: ID!) {\n    unpauseFunction(fnID: $fnID) {\n      id\n    }\n  }\n": types.UnpauseFunctionDocument,
     "\n  query InsightsResults($query: String!, $workspaceID: ID!) {\n    insights(query: $query, workspaceID: $workspaceID) {\n      columns {\n        name\n        columnType\n      }\n      rows {\n        values\n      }\n    }\n  }\n": types.InsightsResultsDocument,
     "\n  query GetEventTypeSchemas($envID: ID!, $cursor: String, $nameSearch: String, $archived: Boolean) {\n    environment: workspace(id: $envID) {\n      eventTypesV2(\n        after: $cursor\n        first: 40\n        filter: { archived: $archived, nameSearch: $nameSearch }\n      ) {\n        edges {\n          node {\n            name\n            latestSchema\n          }\n        }\n        pageInfo {\n          hasNextPage\n          endCursor\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n  }\n": types.GetEventTypeSchemasDocument,
-    "\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        name\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n": types.InsightsSavedQueriesDocument,
+    "\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        creator\n        lastEditor\n        name\n        shared\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n": types.InsightsSavedQueriesDocument,
     "\n  mutation CreateInsightsQuery($input: NewInsightsQuery!) {\n    createInsightsQuery(input: $input) {\n      id\n      name\n      sql\n      createdAt\n      updatedAt\n    }\n  }\n": types.CreateInsightsQueryDocument,
     "\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n": types.RemoveInsightsQueryDocument,
     "\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      name\n      sql\n      createdAt\n      updatedAt\n    }\n  }\n": types.UpdateInsightsQueryDocument,
@@ -526,7 +526,7 @@ export function graphql(source: "\n  query GetEventTypeSchemas($envID: ID!, $cur
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        name\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        name\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        creator\n        lastEditor\n        name\n        shared\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n"): (typeof documents)["\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        creator\n        lastEditor\n        name\n        shared\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

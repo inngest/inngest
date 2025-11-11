@@ -18,7 +18,10 @@ const insightsSavedQueriesQuery = graphql(`
     account {
       insightsQueries {
         id
+        creator
+        lastEditor
         name
+        shared
         sql
         createdAt
         updatedAt
