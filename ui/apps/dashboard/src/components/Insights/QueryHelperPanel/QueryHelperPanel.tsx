@@ -1,8 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useStoredQueries } from './StoredQueriesContext';
 
@@ -13,6 +15,9 @@ interface QueryHelperPanelProps {
 export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
   const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } = useStoredQueries();
+
+  const sharedQueries = useMemo(() => limitQueriesByType('shared', queries), [queries]);
+  const savedQueries = useMemo(() => limitQueriesByType('saved', queries), [queries]);
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -42,7 +47,7 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
           activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={queries}
+          queries={sharedQueries}
           title="Shared queries"
           sectionType="shared"
         />
@@ -50,7 +55,7 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
           activeSavedQueryId={activeSavedQueryId}
           onQueryDelete={deleteQuery}
           onQuerySelect={tabManagerActions.createTabFromQuery}
-          queries={queries}
+          queries={savedQueries}
           title="Saved queries"
           sectionType="saved"
         />
@@ -65,4 +70,24 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
       </div>
     </div>
   );
+}
+
+type QueriesResponse = {
+  data: undefined | Array<InsightsQueryStatement>;
+  error: undefined | string;
+  isLoading: boolean;
+};
+
+function limitQueriesByType(type: 'shared' | 'saved', queries: QueriesResponse) {
+  return {
+    ...queries,
+    data: queries.data?.filter((query) =>
+      type === 'shared' ? isSharedQuery(query) : !isSharedQuery(query)
+    ),
+  };
+}
+
+// TODO: Check against "shared" field when implemented.
+function isSharedQuery(_query: InsightsQueryStatement) {
+  return false;
 }
