@@ -52,7 +52,7 @@ export function Time({ className, format, value, copyable = true }: Props) {
           suppressHydrationWarning={true}
           className={cn(
             'group flex cursor-default items-center gap-1 whitespace-nowrap',
-            copyable && 'hover:bg-canvasSubtle pr-4 hover:pr-0',
+            copyable && 'hover:bg-canvasSubtle',
             className
           )}
           dateTime={date.toISOString()}
@@ -60,7 +60,7 @@ export function Time({ className, format, value, copyable = true }: Props) {
           {dateString}
           {copyable && (
             <RiFileCopyLine
-              className="text-subtle hidden h-3 w-3 cursor-pointer group-hover:block"
+              className="text-subtle h-4 w-4 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
