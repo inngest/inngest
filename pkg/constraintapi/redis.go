@@ -407,7 +407,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	// Retrieve key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix := r.queueStateKeyPrefix
-	if req.IsRateLimit {
+	if req.Migration.IsRateLimit {
 		keyPrefix = r.rateLimitKeyPrefix
 	}
 
@@ -496,7 +496,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	// Retrieve key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix := r.queueStateKeyPrefix
-	if req.IsRateLimit {
+	if req.Migration.IsRateLimit {
 		keyPrefix = r.rateLimitKeyPrefix
 	}
 

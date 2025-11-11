@@ -538,6 +538,23 @@ func LeaseSourceFromProto(pbSource *pb.LeaseSource) LeaseSource {
 	}
 }
 
+func MigrationIdentifierToProto(migration MigrationIdentifier) *pb.MigrationIdentifier {
+	return &pb.MigrationIdentifier{
+		IsRateLimit: migration.IsRateLimit,
+		QueueShard:  migration.QueueShard,
+	}
+}
+
+func MigrationIdentifierFromProto(pbMigration *pb.MigrationIdentifier) MigrationIdentifier {
+	if pbMigration == nil {
+		return MigrationIdentifier{}
+	}
+	return MigrationIdentifier{
+		IsRateLimit: pbMigration.IsRateLimit,
+		QueueShard:  pbMigration.QueueShard,
+	}
+}
+
 func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckRequest {
 	if req == nil {
 		return nil
@@ -803,7 +820,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		LeaseId:             req.LeaseID.String(),
 		Duration:            durationpb.New(req.Duration),
 		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
-		IsRateLimit:         req.IsRateLimit,
+		Migration:           MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -833,7 +850,7 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
 		LeaseID:             leaseID,
 		Duration:            duration,
-		IsRateLimit:         pbReq.IsRateLimit,
+		Migration:           MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 
@@ -881,7 +898,7 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		AccountId:           req.AccountID.String(),
 		LeaseId:             req.LeaseID.String(),
 		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
-		IsRateLimit:         req.IsRateLimit,
+		Migration:           MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -905,7 +922,7 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		AccountID:           accountID,
 		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
 		LeaseID:             leaseID,
-		IsRateLimit:         pbReq.IsRateLimit,
+		Migration:           MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 

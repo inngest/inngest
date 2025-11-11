@@ -950,6 +950,54 @@ func TestCapacityLeaseConversion(t *testing.T) {
 	})
 }
 
+func TestMigrationIdentifierConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    MigrationIdentifier
+		expected *pb.MigrationIdentifier
+	}{
+		{
+			name: "complete migration",
+			input: MigrationIdentifier{
+				IsRateLimit: true,
+				QueueShard:  "shard-123",
+			},
+			expected: &pb.MigrationIdentifier{
+				IsRateLimit: true,
+				QueueShard:  "shard-123",
+			},
+		},
+		{
+			name: "minimal migration",
+			input: MigrationIdentifier{
+				IsRateLimit: false,
+				QueueShard:  "",
+			},
+			expected: &pb.MigrationIdentifier{
+				IsRateLimit: false,
+				QueueShard:  "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MigrationIdentifierToProto(tt.input)
+			assert.Equal(t, tt.expected, result)
+
+			// Test round trip
+			backConverted := MigrationIdentifierFromProto(result)
+			assert.Equal(t, tt.input, backConverted)
+		})
+	}
+
+	// Test nil handling
+	t.Run("nil protobuf", func(t *testing.T) {
+		result := MigrationIdentifierFromProto(nil)
+		assert.Equal(t, MigrationIdentifier{}, result)
+	})
+}
+
 func TestLeaseSourceConversion(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1606,6 +1654,10 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				LeaseIdempotencyKey: "lease-extend-key",
 				LeaseID:             leaseID,
 				Duration:            15 * time.Minute,
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+					QueueShard:  "test-shard",
+				},
 			},
 			expected: &pb.CapacityExtendLeaseRequest{
 				IdempotencyKey:      "extend-key",
@@ -1613,6 +1665,10 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 				LeaseId:             leaseID.String(),
 				Duration:            durationpb.New(15 * time.Minute),
 				LeaseIdempotencyKey: "lease-extend-key",
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: true,
+					QueueShard:  "test-shard",
+				},
 			},
 		},
 		{
@@ -1722,12 +1778,20 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 				AccountID:           accountID,
 				LeaseIdempotencyKey: "lease-commit-key",
 				LeaseID:             leaseID,
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "release-shard",
+				},
 			},
 			expected: &pb.CapacityReleaseRequest{
 				IdempotencyKey:      "commit-key",
 				AccountId:           accountID.String(),
 				LeaseId:             leaseID.String(),
 				LeaseIdempotencyKey: "lease-commit-key",
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "release-shard",
+				},
 			},
 		},
 		{

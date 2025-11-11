@@ -132,6 +132,10 @@ func (q *queue) backlogRefillConstraintCheck(
 			Location:          constraintapi.LeaseLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
+		Migration: constraintapi.MigrationIdentifier{
+			IsRateLimit: false,
+			QueueShard:  q.primaryQueueShard.Name,
+		},
 	})
 	if err != nil {
 		if !fallback {

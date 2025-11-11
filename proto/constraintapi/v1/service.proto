@@ -142,6 +142,11 @@ message CapacityLease {
   string idempotency_key = 2;
 }
 
+// Migration identifier for constraint API migration hints
+message MigrationIdentifier {
+  bool is_rate_limit = 1;
+  string queue_shard = 2;
+}
 
 message LeaseSource {
   ConstraintApiLeaseService service = 1;
@@ -193,7 +198,7 @@ message CapacityExtendLeaseRequest {
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
   string lease_idempotency_key = 5;
-  bool is_rate_limit = 6;
+  MigrationIdentifier migration = 6;
 }
 
 message CapacityExtendLeaseResponse {
@@ -205,7 +210,7 @@ message CapacityReleaseRequest {
   string account_id = 2;
   string lease_id = 3;
   string lease_idempotency_key = 4;
-  bool is_rate_limit = 5;
+  MigrationIdentifier migration = 5;
 }
 
 message CapacityReleaseResponse {
