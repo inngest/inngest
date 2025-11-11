@@ -23,6 +23,9 @@ var (
 type rateLimitOptions struct {
 	now                  time.Time
 	useLuaImplementation bool
+
+	idempotencyKey string
+	idempotencyTTL time.Duration
 }
 
 type rateLimitOptionFn func(o *rateLimitOptions)
@@ -36,6 +39,13 @@ func WithNow(now time.Time) rateLimitOptionFn {
 func WithUseLuaImplementation(useLuaImplementation bool) rateLimitOptionFn {
 	return func(o *rateLimitOptions) {
 		o.useLuaImplementation = useLuaImplementation
+	}
+}
+
+func WithIdempotency(key string, ttl time.Duration) rateLimitOptionFn {
+	return func(o *rateLimitOptions) {
+		o.idempotencyKey = key
+		o.idempotencyTTL = ttl
 	}
 }
 

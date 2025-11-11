@@ -84,6 +84,10 @@ var (
 	PauseHandleConcurrency = 100
 )
 
+const (
+	RateLimitIdempotencyTTL = 30 * time.Minute
+)
+
 // ScheduleStatus returns a string status category for a Schedule error.
 // This is useful for metrics and observability to categorize schedule attempts.
 func ScheduleStatus(err error) string {
@@ -694,7 +698,14 @@ func (e *executor) schedule(
 				// Enable new pure Lua implementation on a per-account basis
 				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
 
-				limited, _, err := e.rateLimiter.RateLimit(ctx, key, *req.Function.RateLimit, ratelimit.WithNow(time.Now()), ratelimit.WithUseLuaImplementation(useLuaRL))
+				limited, _, err := e.rateLimiter.RateLimit(
+					ctx,
+					key,
+					*req.Function.RateLimit,
+					ratelimit.WithNow(time.Now()),
+					ratelimit.WithUseLuaImplementation(useLuaRL),
+					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
+				)
 				if err != nil {
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}

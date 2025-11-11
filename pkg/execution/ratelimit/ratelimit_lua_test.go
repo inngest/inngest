@@ -67,7 +67,7 @@ func TestLuaRateLimit_BasicFunctionality(t *testing.T) {
 		_, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -90,7 +90,7 @@ func TestLuaRateLimit_BasicFunctionality(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		// 10 requests per hour with burst of 1 (10/10)
 		config := inngest.RateLimit{
@@ -145,7 +145,7 @@ func TestLuaRateLimit_SideBySideComparison(t *testing.T) {
 			r2, rc2, _, clock2 := initRedis(t)
 			defer rc2.Close()
 
-			luaLimiter := newLuaGCRARateLimiter(ctx, rc2, "test:")
+			luaLimiter := newLuaGCRARateLimiter(ctx, rc2, "{rl}:")
 
 			config := inngest.RateLimit{
 				Limit:  tc.limit,
@@ -420,7 +420,7 @@ func TestLuaRateLimit_ExistingVsFreshState(t *testing.T) {
 		r1, rc1, _, clock1 := initRedis(t)
 		defer rc1.Close()
 
-		luaLimiterFresh := newLuaGCRARateLimiter(ctx, rc1, "fresh:")
+		luaLimiterFresh := newLuaGCRARateLimiter(ctx, rc1, "{rl}:")
 		keyFresh := "fresh-state-test"
 
 		// Count how many requests fresh state allows
@@ -447,7 +447,7 @@ func TestLuaRateLimit_ExistingVsFreshState(t *testing.T) {
 		r2, rc2, _, clock2 := initRedis(t)
 		defer rc2.Close()
 
-		luaLimiterExisting := newLuaGCRARateLimiter(ctx, rc2, "existing:")
+		luaLimiterExisting := newLuaGCRARateLimiter(ctx, rc2, "{rl}:")
 		keyExisting := "existing-state-test"
 
 		// Pre-consume 1 request to create existing state
@@ -865,7 +865,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "retry-test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -931,7 +931,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "retry-decrease:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -993,7 +993,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "period-test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		testCases := []struct {
 			name        string
@@ -1044,7 +1044,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "burst-test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  10, // burst = 1, total = 2
@@ -1100,7 +1100,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "zero-test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  0, // Zero limit should always rate limit
@@ -1138,7 +1138,7 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "precision-test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -1188,6 +1188,225 @@ func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 	})
 }
 
+func TestLuaRateLimit_Idempotency(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no idempotency baseline", func(t *testing.T) {
+		r, rc, _, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  2, // burst = 2/10 = 0, capacity = 0 + 1 = 1 request total
+			Period: "10s",
+		}
+
+		key := "baseline-test"
+
+		// First request should be allowed (no idempotency) - consumes the 1 available capacity
+		r.SetTime(clock.Now())
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.False(t, limited1)
+		require.Equal(t, time.Duration(0), retry1)
+		t.Logf("Request 1 (no idempotency): limited=%v, retry=%v", limited1, retry1)
+
+		// Second request should be rate limited (capacity exhausted)
+		r.SetTime(clock.Now())
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, limited2)
+		require.Greater(t, retry2, time.Duration(0))
+		t.Logf("Request 2 (no idempotency): limited=%v, retry=%v", limited2, retry2)
+	})
+
+	t.Run("idempotency enforced after successful request", func(t *testing.T) {
+		r, rc, _, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  2, // burst = 2/10 = 0, capacity = 0 + 1 = 1 request total
+			Period: "10s",
+		}
+
+		key := "idempotency-test"
+		idempotencyKey := "request-123"
+		idempotencyTTL := 30 * time.Second
+
+		// First request with idempotency should be allowed and consume the 1 available capacity
+		r.SetTime(clock.Now())
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited1)
+		require.Equal(t, time.Duration(0), retry1)
+		t.Logf("First request with idempotency: limited=%v, retry=%v", limited1, retry1)
+
+		// Subsequent request with same idempotency key should be allowed WITHOUT consuming capacity (idempotency bypass)
+		r.SetTime(clock.Now())
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited2)
+		require.Equal(t, time.Duration(0), retry2)
+		t.Logf("Duplicate request with same idempotency key: limited=%v, retry=%v", limited2, retry2)
+
+		// Third request with same idempotency key should still be allowed (idempotency bypass)
+		r.SetTime(clock.Now())
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited3)
+		require.Equal(t, time.Duration(0), retry3)
+		t.Logf("Third request with same idempotency key: limited=%v, retry=%v", limited3, retry3)
+
+		// New request without idempotency should be rate limited (capacity already exhausted by first request)
+		r.SetTime(clock.Now())
+		limited4, retry4, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, limited4)
+		require.Greater(t, retry4, time.Duration(0))
+		t.Logf("New request without idempotency: limited=%v, retry=%v", limited4, retry4)
+	})
+
+	t.Run("idempotency not enforced after rate limited request", func(t *testing.T) {
+		r, rc, _, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  1, // Only 1 request allowed
+			Period: "10s",
+		}
+
+		key := "rate-limited-test"
+		idempotencyKey := "request-456"
+		idempotencyTTL := 30 * time.Second
+
+		// First request without idempotency to consume capacity
+		r.SetTime(clock.Now())
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.False(t, limited1)
+		require.Equal(t, time.Duration(0), retry1)
+		t.Logf("Setup request (consume capacity): limited=%v, retry=%v", limited1, retry1)
+
+		// Request with idempotency should be rate limited
+		r.SetTime(clock.Now())
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.True(t, limited2)
+		require.Greater(t, retry2, time.Duration(0))
+		t.Logf("Rate limited request with idempotency: limited=%v, retry=%v", limited2, retry2)
+
+		// Subsequent request with same idempotency key should STILL be rate limited
+		// (idempotency key should NOT be set for rate limited requests)
+		r.SetTime(clock.Now())
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.True(t, limited3)
+		require.Greater(t, retry3, time.Duration(0))
+		t.Logf("Retry with same idempotency key after rate limit: limited=%v, retry=%v", limited3, retry3)
+
+		// Advance time to allow capacity recovery
+		waitTime := retry2 + 100*time.Millisecond
+		clock.Advance(waitTime)
+		r.FastForward(waitTime)
+		t.Logf("Advanced time by %v for capacity recovery", waitTime)
+
+		// Now the request with idempotency should succeed
+		r.SetTime(clock.Now())
+		limited4, retry4, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited4)
+		require.Equal(t, time.Duration(0), retry4)
+		t.Logf("Request after recovery with idempotency: limited=%v, retry=%v", limited4, retry4)
+
+		// Subsequent request with same idempotency should now be allowed (idempotency enforced)
+		r.SetTime(clock.Now())
+		limited5, retry5, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited5)
+		require.Equal(t, time.Duration(0), retry5)
+		t.Logf("Duplicate after successful request: limited=%v, retry=%v", limited5, retry5)
+	})
+
+	t.Run("idempotency no longer enforced once expired", func(t *testing.T) {
+		r, rc, _, clock := initRedis(t)
+		defer rc.Close()
+
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
+
+		config := inngest.RateLimit{
+			Limit:  3, // burst = 3/10 = 0, capacity = 0 + 1 = 1 request total
+			Period: "20s",
+		}
+
+		key := "expiry-test"
+		idempotencyKey := "request-789"
+		idempotencyTTL := 5 * time.Second // Short TTL for testing
+
+		// First request with idempotency should be allowed and consume the 1 available capacity
+		r.SetTime(clock.Now())
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited1)
+		require.Equal(t, time.Duration(0), retry1)
+		t.Logf("Initial request with idempotency (TTL=%v): limited=%v, retry=%v", idempotencyTTL, limited1, retry1)
+
+		// Request with same idempotency key should be allowed (idempotency active - bypass)
+		r.SetTime(clock.Now())
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.False(t, limited2)
+		require.Equal(t, time.Duration(0), retry2)
+		t.Logf("Duplicate within TTL: limited=%v, retry=%v", limited2, retry2)
+
+		// Advance time to expire the idempotency key
+		expiryWait := idempotencyTTL + 1*time.Second
+		clock.Advance(expiryWait)
+		r.FastForward(expiryWait)
+		t.Logf("Advanced time by %v to expire idempotency key", expiryWait)
+
+		// Request with same idempotency key should now be rate limited (capacity already exhausted by first request)
+		r.SetTime(clock.Now())
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+			WithNow(clock.Now()),
+			WithIdempotency(idempotencyKey, idempotencyTTL))
+		require.NoError(t, err)
+		require.True(t, limited3) // Should be rate limited since capacity was consumed by first request
+		require.Greater(t, retry3, time.Duration(0))
+		t.Logf("Request after idempotency expired: limited=%v, retry=%v", limited3, retry3)
+
+		// Verify that any new request without idempotency is also rate limited (capacity exhausted)
+		r.SetTime(clock.Now())
+		limited4, retry4, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.True(t, limited4) // Should be rate limited (capacity exhausted)
+		require.Greater(t, retry4, time.Duration(0))
+		t.Logf("Verify capacity exhausted - new request: limited=%v, retry=%v", limited4, retry4)
+	})
+}
+
 func TestLuaRateLimit_EdgeCases(t *testing.T) {
 	ctx := context.Background()
 
@@ -1195,7 +1414,7 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  5,
@@ -1213,7 +1432,7 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  0,
@@ -1237,7 +1456,7 @@ func TestLuaRateLimit_EdgeCases(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		limiter := newLuaGCRARateLimiter(ctx, rc, "test:")
+		limiter := newLuaGCRARateLimiter(ctx, rc, "{rl}:")
 
 		config := inngest.RateLimit{
 			Limit:  1,

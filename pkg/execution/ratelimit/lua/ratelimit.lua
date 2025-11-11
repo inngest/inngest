@@ -2,6 +2,10 @@
 ---@type string
 local key = KEYS[1]
 
+--- idempotencyKey is always defined but may be empty in case no ttl is set
+---@type string
+local idempotencyKey = KEYS[2]
+
 --- now_ns is the current time in nanoseconds
 ---@type integer
 local now_ns = tonumber(ARGV[1])
@@ -17,6 +21,10 @@ local limit = tonumber(ARGV[3])
 --- burst is the optional burst capacity
 ---@type integer
 local burst = tonumber(ARGV[4])
+
+--- idempotencyTTL is an optional idempotency period
+---@type integer
+local idempotencyTTL = tonumber(ARGV[5])
 
 --- gcraCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
 ---@param key string
@@ -121,11 +129,21 @@ local function gcraUpdate(key, now_ns, period_ns, limit, capacity)
 	end
 end
 
+-- If idempotency key is set, do not perform check again
+if idempotencyTTL > 0 and redis.call("EXISTS", idempotencyKey) == 1 then
+	return { 1, 0 }
+end
+
 -- Check if capacity > 0
 local res = gcraCapacity(key, now_ns, period_ns, limit, burst)
 if res[2] == 0 then
 	-- Not rate limited, perform the update
 	gcraUpdate(key, now_ns, period_ns, limit, 1)
+
+	if idempotencyTTL > 0 then
+		redis.call("SET", idempotencyKey, tostring(now_ns), "EX", idempotencyTTL)
+	end
+
 	return { 1, 0 }
 else
 	-- Rate limited, return retry time

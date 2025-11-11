@@ -27,6 +27,7 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 	o := &rateLimitOptions{
 		now:                  time.Now(),
 		useLuaImplementation: true,
+		idempotencyKey:       "-",
 	}
 	for _, opt := range options {
 		opt(o)
@@ -44,12 +45,14 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 
 	keys := []string{
 		l.prefix + key,
+		l.prefix + o.idempotencyKey,
 	}
 	args := []string{
 		fmt.Sprintf("%d", nowNS),
 		fmt.Sprintf("%d", periodNS),
 		fmt.Sprintf("%d", limit),
 		fmt.Sprintf("%d", burst),
+		fmt.Sprintf("%d", int(o.idempotencyTTL.Seconds())),
 	}
 
 	res, err := scripts["ratelimit"].Exec(ctx, l.r, keys, args).AsIntSlice()
