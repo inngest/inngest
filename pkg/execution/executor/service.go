@@ -1042,6 +1042,12 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
+	// ensure that the function has the same cron expression.
+	if !conf.HasCronExpression(ci.Expression) {
+		l.Info("Breaking cron cycle, cron trigger no longer exists")
+		return nil
+	}
+
 	// now actually schedule the cron run
 	at := ci.ID.Timestamp()
 
