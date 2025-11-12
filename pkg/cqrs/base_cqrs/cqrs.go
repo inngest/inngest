@@ -1644,6 +1644,14 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 				// Fallback for other types
 				so.Data = []byte(fmt.Append(nil, row.Output))
 			}
+
+			// First, try to unmarshal as a string (in case it's double-encoded)
+			var jsonStr string
+			if err := json.Unmarshal(so.Data, &jsonStr); err == nil {
+				// Successfully unmarshaled as string, use it as the new data
+				so.Data = []byte(jsonStr)
+			}
+
 			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
 				// NOTE: By default, we wrap errors and data.  However, unforutnately
 				// step.waitForEvent is _not_ wrapped, so we check to see if there's
