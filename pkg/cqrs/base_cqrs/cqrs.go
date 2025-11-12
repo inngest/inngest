@@ -1628,30 +1628,51 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 			// Extract bytes from pqtype.NullRawMessage using type assertion
 			if nullMsg, ok := row.Input.(pqtype.NullRawMessage); ok && nullMsg.Valid {
 				so.Input = []byte(nullMsg.RawMessage)
+
+				// PostgreSQL-specific handling for double-encoded JSON and null values
+				// First, try to unmarshal as a string (in case it's double-encoded)
+				var jsonStr string
+				if err := json.Unmarshal(so.Input, &jsonStr); err == nil {
+					// Successfully unmarshaled as string, use it as the new data
+					so.Input = []byte(jsonStr)
+				}
+
+				// Check if the input is actually JSON null (not the string "null")
+				var nullCheck any
+				if err := json.Unmarshal(so.Input, &nullCheck); err == nil && nullCheck == nil {
+					so.Input = nil
+				}
 			} else {
-				// Fallback for other types
+				// Fallback for other types (e.g., SQLite)
 				so.Input = []byte(fmt.Append(nil, row.Input))
 			}
 		}
 
 		if row.Output != nil {
-			var m map[string]any
-
 			// Extract bytes from pqtype.NullRawMessage using type assertion
 			if nullMsg, ok := row.Output.(pqtype.NullRawMessage); ok && nullMsg.Valid {
 				so.Data = []byte(nullMsg.RawMessage)
+
+				// PostgreSQL-specific handling for double-encoded JSON and null values
+				// First, try to unmarshal as a string (in case it's double-encoded)
+				var jsonStr string
+				if err := json.Unmarshal(so.Data, &jsonStr); err == nil {
+					// Successfully unmarshaled as string, use it as the new data
+					so.Data = []byte(jsonStr)
+				}
+
+				// Check if the output is actually JSON null (not the string "null")
+				var nullCheck any
+				if err := json.Unmarshal(so.Data, &nullCheck); err == nil && nullCheck == nil {
+					so.Data = nil
+					continue
+				}
 			} else {
-				// Fallback for other types
+				// Fallback for other types (e.g., SQLite)
 				so.Data = []byte(fmt.Append(nil, row.Output))
 			}
 
-			// First, try to unmarshal as a string (in case it's double-encoded)
-			var jsonStr string
-			if err := json.Unmarshal(so.Data, &jsonStr); err == nil {
-				// Successfully unmarshaled as string, use it as the new data
-				so.Data = []byte(jsonStr)
-			}
-
+			var m map[string]any
 			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
 				// NOTE: By default, we wrap errors and data.  However, unforutnately
 				// step.waitForEvent is _not_ wrapped, so we check to see if there's
