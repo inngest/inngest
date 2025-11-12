@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -226,21 +225,17 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
 		}
-		async := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
-			return enums.OpcodeIsAsync(s.Op)
-		})
-		if async {
-			// Create a token that can be used for viewing this particular run.
-			claim, err := apiv1auth.CreateRunJWT(
-				a.runClaimsSecret,
-				md.ID.Tenant.EnvID,
-				md.ID.RunID,
-			)
-			if err != nil {
-				logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
-			}
-			jwt = claim
+		// Create a token that can be used for viewing this particular run.
+		claim, err := apiv1auth.CreateRunJWT(
+			a.runClaimsSecret,
+			md.ID.Tenant.EnvID,
+			md.ID.RunID,
+		)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
 		}
+		jwt = claim
+
 	}
 
 	_ = WriteResponse(w, CheckpointNewRunResponse{
