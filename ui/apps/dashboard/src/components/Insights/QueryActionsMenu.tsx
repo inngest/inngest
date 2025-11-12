@@ -11,12 +11,14 @@ import { RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
 
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
+import { isQuerySnapshot } from './queries';
+import type { QuerySnapshot } from './types';
 
 type QueryActionsMenuProps = {
   onOpenChange?: (open: boolean) => void;
-  onSelectDelete: (query: InsightsQueryStatement) => void;
+  onSelectDelete: (query: InsightsQueryStatement | QuerySnapshot) => void;
   open?: boolean;
-  query: InsightsQueryStatement | undefined;
+  query: InsightsQueryStatement | QuerySnapshot | undefined;
   trigger: ReactElement;
 };
 
@@ -33,11 +35,11 @@ export function QueryActionsMenu({
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        {!query?.shared && (
+        {isActualQueryAndUnshared(query) && (
           <DropdownMenuItem
             className="text-basis px-4"
             onSelect={() => {
-              if (query === undefined) return;
+              if (query === undefined || isQuerySnapshot(query)) return;
               shareQuery(query.id);
             }}
           >
@@ -58,4 +60,8 @@ export function QueryActionsMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function isActualQueryAndUnshared(query: InsightsQueryStatement | QuerySnapshot | undefined) {
+  return query !== undefined && !isQuerySnapshot(query) && !query?.shared;
 }
