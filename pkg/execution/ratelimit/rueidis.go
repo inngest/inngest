@@ -127,22 +127,22 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 
 	// If the string value does not contain scientific notation, return
 	if !strings.Contains(strVal, "e+") && !strings.Contains(strVal, "E+") {
-		l.Warn("rate limit key contained value that could not be parsed and was not scientific notation, reset to current time",
+		l.Error("rate limit key contained value that could not be parsed and was not scientific notation",
 			"key", key,
 			"value", strVal,
 		)
-		return -1, now, nil
+		return 0, now, fmt.Errorf("rate limit value %s cannot be parsed: %w", strVal, err)
 	}
 
 	// This is scientific notation - try to parse as float and convert to int64
 	floatVal, err := strconv.ParseFloat(strVal, 64)
 	if err != nil {
-		l.Warn("rate limit key contained scientific notation value that could not be parsed and was not scientific notation, reset to current time",
+		l.Error("rate limit key contained scientific notation value that could not be parsed",
 			"parse_err", err,
 			"key", key,
 			"value", strVal,
 		)
-		return -1, now, nil
+		return 0, now, fmt.Errorf("rate limit value %s included invald scientific notation: %w", strVal, err)
 	}
 
 	// Convert to int64, but clamp to safe values
