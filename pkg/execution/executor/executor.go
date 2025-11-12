@@ -712,7 +712,7 @@ func (e *executor) schedule(
 				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
 
 				limited, _, err := e.rateLimiter.RateLimit(
-					ctx,
+					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),

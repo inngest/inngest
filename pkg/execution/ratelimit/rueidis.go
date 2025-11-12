@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/redis/rueidis"
 )
 
@@ -42,6 +43,8 @@ type rueidisStore struct {
 	prefix string
 
 	luaRateLimiter RateLimiter
+
+	disableGracefulScientificNotationParsing bool
 }
 
 func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error) {
@@ -62,6 +65,7 @@ func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.Rate
 // or -1 if it does not exist. It also returns the current time at
 // the redis server to microsecond precision.
 func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time.Time, error) {
+	l := logger.StdlibLogger(ctx)
 	key = r.prefix + key
 
 	timeCmd := r.r.B().Time().Build()
@@ -81,11 +85,57 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	if valErr != nil && rueidis.IsRedisNil(valErr) {
 		return -1, now, nil
 	}
-	if valErr != nil {
+
+	// Happy path: No error
+	if valErr == nil {
+		return v, now, nil
+	}
+
+	// We could not load the value for some reason
+
+	// Only continue for integer parsing errors, i/o timeouts should be retried properly
+	if !strings.Contains(valErr.Error(), "strconv.ParseInt") && !strings.Contains(valErr.Error(), "invalid syntax") {
 		return 0, now, fmt.Errorf("failed to get key value: %w", valErr)
 	}
 
-	return v, now, nil
+	if r.disableGracefulScientificNotationParsing {
+		return 0, now, fmt.Errorf("unexpected scientific notation: %w", valErr)
+	}
+
+	// Try to get the raw string value and parse it as a float first
+	rawResult := r.r.Do(ctx, r.r.B().Get().Key(key).Build())
+	strVal, strErr := rawResult.ToString()
+	if strErr != nil {
+		return 0, now, fmt.Errorf("failed to get key value as string: %w", err)
+	}
+
+	// If the string value does not contain scientific notation, return
+	if !strings.Contains(strVal, "e+") && !strings.Contains(strVal, "E+") {
+		l.Warn("rate limit key contained value that could not be parsed and was not scientific notation, reset to current time",
+			"key", key,
+			"value", strVal,
+		)
+		return -1, now, nil
+	}
+
+	// This is scientific notation - try to parse as float and convert to int64
+	floatVal, parseErr := strconv.ParseFloat(strVal, 64)
+	if parseErr != nil {
+		l.Warn("rate limit key contained scientific notation value that could not be parsed and was not scientific notation, reset to current time",
+			"key", key,
+			"value", strVal,
+		)
+		return -1, now, nil
+	}
+
+	// Convert to int64, but clamp to safe values
+	safeVal := int64(floatVal)
+	l.Warn("rate limit key contained scientific notation value, handled gracefully",
+		"key", key,
+		"value", strVal,
+		"converted", safeVal,
+	)
+	return safeVal, now, nil
 }
 
 func redisTime(strs []string) (time.Time, error) {
