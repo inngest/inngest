@@ -413,7 +413,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
 				return nil, syscode.Error{
 					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-					Message: "Assigned worker reached capacity before request was assigned",
+					Message: "Assigned worker reached capacity before assigment",
 				}
 			}
 		}
@@ -515,7 +515,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		if routedInstanceID == "" {
 			return nil, syscode.Error{
 				Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-				Message: "Lease expired because it wasn't not assigned to a worker.",
+				Message: "All workers reached capacity before assignment",
 			}
 		}
 

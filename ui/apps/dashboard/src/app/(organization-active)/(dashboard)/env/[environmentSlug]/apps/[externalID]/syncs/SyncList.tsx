@@ -71,7 +71,7 @@ export function SyncList({
                     <SyncStatusPill status={sync.status} />
                   </div>
                   <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
-                    <Time className="text-wrap" value={sync.lastSyncedAt} />
+                    <Time className="text-wrap" value={sync.lastSyncedAt} copyable={false} />
                   </div>
                 </div>
                 <div

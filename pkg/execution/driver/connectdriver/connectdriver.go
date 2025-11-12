@@ -182,11 +182,6 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 		}
 	}
 
-	// check for connect worker capacity errors
-	if sysErr != nil && (sysErr.Code == syscode.CodeConnectAllWorkersAtCapacity || sysErr.Code == syscode.CodeConnectRequestAssignWorkerReachedCapacity) {
-		return nil, state.ErrConnectWorkerCapacity
-	}
-
 	if resp == nil && err != nil {
 		return nil, err
 	}

@@ -49,10 +49,18 @@ export function PillCell({
   );
 }
 
-export function TimeCell({ date, format }: { date: Date | string; format?: 'relative' }) {
+export function TimeCell({
+  date,
+  format,
+  copyable = true,
+}: {
+  date: Date | string;
+  format?: 'relative';
+  copyable?: boolean;
+}) {
   return (
     <span className={cn(cellStyles, 'text-muted font-medium')}>
-      <Time value={date} format={format} copyable={true} />
+      <Time value={date} format={format} copyable={copyable} />
     </span>
   );
 }

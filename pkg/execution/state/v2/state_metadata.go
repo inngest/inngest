@@ -55,6 +55,7 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 		WorkflowVersion:       md.Config.FunctionVersion,
 		WorkspaceID:           md.ID.Tenant.EnvID,
 		AccountID:             md.ID.Tenant.AccountID,
+		AppID:                 md.ID.Tenant.AppID,
 		EventID:               md.Config.EventID(),
 		EventIDs:              md.Config.EventIDs,
 		BatchID:               md.Config.BatchID,
