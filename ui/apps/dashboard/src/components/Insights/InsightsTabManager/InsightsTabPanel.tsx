@@ -12,6 +12,7 @@ import { InsightsSQLEditorQueryEditHistoryButton } from '../InsightsSQLEditor/In
 import { InsightsSQLEditorQueryTitle } from '../InsightsSQLEditor/InsightsSQLEditorQueryTitle';
 import { InsightsSQLEditorResultsTitle } from '../InsightsSQLEditor/InsightsSQLEditorResultsTitle';
 import { InsightsSQLEditorSaveQueryButton } from '../InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
+import { InsightsSQLEditorSavedQueryActionsButton } from '../InsightsSQLEditor/InsightsSQLEditorSavedQueryActionsButton';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '../Section';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
@@ -49,6 +50,7 @@ export function InsightsTabPanel({
             actions={
               <>
                 <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
+                <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
                 <InsightsSQLEditorSaveQueryButton tab={tab} />
                 <InsightsSQLEditorQueryButton />
               </>
