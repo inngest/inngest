@@ -108,7 +108,16 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	if err != nil && rueidis.IsRedisNil(err) {
 		return -1, now, nil
 	}
-	if valErr != nil {
+
+	// Happy path: No error
+	if valErr == nil {
+		return v, now, nil
+	}
+
+	// We could not load the value for some reason
+
+	// Only continue for integer parsing errors, i/o timeouts should be retried properly
+	if !strings.Contains(valErr.Error(), "strconv.ParseInt") && !strings.Contains(valErr.Error(), "invalid syntax") {
 		return 0, now, fmt.Errorf("failed to get key value: %w", valErr)
 	}
 
