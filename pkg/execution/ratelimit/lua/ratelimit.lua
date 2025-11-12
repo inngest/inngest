@@ -52,6 +52,32 @@ local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
 	end
 end
 
+--- retrieveAndNormalizeTat gets the TAT value from Redis and normalizes it if needed
+---@param key string
+---@param now_ns integer
+---@param period_ns integer
+---@param delay_variation_tolerance number
+---@return integer
+local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+	local tat = redis.call("GET", key)
+	if not tat then
+		return now_ns
+	end
+	
+	local raw_tat = tonumber(tat)
+	if not raw_tat then
+		return now_ns -- Reset if tonumber failed
+	end
+	
+	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
+	-- If value was clamped, commit the normalization immediately
+	if raw_tat ~= clamped_tat then
+		redis.call("SET", key, clamped_tat, "KEEPTTL")
+	end
+	
+	return clamped_tat
+end
+
 --- gcraCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
 ---@param key string
 ---@param now_ns integer
@@ -74,13 +100,8 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
 
-	-- retrieve theoretical arrival time
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	-- retrieve and normalize theoretical arrival time
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 
 	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
 	local increment = 1 * emission_interval
@@ -129,14 +150,13 @@ local function gcraUpdate(key, now_ns, period_ns, limit, capacity, burst)
 	-- calculate emission interval (tau) - time between each token
 	-- This matches throttled library: quota.MaxRate.period
 	local emission_interval = period_ns / limit
+	
+	-- Calculate delay_variation_tolerance for bounds checking
+	local total_capacity = (burst or 0) + 1
+	local delay_variation_tolerance = emission_interval * total_capacity
 
-	-- retrieve theoretical arrival time
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	-- retrieve and normalize theoretical arrival time
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 
 	-- calculate next theoretical arrival time
 	-- This matches throttled library logic: tat.Add(increment) where increment = quantity * emissionInterval
@@ -149,11 +169,6 @@ local function gcraUpdate(key, now_ns, period_ns, limit, capacity, burst)
 	end
 
 	if capacity > 0 then
-		-- Calculate delay_variation_tolerance for bounds checking
-		local emission_interval = period_ns / limit
-		local total_capacity = (burst or 0) + 1
-		local delay_variation_tolerance = emission_interval * total_capacity
-
 		-- Clamp new_tat to reasonable bounds and ensure integer storage
 		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
 
