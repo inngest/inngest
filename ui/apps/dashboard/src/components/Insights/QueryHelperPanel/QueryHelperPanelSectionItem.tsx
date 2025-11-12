@@ -11,8 +11,6 @@ import { QueryActionsMenu } from '../QueryActionsMenu';
 import { isQuerySnapshot } from '../queries';
 import { QueryHelperPanelSectionItemRow } from './QueryHelperPanelSectionItemRow';
 
-const RIGHT_MOUSE_BUTTON = 2;
-
 interface QueryHelperPanelSectionItemProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
@@ -52,13 +50,13 @@ export function QueryHelperPanelSectionItem({
           <QueryHelperPanelSectionItemRow
             icon={<Icon className="h-4 w-4 flex-shrink-0" />}
             isActive={isActiveTab}
+            onClick={(e) => {
+              e.preventDefault();
+              onQuerySelect(query);
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
               setMenuOpen(true);
-            }}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              if (e.button !== RIGHT_MOUSE_BUTTON) onQuerySelect(query);
             }}
             text={displayText}
           />

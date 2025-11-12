@@ -8,48 +8,43 @@ type QueryHelperPanelSectionItemRowProps = {
   icon: ReactNode;
   isActive: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
-  onPointerDown: (e: React.PointerEvent) => void;
+  onClick?: (e: React.MouseEvent) => void;
   text: string;
 };
 
 export const QueryHelperPanelSectionItemRow = forwardRef<
   HTMLDivElement,
   QueryHelperPanelSectionItemRowProps
->(
-  (
-    { icon, isActive, onContextMenu, onPointerDown, text }: QueryHelperPanelSectionItemRowProps,
-    ref
-  ) => {
-    const textRef = useRef<HTMLSpanElement>(null);
-    const [isTruncated, setIsTruncated] = useState(false);
+>(({ icon, isActive, onClick, onContextMenu, text }: QueryHelperPanelSectionItemRowProps, ref) => {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
 
-    useEffect(() => {
-      const el = textRef.current;
-      if (el === null) return;
+  useEffect(() => {
+    const el = textRef.current;
+    if (el === null) return;
 
-      setIsTruncated(el.scrollWidth > el.clientWidth);
-    }, [text]);
+    setIsTruncated(el.scrollWidth > el.clientWidth);
+  }, [text]);
 
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors',
-          isActive ? 'bg-canvasSubtle' : 'hover:bg-canvasSubtle'
-        )}
-        onContextMenu={onContextMenu}
-        onPointerDown={onPointerDown}
-      >
-        {icon}
-        <OptionalTooltip side="right" tooltip={isTruncated ? text : ''}>
-          <span
-            ref={textRef}
-            className="flex-1 overflow-hidden truncate text-ellipsis whitespace-nowrap"
-          >
-            {text}
-          </span>
-        </OptionalTooltip>
-      </div>
-    );
-  }
-);
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors',
+        isActive ? 'bg-canvasSubtle' : 'hover:bg-canvasSubtle'
+      )}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+    >
+      {icon}
+      <OptionalTooltip side="right" tooltip={isTruncated ? text : ''}>
+        <span
+          ref={textRef}
+          className="flex-1 overflow-hidden truncate text-ellipsis whitespace-nowrap"
+        >
+          {text}
+        </span>
+      </OptionalTooltip>
+    </div>
+  );
+});
