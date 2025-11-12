@@ -28,7 +28,7 @@ export function ValueRow({
   const typeText = typeLabelOverride !== undefined ? typeLabelOverride : computed;
 
   return (
-    <div className="flex select-none items-baseline gap-1.5 px-1 py-0.5">
+    <div className="flex items-baseline gap-1.5 px-1 py-0.5">
       <span
         className={cn(
           'text-sm',
