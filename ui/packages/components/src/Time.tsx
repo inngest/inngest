@@ -47,11 +47,11 @@ export function Time({ className, format, value, copyable = true }: Props) {
 
   return (
     <Tooltip>
-      <TooltipTrigger>
+      <TooltipTrigger asChild>
         <time
           suppressHydrationWarning={true}
           className={cn(
-            'group flex cursor-default items-center gap-1 whitespace-nowrap',
+            'group flex items-center gap-1 whitespace-nowrap',
             copyable && 'hover:bg-canvasSubtle',
             className
           )}
