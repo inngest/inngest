@@ -73,6 +73,9 @@ type BlockstoreOpts struct {
 	CompactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	CompactionSample float64
+	// CompactionLeaser manages compaction leases for a given index.
+	CompactionLeaser BlockLeaser
+
 	// DeleteAfterFlush is a callback that returns whether we delete from the backing buffer,
 	// or if deletes are ignored for the current workspace.
 	DeleteAfterFlush FeatureCallback
@@ -87,6 +90,9 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	}
 	if opts.Leaser == nil {
 		return nil, fmt.Errorf("leaser is required")
+	}
+	if opts.CompactionLeaser == nil {
+		return nil, fmt.Errorf("compaction leaser is required")
 	}
 	if opts.DeleteAfterFlush == nil {
 		opts.DeleteAfterFlush = func(ctx context.Context, workspaceID uuid.UUID) bool {
@@ -112,6 +118,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		fetchMargin:      opts.FetchMargin,
 		compactionLimit:  opts.CompactionLimit,
 		compactionSample: opts.CompactionSample,
+		compactionLeaser: opts.CompactionLeaser,
 		buf:              opts.Bufferer,
 		bucket:           opts.Bucket,
 		leaser:           opts.Leaser,
@@ -148,6 +155,9 @@ type blockstore struct {
 
 	// leaser manages leases for a given index.
 	leaser BlockLeaser
+
+	// compactionLeaser manages compaction leases for a given index.
+	compactionLeaser BlockLeaser
 
 	// rc is the Redis client used to manage block indexes.
 	rc rueidis.Client
@@ -469,6 +479,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 		if err != nil {
 			return fmt.Errorf("error fetching blocks for timestamp: %w", err)
 		}
+		logger.StdlibLogger(ctx).Debug("deleting pause", "pause", pause.ID, "createdAt", pause.CreatedAt.UnixMilli(), "blks", blockIDs)
 	}
 
 	if len(blockIDs) == 0 {
@@ -569,9 +580,33 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
-func (b *blockstore) Compact(ctx context.Context, idx Index) {
+func (b *blockstore) Compact(ctx context.Context, index Index) {
+	util.Lease(
+		ctx,
+		"compact index blocks",
+		// NOTE: Lease, Renew, and Revoke are closures because they need
+		// access to the Index field.  This makes util.Lease simple and
+		// minimal.
+		func(ctx context.Context) (ulid.ULID, error) {
+			return b.compactionLeaser.Lease(ctx, index)
+		},
+		func(ctx context.Context, leaseID ulid.ULID) (ulid.ULID, error) {
+			return b.compactionLeaser.Renew(ctx, index, leaseID)
+		},
+		func(ctx context.Context, leaseID ulid.ULID) error {
+			return b.compactionLeaser.Revoke(ctx, index, leaseID)
+		},
+		func(ctx context.Context) error {
+			// Call this function and block, renewing leases in the background
+			// until this function is done.
+			return b.compact(ctx, index)
+		},
+		25*time.Second,
+	)
+}
+
+func (b *blockstore) compact(ctx context.Context, index Index) error {
 	// Implement the following:
-	// TODO: Lease compaction for the index.
 	// TODO: Read all block metadata for the index
 	// TODO: Read all blockDeleteKey entries for the index
 	// TODO: For each deleted entry, record which block the delete is for.
@@ -579,6 +614,8 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// 1. fetching the block
 	// 2. filtering deleted pauses from the block
 	// 3. rewriting the block
+
+	return nil
 }
 
 // blockIDsForTimestamp returns the block IDs that may contain pauses for the given timestamp.
