@@ -8,6 +8,7 @@ import type {
   CreateInsightsQueryMutation,
   InsightsQueryStatement,
   RemoveInsightsQueryMutation,
+  ShareInsightsQueryMutation,
   UpdateInsightsQueryMutation,
 } from '@/gql/graphql';
 
@@ -15,9 +16,12 @@ const createInsightsQueryDocument = graphql(`
   mutation CreateInsightsQuery($input: NewInsightsQuery!) {
     createInsightsQuery(input: $input) {
       id
-      name
-      sql
       createdAt
+      creator
+      lastEditor
+      name
+      shared
+      sql
       updatedAt
     }
   }
@@ -31,13 +35,31 @@ const removeInsightsQueryDocument = graphql(`
   }
 `);
 
+const shareInsightsQueryDocument = graphql(`
+  mutation ShareInsightsQuery($id: ULID!) {
+    shareInsightsQuery(id: $id) {
+      id
+      createdAt
+      creator
+      lastEditor
+      name
+      shared
+      sql
+      updatedAt
+    }
+  }
+`);
+
 const updateInsightsQueryDocument = graphql(`
   mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {
     updateInsightsQuery(id: $id, input: $input) {
       id
-      name
-      sql
       createdAt
+      creator
+      lastEditor
+      name
+      shared
+      sql
       updatedAt
     }
   }
@@ -45,6 +67,7 @@ const updateInsightsQueryDocument = graphql(`
 
 export type DeleteQueryArgs = { id: string };
 export type SaveQueryArgs = { name: string; query: string };
+export type ShareQueryArgs = { id: string };
 export type UpdateQueryArgs = { id: string; name: string; query: string };
 
 export type MutationResult<T> = { ok: true; data: T } | { ok: false; error: 'unique' | 'other' };
@@ -52,12 +75,14 @@ export type MutationResult<T> = { ok: true; data: T } | { ok: false; error: 'uni
 type UseModifySavedQueriesReturn = {
   deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
   saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  shareQuery: (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
   updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
 };
 
 export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   const [, runCreate] = useMutation(createInsightsQueryDocument);
   const [, runRemove] = useMutation(removeInsightsQueryDocument);
+  const [, runShare] = useMutation(shareInsightsQueryDocument);
   const [, runUpdate] = useMutation(updateInsightsQueryDocument);
 
   const executeMutation = useCallback(
@@ -83,6 +108,18 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
       return { ok: true, data: ids };
     },
     [executeMutation, runRemove]
+  );
+
+  const shareQuery = useCallback<
+    (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>
+  >(
+    async ({ id }) => {
+      const result = await executeMutation<ShareInsightsQueryMutation>(() => runShare({ id }));
+      if (!result.ok) return { ok: false, error: mapErrorToTag(result.error) };
+
+      return { ok: true, data: result.data.shareInsightsQuery };
+    },
+    [executeMutation, runShare]
   );
 
   const saveQuery = useCallback<
@@ -113,7 +150,7 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
     [executeMutation, runUpdate]
   );
 
-  return { deleteQuery, saveQuery, updateQuery };
+  return { deleteQuery, saveQuery, shareQuery, updateQuery };
 }
 
 function mapErrorToTag(error: CombinedError): 'unique' | 'other' {
