@@ -1553,6 +1553,48 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		t.Logf("ToString() works fine: %s", strResult)
 	})
 
+	t.Run("with graceful handling, no more syntax errors should be surfaced", func(t *testing.T) {
+		r, rc, throttledStore, clock := initRedis(t)
+
+		defer rc.Close()
+
+		// With graceful parsing, we should be handled gracefully
+		throttledStore.disableGracefulScientificNotationParsing = false
+
+		config := inngest.RateLimit{
+			Limit:  50,
+			Period: "1h",
+		}
+
+		key := "scientific-notation-direct-test"
+		redisKey := prefix + key
+
+		// Directly set a scientific notation value in Redis that mimics what we observed
+		// This is the exact value format that caused the issue: "1.7628952937785e+18"
+		scientificValue := "1.7628952937785e+18"
+
+		t.Logf("Manually setting Redis key %s to scientific notation value: %s", redisKey, scientificValue)
+		err := r.Set(redisKey, scientificValue)
+		require.NoError(t, err)
+
+		// Verify the value was set
+		storedValue, err := r.Get(redisKey)
+		require.NoError(t, err)
+		t.Logf("Confirmed stored value: %s", storedValue)
+
+		// Run a couple rate limit operations in sequence to ensure we keep using the valid value
+		for range 5 {
+			limited, retry, err := rateLimit(ctx, throttledStore, key, config)
+			require.NoError(t, err)
+			require.False(t, limited)
+			require.Equal(t, time.Duration(-1), retry)
+
+			clock.Advance(1 * time.Second)
+			r.FastForward(1 * time.Second)
+			r.SetTime(clock.Now())
+		}
+	})
+
 	t.Run("force lua to write scientific notation with artificially large number", func(t *testing.T) {
 		r, rc, throttledStore, _ := initRedis(t)
 		defer rc.Close()

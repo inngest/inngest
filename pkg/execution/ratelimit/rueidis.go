@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,20 +26,34 @@ end
 redis.call('setex', KEYS[1], ARGV[3], ARGV[2])
 return 1
 `
+
+	redisCASFixupScript = `
+local v = redis.call('get', KEYS[1])
+if v == false then
+  return redis.error_reply("key does not exist")
+end
+if v ~= ARGV[1] then
+  return 0
+end
+redis.call('set', KEYS[1], ARGV[2], "KEEPTTL")
+return 1
+`
 )
 
 func New(ctx context.Context, r rueidis.Client, prefix string) RateLimiter {
 	return &rueidisStore{
 		r:              r,
 		casScript:      rueidis.NewLuaScript(redisCASScript),
+		casFixupScript: rueidis.NewLuaScript(redisCASFixupScript),
 		prefix:         prefix,
 		luaRateLimiter: newLuaGCRARateLimiter(ctx, r, prefix),
 	}
 }
 
 type rueidisStore struct {
-	r         rueidis.Client
-	casScript *rueidis.Lua
+	r              rueidis.Client
+	casScript      *rueidis.Lua
+	casFixupScript *rueidis.Lua
 
 	prefix string
 
@@ -68,12 +83,9 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	l := logger.StdlibLogger(ctx)
 	key = r.prefix + key
 
+	// get and parse current redis server time
 	timeCmd := r.r.B().Time().Build()
-	getKeyCmd := r.r.B().Get().Key(key).Build()
-
 	res, timeErr := r.r.Do(ctx, timeCmd).AsStrSlice()
-	v, valErr := r.r.Do(ctx, getKeyCmd).AsInt64()
-
 	if timeErr != nil {
 		return 0, time.Time{}, fmt.Errorf("failed to get redis server time: %w", timeErr)
 	}
@@ -82,30 +94,34 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 		return 0, time.Time{}, fmt.Errorf("failed to parse redis server time: %w", err)
 	}
 
-	if valErr != nil && rueidis.IsRedisNil(valErr) {
+	// get and parse rate limit key value
+	getKeyCmd := r.r.B().Get().Key(key).Build()
+	v, err := r.r.Do(ctx, getKeyCmd).AsInt64()
+	if err != nil && rueidis.IsRedisNil(err) {
 		return -1, now, nil
 	}
 
 	// Happy path: No error
-	if valErr == nil {
+	if err == nil {
 		return v, now, nil
 	}
 
 	// We could not load the value for some reason
 
 	// Only continue for integer parsing errors, i/o timeouts should be retried properly
-	if !strings.Contains(valErr.Error(), "strconv.ParseInt") && !strings.Contains(valErr.Error(), "invalid syntax") {
-		return 0, now, fmt.Errorf("failed to get key value: %w", valErr)
+	numErr := &strconv.NumError{}
+	if !errors.As(err, &numErr) || numErr.Err != strconv.ErrSyntax {
+		return 0, now, fmt.Errorf("failed to get key value: %w", err)
 	}
 
 	if r.disableGracefulScientificNotationParsing {
-		return 0, now, fmt.Errorf("unexpected scientific notation: %w", valErr)
+		return 0, now, fmt.Errorf("unexpected scientific notation: %w", err)
 	}
 
 	// Try to get the raw string value and parse it as a float first
 	rawResult := r.r.Do(ctx, r.r.B().Get().Key(key).Build())
-	strVal, strErr := rawResult.ToString()
-	if strErr != nil {
+	strVal, err := rawResult.ToString()
+	if err != nil {
 		return 0, now, fmt.Errorf("failed to get key value as string: %w", err)
 	}
 
@@ -119,9 +135,10 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	}
 
 	// This is scientific notation - try to parse as float and convert to int64
-	floatVal, parseErr := strconv.ParseFloat(strVal, 64)
-	if parseErr != nil {
+	floatVal, err := strconv.ParseFloat(strVal, 64)
+	if err != nil {
 		l.Warn("rate limit key contained scientific notation value that could not be parsed and was not scientific notation, reset to current time",
+			"parse_err", err,
 			"key", key,
 			"value", strVal,
 		)
@@ -130,11 +147,27 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 
 	// Convert to int64, but clamp to safe values
 	safeVal := int64(floatVal)
-	l.Warn("rate limit key contained scientific notation value, handled gracefully",
-		"key", key,
-		"value", strVal,
-		"converted", safeVal,
-	)
+
+	// Optimistically apply CAS to switch from invalid string to parsed integer representation
+	swapped, err := r.swapStringWithInt(ctx, key, strVal, safeVal)
+	if err != nil {
+		return 0, now, fmt.Errorf("could not swap to normalized rate limit value: %w", err)
+	}
+
+	if swapped {
+		l.Warn("rate limit key contained scientific notation value, handled gracefully",
+			"key", key,
+			"value", strVal,
+			"converted", safeVal,
+		)
+	} else {
+		l.Warn("rate limit value changed while converting to safe value",
+			"key", key,
+			"value", strVal,
+			"converted", safeVal,
+		)
+	}
+
 	return safeVal, now, nil
 }
 
@@ -207,6 +240,28 @@ func (r *rueidisStore) CompareAndSwapWithTTL(ctx context.Context, key string, ol
 			fmt.Sprintf("%d", old),
 			fmt.Sprintf("%d", new),
 			strconv.Itoa(ttlSeconds),
+		},
+	).AsInt64()
+
+	swapped := result == 1
+	if err != nil {
+		if strings.Contains(err.Error(), redisCASMissingKey) {
+			return false, nil
+		}
+		return false, err
+	}
+	return swapped, nil
+}
+
+func (r *rueidisStore) swapStringWithInt(ctx context.Context, key string, old string, new int64) (bool, error) {
+	// result will be 0 or 1
+	result, err := r.casFixupScript.Exec(
+		ctx,
+		r.r,
+		[]string{key},
+		[]string{
+			old,
+			fmt.Sprintf("%d", new),
 		},
 	).AsInt64()
 
