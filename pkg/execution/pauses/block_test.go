@@ -594,6 +594,7 @@ func TestBlockstoreDelete(t *testing.T) {
 		// Normal pause at 4.5s should be marked for deletion only in block 3
 
 		// Create additional blocks to have 4 total
+		mockBufferer.mu.Lock()
 		mockBufferer.pauses = []*state.Pause{
 			{
 				ID:          uuid.New(),
@@ -606,9 +607,11 @@ func TestBlockstoreDelete(t *testing.T) {
 				CreatedAt:   now.Add(3 * time.Second),
 			},
 		}
+		mockBufferer.mu.Unlock()
 		err := store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
 
+		mockBufferer.mu.Lock()
 		mockBufferer.pauses = []*state.Pause{
 			{
 				ID:          uuid.New(),
@@ -621,9 +624,11 @@ func TestBlockstoreDelete(t *testing.T) {
 				CreatedAt:   now.Add(5 * time.Second),
 			},
 		}
+		mockBufferer.mu.Unlock()
 		err = store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
 
+		mockBufferer.mu.Lock()
 		mockBufferer.pauses = []*state.Pause{
 			{
 				ID:          uuid.New(),
@@ -636,6 +641,7 @@ func TestBlockstoreDelete(t *testing.T) {
 				CreatedAt:   now.Add(7 * time.Second),
 			},
 		}
+		mockBufferer.mu.Unlock()
 		err = store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
 
@@ -716,6 +722,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 	}
 
 	// Create block 1
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -728,12 +735,14 @@ func TestBoundaryPauseDelete(t *testing.T) {
 			CreatedAt:   now.Add(time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
 	boundaryTime := now.Add(2 * time.Second)
 
 	// Create block 2 (ends at boundary)
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -746,10 +755,12 @@ func TestBoundaryPauseDelete(t *testing.T) {
 			CreatedAt:   boundaryTime,
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
 	// Create block 3 (starts at boundary)
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -762,10 +773,12 @@ func TestBoundaryPauseDelete(t *testing.T) {
 			CreatedAt:   boundaryTime.Add(time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
 	// Create blocks 4 and 5
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -778,9 +791,11 @@ func TestBoundaryPauseDelete(t *testing.T) {
 			CreatedAt:   now.Add(5 * time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -793,6 +808,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 			CreatedAt:   now.Add(7 * time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
@@ -879,6 +895,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create additional blocks
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -891,9 +908,11 @@ func TestLegacyPauseDelete(t *testing.T) {
 			CreatedAt:   now.Add(3 * time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
+	mockBufferer.mu.Lock()
 	mockBufferer.pauses = []*state.Pause{
 		{
 			ID:          uuid.New(),
@@ -906,6 +925,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 			CreatedAt:   now.Add(5 * time.Second),
 		},
 	}
+	mockBufferer.mu.Unlock()
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
