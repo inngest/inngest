@@ -232,7 +232,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			md.ID.RunID,
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn("error creating run claim JWT for async token", "error", err)
+			logger.StdlibLogger(ctx).Warn("error creating run claim JWT", "error", err)
 		}
 		jwt = claim
 
