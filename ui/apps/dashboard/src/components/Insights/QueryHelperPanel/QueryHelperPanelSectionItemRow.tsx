@@ -48,3 +48,5 @@ export const QueryHelperPanelSectionItemRow = forwardRef<
     </div>
   );
 });
+
+QueryHelperPanelSectionItemRow.displayName = 'QueryHelperPanelSectionItemRow';

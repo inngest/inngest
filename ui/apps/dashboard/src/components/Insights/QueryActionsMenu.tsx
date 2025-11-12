@@ -63,5 +63,5 @@ export function QueryActionsMenu({
 }
 
 function isActualQueryAndUnshared(query: InsightsQueryStatement | QuerySnapshot | undefined) {
-  return query !== undefined && !isQuerySnapshot(query) && !query?.shared;
+  return query !== undefined && !isQuerySnapshot(query) && !query.shared;
 }
