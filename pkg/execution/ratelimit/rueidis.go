@@ -82,7 +82,7 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 		return -1, now, nil
 	}
 	if valErr != nil {
-		return 0, now, fmt.Errorf("failed to get key value: %w", err)
+		return 0, now, fmt.Errorf("failed to get key value: %w", valErr)
 	}
 
 	return v, now, nil

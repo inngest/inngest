@@ -1487,6 +1487,66 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("direct scientific notation parsing failure", func(t *testing.T) {
+		r, rc, throttledStore, _ := initRedis(t)
+		defer rc.Close()
+
+		config := inngest.RateLimit{
+			Limit:  1,
+			Period: "1h",
+		}
+
+		key := "scientific-notation-direct-test"
+		redisKey := prefix + key
+
+		// Directly set a scientific notation value in Redis that mimics what we observed
+		// This is the exact value format that caused the issue: "1.7628952937785e+18"
+		scientificValue := "1.7628952937785e+18"
+
+		t.Logf("Manually setting Redis key %s to scientific notation value: %s", redisKey, scientificValue)
+		err := r.Set(redisKey, scientificValue)
+		require.NoError(t, err)
+
+		// Verify the value was set
+		storedValue, err := r.Get(redisKey)
+		require.NoError(t, err)
+		t.Logf("Confirmed stored value: %s", storedValue)
+
+		// Now try to use the throttled implementation which should fail when trying to parse this
+		t.Logf("Attempting to use throttled implementation with scientific notation value in Redis...")
+
+		// This should fail with the AsInt64() parsing error
+		limited, retry, err := rateLimit(ctx, throttledStore, key, config)
+
+		// We expect this to fail with a parsing error
+		require.Error(t, err)
+		t.Logf("Got expected error: %v", err)
+
+		// Verify it's the specific scientific notation parsing error
+		require.True(t, strings.Contains(err.Error(), "strconv.ParseInt") ||
+			strings.Contains(err.Error(), "invalid syntax") ||
+			strings.Contains(err.Error(), "failed to get key value"),
+			"Expected parsing error, got: %v", err)
+
+		t.Logf("SUCCESS: Reproduced scientific notation parsing failure!")
+		t.Logf("Error details: %v", err)
+		t.Logf("Limited: %v, Retry: %v", limited, retry)
+
+		// Also test the direct Redis parsing that would happen in GetWithTime
+		cmd := rc.B().Get().Key(redisKey).Build()
+		result := rc.Do(ctx, cmd)
+
+		// Try to parse as int64 - this should fail
+		_, parseErr := result.AsInt64()
+		require.Error(t, parseErr)
+		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
+
+		// But ToString should work
+		strResult, err := result.ToString()
+		require.NoError(t, err)
+		t.Logf("ToString() works fine: %s", strResult)
+	})
 }
 
 func TestLuaRateLimit_EdgeCases(t *testing.T) {
