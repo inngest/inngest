@@ -71,7 +71,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/meta/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
@@ -597,7 +597,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
 			},
 
-			MetadataExtractor: meta.DefaultMetadataExtractor,
+			MetadataExtractor: extractors.Default,
 		})
 	})
 

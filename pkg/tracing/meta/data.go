@@ -12,21 +12,7 @@ import (
 
 var ErrInvalidMetadataOp = errors.New("invalid metadata op")
 
-var DefaultMetadataExtractor = MetadataExtractor{
-	ExtendedTrace: SpanMetadataExtractors{
-		SpanMetadataExtractorFunc(func(ctx context.Context, span *tracev1.Span) ([]StructuredMetadata, error) {
-			return []StructuredMetadata{
-				AnyStructuredMetadata(
-					"example",
-					map[string]any{
-						"key": "value",
-					},
-					MetadataOpMerge,
-				),
-			}, nil
-		}),
-	},
-}
+var DefaultMetadataExtractor MetadataExtractor
 
 type RawMetadata map[string]json.RawMessage
 
