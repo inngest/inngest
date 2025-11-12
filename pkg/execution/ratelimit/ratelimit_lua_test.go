@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1660,6 +1661,62 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		t.Logf("SUCCESS: Reproduced scientific notation parsing failure!")
 		t.Logf("Error details: %v", err)
 		t.Logf("Limited: %v, Retry: %v", limited, retry)
+	})
+
+	t.Run("lua script prevents scientific notation with integer conversion", func(t *testing.T) {
+		r, rc, _, clock := initRedis(t)
+		defer rc.Close()
+
+		// Use a configuration that would definitely cause floating-point arithmetic
+		// but should now be prevented by the toInteger function
+		config := inngest.RateLimit{
+			Limit:  7, // This will cause period_ns / 7 = floating-point emission_interval
+			Period: "1h",
+		}
+
+		key := "scientific-notation-prevention-test"
+		redisKey := prefix + key
+
+		t.Logf("Testing configuration that should cause floating-point arithmetic: %dh, limit %d", 1, 7)
+		t.Logf("Expected emission_interval: %d / %d = %f nanoseconds", int64(time.Hour), 7, float64(time.Hour)/7.0)
+
+		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
+
+		// Make several requests to trigger the floating-point arithmetic
+		for i := 1; i <= 10; i++ {
+			r.SetTime(clock.Now())
+			limited, retry, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+			require.NoError(t, err)
+			
+			// Check what's stored in Redis after each request
+			result, err := rc.Do(ctx, rc.B().Get().Key(redisKey).Build()).ToString()
+			if err == nil {
+				t.Logf("Request %d: limited=%v, retry=%v, stored value=%s", i, limited, retry, result)
+				
+				// The stored value should NEVER contain scientific notation
+				require.False(t, strings.Contains(result, "e+") || strings.Contains(result, "E+"), 
+					"Request %d: Stored value should not contain scientific notation: %s", i, result)
+				
+				// The value should be parseable as an integer
+				_, parseErr := strconv.ParseInt(result, 10, 64)
+				require.NoError(t, parseErr, "Request %d: Stored value should be parseable as integer: %s", i, result)
+			}
+
+			// Advance time slightly to ensure different timestamps
+			clock.Advance(100 * time.Millisecond)
+			r.FastForward(100 * time.Millisecond)
+		}
+
+		// After all requests, verify throttled implementation can read the values without issues
+		t.Logf("Testing throttled implementation compatibility...")
+		throttledStore := New(ctx, rc, prefix).(*rueidisStore)
+		
+		limited, retry, err := rateLimit(ctx, throttledStore, key, config)
+		require.NoError(t, err)
+		t.Logf("Throttled implementation result: limited=%v, retry=%v", limited, retry)
+		
+		// Should work without any parsing errors
+		require.True(t, limited) // Should be rate limited at this point
 	})
 }
 
