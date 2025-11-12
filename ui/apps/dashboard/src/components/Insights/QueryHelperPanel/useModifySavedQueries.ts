@@ -15,9 +15,12 @@ const createInsightsQueryDocument = graphql(`
   mutation CreateInsightsQuery($input: NewInsightsQuery!) {
     createInsightsQuery(input: $input) {
       id
-      name
-      sql
       createdAt
+      creator
+      lastEditor
+      name
+      shared
+      sql
       updatedAt
     }
   }
@@ -35,9 +38,12 @@ const updateInsightsQueryDocument = graphql(`
   mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {
     updateInsightsQuery(id: $id, input: $input) {
       id
-      name
-      sql
       createdAt
+      creator
+      lastEditor
+      name
+      shared
+      sql
       updatedAt
     }
   }
