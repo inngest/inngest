@@ -71,18 +71,18 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	v, valErr := r.r.Do(ctx, getKeyCmd).AsInt64()
 
 	if timeErr != nil {
-		return 0, time.Time{}, timeErr
+		return 0, time.Time{}, fmt.Errorf("failed to get redis server time: %w", timeErr)
 	}
 	now, err := redisTime(res)
 	if err != nil {
-		return 0, time.Time{}, err
+		return 0, time.Time{}, fmt.Errorf("failed to parse redis server time: %w", err)
 	}
 
 	if valErr != nil && rueidis.IsRedisNil(valErr) {
 		return -1, now, nil
 	}
 	if valErr != nil {
-		return 0, now, valErr
+		return 0, now, fmt.Errorf("failed to get key value: %w", err)
 	}
 
 	return v, now, nil
@@ -95,11 +95,11 @@ func redisTime(strs []string) (time.Time, error) {
 
 	secs, err := strconv.Atoi(strs[0])
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("failed to parse secs from redis time: %w", err)
 	}
 	msecs, err := strconv.Atoi(strs[1])
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("failed to parse msecs from redis time: %w", err)
 	}
 
 	now := time.Unix(int64(secs), int64(msecs)*int64(time.Microsecond))
