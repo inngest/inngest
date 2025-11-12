@@ -18,7 +18,7 @@ type InsightsSQLEditorSavedQueryActionsButtonProps = { tab: Tab };
 export function InsightsSQLEditorSavedQueryActionsButton({
   tab,
 }: InsightsSQLEditorSavedQueryActionsButtonProps) {
-  const { deleteQuery, queries } = useStoredQueries();
+  const { deleteQuery, queries, shareQuery } = useStoredQueries();
 
   const savedQuery = useMemo(() => {
     if (tab.savedQueryId === undefined) return undefined;
@@ -37,9 +37,8 @@ export function InsightsSQLEditorSavedQueryActionsButton({
         {!savedQuery.shared && (
           <DropdownMenuItem
             className="text-basis px-4"
-            onSelect={(e) => {
-              e.preventDefault();
-              // Placeholder: share action not implemented yet.
+            onSelect={() => {
+              shareQuery(savedQuery.id);
             }}
           >
             <RiShare2Line className="size-4" />
