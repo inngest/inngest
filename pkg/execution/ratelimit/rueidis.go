@@ -108,10 +108,8 @@ func (r *rueidisStore) GetWithTime(ctx context.Context, key string) (int64, time
 	if err != nil && rueidis.IsRedisNil(err) {
 		return -1, now, nil
 	}
-
-	// Happy path: No error
-	if err == nil {
-		return v, now, nil
+	if valErr != nil {
+		return 0, now, fmt.Errorf("failed to get key value: %w", err)
 	}
 
 	// We could not load the value for some reason
