@@ -1629,10 +1629,10 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		cmd = rc.B().Get().Key(redisKey).Build()
 		result := rc.Do(ctx, cmd)
 
-		// Try to parse as int64 - this should fail
-		_, parseErr := result.AsInt64()
-		require.Error(t, parseErr)
-		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				r, rc, throttledStore, clock := initRedis(t)
+				defer rc.Close()
 
 		// But ToString should work
 		strResult, err := result.ToString()
