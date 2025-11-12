@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1238,7 +1239,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// First request with idempotency should be allowed and consume the 1 available capacity
 		r.SetTime(clock.Now())
-		limited1, retry1, err := limiter.RateLimit(ctx, key, config, 
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1248,7 +1249,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Subsequent request with same idempotency key should be allowed WITHOUT consuming capacity (idempotency bypass)
 		r.SetTime(clock.Now())
-		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1258,7 +1259,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Third request with same idempotency key should still be allowed (idempotency bypass)
 		r.SetTime(clock.Now())
-		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1300,7 +1301,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Request with idempotency should be rate limited
 		r.SetTime(clock.Now())
-		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1311,7 +1312,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 		// Subsequent request with same idempotency key should STILL be rate limited
 		// (idempotency key should NOT be set for rate limited requests)
 		r.SetTime(clock.Now())
-		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1327,7 +1328,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Now the request with idempotency should succeed
 		r.SetTime(clock.Now())
-		limited4, retry4, err := limiter.RateLimit(ctx, key, config, 
+		limited4, retry4, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1337,7 +1338,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Subsequent request with same idempotency should now be allowed (idempotency enforced)
 		r.SetTime(clock.Now())
-		limited5, retry5, err := limiter.RateLimit(ctx, key, config, 
+		limited5, retry5, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1363,7 +1364,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// First request with idempotency should be allowed and consume the 1 available capacity
 		r.SetTime(clock.Now())
-		limited1, retry1, err := limiter.RateLimit(ctx, key, config, 
+		limited1, retry1, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1373,7 +1374,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Request with same idempotency key should be allowed (idempotency active - bypass)
 		r.SetTime(clock.Now())
-		limited2, retry2, err := limiter.RateLimit(ctx, key, config, 
+		limited2, retry2, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1389,7 +1390,7 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 
 		// Request with same idempotency key should now be rate limited (capacity already exhausted by first request)
 		r.SetTime(clock.Now())
-		limited3, retry3, err := limiter.RateLimit(ctx, key, config, 
+		limited3, retry3, err := limiter.RateLimit(ctx, key, config,
 			WithNow(clock.Now()),
 			WithIdempotency(idempotencyKey, idempotencyTTL))
 		require.NoError(t, err)
@@ -1404,6 +1405,87 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 		require.True(t, limited4) // Should be rate limited (capacity exhausted)
 		require.Greater(t, retry4, time.Duration(0))
 		t.Logf("Verify capacity exhausted - new request: limited=%v, retry=%v", limited4, retry4)
+	})
+}
+
+func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("large nanosecond timestamps causing scientific notation", func(t *testing.T) {
+		r, rc, throttledStore, clock := initRedis(t)
+		defer rc.Close()
+
+		config := inngest.RateLimit{
+			Limit:  100,
+			Period: "1h",
+		}
+
+		key := "scientific-notation-test"
+
+		// Phase 1: Create throttled state (first request)
+		t.Logf("Phase 1: Creating initial throttled state at time %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
+		limited1, retry1, err := rateLimit(ctx, throttledStore, key, config)
+		require.NoError(t, err)
+		require.False(t, limited1) // Should be allowed (not limited)
+		t.Logf("First request: limited=%v, retry=%v", limited1, retry1)
+
+		currentVal, err := r.Get(prefix + key)
+		require.NoError(t, err)
+		t.Logf("First key: %v", currentVal)
+
+		// Phase 2: Advance clock by 1 second
+		t.Logf("Phase 2: Advancing clock by 1 second")
+		clock.Advance(1 * time.Second)
+		r.FastForward(1 * time.Second)
+		r.SetTime(clock.Now())
+		t.Logf("Clock advanced to %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
+
+		// Phase 3: Make request using Lua implementation (this should work)
+		t.Logf("Phase 3: Making request with Lua implementation")
+		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
+		limited2, retry2, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		require.NoError(t, err)
+		require.False(t, limited2) // Should not be rate limited
+		t.Logf("Lua request: limited=%v, retry=%v", limited2, retry2)
+
+		currentVal, err = r.Get(prefix + key)
+		require.NoError(t, err)
+		t.Logf("Second key: %v", currentVal)
+
+		// Phase 4: Advance clock by another second
+		t.Logf("Phase 4: Advancing clock by another second")
+		clock.Advance(1 * time.Second)
+		r.FastForward(1 * time.Second)
+		r.SetTime(clock.Now())
+		t.Logf("Clock advanced to %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
+
+		// Phase 5: Continue with throttled state - this should trigger the scientific notation issue
+		// The Lua script has stored a very large nanosecond timestamp that gets serialized in scientific notation
+		t.Logf("Phase 5: Attempting throttled implementation (this may fail with scientific notation parsing)")
+
+		// This is where the bug should manifest - AsInt64() trying to parse scientific notation
+		_, _, err = rateLimit(ctx, throttledStore, key, config)
+		require.Error(t, err)
+		t.Logf("ERROR (expected): %v", err)
+		// Check if it's the specific scientific notation parsing error
+		if strings.Contains(err.Error(), "strconv.ParseInt") && strings.Contains(err.Error(), "invalid syntax") {
+			t.Logf("SUCCESS: Reproduced the scientific notation parsing issue!")
+			t.Logf("Error details: %v", err)
+		} else {
+			t.Fatalf("Unexpected error (not the scientific notation issue): %v", err)
+		}
+
+		// Additional verification: try to directly observe the Redis value that might be in scientific notation
+		redisKey := prefix + key
+		cmd := rc.B().Get().Key(redisKey).Build()
+		result, err := rc.Do(ctx, cmd).ToString()
+		if err == nil {
+			t.Logf("Raw Redis value: %s", result)
+			// Check if it's in scientific notation
+			if strings.Contains(result, "e+") || strings.Contains(result, "E+") {
+				t.Logf("CONFIRMED: Redis value is in scientific notation format!")
+			}
+		}
 	})
 }
 
