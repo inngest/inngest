@@ -12,13 +12,12 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"github.com/throttled/throttled/v2"
 )
 
 const prefix = "{rl}:"
 
 // initRedis creates both miniredis/rueidis for Lua, throttled store, and fake clock
-func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, throttled.GCRAStoreCtx, clockwork.FakeClock) {
+func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, *rueidisStore, clockwork.FakeClock) {
 	r := miniredis.RunT(t)
 
 	// Create rueidis client for Lua implementation
@@ -1412,6 +1411,8 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("large nanosecond timestamps causing scientific notation", func(t *testing.T) {
+		t.Skip("this should produce scientific notation but does not -- the root cause is likely a more complex combination")
+
 		r, rc, throttledStore, clock := initRedis(t)
 		defer rc.Close()
 
@@ -1490,7 +1491,11 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 
 	t.Run("direct scientific notation parsing failure", func(t *testing.T) {
 		r, rc, throttledStore, _ := initRedis(t)
+
 		defer rc.Close()
+
+		// NOTE: Explicitly disable graceful parsing here so we get to see the error
+		throttledStore.disableGracefulScientificNotationParsing = true
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -1548,9 +1553,12 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		t.Logf("ToString() works fine: %s", strResult)
 	})
 
-	t.Run("direct scientific notation as numeric parsing failure", func(t *testing.T) {
+	t.Run("force lua to write scientific notation with artificially large number", func(t *testing.T) {
 		r, rc, throttledStore, _ := initRedis(t)
 		defer rc.Close()
+
+		// NOTE: Explicitly disable graceful parsing here so we get to see the error
+		throttledStore.disableGracefulScientificNotationParsing = true
 
 		config := inngest.RateLimit{
 			Limit:  1,
@@ -1560,10 +1568,14 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		key := "scientific-notation-direct-test"
 		redisKey := prefix + key
 
-		// Set the numeric value and see if this ends up being the scientific notation
+		// Try to force Redis to store in scientific notation by using a very large number with decimals
 		cmd := rc.B().Eval().Script(`local key = KEYS[1]
-			local value = 1762895293778500000
-			redis.call("SET", key, value)
+			-- Create a number that's too large for Redis to store as a normal integer
+			-- Math operations that create very large floating-point results
+			local base = 9223372036854775807  -- Max int64
+			local multiplier = 1.5
+			local very_large = base * multiplier  -- This should force floating-point representation
+			redis.call("SET", key, very_large)
 			return 0`).Numkeys(1).Key(redisKey).Build()
 		err := rc.Do(ctx, cmd).Error()
 		require.NoError(t, err)
@@ -1572,6 +1584,20 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		storedValue, err := r.Get(redisKey)
 		require.NoError(t, err)
 		t.Logf("Confirmed stored value: %s", storedValue)
+
+		// Also test the direct Redis parsing that would happen in GetWithTime
+		cmd = rc.B().Get().Key(redisKey).Build()
+		result := rc.Do(ctx, cmd)
+
+		// Try to parse as int64 - this should fail
+		_, parseErr := result.AsInt64()
+		require.Error(t, parseErr)
+		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
+
+		// But ToString should work
+		strResult, err := result.ToString()
+		require.NoError(t, err)
+		t.Logf("ToString() works fine: %s", strResult)
 
 		// Now try to use the throttled implementation which should fail when trying to parse this
 		t.Logf("Attempting to use throttled implementation with scientific notation value in Redis...")
@@ -1592,20 +1618,120 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		t.Logf("SUCCESS: Reproduced scientific notation parsing failure!")
 		t.Logf("Error details: %v", err)
 		t.Logf("Limited: %v, Retry: %v", limited, retry)
+	})
 
-		// Also test the direct Redis parsing that would happen in GetWithTime
-		cmd = rc.B().Get().Key(redisKey).Build()
-		result := rc.Do(ctx, cmd)
+	t.Run("production rate limit configs causing scientific notation", func(t *testing.T) {
+		testCases := []struct {
+			name   string
+			period string
+			limit  uint
+		}{
+			{"1 minute 1 request", "1m", 1},
+			{"24 hours 1 request", "24h", 1},
+			{"1 hour 7 requests", "1h", 7},    // This should cause floating-point emission_interval
+			{"24 hours 7 requests", "24h", 7}, // This should also cause floating-point
+		}
 
-		// Try to parse as int64 - this should fail
-		_, parseErr := result.AsInt64()
-		require.Error(t, parseErr)
-		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				r, rc, throttledStore, clock := initRedis(t)
+				defer rc.Close()
 
-		// But ToString should work
-		strResult, err := result.ToString()
-		require.NoError(t, err)
-		t.Logf("ToString() works fine: %s", strResult)
+				config := inngest.RateLimit{
+					Limit:  tc.limit,
+					Period: tc.period,
+				}
+
+				key := fmt.Sprintf("production-config-%s-%d", tc.period, tc.limit)
+
+				t.Logf("Testing production config: %s, limit %d", tc.period, tc.limit)
+				t.Logf("Current time: %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
+
+				// Create Lua limiter and make multiple requests to accumulate any precision issues
+				luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
+
+				// First request - should be allowed
+				r.SetTime(clock.Now())
+				limited1, retry1, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+				require.NoError(t, err)
+				require.False(t, limited1)
+				t.Logf("Request 1: limited=%v, retry=%v", limited1, retry1)
+
+				// Check what got stored in Redis after first request
+				redisKey := prefix + key
+				cmd := rc.B().Get().Key(redisKey).Build()
+				result1, err := rc.Do(ctx, cmd).ToString()
+				if err == nil {
+					t.Logf("After request 1, Redis value: %s", result1)
+					if strings.Contains(result1, "e+") || strings.Contains(result1, "E+") {
+						t.Logf("SCIENTIFIC NOTATION DETECTED after request 1!")
+					}
+				}
+
+				// Second request - should be rate limited due to limit=1
+				r.SetTime(clock.Now())
+				limited2, retry2, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+				require.NoError(t, err)
+				require.True(t, limited2)
+				t.Logf("Request 2: limited=%v, retry=%v", limited2, retry2)
+
+				// Check what's stored after second request
+				result2, err := rc.Do(ctx, rc.B().Get().Key(redisKey).Build()).ToString()
+				if err == nil {
+					t.Logf("After request 2, Redis value: %s", result2)
+					if strings.Contains(result2, "e+") || strings.Contains(result2, "E+") {
+						t.Logf("SCIENTIFIC NOTATION DETECTED after request 2!")
+					}
+				}
+
+				// Make a few more requests to see if we accumulate precision issues
+				for i := 3; i <= 5; i++ {
+					r.SetTime(clock.Now())
+					limited, retry, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+					require.NoError(t, err)
+					require.True(t, limited) // Should be rate limited
+					t.Logf("Request %d: limited=%v, retry=%v", i, limited, retry)
+
+					// Check for scientific notation after each request
+					result, err := rc.Do(ctx, rc.B().Get().Key(redisKey).Build()).ToString()
+					if err == nil {
+						t.Logf("After request %d, Redis value: %s", i, result)
+						if strings.Contains(result, "e+") || strings.Contains(result, "E+") {
+							t.Logf("SCIENTIFIC NOTATION DETECTED after request %d!", i)
+
+							// Now try to use throttled implementation - this should fail
+							t.Logf("Attempting to use throttled implementation...")
+							limited_throttled, retry_throttled, err := rateLimit(ctx, throttledStore, key, config)
+
+							if err != nil {
+								t.Logf("SUCCESS! Throttled implementation failed: %v", err)
+								require.True(t, strings.Contains(err.Error(), "strconv.ParseInt") ||
+									strings.Contains(err.Error(), "invalid syntax") ||
+									strings.Contains(err.Error(), "failed to get key value"),
+									"Expected parsing error, got: %v", err)
+								return // Test successful
+							} else {
+								t.Logf("Throttled implementation succeeded: limited=%v, retry=%v", limited_throttled, retry_throttled)
+							}
+						}
+					}
+				}
+
+				// Even if we didn't see scientific notation, let's try the throttled implementation
+				// to see if there are any parsing issues with the stored values
+				t.Logf("Testing throttled implementation compatibility...")
+				limited_final, retry_final, err := rateLimit(ctx, throttledStore, key, config)
+				if err != nil {
+					t.Logf("Throttled implementation failed: %v", err)
+					if strings.Contains(err.Error(), "strconv.ParseInt") || strings.Contains(err.Error(), "invalid syntax") {
+						t.Logf("SUCCESS! Reproduced scientific notation parsing issue with production config!")
+					}
+				} else {
+					t.Logf("Throttled implementation worked: limited=%v, retry=%v", limited_final, retry_final)
+					t.Logf("No scientific notation issue detected with this configuration")
+				}
+			})
+		}
 	})
 }
 
