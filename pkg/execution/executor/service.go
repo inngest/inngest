@@ -335,11 +335,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 		return false, queue.AlwaysRetryError(err)
 	}
 
-	// connect worker capacity errors should be retried
-	if errors.Is(err, state.ErrConnectWorkerCapacity) {
-		return false, queue.AlwaysRetryError(err)
-	}
-
 	if errors.Is(err, ErrHandledStepError) {
 		// Retry any next steps.
 		return false, err
@@ -1039,6 +1034,12 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 	if conf.FunctionVersion > ci.FunctionVersion {
 		l.Info("Breaking cron cycle, function version was upgraded")
+		return nil
+	}
+
+	// ensure that the function has the same cron expression.
+	if !conf.HasCronExpression(ci.Expression) {
+		l.Info("Breaking cron cycle, cron trigger no longer exists")
 		return nil
 	}
 
