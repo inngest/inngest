@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiCloseLargeLine, RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
+import { RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
 
 import type { QuerySnapshot } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
@@ -28,7 +27,6 @@ export function QueryHelperPanelSectionItem({
 }: QueryHelperPanelSectionItemProps) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const displayText = query.name;
@@ -56,8 +54,6 @@ export function QueryHelperPanelSectionItem({
           onClick={() => {
             onQuerySelect(query);
           }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
         >
           <Icon className="h-4 w-4 flex-shrink-0" />
           <span
@@ -66,24 +62,6 @@ export function QueryHelperPanelSectionItem({
           >
             {displayText}
           </span>
-          <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
-            <Button
-              appearance="ghost"
-              className={cn(
-                'text-subtle h-4 w-4 p-0 transition-all',
-                isHovered ? 'opacity-100' : 'opacity-0'
-              )}
-              icon={<RiCloseLargeLine className="h-3 w-3" />}
-              onClick={(e: React.MouseEvent) => {
-                e.stopPropagation();
-
-                if (sectionType === 'saved' || sectionType === 'shared') setShowDeleteModal(true);
-                else onQueryDelete(query.id);
-              }}
-              size="small"
-              tooltip="Delete query"
-            />
-          </div>
         </div>
       </OptionalTooltip>
 
