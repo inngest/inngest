@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func getItemIDsFromBacklog(ctx context.Context, mgr redis_state.BacklogManager, 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	itemIDs := make([]string, len(items))
 	for i, item := range items {
 		itemIDs[i] = item.ID
@@ -322,6 +323,29 @@ func TestLuaCompatibility(t *testing.T) {
 				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
 				require.NotNil(t, leaseID)
+			})
+
+			t.Run("current time is returned for rate limiting", func(t *testing.T) {
+				shard := setup(t)
+
+				rc := shard.RedisClient.Client()
+
+				cmd := rc.B().Time().Build()
+				res, err := rc.Do(ctx, cmd).AsStrSlice()
+				require.NoError(t, err)
+				require.Len(t, res, 2)
+
+				t.Log(res)
+
+				parsed, err := strconv.Atoi(res[0])
+				require.NoError(t, err)
+
+				t.Log(res[0], parsed)
+
+				parsed, err = strconv.Atoi(res[1])
+				require.NoError(t, err)
+
+				t.Log(res[1], parsed)
 			})
 		})
 	}

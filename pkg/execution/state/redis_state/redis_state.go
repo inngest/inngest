@@ -828,18 +828,18 @@ func (m unshardedMgr) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID,
 	result, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).ToArray()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
-			return time.Time{}, fmt.Errorf("pause timestamp not found")
+			return time.Time{}, state.ErrPauseNotFound
 		}
 		return time.Time{}, err
 	}
 
 	if len(result) == 0 {
-		return time.Time{}, fmt.Errorf("pause timestamp not found")
+		return time.Time{}, state.ErrPauseNotFound
 	}
 
 	// ZMSCORE returns nil for non-existent members
 	if result[0].IsNil() {
-		return time.Time{}, fmt.Errorf("pause timestamp not found")
+		return time.Time{}, state.ErrPauseNotFound
 	}
 
 	ts, err := result[0].AsInt64()
@@ -874,10 +874,13 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
 
-	now := time.Now()
-	nowUnixSeconds := now.Unix()
+	createdAt := p.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
 
-	p.CreatedAt = now
+	nowUnixSeconds := createdAt.Unix()
+	p.CreatedAt = createdAt
 
 	packed, err := json.Marshal(p)
 	if err != nil {
