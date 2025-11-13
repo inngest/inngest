@@ -9,8 +9,8 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/cmd/main.go",
-      "args": ["dev", "-u", "http://localhost:3030/api/inngest"]
+      "program": "${workspaceFolder}/cmd",
+      "args": ["dev", "-u", "http://localhost:3939/api/inngest"]
     }
   ]
 }

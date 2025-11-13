@@ -7,7 +7,13 @@ import (
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/util"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -276,4 +282,114 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 
 func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*apiv2.PatchEnvsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
+}
+
+func (s *Service) BulkRerun(ctx context.Context, req *apiv2.BulkRerunRequest) (*apiv2.BulkRerunResponse, error) {
+	// Validate request
+	if len(req.RunIds) == 0 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "At least one run ID is required")
+	}
+
+	if len(req.RunIds) > 50 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Cannot rerun more than 50 runs at once")
+	}
+
+	accountID := consts.DevServerAccountID
+	workspaceID := consts.DevServerEnvID
+
+	// Process each run ID
+	results := make([]*apiv2.RerunResult, len(req.RunIds))
+	for i, runIDStr := range req.RunIds {
+		result := &apiv2.RerunResult{
+			OriginalRunId: runIDStr,
+			Success:       false,
+		}
+
+		runID, err := ulid.Parse(runIDStr)
+		if err != nil {
+			result.Error = util.StrPtr("Invalid run ID format, expected ULID")
+			results[i] = result
+			continue
+		}
+
+		fnrun, err := s.data.GetFunctionRun(ctx, accountID, workspaceID, runID)
+		if err != nil {
+			result.Error = util.StrPtr("Failed to find run by ID")
+			results[i] = result
+			continue
+		}
+
+		// NOTE: We could store a map of functions to avoid duplicate database lookups
+		fnCQRS, err := s.data.GetFunctionByInternalUUID(ctx, fnrun.FunctionID)
+		if err != nil {
+			result.Error = util.StrPtr("Failed to load function")
+			results[i] = result
+			continue
+		}
+
+		fn, err := fnCQRS.InngestFunction()
+		if err != nil {
+			result.Error = util.StrPtr("Failed to load function")
+			results[i] = result
+			continue
+		}
+
+		evt, err := s.data.GetEventByInternalID(ctx, fnrun.EventID)
+		if err != nil {
+			result.Error = util.StrPtr("Failed to load run triggering event")
+			results[i] = result
+			continue
+		}
+
+		// Create tracing span for rerun
+		ctx, span := run.NewSpan(ctx,
+			run.WithName(consts.OtelSpanRerun),
+			run.WithScope(consts.OtelScopeRerun),
+			run.WithNewRoot(),
+			run.WithSpanAttributes(
+				attribute.String(consts.OtelSysAppID, fnCQRS.AppID.String()),
+				attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
+				attribute.String(consts.OtelSysFunctionSlug, fnCQRS.Slug),
+				attribute.String(consts.OtelSysEventIDs, evt.GetInternalID().String()),
+			),
+		)
+		defer span.End()
+
+		originalRunID := &fnrun.RunID
+		if fnrun.OriginalRunID != nil {
+			originalRunID = fnrun.OriginalRunID
+		}
+
+		// Schedule the rerun
+		identifier, err := s.executor.Schedule(ctx, execution.ScheduleRequest{
+			Function: *fn,
+			AppID:    fnCQRS.AppID,
+			Events: []event.TrackedEvent{
+				event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
+			},
+			OriginalRunID:    originalRunID,
+			AccountID:        accountID,
+			WorkspaceID:      workspaceID,
+			PreventRateLimit: true, // Bypass rate limits for reruns
+		})
+
+		if err != nil {
+			result.Error = util.StrPtr("Failed to schedule rerun")
+			results[i] = result
+			continue
+		}
+
+		// Success!
+		result.Success = true
+		result.NewRunId = util.StrPtr(identifier.ID.RunID.String())
+		results[i] = result
+	}
+
+	return &apiv2.BulkRerunResponse{
+		Data: results,
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt:   timestamppb.New(time.Now()),
+			CachedUntil: nil,
+		},
+	}, nil
 }
