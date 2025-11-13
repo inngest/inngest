@@ -710,9 +710,13 @@ func (e *executor) schedule(
 			case nil:
 				// Enable new pure Lua implementation on a per-account basis
 				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
+				impl := "throttled"
+				if useLuaRL {
+					impl = "lua"
+				}
 
 				limited, _, err := e.rateLimiter.RateLimit(
-					ctx,
+					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
@@ -720,13 +724,35 @@ func (e *executor) schedule(
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
+					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"impl":   impl,
+							"status": "error",
+						},
+					})
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
 
 				if limited {
 					// Do nothing.
+					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"impl":   impl,
+							"status": "limited",
+						},
+					})
 					return nil, ErrFunctionRateLimited
 				}
+
+				metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"impl":   impl,
+						"status": "allowed",
+					},
+				})
 			case ratelimit.ErrNotRateLimited:
 				// no-op: proceed with function run as usual
 			default:
