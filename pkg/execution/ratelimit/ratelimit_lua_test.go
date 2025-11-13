@@ -1734,60 +1734,86 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		require.Equal(t, time.Duration(0), res.RetryAfter)
 	})
 
-	t.Run("lua script prevents scientific notation with integer conversion", func(t *testing.T) {
+	t.Run("force lua to write scientific notation with artificially large number with new impl", func(t *testing.T) {
 		r, rc, _, clock := initRedis(t)
 		defer rc.Close()
 
-		// Use a configuration that would definitely cause floating-point arithmetic
-		// but should now be prevented by the toInteger function
+		limiter := newLuaGCRARateLimiter(ctx, rc, prefix)
+
 		config := inngest.RateLimit{
-			Limit:  7, // This will cause period_ns / 7 = floating-point emission_interval
+			Limit:  10,
 			Period: "1h",
 		}
 
-		key := "scientific-notation-prevention-test"
+		key := "scientific-notation-direct-test"
 		redisKey := prefix + key
 
-		t.Logf("Testing configuration that should cause floating-point arithmetic: %dh, limit %d", 1, 7)
-		t.Logf("Expected emission_interval: %d / %d = %f nanoseconds", int64(time.Hour), 7, float64(time.Hour)/7.0)
-
-		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
-
-		// Make several requests to trigger the floating-point arithmetic
-		for i := 1; i <= 10; i++ {
-			r.SetTime(clock.Now())
-			limited, retry, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-			require.NoError(t, err)
-			
-			// Check what's stored in Redis after each request
-			result, err := rc.Do(ctx, rc.B().Get().Key(redisKey).Build()).ToString()
-			if err == nil {
-				t.Logf("Request %d: limited=%v, retry=%v, stored value=%s", i, limited, retry, result)
-				
-				// The stored value should NEVER contain scientific notation
-				require.False(t, strings.Contains(result, "e+") || strings.Contains(result, "E+"), 
-					"Request %d: Stored value should not contain scientific notation: %s", i, result)
-				
-				// The value should be parseable as an integer
-				_, parseErr := strconv.ParseInt(result, 10, 64)
-				require.NoError(t, parseErr, "Request %d: Stored value should be parseable as integer: %s", i, result)
-			}
-
-			// Advance time slightly to ensure different timestamps
-			clock.Advance(100 * time.Millisecond)
-			r.FastForward(100 * time.Millisecond)
-		}
-
-		// After all requests, verify throttled implementation can read the values without issues
-		t.Logf("Testing throttled implementation compatibility...")
-		throttledStore := New(ctx, rc, prefix).(*rueidisStore)
-		
-		limited, retry, err := rateLimit(ctx, throttledStore, key, config)
+		// Try to force Redis to store in scientific notation by using a very large number with decimals
+		cmd := rc.B().Eval().Script(`local key = KEYS[1]
+			-- Create a number that's too large for Redis to store as a normal integer
+			-- Math operations that create very large floating-point results
+			local base = 9223372036854775807  -- Max int64
+			local multiplier = 1.5
+			local very_large = base * multiplier  -- This should force floating-point representation
+			redis.call("SET", key, very_large)
+			return 0`).Numkeys(1).Key(redisKey).Build()
+		err := rc.Do(ctx, cmd).Error()
 		require.NoError(t, err)
-		t.Logf("Throttled implementation result: limited=%v, retry=%v", limited, retry)
-		
-		// Should work without any parsing errors
-		require.True(t, limited) // Should be rate limited at this point
+
+		// Verify the value was set
+		storedValue, err := r.Get(redisKey)
+		require.NoError(t, err)
+		t.Logf("Confirmed stored value: %s", storedValue)
+
+		// Also test the direct Redis parsing that would happen in GetWithTime
+		cmd = rc.B().Get().Key(redisKey).Build()
+		result := rc.Do(ctx, cmd)
+
+		// Try to parse as int64 - this should fail
+		_, parseErr := result.AsInt64()
+		require.Error(t, parseErr)
+		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
+
+		// But ToString should work
+		strResult, err := result.ToString()
+		require.NoError(t, err)
+		t.Logf("ToString() works fine: %s", strResult)
+
+		// Should fail because it's clamped to the maximum
+		limited, retry, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+
+		// We expect this to fail with a parsing error
+		require.NoError(t, err)
+
+		// Expect value to be clamped
+		storedValue, err = r.Get(redisKey)
+		require.NoError(t, err)
+		t.Logf("Confirmed stored value: %s", storedValue)
+
+		normalizedValue, err := strconv.Atoi(storedValue)
+		require.NoError(t, err)
+
+		emissionInterval := time.Hour.Nanoseconds() / 10
+		burst := 1
+		totalCapacity := (burst + 1)
+		delayVariationTolerance := emissionInterval * int64(totalCapacity)
+		expectedMax := clock.Now().UnixNano() + time.Hour.Nanoseconds() + delayVariationTolerance
+
+		require.InDelta(t, int(expectedMax), normalizedValue, 10)
+
+		require.True(t, limited)
+		require.Equal(t, time.Hour+6*time.Minute, retry.Round(time.Minute))
+
+		clock.Advance(retry + time.Minute)
+		r.FastForward(retry + time.Minute)
+		r.SetTime(clock.Now())
+
+		// Should allow another request
+		limited, retry, err = limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+
+		require.NoError(t, err)
+		require.False(t, limited)
+		require.Equal(t, time.Duration(0), retry)
 	})
 }
 
