@@ -10,6 +10,8 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -582,64 +584,504 @@ func TestBlockstoreDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("delete with CreatedAt timestamp", func(t *testing.T) {
-		err := store.Delete(ctx, index, *pause1)
+		// Test normal pause deletion in a specific block:
+		//
+		// Block 1: [0s ----------- 1s]
+		// Block 2: [2s ----------- 3s]
+		// Block 3: [4s ----------- 5s] ← pause gets marked here
+		// Block 4: [6s ----------- 7s]
+		//
+		// Normal pause at 4.5s should be marked for deletion only in block 3
+
+		// Create additional blocks to have 4 total
+		mockBufferer.mu.Lock()
+		mockBufferer.pauses = []*state.Pause{
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(2 * time.Second),
+			},
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(3 * time.Second),
+			},
+		}
+		mockBufferer.mu.Unlock()
+		err := store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
 
-		deleteKey := blockDeleteKey(index)
-		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pause1.ID.String()).Build()).AsBool()
+		mockBufferer.mu.Lock()
+		mockBufferer.pauses = []*state.Pause{
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(4 * time.Second),
+			},
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(5 * time.Second),
+			},
+		}
+		mockBufferer.mu.Unlock()
+		err = store.FlushIndexBlock(ctx, index)
 		require.NoError(t, err)
-		require.True(t, exists)
+
+		mockBufferer.mu.Lock()
+		mockBufferer.pauses = []*state.Pause{
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(6 * time.Second),
+			},
+			{
+				ID:          uuid.New(),
+				WorkspaceID: index.WorkspaceID,
+				CreatedAt:   now.Add(7 * time.Second),
+			},
+		}
+		mockBufferer.mu.Unlock()
+		err = store.FlushIndexBlock(ctx, index)
+		require.NoError(t, err)
+
+		// Create pause that should be in block 3
+		testPause := state.Pause{
+			ID:        uuid.New(),
+			CreatedAt: now.Add(4*time.Second + 500*time.Millisecond),
+		}
+
+		err = store.Delete(ctx, index, testPause)
+		require.NoError(t, err)
+
+		blocks, err := store.BlocksSince(ctx, index, time.Time{})
+		require.NoError(t, err)
+		require.Len(t, blocks, 4)
+
+		block3ID := blocks[2] // third block
+		var foundCount int
+		var foundBlocks []ulid.ULID
+		for _, blockID := range blocks {
+			deleteKey := blockDeleteKey(index, blockID)
+			exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(testPause.ID.String()).Build()).AsBool()
+			require.NoError(t, err)
+			if exists {
+				foundCount++
+				foundBlocks = append(foundBlocks, blockID)
+			}
+		}
+		require.Equal(t, 1, foundCount, "normal pause should be marked for deletion in exactly 1 block")
+		require.Contains(t, foundBlocks, block3ID, "block 3 should contain the pause")
 	})
+}
 
-	t.Run("delete without CreatedAt falls back to bufferer", func(t *testing.T) {
-		pauseWithoutTime := state.Pause{
+func TestBoundaryPauseDelete(t *testing.T) {
+	// Test boundary pause deletion across multiple blocks:
+	//
+	// Block 1: [0s ----------- 1s]
+	// Block 2: [1.5s --------- 2s] ← ends at boundary
+	// Block 3: [2s ----------- 3s] ← starts at boundary
+	// Block 4: [4s ----------- 5s]
+	// Block 5: [6s ----------- 7s]
+	//
+	// Boundary pause at 2s should be marked for deletion in blocks 2 & 3 only
+
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	bucket := memblob.OpenBucket(nil)
+	now := time.Now()
+
+	mockBufferer := &mockBufferer{}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         mockBufferer,
+		Leaser:           leaser,
+		BlockSize:        2,
+		CompactionLimit:  3,
+		CompactionSample: 1.0,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.boundary",
+	}
+
+	// Create block 1
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
 			ID:          uuid.New(),
 			WorkspaceID: index.WorkspaceID,
-		}
+			CreatedAt:   now,
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
 
-		err := store.Delete(ctx, index, pauseWithoutTime)
+	boundaryTime := now.Add(2 * time.Second)
+
+	// Create block 2 (ends at boundary)
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(time.Second + 500*time.Millisecond),
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   boundaryTime,
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Create block 3 (starts at boundary)
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   boundaryTime,
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   boundaryTime.Add(time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Create blocks 4 and 5
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(4 * time.Second),
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(5 * time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(6 * time.Second),
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(7 * time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Create pause at boundary timestamp
+	boundaryPause := state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: boundaryTime,
+	}
+
+	err = store.Delete(ctx, index, boundaryPause)
+	require.NoError(t, err)
+
+	// Get all blocks
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 5)
+
+	block2ID := blocks[1]
+	block3ID := blocks[2]
+	var foundCount int
+	var foundBlocks []ulid.ULID
+	for _, blockID := range blocks {
+		deleteKey := blockDeleteKey(index, blockID)
+		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(boundaryPause.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
+		if exists {
+			foundCount++
+			foundBlocks = append(foundBlocks, blockID)
+		}
+	}
+	require.Equal(t, 2, foundCount, "boundary pause should be marked for deletion in exactly 2 blocks")
+	require.Contains(t, foundBlocks, block2ID, "block 2 should contain the boundary pause")
+	require.Contains(t, foundBlocks, block3ID, "block 3 should contain the boundary pause")
+}
 
-		deleteKey := blockDeleteKey(index)
+func TestLegacyPauseDelete(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	bucket := memblob.OpenBucket(nil)
+	now := time.Now()
+
+	pause1 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now,
+	}
+	pause2 := &state.Pause{
+		ID:        uuid.New(),
+		CreatedAt: now.Add(time.Second),
+	}
+
+	mockBufferer := &mockBufferer{
+		pauses: []*state.Pause{pause1, pause2},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         mockBufferer,
+		Leaser:           leaser,
+		BlockSize:        2,
+		CompactionLimit:  3,
+		CompactionSample: 1.0,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.legacy",
+	}
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Create additional blocks
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(2 * time.Second),
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(3 * time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	mockBufferer.mu.Lock()
+	mockBufferer.pauses = []*state.Pause{
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(4 * time.Second),
+		},
+		{
+			ID:          uuid.New(),
+			WorkspaceID: index.WorkspaceID,
+			CreatedAt:   now.Add(5 * time.Second),
+		},
+	}
+	mockBufferer.mu.Unlock()
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	pauseWithoutTime := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: index.WorkspaceID,
+	}
+
+	err = store.Delete(ctx, index, pauseWithoutTime)
+	require.NoError(t, err)
+
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 3)
+
+	var foundCount int
+	for _, blockID := range blocks {
+		deleteKey := blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pauseWithoutTime.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
-		require.True(t, exists)
-	})
-
-	t.Run("delete nonexistent pause returns without error", func(t *testing.T) {
-		futureTime := now.Add(10 * time.Minute)
-		futurePause := state.Pause{
-			ID:        uuid.New(),
-			CreatedAt: futureTime,
+		if exists {
+			foundCount++
 		}
+	}
+	require.Equal(t, 3, foundCount)
+}
 
-		err := store.Delete(ctx, index, futurePause)
-		require.NoError(t, err)
+func TestBlockFlushOrderingBug(t *testing.T) {
+	// Test that exposes ordering bug where pauses retrieved by Redis second-precision
+	// can be out of order when using millisecond-precision CreatedAt timestamps.
+	//
+	// Bug scenario:
+	// - Create 99 pauses within the same second (millisecond differences)
+	// - Create 1 pause after a few seconds (for proper block boundaries)
+
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
+	require.NoError(t, err)
+	defer rc.Close()
 
-	t.Run("delete with exact block timestamp is inclusive", func(t *testing.T) {
-		// Test with the exact block index timestamp (latest pause timestamp)
-		blockIndexTimestamp := now.Add(time.Second) // This is what the block is indexed under
-		
-		// First, test blockIDForTimestamp directly to ensure it finds the block
-		blockstore := store.(*blockstore)
-		blockID, err := blockstore.blockIDForTimestamp(ctx, index, blockIndexTimestamp)
-		require.NoError(t, err)
-		require.NotNil(t, blockID, "blockIDForTimestamp should find block with exact index timestamp match")
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
 
-		// Now test the full Delete functionality
-		exactTimestampPause := state.Pause{
-			ID:        uuid.New(),
-			CreatedAt: blockIndexTimestamp, // Same timestamp as block index
+	// Create Redis state manager with actual Redis backend
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	sm, err := redis_state.New(
+		ctx,
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+
+	baseTime := time.Now()
+	workspaceID := uuid.New()
+	index := Index{
+		WorkspaceID: workspaceID,
+		EventName:   "test.ordering",
+	}
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	expires := state.Time(baseTime.Add(time.Hour))
+	eventName := "test.ordering"
+
+	// Create 99 pauses within the same second with millisecond differences
+	for i := 0; i < 99; i++ {
+		pause := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: workspaceID,
+			CreatedAt:   baseTime.Add(time.Duration(i) * time.Millisecond),
+			Identifier: state.PauseIdentifier{
+				RunID:      runID,
+				AccountID:  workspaceID,
+				FunctionID: uuid.New(),
+			},
+			Outgoing: "start",
+			Incoming: "end",
+			StepName: fmt.Sprintf("pause-%d", i),
+			Expires:  expires,
+			Event:    &eventName,
 		}
-
-		err = store.Delete(ctx, index, exactTimestampPause)
+		_, err := sm.SavePause(ctx, pause)
 		require.NoError(t, err)
+	}
 
-		deleteKey := blockDeleteKey(index)
-		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(exactTimestampPause.ID.String()).Build()).AsBool()
-		require.NoError(t, err)
-		require.True(t, exists, "pause with exact block index timestamp should be marked for deletion")
+	// Create the 100th pause after a few seconds for proper block boundaries
+	lastPause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		CreatedAt:   baseTime.Add(3 * time.Second),
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Outgoing: "start",
+		Incoming: "end",
+		StepName: "pause-last",
+		Expires:  expires,
+		Event:    &eventName,
+	}
+	_, err = sm.SavePause(ctx, lastPause)
+	require.NoError(t, err)
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	bufferer := StateBufferer(sm)
+	store, err := NewBlockstore(BlockstoreOpts{
+		RC:               rc,
+		Bucket:           bucket,
+		Bufferer:         bufferer,
+		Leaser:           leaser,
+		BlockSize:        100,
+		CompactionLimit:  3,
+		CompactionSample: 1.0,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
+	require.NoError(t, err)
 
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Get the created block
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	// Read the block back to check ordering
+	block, err := store.ReadBlock(ctx, index, blocks[0])
+	require.NoError(t, err)
+	require.NotNil(t, block)
+	require.Len(t, block.Pauses, 100)
+
+	firstPauseTime := block.Pauses[0].CreatedAt
+	lastPauseTime := block.Pauses[99].CreatedAt
+
+	// Last pause should be the one created 3 seconds later
+	require.Equal(t, baseTime.Add(3*time.Second).UnixMilli(), lastPauseTime.UnixMilli(),
+		"Last pause should be the one created 3 seconds later")
+
+	require.Equal(t, baseTime.UnixMilli(), firstPauseTime.UnixMilli(),
+		"First pause should have the earliest timestamp, but ordering is wrong due to Redis second-precision vs millisecond-precision mismatch")
+
+	// Verify all pauses are in chronological order
+	for i := 1; i < len(block.Pauses); i++ {
+		prevTime := block.Pauses[i-1].CreatedAt
+		currTime := block.Pauses[i].CreatedAt
+		require.True(t, !currTime.Before(prevTime),
+			"Pauses should be in chronological order, but pause %d (%v) comes before pause %d (%v)",
+			i, currTime.UnixMilli(), i-1, prevTime.UnixMilli())
+	}
 }
