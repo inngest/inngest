@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { toast } from 'sonner';
 
 import { useTabManagerActions } from './InsightsTabManager/TabManagerContext';
 import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
@@ -50,8 +51,9 @@ function useProcessInitialDeepLink(activeQueryIdParam: string | undefined) {
 
     if (matchingQuery !== undefined) {
       tabManagerActions.createTabFromQuery(matchingQuery);
+      toast.success('Successfully loaded query.');
     } else {
-      console.log('[Insights deep-link] no match for saved query id:', targetId);
+      toast.error('Failed to load query.');
     }
   }, [queries.data, queries.isLoading, tabManagerActions]);
 }
