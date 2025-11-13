@@ -54,6 +54,51 @@ local function getConcurrencyCount(key)
 	return count
 end
 
+--- clampTat ensures tat value is within reasonable bounds to prevent corruption issues
+---@param tat number
+---@param now_ns integer
+---@param period_ns integer
+---@param delay_variation_tolerance number
+---@return integer
+local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
+	local max_reasonable_tat = now_ns + period_ns + delay_variation_tolerance
+	local min_reasonable_tat = now_ns - period_ns -- Allow some past values for clock skew
+
+	if tat > max_reasonable_tat then
+		return toInteger(max_reasonable_tat)
+	elseif tat < min_reasonable_tat then
+		return toInteger(now_ns) -- Reset to current time if too far in past
+	else
+		return toInteger(tat)
+	end
+end
+
+--- retrieveAndNormalizeTat gets the TAT value from Redis and normalizes it if needed
+---@param key string
+---@param now_ns integer
+---@param period_ns integer
+---@param delay_variation_tolerance number
+---@return integer
+local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+	local tat = redis.call("GET", key)
+	if not tat then
+		return now_ns
+	end
+
+	local raw_tat = tonumber(tat)
+	if not raw_tat then
+		return now_ns -- Reset if tonumber failed
+	end
+
+	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
+	-- If value was clamped, commit the normalization immediately
+	if raw_tat ~= clamped_tat then
+		redis.call("SET", key, clamped_tat, "KEEPTTL")
+	end
+
+	return clamped_tat
+end
+
 --- rateLimitCapacity is the first half of a nanosecond-precision GCRA implementation. This method calculates the number of requests that can be admitted in the current period.
 ---@param key string
 ---@param now_ns integer
@@ -76,13 +121,8 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
 
-	-- retrieve theoretical arrival time
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	-- retrieve and normalize theoretical arrival time
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 
 	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
 	local increment = 1 * emission_interval
@@ -121,10 +161,10 @@ end
 ---@param period_ns integer
 ---@param limit integer
 ---@param capacity integer the number of requests to admit at once
-local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
+---@param burst integer
+local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 	-- Handle zero limit case - no update needed since we always rate limit
 	if limit == 0 then
-		debug("quitting early")
 		return
 	end
 
@@ -132,13 +172,12 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 	-- This matches throttled library: quota.MaxRate.period
 	local emission_interval = period_ns / limit
 
-	-- retrieve theoretical arrival time
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	-- Calculate delay_variation_tolerance for bounds checking
+	local total_capacity = (burst or 0) + 1
+	local delay_variation_tolerance = emission_interval * total_capacity
+
+	-- retrieve and normalize theoretical arrival time
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 
 	-- calculate next theoretical arrival time
 	-- This matches throttled library logic: tat.Add(increment) where increment = quantity * emissionInterval
@@ -151,11 +190,13 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 	end
 
 	if capacity > 0 then
+		-- Clamp new_tat to reasonable bounds and ensure integer storage
+		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
+
 		-- Calculate TTL like throttled library: ttl = newTat.Sub(now)
-		local ttl_ns = new_tat - now_ns
+		local ttl_ns = clamped_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
-		call("SET", key, new_tat, "EX", ttl_seconds)
-		debug("setting rl", key, tostring(ttl_seconds))
+		redis.call("SET", key, clamped_tat, "EX", ttl_seconds)
 	end
 end
 
