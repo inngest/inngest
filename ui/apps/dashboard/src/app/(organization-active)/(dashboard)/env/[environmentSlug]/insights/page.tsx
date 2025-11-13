@@ -29,7 +29,7 @@ export default function InsightsPage() {
     <StoredQueriesProvider tabManagerActions={actions}>
       <TabManagerProvider actions={actions}>
         <SchemasProvider>
-          <QueryDeepLinkManager activeSavedQueryId={activeSavedQueryId}>
+          <QueryDeepLinkManager activeSavedQueryId={activeSavedQueryId} activeTabId={activeTabId}>
             <div className="flex h-full w-full flex-1 overflow-hidden">
               {isQueryHelperPanelVisible && (
                 <div className="w-[240px] flex-shrink-0">
