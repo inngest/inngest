@@ -11,7 +11,7 @@ export type UseProcessDeepLinkResult = {
   initialDeepLinkIdRef: React.MutableRefObject<string | undefined>;
 };
 
-export function useProcessDeepLinkResults(
+export function useProcessDeepLink(
   activeQueryIdParam: string | undefined
 ): UseProcessDeepLinkResult {
   const initialDeepLinkIdRef = useRef<string | undefined>(activeQueryIdParam);

@@ -5,7 +5,7 @@ import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
 import { HOME_TAB } from '../InsightsTabManager/constants';
 import { guardAgainstActiveQueryIdParamFlash } from './guard';
-import { useProcessDeepLinkResults } from './useProcessDeepLinkResults';
+import { useProcessDeepLink } from './useProcessDeepLink';
 
 type QueryDeepLinkManagerProps = {
   activeSavedQueryId?: string;
@@ -21,8 +21,7 @@ export function QueryDeepLinkManager({
   const [activeQueryIdParam, updateActiveQueryIdParam, removeActiveQueryIdParam] =
     useSearchParam('activeQueryId');
 
-  const { initialDeepLinkIdRef, hasProcessedDeepLinkRef } =
-    useProcessDeepLinkResults(activeQueryIdParam);
+  const { initialDeepLinkIdRef, hasProcessedDeepLinkRef } = useProcessDeepLink(activeQueryIdParam);
 
   useEffect(() => {
     if (activeSavedQueryId !== undefined) {
