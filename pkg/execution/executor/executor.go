@@ -3799,6 +3799,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -3988,6 +3989,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -4192,6 +4194,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// SDK-based event coordination is called both when an event is received

@@ -686,6 +686,13 @@ func IncrRateLimitUsage(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "rate_limit_usage",
 		Description: "Total number of calls to the rate limiter",
+	})
+}
+func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_legacy_deletion_total",
+		Description: "Total number of legacy pause deletions without timestamps",
 		Tags:        opts.Tags,
 	})
 }
