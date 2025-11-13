@@ -625,6 +625,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
+		DataManager:         dbcqrs,
 	}
 
 	apiv2Base := apiv2base.NewBase()

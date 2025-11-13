@@ -69,10 +69,10 @@ service V2 {
       }
     };
   }
-  
+
   // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
   rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
-  
+
   rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
       post: "/partner/accounts",
@@ -912,6 +912,85 @@ service V2 {
       }
     };
   }
+
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {
+    option (google.api.http) = {
+      get: "/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List runs"
+      description: "Lists function runs with filtering by status and time range"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Filter runs by environment (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: false
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "List of runs"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ListRunsResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid query parameters"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1201,4 +1280,71 @@ message PatchEnvRequest {
 message PatchEnvsResponse {
   Env data = 1;
   ResponseMetadata metadata = 2;
+}
+
+enum RunStatus {
+  RUNNING = 0;
+  COMPLETED = 1;
+  FAILED = 2;
+  CANCELLED = 3;
+  SCHEDULED = 4;
+  UNKNOWN = 5;
+  SKIPPED = 6;
+}
+
+enum RunTimeField {
+  QUEUED_AT = 0;
+  STARTED_AT = 1;
+  ENDED_AT = 2;
+}
+
+message ListRunsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of runs to return per page (min: 1, max: 250)"
+      default: "50"
+    }
+  ];
+  repeated RunStatus status = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Filter by run status (e.g., RUNNING, COMPLETED, FAILED)"
+    }
+  ];
+  optional string startTime = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Start of time range filter in RFC 3339 format (e.g., '2025-08-01T00:00:00Z')"
+    }
+  ];
+  optional string endTime = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "End of time range filter in RFC 3339 format (e.g., '2025-08-31T23:59:59Z')"
+    }
+  ];
+  optional RunTimeField timeField = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Which timestamp field to filter on (QUEUED_AT, STARTED_AT, or ENDED_AT). Defaults to QUEUED_AT."
+      default: "\"QUEUED_AT\""
+    }
+  ];
+}
+
+message ListRunsResponse {
+  repeated Run data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Run {
+  string id = 1;
+  string appId = 2;
+  string functionId = 3;
+  RunStatus status = 4;
+  google.protobuf.Timestamp queuedAt = 5;
+  optional google.protobuf.Timestamp startedAt = 6;
+  optional google.protobuf.Timestamp endedAt = 7;
 }
