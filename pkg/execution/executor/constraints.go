@@ -67,6 +67,12 @@ func WithConstraints[T any](
 		return fn(ctx, true, "")
 	}
 
+	// If no rate limits are configured, simply run the function
+	if len(constraints) == 0 {
+		// TODO: Should we skip constraint checks in this case?
+		return fn(ctx, true, "")
+	}
+
 	// Perform constraint check to acquire lease
 	checkResult, err := CheckConstraints(
 		ctx,
