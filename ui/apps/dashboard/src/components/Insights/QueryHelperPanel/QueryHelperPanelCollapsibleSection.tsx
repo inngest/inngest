@@ -24,6 +24,9 @@ export function QueryHelperPanelCollapsibleSection({
 }: QueryHelperPanelCollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
+  // Temporarily hide shared section until users can share queries.
+  if (sectionType === 'shared') return null;
+
   return (
     <div className="px-4 pb-3">
       <button
