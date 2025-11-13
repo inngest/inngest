@@ -54,6 +54,13 @@ local function getConcurrencyCount(key)
 	return count
 end
 
+--- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
+---@param value number
+---@return integer
+local function toInteger(value)
+	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
 --- clampTat ensures tat value is within reasonable bounds to prevent corruption issues
 ---@param tat number
 ---@param now_ns integer
