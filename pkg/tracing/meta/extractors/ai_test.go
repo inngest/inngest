@@ -12,7 +12,7 @@ import (
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func TestAITokenExtractor_OpenAISpan(t *testing.T) {
+func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 	span := &tracev1.Span{
 		SpanId: []byte("test-span-id"),
 		Name:   "chat gpt-4",
@@ -56,7 +56,7 @@ func TestAITokenExtractor_OpenAISpan(t *testing.T) {
 		},
 	}
 
-	extractor := NewAITokenExtractor()
+	extractor := NewAIMetadataExtractor()
 	metadata, err := extractor.ExtractMetadata(context.Background(), span)
 
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestAITokenExtractor_OpenAISpan(t *testing.T) {
 	assert.Equal(t, "openai", data["system"], "Should extract AI system")
 }
 
-func TestAITokenExtractor_NonAISpan(t *testing.T) {
+func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
 	span := &tracev1.Span{
 		SpanId: []byte("http-span-id"),
 		Name:   "GET /api/users",
@@ -122,11 +122,10 @@ func TestAITokenExtractor_NonAISpan(t *testing.T) {
 		},
 	}
 
-	extractor := NewAITokenExtractor()
+	extractor := NewAIMetadataExtractor()
 	metadata, err := extractor.ExtractMetadata(context.Background(), span)
 
 	require.NoError(t, err)
 
 	assert.Nil(t, metadata, "Non-AI span should not produce metadata")
 }
-

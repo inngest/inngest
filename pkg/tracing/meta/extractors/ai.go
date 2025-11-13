@@ -33,13 +33,13 @@ func (ms AIMetadata) Serialize() (meta.RawMetadata, error) {
 	return rawMetadata, nil
 }
 
-type AITokenExtractor struct{}
+type AIMetadataExtractor struct{}
 
-func NewAITokenExtractor() *AITokenExtractor {
-	return &AITokenExtractor{}
+func NewAIMetadataExtractor() *AIMetadataExtractor {
+	return &AIMetadataExtractor{}
 }
 
-func (e *AITokenExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]meta.StructuredMetadata, error) {
+func (e *AIMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]meta.StructuredMetadata, error) {
 	if !e.isLikelyAISpan(span) {
 		return nil, nil // TODO: should this be an explicit "nah, didn't find any" return?
 	}
@@ -56,7 +56,7 @@ var aiAttributeKeys = map[string]bool{
 	"gen_ai.operation.name":      true,
 }
 
-func (e *AITokenExtractor) isLikelyAISpan(span *tracev1.Span) bool {
+func (e *AIMetadataExtractor) isLikelyAISpan(span *tracev1.Span) bool {
 	for _, attr := range span.Attributes {
 		if aiAttributeKeys[attr.Key] {
 			return true
@@ -65,7 +65,7 @@ func (e *AITokenExtractor) isLikelyAISpan(span *tracev1.Span) bool {
 	return false
 }
 
-func (e *AITokenExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
+func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
 	var metadata AIMetadata
 
 	for _, attr := range span.Attributes {
@@ -84,8 +84,4 @@ func (e *AITokenExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
 	}
 
 	return metadata
-<<<<<<< HEAD:pkg/tracing/meta/extractors/ai_tokens.go
 }
-=======
-}
->>>>>>> 52996a499 (tweak):pkg/tracing/meta/extractors/ai.go
