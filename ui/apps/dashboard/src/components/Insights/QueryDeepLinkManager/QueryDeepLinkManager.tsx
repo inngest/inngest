@@ -44,6 +44,8 @@ export function QueryDeepLinkManager({
     activeQueryIdParam,
     activeSavedQueryId,
     activeTabId,
+    hasProcessedDeepLinkRef,
+    initialDeepLinkIdRef,
     removeActiveQueryIdParam,
     updateActiveQueryIdParam,
   ]);
