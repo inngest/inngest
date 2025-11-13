@@ -77,7 +77,7 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 -- Check if the item is a singleton and if an existing item already exists
-if exists_without_ending(singletonKey, ":singleton:-") then 
+if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then 
   if redis.call("EXISTS", singletonKey) ~= 0 then
     return 2
   end
