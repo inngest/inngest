@@ -6,7 +6,7 @@ import { useQuery } from 'urql';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import { QueryDeepLinkManager } from '@/components/Insights/QueryDeepLinkManager';
+import { QueryDeepLinkManager } from '@/components/Insights/QueryDeepLinkManager/QueryDeepLinkManager';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
