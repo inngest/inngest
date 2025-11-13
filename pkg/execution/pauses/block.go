@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -231,6 +232,16 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			continue
 		}
 
+		if !item.CreatedAt.After(since) {
+			// Since iterator query uses second precision but pause timestamps have millisecond precision,
+			// we may retrieve pauses that occurred slightly before the last block boundary.
+			// Skipping these prevents breaking the assumption that blocks are contiguous.
+			// Pauses before the boundary will remain in buffer indefinitely.
+			l.Warn("skipping pause before block boundary",
+				"pause_created_at", item.CreatedAt,
+				"block_boundary", since)
+		}
+
 		if item.CreatedAt.IsZero() {
 			// Old pauses don't have the time embedded in the pause item but the iterator should have
 			// injected it from the pause index when prefetching IDs/scores.
@@ -299,6 +310,12 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 
 		return nil
 	}
+
+	// We have enough pauses at this point we can now sort them based on msec precision,
+	// the Redis iterator uses ZRANGE which guarantees order but at seconds precision.
+	slices.SortFunc(block.Pauses, func(a, b *state.Pause) int {
+		return a.CreatedAt.Compare(b.CreatedAt)
+	})
 
 	metadata, err := b.blockMetadata(ctx, index, block)
 	if err != nil {
@@ -436,44 +453,65 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	var blockIDs []ulid.ULID
 	var err error
-	ts := pause.CreatedAt
-	if ts.IsZero() {
-		ts, err = b.buf.PauseTimestamp(ctx, index, pause)
-		if err != nil || ts.IsZero() {
-			return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
+
+	if pause.CreatedAt.IsZero() {
+		// Legacy pauses without timestamps: add to all blocks in the index
+		blockIDs, err = b.BlocksSince(ctx, index, time.Time{})
+		if err != nil {
+			return fmt.Errorf("error fetching all blocks for legacy pause: %w", err)
+		}
+		metrics.IncrPausesLegacyDeletionCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+	} else {
+		// Normal pauses with timestamps: find specific blocks that may contain the pause
+		blockIDs, err = b.blockIDsForTimestamp(ctx, index, pause.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error fetching blocks for timestamp: %w", err)
 		}
 	}
 
-	// Check if atleast one block may contain the pause.
-	blockID, err := b.blockIDForTimestamp(ctx, index, ts)
-	if err != nil {
-		return fmt.Errorf("error fetching block for timestamp: %w", err)
-	}
-	if blockID == nil {
+	if len(blockIDs) == 0 {
 		return nil
 	}
 
-	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
-	if err != nil {
-		return fmt.Errorf("error tracking pause delete in block index: %w", err)
+	// Track deletion in each relevant block.
+	// This is typically 1 operation, except for:
+	// - Pauses on block boundaries (2 operations)
+	// - Legacy pauses without timestamps (all blocks)
+	for _, blockID := range blockIDs {
+		err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pause.ID.String()).Build()).Error()
+		if err != nil {
+			return fmt.Errorf("error tracking pause delete in block %s: %w", blockID, err)
+		}
 	}
 
-	// As an optimization, check how many deletes this index has and trigger compaction if over the
-	// compaction limit.
-	if rand.IntN(100) <= int(b.compactionSample*100) {
+	// As an optimization, check delete counts across all blocks and trigger compaction
+	// if any block exceeds the compaction limit.
+	// Legacy pauses get added to all blocks, so reduce compaction frequency to limit Redis overhead.
+	compactionSample := b.compactionSample
+	if pause.CreatedAt.IsZero() {
+		compactionSample = b.compactionSample * 0.1 // 10x lower chance for legacy pauses
+	}
+
+	if rand.IntN(100) <= int(compactionSample*100) {
 		go func() {
-			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(blockDeleteKey(index)).Build()).AsInt64()
-			if err != nil {
-				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err)
-				return
+			var maxDeletes int64
+			for _, blockID := range blockIDs {
+				size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
+				if err != nil {
+					logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err, "block_id", blockID)
+					continue
+				}
+				maxDeletes = max(maxDeletes, size)
 			}
-			if size < int64(b.compactionLimit) {
+
+			if maxDeletes < int64(b.compactionLimit) {
 				return
 			}
 
 			// Trigger a new compaction.
-			logger.StdlibLogger(ctx).Debug("compacting block deletes", "len", size, "index", index)
+			logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
 			b.Compact(ctx, index)
 		}()
 	}
@@ -543,21 +581,49 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// 3. rewriting the block
 }
 
-// blockIDForTimestamp returns the block ID that contains pauses for the given timestamp.
-func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
+// blockIDsForTimestamp returns the block IDs that may contain pauses for the given timestamp.
+// Handles boundary cases where a pause with the same timestamp as a block boundary
+// might exist in both the ending and starting blocks.
+func (b *blockstore) blockIDsForTimestamp(ctx context.Context, idx Index, ts time.Time) ([]ulid.ULID, error) {
 	score := strconv.Itoa(int(ts.UnixMilli()))
+
+	// Get first 2 blocks that could contain this timestamp
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 1).Build(),
+		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 2).Build(),
 	).AsStrSlice()
-	if len(ids) == 1 {
-		id, err := ulid.Parse(ids[0])
-		return &id, err
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return nil, err
 	}
-	if err == nil || rueidis.IsRedisNil(err) {
+
+	if len(ids) == 0 {
 		return nil, nil
 	}
-	return nil, err
+
+	// Always include the first block
+	result := make([]ulid.ULID, 0, 2)
+	firstID, err := ulid.Parse(ids[0])
+	if err != nil {
+		return nil, fmt.Errorf("error parsing first block ULID '%s': %w", ids[0], err)
+	}
+	result = append(result, firstID)
+
+	// Check if we need the second block (boundary case)
+	if len(ids) == 2 {
+		secondID, err := ulid.Parse(ids[1])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing second block ULID '%s': %w", ids[1], err)
+		}
+
+		// If pause timestamp equals the first block's last timestamp,
+		// the pause might exist in both blocks due to inclusive boundary
+		firstBlockLastTimestamp := ulid.Time(firstID.Time()).UnixMilli()
+		if ts.UnixMilli() == firstBlockLastTimestamp {
+			result = append(result, secondID)
+		}
+	}
+
+	return result, nil
 }
 
 // blockMetadata creates metadata for the given block. It expects all pauses
@@ -650,10 +716,9 @@ func blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
-// blockDeleteKey tracks all deletes for a given index.
-// note that block
-func blockDeleteKey(idx Index) string {
-	return fmt.Sprintf("{estate}:blk:dels:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+// blockDeleteKey tracks all deletes for a specific block within an index.
+func blockDeleteKey(idx Index, blockID ulid.ULID) string {
+	return fmt.Sprintf("{estate}:blk:dels:%s:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
 }
 
 type blockMetadata struct {
