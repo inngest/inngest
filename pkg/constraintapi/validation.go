@@ -92,6 +92,15 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("cannot mix queue and rate limit constraints for first stage"))
 	}
 
+	// Ensure migration identifier is provided
+	if hasRateLimit && !r.Migration.IsRateLimit {
+		errs = multierror.Append(errs, fmt.Errorf("missing rate limit flag in migration identifier"))
+	}
+
+	if hasQueueConstraint && r.Migration.QueueShard == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing queue shard in migration identifier"))
+	}
+
 	return errs
 }
 
