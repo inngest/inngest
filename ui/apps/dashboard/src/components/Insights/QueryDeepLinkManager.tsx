@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
+import { useTabManagerActions } from './InsightsTabManager/TabManagerContext';
 import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
 
 type QueryDeepLinkManagerProps = {
@@ -31,20 +32,26 @@ export function QueryDeepLinkManager({ activeSavedQueryId, children }: QueryDeep
 function useProcessInitialDeepLink(activeQueryIdParam: string | undefined) {
   const queryIdParamRef = useRef<string | undefined>(activeQueryIdParam);
   const { queries } = useStoredQueries();
+  const { tabManagerActions } = useTabManagerActions();
+
+  // Default to true if there's no deep-link to process.
+  const hasProcessedDeepLink = useRef(queryIdParamRef.current === undefined);
 
   useEffect(() => {
+    if (hasProcessedDeepLink.current) return;
     if (queries.isLoading) return;
 
     const targetId = queryIdParamRef.current;
     if (targetId === undefined) return;
 
+    hasProcessedDeepLink.current = true;
+
     const matchingQuery = queries.data?.find((q) => q.id === targetId);
 
     if (matchingQuery !== undefined) {
-      console.log('[Insights deep-link] match found for saved query id:', targetId);
-      return;
+      tabManagerActions.createTabFromQuery(matchingQuery);
+    } else {
+      console.log('[Insights deep-link] no match for saved query id:', targetId);
     }
-
-    console.log('[Insights deep-link] no match for saved query id:', targetId);
-  }, [queries.data, queries.isLoading]);
+  }, [queries.data, queries.isLoading, tabManagerActions]);
 }
