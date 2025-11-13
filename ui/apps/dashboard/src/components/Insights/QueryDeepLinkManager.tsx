@@ -3,29 +3,48 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
+import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
+
 type QueryDeepLinkManagerProps = {
   activeSavedQueryId?: string;
   children: React.ReactNode;
 };
 
 export function QueryDeepLinkManager({ activeSavedQueryId, children }: QueryDeepLinkManagerProps) {
-  const [currentParamValue, updateActiveQueryIdParam, removeActiveQueryIdParam] =
+  const [activeQueryIdParam, updateActiveQueryIdParam, removeActiveQueryIdParam] =
     useSearchParam('activeQueryId');
 
   useEffect(() => {
     if (activeSavedQueryId !== undefined) {
-      if (currentParamValue !== activeSavedQueryId) updateActiveQueryIdParam(activeSavedQueryId);
+      if (activeQueryIdParam !== activeSavedQueryId) updateActiveQueryIdParam(activeSavedQueryId);
       return;
     }
 
-    if (currentParamValue !== undefined) removeActiveQueryIdParam();
-  }, [activeSavedQueryId, currentParamValue, removeActiveQueryIdParam, updateActiveQueryIdParam]);
+    if (activeQueryIdParam !== undefined) removeActiveQueryIdParam();
+  }, [activeSavedQueryId, activeQueryIdParam, removeActiveQueryIdParam, updateActiveQueryIdParam]);
 
-  useProcessInitialDeepLink(currentParamValue);
+  useProcessInitialDeepLink(activeQueryIdParam);
 
   return children;
 }
 
 function useProcessInitialDeepLink(activeQueryIdParam: string | undefined) {
-  const _queryIdParamRef = useRef<string | undefined>(activeQueryIdParam);
+  const queryIdParamRef = useRef<string | undefined>(activeQueryIdParam);
+  const { queries } = useStoredQueries();
+
+  useEffect(() => {
+    if (queries.isLoading) return;
+
+    const targetId = queryIdParamRef.current;
+    if (targetId === undefined) return;
+
+    const matchingQuery = queries.data?.find((q) => q.id === targetId);
+
+    if (matchingQuery !== undefined) {
+      console.log('[Insights deep-link] match found for saved query id:', targetId);
+      return;
+    }
+
+    console.log('[Insights deep-link] no match for saved query id:', targetId);
+  }, [queries.data, queries.isLoading]);
 }
