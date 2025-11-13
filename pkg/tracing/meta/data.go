@@ -30,6 +30,16 @@ var DefaultMetadataExtractor = MetadataExtractor{
 
 type RawMetadata map[string]json.RawMessage
 
+func (m *RawMetadata) FromStruct(v any) error {
+	// TODO: reflect stuff so we don't need to remarshal?
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(data, m)
+}
+
 func (m RawMetadata) Combine(o RawMetadata, op MetadataOp) error {
 	switch op {
 	case MetadataOpMerge:
