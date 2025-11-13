@@ -92,10 +92,10 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 
 func (r *redisCapacityManager) scavengePrefix(ctx context.Context, mi MigrationIdentifier, client rueidis.Client, keyPrefix string, o *scavengerOptions) error {
 	// TODO: Pick random shard
-	scavengerShard := 0 // scavengerShard placeholder
+	scavengerShard := 0
 
-	// TODO: Peek accounts
-	peekedAccounts, err := r.peekScavengerShard(ctx, keyPrefix, scavengerShard, o.accountsPeekSize)
+	// Peek accounts
+	peekedAccounts, err := r.peekScavengerShard(ctx, keyPrefix, client, scavengerShard, o.accountsPeekSize)
 	if err != nil {
 		return fmt.Errorf("could not peek accounts to scavenge expired leases: %w", err)
 	}
@@ -124,9 +124,48 @@ func (r *redisCapacityManager) scavengePrefix(ctx context.Context, mi MigrationI
 	return nil
 }
 
-func (r *redisCapacityManager) peekScavengerShard(ctx context.Context, keyPrefix string, scavengerShard, peekSize int) ([]uuid.UUID, error) {
-	// TODO: Implement scavenger shard peeking
-	return nil, nil
+func (r *redisCapacityManager) peekScavengerShard(ctx context.Context, keyPrefix string, client rueidis.Client, scavengerShard, peekSize int) ([]uuid.UUID, error) {
+	key := r.keyScavengerShard(keyPrefix, scavengerShard)
+
+	// Scores are represented in unix millis
+	nowMS := r.clock.Now().UnixMilli()
+	now := fmt.Sprintf("%d", nowMS)
+
+	// Peek all accounts that have a score < now
+	cmd := client.
+		B().
+		Zrange().
+		Key(key).
+		Min("-inf").
+		Max(now).
+		Byscore().
+		Limit(0, int64(peekSize)).
+		Build()
+
+	accountIDs, err := client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking scavenger shard key: %w", err)
+	}
+
+	parsedIDs := make([]uuid.UUID, len(accountIDs))
+	for i, v := range accountIDs {
+		parsedID, err := uuid.Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid uuid: %w", err)
+		}
+
+		parsedIDs[i] = parsedID
+	}
+
+	return parsedIDs, nil
+}
+
+type peekedLease struct {
+	LeaseIdempotencyKey string
+	LeaseID             ulid.ULID
+}
+
+func peekExpiredLeases(ctx context.Context, keyPrefix string, client rueidis.Client, accountID uuid.UUID, peekSize int) ([]peekedLease, error) {
 }
 
 func (r *redisCapacityManager) scavengeAccount(ctx context.Context, mi MigrationIdentifier, accountID uuid.UUID, peekSize int) error {
