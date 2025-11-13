@@ -53,6 +53,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 		CompactionSample: 1.0, // Always compact for testing
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 

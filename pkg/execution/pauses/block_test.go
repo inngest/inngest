@@ -131,6 +131,7 @@ func TestBlockFlusher(t *testing.T) {
 		CompactionSample: 0.1,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -461,6 +462,7 @@ func TestLastBlockMetadata(t *testing.T) {
 		CompactionSample: 0.1,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -575,6 +577,7 @@ func TestBlockstoreDelete(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -718,6 +721,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -889,6 +893,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -1056,6 +1061,7 @@ func TestBlockFlushOrderingBug(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -1147,6 +1153,7 @@ func TestCompaction(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -1321,6 +1328,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 		CompactionSample: 1.0,
 		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 

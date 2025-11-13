@@ -79,6 +79,10 @@ type BlockstoreOpts struct {
 	// DeleteAfterFlush is a callback that returns whether we delete from the backing buffer,
 	// or if deletes are ignored for the current workspace.
 	DeleteAfterFlush FeatureCallback
+
+	// EnableBlockCompaction is a callback that returns whether block compaction is enabled
+	// for the current workspace.
+	EnableBlockCompaction FeatureCallback
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
@@ -99,6 +103,11 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 			return false
 		}
 	}
+	if opts.EnableBlockCompaction == nil {
+		opts.EnableBlockCompaction = func(ctx context.Context, workspaceID uuid.UUID) bool {
+			return false
+		}
+	}
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
 	}
@@ -113,16 +122,17 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	}
 
 	return &blockstore{
-		rc:               opts.RC,
-		blocksize:        opts.BlockSize,
-		fetchMargin:      opts.FetchMargin,
-		compactionLimit:  opts.CompactionLimit,
-		compactionSample: opts.CompactionSample,
-		compactionLeaser: opts.CompactionLeaser,
-		buf:              opts.Bufferer,
-		bucket:           opts.Bucket,
-		leaser:           opts.Leaser,
-		deleteAfterFlush: opts.DeleteAfterFlush,
+		rc:                    opts.RC,
+		blocksize:             opts.BlockSize,
+		fetchMargin:           opts.FetchMargin,
+		compactionLimit:       opts.CompactionLimit,
+		compactionSample:      opts.CompactionSample,
+		compactionLeaser:      opts.CompactionLeaser,
+		buf:                   opts.Bufferer,
+		bucket:                opts.Bucket,
+		leaser:                opts.Leaser,
+		deleteAfterFlush:      opts.DeleteAfterFlush,
+		enableBlockCompaction: opts.EnableBlockCompaction,
 	}, nil
 }
 
@@ -164,6 +174,9 @@ type blockstore struct {
 
 	// deleteAfterFlush, if it returns false, prevents deleting items from the backing buffer when flushed.
 	deleteAfterFlush FeatureCallback
+
+	// enableBlockCompaction, if it returns false, prevents block compaction for the workspace.
+	enableBlockCompaction FeatureCallback
 }
 
 func (b blockstore) BlockSize() int {
@@ -606,8 +619,10 @@ func (b *blockstore) Compact(ctx context.Context, index Index) {
 }
 
 func (b *blockstore) compact(ctx context.Context, index Index) error {
-	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName)
 	start := time.Now()
+	dryRun := !b.enableBlockCompaction(ctx, index.WorkspaceID)
+
+	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName, "dry_run", dryRun)
 	l.Debug("compacting block index")
 
 	blockMetadataList, err := b.readAllBlockMetadata(ctx, index)
@@ -651,9 +666,11 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 		return nil
 	}
 
-	// Compact the identified blocks
-	for _, blockID := range blocksToCompact {
-		b.compactBlock(ctx, l, index, blockID)
+	if !dryRun {
+		// Compact the identified blocks
+		for _, blockID := range blocksToCompact {
+			b.compactBlock(ctx, l, index, blockID)
+		}
 	}
 
 	l.Debug("blocks compaction finished", "count", len(blocksToCompact), "duration", time.Since(start).Milliseconds())
