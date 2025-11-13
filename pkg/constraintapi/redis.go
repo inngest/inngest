@@ -26,8 +26,18 @@ const (
 var enableDebugLogs = false
 
 type redisCapacityManager struct {
-	client rueidis.Client
-	clock  clockwork.Clock
+	// Until fully rolled out, the Constraint API will use the existing data stores
+	// for accessing and modifying existing constraint state, as well as lease-related state.
+	//
+	// This means, we need to connect to all queue shards, as well as the instance
+	// responsible for storing rate limit state.
+	//
+	// In a future release, we will gracefully migrate all constraint and lease state to a
+	// dedicated horizontally-scalable and account-sharded backing data store.
+	queueShards     map[string]rueidis.Client
+	rateLimitClient rueidis.Client
+
+	clock clockwork.Clock
 
 	rateLimitKeyPrefix  string
 	queueStateKeyPrefix string
@@ -37,15 +47,21 @@ type redisCapacityManager struct {
 
 type redisCapacityManagerOption func(m *redisCapacityManager)
 
-func WithClient(client rueidis.Client) redisCapacityManagerOption {
+func WithQueueShards(shards map[string]rueidis.Client) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
-		m.client = client
+		m.queueShards = shards
 	}
 }
 
-func WithClock(clock clockwork.Clock) redisCapacityManagerOption {
+func WithQueueStateKeyPrefix(prefix string) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
-		m.clock = clock
+		m.queueStateKeyPrefix = prefix
+	}
+}
+
+func WithRateLimitClient(client rueidis.Client) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.rateLimitClient = client
 	}
 }
 
@@ -55,9 +71,9 @@ func WithRateLimitKeyPrefix(prefix string) redisCapacityManagerOption {
 	}
 }
 
-func WithQueueStateKeyPrefix(prefix string) redisCapacityManagerOption {
+func WithClock(clock clockwork.Clock) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
-		m.queueStateKeyPrefix = prefix
+		m.clock = clock
 	}
 }
 
@@ -76,8 +92,8 @@ func NewRedisCapacityManager(
 		rcmo(manager)
 	}
 
-	if manager.client == nil {
-		return nil, fmt.Errorf("missing client")
+	if manager.rateLimitClient == nil || manager.queueShards == nil {
+		return nil, fmt.Errorf("missing clients")
 	}
 
 	if manager.clock == nil {
@@ -117,37 +133,23 @@ func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUI
 	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseIdempotencyKey)
 }
 
-// keyPrefix returns the Lua key prefix for the first stage of the Constraint API.
+// clientAndPrefix returns the Redis client and Lua key prefix for the first stage of the Constraint API.
 //
 // Since we are colocating lease data with the existing state, we will have to use the
 // same Redis hash tag to avoid Lua errors and inconsistencies on the old and new scripts.
 //
 // This is essentially required for backward- and forward-compatibility.
-func (r *redisCapacityManager) keyPrefix(
-	constraints []ConstraintItem,
-) (string, error) {
-	var hasRateLimit bool
-	var hasQueueConstraint bool
-
-	for _, ci := range constraints {
-		switch ci.Kind {
-		case ConstraintKindConcurrency, ConstraintKindThrottle:
-			hasQueueConstraint = true
-		case ConstraintKindRateLimit:
-			hasRateLimit = true
-		default:
-		}
+func (r *redisCapacityManager) clientAndPrefix(m MigrationIdentifier) (string, rueidis.Client, error) {
+	if m.IsRateLimit {
+		return r.rateLimitKeyPrefix, r.rateLimitClient, nil
 	}
 
-	if hasRateLimit && hasQueueConstraint {
-		return "", fmt.Errorf("mixed constraints are not allowed during the first stage")
+	shard, ok := r.queueShards[m.QueueShard]
+	if !ok {
+		return "", nil, fmt.Errorf("unknown queue shard %q", m.QueueShard)
 	}
 
-	if hasRateLimit {
-		return r.rateLimitKeyPrefix, nil
-	}
-
-	return r.queueStateKeyPrefix, nil
+	return r.queueStateKeyPrefix, shard, nil
 }
 
 // redisRequestState represents the data structure stored for every request
@@ -258,11 +260,11 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "exceeded maximum allowed request delay")
 	}
 
-	// Retrieve key prefix for current constraints
+	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix, err := r.keyPrefix(req.Constraints)
+	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
 	if err != nil {
-		return nil, errs.Wrap(0, false, "failed to generate key prefix: %w", err)
+		return nil, errs.Wrap(0, false, "failed to get client: %w", err)
 	}
 
 	// TODO: Should we get the current time again/cancel if too much time passed up until here?
@@ -319,7 +321,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["acquire"].Exec(ctx, r.client, keys, args).AsBytes()
+	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
 	}
@@ -371,14 +373,25 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
-	keys := []string{}
+	// TODO: Validate request
+
+	// Retrieve client and key prefix for current constraints
+	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
+	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
+	if err != nil {
+		return nil, nil, errs.Wrap(0, false, "failed to get client: %w", err)
+	}
+
+	keys := []string{
+		r.keyAccountLeases(keyPrefix, req.AccountID),
+	}
 
 	args, err := strSlice([]any{})
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	status, err := scripts["check"].Exec(ctx, r.client, keys, args).AsInt64()
+	status, err := scripts["check"].Exec(ctx, client, keys, args).AsInt64()
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
 	}
@@ -404,11 +417,11 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 
 	now := r.clock.Now()
 
-	// Retrieve key prefix for current constraints
+	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix := r.queueStateKeyPrefix
-	if req.Migration.IsRateLimit {
-		keyPrefix = r.rateLimitKeyPrefix
+	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "failed to get client: %w", err)
 	}
 
 	// TODO: Deterministically compute this based on numScavengerShards and accountID
@@ -447,7 +460,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["extend"].Exec(ctx, r.client, keys, args).AsBytes()
+	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "extend script failed: %w", err)
 	}
@@ -493,11 +506,11 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
-	// Retrieve key prefix for current constraints
+	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
-	keyPrefix := r.queueStateKeyPrefix
-	if req.Migration.IsRateLimit {
-		keyPrefix = r.rateLimitKeyPrefix
+	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "could not get client: %w", err)
 	}
 
 	// TODO: Deterministically compute this based on numScavengerShards and accountID
@@ -527,7 +540,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	rawRes, err := scripts["release"].Exec(ctx, r.client, keys, args).AsBytes()
+	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "release script failed: %w", err)
 	}
