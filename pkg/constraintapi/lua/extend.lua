@@ -99,7 +99,9 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 end
 
 -- Check if lease details still exist
-local leaseDetails = call("HMGET", keyLeaseDetails, "lid", "oik")
+local keyCurrentLeaseID = string.format("%s:lid", keyLeaseDetails)
+local keyLeaseOperationIdempotencyKey = string.format("%s:oik", keyLeaseDetails)
+local leaseDetails = call("MGET", keyCurrentLeaseID, keyLeaseOperationIdempotencyKey)
 if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
 	local res = {}
 	res["s"] = 1
@@ -158,7 +160,7 @@ for _, value in ipairs(constraints) do
 end
 
 -- update current leaseID to new lease ID
-call("HSET", keyLeaseDetails, "lid", newLeaseID)
+call("SET", string.format("%s:lid", keyLeaseDetails), newLeaseID)
 
 -- update account leases for scavenger (do not clean up active lease)
 call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), leaseIdempotencyKey)
