@@ -732,6 +732,7 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 	// same timestamp for boundaries.
 	md, err := b.blockMetadata(ctx, index, block)
 	if err != nil {
+		status = "boundary_fail"
 		l.ReportError(err, "error generating block metadata after compaction", blockIDTags)
 		return
 	}
