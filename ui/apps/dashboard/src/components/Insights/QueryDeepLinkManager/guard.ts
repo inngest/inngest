@@ -1,11 +1,11 @@
-export type GuardArgs = {
+type GuardArgs = {
   activeQueryIdParam: string | undefined;
   hasProcessedDeepLink: boolean;
   initialDeepLinkId: string | undefined;
   isHomeTabActive: boolean;
 };
 
-export type GuardResult = { shouldGuard: boolean };
+type GuardResult = { shouldGuard: boolean };
 
 /**
  * Returns true when we should temporarily avoid removing the activeQueryId param
