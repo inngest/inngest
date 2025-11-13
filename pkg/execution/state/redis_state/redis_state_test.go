@@ -505,7 +505,7 @@ func TestPauseCreatedAt(t *testing.T) {
 	nonExistentPauseID := uuid.New()
 	_, err = mgr.PauseCreatedAt(ctx, workspaceID, eventName, nonExistentPauseID)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "pause timestamp not found")
+	require.Contains(t, err.Error(), "pause not found")
 
 	// Clean up
 	r.FlushAll()
