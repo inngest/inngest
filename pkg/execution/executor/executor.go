@@ -702,19 +702,6 @@ func (e *executor) schedule(
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	var runID ulid.ULID
-
-	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
-	} else {
-		runID = *req.RunID
-	}
-
-	key := idempotencyKey(req, runID)
-
 	if performChecks {
 		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
 		_ = fallbackIdempotencyKey
