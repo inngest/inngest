@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -70,11 +71,16 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.SetLimit(o.concurrency)
 
+	// Scavenge all queue shards
+	for k, v := range r.queueShards {
+		eg.Go(func() error {
+			return r.scavengePrefix(ctx, MigrationIdentifier{QueueShard: k}, v, r.queueStateKeyPrefix, o)
+		})
+	}
+
+	// Scavenge rate limit cluster
 	eg.Go(func() error {
-		return r.scavengePrefix(ctx, false, r.queueStateKeyPrefix, o)
-	})
-	eg.Go(func() error {
-		return r.scavengePrefix(ctx, true, r.rateLimitKeyPrefix, o)
+		return r.scavengePrefix(ctx, MigrationIdentifier{IsRateLimit: true}, r.rateLimitClient, r.rateLimitKeyPrefix, o)
 	})
 
 	if err := eg.Wait(); err != nil {
@@ -84,7 +90,7 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 	return nil
 }
 
-func (r *redisCapacityManager) scavengePrefix(ctx context.Context, isRateLimit bool, keyPrefix string, o *scavengerOptions) error {
+func (r *redisCapacityManager) scavengePrefix(ctx context.Context, mi MigrationIdentifier, client rueidis.Client, keyPrefix string, o *scavengerOptions) error {
 	// TODO: Pick random shard
 	scavengerShard := 0 // scavengerShard placeholder
 
@@ -102,7 +108,7 @@ func (r *redisCapacityManager) scavengePrefix(ctx context.Context, isRateLimit b
 
 	for _, accountID := range peekedAccounts {
 		eg.Go(func() error {
-			err := r.scavengeAccount(ctx, isRateLimit, accountID, o.leasesPeekSize)
+			err := r.scavengeAccount(ctx, mi, accountID, o.leasesPeekSize)
 			if err != nil {
 				return fmt.Errorf("could not scavenge account: %w", err)
 			}
@@ -123,7 +129,7 @@ func (r *redisCapacityManager) peekScavengerShard(ctx context.Context, keyPrefix
 	return nil, nil
 }
 
-func (r *redisCapacityManager) scavengeAccount(ctx context.Context, isRateLimit bool, accountID uuid.UUID, peekSize int) error {
+func (r *redisCapacityManager) scavengeAccount(ctx context.Context, mi MigrationIdentifier, accountID uuid.UUID, peekSize int) error {
 	// TODO: Peek lease idempotency key + lease ID
 	peekedLeaseIdempotencyKeys := []struct {
 		leaseIdempotencyKey string
@@ -136,9 +142,7 @@ func (r *redisCapacityManager) scavengeAccount(ctx context.Context, isRateLimit 
 			AccountID:           accountID,
 			LeaseIdempotencyKey: v.leaseIdempotencyKey,
 			LeaseID:             v.leaseID,
-			Migration: MigrationIdentifier{
-				IsRateLimit: isRateLimit,
-			},
+			Migration:           mi,
 		})
 		if err != nil {
 			return fmt.Errorf("could not scavenge expired lease: %w", err)
