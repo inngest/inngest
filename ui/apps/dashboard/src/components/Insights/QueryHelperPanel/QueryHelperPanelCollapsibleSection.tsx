@@ -8,8 +8,6 @@ import {
   type QueryHelperPanelSectionContentProps,
 } from './QueryHelperPanelSectionContent';
 
-const TEMPORARILY_HIDE_SHARED_SECTION = true;
-
 interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
@@ -26,7 +24,8 @@ export function QueryHelperPanelCollapsibleSection({
 }: QueryHelperPanelCollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
-  if (TEMPORARILY_HIDE_SHARED_SECTION && sectionType === 'shared') return null;
+  // Temporarily hide shared section until users can share queries.
+  if (sectionType === 'shared') return null;
 
   return (
     <div className="px-4 pb-3">
