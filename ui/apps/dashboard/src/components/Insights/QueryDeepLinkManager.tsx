@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
 type QueryDeepLinkManagerProps = {
@@ -21,5 +21,11 @@ export function QueryDeepLinkManager({ activeSavedQueryId, children }: QueryDeep
     if (currentParamValue !== undefined) removeActiveQueryIdParam();
   }, [activeSavedQueryId, currentParamValue, removeActiveQueryIdParam, updateActiveQueryIdParam]);
 
+  useProcessInitialDeepLink(currentParamValue);
+
   return children;
+}
+
+function useProcessInitialDeepLink(activeQueryIdParam: string | undefined) {
+  const _queryIdParamRef = useRef<string | undefined>(activeQueryIdParam);
 }
