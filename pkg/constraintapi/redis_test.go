@@ -27,7 +27,8 @@ func TestRedisCapacityManager(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 
 	cm, err := NewRedisCapacityManager(
-		WithClient(rc),
+		WithRateLimitClient(rc),
+		WithQueueShards(map[string]rueidis.Client{}),
 		WithClock(clock),
 		WithNumScavengerShards(4),
 		WithQueueStateKeyPrefix("q:v1"),
@@ -81,6 +82,9 @@ func TestRedisCapacityManager(t *testing.T) {
 			},
 			CurrentTime:     clock.Now(),
 			MaximumLifetime: time.Minute,
+			Migration: MigrationIdentifier{
+				IsRateLimit: true,
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -181,190 +185,4 @@ func TestRedisCapacityManager(t *testing.T) {
 		// TODO: Verify all respective keys have been updated
 		require.Len(t, r.Keys(), 0, r.Dump())
 	})
-}
-
-func TestRedisCapacityManager_keyPrefix(t *testing.T) {
-	manager := &redisCapacityManager{
-		rateLimitKeyPrefix:  "rate-limit-prefix",
-		queueStateKeyPrefix: "queue-state-prefix",
-	}
-
-	tests := []struct {
-		name        string
-		constraints []ConstraintItem
-		want        string
-		wantErr     bool
-		errMsg      string
-	}{
-		{
-			name:        "empty constraints - returns queue state prefix",
-			constraints: []ConstraintItem{},
-			want:        "queue-state-prefix",
-			wantErr:     false,
-		},
-		{
-			name: "only concurrency constraint - returns queue state prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "only throttle constraint - returns queue state prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "only rate limit constraint - returns rate limit prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "rate-limit-prefix",
-			wantErr: false,
-		},
-		{
-			name: "multiple queue constraints (concurrency + throttle) - returns queue state prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindThrottle},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "multiple concurrency constraints - returns queue state prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindConcurrency},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "multiple throttle constraints - returns queue state prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindThrottle},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "multiple rate limit constraints - returns rate limit prefix",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "rate-limit-prefix",
-			wantErr: false,
-		},
-		{
-			name: "mixed: rate limit + concurrency - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindConcurrency},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "mixed: rate limit + throttle - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindThrottle},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "mixed: concurrency + rate limit - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "mixed: throttle + rate limit - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "mixed: all three constraint types - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "mixed: multiple mixed constraints - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindConcurrency},
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindThrottle},
-			},
-			want:    "",
-			wantErr: true,
-			errMsg:  "mixed constraints are not allowed during the first stage",
-		},
-		{
-			name: "unknown constraint type - returns queue state prefix (default)",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKind("unknown")},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "mix of unknown and known constraints - follows same rules",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKind("unknown")},
-				{Kind: ConstraintKindConcurrency},
-			},
-			want:    "queue-state-prefix",
-			wantErr: false,
-		},
-		{
-			name: "mix of unknown and rate limit - error",
-			constraints: []ConstraintItem{
-				{Kind: ConstraintKind("unknown")},
-				{Kind: ConstraintKindRateLimit},
-			},
-			want:    "rate-limit-prefix",
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := manager.keyPrefix(tt.constraints)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errMsg)
-				require.Equal(t, tt.want, got)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.want, got)
-			}
-		})
-	}
 }
