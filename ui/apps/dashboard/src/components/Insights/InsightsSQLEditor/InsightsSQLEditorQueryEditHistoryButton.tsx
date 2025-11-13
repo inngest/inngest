@@ -61,6 +61,7 @@ export function InsightsSQLEditorQueryEditHistoryButton({
       <PopoverContent
         align="start"
         className="text-subtle flex flex-col gap-2 rounded-lg p-3 text-sm leading-tight shadow-[0_1px_1px_0_rgba(0,0,0,0.06),_0_1px_2px_0_rgba(0,0,0,0.10)]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
         side="bottom"
       >
         <AuthorshipDate author={creator} date={createdAt} label="Created by" />
