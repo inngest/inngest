@@ -37,7 +37,10 @@ const (
 	DefaultCompactionSample = 0.1
 
 	// DefaultCompactionLeaseRenewInterval is the lease renewal period for compaction.
-	DefaultCompactionLeaseRenewInterval = 25 * time.Second
+	DefaultCompactionLeaseRenewInterval = 15 * time.Second
+
+	// DefaultFlushLeaseRenewInterval is the lease renewal period for flushing.
+	DefaultFlushLeaseRenewInterval = 10 * time.Second
 
 	// DefaultFetchMargin provides a safety buffer when pre-fetching pause IDs.
 	// Used with the block size to ensure enough ordered results are returned,
@@ -71,6 +74,9 @@ type BlockstoreOpts struct {
 	BlockSize int
 	// FetchMargin is the number of additional pauses to pre-fetch ids for when block flushing.
 	FetchMargin int
+	// FlushLeaseRenewInterval is the interval for flush lease renewals.
+	FlushLeaseRenewInterval time.Duration
+
 	// CompactionLimit is the total number of pauses that should trigger a compaction.
 	// Note that this doesnt always trigger a compaction;
 	CompactionLimit int
@@ -130,10 +136,15 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		opts.CompactionLeaseRenewInterval = DefaultCompactionLeaseRenewInterval
 	}
 
+	if opts.FlushLeaseRenewInterval.Nanoseconds() == 0 {
+		opts.FlushLeaseRenewInterval = DefaultFlushLeaseRenewInterval
+	}
+
 	return &blockstore{
 		rc:                           opts.RC,
 		blocksize:                    opts.BlockSize,
 		fetchMargin:                  opts.FetchMargin,
+		flushLeaseRenewInterval:      opts.FlushLeaseRenewInterval,
 		compactionLimit:              opts.CompactionLimit,
 		compactionSample:             opts.CompactionSample,
 		compactionLeaser:             opts.CompactionLeaser,
@@ -152,6 +163,9 @@ type blockstore struct {
 
 	// fetchMargin is the number of additional pauses to pre-fetch ids for when block flushing.
 	fetchMargin int
+
+	// flushLeaseRenewInterval is the interval for flush lease renewals.
+	flushLeaseRenewInterval time.Duration
 
 	// compactionLimit is the number of pauses that have to be deleted from
 	// a block to compact it.  This prevents us from rewriting pauses on every
@@ -222,7 +236,7 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 			// until this function is done.
 			return b.flushIndexBlock(ctx, index)
 		},
-		10*time.Second,
+		b.flushLeaseRenewInterval,
 	)
 }
 
