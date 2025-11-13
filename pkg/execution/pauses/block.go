@@ -36,6 +36,9 @@ const (
 	// a delete.
 	DefaultCompactionSample = 0.1
 
+	// DefaultCompactionLeaseRenewInterval is the lease renewal period for compaction.
+	DefaultCompactionLeaseRenewInterval = 25 * time.Second
+
 	// DefaultFetchMargin provides a safety buffer when pre-fetching pause IDs.
 	// Used with the block size to ensure enough ordered results are returned,
 	// even if some pauses were deleted in the meantime as we can’t rely on
@@ -75,6 +78,8 @@ type BlockstoreOpts struct {
 	CompactionSample float64
 	// CompactionLeaser manages compaction leases for a given index.
 	CompactionLeaser BlockLeaser
+	// compactionLeaseRenewInterval is the interval for compaction lease renewals.
+	CompactionLeaseRenewInterval time.Duration
 
 	// DeleteAfterFlush is a callback that returns whether we delete from the backing buffer,
 	// or if deletes are ignored for the current workspace.
@@ -121,18 +126,23 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		opts.FetchMargin = DefaultFetchMargin
 	}
 
+	if opts.CompactionLeaseRenewInterval.Nanoseconds() == 0 {
+		opts.CompactionLeaseRenewInterval = DefaultCompactionLeaseRenewInterval
+	}
+
 	return &blockstore{
-		rc:                    opts.RC,
-		blocksize:             opts.BlockSize,
-		fetchMargin:           opts.FetchMargin,
-		compactionLimit:       opts.CompactionLimit,
-		compactionSample:      opts.CompactionSample,
-		compactionLeaser:      opts.CompactionLeaser,
-		buf:                   opts.Bufferer,
-		bucket:                opts.Bucket,
-		leaser:                opts.Leaser,
-		deleteAfterFlush:      opts.DeleteAfterFlush,
-		enableBlockCompaction: opts.EnableBlockCompaction,
+		rc:                           opts.RC,
+		blocksize:                    opts.BlockSize,
+		fetchMargin:                  opts.FetchMargin,
+		compactionLimit:              opts.CompactionLimit,
+		compactionSample:             opts.CompactionSample,
+		compactionLeaser:             opts.CompactionLeaser,
+		compactionLeaseRenewInterval: opts.CompactionLeaseRenewInterval,
+		buf:                          opts.Bufferer,
+		bucket:                       opts.Bucket,
+		leaser:                       opts.Leaser,
+		deleteAfterFlush:             opts.DeleteAfterFlush,
+		enableBlockCompaction:        opts.EnableBlockCompaction,
 	}, nil
 }
 
@@ -149,6 +159,10 @@ type blockstore struct {
 	compactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	compactionSample float64
+	// compactionLeaser manages compaction leases for a given index.
+	compactionLeaser BlockLeaser
+	// compactionLeaseRenewInterval is the interval for compaction lease renewals.
+	compactionLeaseRenewInterval time.Duration
 
 	// buf is the backing buffer that we process blocks from when flushing.
 	//
@@ -165,9 +179,6 @@ type blockstore struct {
 
 	// leaser manages leases for a given index.
 	leaser BlockLeaser
-
-	// compactionLeaser manages compaction leases for a given index.
-	compactionLeaser BlockLeaser
 
 	// rc is the Redis client used to manage block indexes.
 	rc rueidis.Client
@@ -614,7 +625,7 @@ func (b *blockstore) Compact(ctx context.Context, index Index) {
 			// until this function is done.
 			return b.compact(ctx, index)
 		},
-		25*time.Second,
+		b.compactionLeaseRenewInterval,
 	)
 }
 
