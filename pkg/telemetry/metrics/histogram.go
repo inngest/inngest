@@ -318,3 +318,14 @@ func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts Histogram
 		Boundaries:  QueueItemLatencyBoundaries,
 	})
 }
+
+func HistogramPauseBlockCompactionDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "pauses_block_compaction_duration",
+		Description: "Distribution of pause block compaction duration per block",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}

@@ -71,7 +71,7 @@ type BlockstoreOpts struct {
 	// CompactionLimit is the total number of pauses that should trigger a compaction.
 	// Note that this doesnt always trigger a compaction;
 	CompactionLimit int
-	// CompactionSample is the chance of compaction, from 0-100
+	// CompactionSample is the chance of compaction, from 0-1.0
 	CompactionSample float64
 	// CompactionLeaser manages compaction leases for a given index.
 	CompactionLeaser BlockLeaser
@@ -607,6 +607,7 @@ func (b *blockstore) Compact(ctx context.Context, index Index) {
 
 func (b *blockstore) compact(ctx context.Context, index Index) error {
 	l := logger.StdlibLogger(ctx).With("workspace_id", index.WorkspaceID, "event_name", index.EventName)
+	start := time.Now()
 	l.Debug("compacting block index")
 
 	blockMetadataList, err := b.readAllBlockMetadata(ctx, index)
@@ -616,7 +617,7 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 
 	// Identify blocks that need compaction
 	var blocksToCompact []ulid.ULID
-	for blockIDStr, _ := range blockMetadataList {
+	for blockIDStr := range blockMetadataList {
 		blockID, err := ulid.Parse(blockIDStr)
 		if err != nil {
 			l.ReportError(
@@ -652,93 +653,124 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 
 	// Compact the identified blocks
 	for _, blockID := range blocksToCompact {
-		blockIDTags := logger.WithErrorReportTags(map[string]string{"block_id": blockID.String()})
-		
-		// Fetch the block from storage
-		block, err := b.ReadBlock(ctx, index, blockID)
-		if err != nil {
-			l.ReportError(err, "error reading block for compaction", blockIDTags)
-			continue
-		}
-
-		// Filter out deleted pauses from the block
-		deleteKey := blockDeleteKey(index, blockID)
-		deletedPauseIDs, err := b.rc.Do(ctx, b.rc.B().Smembers().Key(deleteKey).Build()).AsStrSlice()
-		if err != nil {
-			l.ReportError(err, "error getting deleted pause IDs for block", blockIDTags)
-			continue
-		}
-
-		// Create a set of deleted pause IDs for fast lookup
-		deletedSet := make(map[string]bool)
-		for _, pauseID := range deletedPauseIDs {
-			deletedSet[pauseID] = true
-		}
-
-		// Filter out deleted pauses
-		var remainingPauses []*state.Pause
-		for _, pause := range block.Pauses {
-			if !deletedSet[pause.ID.String()] {
-				remainingPauses = append(remainingPauses, pause)
-			}
-		}
-
-		l.Debug("filtered pauses for compaction", "block_id", blockID, "original_count", len(block.Pauses), "remaining_count", len(remainingPauses), "deleted_count", len(deletedPauseIDs))
-
-		// Handle the case where all pauses were deleted
-		if len(remainingPauses) == 0 {
-			l.Debug("all pauses deleted, removing block completely", "block_id", blockID)
-			if err := b.deleteBlock(ctx, index, blockID); err != nil {
-				l.ReportError(err, "error deleting empty block", blockIDTags)
-			}
-			continue
-		}
-
-		block.Pauses = remainingPauses
-
-		byt, err := Serialize(block, encodingJSON, 0x00)
-		if err != nil {
-			l.ReportError(err, "error serializing compacted block", blockIDTags)
-			continue
-		}
-
-		key := b.BlockKey(index, blockID)
-		if err := b.bucket.WriteAll(ctx, key, byt, nil); err != nil {
-			l.ReportError(err, "error writing compacted block to storage", blockIDTags)
-			continue
-		}
-
-		// XXX: At this point a block can be read with unmatching metadata but that should be fine
-
-		md, err := b.blockMetadata(ctx, index, block)
-		if err != nil {
-			l.ReportError(err, "error generating block metadata after compaction", blockIDTags)
-		} else {
-			// addBlockIndex uses block.ID from the struct, which preserves the original stable block ID
-			if err := b.addBlockIndex(ctx, index, block, md); err != nil {
-				l.ReportError(err, "error updating block metadata after compaction", blockIDTags)
-			}
-		}
-
-		// Cleanup deleted pauses from the block deletion key, it can't be done in one OP because
-		// deletions could have happened while compaction is running.
-		batchSize := 100
-		for i := 0; i < len(deletedPauseIDs); i += batchSize {
-			end := min(i+batchSize, len(deletedPauseIDs))
-			batch := deletedPauseIDs[i:end]
-
-			cmd := b.rc.B().Srem().Key(deleteKey).Member(batch...).Build()
-			err = b.rc.Do(ctx, cmd).Error()
-			if err != nil {
-				l.ReportError(err, "error cleaning up delete tracking batch for compacted block", blockIDTags)
-				break
-			}
-		}
-
-		l.Debug("compaction successful", "block_id", blockID, "cleaned_pause_ids", len(deletedPauseIDs))
+		b.compactBlock(ctx, l, index, blockID)
 	}
 
+	l.Debug("blocks compaction finished", "count", len(blocksToCompact), "duration", time.Since(start).Milliseconds())
+
 	return nil
+}
+
+// compactBlock compacts a single block
+func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index Index, blockID ulid.ULID) {
+	startTime := time.Now()
+	status := "fail"
+
+	defer func() {
+		duration := time.Since(startTime)
+		metrics.HistogramPauseBlockCompactionDuration(ctx, duration, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"status": status,
+			},
+		})
+	}()
+
+	blockIDTags := logger.WithErrorReportTags(map[string]string{"block_id": blockID.String()})
+
+	// Fetch the block from storage
+	block, err := b.ReadBlock(ctx, index, blockID)
+	if err != nil {
+		l.ReportError(err, "error reading block for compaction", blockIDTags)
+		return
+	}
+
+	// Filter out deleted pauses from the block
+	deleteKey := blockDeleteKey(index, blockID)
+	deletedPauseIDs, err := b.rc.Do(ctx, b.rc.B().Smembers().Key(deleteKey).Build()).AsStrSlice()
+	if err != nil {
+		l.ReportError(err, "error getting deleted pause IDs for block", blockIDTags)
+		return
+	}
+
+	deletedSet := make(map[string]bool)
+	for _, pauseID := range deletedPauseIDs {
+		deletedSet[pauseID] = true
+	}
+
+	// Filter out deleted pauses
+	var remainingPauses []*state.Pause
+	for _, pause := range block.Pauses {
+		if !deletedSet[pause.ID.String()] {
+			remainingPauses = append(remainingPauses, pause)
+		}
+	}
+
+	originalCount := len(block.Pauses)
+	l.Debug("filtered pauses for compaction", "block_id", blockID, "original_count", len(block.Pauses), "remaining_count", len(remainingPauses), "deleted_count", len(deletedPauseIDs))
+
+	// Handle the case where all pauses were deleted
+	if len(remainingPauses) == 0 {
+		l.Debug("all pauses deleted, removing block completely", "block_id", blockID)
+		if err := b.deleteBlock(ctx, index, blockID); err != nil {
+			l.ReportError(err, "error deleting empty block", blockIDTags)
+			return
+		}
+		status = "success"
+		return
+	}
+
+	block.Pauses = remainingPauses
+
+	byt, err := Serialize(block, encodingJSON, 0x00)
+	if err != nil {
+		l.ReportError(err, "error serializing compacted block", blockIDTags)
+		return
+	}
+
+	// Generate metadata before overwriting the block, it could break the boundary checks,
+	// same timestamp for boundaries.
+	md, err := b.blockMetadata(ctx, index, block)
+	if err != nil {
+		l.ReportError(err, "error generating block metadata after compaction", blockIDTags)
+		return
+	}
+
+	key := b.BlockKey(index, blockID)
+	if err := b.bucket.WriteAll(ctx, key, byt, nil); err != nil {
+		l.ReportError(err, "error writing compacted block to storage", blockIDTags)
+		return
+	}
+
+	// XXX: At this point a block can be read with unmatching metadata but that should be fine
+
+	// addBlockIndex uses block.ID from the struct, which preserves the original stable block ID
+	if err := b.addBlockIndex(ctx, index, block, md); err != nil {
+		l.ReportError(err, "error updating block metadata after compaction", blockIDTags)
+		return
+	}
+
+	// Cleanup deleted pauses from the block deletion key, it can't be done in one OP because
+	// deletions could have happened while compaction is running.
+	batchSize := 100
+	for i := 0; i < len(deletedPauseIDs); i += batchSize {
+		end := min(i+batchSize, len(deletedPauseIDs))
+		batch := deletedPauseIDs[i:end]
+
+		cmd := b.rc.B().Srem().Key(deleteKey).Member(batch...).Build()
+		err = b.rc.Do(ctx, cmd).Error()
+		if err != nil {
+			l.ReportError(err, "error cleaning up delete tracking batch for compacted block", blockIDTags)
+			return
+		}
+	}
+
+	l.Debug("compaction successful", "block_id", "duration",
+		time.Since(startTime).Milliseconds(), blockID,
+		"original_count", originalCount, "cleaned_pause_ids",
+		len(deletedPauseIDs), "remaining_count", len(remainingPauses))
+
+	status = "success"
 }
 
 // readAllBlockMetadata reads all block metadata for a given index from Redis
@@ -857,7 +889,10 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 		Key(blockIndexKey(idx)).
 		ScoreMember().
 		ScoreMember(
-			float64(ulid.Time(block.ID.Time()).UnixMilli()),
+			// We use metadata timestamp because the time in the blockID can diverge
+			// during compaction, we want a stable blockID even though the boundaries
+			// changed.
+			float64(md.LastTimestamp().UnixMilli()),
 			block.ID.String(),
 		).
 		Build()
