@@ -594,7 +594,7 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
 func (b *blockstore) Compact(ctx context.Context, index Index) {
-	util.Lease(
+	_ = util.Lease(
 		ctx,
 		"compact index blocks",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
