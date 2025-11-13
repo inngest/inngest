@@ -18,6 +18,9 @@ type CapacityManager interface {
 
 // MigrationIdentifier includes hints for the Constraint API which will be removed
 // once all constraint state is moved to a dedicated data store
+//
+// While we can infer the target data store from the contraint, we only send constraints
+// during the Acquire call. Sharing the same migration identifier simplifies this.
 type MigrationIdentifier struct {
 	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
 	// queue constraints.
