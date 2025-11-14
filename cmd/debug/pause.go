@@ -12,6 +12,7 @@ func pauseCommand() *cli.Command {
 		Usage:   "Pause debugging commands",
 		Commands: []*cli.Command{
 			pause.PauseCommand(),
+			pause.IndexCommand(),
 		},
 	}
 }

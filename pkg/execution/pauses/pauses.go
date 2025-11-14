@@ -47,6 +47,23 @@ type Index struct {
 	EventName   string    `json:"eventName"`
 }
 
+// BlockInfo contains information about a single block.
+type BlockInfo struct {
+	ID             string    `json:"id"`
+	Length         int       `json:"length"`
+	FirstTimestamp time.Time `json:"firstTimestamp"`
+	LastTimestamp  time.Time `json:"lastTimestamp"`
+	DeleteCount    int64     `json:"deleteCount"`
+}
+
+// IndexStats contains statistics about a pause index.
+type IndexStats struct {
+	WorkspaceID  uuid.UUID    `json:"workspaceID"`
+	EventName    string       `json:"eventName"`
+	BufferLength int64        `json:"bufferLength"`
+	Blocks       []*BlockInfo `json:"blocks"`
+}
+
 // PauseIndex returns an index for a given pause.
 func PauseIndex(p state.Pause) Index {
 	idx := Index{WorkspaceID: p.WorkspaceID}
@@ -109,6 +126,10 @@ type Manager interface {
 
 	// FlushIndexBlock flushes a new pauses block for the specified index.
 	FlushIndexBlock(ctx context.Context, index Index) error
+
+	// IndexStats returns statistics about an index including block information.
+	// Used for debugging pause storage and block compaction status.
+	IndexStats(ctx context.Context, index Index) (*IndexStats, error)
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
@@ -206,6 +227,14 @@ type BlockReader interface {
 	// LastBlockMetadata returns metadata on the last block written for the given index.
 	// This allows us to check the last timestamp flushed overall.
 	LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error)
+
+	// GetBlockMetadata returns metadata for all blocks in the given index.
+	// Used for debugging block information.
+	GetBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error)
+
+	// GetBlockDeleteCount returns the number of deleted pauses for a specific block.
+	// Used for debugging block compaction status.
+	GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error)
 
 	// IndexExists returns whether we've written any blocks for the given index.
 	IndexExists(ctx context.Context, i Index) (bool, error)

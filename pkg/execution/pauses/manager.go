@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/oklog/ulid/v2"
 )
 
 var BlockFlushQueueName = "block-flush"
@@ -370,4 +371,66 @@ func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	// flushDelay is the amount of clock skew we mitigate.
 	time.Sleep(m.flushDelay)
 	return m.bs.FlushIndexBlock(ctx, index)
+}
+
+func (m manager) IndexStats(ctx context.Context, index Index) (*IndexStats, error) {
+	stats := &IndexStats{
+		WorkspaceID: index.WorkspaceID,
+		EventName:   index.EventName,
+	}
+
+	// Get buffer length
+	bufLen, err := m.buf.BufferLen(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get buffer length: %w", err)
+	}
+	stats.BufferLength = bufLen
+
+	// Get block information if blockstore is available
+	if m.bs != nil {
+		blockIDs, err := m.bs.BlocksSince(ctx, index, time.Time{}) // Get all blocks
+		if err != nil {
+			return nil, fmt.Errorf("failed to get blocks: %w", err)
+		}
+
+		for _, blockID := range blockIDs {
+			blockInfo, err := m.getBlockInfo(ctx, index, blockID)
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn("failed to get block info", "block_id", blockID, "error", err)
+				continue
+			}
+			stats.Blocks = append(stats.Blocks, blockInfo)
+		}
+	}
+
+	return stats, nil
+}
+
+func (m manager) getBlockInfo(ctx context.Context, index Index, blockID ulid.ULID) (*BlockInfo, error) {
+	// Get metadata for the block
+	metadataMap, err := m.bs.GetBlockMetadata(ctx, index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read block metadata: %w", err)
+	}
+
+	blockIDStr := blockID.String()
+	metadata, exists := metadataMap[blockIDStr]
+	if !exists {
+		return nil, fmt.Errorf("metadata not found for block %s", blockIDStr)
+	}
+
+	// Get delete count for the block
+	deleteCount, err := m.bs.GetBlockDeleteCount(ctx, index, blockID)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("failed to get delete count", "block_id", blockIDStr, "error", err)
+		deleteCount = 0 // Default to 0 if we can't get the count
+	}
+
+	return &BlockInfo{
+		ID:             blockIDStr,
+		Length:         metadata.Len,
+		FirstTimestamp: metadata.FirstTimestamp(),
+		LastTimestamp:  metadata.LastTimestamp(),
+		DeleteCount:    deleteCount,
+	}, nil
 }

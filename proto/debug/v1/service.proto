@@ -16,4 +16,6 @@ service Debug {
   rpc GetQueueItem(QueueItemRequest) returns (QueueItemResponse) {}
   // GetPause retrieves a single pause item.
   rpc GetPause(PauseRequest) returns (PauseResponse) {}
+  // GetIndex retrieves block information for a pause index.
+  rpc GetIndex(IndexRequest) returns (IndexResponse) {}
 }

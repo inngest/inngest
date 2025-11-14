@@ -12,3 +12,23 @@ message PauseRequest {
 }
 
 message PauseResponse { bytes data = 1; }
+
+message IndexRequest {
+  string event_name = 1;
+  string workspace_id = 2;
+}
+
+message BlockInfo {
+  string id = 1;
+  int64 length = 2;
+  int64 first_timestamp = 3;
+  int64 last_timestamp = 4;
+  int64 delete_count = 5;
+}
+
+message IndexResponse {
+  string workspace_id = 1;
+  string event_name = 2;
+  int64 buffer_length = 3;
+  repeated BlockInfo blocks = 4;
+}

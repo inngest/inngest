@@ -126,6 +126,202 @@ func (x *PauseResponse) GetData() []byte {
 	return nil
 }
 
+type IndexRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventName     string                 `protobuf:"bytes,1,opt,name=event_name,json=eventName,proto3" json:"event_name,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IndexRequest) Reset() {
+	*x = IndexRequest{}
+	mi := &file_debug_v1_pause_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IndexRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexRequest) ProtoMessage() {}
+
+func (x *IndexRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexRequest.ProtoReflect.Descriptor instead.
+func (*IndexRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IndexRequest) GetEventName() string {
+	if x != nil {
+		return x.EventName
+	}
+	return ""
+}
+
+func (x *IndexRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type BlockInfo struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Length         int64                  `protobuf:"varint,2,opt,name=length,proto3" json:"length,omitempty"`
+	FirstTimestamp int64                  `protobuf:"varint,3,opt,name=first_timestamp,json=firstTimestamp,proto3" json:"first_timestamp,omitempty"`
+	LastTimestamp  int64                  `protobuf:"varint,4,opt,name=last_timestamp,json=lastTimestamp,proto3" json:"last_timestamp,omitempty"`
+	DeleteCount    int64                  `protobuf:"varint,5,opt,name=delete_count,json=deleteCount,proto3" json:"delete_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *BlockInfo) Reset() {
+	*x = BlockInfo{}
+	mi := &file_debug_v1_pause_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockInfo) ProtoMessage() {}
+
+func (x *BlockInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockInfo.ProtoReflect.Descriptor instead.
+func (*BlockInfo) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *BlockInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *BlockInfo) GetLength() int64 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+func (x *BlockInfo) GetFirstTimestamp() int64 {
+	if x != nil {
+		return x.FirstTimestamp
+	}
+	return 0
+}
+
+func (x *BlockInfo) GetLastTimestamp() int64 {
+	if x != nil {
+		return x.LastTimestamp
+	}
+	return 0
+}
+
+func (x *BlockInfo) GetDeleteCount() int64 {
+	if x != nil {
+		return x.DeleteCount
+	}
+	return 0
+}
+
+type IndexResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	EventName     string                 `protobuf:"bytes,2,opt,name=event_name,json=eventName,proto3" json:"event_name,omitempty"`
+	BufferLength  int64                  `protobuf:"varint,3,opt,name=buffer_length,json=bufferLength,proto3" json:"buffer_length,omitempty"`
+	Blocks        []*BlockInfo           `protobuf:"bytes,4,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IndexResponse) Reset() {
+	*x = IndexResponse{}
+	mi := &file_debug_v1_pause_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IndexResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexResponse) ProtoMessage() {}
+
+func (x *IndexResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexResponse.ProtoReflect.Descriptor instead.
+func (*IndexResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *IndexResponse) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *IndexResponse) GetEventName() string {
+	if x != nil {
+		return x.EventName
+	}
+	return ""
+}
+
+func (x *IndexResponse) GetBufferLength() int64 {
+	if x != nil {
+		return x.BufferLength
+	}
+	return 0
+}
+
+func (x *IndexResponse) GetBlocks() []*BlockInfo {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
 var File_debug_v1_pause_proto protoreflect.FileDescriptor
 
 const file_debug_v1_pause_proto_rawDesc = "" +
@@ -137,7 +333,23 @@ const file_debug_v1_pause_proto_rawDesc = "" +
 	"event_name\x18\x02 \x01(\tR\teventName\x12!\n" +
 	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\"#\n" +
 	"\rPauseResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04dataB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\x04data\x18\x01 \x01(\fR\x04data\"P\n" +
+	"\fIndexRequest\x12\x1d\n" +
+	"\n" +
+	"event_name\x18\x01 \x01(\tR\teventName\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"\xa6\x01\n" +
+	"\tBlockInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06length\x18\x02 \x01(\x03R\x06length\x12'\n" +
+	"\x0ffirst_timestamp\x18\x03 \x01(\x03R\x0efirstTimestamp\x12%\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\x03R\rlastTimestamp\x12!\n" +
+	"\fdelete_count\x18\x05 \x01(\x03R\vdeleteCount\"\xa3\x01\n" +
+	"\rIndexResponse\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x1d\n" +
+	"\n" +
+	"event_name\x18\x02 \x01(\tR\teventName\x12#\n" +
+	"\rbuffer_length\x18\x03 \x01(\x03R\fbufferLength\x12+\n" +
+	"\x06blocks\x18\x04 \x03(\v2\x13.debug.v1.BlockInfoR\x06blocksB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_pause_proto_rawDescOnce sync.Once
@@ -151,17 +363,21 @@ func file_debug_v1_pause_proto_rawDescGZIP() []byte {
 	return file_debug_v1_pause_proto_rawDescData
 }
 
-var file_debug_v1_pause_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_debug_v1_pause_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_debug_v1_pause_proto_goTypes = []any{
 	(*PauseRequest)(nil),  // 0: debug.v1.PauseRequest
 	(*PauseResponse)(nil), // 1: debug.v1.PauseResponse
+	(*IndexRequest)(nil),  // 2: debug.v1.IndexRequest
+	(*BlockInfo)(nil),     // 3: debug.v1.BlockInfo
+	(*IndexResponse)(nil), // 4: debug.v1.IndexResponse
 }
 var file_debug_v1_pause_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	3, // 0: debug.v1.IndexResponse.blocks:type_name -> debug.v1.BlockInfo
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_pause_proto_init() }
@@ -175,7 +391,7 @@ func file_debug_v1_pause_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_pause_proto_rawDesc), len(file_debug_v1_pause_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

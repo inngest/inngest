@@ -817,6 +817,15 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 }
 
 // readAllBlockMetadata reads all block metadata for a given index from Redis
+func (b *blockstore) GetBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error) {
+	return b.readAllBlockMetadata(ctx, index)
+}
+
+func (b *blockstore) GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error) {
+	deleteKey := blockDeleteKey(index, blockID)
+	return b.rc.Do(ctx, b.rc.B().Scard().Key(deleteKey).Build()).AsInt64()
+}
+
 func (b *blockstore) readAllBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error) {
 	metadataKey := blockMetadataKey(index)
 	metadataMap, err := b.rc.Do(ctx, b.rc.B().Hgetall().Key(metadataKey).Build()).AsStrMap()

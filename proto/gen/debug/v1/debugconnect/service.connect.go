@@ -42,6 +42,8 @@ const (
 	DebugGetQueueItemProcedure = "/debug.v1.Debug/GetQueueItem"
 	// DebugGetPauseProcedure is the fully-qualified name of the Debug's GetPause RPC.
 	DebugGetPauseProcedure = "/debug.v1.Debug/GetPause"
+	// DebugGetIndexProcedure is the fully-qualified name of the Debug's GetIndex RPC.
+	DebugGetIndexProcedure = "/debug.v1.Debug/GetIndex"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -55,6 +57,8 @@ type DebugClient interface {
 	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
 	// GetPause retrieves a single pause item.
 	GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -92,6 +96,12 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("GetPause")),
 			connect.WithClientOptions(opts...),
 		),
+		getIndex: connect.NewClient[v1.IndexRequest, v1.IndexResponse](
+			httpClient,
+			baseURL+DebugGetIndexProcedure,
+			connect.WithSchema(debugMethods.ByName("GetIndex")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -101,6 +111,7 @@ type debugClient struct {
 	getPartitionStatus *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
 	getQueueItem       *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
 	getPause           *connect.Client[v1.PauseRequest, v1.PauseResponse]
+	getIndex           *connect.Client[v1.IndexRequest, v1.IndexResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -123,6 +134,11 @@ func (c *debugClient) GetPause(ctx context.Context, req *connect.Request[v1.Paus
 	return c.getPause.CallUnary(ctx, req)
 }
 
+// GetIndex calls debug.v1.Debug.GetIndex.
+func (c *debugClient) GetIndex(ctx context.Context, req *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error) {
+	return c.getIndex.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -134,6 +150,8 @@ type DebugHandler interface {
 	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
 	// GetPause retrieves a single pause item.
 	GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -167,6 +185,12 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("GetPause")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetIndexHandler := connect.NewUnaryHandler(
+		DebugGetIndexProcedure,
+		svc.GetIndex,
+		connect.WithSchema(debugMethods.ByName("GetIndex")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -177,6 +201,8 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugGetQueueItemHandler.ServeHTTP(w, r)
 		case DebugGetPauseProcedure:
 			debugGetPauseHandler.ServeHTTP(w, r)
+		case DebugGetIndexProcedure:
+			debugGetIndexHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -200,4 +226,8 @@ func (UnimplementedDebugHandler) GetQueueItem(context.Context, *connect.Request[
 
 func (UnimplementedDebugHandler) GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetPause is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetIndex is not implemented"))
 }

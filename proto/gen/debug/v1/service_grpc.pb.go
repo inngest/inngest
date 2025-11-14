@@ -23,6 +23,7 @@ const (
 	Debug_GetPartitionStatus_FullMethodName = "/debug.v1.Debug/GetPartitionStatus"
 	Debug_GetQueueItem_FullMethodName       = "/debug.v1.Debug/GetQueueItem"
 	Debug_GetPause_FullMethodName           = "/debug.v1.Debug/GetPause"
+	Debug_GetIndex_FullMethodName           = "/debug.v1.Debug/GetIndex"
 )
 
 // DebugClient is the client API for Debug service.
@@ -38,6 +39,8 @@ type DebugClient interface {
 	GetQueueItem(ctx context.Context, in *QueueItemRequest, opts ...grpc.CallOption) (*QueueItemResponse, error)
 	// GetPause retrieves a single pause item.
 	GetPause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error)
 }
 
 type debugClient struct {
@@ -88,6 +91,16 @@ func (c *debugClient) GetPause(ctx context.Context, in *PauseRequest, opts ...gr
 	return out, nil
 }
 
+func (c *debugClient) GetIndex(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IndexResponse)
+	err := c.cc.Invoke(ctx, Debug_GetIndex_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -101,6 +114,8 @@ type DebugServer interface {
 	GetQueueItem(context.Context, *QueueItemRequest) (*QueueItemResponse, error)
 	// GetPause retrieves a single pause item.
 	GetPause(context.Context, *PauseRequest) (*PauseResponse, error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(context.Context, *IndexRequest) (*IndexResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -122,6 +137,9 @@ func (UnimplementedDebugServer) GetQueueItem(context.Context, *QueueItemRequest)
 }
 func (UnimplementedDebugServer) GetPause(context.Context, *PauseRequest) (*PauseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPause not implemented")
+}
+func (UnimplementedDebugServer) GetIndex(context.Context, *IndexRequest) (*IndexResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIndex not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -216,6 +234,24 @@ func _Debug_GetPause_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetIndex_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IndexRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetIndex(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetIndex_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetIndex(ctx, req.(*IndexRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -238,6 +274,10 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPause",
 			Handler:    _Debug_GetPause_Handler,
+		},
+		{
+			MethodName: "GetIndex",
+			Handler:    _Debug_GetIndex_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

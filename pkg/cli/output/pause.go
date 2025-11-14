@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
 func TextPause(item *state.Pause) error {
@@ -48,4 +49,45 @@ func TextPause(item *state.Pause) error {
 	}
 
 	return w.Flush()
+}
+
+func TextIndex(resp *pb.IndexResponse) error {
+	if resp == nil {
+		fmt.Println("no index found")
+		return nil
+	}
+
+	w := NewTextWriter()
+
+	// Write index summary first
+	if err := w.WriteOrdered(OrderedData(
+		"WorkspaceID", resp.WorkspaceId,
+		"EventName", resp.EventName,
+		"BufferLength", resp.BufferLength,
+		"BlockCount", len(resp.Blocks),
+	), WithTextOptLeadSpace(true)); err != nil {
+		return err
+	}
+
+	if err := w.Flush(); err != nil {
+		return err
+	}
+
+	// Write block information
+	if len(resp.Blocks) > 0 {
+		fmt.Printf("\nBlocks:\n")
+		
+		for i, block := range resp.Blocks {
+			fmt.Printf("\n  Block %d:\n", i+1)
+			fmt.Printf("    ID:             %s\n", block.Id)
+			fmt.Printf("    Length:         %d\n", block.Length)
+			fmt.Printf("    FirstTimestamp: %d (%s)\n", block.FirstTimestamp, time.UnixMilli(block.FirstTimestamp).UTC().Format(time.RFC3339))
+			fmt.Printf("    LastTimestamp:  %d (%s)\n", block.LastTimestamp, time.UnixMilli(block.LastTimestamp).UTC().Format(time.RFC3339))
+			fmt.Printf("    DeleteCount:    %d\n", block.DeleteCount)
+		}
+	} else {
+		fmt.Printf("\nNo blocks found\n")
+	}
+
+	return nil
 }
