@@ -392,7 +392,12 @@ type checkRequestData struct {
 	ConfigVersion int `json:"cv,omitempty"`
 }
 
-func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (*checkRequestData, []ConstraintItem) {
+func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
+	*checkRequestData,
+	[]ConstraintItem,
+	string,
+	error,
+) {
 	state := &checkRequestData{
 		EnvID:         req.EnvID,
 		FunctionID:    req.FunctionID,
@@ -416,14 +421,32 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (*checkR
 
 	state.SortedConstraints = serialized
 
-	return state, constraints
+	// NOTE: We fingerprint the query to apply basic response caching.
+	// As Check can be expensive, we don't want to run unnecessary queries
+	// that may impact lease and constraint enforcement operations.
+	var hash string
+	{
+		dataBytes, err := json.Marshal(state)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
+		}
+
+		fingerprint := sha256.New()
+		_, err = fingerprint.Write(dataBytes)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("could not fingerprint query: %w", err)
+		}
+		hash = hex.EncodeToString(fingerprint.Sum(nil))
+	}
+
+	return state, constraints, hash, nil
 }
 
 type checkScriptResponse struct {
 	Status              int   `json:"s"`
 	AvailableCapacity   int   `json:"a"`
 	LimitingConstraints []int `json:"lc"`
-	ConstraintUsage     map[int]struct {
+	ConstraintUsage     []struct {
 		Usage int `json:"u"`
 		Limit int `json:"l"`
 	} `json:"cu"`
@@ -443,24 +466,9 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		return nil, nil, errs.Wrap(0, false, "failed to get client: %w", err)
 	}
 
-	data, sortedConstraints := buildCheckRequestData(req, keyPrefix)
-
-	// NOTE: We fingerprint the query to apply basic response caching.
-	// As Check can be expensive, we don't want to run unnecessary queries
-	// that may impact lease and constraint enforcement operations.
-	var hash string
-	{
-		dataBytes, err := json.Marshal(data)
-		if err != nil {
-			return nil, nil, errs.Wrap(0, false, "could not marshal request: %w", err)
-		}
-
-		fingerprint := sha256.New()
-		_, err = fingerprint.Write(dataBytes)
-		if err != nil {
-			return nil, nil, errs.Wrap(0, false, "could not fingerprint query: %w", err)
-		}
-		hash = hex.EncodeToString(fingerprint.Sum(nil))
+	data, sortedConstraints, hash, err := buildCheckRequestData(req, keyPrefix)
+	if err != nil {
+		return nil, nil, errs.Wrap(0, false, "failed to construct request data: %w", err)
 	}
 
 	keys := []string{
@@ -508,10 +516,10 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	}
 
 	constraintUsage := make([]ConstraintUsage, 0, len(req.Constraints))
-	if parsedResponse.ConstraintUsage != nil {
-		for k, v := range parsedResponse.ConstraintUsage {
+	if len(parsedResponse.ConstraintUsage) > 0 {
+		for i, v := range parsedResponse.ConstraintUsage {
 			constraintUsage = append(constraintUsage, ConstraintUsage{
-				Constraint: sortedConstraints[k-1],
+				Constraint: sortedConstraints[i],
 				Limit:      v.Limit,
 				Used:       v.Usage,
 			})
@@ -565,7 +573,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	keys := []string{
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "ext", req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
@@ -648,7 +656,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	scavengerShard := 0
 
 	keys := []string{
-		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "rel", req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
