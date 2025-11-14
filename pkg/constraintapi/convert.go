@@ -627,6 +627,8 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 		AvailableCapacity:   int32(resp.AvailableCapacity),
 		LimitingConstraints: limitingConstraints,
 		Usage:               usage,
+		FairnessReduction:   int32(resp.FairnessReduction),
+		RetryAfter:          timestamppb.New(resp.RetryAfter),
 	}
 }
 
@@ -645,10 +647,17 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 		usage[i] = ConstraintUsageFromProto(u)
 	}
 
+	var retryAfter time.Time
+	if pbResp.RetryAfter != nil {
+		retryAfter = pbResp.RetryAfter.AsTime()
+	}
+
 	return &CapacityCheckResponse{
 		AvailableCapacity:   int(pbResp.AvailableCapacity),
 		LimitingConstraints: limitingConstraints,
 		Usage:               usage,
+		FairnessReduction:   int(pbResp.FairnessReduction),
+		RetryAfter:          retryAfter,
 	}
 }
 
@@ -776,6 +785,7 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		Leases:              leases,
 		LimitingConstraints: limitingConstraints,
 		RetryAfter:          timestamppb.New(resp.RetryAfter),
+		FairnessReduction:   int32(resp.FairnessReduction),
 	}
 }
 
@@ -807,6 +817,7 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		Leases:              leases,
 		LimitingConstraints: limitingConstraints,
 		RetryAfter:          retryAfter,
+		FairnessReduction:   int(pbResp.FairnessReduction),
 	}, nil
 }
 

@@ -167,6 +167,8 @@ message CapacityCheckResponse {
   int32 available_capacity = 1;
   repeated ConstraintItem limiting_constraints = 2;
   repeated ConstraintUsage usage = 3;
+  int32 fairness_reduction = 4;
+  google.protobuf.Timestamp retry_after = 5;
 }
 
 message CapacityAcquireRequest {
@@ -189,7 +191,8 @@ message CapacityAcquireRequest {
 message CapacityAcquireResponse {
   repeated CapacityLease leases = 1;
   repeated ConstraintItem limiting_constraints = 2;
-  google.protobuf.Timestamp retry_after = 3;
+  int32 fairness_reduction = 3;
+  google.protobuf.Timestamp retry_after = 4;
 }
 
 message CapacityExtendLeaseRequest {
