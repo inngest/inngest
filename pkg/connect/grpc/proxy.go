@@ -406,7 +406,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
 				return nil, syscode.Error{
 					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-					Message: "Assigned worker reached capacity before assigment",
+					Message: "Assigned workers at capacity", // Assigned worker reached capacity before assigment
 				}
 			}
 
