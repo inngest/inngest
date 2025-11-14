@@ -55,7 +55,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
+        enableConstraintAPI: [false, true]
     runs-on: ${{ matrix.os }}
     name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     steps:
@@ -74,6 +75,7 @@ jobs:
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5

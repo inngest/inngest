@@ -23,6 +23,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
+        enableConstraintAPI: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +71,7 @@ jobs:
           SDK_URL: http://127.0.0.1:3000/api/inngest
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+          ENABLE_CONSTRAINT_API: "${{ matrix.enableConstraintAPI }}"
 
       - name: Convert coverage for tooling
         run: |
@@ -91,7 +93,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
         parallelism: [5]
         index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
@@ -147,7 +149,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [ false, true ]
+        experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

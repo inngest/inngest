@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -73,6 +74,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -342,6 +344,34 @@ func start(ctx context.Context, opts StartOpts) error {
 			return redis_state.PartitionPausedInfo{}
 		}),
 	}
+
+	const rateLimitPrefix = "ratelimit"
+	var capacityManager constraintapi.CapacityManager
+	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
+	if enableConstraintAPI {
+		shards := make(map[string]rueidis.Client)
+		for k, qs := range queueShards {
+			shards[k] = qs.RedisClient.Client()
+		}
+
+		capacityManager, err = constraintapi.NewRedisCapacityManager(
+			constraintapi.WithClock(clockwork.NewRealClock()),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueShards(shards),
+			constraintapi.WithRateLimitClient(unshardedRc),
+			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
+			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+		)
+		if err != nil {
+			return fmt.Errorf("could not create contraint API: %w", err)
+		}
+
+		queueOpts = append(queueOpts, redis_state.WithCapacityManager(capacityManager))
+		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+	}
+
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
@@ -349,7 +379,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
-	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
+	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
@@ -429,7 +459,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	pauseMgr := pauses.NewRedisOnlyManager(sm)
 
-	exec, err := executor.NewExecutor(
+	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -490,7 +520,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tp),
-	)
+	}
+
+	if capacityManager != nil {
+		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+	}
+
+	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
 		return err
 	}
