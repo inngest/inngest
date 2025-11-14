@@ -366,9 +366,23 @@ func (r *GetSpansByDebugSessionIDRow) ToSQLite() (*sqlc.GetSpansByDebugSessionID
 }
 
 func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
+	var input, output interface{}
+
+	if r.Input.Valid {
+		if err := json.Unmarshal(r.Input.RawMessage, &input); err != nil {
+			return nil, err
+		}
+	}
+
+	if r.Output.Valid {
+		if err := json.Unmarshal(r.Output.RawMessage, &output); err != nil {
+			return nil, err
+		}
+	}
+
 	return &sqlc.GetSpanOutputRow{
-		Input:  r.Input,
-		Output: r.Output,
+		Input:  input,
+		Output: output,
 	}, nil
 }
 

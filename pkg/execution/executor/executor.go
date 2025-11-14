@@ -685,6 +685,19 @@ func (e *executor) schedule(
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
+
+	key := idempotencyKey(req, runID)
+
 	if performChecks {
 		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
 		_ = fallbackIdempotencyKey
@@ -692,28 +705,54 @@ func (e *executor) schedule(
 		// Attempt to rate-limit the incoming function.
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
-			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
+			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
 				// Enable new pure Lua implementation on a per-account basis
 				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
+				impl := "throttled"
+				if useLuaRL {
+					impl = "lua"
+				}
 
 				limited, _, err := e.rateLimiter.RateLimit(
-					ctx,
-					key,
+					logger.WithStdlib(ctx, l),
+					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
 					ratelimit.WithUseLuaImplementation(useLuaRL),
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
+					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"impl":   impl,
+							"status": "error",
+						},
+					})
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
 
 				if limited {
 					// Do nothing.
+					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"impl":   impl,
+							"status": "limited",
+						},
+					})
 					return nil, ErrFunctionRateLimited
 				}
+
+				metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"impl":   impl,
+						"status": "allowed",
+					},
+				})
 			case ratelimit.ErrNotRateLimited:
 				// no-op: proceed with function run as usual
 			default:
@@ -740,19 +779,6 @@ func (e *executor) schedule(
 		}
 		return nil, ErrFunctionDebounced
 	}
-
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	var runID ulid.ULID
-
-	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
-	} else {
-		runID = *req.RunID
-	}
-
-	key := idempotencyKey(req, runID)
 
 	if req.Context == nil {
 		req.Context = map[string]any{}
@@ -3773,6 +3799,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -3962,6 +3989,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -4166,6 +4194,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			consts.OtelPropagationKey: carrier,
 		},
 		ParallelMode: gen.ParallelMode(),
+		CreatedAt:    now,
 	}
 
 	// SDK-based event coordination is called both when an event is received
