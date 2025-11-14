@@ -89,9 +89,17 @@ function AuthorshipDate({ author, date, label }: AuthorshipDateProps) {
   );
 }
 
+const ONE_MINUTE_IN_MILLIS = 60 * 1000;
+
 function getSafeRelativeText(value: string): undefined | string {
   const d = toMaybeDate(value);
   if (d === null || !isValid(d)) return undefined;
+
+  // This guards against clock skew where the action appears to have happened in the future.
+  const deltaMillis = d.getTime() - Date.now();
+  if (deltaMillis > 0 && deltaMillis < ONE_MINUTE_IN_MILLIS) {
+    return 'less than a minute ago';
+  }
 
   return relativeTime(d);
 }
