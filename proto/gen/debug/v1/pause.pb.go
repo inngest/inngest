@@ -387,7 +387,6 @@ type BlockPeekResponse struct {
 	BlockId       string                 `protobuf:"bytes,1,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
 	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
 	PauseIds      []string               `protobuf:"bytes,3,rep,name=pause_ids,json=pauseIds,proto3" json:"pause_ids,omitempty"`
-	Compacted     bool                   `protobuf:"varint,4,opt,name=compacted,proto3" json:"compacted,omitempty"` // true if results were limited
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -441,13 +440,6 @@ func (x *BlockPeekResponse) GetPauseIds() []string {
 		return x.PauseIds
 	}
 	return nil
-}
-
-func (x *BlockPeekResponse) GetCompacted() bool {
-	if x != nil {
-		return x.Compacted
-	}
-	return false
 }
 
 type BlockDeletedRequest struct {
@@ -515,7 +507,6 @@ type BlockDeletedResponse struct {
 	BlockId       string                 `protobuf:"bytes,1,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
 	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
 	DeletedIds    []string               `protobuf:"bytes,3,rep,name=deleted_ids,json=deletedIds,proto3" json:"deleted_ids,omitempty"`
-	Compacted     bool                   `protobuf:"varint,4,opt,name=compacted,proto3" json:"compacted,omitempty"` // true if results were limited
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -571,13 +562,6 @@ func (x *BlockDeletedResponse) GetDeletedIds() []string {
 	return nil
 }
 
-func (x *BlockDeletedResponse) GetCompacted() bool {
-	if x != nil {
-		return x.Compacted
-	}
-	return false
-}
-
 var File_debug_v1_pause_proto protoreflect.FileDescriptor
 
 const file_debug_v1_pause_proto_rawDesc = "" +
@@ -610,25 +594,23 @@ const file_debug_v1_pause_proto_rawDesc = "" +
 	"\n" +
 	"event_name\x18\x01 \x01(\tR\teventName\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
-	"\bblock_id\x18\x03 \x01(\tR\ablockId\"\x8a\x01\n" +
+	"\bblock_id\x18\x03 \x01(\tR\ablockId\"l\n" +
 	"\x11BlockPeekResponse\x12\x19\n" +
 	"\bblock_id\x18\x01 \x01(\tR\ablockId\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x03R\n" +
 	"totalCount\x12\x1b\n" +
-	"\tpause_ids\x18\x03 \x03(\tR\bpauseIds\x12\x1c\n" +
-	"\tcompacted\x18\x04 \x01(\bR\tcompacted\"r\n" +
+	"\tpause_ids\x18\x03 \x03(\tR\bpauseIds\"r\n" +
 	"\x13BlockDeletedRequest\x12\x1d\n" +
 	"\n" +
 	"event_name\x18\x01 \x01(\tR\teventName\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
-	"\bblock_id\x18\x03 \x01(\tR\ablockId\"\x91\x01\n" +
+	"\bblock_id\x18\x03 \x01(\tR\ablockId\"s\n" +
 	"\x14BlockDeletedResponse\x12\x19\n" +
 	"\bblock_id\x18\x01 \x01(\tR\ablockId\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x03R\n" +
 	"totalCount\x12\x1f\n" +
 	"\vdeleted_ids\x18\x03 \x03(\tR\n" +
-	"deletedIds\x12\x1c\n" +
-	"\tcompacted\x18\x04 \x01(\bR\tcompactedB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"deletedIdsB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_pause_proto_rawDescOnce sync.Once

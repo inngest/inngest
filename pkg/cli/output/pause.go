@@ -104,7 +104,6 @@ func TextBlockPeek(resp *pb.BlockPeekResponse) error {
 	if err := w.WriteOrdered(OrderedData(
 		"BlockID", resp.BlockId,
 		"TotalCount", resp.TotalCount,
-		"Compacted", resp.Compacted,
 	), WithTextOptLeadSpace(true)); err != nil {
 		return err
 	}
@@ -113,17 +112,22 @@ func TextBlockPeek(resp *pb.BlockPeekResponse) error {
 		return err
 	}
 
-	// Write pause IDs
+	// Write pause IDs using WriteOrdered for consistent formatting
 	if len(resp.PauseIds) > 0 {
 		fmt.Printf("\nPause IDs:\n")
-		// Calculate padding width based on total count
-		width := len(fmt.Sprintf("%d", len(resp.PauseIds)))
+
+		// Build ordered data for all IDs
+		var idData []interface{}
 		for i, pauseID := range resp.PauseIds {
-			fmt.Printf("  %*d: %s\n", width, i+1, pauseID)
+			idData = append(idData, fmt.Sprintf("%d", i+1), pauseID)
 		}
 
-		if resp.Compacted {
-			fmt.Printf("\n... and %d more (use --limit to show more)\n", resp.TotalCount-int64(len(resp.PauseIds)))
+		if err := w.WriteOrdered(OrderedData(idData...), WithTextOptLeadSpace(true)); err != nil {
+			return err
+		}
+
+		if err := w.Flush(); err != nil {
+			return err
 		}
 	} else {
 		fmt.Printf("\nNo pause IDs found\n")
@@ -144,7 +148,6 @@ func TextBlockDeleted(resp *pb.BlockDeletedResponse) error {
 	if err := w.WriteOrdered(OrderedData(
 		"BlockID", resp.BlockId,
 		"TotalCount", resp.TotalCount,
-		"Compacted", resp.Compacted,
 	), WithTextOptLeadSpace(true)); err != nil {
 		return err
 	}
@@ -153,17 +156,22 @@ func TextBlockDeleted(resp *pb.BlockDeletedResponse) error {
 		return err
 	}
 
-	// Write deleted IDs
+	// Write deleted IDs using WriteOrdered for consistent formatting
 	if len(resp.DeletedIds) > 0 {
 		fmt.Printf("\nDeleted IDs:\n")
-		// Calculate padding width based on total count
-		width := len(fmt.Sprintf("%d", len(resp.DeletedIds)))
+
+		// Build ordered data for all IDs
+		var idData []interface{}
 		for i, deletedID := range resp.DeletedIds {
-			fmt.Printf("  %*d: %s\n", width, i+1, deletedID)
+			idData = append(idData, fmt.Sprintf("%d", i+1), deletedID)
 		}
 
-		if resp.Compacted {
-			fmt.Printf("\n... and %d more (use --limit to show more)\n", resp.TotalCount-int64(len(resp.DeletedIds)))
+		if err := w.WriteOrdered(OrderedData(idData...), WithTextOptLeadSpace(true)); err != nil {
+			return err
+		}
+
+		if err := w.Flush(); err != nil {
+			return err
 		}
 	} else {
 		fmt.Printf("\nNo deleted IDs found\n")

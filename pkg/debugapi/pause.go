@@ -118,7 +118,6 @@ func (d *debugAPI) BlockPeek(ctx context.Context, req *pb.BlockPeekRequest) (*pb
 		BlockId:    req.GetBlockId(),
 		TotalCount: totalCount,
 		PauseIds:   pauseIDs,
-		Compacted:  int64(len(pauseIDs)) < totalCount,
 	}, nil
 }
 
@@ -151,6 +150,5 @@ func (d *debugAPI) BlockDeleted(ctx context.Context, req *pb.BlockDeletedRequest
 		BlockId:    req.GetBlockId(),
 		TotalCount: totalCount,
 		DeletedIds: deletedIDs,
-		Compacted:  int64(len(deletedIDs)) < totalCount,
 	}, nil
 }
