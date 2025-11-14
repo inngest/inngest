@@ -18,21 +18,9 @@ func BSelectCommand() *cli.Command {
 		Aliases: []string{"bs"},
 		Usage:   "Select pause IDs from a block",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "event",
-				Aliases: []string{"ev"},
-				Usage:   "The event name for the pause index",
-			},
-			&cli.StringFlag{
-				Name:    "workspace-id",
-				Aliases: []string{"ws"},
-				Usage:   "The workspace id for the pause index",
-			},
-			&cli.StringFlag{
-				Name:    "block-id",
-				Aliases: []string{"bid"},
-				Usage:   "The block ID to select from (ULID)",
-			},
+			eventFlag,
+			workspaceFlag,
+			blockIDFlag,
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			eventName := cmd.String("event")

@@ -12,22 +12,33 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 )
 
+// Common flags shared across pause commands
+var (
+	eventFlag = &cli.StringFlag{
+		Name:    "event",
+		Aliases: []string{"ev"},
+		Usage:   "The event name for the pause index",
+	}
+	workspaceFlag = &cli.StringFlag{
+		Name:    "workspace-id",
+		Aliases: []string{"ws"},
+		Usage:   "The workspace id for the pause index",
+	}
+	blockIDFlag = &cli.StringFlag{
+		Name:    "block-id",
+		Aliases: []string{"bid"},
+		Usage:   "The block ID (ULID)",
+	}
+)
+
 func DescribeCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "describe",
 		Aliases: []string{"d"},
 		Usage:   "Get pause index block information",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "event",
-				Aliases: []string{"ev"},
-				Usage:   "The event name for the pause index",
-			},
-			&cli.StringFlag{
-				Name:    "workspace-id",
-				Aliases: []string{"ws"},
-				Usage:   "The workspace id for the pause index",
-			},
+			eventFlag,
+			workspaceFlag,
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			eventName := cmd.String("event")
