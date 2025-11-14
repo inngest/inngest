@@ -400,6 +400,16 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		routedInstanceID = route.InstanceID
 		// Assign the request lease to the worker for capacity tracking
 		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); err != nil {
+
+			// Check if this is a capacity error, this will happen when two in parallel
+			// checked for worker capacity earlier but now one got to this point first
+			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+					Message: "Assigned workers at capacity", // Assigned worker reached capacity before assigment
+				}
+			}
+
 			// if the instance ID is not set, we log the error and skip for now
 			span.RecordError(err)
 			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
@@ -408,14 +418,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				"gateway_id":  route.GatewayID.String(),
 			}))
 
-			// Check if this is a capacity error, this will happen when two in parallel
-			// checked for worker capacity earlier but now one got to this point first
-			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
-				return nil, syscode.Error{
-					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-					Message: "Assigned worker reached capacity before assigment",
-				}
-			}
 		}
 
 		// Trace the request lease assignment
@@ -538,7 +540,7 @@ func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.Stat
 
 	// if the instance ID is not set, we need to return an error
 	if instanceID == "" {
-		l.ReportError(state.ErrNoInstanceIDFound, message)
+		l.Info(fmt.Sprintf("%s: %s", state.ErrNoInstanceIDFound.Error(), message))
 		return
 	}
 
