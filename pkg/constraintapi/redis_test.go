@@ -184,6 +184,11 @@ func TestRedisCapacityManager(t *testing.T) {
 
 		// TODO: Verify all respective keys have been updated
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
-		require.Len(t, r.Keys(), 0, r.Dump())
+		keys := r.Keys()
+		require.Len(t, keys, 4, r.Dump())
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "release-test"))
 	})
 }
