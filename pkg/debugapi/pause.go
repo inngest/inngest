@@ -21,12 +21,12 @@ func (d *debugAPI) GetPause(ctx context.Context, req *pb.PauseRequest) (*pb.Paus
 
 		wId, err := uuid.Parse(req.WorkspaceId)
 		if err != nil {
-			return nil, status.Error(codes.Unknown, fmt.Errorf("error parsing workspace-id, needs UUID", err).Error())
+			return nil, status.Error(codes.Unknown, fmt.Errorf("error parsing workspace-id, needs UUID: %w", err).Error())
 		}
 
 		pID, err := uuid.Parse(req.ItemId)
 		if err != nil {
-			return nil, status.Error(codes.Unknown, fmt.Errorf("error parsing pause id, needs UUID", err).Error())
+			return nil, status.Error(codes.Unknown, fmt.Errorf("error parsing pause id, needs UUID: %w", err).Error())
 		}
 		index := pauses.Index{EventName: req.EventName, WorkspaceID: wId}
 		pause, err := d.pm.PauseByID(ctx, index, pID)

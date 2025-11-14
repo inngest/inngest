@@ -209,3 +209,19 @@ func (m *mockBlockReader) PauseByID(ctx context.Context, index Index, pauseID uu
 	}
 	return nil, nil
 }
+
+func (m *mockBlockReader) GetBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error) {
+	return nil, nil // Not needed for this test
+}
+
+func (m *mockBlockReader) GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error) {
+	return 0, nil // Not needed for this test
+}
+
+func (m *mockBlockReader) GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	return nil, 0, nil // Not needed for this test
+}
+
+func (m *mockBlockReader) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	return nil, 0, nil // Not needed for this test
+}
