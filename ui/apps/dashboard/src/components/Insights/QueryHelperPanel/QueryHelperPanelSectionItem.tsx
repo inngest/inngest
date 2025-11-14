@@ -6,7 +6,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/react';
+import { RiCloseLargeLine, RiCodeBlock, RiHistoryLine, RiSaveLine } from '@remixicon/react';
 
 import type { QuerySnapshot } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
@@ -16,7 +16,7 @@ interface QueryHelperPanelSectionItemProps {
   onQueryDelete: (queryId: string) => void;
   onQuerySelect: (query: InsightsQueryStatement | QuerySnapshot) => void;
   query: InsightsQueryStatement | QuerySnapshot;
-  sectionType: 'history' | 'saved';
+  sectionType: 'history' | 'saved' | 'shared';
 }
 
 export function QueryHelperPanelSectionItem({
@@ -32,9 +32,11 @@ export function QueryHelperPanelSectionItem({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const displayText = query.name;
-  const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
+  const Icon =
+    sectionType === 'history' ? RiHistoryLine : sectionType === 'saved' ? RiSaveLine : RiCodeBlock;
 
-  const isActiveTab = sectionType === 'saved' && activeSavedQueryId === query.id;
+  const isActiveTab =
+    (sectionType === 'saved' || sectionType === 'shared') && activeSavedQueryId === query.id;
 
   useEffect(() => {
     const el = textRef.current;
@@ -75,7 +77,7 @@ export function QueryHelperPanelSectionItem({
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
 
-                if (sectionType === 'saved') setShowDeleteModal(true);
+                if (sectionType === 'saved' || sectionType === 'shared') setShowDeleteModal(true);
                 else onQueryDelete(query.id);
               }}
               size="small"
