@@ -197,8 +197,7 @@ message CapacityExtendLeaseRequest {
   string account_id = 2;
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
-  string lease_idempotency_key = 5;
-  MigrationIdentifier migration = 6;
+  MigrationIdentifier migration = 5;
 }
 
 message CapacityExtendLeaseResponse {
@@ -209,8 +208,7 @@ message CapacityReleaseRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string lease_id = 3;
-  string lease_idempotency_key = 4;
-  MigrationIdentifier migration = 5;
+  MigrationIdentifier migration = 4;
 }
 
 message CapacityReleaseResponse {

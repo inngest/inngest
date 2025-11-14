@@ -68,17 +68,17 @@ local ARGV = ARGV
 local keyOperationIdempotency = KEYS[1]
 local keyScavengerShard = KEYS[2]
 local keyAccountLeases = KEYS[3]
-local keyLeaseDetails = KEYS[4]
+local keyOldLeaseDetails = KEYS[4]
+local keyNewLeaseDetails = KEYS[4]
 
 local keyPrefix = ARGV[1]
 local accountID = ARGV[2]
-local leaseIdempotencyKey = ARGV[3]
-local currentLeaseID = ARGV[4]
-local newLeaseID = ARGV[5]
-local nowMS = tonumber(ARGV[6]) --[[@as integer]]
-local leaseExpiryMS = tonumber(ARGV[7])
-local operationIdempotencyTTL = tonumber(ARGV[8])--[[@as integer]]
-local enableDebugLogs = tonumber(ARGV[9]) == 1
+local currentLeaseID = ARGV[3]
+local newLeaseID = ARGV[4]
+local nowMS = tonumber(ARGV[5]) --[[@as integer]]
+local leaseExpiryMS = tonumber(ARGV[6])
+local operationIdempotencyTTL = tonumber(ARGV[7])--[[@as integer]]
+local enableDebugLogs = tonumber(ARGV[8]) == 1
 
 ---@type string[]
 local debugLogs = {}
@@ -98,19 +98,26 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 
--- Check if lease details still exist
-local keyCurrentLeaseID = string.format("%s:lid", keyLeaseDetails)
-local keyLeaseOperationIdempotencyKey = string.format("%s:oik", keyLeaseDetails)
-local leaseDetails = call("MGET", keyCurrentLeaseID, keyLeaseOperationIdempotencyKey)
-if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
+-- Check if lease already expired
+if decode_ulid_time(currentLeaseID) < nowMS then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
 
-local leaseDetailsCurrentLeaseID = leaseDetails[1]
+-- Check if lease details still exist
+local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "oik", "rid")
+if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
+	local res = {}
+	res["s"] = 2
+	res["d"] = debugLogs
+	return cjson.encode(res)
+end
+
+local leaseIdempotencyKey = leaseDetails[1]
 local leaseOperationIdempotencyKey = leaseDetails[2]
+local leaseRunID = leaseDetails[3]
 
 -- Request state must still exist
 local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, leaseOperationIdempotencyKey)
@@ -119,30 +126,13 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	debug(keyRequestState)
 
 	local res = {}
-	res["s"] = 2
+	res["s"] = 3
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(requestStateStr)
-
--- Check if current lease still matches
-local storedLeaseID = leaseDetailsCurrentLeaseID
-if storedLeaseID == nil or storedLeaseID == false or storedLeaseID ~= currentLeaseID then
-	local res = {}
-	res["s"] = 3
-	res["d"] = debugLogs
-	return cjson.encode(res)
-end
-
--- Check if lease already expired
-if decode_ulid_time(storedLeaseID) < nowMS then
-	local res = {}
-	res["s"] = 4
-	res["d"] = debugLogs
-	return cjson.encode(res)
-end
 
 -- At this point, we know that
 -- - The request state still exists and
@@ -153,17 +143,19 @@ end
 local constraints = requestDetails.s
 
 for _, value in ipairs(constraints) do
-	-- for concurrency constraints
+	-- for concurrency constraints, update score to new expiry
 	if value.k == 2 then
 		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
 	end
 end
 
--- update current leaseID to new lease ID
-call("SET", string.format("%s:lid", keyLeaseDetails), newLeaseID)
+-- update lease details
+call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", leaseOperationIdempotencyKey)
+call("DEL", keyOldLeaseDetails)
 
 -- update account leases for scavenger (do not clean up active lease)
-call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), leaseIdempotencyKey)
+call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), newLeaseID)
+call("ZREM", keyAccountLeases, currentLeaseID)
 
 -- Update scavenger shard score (do not process account too early)
 local accountScore = call("ZSCORE", keyScavengerShard, accountID)
@@ -174,7 +166,7 @@ end
 ---@type { s: integer, lid: string }
 local res = {}
 
-res["s"] = 5
+res["s"] = 4
 res["d"] = debugLogs
 res["lid"] = newLeaseID
 

@@ -27,12 +27,9 @@ if count > limit then
 	offset = math.random((count - limit) + 1) - 1
 end
 
-local leaseIdempotencyKeys =
-	call("ZRANGE", keyAccountLeases, "-inf", tostring(nowMS), "BYSCORE", "LIMIT", offset, limit)
-if #leaseIdempotencyKeys == 0 then
+local leaseIDs = call("ZRANGE", keyAccountLeases, "-inf", tostring(nowMS), "BYSCORE", "LIMIT", offset, limit)
+if #leaseIDs == 0 then
 	return {}
 end
 
-local potentiallyMissingQueueItems = call("MGET", keyAccountLeases, unpack(leaseIdempotencyKeys))
-
-return { potentiallyMissingQueueItems, leaseIdempotencyKeys }
+return { count, leaseIDs }
