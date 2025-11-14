@@ -105,6 +105,7 @@ const documents = {
     "\n  query InsightsSavedQueries {\n    account {\n      insightsQueries {\n        id\n        creator\n        lastEditor\n        name\n        shared\n        sql\n        createdAt\n        updatedAt\n      }\n    }\n  }\n": types.InsightsSavedQueriesDocument,
     "\n  mutation CreateInsightsQuery($input: NewInsightsQuery!) {\n    createInsightsQuery(input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": types.CreateInsightsQueryDocument,
     "\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n": types.RemoveInsightsQueryDocument,
+    "\n  mutation ShareInsightsQuery($id: ULID!) {\n    shareInsightsQuery(id: $id) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": types.ShareInsightsQueryDocument,
     "\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": types.UpdateInsightsQueryDocument,
     "\n  query MetricsLookups($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      apps {\n        externalID\n        id\n        name\n        isArchived\n      }\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          name\n          id\n          slug\n        }\n        page {\n          page\n          totalPages\n          perPage\n        }\n      }\n    }\n  }\n": types.MetricsLookupsDocument,
     "\n  query AccountConcurrencyLookup {\n    account {\n      marketplace\n      entitlements {\n        concurrency {\n          limit\n        }\n      }\n    }\n  }\n": types.AccountConcurrencyLookupDocument,
@@ -535,6 +536,10 @@ export function graphql(source: "\n  mutation CreateInsightsQuery($input: NewIns
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n"): (typeof documents)["\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ShareInsightsQuery($id: ULID!) {\n    shareInsightsQuery(id: $id) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n"): (typeof documents)["\n  mutation ShareInsightsQuery($id: ULID!) {\n    shareInsightsQuery(id: $id) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

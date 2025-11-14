@@ -25,6 +25,7 @@ interface StoredQueriesContextValue {
   };
   saveQuery: (tab: Tab) => Promise<void>;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
+  shareQuery: (queryId: string) => void;
 }
 
 const StoredQueriesContext = createContext<undefined | StoredQueriesContextValue>(undefined);
@@ -43,6 +44,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
     savedQueriesError,
     isSavedQueriesFetching,
     saveQuery: beSaveQuery,
+    shareQuery: beShareQuery,
     updateQuery: beUpdateQuery,
     refetchSavedQueries,
   } = useInsightsSavedQueries();
@@ -101,6 +103,22 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
     [beDeleteQuery, refetchSavedQueries, tabManagerActions]
   );
 
+  const shareQuery = useCallback(
+    async (queryId: string) => {
+      const result = await beShareQuery({ id: queryId });
+      if (result.ok) {
+        // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
+        // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
+        // that we have a consistent type name to match on regardless of existing saved queries.
+        refetchSavedQueries();
+        toast.success('Query shared with your organization');
+      } else {
+        toast.error('Failed to share query with your organization');
+      }
+    },
+    [beShareQuery, refetchSavedQueries]
+  );
+
   const deleteQuerySnapshot = useCallback((snapshotId: string) => {
     setQuerySnapshots((prev) => prev.filter((s) => s.id !== snapshotId));
   }, []);
@@ -128,6 +146,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         deleteQuery,
         deleteQuerySnapshot,
         isSavedQueriesFetching,
+        shareQuery,
         queries,
         querySnapshots: orderedQuerySnapshots,
         saveQuery,
