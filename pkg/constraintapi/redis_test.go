@@ -145,7 +145,7 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.NotNil(t, resp)
 		t.Log(resp.internalDebugState.Debug)
 
-		require.Equal(t, 5, resp.internalDebugState.Status, r.Dump())
+		require.Equal(t, 4, resp.internalDebugState.Status, r.Dump())
 		require.NotEqual(t, ulid.Zero, resp.internalDebugState.LeaseID)
 
 		require.NotNil(t, resp.LeaseID)
@@ -163,6 +163,8 @@ func TestRedisCapacityManager(t *testing.T) {
 		r.FastForward(2 * time.Second)
 		r.SetTime(clock.Now())
 
+		t.Log(r.Dump())
+
 		opIdempotencyKey := "release-test"
 
 		resp, err := cm.Release(ctx, &CapacityReleaseRequest{
@@ -177,10 +179,11 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.NotNil(t, resp)
 		t.Log(resp.internalDebugState.Debug)
 
-		require.Equal(t, 5, resp.internalDebugState.Status, r.Dump())
+		require.Equal(t, 3, resp.internalDebugState.Status, r.Dump())
 		require.Equal(t, 0, resp.internalDebugState.Remaining)
 
 		// TODO: Verify all respective keys have been updated
+		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
 		require.Len(t, r.Keys(), 0, r.Dump())
 	})
 }

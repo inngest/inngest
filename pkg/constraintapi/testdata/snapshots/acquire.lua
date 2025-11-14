@@ -30,6 +30,35 @@ local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
 	return count
 end
+local function toInteger(value)
+	return math.floor(value + 0.5) 
+end
+local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
+	local max_reasonable_tat = now_ns + period_ns + delay_variation_tolerance
+	local min_reasonable_tat = now_ns - period_ns 
+	if tat > max_reasonable_tat then
+		return toInteger(max_reasonable_tat)
+	elseif tat < min_reasonable_tat then
+		return toInteger(now_ns) 
+	else
+		return toInteger(tat)
+	end
+end
+local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+	local tat = redis.call("GET", key)
+	if not tat then
+		return now_ns
+	end
+	local raw_tat = tonumber(tat)
+	if not raw_tat then
+		return now_ns 
+	end
+	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
+	if raw_tat ~= clamped_tat then
+		redis.call("SET", key, clamped_tat, "KEEPTTL")
+	end
+	return clamped_tat
+end
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	if limit == 0 then
 		return { 0, now_ns + period_ns }
@@ -37,12 +66,7 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local emission_interval = period_ns / limit
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 	local increment = 1 * emission_interval
 	local new_tat
 	if now_ns > tat then
@@ -64,18 +88,14 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		return { remaining, 0 }
 	end
 end
-local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
+local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 	if limit == 0 then
-		debug("quitting early")
 		return
 	end
 	local emission_interval = period_ns / limit
-	local tat = call("GET", key)
-	if not tat then
-		tat = now_ns
-	else
-		tat = tonumber(tat)
-	end
+	local total_capacity = (burst or 0) + 1
+	local delay_variation_tolerance = emission_interval * total_capacity
+	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
 	local increment = math.max(capacity, 1) * emission_interval
 	local new_tat
 	if now_ns > tat then
@@ -84,10 +104,10 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity)
 		new_tat = tat + increment
 	end
 	if capacity > 0 then
-		local ttl_ns = new_tat - now_ns
+		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
+		local ttl_ns = clamped_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) 
-		call("SET", key, new_tat, "EX", ttl_seconds)
-		debug("setting rl", key, tostring(ttl_seconds))
+		redis.call("SET", key, clamped_tat, "EX", ttl_seconds)
 	end
 end
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
@@ -207,9 +227,9 @@ for i = 1, granted, 1 do
 			throttleUpdate(value.t.h, nowMS, value.t.p, value.t.l, 1)
 		end
 	end
-	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, leaseIdempotencyKey)
-	call("HSET", keyLeaseDetails, "lid", initialLeaseID, "rid", leaseRunID, "oik", operationIdempotencyKey)
-	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), leaseIdempotencyKey)
+	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
+	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", operationIdempotencyKey)
+	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
 	leaseObject["lik"] = leaseIdempotencyKey

@@ -50,6 +50,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -470,6 +473,9 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
