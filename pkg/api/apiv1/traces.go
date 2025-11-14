@@ -207,7 +207,7 @@ func (a router) commitSpan(ctx context.Context, auth apiv1auth.V1Auth, res *reso
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
-	run, err := a.opts.FunctionRunReader.GetFunctionRun(ctx, auth.AccountID(), auth.WorkspaceID(), runID)
+	run, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	if err != nil {
 		return fmt.Errorf("function run not found: %w", err)
 	}

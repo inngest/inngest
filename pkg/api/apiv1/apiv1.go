@@ -35,8 +35,6 @@ type Opts struct {
 	Queue queue.Queue
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
-	// FunctionRunReader reads function runs, history, etc. from backing storage
-	FunctionRunReader cqrs.APIV1FunctionRunReader
 	// JobQueueReader reads information around a function run's job queues.
 	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
