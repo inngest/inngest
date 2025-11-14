@@ -1823,14 +1823,19 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 				Error:   fmt.Sprintf("%s: %s", serr.Code, serr.Message),
 				Name:    serr.Code,
 				Message: serr.Message,
-			}.Serialize(execution.StateErrorKey)
-			response.Output = gracefulErr
-			response.Err = &serr.Code
+			}
 
 			// check for connect worker capacity errors after updating the UI response
 			if serr.Code == syscode.CodeConnectAllWorkersAtCapacity || serr.Code == syscode.CodeConnectRequestAssignWorkerReachedCapacity {
 				err = queue.AlwaysRetryError(state.ErrConnectWorkerCapacity)
+				gracefulErr.Message = "All workers are at capacity"
+				gracefulErr.Stack = fmt.Sprintf("%s\n%s\n%s", serr.Message, "This is a retryable error", "The executor will retry again")
 			}
+
+			// serialize error
+			gracefulErrSerialized := gracefulErr.Serialize(execution.StateErrorKey)
+			response.Output = gracefulErrSerialized
+			response.Err = &serr.Code
 		} else {
 			// Set the response error if it wasn't set, or if Execute had an internal error.
 			// This ensures that we only ever need to check resp.Err to handle errors.
