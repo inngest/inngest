@@ -1173,10 +1173,9 @@ func (q *queue) process(
 				operationIdempotencyKey := capacityLeaseID.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
-					AccountID:           p.AccountID,
-					IdempotencyKey:      operationIdempotencyKey,
-					LeaseID:             *capacityLeaseID,
-					LeaseIdempotencyKey: qi.ID,
+					AccountID:      p.AccountID,
+					IdempotencyKey: operationIdempotencyKey,
+					LeaseID:        *capacityLeaseID,
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
 						QueueShard:  q.primaryQueueShard.Name,
@@ -1351,10 +1350,9 @@ func (q *queue) process(
 	if capacityLeaseID != nil {
 		defer func() {
 			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
-				AccountID:           p.AccountID,
-				IdempotencyKey:      qi.ID,
-				LeaseID:             *capacityLeaseID,
-				LeaseIdempotencyKey: qi.ID,
+				AccountID:      p.AccountID,
+				IdempotencyKey: qi.ID,
+				LeaseID:        *capacityLeaseID,
 				Migration: constraintapi.MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  q.primaryQueueShard.Name,

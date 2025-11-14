@@ -103,16 +103,16 @@ func TestRedisCapacityManager(t *testing.T) {
 		// RetryAfter should not be set
 		require.Zero(t, resp.RetryAfter)
 
+		leaseID = resp.Leases[0].LeaseID
+
 		// TODO: Verify all keys have been created as expected + TTLs set
 		require.Len(t, r.Keys(), 7)
 		require.True(t, r.Exists("{rl}:test-value")) // rate limit state exists
 		require.True(t, r.Exists(cm.keyScavengerShard(cm.rateLimitKeyPrefix, 0)))
 		require.True(t, r.Exists(cm.keyAccountLeases(cm.rateLimitKeyPrefix, accountID)))
-		require.True(t, r.Exists(cm.keyLeaseDetails(cm.rateLimitKeyPrefix, accountID, leaseIdempotencyKey)))
+		require.True(t, r.Exists(cm.keyLeaseDetails(cm.rateLimitKeyPrefix, accountID, leaseID)))
 		require.True(t, r.Exists(cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, leaseIdempotencyKey)))
 		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", opIdempotencyKey)))
-
-		leaseID = resp.Leases[0].LeaseID
 	})
 
 	t.Run("Check", func(t *testing.T) {
@@ -133,11 +133,10 @@ func TestRedisCapacityManager(t *testing.T) {
 		opIdempotencyKey := "extend-test"
 
 		resp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{
-			IdempotencyKey:      opIdempotencyKey,
-			LeaseIdempotencyKey: leaseIdempotencyKey,
-			Duration:            5 * time.Second,
-			AccountID:           accountID,
-			LeaseID:             leaseID,
+			IdempotencyKey: opIdempotencyKey,
+			Duration:       5 * time.Second,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
 			Migration: MigrationIdentifier{
 				IsRateLimit: true,
 			},
@@ -167,10 +166,9 @@ func TestRedisCapacityManager(t *testing.T) {
 		opIdempotencyKey := "release-test"
 
 		resp, err := cm.Release(ctx, &CapacityReleaseRequest{
-			IdempotencyKey:      opIdempotencyKey,
-			LeaseIdempotencyKey: leaseIdempotencyKey,
-			AccountID:           accountID,
-			LeaseID:             leaseID,
+			IdempotencyKey: opIdempotencyKey,
+			AccountID:      accountID,
+			LeaseID:        leaseID,
 			Migration: MigrationIdentifier{
 				IsRateLimit: true,
 			},
