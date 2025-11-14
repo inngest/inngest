@@ -538,6 +538,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -568,6 +571,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -596,6 +602,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -626,6 +635,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: true,
@@ -658,6 +670,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false, // Note: validation only checks for empty string, not whitespace
 		},
@@ -687,6 +702,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceNewRuns,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -718,6 +736,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationScheduleRun,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -748,6 +769,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationPartitionLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -777,6 +801,9 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceAPI,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -839,6 +866,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -868,6 +898,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -899,6 +932,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -928,6 +964,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false, // Validation doesn't check key length
@@ -959,6 +998,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -988,6 +1030,9 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1050,6 +1095,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -1079,6 +1127,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
 				},
 			},
 			wantErr: false,
@@ -1110,6 +1161,9 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
 			},
 			wantErr: false,
 		},
@@ -1140,6 +1194,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 	tests := []struct {
 		name        string
 		constraints []ConstraintItem
+		mi          MigrationIdentifier
 		wantErr     bool
 		errMsgs     []string
 	}{
@@ -1153,6 +1208,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
 			wantErr: false,
 		},
 		{
@@ -1160,12 +1218,18 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindThrottle},
 			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
 			wantErr: false,
 		},
 		{
 			name: "valid - only rate limit constraint",
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindRateLimit},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
 			},
 			wantErr: false,
 		},
@@ -1179,6 +1243,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 				{Kind: ConstraintKindThrottle},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
 			},
 			wantErr: false,
 		},
@@ -1198,6 +1265,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
 			wantErr: false,
 		},
 		{
@@ -1206,6 +1276,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				{Kind: ConstraintKindThrottle},
 				{Kind: ConstraintKindThrottle},
 			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
 			wantErr: false,
 		},
 		{
@@ -1213,6 +1286,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindRateLimit},
 				{Kind: ConstraintKindRateLimit},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
 			},
 			wantErr: false,
 		},
@@ -1227,6 +1303,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
+			mi: MigrationIdentifier{
+				QueueShard:  "test",
+				IsRateLimit: true,
+			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
 		},
@@ -1235,6 +1315,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindRateLimit},
 				{Kind: ConstraintKindThrottle},
+			},
+			mi: MigrationIdentifier{
+				QueueShard:  "test",
+				IsRateLimit: true,
 			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
@@ -1250,6 +1334,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				},
 				{Kind: ConstraintKindRateLimit},
 			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+				QueueShard:  "test",
+			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
 		},
@@ -1258,6 +1346,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			constraints: []ConstraintItem{
 				{Kind: ConstraintKindThrottle},
 				{Kind: ConstraintKindRateLimit},
+			},
+			mi: MigrationIdentifier{
+				QueueShard:  "test",
+				IsRateLimit: true,
 			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
@@ -1273,6 +1365,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				},
 				{Kind: ConstraintKindThrottle},
 				{Kind: ConstraintKindRateLimit},
+			},
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+				QueueShard:  "test",
 			},
 			wantErr: true,
 			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
@@ -1315,6 +1411,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,
 				},
+				Migration: tt.mi,
 			}
 
 			err := request.Valid()
@@ -1577,7 +1674,6 @@ func TestCapacityExtendLeaseRequestValid(t *testing.T) {
 			errMsgs: []string{
 				"missing idempotency key",
 				"missing accountID",
-				"missing lease idempotency key",
 				"missing lease ID",
 				"invalid duration: must be positive",
 			},
