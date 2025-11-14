@@ -414,24 +414,13 @@ for i = 1, granted, 1 do
 		end
 	end
 
-	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, leaseIdempotencyKey)
+	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
 
-	local keyCurrentLeaseID = string.format("%s:lid", keyLeaseDetails)
-
-	-- Store lease details (current lease ID, associated run ID, operation idempotency key for request details)
-	-- NOTE: we do not use a hash to make lookups during scavenger peeks easier (single MGET)
-	call(
-		"MSET",
-		keyCurrentLeaseID,
-		initialLeaseID,
-		string.format("%s:rid", keyLeaseDetails),
-		leaseRunID,
-		string.format("%s:oik", keyLeaseDetails),
-		operationIdempotencyKey
-	)
+	-- Store lease details (lease idempotency key, associated run ID, operation idempotency key for request details)
+	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", operationIdempotencyKey)
 
 	-- Add lease to scavenger set of account leases
-	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), leaseIdempotencyKey)
+	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 
 	---@type { lid: string, lik: string }
 	local leaseObject = {}

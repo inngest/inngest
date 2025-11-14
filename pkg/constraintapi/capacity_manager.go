@@ -180,8 +180,6 @@ type CapacityExtendLeaseRequest struct {
 
 	AccountID uuid.UUID
 
-	// LeaseIdempotencyKey is the idempotency key for the lease
-	LeaseIdempotencyKey string
 	// LeaseID is the current lease ID
 	LeaseID ulid.ULID
 
@@ -202,9 +200,6 @@ type CapacityReleaseRequest struct {
 	IdempotencyKey string
 
 	AccountID uuid.UUID
-
-	// LeaseIdempotencyKey is the idempotency key for the lease
-	LeaseIdempotencyKey string
 
 	// LeaseID is the current lease ID
 	LeaseID ulid.ULID

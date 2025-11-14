@@ -20,10 +20,9 @@ local keyLeaseDetails = KEYS[4]
 
 local keyPrefix = ARGV[1]
 local accountID = ARGV[2]
-local leaseIdempotencyKey = ARGV[3]
-local currentLeaseID = ARGV[4]
-local operationIdempotencyTTL = tonumber(ARGV[5])--[[@as integer]]
-local enableDebugLogs = tonumber(ARGV[6]) == 1
+local currentLeaseID = ARGV[3]
+local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
+local enableDebugLogs = tonumber(ARGV[5]) == 1
 
 ---@type string[]
 local debugLogs = {}
@@ -44,9 +43,7 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 end
 
 -- Check if lease details still exist
-local keyCurrentLeaseID = string.format("%s:lid", keyLeaseDetails)
-local keyLeaseOperationIdempotencyKey = string.format("%s:oik", keyLeaseDetails)
-local leaseDetails = call("MGET", keyCurrentLeaseID, keyLeaseOperationIdempotencyKey)
+local leaseDetails = call("HMGET", keyLeaseDetails, "lik", "oik", "rid")
 if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
 	local res = {}
 	res["s"] = 1
@@ -54,8 +51,9 @@ if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or lea
 	return cjson.encode(res)
 end
 
-local leaseDetailsCurrentLeaseID = leaseDetails[1]
+local leaseIdempotencyKey = leaseDetails[1]
 local leaseOperationIdempotencyKey = leaseDetails[2]
+local leaseRunID = leaseDetails[3]
 
 -- Request state must still exist
 local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, leaseOperationIdempotencyKey)
@@ -71,15 +69,6 @@ end
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(requestStateStr)
-
--- Check if current lease still matches
-local storedLeaseID = leaseDetailsCurrentLeaseID
-if storedLeaseID == nil or storedLeaseID == false or storedLeaseID ~= currentLeaseID then
-	local res = {}
-	res["s"] = 3
-	res["d"] = debugLogs
-	return cjson.encode(res)
-end
 
 -- At this point, we know that
 -- - The request state still exists and
@@ -97,15 +86,10 @@ for _, value in ipairs(constraints) do
 end
 
 -- remove lease details
-call(
-	"DEL",
-	string.format("%s:lid", keyLeaseDetails),
-	string.format("%s:rid", keyLeaseDetails),
-	string.format("%s:oik", keyLeaseDetails)
-)
+call("DEL", keyLeaseDetails)
 
 -- remove from account leases
-call("ZREM", keyAccountLeases, leaseIdempotencyKey)
+call("ZREM", keyAccountLeases, currentLeaseID)
 
 local earliestScore = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if earliestScore == nil or earliestScore == false or earliestScore[2] == nil then
@@ -125,7 +109,7 @@ end
 ---@type { s: integer, lid: string, r: integer }
 local res = {}
 
-res["s"] = 5
+res["s"] = 3
 res["d"] = debugLogs
 res["r"] = requestDetails.a
 

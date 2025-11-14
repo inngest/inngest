@@ -128,9 +128,9 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, acco
 	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, idempotencyKey)
 }
 
-// keyLeaseDetails returns the key to the hash including the current lease ID, lease run ID, and operation idempotency key
-func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUID, leaseIdempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseIdempotencyKey)
+// keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
+func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUID, leaseID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseID)
 }
 
 // clientAndPrefix returns the Redis client and Lua key prefix for the first stage of the Constraint API.
@@ -427,11 +427,18 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	// TODO: Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := 0
 
+	leaseExpiry := now.Add(req.Duration)
+	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "failed to generate new lease ID: %w", err)
+	}
+
 	keys := []string{
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
-		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseIdempotencyKey),
+		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
+		r.keyLeaseDetails(keyPrefix, req.AccountID, newLeaseID),
 	}
 
 	enableDebugLogsVal := "0"
@@ -439,16 +446,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		enableDebugLogsVal = "1"
 	}
 
-	leaseExpiry := now.Add(req.Duration)
-	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "failed to generate new lease ID: %w", err)
-	}
-
 	args, err := strSlice([]any{
 		keyPrefix,
 		req.AccountID,
-		req.LeaseIdempotencyKey,
 		req.LeaseID.String(),
 		newLeaseID.String(),
 		now.UnixMilli(), // current time in milliseconds for throttle
@@ -479,10 +479,10 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	switch parsedResponse.Status {
-	case 1, 2, 3, 4:
+	case 1, 2, 3:
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
-	case 5:
+	case 4:
 		// TODO: track success
 		return res, nil
 	default:
@@ -520,7 +520,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
-		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseIdempotencyKey),
+		r.keyLeaseDetails(keyPrefix, req.AccountID, req.LeaseID),
 	}
 
 	enableDebugLogsVal := "0"
@@ -531,7 +531,6 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	args, err := strSlice([]any{
 		keyPrefix,
 		req.AccountID,
-		req.LeaseIdempotencyKey,
 		req.LeaseID.String(),
 		int(OperationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
@@ -556,10 +555,10 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	}
 
 	switch parsedResponse.Status {
-	case 1, 2, 3, 4:
+	case 1, 2:
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
-	case 5:
+	case 3:
 		// TODO: track success
 		return res, nil
 	default:
