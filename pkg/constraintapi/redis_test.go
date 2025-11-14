@@ -147,8 +147,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.Equal(t, 11, resp.AvailableCapacity)
 		require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
 		require.Equal(t, 120, resp.Usage[0].Limit)
-		// TODO: Figure out why capacity calculation is buggy
-		require.Equal(t, 0, resp.Usage[0].Used)
+		require.Equal(t, 109, resp.Usage[0].Used)
 	})
 
 	t.Run("Extend", func(t *testing.T) {
@@ -346,6 +345,8 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 
 	var checkHash string
 	t.Run("Check", func(t *testing.T) {
+		enableDebugLogs = true
+
 		req := &CapacityCheckRequest{
 			AccountID:     accountID,
 			EnvID:         envID,
@@ -353,11 +354,11 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			Configuration: config,
 			Constraints:   constraints,
 			Migration: MigrationIdentifier{
-				IsRateLimit: true,
+				QueueShard: "test",
 			},
 		}
 
-		_, _, hash, err := buildCheckRequestData(req, cm.rateLimitKeyPrefix)
+		_, _, hash, err := buildCheckRequestData(req, cm.queueStateKeyPrefix)
 		require.NoError(t, err)
 		require.NotZero(t, hash)
 		checkHash = hash
@@ -367,6 +368,15 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		require.NoError(t, internalErr)
 		require.NotNil(t, resp)
 
+		t.Log(resp.internalDebugState.Debug)
+
+		mem, err := r.ZMembers(constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID))
+		require.NoError(t, err)
+		require.Len(t, mem, 1)
+		mem, err = r.ZMembers(constraints[1].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID))
+		require.NoError(t, err)
+		require.Len(t, mem, 1)
+
 		require.Equal(t, 4, resp.AvailableCapacity, r.Dump())
 		require.Equal(t, ConstraintKindConcurrency, resp.LimitingConstraints[0].Kind)
 		require.Equal(t, enums.ConcurrencyScopeAccount, resp.LimitingConstraints[0].Concurrency.Scope)
@@ -374,7 +384,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		require.Equal(t, 20, resp.Usage[0].Limit)
 		require.Equal(t, 1, resp.Usage[0].Used)
 		require.Equal(t, 5, resp.Usage[1].Limit)
-		require.Equal(t, 1, resp.Usage[2].Used)
+		require.Equal(t, 1, resp.Usage[1].Used)
 	})
 
 	t.Run("Extend", func(t *testing.T) {
@@ -393,7 +403,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			AccountID:      accountID,
 			LeaseID:        leaseID,
 			Migration: MigrationIdentifier{
-				IsRateLimit: true,
+				QueueShard: "test",
 			},
 		})
 		require.NoError(t, err)
@@ -427,7 +437,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			AccountID:      accountID,
 			LeaseID:        leaseID,
 			Migration: MigrationIdentifier{
-				IsRateLimit: true,
+				QueueShard: "test",
 			},
 		})
 		require.NoError(t, err)
@@ -441,10 +451,10 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
 		keys := r.Keys()
 		require.Len(t, keys, 5, r.Dump())
-		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, "event1"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "event1"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "ext", "extend-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "rel", "release-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "chk", checkHash))
+		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "event1"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "chk", checkHash))
 	})
 }
