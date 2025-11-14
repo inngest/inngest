@@ -686,8 +686,10 @@ func IncrRateLimitUsage(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "rate_limit_usage",
 		Description: "Total number of calls to the rate limiter",
+		Tags:        opts.Tags,
 	})
 }
+
 func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
