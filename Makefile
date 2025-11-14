@@ -1,10 +1,10 @@
 .PHONY: dev
-dev: docs
+dev: submodules docs
 	goreleaser build --single-target --snapshot --clean
 
 # specifically for tests
 .PHONY: run
-run:
+run: submodules
 	TEST_MODE=true LOG_LEVEL=info DEBUG=1 go run ./cmd dev --tick=50 --no-poll --verbose $(PARAMS)
 
 # Start with debug mode in Delve
@@ -91,6 +91,11 @@ build: docs
 .PHONY: gql
 gql:
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
+
+.PHONY: submodules
+submodules:
+	@echo "Initializing submodules..."
+	@git submodule update --init --recursive
 
 .PHONY: clean
 clean:
