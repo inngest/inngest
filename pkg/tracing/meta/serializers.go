@@ -228,6 +228,31 @@ func StringAttr(key string) attr[*string] {
 	}
 }
 
+func TruncatedStringAttr(key string, length int) attr[*string] {
+	return attr[*string]{
+		key: withPrefix(key),
+		serialize: func(v *string) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			str := *v
+			if len(str) > length {
+				str = str[:length]
+			}
+
+			return attribute.String(withPrefix(key), str)
+		},
+		deserialize: func(v any) (*string, bool) {
+			s, ok := v.(string)
+			if ok && len(s) > length {
+				s = s[:length]
+			}
+			return &s, ok
+		},
+	}
+}
+
 func StringSliceAttr(key string) attr[*[]string] {
 	return attr[*[]string]{
 		key: withPrefix(key),
