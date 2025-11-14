@@ -540,7 +540,7 @@ func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.Stat
 
 	// if the instance ID is not set, we need to return an error
 	if instanceID == "" {
-		l.ReportError(state.ErrNoInstanceIDFound, message)
+		l.Info(fmt.Sprintf("%s: %s", state.ErrNoInstanceIDFound.Error(), message))
 		return
 	}
 
