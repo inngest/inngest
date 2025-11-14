@@ -70,6 +70,13 @@ type CapacityCheckResponse struct {
 
 	// Detailed constraint usage for requested constraints
 	Usage []ConstraintUsage
+
+	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
+	FairnessReduction int
+
+	RetryAfter time.Time
+
+	internalDebugState checkScriptResponse
 }
 
 type CapacityAcquireRequest struct {
@@ -168,6 +175,9 @@ type CapacityAcquireResponse struct {
 	// LimitingConstraints contains constraints that
 	// ended up reducing the number of leases from the expected Amount.
 	LimitingConstraints []ConstraintItem
+
+	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
+	FairnessReduction int
 
 	RetryAfter time.Time
 

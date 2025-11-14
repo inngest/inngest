@@ -3,6 +3,8 @@ package constraintapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -21,6 +23,7 @@ const (
 	// Depending on the operation, this should be low (Otherwise, Acquire may return an already expired lease)
 	// TODO: Figure out a reasonable operation idempotency TTL (maybe per-operation)
 	OperationIdempotencyTTL       = 5 * time.Second
+	CheckIdempotencyTTL           = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
 )
 
@@ -193,7 +196,7 @@ type redisRequestState struct {
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 }
 
-func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) *redisRequestState {
+func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisRequestState, []ConstraintItem) {
 	state := &redisRequestState{
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
@@ -227,7 +230,7 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) *redisRequ
 
 	state.SortedConstraints = serialized
 
-	return state
+	return state, constraints
 }
 
 type acquireScriptResponse struct {
@@ -283,7 +286,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState := buildRequestState(req, keyPrefix)
+	requestState, sortedConstraints := buildRequestState(req, keyPrefix)
 
 	// TODO: Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := 0
@@ -347,7 +350,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
 		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
-			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
+			limitingConstraints[i] = sortedConstraints[limitingConstraintIndex-1]
 		}
 	}
 
@@ -357,6 +360,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return &CapacityAcquireResponse{
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
+			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
 		}, nil
 
@@ -366,12 +370,66 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
 		}, nil
 
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
+}
+
+type checkRequestData struct {
+	EnvID      uuid.UUID `json:"e,omitempty"`
+	FunctionID uuid.UUID `json:"f,omitempty"`
+
+	// SortedConstraints represents the list of constraints
+	// included in the request sorted to execute in the expected
+	// order. Configuration limits are now embedded directly in each constraint.
+	SortedConstraints []SerializedConstraintItem `json:"s"`
+
+	// ConfigVersion represents the function version used for this request
+	ConfigVersion int `json:"cv,omitempty"`
+}
+
+func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (*checkRequestData, []ConstraintItem) {
+	state := &checkRequestData{
+		EnvID:         req.EnvID,
+		FunctionID:    req.FunctionID,
+		ConfigVersion: req.Configuration.FunctionVersion,
+	}
+
+	// Sort and serialize constraints with embedded configuration limits
+	constraints := req.Constraints
+	sortConstraints(constraints)
+
+	serialized := make([]SerializedConstraintItem, len(constraints))
+	for i := range constraints {
+		serialized[i] = constraints[i].ToSerializedConstraintItem(
+			req.Configuration,
+			req.AccountID,
+			req.EnvID,
+			req.FunctionID,
+			keyPrefix,
+		)
+	}
+
+	state.SortedConstraints = serialized
+
+	return state, constraints
+}
+
+type checkScriptResponse struct {
+	Status              int   `json:"s"`
+	AvailableCapacity   int   `json:"a"`
+	LimitingConstraints []int `json:"lc"`
+	ConstraintUsage     map[int]struct {
+		Usage int `json:"u"`
+		Limit int `json:"l"`
+	} `json:"cu"`
+	FairnessReduction int      `json:"fr"`
+	RetryAt           int      `json:"ra"`
+	Debug             []string `json:"d"`
 }
 
 // Check implements CapacityManager.
@@ -385,23 +443,93 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		return nil, nil, errs.Wrap(0, false, "failed to get client: %w", err)
 	}
 
-	keys := []string{
-		r.keyAccountLeases(keyPrefix, req.AccountID),
+	data, sortedConstraints := buildCheckRequestData(req, keyPrefix)
+
+	// NOTE: We fingerprint the query to apply basic response caching.
+	// As Check can be expensive, we don't want to run unnecessary queries
+	// that may impact lease and constraint enforcement operations.
+	var hash string
+	{
+		dataBytes, err := json.Marshal(data)
+		if err != nil {
+			return nil, nil, errs.Wrap(0, false, "could not marshal request: %w", err)
+		}
+
+		fingerprint := sha256.New()
+		_, err = fingerprint.Write(dataBytes)
+		if err != nil {
+			return nil, nil, errs.Wrap(0, false, "could not fingerprint query: %w", err)
+		}
+		hash = hex.EncodeToString(fingerprint.Sum(nil))
 	}
 
-	args, err := strSlice([]any{})
+	keys := []string{
+		r.keyAccountLeases(keyPrefix, req.AccountID),
+		r.keyOperationIdempotency(keyPrefix, req.AccountID, "chk", hash),
+	}
+
+	enableDebugLogsVal := "0"
+	if enableDebugLogs {
+		enableDebugLogsVal = "1"
+	}
+
+	now := r.clock.Now()
+
+	args, err := strSlice([]any{
+		data,
+		keyPrefix,
+		req.AccountID,
+		now.UnixMilli(),
+		now.UnixNano(),
+		CheckIdempotencyTTL.Seconds(),
+		enableDebugLogsVal,
+	})
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
-	status, err := scripts["check"].Exec(ctx, client, keys, args).AsInt64()
+	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
 	}
 
-	switch status {
+	parsedResponse := checkScriptResponse{}
+	err = json.Unmarshal(rawRes, &parsedResponse)
+	if err != nil {
+		return nil, nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+
+	var limitingConstraints []ConstraintItem
+	if len(parsedResponse.LimitingConstraints) > 0 {
+		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
+		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
+		}
+	}
+
+	constraintUsage := make([]ConstraintUsage, 0, len(req.Constraints))
+	if parsedResponse.ConstraintUsage != nil {
+		for k, v := range parsedResponse.ConstraintUsage {
+			constraintUsage = append(constraintUsage, ConstraintUsage{
+				Constraint: sortedConstraints[k-1],
+				Limit:      v.Limit,
+				Used:       v.Usage,
+			})
+		}
+	}
+
+	switch parsedResponse.Status {
+	case 1:
+		return &CapacityCheckResponse{
+			LimitingConstraints: limitingConstraints,
+			FairnessReduction:   parsedResponse.FairnessReduction,
+			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			AvailableCapacity:   parsedResponse.AvailableCapacity,
+			Usage:               constraintUsage,
+			internalDebugState:  parsedResponse,
+		}, nil, nil
 	default:
-		return nil, nil, errs.Wrap(0, false, "unexpected status code %v", status)
+		return nil, nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
 
