@@ -25,7 +25,14 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 local leaseDetails = call("HMGET", keyLeaseDetails, "lik", "oik", "rid")
-if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
+if
+	leaseDetails == false
+	or leaseDetails == nil
+	or leaseDetails[1] == nil
+	or leaseDetails[1] == ""
+	or leaseDetails[2] == nil
+	or leaseDetails[2] == ""
+then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
