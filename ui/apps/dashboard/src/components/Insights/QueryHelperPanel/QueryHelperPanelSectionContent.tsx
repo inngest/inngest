@@ -50,7 +50,7 @@ export function QueryHelperPanelSectionContent({
             ? 'You will find the last 10 queries that ran successfully here.'
             : sectionType === 'saved'
             ? 'Click the save query button to easily access your queries later.'
-            : 'Share queries with your org.'
+            : 'Share queries with your org by right-clicking on the query.'
         }
         sectionType={sectionType}
       />
