@@ -17,7 +17,7 @@ env:
 
 jobs:
   ts:
-    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}"
     strategy:
       fail-fast: false
       matrix:

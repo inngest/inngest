@@ -58,7 +58,7 @@ jobs:
         experimentalKeyQueues: [false, true]
         enableConstraintAPI: [false, true]
     runs-on: ${{ matrix.os }}
-    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, constraint-api: ${{ matrix.enableConstraintAPI }}"
     steps:
       - uses: actions/checkout@v4
         with:
