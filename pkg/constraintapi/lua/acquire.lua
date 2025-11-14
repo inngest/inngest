@@ -34,7 +34,7 @@ local leaseExpiryMS = tonumber(ARGV[5])
 local keyPrefix = ARGV[6]
 ---@type string[]
 local initialLeaseIDs = cjson.decode(ARGV[7])
-local operationIdempotencyKey = ARGV[8]
+local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
@@ -283,7 +283,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
 
 -- Handle operation idempotency
@@ -404,10 +404,10 @@ for i = 1, granted, 1 do
 		elseif value.k == 1 then
 			debug("updating rate limit", value.r.h)
 			-- rate limit
-			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1)
+			rateLimitUpdate(value.r.k, nowNS, value.r.p, value.r.l, 1, value.r.b)
 		elseif value.k == 2 then
 			-- concurrency
-			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
+			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
 			-- throttle
 			throttleUpdate(value.t.h, nowMS, value.t.p, value.t.l, 1)
@@ -417,7 +417,7 @@ for i = 1, granted, 1 do
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
 
 	-- Store lease details (lease idempotency key, associated run ID, operation idempotency key for request details)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", operationIdempotencyKey)
+	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
 
 	-- Add lease to scavenger set of account leases
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
