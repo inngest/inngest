@@ -70,7 +70,7 @@ func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, env
 		keyID = fmt.Sprintf("<%s:%s>", c.KeyExpressionHash, c.EvaluatedKeyHash)
 	}
 
-	return fmt.Sprintf("%s:%s:state:concurrency:%s:%s%s", prefix, accountID, scopeID, entityID, keyID)
+	return fmt.Sprintf("{%s}:%s:state:concurrency:%s:%s%s", prefix, accountID, scopeID, entityID, keyID)
 }
 
 type ThrottleConstraint struct {
