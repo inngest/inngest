@@ -24,41 +24,51 @@ var File_debug_v1_service_proto protoreflect.FileDescriptor
 
 const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto\x1a\x14debug/v1/pause.proto2\xf2\x02\n" +
+	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto\x1a\x14debug/v1/pause.proto2\x8b\x04\n" +
 	"\x05Debug\x12I\n" +
 	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00\x12U\n" +
 	"\x12GetPartitionStatus\x12\x1a.debug.v1.PartitionRequest\x1a!.debug.v1.PartitionStatusResponse\"\x00\x12I\n" +
 	"\fGetQueueItem\x12\x1a.debug.v1.QueueItemRequest\x1a\x1b.debug.v1.QueueItemResponse\"\x00\x12=\n" +
 	"\bGetPause\x12\x16.debug.v1.PauseRequest\x1a\x17.debug.v1.PauseResponse\"\x00\x12=\n" +
-	"\bGetIndex\x12\x16.debug.v1.IndexRequest\x1a\x17.debug.v1.IndexResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\bGetIndex\x12\x16.debug.v1.IndexRequest\x1a\x17.debug.v1.IndexResponse\"\x00\x12F\n" +
+	"\tBlockPeek\x12\x1a.debug.v1.BlockPeekRequest\x1a\x1b.debug.v1.BlockPeekResponse\"\x00\x12O\n" +
+	"\fBlockDeleted\x12\x1d.debug.v1.BlockDeletedRequest\x1a\x1e.debug.v1.BlockDeletedResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var file_debug_v1_service_proto_goTypes = []any{
 	(*PartitionRequest)(nil),        // 0: debug.v1.PartitionRequest
 	(*QueueItemRequest)(nil),        // 1: debug.v1.QueueItemRequest
 	(*PauseRequest)(nil),            // 2: debug.v1.PauseRequest
 	(*IndexRequest)(nil),            // 3: debug.v1.IndexRequest
-	(*PartitionResponse)(nil),       // 4: debug.v1.PartitionResponse
-	(*PartitionStatusResponse)(nil), // 5: debug.v1.PartitionStatusResponse
-	(*QueueItemResponse)(nil),       // 6: debug.v1.QueueItemResponse
-	(*PauseResponse)(nil),           // 7: debug.v1.PauseResponse
-	(*IndexResponse)(nil),           // 8: debug.v1.IndexResponse
+	(*BlockPeekRequest)(nil),        // 4: debug.v1.BlockPeekRequest
+	(*BlockDeletedRequest)(nil),     // 5: debug.v1.BlockDeletedRequest
+	(*PartitionResponse)(nil),       // 6: debug.v1.PartitionResponse
+	(*PartitionStatusResponse)(nil), // 7: debug.v1.PartitionStatusResponse
+	(*QueueItemResponse)(nil),       // 8: debug.v1.QueueItemResponse
+	(*PauseResponse)(nil),           // 9: debug.v1.PauseResponse
+	(*IndexResponse)(nil),           // 10: debug.v1.IndexResponse
+	(*BlockPeekResponse)(nil),       // 11: debug.v1.BlockPeekResponse
+	(*BlockDeletedResponse)(nil),    // 12: debug.v1.BlockDeletedResponse
 }
 var file_debug_v1_service_proto_depIdxs = []int32{
-	0, // 0: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
-	0, // 1: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
-	1, // 2: debug.v1.Debug.GetQueueItem:input_type -> debug.v1.QueueItemRequest
-	2, // 3: debug.v1.Debug.GetPause:input_type -> debug.v1.PauseRequest
-	3, // 4: debug.v1.Debug.GetIndex:input_type -> debug.v1.IndexRequest
-	4, // 5: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
-	5, // 6: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
-	6, // 7: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
-	7, // 8: debug.v1.Debug.GetPause:output_type -> debug.v1.PauseResponse
-	8, // 9: debug.v1.Debug.GetIndex:output_type -> debug.v1.IndexResponse
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
+	0,  // 1: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
+	1,  // 2: debug.v1.Debug.GetQueueItem:input_type -> debug.v1.QueueItemRequest
+	2,  // 3: debug.v1.Debug.GetPause:input_type -> debug.v1.PauseRequest
+	3,  // 4: debug.v1.Debug.GetIndex:input_type -> debug.v1.IndexRequest
+	4,  // 5: debug.v1.Debug.BlockPeek:input_type -> debug.v1.BlockPeekRequest
+	5,  // 6: debug.v1.Debug.BlockDeleted:input_type -> debug.v1.BlockDeletedRequest
+	6,  // 7: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
+	7,  // 8: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
+	8,  // 9: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
+	9,  // 10: debug.v1.Debug.GetPause:output_type -> debug.v1.PauseResponse
+	10, // 11: debug.v1.Debug.GetIndex:output_type -> debug.v1.IndexResponse
+	11, // 12: debug.v1.Debug.BlockPeek:output_type -> debug.v1.BlockPeekResponse
+	12, // 13: debug.v1.Debug.BlockDeleted:output_type -> debug.v1.BlockDeletedResponse
+	7,  // [7:14] is the sub-list for method output_type
+	0,  // [0:7] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_service_proto_init() }

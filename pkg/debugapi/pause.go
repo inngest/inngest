@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
+	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -86,4 +87,70 @@ func (d *debugAPI) GetIndex(ctx context.Context, req *pb.IndexRequest) (*pb.Inde
 	}
 
 	return response, nil
+}
+
+func (d *debugAPI) BlockPeek(ctx context.Context, req *pb.BlockPeekRequest) (*pb.BlockPeekResponse, error) {
+	if req.GetEventName() == "" || req.GetWorkspaceId() == "" || req.GetBlockId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "event_name, workspace_id, and block_id are required")
+	}
+
+	wId, err := uuid.Parse(req.GetWorkspaceId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workspace_id format, must be UUID")
+	}
+
+	blockID, err := ulid.Parse(req.GetBlockId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid block_id format, must be ULID")
+	}
+
+	index := pauses.Index{
+		EventName:   req.GetEventName(),
+		WorkspaceID: wId,
+	}
+
+	pauseIDs, totalCount, err := d.pm.GetBlockPauseIDs(ctx, index, blockID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to get block pause IDs: %v", err))
+	}
+
+	return &pb.BlockPeekResponse{
+		BlockId:    req.GetBlockId(),
+		TotalCount: totalCount,
+		PauseIds:   pauseIDs,
+		Compacted:  int64(len(pauseIDs)) < totalCount,
+	}, nil
+}
+
+func (d *debugAPI) BlockDeleted(ctx context.Context, req *pb.BlockDeletedRequest) (*pb.BlockDeletedResponse, error) {
+	if req.GetEventName() == "" || req.GetWorkspaceId() == "" || req.GetBlockId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "event_name, workspace_id, and block_id are required")
+	}
+
+	wId, err := uuid.Parse(req.GetWorkspaceId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workspace_id format, must be UUID")
+	}
+
+	blockID, err := ulid.Parse(req.GetBlockId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid block_id format, must be ULID")
+	}
+
+	index := pauses.Index{
+		EventName:   req.GetEventName(),
+		WorkspaceID: wId,
+	}
+
+	deletedIDs, totalCount, err := d.pm.GetBlockDeletedIDs(ctx, index, blockID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to get block deleted IDs: %v", err))
+	}
+
+	return &pb.BlockDeletedResponse{
+		BlockId:    req.GetBlockId(),
+		TotalCount: totalCount,
+		DeletedIds: deletedIDs,
+		Compacted:  int64(len(deletedIDs)) < totalCount,
+	}, nil
 }

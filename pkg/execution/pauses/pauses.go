@@ -130,6 +130,14 @@ type Manager interface {
 	// IndexStats returns statistics about an index including block information.
 	// Used for debugging pause storage and block compaction status.
 	IndexStats(ctx context.Context, index Index) (*IndexStats, error)
+
+	// GetBlockPauseIDs returns all pause IDs from a specific block.
+	// Used for debugging block contents. Returns IDs, total count, and error.
+	GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// GetBlockDeletedIDs returns all deleted pause IDs for a specific block.
+	// Used for debugging block deletion tracking. Returns IDs, total count, and error.
+	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
@@ -235,6 +243,14 @@ type BlockReader interface {
 	// GetBlockDeleteCount returns the number of deleted pauses for a specific block.
 	// Used for debugging block compaction status.
 	GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error)
+
+	// GetBlockPauseIDs returns all pause IDs from a specific block.
+	// Used for debugging block contents. Returns total count and all IDs.
+	GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// GetBlockDeletedIDs returns all deleted pause IDs for a specific block.
+	// Used for debugging block deletion tracking. Returns total count and all IDs.
+	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
 
 	// IndexExists returns whether we've written any blocks for the given index.
 	IndexExists(ctx context.Context, i Index) (bool, error)

@@ -12,7 +12,9 @@ func pauseCommand() *cli.Command {
 		Usage:   "Pause debugging commands",
 		Commands: []*cli.Command{
 			pause.PauseCommand(),
-			pause.IndexCommand(),
+			pause.DescribeCommand(),
+			pause.BSelectCommand(),
+			pause.BTombstonesCommand(),
 		},
 	}
 }

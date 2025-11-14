@@ -322,6 +322,262 @@ func (x *IndexResponse) GetBlocks() []*BlockInfo {
 	return nil
 }
 
+type BlockPeekRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventName     string                 `protobuf:"bytes,1,opt,name=event_name,json=eventName,proto3" json:"event_name,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	BlockId       string                 `protobuf:"bytes,3,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockPeekRequest) Reset() {
+	*x = BlockPeekRequest{}
+	mi := &file_debug_v1_pause_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockPeekRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockPeekRequest) ProtoMessage() {}
+
+func (x *BlockPeekRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockPeekRequest.ProtoReflect.Descriptor instead.
+func (*BlockPeekRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BlockPeekRequest) GetEventName() string {
+	if x != nil {
+		return x.EventName
+	}
+	return ""
+}
+
+func (x *BlockPeekRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *BlockPeekRequest) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+type BlockPeekResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockId       string                 `protobuf:"bytes,1,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	PauseIds      []string               `protobuf:"bytes,3,rep,name=pause_ids,json=pauseIds,proto3" json:"pause_ids,omitempty"`
+	Compacted     bool                   `protobuf:"varint,4,opt,name=compacted,proto3" json:"compacted,omitempty"` // true if results were limited
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockPeekResponse) Reset() {
+	*x = BlockPeekResponse{}
+	mi := &file_debug_v1_pause_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockPeekResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockPeekResponse) ProtoMessage() {}
+
+func (x *BlockPeekResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockPeekResponse.ProtoReflect.Descriptor instead.
+func (*BlockPeekResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *BlockPeekResponse) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+func (x *BlockPeekResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *BlockPeekResponse) GetPauseIds() []string {
+	if x != nil {
+		return x.PauseIds
+	}
+	return nil
+}
+
+func (x *BlockPeekResponse) GetCompacted() bool {
+	if x != nil {
+		return x.Compacted
+	}
+	return false
+}
+
+type BlockDeletedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventName     string                 `protobuf:"bytes,1,opt,name=event_name,json=eventName,proto3" json:"event_name,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	BlockId       string                 `protobuf:"bytes,3,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockDeletedRequest) Reset() {
+	*x = BlockDeletedRequest{}
+	mi := &file_debug_v1_pause_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockDeletedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockDeletedRequest) ProtoMessage() {}
+
+func (x *BlockDeletedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockDeletedRequest.ProtoReflect.Descriptor instead.
+func (*BlockDeletedRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BlockDeletedRequest) GetEventName() string {
+	if x != nil {
+		return x.EventName
+	}
+	return ""
+}
+
+func (x *BlockDeletedRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *BlockDeletedRequest) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+type BlockDeletedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockId       string                 `protobuf:"bytes,1,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	TotalCount    int64                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	DeletedIds    []string               `protobuf:"bytes,3,rep,name=deleted_ids,json=deletedIds,proto3" json:"deleted_ids,omitempty"`
+	Compacted     bool                   `protobuf:"varint,4,opt,name=compacted,proto3" json:"compacted,omitempty"` // true if results were limited
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockDeletedResponse) Reset() {
+	*x = BlockDeletedResponse{}
+	mi := &file_debug_v1_pause_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockDeletedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockDeletedResponse) ProtoMessage() {}
+
+func (x *BlockDeletedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_pause_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockDeletedResponse.ProtoReflect.Descriptor instead.
+func (*BlockDeletedResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_pause_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BlockDeletedResponse) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+func (x *BlockDeletedResponse) GetTotalCount() int64 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *BlockDeletedResponse) GetDeletedIds() []string {
+	if x != nil {
+		return x.DeletedIds
+	}
+	return nil
+}
+
+func (x *BlockDeletedResponse) GetCompacted() bool {
+	if x != nil {
+		return x.Compacted
+	}
+	return false
+}
+
 var File_debug_v1_pause_proto protoreflect.FileDescriptor
 
 const file_debug_v1_pause_proto_rawDesc = "" +
@@ -349,7 +605,30 @@ const file_debug_v1_pause_proto_rawDesc = "" +
 	"\n" +
 	"event_name\x18\x02 \x01(\tR\teventName\x12#\n" +
 	"\rbuffer_length\x18\x03 \x01(\x03R\fbufferLength\x12+\n" +
-	"\x06blocks\x18\x04 \x03(\v2\x13.debug.v1.BlockInfoR\x06blocksB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\x06blocks\x18\x04 \x03(\v2\x13.debug.v1.BlockInfoR\x06blocks\"o\n" +
+	"\x10BlockPeekRequest\x12\x1d\n" +
+	"\n" +
+	"event_name\x18\x01 \x01(\tR\teventName\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
+	"\bblock_id\x18\x03 \x01(\tR\ablockId\"\x8a\x01\n" +
+	"\x11BlockPeekResponse\x12\x19\n" +
+	"\bblock_id\x18\x01 \x01(\tR\ablockId\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x03R\n" +
+	"totalCount\x12\x1b\n" +
+	"\tpause_ids\x18\x03 \x03(\tR\bpauseIds\x12\x1c\n" +
+	"\tcompacted\x18\x04 \x01(\bR\tcompacted\"r\n" +
+	"\x13BlockDeletedRequest\x12\x1d\n" +
+	"\n" +
+	"event_name\x18\x01 \x01(\tR\teventName\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x19\n" +
+	"\bblock_id\x18\x03 \x01(\tR\ablockId\"\x91\x01\n" +
+	"\x14BlockDeletedResponse\x12\x19\n" +
+	"\bblock_id\x18\x01 \x01(\tR\ablockId\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x03R\n" +
+	"totalCount\x12\x1f\n" +
+	"\vdeleted_ids\x18\x03 \x03(\tR\n" +
+	"deletedIds\x12\x1c\n" +
+	"\tcompacted\x18\x04 \x01(\bR\tcompactedB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_pause_proto_rawDescOnce sync.Once
@@ -363,13 +642,17 @@ func file_debug_v1_pause_proto_rawDescGZIP() []byte {
 	return file_debug_v1_pause_proto_rawDescData
 }
 
-var file_debug_v1_pause_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_debug_v1_pause_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_debug_v1_pause_proto_goTypes = []any{
-	(*PauseRequest)(nil),  // 0: debug.v1.PauseRequest
-	(*PauseResponse)(nil), // 1: debug.v1.PauseResponse
-	(*IndexRequest)(nil),  // 2: debug.v1.IndexRequest
-	(*BlockInfo)(nil),     // 3: debug.v1.BlockInfo
-	(*IndexResponse)(nil), // 4: debug.v1.IndexResponse
+	(*PauseRequest)(nil),         // 0: debug.v1.PauseRequest
+	(*PauseResponse)(nil),        // 1: debug.v1.PauseResponse
+	(*IndexRequest)(nil),         // 2: debug.v1.IndexRequest
+	(*BlockInfo)(nil),            // 3: debug.v1.BlockInfo
+	(*IndexResponse)(nil),        // 4: debug.v1.IndexResponse
+	(*BlockPeekRequest)(nil),     // 5: debug.v1.BlockPeekRequest
+	(*BlockPeekResponse)(nil),    // 6: debug.v1.BlockPeekResponse
+	(*BlockDeletedRequest)(nil),  // 7: debug.v1.BlockDeletedRequest
+	(*BlockDeletedResponse)(nil), // 8: debug.v1.BlockDeletedResponse
 }
 var file_debug_v1_pause_proto_depIdxs = []int32{
 	3, // 0: debug.v1.IndexResponse.blocks:type_name -> debug.v1.BlockInfo
@@ -391,7 +674,7 @@ func file_debug_v1_pause_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_pause_proto_rawDesc), len(file_debug_v1_pause_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

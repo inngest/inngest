@@ -434,3 +434,17 @@ func (m manager) getBlockInfo(ctx context.Context, index Index, blockID ulid.ULI
 		DeleteCount:    deleteCount,
 	}, nil
 }
+
+func (m manager) GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	if m.bs == nil {
+		return nil, 0, fmt.Errorf("block store not available")
+	}
+	return m.bs.GetBlockPauseIDs(ctx, index, blockID)
+}
+
+func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	if m.bs == nil {
+		return nil, 0, fmt.Errorf("block store not available")
+	}
+	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
+}

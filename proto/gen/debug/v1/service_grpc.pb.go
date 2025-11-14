@@ -24,6 +24,8 @@ const (
 	Debug_GetQueueItem_FullMethodName       = "/debug.v1.Debug/GetQueueItem"
 	Debug_GetPause_FullMethodName           = "/debug.v1.Debug/GetPause"
 	Debug_GetIndex_FullMethodName           = "/debug.v1.Debug/GetIndex"
+	Debug_BlockPeek_FullMethodName          = "/debug.v1.Debug/BlockPeek"
+	Debug_BlockDeleted_FullMethodName       = "/debug.v1.Debug/BlockDeleted"
 )
 
 // DebugClient is the client API for Debug service.
@@ -41,6 +43,10 @@ type DebugClient interface {
 	GetPause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error)
 	// GetIndex retrieves block information for a pause index.
 	GetIndex(ctx context.Context, in *IndexRequest, opts ...grpc.CallOption) (*IndexResponse, error)
+	// BlockPeek retrieves pause IDs from a specific block.
+	BlockPeek(ctx context.Context, in *BlockPeekRequest, opts ...grpc.CallOption) (*BlockPeekResponse, error)
+	// BlockDeleted retrieves deleted pause IDs from a specific block.
+	BlockDeleted(ctx context.Context, in *BlockDeletedRequest, opts ...grpc.CallOption) (*BlockDeletedResponse, error)
 }
 
 type debugClient struct {
@@ -101,6 +107,26 @@ func (c *debugClient) GetIndex(ctx context.Context, in *IndexRequest, opts ...gr
 	return out, nil
 }
 
+func (c *debugClient) BlockPeek(ctx context.Context, in *BlockPeekRequest, opts ...grpc.CallOption) (*BlockPeekResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlockPeekResponse)
+	err := c.cc.Invoke(ctx, Debug_BlockPeek_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *debugClient) BlockDeleted(ctx context.Context, in *BlockDeletedRequest, opts ...grpc.CallOption) (*BlockDeletedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BlockDeletedResponse)
+	err := c.cc.Invoke(ctx, Debug_BlockDeleted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -116,6 +142,10 @@ type DebugServer interface {
 	GetPause(context.Context, *PauseRequest) (*PauseResponse, error)
 	// GetIndex retrieves block information for a pause index.
 	GetIndex(context.Context, *IndexRequest) (*IndexResponse, error)
+	// BlockPeek retrieves pause IDs from a specific block.
+	BlockPeek(context.Context, *BlockPeekRequest) (*BlockPeekResponse, error)
+	// BlockDeleted retrieves deleted pause IDs from a specific block.
+	BlockDeleted(context.Context, *BlockDeletedRequest) (*BlockDeletedResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -140,6 +170,12 @@ func (UnimplementedDebugServer) GetPause(context.Context, *PauseRequest) (*Pause
 }
 func (UnimplementedDebugServer) GetIndex(context.Context, *IndexRequest) (*IndexResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIndex not implemented")
+}
+func (UnimplementedDebugServer) BlockPeek(context.Context, *BlockPeekRequest) (*BlockPeekResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockPeek not implemented")
+}
+func (UnimplementedDebugServer) BlockDeleted(context.Context, *BlockDeletedRequest) (*BlockDeletedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockDeleted not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -252,6 +288,42 @@ func _Debug_GetIndex_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_BlockPeek_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockPeekRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).BlockPeek(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_BlockPeek_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).BlockPeek(ctx, req.(*BlockPeekRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Debug_BlockDeleted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockDeletedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).BlockDeleted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_BlockDeleted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).BlockDeleted(ctx, req.(*BlockDeletedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -278,6 +350,14 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetIndex",
 			Handler:    _Debug_GetIndex_Handler,
+		},
+		{
+			MethodName: "BlockPeek",
+			Handler:    _Debug_BlockPeek_Handler,
+		},
+		{
+			MethodName: "BlockDeleted",
+			Handler:    _Debug_BlockDeleted_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

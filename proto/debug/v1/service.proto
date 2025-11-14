@@ -18,4 +18,8 @@ service Debug {
   rpc GetPause(PauseRequest) returns (PauseResponse) {}
   // GetIndex retrieves block information for a pause index.
   rpc GetIndex(IndexRequest) returns (IndexResponse) {}
+  // BlockPeek retrieves pause IDs from a specific block.
+  rpc BlockPeek(BlockPeekRequest) returns (BlockPeekResponse) {}
+  // BlockDeleted retrieves deleted pause IDs from a specific block.
+  rpc BlockDeleted(BlockDeletedRequest) returns (BlockDeletedResponse) {}
 }

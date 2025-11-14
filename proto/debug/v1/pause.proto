@@ -32,3 +32,29 @@ message IndexResponse {
   int64 buffer_length = 3;
   repeated BlockInfo blocks = 4;
 }
+
+message BlockPeekRequest {
+  string event_name = 1;
+  string workspace_id = 2;
+  string block_id = 3;
+}
+
+message BlockPeekResponse {
+  string block_id = 1;
+  int64 total_count = 2;
+  repeated string pause_ids = 3;
+  bool compacted = 4; // true if results were limited
+}
+
+message BlockDeletedRequest {
+  string event_name = 1;
+  string workspace_id = 2;
+  string block_id = 3;
+}
+
+message BlockDeletedResponse {
+  string block_id = 1;
+  int64 total_count = 2;
+  repeated string deleted_ids = 3;
+  bool compacted = 4; // true if results were limited
+}
