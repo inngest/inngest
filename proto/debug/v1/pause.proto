@@ -1,0 +1,14 @@
+syntax = "proto3";
+package debug.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+message PauseRequest {
+  string item_id = 1;
+  string event_name = 2;
+  string workspace_id = 3;
+}
+
+message PauseResponse { bytes data = 1; }

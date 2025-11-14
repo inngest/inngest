@@ -22,6 +22,7 @@ const (
 	Debug_GetPartition_FullMethodName       = "/debug.v1.Debug/GetPartition"
 	Debug_GetPartitionStatus_FullMethodName = "/debug.v1.Debug/GetPartitionStatus"
 	Debug_GetQueueItem_FullMethodName       = "/debug.v1.Debug/GetQueueItem"
+	Debug_GetPause_FullMethodName           = "/debug.v1.Debug/GetPause"
 )
 
 // DebugClient is the client API for Debug service.
@@ -35,6 +36,8 @@ type DebugClient interface {
 	GetPartitionStatus(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionStatusResponse, error)
 	// GetQueueItem retrieves the queue item object from the queue
 	GetQueueItem(ctx context.Context, in *QueueItemRequest, opts ...grpc.CallOption) (*QueueItemResponse, error)
+	// GetPause retrieves a single pause item.
+	GetPause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error)
 }
 
 type debugClient struct {
@@ -75,6 +78,16 @@ func (c *debugClient) GetQueueItem(ctx context.Context, in *QueueItemRequest, op
 	return out, nil
 }
 
+func (c *debugClient) GetPause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseResponse)
+	err := c.cc.Invoke(ctx, Debug_GetPause_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
@@ -86,6 +99,8 @@ type DebugServer interface {
 	GetPartitionStatus(context.Context, *PartitionRequest) (*PartitionStatusResponse, error)
 	// GetQueueItem retrieves the queue item object from the queue
 	GetQueueItem(context.Context, *QueueItemRequest) (*QueueItemResponse, error)
+	// GetPause retrieves a single pause item.
+	GetPause(context.Context, *PauseRequest) (*PauseResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -104,6 +119,9 @@ func (UnimplementedDebugServer) GetPartitionStatus(context.Context, *PartitionRe
 }
 func (UnimplementedDebugServer) GetQueueItem(context.Context, *QueueItemRequest) (*QueueItemResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetQueueItem not implemented")
+}
+func (UnimplementedDebugServer) GetPause(context.Context, *PauseRequest) (*PauseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPause not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -180,6 +198,24 @@ func _Debug_GetQueueItem_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetPause_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetPause(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetPause_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetPause(ctx, req.(*PauseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -198,6 +234,10 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetQueueItem",
 			Handler:    _Debug_GetQueueItem_Handler,
+		},
+		{
+			MethodName: "GetPause",
+			Handler:    _Debug_GetPause_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

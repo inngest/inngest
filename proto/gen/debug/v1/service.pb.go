@@ -24,28 +24,33 @@ var File_debug_v1_service_proto protoreflect.FileDescriptor
 
 const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto2\xf4\x01\n" +
+	"\x16debug/v1/service.proto\x12\bdebug.v1\x1a\x14debug/v1/queue.proto\x1a\x14debug/v1/pause.proto2\xb3\x02\n" +
 	"\x05Debug\x12I\n" +
 	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00\x12U\n" +
 	"\x12GetPartitionStatus\x12\x1a.debug.v1.PartitionRequest\x1a!.debug.v1.PartitionStatusResponse\"\x00\x12I\n" +
-	"\fGetQueueItem\x12\x1a.debug.v1.QueueItemRequest\x1a\x1b.debug.v1.QueueItemResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\fGetQueueItem\x12\x1a.debug.v1.QueueItemRequest\x1a\x1b.debug.v1.QueueItemResponse\"\x00\x12=\n" +
+	"\bGetPause\x12\x16.debug.v1.PauseRequest\x1a\x17.debug.v1.PauseResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var file_debug_v1_service_proto_goTypes = []any{
 	(*PartitionRequest)(nil),        // 0: debug.v1.PartitionRequest
 	(*QueueItemRequest)(nil),        // 1: debug.v1.QueueItemRequest
-	(*PartitionResponse)(nil),       // 2: debug.v1.PartitionResponse
-	(*PartitionStatusResponse)(nil), // 3: debug.v1.PartitionStatusResponse
-	(*QueueItemResponse)(nil),       // 4: debug.v1.QueueItemResponse
+	(*PauseRequest)(nil),            // 2: debug.v1.PauseRequest
+	(*PartitionResponse)(nil),       // 3: debug.v1.PartitionResponse
+	(*PartitionStatusResponse)(nil), // 4: debug.v1.PartitionStatusResponse
+	(*QueueItemResponse)(nil),       // 5: debug.v1.QueueItemResponse
+	(*PauseResponse)(nil),           // 6: debug.v1.PauseResponse
 }
 var file_debug_v1_service_proto_depIdxs = []int32{
 	0, // 0: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
 	0, // 1: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
 	1, // 2: debug.v1.Debug.GetQueueItem:input_type -> debug.v1.QueueItemRequest
-	2, // 3: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
-	3, // 4: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
-	4, // 5: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
+	2, // 3: debug.v1.Debug.GetPause:input_type -> debug.v1.PauseRequest
+	3, // 4: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
+	4, // 5: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
+	5, // 6: debug.v1.Debug.GetQueueItem:output_type -> debug.v1.QueueItemResponse
+	6, // 7: debug.v1.Debug.GetPause:output_type -> debug.v1.PauseResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -57,6 +62,7 @@ func file_debug_v1_service_proto_init() {
 		return
 	}
 	file_debug_v1_queue_proto_init()
+	file_debug_v1_pause_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

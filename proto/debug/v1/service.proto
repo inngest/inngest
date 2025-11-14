@@ -2,6 +2,7 @@ syntax = "proto3";
 package debug.v1;
 
 import "debug/v1/queue.proto";
+import "debug/v1/pause.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 
@@ -13,4 +14,6 @@ service Debug {
   rpc GetPartitionStatus(PartitionRequest) returns (PartitionStatusResponse) {}
   // GetQueueItem retrieves the queue item object from the queue
   rpc GetQueueItem(QueueItemRequest) returns (QueueItemResponse) {}
+  // GetPause retrieves a single pause item.
+  rpc GetPause(PauseRequest) returns (PauseResponse) {}
 }
