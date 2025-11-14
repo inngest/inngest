@@ -815,12 +815,11 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		return nil
 	}
 	return &pb.CapacityExtendLeaseRequest{
-		IdempotencyKey:      req.IdempotencyKey,
-		AccountId:           req.AccountID.String(),
-		LeaseId:             req.LeaseID.String(),
-		Duration:            durationpb.New(req.Duration),
-		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
-		Migration:           MigrationIdentifierToProto(req.Migration),
+		IdempotencyKey: req.IdempotencyKey,
+		AccountId:      req.AccountID.String(),
+		LeaseId:        req.LeaseID.String(),
+		Duration:       durationpb.New(req.Duration),
+		Migration:      MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -845,12 +844,11 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 	}
 
 	return &CapacityExtendLeaseRequest{
-		IdempotencyKey:      pbReq.IdempotencyKey,
-		AccountID:           accountID,
-		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
-		LeaseID:             leaseID,
-		Duration:            duration,
-		Migration:           MigrationIdentifierFromProto(pbReq.Migration),
+		IdempotencyKey: pbReq.IdempotencyKey,
+		AccountID:      accountID,
+		LeaseID:        leaseID,
+		Duration:       duration,
+		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 
@@ -894,11 +892,10 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		return nil
 	}
 	return &pb.CapacityReleaseRequest{
-		IdempotencyKey:      req.IdempotencyKey,
-		AccountId:           req.AccountID.String(),
-		LeaseId:             req.LeaseID.String(),
-		LeaseIdempotencyKey: req.LeaseIdempotencyKey,
-		Migration:           MigrationIdentifierToProto(req.Migration),
+		IdempotencyKey: req.IdempotencyKey,
+		AccountId:      req.AccountID.String(),
+		LeaseId:        req.LeaseID.String(),
+		Migration:      MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -918,11 +915,10 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 	}
 
 	return &CapacityReleaseRequest{
-		IdempotencyKey:      pbReq.IdempotencyKey,
-		AccountID:           accountID,
-		LeaseIdempotencyKey: pbReq.LeaseIdempotencyKey,
-		LeaseID:             leaseID,
-		Migration:           MigrationIdentifierFromProto(pbReq.Migration),
+		IdempotencyKey: pbReq.IdempotencyKey,
+		AccountID:      accountID,
+		LeaseID:        leaseID,
+		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 

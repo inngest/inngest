@@ -1649,22 +1649,20 @@ func TestCapacityExtendLeaseRequestConversion(t *testing.T) {
 		{
 			name: "valid request",
 			input: &CapacityExtendLeaseRequest{
-				IdempotencyKey:      "extend-key",
-				AccountID:           accountID,
-				LeaseIdempotencyKey: "lease-extend-key",
-				LeaseID:             leaseID,
-				Duration:            15 * time.Minute,
+				IdempotencyKey: "extend-key",
+				AccountID:      accountID,
+				LeaseID:        leaseID,
+				Duration:       15 * time.Minute,
 				Migration: MigrationIdentifier{
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
 				},
 			},
 			expected: &pb.CapacityExtendLeaseRequest{
-				IdempotencyKey:      "extend-key",
-				AccountId:           accountID.String(),
-				LeaseId:             leaseID.String(),
-				Duration:            durationpb.New(15 * time.Minute),
-				LeaseIdempotencyKey: "lease-extend-key",
+				IdempotencyKey: "extend-key",
+				AccountId:      accountID.String(),
+				LeaseId:        leaseID.String(),
+				Duration:       durationpb.New(15 * time.Minute),
 				Migration: &pb.MigrationIdentifier{
 					IsRateLimit: true,
 					QueueShard:  "test-shard",
@@ -1774,20 +1772,18 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 		{
 			name: "valid request",
 			input: &CapacityReleaseRequest{
-				IdempotencyKey:      "commit-key",
-				AccountID:           accountID,
-				LeaseIdempotencyKey: "lease-commit-key",
-				LeaseID:             leaseID,
+				IdempotencyKey: "commit-key",
+				AccountID:      accountID,
+				LeaseID:        leaseID,
 				Migration: MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  "release-shard",
 				},
 			},
 			expected: &pb.CapacityReleaseRequest{
-				IdempotencyKey:      "commit-key",
-				AccountId:           accountID.String(),
-				LeaseId:             leaseID.String(),
-				LeaseIdempotencyKey: "lease-commit-key",
+				IdempotencyKey: "commit-key",
+				AccountId:      accountID.String(),
+				LeaseId:        leaseID.String(),
 				Migration: &pb.MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  "release-shard",

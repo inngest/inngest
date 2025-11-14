@@ -138,10 +138,6 @@ func (r *CapacityExtendLeaseRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
 	}
 
-	if r.LeaseIdempotencyKey == "" {
-		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
-	}
-
 	if r.LeaseID == ulid.Zero {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease ID"))
 	}
@@ -162,10 +158,6 @@ func (r *CapacityReleaseRequest) Valid() error {
 
 	if r.AccountID == uuid.Nil {
 		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
-	}
-
-	if r.LeaseIdempotencyKey == "" {
-		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency key"))
 	}
 
 	if r.LeaseID == ulid.Zero {

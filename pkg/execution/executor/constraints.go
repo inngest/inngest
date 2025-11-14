@@ -147,8 +147,7 @@ func WithConstraints[T any](
 				Migration: constraintapi.MigrationIdentifier{
 					IsRateLimit: true,
 				},
-				LeaseIdempotencyKey: idempotencyKey,
-				Duration:            ScheduleLeaseDuration,
+				Duration: ScheduleLeaseDuration,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err)
@@ -191,7 +190,6 @@ func WithConstraints[T any](
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: true,
 					},
-					LeaseIdempotencyKey: idempotencyKey,
 				})
 				if internalErr != nil {
 					l.Error("failed to release capacity", "err", internalErr)
