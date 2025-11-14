@@ -88,9 +88,9 @@ if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or lea
 	return cjson.encode(res)
 end
 local leaseIdempotencyKey = leaseDetails[1]
-local leaseOperationIdempotencyKey = leaseDetails[2]
+local hashedOperationIdempotencyKey = leaseDetails[2]
 local leaseRunID = leaseDetails[3]
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, leaseOperationIdempotencyKey)
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	debug(keyRequestState)
@@ -103,10 +103,11 @@ local requestDetails = cjson.decode(requestStateStr)
 local constraints = requestDetails.s
 for _, value in ipairs(constraints) do
 	if value.k == 2 then
-		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), leaseIdempotencyKey)
+		call("ZREM", value.c.ilk, currentLeaseID)
+		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), newLeaseID)
 	end
 end
-call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", leaseOperationIdempotencyKey)
+call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
 call("DEL", keyOldLeaseDetails)
 call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), newLeaseID)
 call("ZREM", keyAccountLeases, currentLeaseID)

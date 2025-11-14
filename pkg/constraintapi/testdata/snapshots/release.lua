@@ -24,24 +24,18 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 	return opIdempotency
 end
-local leaseDetails = call("HMGET", keyLeaseDetails, "lik", "oik", "rid")
+local hashedOperationIdempotencyKey = call("HGET", keyLeaseDetails, "oik")
 if
-	leaseDetails == false
-	or leaseDetails == nil
-	or leaseDetails[1] == nil
-	or leaseDetails[1] == ""
-	or leaseDetails[2] == nil
-	or leaseDetails[2] == ""
+	hashedOperationIdempotencyKey == false
+	or hashedOperationIdempotencyKey == nil
+	or hashedOperationIdempotencyKey == ""
 then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
-local leaseIdempotencyKey = leaseDetails[1]
-local leaseOperationIdempotencyKey = leaseDetails[2]
-local leaseRunID = leaseDetails[3]
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, leaseOperationIdempotencyKey)
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	debug(keyRequestState)
@@ -54,7 +48,7 @@ local requestDetails = cjson.decode(requestStateStr)
 local constraints = requestDetails.s
 for _, value in ipairs(constraints) do
 	if value.k == 2 then
-		call("ZREM", value.c.ilk, leaseIdempotencyKey)
+		call("ZREM", value.c.ilk, currentLeaseID)
 	end
 end
 call("DEL", keyLeaseDetails)
