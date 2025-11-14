@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -115,17 +116,17 @@ func (r *redisCapacityManager) keyAccountLeases(prefix string, accountID uuid.UU
 
 // keyRequestState returns the key storing per-operation request details
 func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, operationIdempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, operationIdempotencyKey)
+	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, util.XXHash(operationIdempotencyKey))
 }
 
 // keyOperationIdempotency returns the operation idempotency key for operation retries
 func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, idempotencyKey)
+	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, util.XXHash(idempotencyKey))
 }
 
 // keyConstraintCheckIdempotency returns the operation idempotency key for constraint check retries
 func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, accountID uuid.UUID, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, idempotencyKey)
+	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, util.XXHash(idempotencyKey))
 }
 
 // keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
@@ -140,6 +141,8 @@ func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUI
 //
 // This is essentially required for backward- and forward-compatibility.
 func (r *redisCapacityManager) clientAndPrefix(m MigrationIdentifier) (string, rueidis.Client, error) {
+	// TODO: Once we support new data stores, we can return those clients here, including a per-account hash tag prefix, e.g. <accountID>
+
 	if m.IsRateLimit {
 		return r.rateLimitKeyPrefix, r.rateLimitClient, nil
 	}
@@ -311,7 +314,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		keyPrefix,
 		initialLeaseIDs,
 
-		req.IdempotencyKey,
+		util.XXHash(req.IdempotencyKey), // hashed operation idempotency key
 		int(OperationIdempotencyTTL.Seconds()),
 		int(ConstraintCheckIdempotencyTTL.Seconds()),
 

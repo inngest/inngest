@@ -177,6 +177,9 @@ type SerializedRateLimitConstraint struct {
 	// p = Period (embedded from config)
 	Period int `json:"p,omitempty"`
 
+	// b = Burst (embedded from config)
+	Burst int `json:"b,omitempty"`
+
 	// k = Key (fully-qualified Redis key: concatenated evaluated key hash with prefix)
 	Key string `json:"k,omitempty"`
 }
@@ -211,6 +214,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 			for _, rlConfig := range config.RateLimit {
 				if rlConfig.Scope == ci.RateLimit.Scope && rlConfig.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
 					rateLimitConstraint.Limit = rlConfig.Limit
+					rateLimitConstraint.Burst = int(rlConfig.Limit / 10)
 					// Ensure rate limiting period is encoded as nanoseconds
 					rateLimitConstraint.Period = int((time.Duration(rlConfig.Period) * time.Second).Nanoseconds())
 					break
