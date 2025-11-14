@@ -400,13 +400,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		routedInstanceID = route.InstanceID
 		// Assign the request lease to the worker for capacity tracking
 		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); err != nil {
-			// if the instance ID is not set, we log the error and skip for now
-			span.RecordError(err)
-			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
-				"instance_id": routedInstanceID,
-				"request_id":  opts.Data.RequestId,
-				"gateway_id":  route.GatewayID.String(),
-			}))
 
 			// Check if this is a capacity error, this will happen when two in parallel
 			// checked for worker capacity earlier but now one got to this point first
@@ -416,6 +409,15 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 					Message: "Assigned worker reached capacity before assigment",
 				}
 			}
+
+			// if the instance ID is not set, we log the error and skip for now
+			span.RecordError(err)
+			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
+				"instance_id": routedInstanceID,
+				"request_id":  opts.Data.RequestId,
+				"gateway_id":  route.GatewayID.String(),
+			}))
+
 		}
 
 		// Trace the request lease assignment
