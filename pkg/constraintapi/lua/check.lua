@@ -229,7 +229,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.r.l
 		usage["u"] = math.min(math.max(value.r.l - constraintCapacity, value.r.l), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		-- concurrency
 		debug("evaluating concurrency")
@@ -241,7 +241,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.c.l
 		usage["u"] = math.min(math.max(value.c.l - constraintCapacity, value.c.l or 0), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")
@@ -252,7 +252,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.t.l
 		usage["u"] = math.min(math.max(value.t.l - constraintCapacity, value.t.l or 0), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint
@@ -282,7 +282,7 @@ local fairnessReduction = 0
 -- TODO: How can we track and gracefully handle end to end that we ran out of capacity because for fairness?
 availableCapacity = availableCapacity - fairnessReduction
 
----@type { s: integer, d: string[], lc: integer[], ra: integer, fr: integer }
+---@type { s: integer, d: string[], lc: integer[], ra: integer, fr: integer, a: integer, constraintUsage: {}[] }
 local res = {}
 res["s"] = 1
 res["d"] = debugLogs

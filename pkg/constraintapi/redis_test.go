@@ -44,6 +44,27 @@ func TestRedisCapacityManager(t *testing.T) {
 	var leaseID ulid.ULID
 	leaseIdempotencyKey := "event1"
 
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		RateLimit: []RateLimitConfig{
+			{
+				KeyExpressionHash: "expr-hash",
+				Limit:             120,
+				Period:            60,
+			},
+		},
+	}
+
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{
+				KeyExpressionHash: "expr-hash",
+				EvaluatedKeyHash:  "test-value",
+			},
+		},
+	}
+
 	t.Run("Acquire", func(t *testing.T) {
 		enableDebugLogs = true
 		opIdempotencyKey := "event1"
@@ -61,25 +82,8 @@ func TestRedisCapacityManager(t *testing.T) {
 				Location:          LeaseLocationScheduleRun,
 				RunProcessingMode: RunProcessingModeBackground,
 			},
-			Configuration: ConstraintConfig{
-				FunctionVersion: 1,
-				RateLimit: []RateLimitConfig{
-					{
-						KeyExpressionHash: "expr-hash",
-						Limit:             120,
-						Period:            60,
-					},
-				},
-			},
-			Constraints: []ConstraintItem{
-				{
-					Kind: ConstraintKindRateLimit,
-					RateLimit: &RateLimitConstraint{
-						KeyExpressionHash: "expr-hash",
-						EvaluatedKeyHash:  "test-value",
-					},
-				},
-			},
+			Configuration:   config,
+			Constraints:     constraints,
 			CurrentTime:     clock.Now(),
 			MaximumLifetime: time.Minute,
 			Migration: MigrationIdentifier{
@@ -115,8 +119,25 @@ func TestRedisCapacityManager(t *testing.T) {
 		require.True(t, r.Exists(cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", opIdempotencyKey)))
 	})
 
+	var checkHash string
 	t.Run("Check", func(t *testing.T) {
-		resp, userErr, internalErr := cm.Check(ctx, &CapacityCheckRequest{})
+		req := &CapacityCheckRequest{
+			AccountID:     accountID,
+			EnvID:         envID,
+			FunctionID:    fnID,
+			Configuration: config,
+			Constraints:   constraints,
+			Migration: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+		}
+
+		_, _, hash, err := buildCheckRequestData(req, cm.rateLimitKeyPrefix)
+		require.NoError(t, err)
+		require.NotZero(t, hash)
+		checkHash = hash
+
+		resp, userErr, internalErr := cm.Check(ctx, req)
 		require.NoError(t, userErr)
 		require.NoError(t, internalErr)
 		require.NotNil(t, resp)
@@ -185,10 +206,11 @@ func TestRedisCapacityManager(t *testing.T) {
 		// TODO: Verify all respective keys have been updated
 		// TODO: Expect 4 idempotency keys (1 constraint check + 3 operations)
 		keys := r.Keys()
-		require.Len(t, keys, 4, r.Dump())
+		require.Len(t, keys, 5, r.Dump())
 		require.Contains(t, keys, cm.keyConstraintCheckIdempotency(cm.rateLimitKeyPrefix, accountID, "event1"))
 		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "event1"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "extend-test"))
-		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "acq", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "ext", "extend-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "rel", "release-test"))
+		require.Contains(t, keys, cm.keyOperationIdempotency(cm.rateLimitKeyPrefix, accountID, "chk", checkHash))
 	})
 }

@@ -121,7 +121,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.r.l
 		usage["u"] = math.min(math.max(value.r.l - constraintCapacity, value.r.l), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
@@ -131,7 +131,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.c.l
 		usage["u"] = math.min(math.max(value.c.l - constraintCapacity, value.c.l or 0), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
@@ -140,7 +140,7 @@ for index, value in ipairs(constraints) do
 		local usage = {}
 		usage["l"] = value.t.l
 		usage["u"] = math.min(math.max(value.t.l - constraintCapacity, value.t.l or 0), 0)
-		constraintUsage[index] = usage
+		table.insert(constraintUsage, usage)
 	end
 	if availableCapacity == nil or constraintCapacity < availableCapacity then
 		debug(
