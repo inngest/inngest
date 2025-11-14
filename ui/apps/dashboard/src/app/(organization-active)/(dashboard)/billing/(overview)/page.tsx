@@ -74,7 +74,9 @@ export default async function Page() {
     ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
     : undefined;
 
-  const nextInvoiceAmount = currentPlan.amount
+  const nextInvoiceAmount = currentSubscription?.nextInvoiceAmount
+    ? `$${(currentSubscription.nextInvoiceAmount / 100).toFixed(2)}`
+    : currentPlan.amount
     ? `$${(currentPlan.amount / 100).toFixed(2)}`
     : 'Free';
   const overageAllowed =

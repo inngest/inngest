@@ -196,6 +196,7 @@ export const currentPlanDocument = graphql(`
       }
       subscription {
         nextInvoiceDate
+        nextInvoiceAmount
       }
     }
   }
