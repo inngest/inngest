@@ -72,6 +72,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta/extractors"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
@@ -656,6 +657,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				},
 				SpanExtractor: metadata.SpanExtractors{},
 			},
+			MetadataOpts: extractors.Default,
 		})
 	})
 
