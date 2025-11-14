@@ -16,6 +16,20 @@ type CapacityManager interface {
 	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
 }
 
+// MigrationIdentifier includes hints for the Constraint API which will be removed
+// once all constraint state is moved to a dedicated data store
+//
+// While we can infer the target data store from the contraint, we only send constraints
+// during the Acquire call. Sharing the same migration identifier simplifies this.
+type MigrationIdentifier struct {
+	// IsRateLimit specifies whether the request is linked to a rate limit constraint vs.
+	// queue constraints.
+	//
+	// This is only necessary until constraint state is migrated to a dedicated data store in a later milestone.
+	IsRateLimit bool
+	QueueShard  string
+}
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -42,6 +56,8 @@ type CapacityCheckRequest struct {
 	//
 	// This design assumes that the other side _knows_ the current constraint.
 	Constraints []ConstraintItem
+
+	Migration MigrationIdentifier
 }
 
 type CapacityCheckResponse struct {
@@ -54,6 +70,13 @@ type CapacityCheckResponse struct {
 
 	// Detailed constraint usage for requested constraints
 	Usage []ConstraintUsage
+
+	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
+	FairnessReduction int
+
+	RetryAfter time.Time
+
+	internalDebugState checkScriptResponse
 }
 
 type CapacityAcquireRequest struct {
@@ -99,11 +122,12 @@ type CapacityAcquireRequest struct {
 	// in case the original lease expired by the time the respective item starts processing.
 	LeaseIdempotencyKeys []string
 
-	// ResourceKind specifies the resource kind associated with the lease.
+	// LeaseRunIDs represent individual run IDs associated with the leases.
+	// This may be empty in case the operation is not related to a run.
 	//
-	// For run scheduling, this will be an event.
-	// For queue constraints, this will be one or more queue items.
-	ResourceKind LeaseResourceKind
+	//
+	// This may include duplicates: We may be acquiring leases for multiple items of the same run in parallel.
+	LeaseRunIDs map[string]ulid.ULID
 
 	// CurrentTime specifies the current time on the calling side. If this drifts too far from the manager, the request will be
 	// rejected. For generating the lease expiry, we will use the current time on the manager side.
@@ -126,6 +150,8 @@ type CapacityAcquireRequest struct {
 
 	// Source includes information on the calling service and processing mode for instrumentation purposes and to enforce fairness/avoid starvation.
 	Source LeaseSource
+
+	Migration MigrationIdentifier
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -150,30 +176,50 @@ type CapacityAcquireResponse struct {
 	// ended up reducing the number of leases from the expected Amount.
 	LimitingConstraints []ConstraintItem
 
+	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
+	FairnessReduction int
+
 	RetryAfter time.Time
+
+	internalDebugState acquireScriptResponse
 }
 
 type CapacityExtendLeaseRequest struct {
+	// IdempotencyKey is the operation idempotency key
 	IdempotencyKey string
 
 	AccountID uuid.UUID
-	LeaseID   ulid.ULID
+
+	// LeaseID is the current lease ID
+	LeaseID ulid.ULID
 
 	Duration time.Duration
+
+	Migration MigrationIdentifier
 }
 
 type CapacityExtendLeaseResponse struct {
+	// LeaseID is set to the next lease ID. If this is unset, the lease may have already expired.
 	LeaseID *ulid.ULID
+
+	internalDebugState extendLeaseScriptResponse
 }
 
 type CapacityReleaseRequest struct {
+	// IdempotencyKey is the operation idempotency key
 	IdempotencyKey string
 
 	AccountID uuid.UUID
-	LeaseID   ulid.ULID
+
+	// LeaseID is the current lease ID
+	LeaseID ulid.ULID
+
+	Migration MigrationIdentifier
 }
 
-type CapacityReleaseResponse struct{}
+type CapacityReleaseResponse struct {
+	internalDebugState releaseScriptResponse
+}
 
 type RunProcessingMode int
 
@@ -182,18 +228,6 @@ const (
 	RunProcessingModeBackground RunProcessingMode = iota
 	// RunProcessingModeSync is used for requests sent by the Checkpointing API/Project Zero.
 	RunProcessingModeSync
-)
-
-// LeaseResourceKind specifies the resource associated with the capacity lease.
-//
-// For run scheduling, this is usually an event.
-// For queue constraints, this is one or more queue items.
-type LeaseResourceKind int
-
-const (
-	LeaseResourceUnknown LeaseResourceKind = iota
-	LeaseResourceEvent
-	LeaseResourceQueueItem
 )
 
 type LeaseLocation int

@@ -1170,12 +1170,17 @@ func (q *queue) process(
 				}
 
 				// This idempotency key will change with every refreshed lease, which makes sense.
-				idempotencyKey := capacityLeaseID.String()
+				operationIdempotencyKey := capacityLeaseID.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 					AccountID:      p.AccountID,
-					IdempotencyKey: idempotencyKey,
+					IdempotencyKey: operationIdempotencyKey,
 					LeaseID:        *capacityLeaseID,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  q.primaryQueueShard.Name,
+					},
+					Duration: QueueLeaseDuration,
 				})
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1348,6 +1353,10 @@ func (q *queue) process(
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
 				LeaseID:        *capacityLeaseID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  q.primaryQueueShard.Name,
+				},
 			})
 			if err != nil {
 				q.log.ReportError(err, "failed to release capacity")
@@ -1798,7 +1807,16 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		LeaseConstraints(constraints),
 	}
 
-	constraintRes, err := p.queue.itemLeaseConstraintCheck(ctx, *p.partition, &backlog, constraints, item, p.staticTime)
+	constraintRes, err := p.queue.itemLeaseConstraintCheck(
+		ctx,
+		*p.partition,
+		&partition,
+		&backlog,
+		constraints,
+		item,
+		p.staticTime,
+		p.queue.primaryQueueShard.RedisClient.KeyGenerator(),
+	)
 	if err != nil {
 		p.queue.sem.Release(1)
 		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.queue.primaryQueueShard.Name}})

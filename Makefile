@@ -41,7 +41,7 @@ e2e-golang:
 .PHONY: gen
 gen:
 	go generate ./...
-	make gql queries
+	make gql queries constraintapi-snapshots
 
 .PHONY: protobuf
 protobuf:
@@ -91,6 +91,12 @@ build: docs
 .PHONY: gql
 gql:
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
+
+.PHONY: constraintapi-snapshots
+constraintapi-snapshots:
+	@echo "Regenerating constraint API Lua script snapshots..."
+	rm -rf pkg/constraintapi/testdata/snapshots
+	cd pkg/constraintapi && go test -run TestLuaScriptSnapshots .
 
 .PHONY: clean
 clean:

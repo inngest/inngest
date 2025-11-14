@@ -80,10 +80,13 @@ func (q *queue) backlogRefillConstraintCheck(
 	backlog *QueueBacklog,
 	constraints PartitionConstraintConfig,
 	items []*osqueue.QueueItem,
+	kg QueueKeyGenerator,
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
+	itemRunIDs := make(map[string]ulid.ULID)
 	for i, item := range items {
 		itemIDs[i] = item.ID
+		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
 	if q.capacityManager == nil || q.useConstraintAPI == nil {
@@ -118,16 +121,20 @@ func (q *queue) backlogRefillConstraintCheck(
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
-		ResourceKind:         constraintapi.LeaseResourceQueueItem,
 		Configuration:        constraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(backlog),
+		Constraints:          constraintItemsFromBacklog(shadowPart, backlog, kg),
 		Amount:               len(items),
 		LeaseIdempotencyKeys: itemIDs,
+		LeaseRunIDs:          itemRunIDs,
 		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.LeaseLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		},
+		Migration: constraintapi.MigrationIdentifier{
+			IsRateLimit: false,
+			QueueShard:  q.primaryQueueShard.Name,
 		},
 	})
 	if err != nil {
@@ -185,10 +192,12 @@ type itemLeaseConstraintCheckResult struct {
 func (q *queue) itemLeaseConstraintCheck(
 	ctx context.Context,
 	partition QueuePartition,
+	shadowPart *QueueShadowPartition,
 	backlog *QueueBacklog,
 	constraints PartitionConstraintConfig,
 	item *osqueue.QueueItem,
 	now time.Time,
+	kg QueueKeyGenerator,
 ) (itemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
 
@@ -226,15 +235,17 @@ func (q *queue) itemLeaseConstraintCheck(
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?
 		IdempotencyKey:       idempotencyKey,
-		ResourceKind:         constraintapi.LeaseResourceQueueItem,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
-		FunctionID:           *partition.FunctionID,
-		CurrentTime:          now,
-		Duration:             QueueLeaseDuration,
-		Configuration:        constraintConfigFromConstraints(constraints),
-		Constraints:          constraintItemsFromBacklog(backlog),
-		Amount:               1,
-		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
+		LeaseRunIDs: map[string]ulid.ULID{
+			idempotencyKey: item.Data.Identifier.RunID,
+		},
+		FunctionID:      *partition.FunctionID,
+		CurrentTime:     now,
+		Duration:        QueueLeaseDuration,
+		Configuration:   constraintConfigFromConstraints(constraints),
+		Constraints:     constraintItemsFromBacklog(shadowPart, backlog, kg),
+		Amount:          1,
+		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.LeaseLocationItemLease,
@@ -312,22 +323,24 @@ func constraintConfigFromConstraints(
 	return config
 }
 
-func constraintItemsFromBacklog(backlog *QueueBacklog) []constraintapi.ConstraintItem {
+func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog, kg QueueKeyGenerator) []constraintapi.ConstraintItem {
 	constraints := []constraintapi.ConstraintItem{
 		// Account concurrency (always set)
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeAccount,
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             enums.ConcurrencyScopeAccount,
+				InProgressItemKey: sp.accountInProgressKey(kg),
 			},
 		},
 		// Function concurrency (always set - falls back to account concurrency)
 		{
 			Kind: constraintapi.ConstraintKindConcurrency,
 			Concurrency: &constraintapi.ConcurrencyConstraint{
-				Mode:  enums.ConcurrencyModeStep,
-				Scope: enums.ConcurrencyScopeFn,
+				Mode:              enums.ConcurrencyModeStep,
+				Scope:             enums.ConcurrencyScopeFn,
+				InProgressItemKey: sp.inProgressKey(kg),
 			},
 		},
 	}
@@ -351,6 +364,7 @@ func constraintItemsFromBacklog(backlog *QueueBacklog) []constraintapi.Constrain
 					Scope:             bck.Scope,
 					KeyExpressionHash: bck.HashedKeyExpression,
 					EvaluatedKeyHash:  bck.HashedValue,
+					InProgressItemKey: bck.concurrencyKey(kg),
 				},
 			})
 		}

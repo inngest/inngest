@@ -62,17 +62,11 @@ enum ConstraintApiLeaseService {
   CONSTRAINT_API_LEASE_SERVICE_API = 3;
 }
 
-enum ConstraintApiLeaseResourceKind {
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED = 0;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT = 1;
-  CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM = 2;
-}
-
 // Message definitions
 message RateLimitConfig {
   ConstraintApiRateLimitScope scope = 1;
   int32 limit = 2;
-  string period = 3;
+  int32 period = 3;
   string key_expression_hash = 4;
 }
 
@@ -118,6 +112,7 @@ message ConcurrencyConstraint {
   ConstraintApiConcurrencyScope scope = 2;
   string key_expression_hash = 3;
   string evaluated_key_hash = 4;
+  string in_progress_item_key = 5; 
 }
 
 message ThrottleConstraint {
@@ -147,6 +142,11 @@ message CapacityLease {
   string idempotency_key = 2;
 }
 
+// Migration identifier for constraint API migration hints
+message MigrationIdentifier {
+  bool is_rate_limit = 1;
+  string queue_shard = 2;
+}
 
 message LeaseSource {
   ConstraintApiLeaseService service = 1;
@@ -167,6 +167,8 @@ message CapacityCheckResponse {
   int32 available_capacity = 1;
   repeated ConstraintItem limiting_constraints = 2;
   repeated ConstraintUsage usage = 3;
+  int32 fairness_reduction = 4;
+  google.protobuf.Timestamp retry_after = 5;
 }
 
 message CapacityAcquireRequest {
@@ -178,7 +180,7 @@ message CapacityAcquireRequest {
   repeated ConstraintItem constraints = 6;
   int32 amount = 7;
   repeated string lease_idempotency_keys = 8;
-  ConstraintApiLeaseResourceKind resource_kind = 9;
+  map<string, string> lease_run_ids = 9;
   google.protobuf.Timestamp current_time = 10;
   google.protobuf.Duration duration = 11;
   google.protobuf.Duration maximum_lifetime = 12;
@@ -189,7 +191,8 @@ message CapacityAcquireRequest {
 message CapacityAcquireResponse {
   repeated CapacityLease leases = 1;
   repeated ConstraintItem limiting_constraints = 2;
-  google.protobuf.Timestamp retry_after = 3;
+  int32 fairness_reduction = 3;
+  google.protobuf.Timestamp retry_after = 4;
 }
 
 message CapacityExtendLeaseRequest {
@@ -197,6 +200,7 @@ message CapacityExtendLeaseRequest {
   string account_id = 2;
   string lease_id = 3;
   google.protobuf.Duration duration = 4;
+  MigrationIdentifier migration = 5;
 }
 
 message CapacityExtendLeaseResponse {
@@ -207,6 +211,7 @@ message CapacityReleaseRequest {
   string idempotency_key = 1;
   string account_id = 2;
   string lease_id = 3;
+  MigrationIdentifier migration = 4;
 }
 
 message CapacityReleaseResponse {
