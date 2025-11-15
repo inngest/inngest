@@ -15,6 +15,7 @@
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.26.5",
     "@graphql-typed-document-node/core": "^3.2.0",
+    "@headlessui/react": "^1.7.18",
     "@launchdarkly/node-server-sdk": "^9.0.3",
     "@remixicon/react": "^4.7.0",
     "@sindresorhus/slugify": "^3.0.0",
@@ -27,6 +28,7 @@
     "@urql/exchange-auth": "^3.0.0",
     "@urql/exchange-request-policy": "^2.0.0",
     "@urql/exchange-retry": "^2.0.0",
+    "cmdk": "^1.0.4",
     "dotenv": "^17.2.3",
     "graphql": "16.8.1",
     "graphql-config": "^4.5.0",

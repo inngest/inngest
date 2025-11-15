@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, useState } from "react";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import {
   Tooltip,
   TooltipContent,

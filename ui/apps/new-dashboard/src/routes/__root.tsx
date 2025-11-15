@@ -18,6 +18,7 @@ import { TooltipProvider } from "@inngest/components/Tooltip";
 import { fetchClerkAuth } from "@/data/clerk";
 import { navCollapsed } from "@/data/nav";
 import { QueryClient } from "@tanstack/react-query";
+import URQLProviderWrapper from "@/components/URQL/URQLProvider";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -79,13 +80,15 @@ function RootComponent() {
     <RootDocument>
       <ThemeProvider attribute="class" defaultTheme="system">
         <InngestClerkProvider>
-          {/* TANSTACK TODO: add sentry user identification provider here */}
-          <ClientFeatureFlagProvider>
-            <TooltipProvider delayDuration={0}>
-              <Outlet />
-            </TooltipProvider>
-            {/* TANSTACK TODO: add page view tracker here */}
-          </ClientFeatureFlagProvider>
+          <URQLProviderWrapper>
+            {/* TANSTACK TODO: add sentry user identification provider here */}
+            <ClientFeatureFlagProvider>
+              <TooltipProvider delayDuration={0}>
+                <Outlet />
+              </TooltipProvider>
+              {/* TANSTACK TODO: add page view tracker here */}
+            </ClientFeatureFlagProvider>
+          </URQLProviderWrapper>
         </InngestClerkProvider>
       </ThemeProvider>
     </RootDocument>

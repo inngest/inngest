@@ -1,13 +1,6 @@
-"use client";
-
 import { useState } from "react";
-import { type Route } from "next";
-import NextLink from "next/link";
-import {
-  usePathname,
-  useRouter,
-  useSelectedLayoutSegments,
-} from "next/navigation";
+
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { Listbox } from "@headlessui/react";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import {
@@ -37,11 +30,11 @@ import {
 // we need to redirect to a less specific resource URL that is shared across environments
 // for the user to switch context correctly
 const useSwitchablePathname = (): string => {
-  const segments = useSelectedLayoutSegments();
-  const segmentsWithoutRouteGroups = segments.filter(
-    (segment) => !segment.startsWith("(") && !segment.endsWith(")"),
-  );
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  // Parse pathname into segments (TanStack Router doesn't have route groups like Next.js)
+  const segments = pathname.split("/").filter((segment) => segment.length > 0);
 
   // Accounts are not environment specific
   if (pathname.match(/^\/settings\//)) {
@@ -53,27 +46,24 @@ const useSwitchablePathname = (): string => {
   }
 
   // Deploys should always move to the root resource level
-  if (segmentsWithoutRouteGroups[0] === "apps") {
+  if (segments[0] === "apps") {
     return "/apps";
   }
   // Manage paths, we drop the id at the end
-  if (segmentsWithoutRouteGroups[0] === "manage") {
-    return "/" + segmentsWithoutRouteGroups.slice(0, 2).join("/");
+  if (segments[0] === "manage") {
+    return "/" + segments.slice(0, 2).join("/");
   }
 
   // Logs are specific to a given environment, return to the function dashboard
-  if (
-    segmentsWithoutRouteGroups[0] === "functions" &&
-    segmentsWithoutRouteGroups[2] === "logs"
-  ) {
-    return "/" + segmentsWithoutRouteGroups.slice(0, 3).join("/");
+  if (segments[0] === "functions" && segments[2] === "logs") {
+    return "/" + segments.slice(0, 3).join("/");
   }
 
-  if (segmentsWithoutRouteGroups.length === 0) {
+  if (segments.length === 0) {
     return "/functions"; // default if selected from /env
   }
 
-  return "/" + segmentsWithoutRouteGroups.join("/");
+  return "/" + segments.join("/");
 };
 
 const selectedName = (name: string, collapsed: boolean) => {
@@ -132,7 +122,7 @@ export default function EnvironmentSelectMenu({
   activeEnv,
   collapsed,
 }: EnvironmentSelectMenuProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<Environment | null>(null);
   const nextPathname = useSwitchablePathname();
   const [{ data: envs = [], error }] = useEnvironments();
@@ -174,7 +164,9 @@ export default function EnvironmentSelectMenu({
     setSelected(env);
 
     // When switching environments, use the switchable pathname
-    router.push(`/env/${env.slug}${nextPathname}` as Route);
+    navigate({
+      to: `/env/${env.slug}${nextPathname}`,
+    });
   };
 
   return (
@@ -228,25 +220,24 @@ export default function EnvironmentSelectMenu({
                   />
                 ))
               ) : (
-                <NextLink
-                  href="/env"
+                <div
+                  onClick={() => navigate({ to: "/env" as any })}
                   className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
                 >
                   <RiLoopLeftLine className="h-3 w-3" />
                   Sync a branch
-                </NextLink>
+                </div>
               )}
             </div>
 
             <div>
-              <NextLink
-                prefetch={true}
-                href="/env"
+              <div
+                onClick={() => navigate({ to: "/env" as any })}
                 className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
-              </NextLink>
+              </div>
             </div>
           </Listbox.Options>
         </div>

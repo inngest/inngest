@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal } from "@inngest/components/Modal";
-import { Pill } from "@inngest/components/Pill/Pill";
+import { Pill } from "@inngest/components/Pill/NewPill";
 import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
 import { cn } from "@inngest/components/utils/classNames";
 import { RiSearchLine } from "@remixicon/react";

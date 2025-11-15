@@ -1,7 +1,5 @@
-"use client";
-
 import { useCallback, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+
 import {
   baseFetchSkipped,
   baseFetchSucceeded,
@@ -14,6 +12,7 @@ import {
 import { useQuery, type TypedDocumentNode, type UseQueryArgs } from "urql";
 
 import { skipCacheSearchParam } from "./urls";
+import { useSearch } from "@tanstack/react-router";
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -75,9 +74,9 @@ export function useSkippableGraphQLQuery<
   ResultT,
   { skippable: true }
 > {
-  const searchParams = useSearchParams();
+  const search = useSearch({ strict: false }) as Record<string, unknown>;
   const skipCache =
-    searchParams.get(skipCacheSearchParam.name) === skipCacheSearchParam.value;
+    search[skipCacheSearchParam.name] === skipCacheSearchParam.value;
 
   // Store the result data in a ref because we don't want polling errors to
   // clear that cached data. If urql has a first-class way of doing this then we
