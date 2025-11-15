@@ -41,6 +41,8 @@ export default async function Page() {
     await getBillingDetails();
   };
 
+  const isCurrentHobbyPlan = isHobbyPlan(currentPlan);
+
   const legacyNoRunsPlan = entitlements.runCount.limit === null;
   const runs: Data = {
     title: 'Runs',
@@ -67,7 +69,19 @@ export default async function Page() {
     current: entitlements.stepCount.usage || 0,
     limit: entitlements.stepCount.limit || null,
     overageAllowed: entitlements.stepCount.overageAllowed,
-    tooltipContent: 'An individual step in durable functions.',
+    tooltipContent: isExecutionBasedPlan
+      ? 'Combined total of runs and steps executed.'
+      : 'An individual step in durable functions.',
+  };
+  const executions: Data = {
+    title: 'Executions',
+    description: isCurrentHobbyPlan
+      ? 'The maximum number of executions per month'
+      : 'Additional usage billed at the start of the next billing cycle.',
+    current: entitlements.executions.usage || 0,
+    limit: entitlements.executions.limit || null,
+    overageAllowed: entitlements.executions.overageAllowed,
+    tooltipContent: 'Combined total of runs and steps executed.',
   };
 
   const nextInvoiceDate = currentSubscription?.nextInvoiceDate
@@ -82,7 +96,6 @@ export default async function Page() {
     !isHobbyFreePlan(currentPlan);
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
-  const isCurrentHobbyPlan = isHobbyPlan(currentPlan);
 
   const advancedObservabilityAddon = {
     available: addons.advancedObservability.available,
@@ -142,6 +155,7 @@ export default async function Page() {
           </div>
           {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
           {!isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
+          {isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />}
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}

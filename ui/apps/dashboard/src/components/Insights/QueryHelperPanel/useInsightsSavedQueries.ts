@@ -10,6 +10,7 @@ import {
   type DeleteQueryArgs,
   type MutationResult,
   type SaveQueryArgs,
+  type ShareQueryArgs,
   type UpdateQueryArgs,
 } from './useModifySavedQueries';
 
@@ -18,7 +19,10 @@ const insightsSavedQueriesQuery = graphql(`
     account {
       insightsQueries {
         id
+        creator
+        lastEditor
         name
+        shared
         sql
         createdAt
         updatedAt
@@ -34,12 +38,13 @@ export interface UseInsightsSavedQueriesReturn {
   savedQueries: undefined | InsightsQueryStatement[];
   savedQueriesError: undefined | CombinedError;
   saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  shareQuery: (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
   updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
   const [result, reexecute] = useQuery({ query: insightsSavedQueriesQuery });
-  const { saveQuery, updateQuery, deleteQuery } = useModifySavedQueries();
+  const { deleteQuery, saveQuery, shareQuery, updateQuery } = useModifySavedQueries();
 
   const refetchSavedQueries = useCallback(() => {
     reexecute({ requestPolicy: 'network-only' });
@@ -54,6 +59,7 @@ export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
     savedQueries,
     savedQueriesError: result.error,
     saveQuery,
+    shareQuery,
     updateQuery,
   };
 }
