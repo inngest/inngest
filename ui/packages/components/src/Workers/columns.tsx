@@ -12,6 +12,7 @@ const columnsIDs = [
   'connectedAt',
   'status',
   'lastHeartbeatAt',
+  'maxWorkerConcurrency',
   'appVersion',
 ] as const;
 export type ColumnID = (typeof columnsIDs)[number];
@@ -106,6 +107,21 @@ export function useColumns() {
       header: 'Last heartbeat',
       enableSorting: true,
       id: ensureColumnID('lastHeartbeatAt'),
+    }),
+
+    columnHelper.accessor('maxWorkerConcurrency', {
+      cell: (info) => {
+        const concurrency = info.getValue();
+
+        return (
+          <div className="flex items-center">
+            <TextCell>{concurrency}</TextCell>
+          </div>
+        );
+      },
+      header: 'Max concurrency',
+      enableSorting: false,
+      id: ensureColumnID('maxWorkerConcurrency'),
     }),
 
     columnHelper.accessor('appVersion', {
