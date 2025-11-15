@@ -43,8 +43,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -399,8 +399,8 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{}, // Empty slice
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -663,8 +663,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -696,8 +696,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceNewRuns,
@@ -729,8 +729,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -762,8 +762,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -795,8 +795,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceAPI,
@@ -958,8 +958,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -991,8 +991,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1024,8 +1024,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1088,8 +1088,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1121,8 +1121,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1154,8 +1154,8 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1404,8 +1404,8 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				Constraints:          tt.constraints,
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
-				MaximumLifetime:      30 * time.Minute,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -2173,6 +2173,314 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 			},
 			wantErr: true,
 			errMsgs: []string{"invalid constraint 0", "run level concurrency is not implemented yet"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				for _, expectedMsg := range tt.errMsgs {
+					assert.Contains(t, err.Error(), expectedMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
+	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+	kindConcurrency := ConstraintKindConcurrency
+
+	tests := []struct {
+		name    string
+		request CapacityAcquireRequest
+		wantErr bool
+		errMsgs []string
+	}{
+		{
+			name: "negative amount is invalid",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               -1, // Negative amount
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1"},
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must request at least one lease"},
+		},
+		{
+			name: "zero amount is invalid",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               0, // Zero amount
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1"},
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must request at least one lease"},
+		},
+		{
+			name: "amount greater than lease keys - too few keys",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               3, // Request 3 leases
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2"}, // Only 2 keys
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must provide as many lease idempotency keys as amount"},
+		},
+		{
+			name: "amount less than lease keys - too many keys",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               2, // Request 2 leases
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // 3 keys
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must provide as many lease idempotency keys as amount"},
+		},
+		{
+			name: "valid case - amount matches lease keys",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               3, // Request 3 leases
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // Exactly 3 keys
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero amount with empty lease keys (both invalid)",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               0, // Zero amount
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{}, // Empty
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must request at least one lease", "missing lease idempotency keys"},
+		},
+		{
+			name: "very large negative amount",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               -999999, // Very large negative amount
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{"lease-key-1"},
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must request at least one lease"},
+		},
+		{
+			name: "large positive amount with matching keys - should exceed maximum",
+			request: CapacityAcquireRequest{
+				IdempotencyKey: "test-key",
+				AccountID:      accountID,
+				EnvID:          envID,
+				FunctionID:     functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Amount:               25, // Exceeds MaximumAmount of 20
+				CurrentTime:          baseTime,
+				Duration:             30 * time.Second,
+				MaximumLifetime:      time.Minute,
+				LeaseIdempotencyKeys: []string{ // Create 25 keys to match amount
+						"lease-key-0", "lease-key-1", "lease-key-2", "lease-key-3", "lease-key-4",
+						"lease-key-5", "lease-key-6", "lease-key-7", "lease-key-8", "lease-key-9",
+						"lease-key-10", "lease-key-11", "lease-key-12", "lease-key-13", "lease-key-14",
+						"lease-key-15", "lease-key-16", "lease-key-17", "lease-key-18", "lease-key-19",
+						"lease-key-20", "lease-key-21", "lease-key-22", "lease-key-23", "lease-key-24",
+					},
+				Source: LeaseSource{
+					Service:  ServiceExecutor,
+					Location: LeaseLocationItemLease,
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must request no more than 20 leases"},
 		},
 	}
 

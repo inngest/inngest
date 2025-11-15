@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"fmt"
+	"hash/crc32"
 	"sync"
 	"time"
 
@@ -60,6 +61,12 @@ type ScavengeResult struct {
 	TotalAccountsCount        int
 	ReclaimedLeases           int
 	ScannedAccounts           int
+}
+
+// scavengerShard deterministically retrieves a shard number based on numScavengerShards and accountID
+func (r *redisCapacityManager) scavengerShard(ctx context.Context, accountID uuid.UUID) int {
+	hash := crc32.ChecksumIEEE([]byte(accountID.String()))
+	return int(hash) % r.numScavengerShards
 }
 
 func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavengerOpt) (*ScavengeResult, errs.InternalError) {
