@@ -264,7 +264,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsgs: []string{"missing duration"},
+			errMsgs: []string{"duration smaller than minimum"},
 		},
 		{
 			name: "missing maximum lifetime",
@@ -377,7 +377,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsgs: []string{"must request capacity"},
+			errMsgs: []string{"must provide constraints"},
 		},
 		{
 			name: "missing lease idempotency keys",
@@ -438,12 +438,12 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				"missing functionID",
 				"missing constraint config workflow version",
 				"missing current time",
-				"missing duration",
+				"duration smaller than minimum",
 				"missing maximum lifetime",
 				"missing source service",
 				"missing source location",
 				"missing lease idempotency keys",
-				"must request capacity",
+				"must provide constraints",
 			},
 		},
 		{
@@ -466,7 +466,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             5 * time.Minute,
+				Duration:             30 * time.Second,
 				BlockingThreshold:    0, // Zero blocking threshold should be valid since it's not required
 				MaximumLifetime:      30 * time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
@@ -531,8 +531,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             1 * time.Nanosecond,
-				MaximumLifetime:      1 * time.Nanosecond,
+				Duration:             3 * time.Second,
+				MaximumLifetime:      5 * time.Minute,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -564,8 +564,8 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             24 * time.Hour,
-				MaximumLifetime:      168 * time.Hour, // 1 week
+				Duration:             1 * time.Minute,
+				MaximumLifetime:      24 * time.Hour,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -608,7 +608,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsgs: []string{"missing duration"},
+			errMsgs: []string{"duration smaller than minimum"},
 		},
 		{
 			name: "negative maximum lifetime is invalid",
@@ -859,8 +859,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          time.Unix(0, 1), // Minimum non-zero time
-				Duration:             1,               // Minimum non-zero duration
-				MaximumLifetime:      1,               // Minimum non-zero lifetime
+				Duration:             3 * time.Second, // Minimum allowed duration
+				MaximumLifetime:      5 * time.Minute, // Minimum reasonable lifetime
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -892,8 +892,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             time.Duration(1<<63 - 1), // Max duration
-				MaximumLifetime:      time.Duration(1<<63 - 1), // Max lifetime
+				Duration:             1 * time.Minute,  // Max allowed duration
+				MaximumLifetime:      24 * time.Hour,   // Max allowed lifetime
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -925,7 +925,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
-				Duration:             1 * time.Hour,
+				Duration:             1 * time.Minute,
 				MaximumLifetime:      24 * time.Hour,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
@@ -969,7 +969,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 					QueueShard: "test",
 				},
 			},
-			wantErr: false, // Validation doesn't check key length
+			wantErr: true, // Key exceeds maximum length of 128 characters
 		},
 		{
 			name: "single character idempotency key",
@@ -1739,12 +1739,22 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				FunctionID: functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
+					RateLimit: []RateLimitConfig{
+						{
+							Scope:             enums.RateLimitScopeFn,
+							Limit:             100,
+							Period:            60,
+							KeyExpressionHash: "rate-key",
+						},
+					},
 				},
 				Constraints: []ConstraintItem{
 					{
 						Kind: ConstraintKindRateLimit,
 						RateLimit: &RateLimitConstraint{
-							EvaluatedKeyHash: "rate-key-hash",
+							Scope:             enums.RateLimitScopeFn,
+							KeyExpressionHash: "rate-key",
+							EvaluatedKeyHash:  "rate-key-hash",
 						},
 					},
 				},
@@ -1762,12 +1772,23 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				FunctionID: functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:                    enums.ThrottleScopeFn,
+							ThrottleKeyExpressionHash: "throttle-key",
+							Limit:                    10,
+							Burst:                    20,
+							Period:                   60,
+						},
+					},
 				},
 				Constraints: []ConstraintItem{
 					{
 						Kind: ConstraintKindThrottle,
 						Throttle: &ThrottleConstraint{
-							EvaluatedKeyHash: "throttle-key-hash",
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key-hash",
 						},
 					},
 				},
@@ -2099,18 +2120,31 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				FunctionID: functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:                    enums.ThrottleScopeFn,
+							ThrottleKeyExpressionHash: "throttle-key-1",
+							Limit:                    10,
+							Burst:                    20,
+							Period:                   60,
+						},
+					},
 				},
 				Constraints: []ConstraintItem{
 					{
 						Kind: ConstraintKindThrottle,
 						Throttle: &ThrottleConstraint{
-							EvaluatedKeyHash: "throttle-key-1",
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key-1",
+							EvaluatedKeyHash:  "throttle-key-1",
 						},
 					},
 					{
 						Kind: ConstraintKindThrottle,
 						Throttle: &ThrottleConstraint{
-							EvaluatedKeyHash: "throttle-key-2",
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key-1",
+							EvaluatedKeyHash:  "throttle-key-2",
 						},
 					},
 				},
@@ -2128,6 +2162,15 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				FunctionID: functionID,
 				Configuration: ConstraintConfig{
 					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:                    enums.ThrottleScopeFn,
+							ThrottleKeyExpressionHash: "throttle-key",
+							Limit:                    10,
+							Burst:                    20,
+							Period:                   60,
+						},
+					},
 				},
 				Constraints: []ConstraintItem{
 					{
@@ -2139,7 +2182,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: ConstraintKindThrottle,
 						Throttle: &ThrottleConstraint{
-							EvaluatedKeyHash: "throttle-key",
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key",
 						},
 					},
 				},

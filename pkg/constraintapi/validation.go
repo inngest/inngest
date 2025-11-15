@@ -186,7 +186,7 @@ func (r *CapacityAcquireRequest) Valid() error {
 	}
 
 	if len(r.Constraints) == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("must provide constraints to check"))
+		errs = multierror.Append(errs, fmt.Errorf("must provide constraints"))
 	}
 
 	if len(r.Constraints) > MaxConstraints {
@@ -320,7 +320,7 @@ func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 			}
 		}
 		if !found {
-			return fmt.Errorf("unknown rate lmit constraint")
+			return fmt.Errorf("unknown rate limit constraint")
 		}
 	}
 	return nil
