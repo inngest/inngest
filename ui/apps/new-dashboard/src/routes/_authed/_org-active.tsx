@@ -1,8 +1,8 @@
-import { getEnv } from "@/components/Environments/data";
 import SideBar from "@/components/Layout/SideBar";
 import URQLProviderWrapper from "@/components/URQL/URQLProvider";
 import { navCollapsed } from "@/data/nav";
-import { createFileRoute, Outlet, useParams } from "@tanstack/react-router";
+import { getEnvironment } from "@/queries/server-only/getEnvironment";
+import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authed/_org-active")({
   component: OrgActive,
@@ -18,7 +18,13 @@ export const Route = createFileRoute("/_authed/_org-active")({
     ],
   }),
   loader: async ({ params }: { params: { env?: string } }) => {
-    const env = params.env ? await getEnv(params.env) : undefined;
+    const env = params.env
+      ? await getEnvironment({ environmentSlug: params.env })
+      : undefined;
+
+    if (!env) {
+      throw notFound();
+    }
     return {
       env,
       navCollapsed: await navCollapsed(),

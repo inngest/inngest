@@ -1,14 +1,16 @@
-import { getCookies } from "@tanstack/react-start/server";
-
 import {
   GraphQLClient,
   type RequestMiddleware,
   type ResponseMiddleware,
 } from "graphql-request";
 import { notFound } from "@tanstack/react-router";
-import { auth } from "@clerk/tanstack-react-start/server";
 
 const requestMiddleware: RequestMiddleware = async (request) => {
+  //
+  // Lazy import server-only modules to prevent them from being bundled for the client
+  const { auth } = await import("@clerk/tanstack-react-start/server");
+  const { getCookies } = await import("@tanstack/react-start/server");
+
   const { getToken } = await auth();
   const sessionToken = await getToken();
 
@@ -19,6 +21,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
       Authorization: `Bearer ${sessionToken}`,
     };
   } else {
+    //
     // Need to forward the `Cookie` header for non-Clerk users.
     // TANSTACK TODO: what is this? do we still need it
     const allCookies = getCookies();
