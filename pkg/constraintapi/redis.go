@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +103,10 @@ func NewRedisCapacityManager(
 
 	if manager.clock == nil {
 		manager.clock = clockwork.NewRealClock()
+	}
+
+	if manager.numScavengerShards == 0 {
+		manager.numScavengerShards = 64
 	}
 
 	return manager, nil
@@ -247,6 +252,12 @@ type acquireScriptResponse struct {
 	Debug               []string `json:"d"`
 }
 
+// scavengerShard deterministically retrieves a shard number based on numScavengerShards and accountID
+func (r *redisCapacityManager) scavengerShard(ctx context.Context, accountID uuid.UUID) int {
+	hash := crc32.ChecksumIEEE([]byte(accountID.String()))
+	return int(hash) % r.numScavengerShards
+}
+
 // Acquire implements CapacityManager.
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	// Validate request
@@ -288,8 +299,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	requestState, sortedConstraints := buildRequestState(req, keyPrefix)
 
-	// TODO: Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := 0
+	// Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	// Build Lua request
 
@@ -566,8 +577,8 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		return nil, errs.Wrap(0, false, "failed to get client: %w", err)
 	}
 
-	// TODO: Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := 0
+	// Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	leaseExpiry := now.Add(req.Duration)
 	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
@@ -655,8 +666,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "could not get client: %w", err)
 	}
 
-	// TODO: Deterministically compute this based on numScavengerShards and accountID
-	scavengerShard := 0
+	// Deterministically compute this based on numScavengerShards and accountID
+	scavengerShard := r.scavengerShard(ctx, req.AccountID)
 
 	keys := []string{
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "rel", req.IdempotencyKey),
