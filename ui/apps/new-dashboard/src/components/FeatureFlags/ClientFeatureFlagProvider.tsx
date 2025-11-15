@@ -49,10 +49,10 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
 }
 
 let clientSideID: string;
-if (process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID) {
-  clientSideID = process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID;
+if (import.meta.env.VITE_LAUNCH_DARKLY_CLIENT_ID) {
+  clientSideID = import.meta.env.VITE_LAUNCH_DARKLY_CLIENT_ID;
 } else {
-  console.error("missing NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID");
+  console.error("missing VITE_LAUNCH_DARKLY_CLIENT_ID");
   clientSideID = "missing";
 }
 

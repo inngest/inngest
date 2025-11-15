@@ -6,7 +6,7 @@ import {
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
 } from "@tanstack/react-router";
 
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
@@ -15,8 +15,13 @@ import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { ThemeProvider } from "next-themes";
 import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
 import { TooltipProvider } from "@inngest/components/Tooltip";
+import { fetchClerkAuth } from "@/data/clerk";
+import { navCollapsed } from "@/data/nav";
+import { QueryClient } from "@tanstack/react-query";
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+}>()({
   head: () => ({
     meta: [
       {
@@ -54,11 +59,17 @@ export const Route = createRootRoute({
     ],
   }),
   beforeLoad: async () => {
-    // const { userId, token } = await fetchClerkAuth()
-    // return {
-    //   userId,
-    //   token,
-    // }
+    const { userId, token } = await fetchClerkAuth();
+
+    return {
+      userId,
+      token,
+    };
+  },
+  loader: async () => {
+    return {
+      navCollapsed: await navCollapsed(),
+    };
   },
   component: RootComponent,
 });
