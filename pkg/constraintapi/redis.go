@@ -457,7 +457,10 @@ type checkScriptResponse struct {
 
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
-	// TODO: Validate request
+	// Validate request
+	if err := req.Valid(); err != nil {
+		return nil, nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
 
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state

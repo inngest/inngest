@@ -1696,6 +1696,502 @@ func TestCapacityExtendLeaseRequestValid(t *testing.T) {
 	}
 }
 
+func TestCapacityCheckRequestValid(t *testing.T) {
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+	kindConcurrency := ConstraintKindConcurrency
+
+	tests := []struct {
+		name    string
+		request CapacityCheckRequest
+		wantErr bool
+		errMsgs []string
+	}{
+		{
+			name: "valid request with concurrency constraint",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with rate limit constraint",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							EvaluatedKeyHash: "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with throttle constraint",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							EvaluatedKeyHash: "throttle-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing account ID",
+			request: CapacityCheckRequest{
+				AccountID:  uuid.Nil,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing accountID"},
+		},
+		{
+			name: "missing env ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      uuid.Nil,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing envID"},
+		},
+		{
+			name: "missing function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing functionID"},
+		},
+		{
+			name: "missing constraint config function version",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing constraint config workflow version"},
+		},
+		{
+			name: "missing constraints",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{}, // Empty slice
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"must provide constraints"},
+		},
+		{
+			name: "invalid constraint - concurrency missing InProgressItemKey",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "", // Missing required field
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid constraint 0", "concurrency constraint must specify InProgressItemKey"},
+		},
+		{
+			name: "invalid constraint - throttle missing EvaluatedKeyHash",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							EvaluatedKeyHash: "", // Missing required field
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid constraint 0", "throttle constraint must include EvaluatedKeyHash"},
+		},
+		{
+			name: "invalid constraint - rate limit missing EvaluatedKeyHash",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							EvaluatedKeyHash: "", // Missing required field
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid constraint 0", "rate limit constraint must include EvaluatedKeyHash"},
+		},
+		{
+			name: "invalid - mixed queue and rate limit constraints",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							EvaluatedKeyHash: "rate-key-hash",
+						},
+					},
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard:  "test",
+					IsRateLimit: true,
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"cannot mix queue and rate limit constraints for first stage"},
+		},
+		{
+			name: "missing rate limit flag in migration identifier",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							EvaluatedKeyHash: "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false, // Should be true for rate limit constraints
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing rate limit flag in migration identifier"},
+		},
+		{
+			name: "missing queue shard in migration identifier",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "", // Should be provided for queue constraints
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"missing queue shard in migration identifier"},
+		},
+		{
+			name: "multiple validation errors",
+			request: CapacityCheckRequest{
+				AccountID:  uuid.Nil,
+				EnvID:      uuid.Nil,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{}, // Empty slice
+				Migration:   MigrationIdentifier{},
+			},
+			wantErr: true,
+			errMsgs: []string{
+				"missing accountID",
+				"missing envID",
+				"missing functionID",
+				"missing constraint config workflow version",
+				"must provide constraints",
+			},
+		},
+		{
+			name: "valid request with multiple concurrency constraints",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key-1",
+						},
+					},
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with multiple throttle constraints",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							EvaluatedKeyHash: "throttle-key-1",
+						},
+					},
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							EvaluatedKeyHash: "throttle-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with concurrency and throttle constraints",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							InProgressItemKey: "test-key",
+						},
+					},
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							EvaluatedKeyHash: "throttle-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "constraint with run mode concurrency",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Mode:              enums.ConcurrencyModeRun,
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"invalid constraint 0", "run level concurrency is not implemented yet"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				for _, expectedMsg := range tt.errMsgs {
+					assert.Contains(t, err.Error(), expectedMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestCapacityReleaseRequestValid(t *testing.T) {
 	accountID := uuid.New()
 	leaseID := ulid.Make()
