@@ -43,7 +43,6 @@ type ConcurrencyConstraint struct {
 	InProgressItemKey string
 }
 
-// TODO: Add comprehensive tests around this
 func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, envID, functionID uuid.UUID) string {
 	switch c.Mode {
 	case enums.ConcurrencyModeStep:
