@@ -1292,11 +1292,13 @@ func TestCapacityCheckResponseConversion(t *testing.T) {
 				AvailableCapacity:   0,
 				LimitingConstraints: []ConstraintItem{},
 				Usage:               []ConstraintUsage{},
+				RetryAfter:          time.Time{},
 			},
 			expected: &pb.CapacityCheckResponse{
 				AvailableCapacity:   0,
 				LimitingConstraints: []*pb.ConstraintItem{},
 				Usage:               []*pb.ConstraintUsage{},
+				RetryAfter:          nil,
 			},
 		},
 		{

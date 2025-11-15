@@ -120,7 +120,7 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = rlRes[2] / 1000000 
 		local usage = {}
 		usage["l"] = value.r.l
-		usage["u"] = math.min(math.max(value.r.l - constraintCapacity, value.r.l), 0)
+		usage["u"] = math.max(math.min(value.r.l - constraintCapacity, value.r.l), 0)
 		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
@@ -130,7 +130,19 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressTotal
 		local usage = {}
 		usage["l"] = value.c.l
-		usage["u"] = math.min(math.max(value.c.l - constraintCapacity, value.c.l or 0), 0)
+		usage["u"] = math.max(math.min(value.c.l - constraintCapacity, value.c.l or 0), 0)
+		debug(
+			"i",
+			index,
+			"ipi",
+			inProgressItems,
+			"ipl",
+			inProgressLeases,
+			"ipt",
+			inProgressTotal,
+			"cc",
+			constraintCapacity
+		)
 		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		debug("evaluating throttle")
@@ -139,7 +151,7 @@ for index, value in ipairs(constraints) do
 		constraintRetryAfter = throttleRes[2] 
 		local usage = {}
 		usage["l"] = value.t.l
-		usage["u"] = math.min(math.max(value.t.l - constraintCapacity, value.t.l or 0), 0)
+		usage["u"] = math.max(math.min(value.t.l - constraintCapacity, value.t.l or 0), 0)
 		table.insert(constraintUsage, usage)
 	end
 	if availableCapacity == nil or constraintCapacity < availableCapacity then

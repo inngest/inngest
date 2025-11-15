@@ -623,12 +623,17 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 		usage[i] = ConstraintUsageToProto(u)
 	}
 
+	var retryAfter *timestamppb.Timestamp
+	if !resp.RetryAfter.IsZero() {
+		retryAfter = timestamppb.New(resp.RetryAfter)
+	}
+
 	return &pb.CapacityCheckResponse{
 		AvailableCapacity:   int32(resp.AvailableCapacity),
 		LimitingConstraints: limitingConstraints,
 		Usage:               usage,
 		FairnessReduction:   int32(resp.FairnessReduction),
-		RetryAfter:          timestamppb.New(resp.RetryAfter),
+		RetryAfter:          retryAfter,
 	}
 }
 
