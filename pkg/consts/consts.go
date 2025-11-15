@@ -152,6 +152,8 @@ const (
 	ConnectWorkerNoConcurrencyLimitForRequests = -1
 
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
+
+	ConstraintAPIScavengerTick = 500 * time.Millisecond
 )
 
 var (

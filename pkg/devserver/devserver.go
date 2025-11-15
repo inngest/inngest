@@ -176,6 +176,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
+	services := []service.Service{}
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    opts.InMemory,
 		PostgresURI: opts.PostgresURI,
@@ -354,7 +356,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			shards[k] = qs.RedisClient.Client()
 		}
 
-		capacityManager, err = constraintapi.NewRedisCapacityManager(
+		cm, err := constraintapi.NewRedisCapacityManager(
 			constraintapi.WithClock(clockwork.NewRealClock()),
 			constraintapi.WithNumScavengerShards(1),
 			constraintapi.WithQueueShards(shards),
@@ -370,6 +372,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
+
+		capacityManager = cm
+
+		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
 	}
 
 	if opts.RetryInterval > 0 {
@@ -724,7 +730,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+	services = append(services, ds, runner, executorSvc, ds.Apiservice, connGateway)
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
