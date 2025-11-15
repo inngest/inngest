@@ -124,52 +124,55 @@ func (r *redisCapacityManager) Scavenge(ctx context.Context, options ...scavenge
 }
 
 func (r *redisCapacityManager) scavengePrefix(ctx context.Context, mi MigrationIdentifier, client rueidis.Client, keyPrefix string, o *scavengerOptions, now time.Time) (*ScavengeResult, error) {
-	// TODO: Pick random shard
-	scavengerShard := 0
-
-	// Peek accounts
-	peekedAccounts, err := r.peekScavengerShard(ctx, keyPrefix, client, scavengerShard, o.accountsPeekSize, now)
-	if err != nil {
-		return nil, fmt.Errorf("could not peek accounts to scavenge expired leases: %w", err)
-	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.SetLimit(o.concurrency)
-
-	result := &ScavengeResult{
-		ScannedAccounts: len(peekedAccounts),
-	}
+	result := &ScavengeResult{}
 	resLock := sync.Mutex{}
 
-	for _, accountID := range peekedAccounts {
-		eg.Go(func() error {
-			res, err := r.scavengeAccount(
-				ctx,
-				mi,
-				keyPrefix,
-				client,
-				accountID,
-				o.leasesPeekSize,
-				now,
-			)
-			if err != nil {
-				return fmt.Errorf("could not scavenge account: %w", err)
-			}
+	// Iterate over shards
+	// TODO: We could also do a random shard strategy
+	for scavengerShard := range r.numScavengerShards {
+		// Peek accounts
+		peekedAccounts, err := r.peekScavengerShard(ctx, keyPrefix, client, scavengerShard, o.accountsPeekSize, now)
+		if err != nil {
+			return nil, fmt.Errorf("could not peek accounts to scavenge expired leases: %w", err)
+		}
 
-			resLock.Lock()
-			result.TotalCount += res.TotalCount
-			result.ReclaimedLeases += res.ReclaimedLeases
-			resLock.Unlock()
+		resLock.Lock()
+		result.ScannedAccounts += len(peekedAccounts)
+		resLock.Unlock()
 
-			return nil
-		})
-	}
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
-	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("could not scavenge accounts: %w", err)
+		eg, ctx := errgroup.WithContext(ctx)
+		eg.SetLimit(o.concurrency)
+
+		for _, accountID := range peekedAccounts {
+			eg.Go(func() error {
+				res, err := r.scavengeAccount(
+					ctx,
+					mi,
+					keyPrefix,
+					client,
+					accountID,
+					o.leasesPeekSize,
+					now,
+				)
+				if err != nil {
+					return fmt.Errorf("could not scavenge account: %w", err)
+				}
+
+				resLock.Lock()
+				result.TotalCount += res.TotalCount
+				result.ReclaimedLeases += res.ReclaimedLeases
+				resLock.Unlock()
+
+				return nil
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			return nil, fmt.Errorf("could not scavenge accounts: %w", err)
+		}
 	}
 
 	return result, nil
