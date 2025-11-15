@@ -2,11 +2,19 @@ package constraintapi
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+)
+
+const (
+	MaximumLeaseLifetime = 24 * time.Hour
+	MaximumDuration      = 1 * time.Minute
+	MaximumAmount        = 20
+	MaxConstraints       = 10
 )
 
 func (r *CapacityCheckRequest) Valid() error {
@@ -32,6 +40,10 @@ func (r *CapacityCheckRequest) Valid() error {
 
 	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must provide constraints"))
+	}
+
+	if len(r.Constraints) > MaxConstraints {
+		errs = multierror.Append(errs, fmt.Errorf("exceeds %d maximum constraints", MaxConstraints))
 	}
 
 	// Validate individual constraint items
@@ -105,10 +117,18 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing duration"))
 	}
 
+	if r.Duration > MaximumDuration {
+		errs = multierror.Append(errs, fmt.Errorf("duration exceeds max value of %s", MaximumDuration))
+	}
+
 	// NOTE: We do not verify blocking threshold.
 
 	if r.MaximumLifetime <= 0 {
 		errs = multierror.Append(errs, fmt.Errorf("missing maximum lifetime"))
+	}
+
+	if r.MaximumLifetime > MaximumLeaseLifetime {
+		errs = multierror.Append(errs, fmt.Errorf("exceeds maximum lease lifetime of %s", MaximumLeaseLifetime))
 	}
 
 	if r.Source.Service == ServiceUnknown {
@@ -123,10 +143,26 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing lease idempotency keys"))
 	}
 
+	if r.Amount <= 0 {
+		errs = multierror.Append(errs, fmt.Errorf("must request at least one lease"))
+	}
+
+	if r.Amount != len(r.LeaseIdempotencyKeys) {
+		errs = multierror.Append(errs, fmt.Errorf("must provide as many lease idempotency keys as amount"))
+	}
+
+	if r.Amount > MaximumAmount {
+		errs = multierror.Append(errs, fmt.Errorf("must request no more than %d leases", MaximumAmount))
+	}
+
 	// TODO: Validate configuration
 
 	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must provide constraints to check"))
+	}
+
+	if len(r.Constraints) > MaxConstraints {
+		errs = multierror.Append(errs, fmt.Errorf("exceeds %d maximum constraints", MaxConstraints))
 	}
 
 	// Validate individual constraint items
