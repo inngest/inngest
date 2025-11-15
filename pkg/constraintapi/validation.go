@@ -12,9 +12,17 @@ import (
 
 const (
 	MaximumLeaseLifetime = 24 * time.Hour
+	MinimumDuration      = 2 * time.Second
 	MaximumDuration      = 1 * time.Minute
 	MaximumAmount        = 20
 	MaxConstraints       = 10
+
+	MaxIdempotencyKeyLength = 128
+
+	// Max constraints per kind
+	MaxRateLimits            = 1
+	MaxThrottles             = 1
+	MaxCustomConcurrencyKeys = 2
 )
 
 func (r *CapacityCheckRequest) Valid() error {
@@ -36,7 +44,10 @@ func (r *CapacityCheckRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing constraint config workflow version"))
 	}
 
-	// TODO: Validate configuration
+	// Validate configuration
+	if err := r.Configuration.Valid(); err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("invalid configuration: %w", err))
+	}
 
 	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must provide constraints"))
@@ -50,6 +61,10 @@ func (r *CapacityCheckRequest) Valid() error {
 	for i, ci := range r.Constraints {
 		if err := ci.Valid(); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("invalid constraint %d: %w", i, err))
+		}
+
+		if err := r.Configuration.ValidConstraintUsage(ci); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("invalid constraint usage %d: %w", i, err))
 		}
 	}
 
@@ -93,6 +108,10 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing idempotency key"))
 	}
 
+	if len(r.IdempotencyKey) > MaxIdempotencyKeyLength {
+		errs = multierror.Append(errs, fmt.Errorf("idempotency key longer than %d chars", MaxIdempotencyKeyLength))
+	}
+
 	if r.AccountID == uuid.Nil {
 		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
 	}
@@ -113,8 +132,8 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing current time"))
 	}
 
-	if r.Duration <= 0 {
-		errs = multierror.Append(errs, fmt.Errorf("missing duration"))
+	if r.Duration <= MinimumDuration {
+		errs = multierror.Append(errs, fmt.Errorf("duration smaller than minimum of %s", MinimumDuration))
 	}
 
 	if r.Duration > MaximumDuration {
@@ -151,11 +170,20 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("must provide as many lease idempotency keys as amount"))
 	}
 
+	for i, v := range r.LeaseIdempotencyKeys {
+		if len(v) > MaxIdempotencyKeyLength {
+			errs = multierror.Append(errs, fmt.Errorf("idempotency key %d longer than %d chars", i, MaxIdempotencyKeyLength))
+		}
+	}
+
 	if r.Amount > MaximumAmount {
 		errs = multierror.Append(errs, fmt.Errorf("must request no more than %d leases", MaximumAmount))
 	}
 
-	// TODO: Validate configuration
+	// Validate configuration
+	if err := r.Configuration.Valid(); err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("invalid configuration: %w", err))
+	}
 
 	if len(r.Constraints) == 0 {
 		errs = multierror.Append(errs, fmt.Errorf("must provide constraints to check"))
@@ -169,6 +197,10 @@ func (r *CapacityAcquireRequest) Valid() error {
 	for i, ci := range r.Constraints {
 		if err := ci.Valid(); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("invalid constraint %d: %w", i, err))
+		}
+
+		if err := r.Configuration.ValidConstraintUsage(ci); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("invalid constraint usage %d: %w", i, err))
 		}
 	}
 
@@ -228,11 +260,81 @@ func (ci ConstraintItem) Valid() error {
 	return nil
 }
 
+// Valid validates a ConstraintItem ensuring required fields are present
+func (cc ConstraintConfig) Valid() error {
+	var errs error
+
+	if cc.FunctionVersion == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("missing function version"))
+	}
+
+	if len(cc.Concurrency.CustomConcurrencyKeys) > MaxCustomConcurrencyKeys {
+		errs = multierror.Append(errs, fmt.Errorf("exceeded maximum of %d custom concurrency keys", MaxCustomConcurrencyKeys))
+	}
+
+	if len(cc.RateLimit) > MaxRateLimits {
+		errs = multierror.Append(errs, fmt.Errorf("exceeded maximum of %d rate limits", MaxRateLimits))
+	}
+
+	if len(cc.Throttle) > MaxThrottles {
+		errs = multierror.Append(errs, fmt.Errorf("exceeded maximum of %d throttles", MaxThrottles))
+	}
+
+	return errs
+}
+
+func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
+	switch ci.Kind {
+	case ConstraintKindConcurrency:
+		if ci.Concurrency.EvaluatedKeyHash != "" {
+			var found bool
+			for _, ckey := range cc.Concurrency.CustomConcurrencyKeys {
+				if ckey.Scope == ci.Concurrency.Scope && ckey.Mode == ci.Concurrency.Mode && ckey.KeyExpressionHash == ci.Concurrency.KeyExpressionHash {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("unknown custom concurrency key")
+			}
+		}
+
+	case ConstraintKindThrottle:
+		var found bool
+		for _, t := range cc.Throttle {
+			if t.Scope == ci.Throttle.Scope && t.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("unknown throttle constraint")
+		}
+
+	case ConstraintKindRateLimit:
+		var found bool
+		for _, r := range cc.RateLimit {
+			if r.Scope == ci.RateLimit.Scope && r.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("unknown rate lmit constraint")
+		}
+	}
+	return nil
+}
+
 func (r *CapacityExtendLeaseRequest) Valid() error {
 	var errs error
 
 	if r.IdempotencyKey == "" {
 		errs = multierror.Append(errs, fmt.Errorf("missing idempotency key"))
+	}
+
+	if len(r.IdempotencyKey) > MaxIdempotencyKeyLength {
+		errs = multierror.Append(errs, fmt.Errorf("idempotency key longer than %d chars", MaxIdempotencyKeyLength))
 	}
 
 	if r.AccountID == uuid.Nil {
@@ -255,6 +357,10 @@ func (r *CapacityReleaseRequest) Valid() error {
 
 	if r.IdempotencyKey == "" {
 		errs = multierror.Append(errs, fmt.Errorf("missing idempotency key"))
+	}
+
+	if len(r.IdempotencyKey) > MaxIdempotencyKeyLength {
+		errs = multierror.Append(errs, fmt.Errorf("idempotency key longer than %d chars", MaxIdempotencyKeyLength))
 	}
 
 	if r.AccountID == uuid.Nil {
