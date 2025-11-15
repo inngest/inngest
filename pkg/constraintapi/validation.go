@@ -9,6 +9,71 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+func (r *CapacityCheckRequest) Valid() error {
+	var errs error
+
+	if r.AccountID == uuid.Nil {
+		errs = multierror.Append(errs, fmt.Errorf("missing accountID"))
+	}
+
+	if r.EnvID == uuid.Nil {
+		errs = multierror.Append(errs, fmt.Errorf("missing envID"))
+	}
+
+	if r.FunctionID == uuid.Nil {
+		errs = multierror.Append(errs, fmt.Errorf("missing functionID"))
+	}
+
+	if r.Configuration.FunctionVersion == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("missing constraint config workflow version"))
+	}
+
+	// TODO: Validate configuration
+
+	if len(r.Constraints) == 0 {
+		errs = multierror.Append(errs, fmt.Errorf("must provide constraints"))
+	}
+
+	// Validate individual constraint items
+	for i, ci := range r.Constraints {
+		if err := ci.Valid(); err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("invalid constraint %d: %w", i, err))
+		}
+	}
+
+	// NOTE: This validation is only enforced as long as existing constraint state
+	// and the new lease-related data are colocated.
+	//
+	// Once we move all constraint state to a dedicated store, we will be able to
+	// mix constraints of different stages.
+	var hasRateLimit bool
+	var hasQueueConstraint bool
+	for _, ci := range r.Constraints {
+		if ci.Kind.IsQueueConstraint() {
+			hasQueueConstraint = true
+		}
+
+		if ci.Kind == ConstraintKindRateLimit {
+			hasRateLimit = true
+		}
+	}
+
+	if hasRateLimit && hasQueueConstraint {
+		errs = multierror.Append(errs, fmt.Errorf("cannot mix queue and rate limit constraints for first stage"))
+	}
+
+	// Ensure migration identifier is provided
+	if hasRateLimit && !r.Migration.IsRateLimit {
+		errs = multierror.Append(errs, fmt.Errorf("missing rate limit flag in migration identifier"))
+	}
+
+	if hasQueueConstraint && r.Migration.QueueShard == "" {
+		errs = multierror.Append(errs, fmt.Errorf("missing queue shard in migration identifier"))
+	}
+
+	return errs
+}
+
 func (r *CapacityAcquireRequest) Valid() error {
 	var errs error
 
@@ -61,7 +126,7 @@ func (r *CapacityAcquireRequest) Valid() error {
 	// TODO: Validate configuration
 
 	if len(r.Constraints) == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("must request capacity"))
+		errs = multierror.Append(errs, fmt.Errorf("must provide constraints to check"))
 	}
 
 	// Validate individual constraint items
