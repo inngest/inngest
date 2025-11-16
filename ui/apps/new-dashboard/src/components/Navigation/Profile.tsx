@@ -1,25 +1,16 @@
-"use client";
-
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-
+import { useLocation } from "@tanstack/react-router";
 import { ProfileMenu } from "./ProfileMenu";
-
-export type ProfileType = {
-  displayName: string;
-  isMarketplace: boolean;
-  orgName?: string;
-  orgProfilePic: string | null;
-};
+import { ProfileDisplayType } from "@/queries/server-only/profile";
 
 export const Profile = ({
   collapsed,
   profile,
 }: {
   collapsed: boolean;
-  profile: ProfileType;
+  profile: ProfileDisplayType;
 }) => {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const active =
     pathname.startsWith("/settings/organization") ||
     pathname.startsWith("/billing") ||
@@ -41,7 +32,7 @@ export const Profile = ({
         >
           <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
             {profile.orgProfilePic ? (
-              <Image
+              <img
                 src={profile.orgProfilePic}
                 className="h-8 w-8 rounded-full object-cover"
                 width={32}

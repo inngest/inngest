@@ -1,8 +1,3 @@
-"use client";
-
-import dynamic from "next/dynamic";
-import NextLink from "next/link";
-import { useClerk } from "@clerk/nextjs";
 import { Listbox } from "@headlessui/react";
 import {
   RiArrowLeftRightLine,
@@ -14,14 +9,11 @@ import {
   RiUserSharedLine,
 } from "@remixicon/react";
 
-import { pathCreator } from "@/utils/urls";
+import ModeSwitch from "@inngest/components/ThemeMode/ModeSwitch";
 
-const ModeSwitch = dynamic(
-  () => import("@inngest/components/ThemeMode/ModeSwitch"),
-  {
-    ssr: false,
-  },
-);
+import { pathCreator } from "@/utils/urls";
+import { Link } from "@tanstack/react-router";
+import { useClerk } from "@clerk/tanstack-react-start";
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -46,7 +38,8 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <NextLink href="/settings/user" scroll={false}>
+          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
+          <Link to="/settings/user" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="userProfile"
@@ -56,8 +49,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Your Profile</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="/settings/organization" scroll={false}>
+          </Link>
+          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
+          <Link to="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
@@ -67,11 +61,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Your Organization</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink
-            href="/settings/organization/organization-members"
-            scroll={false}
-          >
+          </Link>
+          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
+          <Link to="/settings/organization/organization-members" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -81,9 +73,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Members</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
 
-          <NextLink href={pathCreator.billing()} scroll={false}>
+          <Link to={pathCreator.billing()}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="billing"
@@ -93,9 +85,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Billing</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
 
-          <a href="/organization-list">
+          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
+          <Link to="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -105,11 +98,12 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Switch Organization</div>
               </div>
             </Listbox.Option>
-          </a>
+          </Link>
 
           <hr className="border-subtle" />
 
-          <NextLink href="/sign-in/choose" scroll={false}>
+          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
+          <Link to="/sign-in/choose">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchAccount"
@@ -119,7 +113,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Switch Account</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
           <hr className="border-subtle" />
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -161,8 +155,7 @@ function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
 
   // Sign out via our backend.
   return (
-    <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/v1/logout`}>
-      {content}
-    </NextLink>
+    // @ts-expect-error - TANSTACK TODO: fix when routes land
+    <Link to={`${import.meta.env.VITE_API_URL}/v1/logout`}>{content}</Link>
   );
 }

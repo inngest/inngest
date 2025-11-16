@@ -6,6 +6,7 @@ import type { ProfileDisplayType } from "@/queries/server-only/profile";
 import type { Environment } from "@/utils/environments";
 import Logo from "../Navigation/Logo";
 import Navigation from "../Navigation/Navigation";
+import { Profile } from "../Navigation/Profile";
 // import useOnboardingWidget from "../Onboarding/useOnboardingWidget";
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
@@ -23,7 +24,7 @@ export default function SideBar({
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile?: ProfileDisplayType;
+  profile: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -74,7 +75,7 @@ export default function SideBar({
           {/* <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} /> */}
         </div>
-        {/* <Profile collapsed={collapsed} profile={profile} /> */}
+        <Profile collapsed={collapsed} profile={profile} />
       </div>
     </nav>
   );
