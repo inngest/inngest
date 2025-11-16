@@ -130,7 +130,7 @@ type SerializedConcurrencyConstraint struct {
 	EvaluatedKeyHash string `json:"eh,omitempty"`
 
 	// l = Limit (embedded from config)
-	Limit int `json:"l,omitempty"`
+	Limit int `json:"l"`
 
 	// InProgressLeaseKey represents the Redis key holding the ZSET for this constraint
 	InProgressLeaseKey string `json:"ilk"`
@@ -151,7 +151,7 @@ type SerializedThrottleConstraint struct {
 	EvaluatedKeyHash string `json:"eh,omitempty"`
 
 	// l = Limit (embedded from config)
-	Limit int `json:"l,omitempty"`
+	Limit int `json:"l"`
 
 	// b = Burst (embedded from config)
 	Burst int `json:"b,omitempty"`
@@ -172,7 +172,7 @@ type SerializedRateLimitConstraint struct {
 	EvaluatedKeyHash string `json:"eh,omitempty"`
 
 	// l = Limit (embedded from config)
-	Limit int `json:"l,omitempty"`
+	Limit int `json:"l"`
 
 	// p = Period (embedded from config)
 	Period int `json:"p,omitempty"`

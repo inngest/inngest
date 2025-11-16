@@ -21,6 +21,9 @@ local function debug(...)
 end
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
 	return count
 end
 local function toInteger(value)
