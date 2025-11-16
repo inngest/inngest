@@ -2443,6 +2443,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			"instance_id",
 			"status",
 			"worker_ip",
+			"max_worker_concurrency",
 
 			"connected_at",
 			"last_heartbeat_at",
@@ -2491,6 +2492,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			&data.InstanceID,
 			&data.Status,
 			&data.WorkerIp,
+			&data.MaxWorkerConcurrency,
 
 			&data.ConnectedAt,
 			&data.LastHeartbeatAt,
@@ -2570,11 +2572,12 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			AppID:       data.AppID,
 			AppName:     data.AppName,
 
-			Id:         data.ID,
-			GatewayId:  data.GatewayID,
-			InstanceId: data.InstanceID,
-			Status:     connpb.ConnectionStatus(data.Status),
-			WorkerIP:   data.WorkerIp,
+			Id:                   data.ID,
+			GatewayId:            data.GatewayID,
+			InstanceId:           data.InstanceID,
+			Status:               connpb.ConnectionStatus(data.Status),
+			WorkerIP:             data.WorkerIp,
+			MaxWorkerConcurrency: data.MaxWorkerConcurrency,
 
 			LastHeartbeatAt: lastHeartbeatAt,
 			ConnectedAt:     connectedAt,
