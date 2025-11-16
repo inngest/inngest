@@ -37,7 +37,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
 
   const client = useMemo(() => {
     return createClient({
-      url: `${process.env.NEXT_PUBLIC_API_URL}/gql`,
+      url: `${import.meta.env.VITE_API_URL}/gql`,
       fetchOptions: {
         // Necessary to include HTTP-only cookies. This is used for non-Clerk
         // auth.

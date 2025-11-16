@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useLocation } from '@tanstack/react-router';
 
 import { OptionalLink } from '../Link/NewOptionalLink';
-import { Pill } from '../Pill';
+import { Pill } from '../Pill/NewPill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
 

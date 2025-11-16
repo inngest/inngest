@@ -1,20 +1,30 @@
 import { type ReactNode } from "react";
 
-import { getNavCollapsed } from "@/app/actions";
-
-import { getProfileDisplay } from "@/queries/server-only/profile";
-import type { Environment } from "@/utils/environments";
 import SideBar from "./SideBar";
+import { ProfileDisplayType } from "@/queries/server-only/profile";
+import type { Environment } from "@/utils/environments";
+import { useRouterState } from "@tanstack/react-router";
+import { HeaderType } from "@inngest/components/Header/NewHeader";
+import { Header } from "@inngest/components/Header/NewHeader";
 
 type LayoutProps = {
+  collapsed: boolean | undefined;
   activeEnv?: Environment;
+  profile?: ProfileDisplayType;
   children: ReactNode;
 };
 
-export default async function Layout({ activeEnv, children }: LayoutProps) {
-  const collapsed = await getNavCollapsed();
-  const profile = await getProfileDisplay();
-
+export default function Layout({
+  collapsed,
+  activeEnv,
+  profile,
+  children,
+}: LayoutProps) {
+  const layoutHeader = useRouterState({
+    //
+    // get the last, fully merged context
+    select: (s) => s.matches[s.matches.length - 1]?.context?.layoutHeader,
+  });
   return (
     <div
       id="layout-scroll-container"
@@ -24,7 +34,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         {/* TANSTACK TODO: add incident banner, billing banner, and execution overage banner here */}
-
+        {layoutHeader && <Header {...layoutHeader} />}
         {children}
       </div>
     </div>

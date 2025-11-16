@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import * as React from "react";
+import { HeaderType } from "@inngest/components/Header/NewHeader";
 
 import {
   HeadContent,
@@ -22,6 +23,7 @@ import URQLProviderWrapper from "@/components/URQL/URQLProvider";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  layoutHeader?: HeaderType;
 }>()({
   head: () => ({
     meta: [
