@@ -2,8 +2,6 @@ import { type ReactNode } from "react";
 
 import { ProfileDisplayType } from "@/queries/server-only/profile";
 import type { Environment } from "@/utils/environments";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { useRouterState } from "@tanstack/react-router";
 import SideBar from "./SideBar";
 
 type LayoutProps = {
@@ -19,11 +17,6 @@ export default function Layout({
   profile,
   children,
 }: LayoutProps) {
-  const layoutHeader = useRouterState({
-    //
-    // get the last, fully merged context
-    select: (s) => s.matches[s.matches.length - 1]?.context?.layoutHeader,
-  });
   return (
     <div
       id="layout-scroll-container"
@@ -33,7 +26,6 @@ export default function Layout({
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         {/* TANSTACK TODO: add incident banner, billing banner, and execution overage banner here */}
-        {layoutHeader && <Header {...layoutHeader} />}
         {children}
       </div>
     </div>
