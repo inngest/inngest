@@ -4,7 +4,7 @@ import {
   workspacesToEnvironments,
   type Environment,
 } from "@/utils/environments";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { graphqlAPI } from "../graphqlAPI";
 
 const GetEnvironmentBySlugDocument = graphql(`
@@ -47,25 +47,47 @@ type GetEnvironmentParams = {
   environmentSlug: string;
 };
 
-export async function getEnvironment({
-  environmentSlug,
-}: GetEnvironmentParams): Promise<Environment> {
-  const query = await graphqlAPI.request(GetEnvironmentBySlugDocument, {
-    slug: environmentSlug,
+export const getEnvironment = createServerFn({
+  method: "GET",
+})
+  .inputValidator((data: GetEnvironmentParams) => data)
+  .handler(async ({ data }) => {
+    const { environmentSlug } = data;
+    const query = await graphqlAPI.request(GetEnvironmentBySlugDocument, {
+      slug: environmentSlug,
+    });
+    if (!query.envBySlug) {
+      throw new Error(`Environment "${environmentSlug}" not found`);
+    }
+
+    const environment = workspacesToEnvironments([query.envBySlug])[0];
+    if (!environment) {
+      throw new Error(
+        `Failed to convert workspace "${environmentSlug}" to environment`,
+      );
+    }
+
+    return environment;
   });
-  if (!query.envBySlug) {
-    throw new Error(`Environment "${environmentSlug}" not found`);
-  }
+// export async function old({
+//   environmentSlug,
+// }: GetEnvironmentParams): Promise<Environment> {
+//   const query = await graphqlAPI.request(GetEnvironmentBySlugDocument, {
+//     slug: environmentSlug,
+//   });
+//   if (!query.envBySlug) {
+//     throw new Error(`Environment "${environmentSlug}" not found`);
+//   }
 
-  const environment = workspacesToEnvironments([query.envBySlug])[0];
-  if (!environment) {
-    throw new Error(
-      `Failed to convert workspace "${environmentSlug}" to environment`,
-    );
-  }
+//   const environment = workspacesToEnvironments([query.envBySlug])[0];
+//   if (!environment) {
+//     throw new Error(
+//       `Failed to convert workspace "${environmentSlug}" to environment`,
+//     );
+//   }
 
-  return environment;
-}
+//   return environment;
+// }
 
 export async function getOEnvironment({
   environmentSlug,

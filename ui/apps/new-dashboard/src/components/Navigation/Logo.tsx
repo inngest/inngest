@@ -2,7 +2,6 @@ import { Button } from "@inngest/components/Button/NewButton";
 import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
 import { RiContractLeftLine, RiContractRightLine } from "@remixicon/react";
-
 import { QuickSearch } from "./QuickSearch/QuickSearch";
 import { Link } from "@tanstack/react-router";
 
@@ -72,11 +71,9 @@ export default function Logo({
             <InngestLogoSmall className="text-basis" />
           </div>
         ) : (
-          <>
-            <Link to={import.meta.env.VITE_HOME_PATH}>
-              <InngestLogo className="text-basis mr-2" width={96} />
-            </Link>
-          </>
+          <Link to={import.meta.env.VITE_HOME_PATH} preload={false}>
+            <InngestLogo className="text-basis mr-2" width={96} />
+          </Link>
         )}
         <QuickSearch
           collapsed={collapsed}

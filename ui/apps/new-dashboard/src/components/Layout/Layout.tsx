@@ -1,11 +1,10 @@
 import { type ReactNode } from "react";
 
-import SideBar from "./SideBar";
 import { ProfileDisplayType } from "@/queries/server-only/profile";
 import type { Environment } from "@/utils/environments";
-import { useRouterState } from "@tanstack/react-router";
-import { HeaderType } from "@inngest/components/Header/NewHeader";
 import { Header } from "@inngest/components/Header/NewHeader";
+import { useRouterState } from "@tanstack/react-router";
+import SideBar from "./SideBar";
 
 type LayoutProps = {
   collapsed: boolean | undefined;

@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authed/_org-active")({
   }),
   loader: async ({ params }: { params: { env?: string } }) => {
     const env = params.env
-      ? await getEnvironment({ environmentSlug: params.env })
+      ? await getEnvironment({ data: { environmentSlug: params.env } })
       : undefined;
 
     if (!env) {
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authed/_org-active")({
 });
 
 function OrgActive() {
-  const { navCollapsed, env: env } = Route.useLoaderData();
+  const { navCollapsed, env } = Route.useLoaderData();
 
   return (
     <Layout collapsed={navCollapsed} activeEnv={env} profile={undefined}>
