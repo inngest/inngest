@@ -41,7 +41,7 @@ export const Route = createFileRoute("/_authed/_org-active/env/$envSlug/apps/")(
     component: AppsPage,
     validateSearch: (search: Record<string, unknown>): AppsSearchParams => {
       return {
-        archived: search?.archive as string | undefined,
+        archived: search?.archived as string | undefined,
       };
     },
   },

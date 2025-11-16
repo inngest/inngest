@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Select } from "@inngest/components/Select/Select";
 import { StatusDot } from "@inngest/components/Status/StatusDot";
 
@@ -9,11 +9,24 @@ export const StatusMenu = ({
   envSlug: string;
   archived: boolean;
 }) => {
+  const navigate = useNavigate();
   const activeOption = { id: "active", name: "Active apps" };
   const archivedOption = { id: "archived", name: "Archived apps" };
+
+  const handleChange = (
+    option: typeof activeOption | typeof archivedOption,
+  ) => {
+    navigate({
+      to: "/env/$envSlug/apps",
+      params: { envSlug },
+      search: { archived: option.id === "archived" ? "true" : undefined },
+      replace: true,
+    });
+  };
+
   return (
     <Select
-      onChange={() => null}
+      onChange={handleChange}
       isLabelVisible={false}
       label="Select app status"
       multiple={false}
@@ -27,30 +40,18 @@ export const StatusMenu = ({
         </div>
       </Select.Button>
       <Select.Options>
-        <Link
-          to="/env/$envSlug/apps"
-          params={{ envSlug }}
-          search={{ archived: undefined }}
-        >
-          <Select.Option key={activeOption.id} option={activeOption}>
-            <div className="flex flex-row items-center gap-2">
-              <StatusDot status="ACTIVE" size="small" />
-              {activeOption.name}
-            </div>
-          </Select.Option>
-        </Link>
-        <Link
-          to="/env/$envSlug/apps"
-          params={{ envSlug }}
-          search={{ archived: "true" }}
-        >
-          <Select.Option key={archivedOption.id} option={archivedOption}>
-            <div className="flex flex-row items-center gap-2">
-              <StatusDot status="ARCHIVED" size="small" />
-              {archivedOption.name}
-            </div>
-          </Select.Option>
-        </Link>
+        <Select.Option key={activeOption.id} option={activeOption}>
+          <div className="flex flex-row items-center gap-2">
+            <StatusDot status="ACTIVE" size="small" />
+            {activeOption.name}
+          </div>
+        </Select.Option>
+        <Select.Option key={archivedOption.id} option={archivedOption}>
+          <div className="flex flex-row items-center gap-2">
+            <StatusDot status="ARCHIVED" size="small" />
+            {archivedOption.name}
+          </div>
+        </Select.Option>
       </Select.Options>
     </Select>
   );
