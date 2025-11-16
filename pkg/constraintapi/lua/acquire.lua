@@ -276,6 +276,9 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 
 	if capacity > 0 then
 		local expiry = string.format("%d", period_ms / 1000)
+		if expiry == "0" then
+			expiry = "1"
+		end
 		call("SET", key, new_tat, "EX", expiry)
 	end
 end
@@ -286,7 +289,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
 
 -- Handle operation idempotency
@@ -335,7 +338,7 @@ for index, value in ipairs(constraints) do
 		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
 		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
-		constraintRetryAfter = rlRes[2] / 1000000 -- convert from ns to ms
+		constraintRetryAfter = toInteger(rlRes[2] / 1000000) -- convert from ns to ms
 	elseif value.k == 2 then
 		-- concurrency
 		debug("evaluating concurrency")
@@ -348,7 +351,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = throttleRes[2] -- already in ms
+		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
 	end
 
 	-- If index ends up limiting capacity, reduce available capacity and remember current constraint

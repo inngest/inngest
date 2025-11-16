@@ -154,10 +154,10 @@ type SerializedThrottleConstraint struct {
 	Limit int `json:"l"`
 
 	// b = Burst (embedded from config)
-	Burst int `json:"b,omitempty"`
+	Burst int `json:"b"`
 
 	// p = Period (embedded from config)
-	Period int `json:"p,omitempty"`
+	Period int `json:"p"`
 }
 
 // SerializedRateLimitConstraint represents a minimal version of RateLimitConstraint
@@ -175,10 +175,10 @@ type SerializedRateLimitConstraint struct {
 	Limit int `json:"l"`
 
 	// p = Period (embedded from config)
-	Period int `json:"p,omitempty"`
+	Period int `json:"p"`
 
 	// b = Burst (embedded from config)
-	Burst int `json:"b,omitempty"`
+	Burst int `json:"b"`
 
 	// k = Key (fully-qualified Redis key: concatenated evaluated key hash with prefix)
 	Key string `json:"k,omitempty"`

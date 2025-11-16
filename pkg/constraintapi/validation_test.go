@@ -1265,7 +1265,20 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 						InProgressItemKey: "test-key",
 					},
 				},
-				{Kind: ConstraintKindThrottle},
+				{
+					Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
 			},
 			mi: MigrationIdentifier{
 				QueueShard: "test",
@@ -1294,26 +1307,78 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid - multiple throttle constraints",
+			name: "invalid - multiple throttle constraints",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
-				{Kind: ConstraintKindThrottle},
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash-1",
+						EvaluatedKeyHash:  "key-1",
+					},
+				},
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash-2",
+						EvaluatedKeyHash:  "key-2",
+					},
+				},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						ThrottleKeyExpressionHash: "expr-hash-1",
+					},
+					{
+						ThrottleKeyExpressionHash: "expr-hash-2",
+					},
+				},
 			},
 			mi: MigrationIdentifier{
 				QueueShard: "test",
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{
+				"exceeded maximum of 1 throttles",
+			},
 		},
 		{
-			name: "valid - multiple rate limit constraints",
+			name: "invalid - multiple rate limit constraints",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
-				{Kind: ConstraintKindRateLimit},
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash-1",
+						EvaluatedKeyHash:  "key-1",
+					},
+				},
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash-2",
+						EvaluatedKeyHash:  "key-2",
+					},
+				},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						KeyExpressionHash: "expr-hash-1",
+					},
+					{
+						KeyExpressionHash: "expr-hash-2",
+					},
+				},
 			},
 			mi: MigrationIdentifier{
 				IsRateLimit: true,
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{
+				"exceeded maximum of 1 rate limits",
+			},
 		},
 		{
 			name: "invalid - rate limit + concurrency",

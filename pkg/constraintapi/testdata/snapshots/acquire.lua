@@ -143,6 +143,9 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	local new_tat = tat + (math.max(capacity, 1) * emission)
 	if capacity > 0 then
 		local expiry = string.format("%d", period_ms / 1000)
+		if expiry == "0" then
+			expiry = "1"
+		end
 		call("SET", key, new_tat, "EX", expiry)
 	end
 end
@@ -172,7 +175,7 @@ for index, value in ipairs(constraints) do
 		local burst = math.floor(value.r.l / 10) 
 		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
-		constraintRetryAfter = rlRes[2] / 1000000 
+		constraintRetryAfter = toInteger(rlRes[2] / 1000000) 
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
 		local inProgressItems = getConcurrencyCount(value.c.iik)
@@ -183,7 +186,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = throttleRes[2] 
+		constraintRetryAfter = toInteger(throttleRes[2]) 
 	end
 	if constraintCapacity < availableCapacity then
 		debug(
