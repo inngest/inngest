@@ -1,4 +1,4 @@
-import { Children, isValidElement, useLayoutEffect, useRef, useState } from 'react';
+import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -51,7 +51,9 @@ export function Pill({
   } else if (flatSide === 'right') {
     roundedClasses = 'rounded-l-2xl';
   }
-  useLayoutEffect(() => {
+  //
+  // TANSTACK TODO: revert to useLayoutEffect in a client only component
+  useEffect(() => {
     const checkTruncation = () => {
       if (!pillRef.current || !hiddenTextRef.current) return;
 

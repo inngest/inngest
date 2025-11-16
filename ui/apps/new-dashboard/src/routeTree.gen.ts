@@ -15,8 +15,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as AuthedOrgActiveRouteImport } from './routes/_authed/_org-active'
-import { Route as AuthedOrgActiveEnvEnvAppsRouteRouteImport } from './routes/_authed/_org-active/env/$env/apps/route'
-import { Route as AuthedOrgActiveEnvEnvAppsIndexRouteImport } from './routes/_authed/_org-active/env/$env/apps/index'
+import { Route as AuthedOrgActiveEnvEnvSlugRouteRouteImport } from './routes/_authed/_org-active/env/$envSlug/route'
+import { Route as AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport } from './routes/_authed/_org-active/env/$envSlug/apps/route'
+import { Route as AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport } from './routes/_authed/_org-active/env/$envSlug/apps/index'
 
 const SignOutRoute = SignOutRouteImport.update({
   id: '/sign-out',
@@ -46,17 +47,23 @@ const AuthedOrgActiveRoute = AuthedOrgActiveRouteImport.update({
   id: '/_org-active',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedOrgActiveEnvEnvAppsRouteRoute =
-  AuthedOrgActiveEnvEnvAppsRouteRouteImport.update({
-    id: '/env/$env/apps',
-    path: '/env/$env/apps',
+const AuthedOrgActiveEnvEnvSlugRouteRoute =
+  AuthedOrgActiveEnvEnvSlugRouteRouteImport.update({
+    id: '/env/$envSlug',
+    path: '/env/$envSlug',
     getParentRoute: () => AuthedOrgActiveRoute,
   } as any)
-const AuthedOrgActiveEnvEnvAppsIndexRoute =
-  AuthedOrgActiveEnvEnvAppsIndexRouteImport.update({
+const AuthedOrgActiveEnvEnvSlugAppsRouteRoute =
+  AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport.update({
+    id: '/apps',
+    path: '/apps',
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedOrgActiveEnvEnvSlugAppsIndexRoute =
+  AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AuthedOrgActiveEnvEnvAppsRouteRoute,
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugAppsRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -64,15 +71,17 @@ export interface FileRoutesByFullPath {
   '/sign-out': typeof SignOutRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
-  '/env/$env/apps': typeof AuthedOrgActiveEnvEnvAppsRouteRouteWithChildren
-  '/env/$env/apps/': typeof AuthedOrgActiveEnvEnvAppsIndexRoute
+  '/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
+  '/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
+  '/env/$envSlug/apps/': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-out': typeof SignOutRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
-  '/env/$env/apps': typeof AuthedOrgActiveEnvEnvAppsIndexRoute
+  '/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
+  '/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -82,8 +91,9 @@ export interface FileRoutesById {
   '/_authed/_org-active': typeof AuthedOrgActiveRouteWithChildren
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
-  '/_authed/_org-active/env/$env/apps': typeof AuthedOrgActiveEnvEnvAppsRouteRouteWithChildren
-  '/_authed/_org-active/env/$env/apps/': typeof AuthedOrgActiveEnvEnvAppsIndexRoute
+  '/_authed/_org-active/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
+  '/_authed/_org-active/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
+  '/_authed/_org-active/env/$envSlug/apps/': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -92,10 +102,17 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/sign-in/$'
     | '/sign-up/$'
-    | '/env/$env/apps'
-    | '/env/$env/apps/'
+    | '/env/$envSlug'
+    | '/env/$envSlug/apps'
+    | '/env/$envSlug/apps/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sign-out' | '/sign-in/$' | '/sign-up/$' | '/env/$env/apps'
+  to:
+    | '/'
+    | '/sign-out'
+    | '/sign-in/$'
+    | '/sign-up/$'
+    | '/env/$envSlug'
+    | '/env/$envSlug/apps'
   id:
     | '__root__'
     | '/'
@@ -104,8 +121,9 @@ export interface FileRouteTypes {
     | '/_authed/_org-active'
     | '/sign-in/$'
     | '/sign-up/$'
-    | '/_authed/_org-active/env/$env/apps'
-    | '/_authed/_org-active/env/$env/apps/'
+    | '/_authed/_org-active/env/$envSlug'
+    | '/_authed/_org-active/env/$envSlug/apps'
+    | '/_authed/_org-active/env/$envSlug/apps/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -160,44 +178,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedOrgActiveRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/_org-active/env/$env/apps': {
-      id: '/_authed/_org-active/env/$env/apps'
-      path: '/env/$env/apps'
-      fullPath: '/env/$env/apps'
-      preLoaderRoute: typeof AuthedOrgActiveEnvEnvAppsRouteRouteImport
+    '/_authed/_org-active/env/$envSlug': {
+      id: '/_authed/_org-active/env/$envSlug'
+      path: '/env/$envSlug'
+      fullPath: '/env/$envSlug'
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRouteImport
       parentRoute: typeof AuthedOrgActiveRoute
     }
-    '/_authed/_org-active/env/$env/apps/': {
-      id: '/_authed/_org-active/env/$env/apps/'
+    '/_authed/_org-active/env/$envSlug/apps': {
+      id: '/_authed/_org-active/env/$envSlug/apps'
+      path: '/apps'
+      fullPath: '/env/$envSlug/apps'
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute
+    }
+    '/_authed/_org-active/env/$envSlug/apps/': {
+      id: '/_authed/_org-active/env/$envSlug/apps/'
       path: '/'
-      fullPath: '/env/$env/apps/'
-      preLoaderRoute: typeof AuthedOrgActiveEnvEnvAppsIndexRouteImport
-      parentRoute: typeof AuthedOrgActiveEnvEnvAppsRouteRoute
+      fullPath: '/env/$envSlug/apps/'
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRoute
     }
   }
 }
 
-interface AuthedOrgActiveEnvEnvAppsRouteRouteChildren {
-  AuthedOrgActiveEnvEnvAppsIndexRoute: typeof AuthedOrgActiveEnvEnvAppsIndexRoute
+interface AuthedOrgActiveEnvEnvSlugAppsRouteRouteChildren {
+  AuthedOrgActiveEnvEnvSlugAppsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
 }
 
-const AuthedOrgActiveEnvEnvAppsRouteRouteChildren: AuthedOrgActiveEnvEnvAppsRouteRouteChildren =
+const AuthedOrgActiveEnvEnvSlugAppsRouteRouteChildren: AuthedOrgActiveEnvEnvSlugAppsRouteRouteChildren =
   {
-    AuthedOrgActiveEnvEnvAppsIndexRoute: AuthedOrgActiveEnvEnvAppsIndexRoute,
+    AuthedOrgActiveEnvEnvSlugAppsIndexRoute:
+      AuthedOrgActiveEnvEnvSlugAppsIndexRoute,
   }
 
-const AuthedOrgActiveEnvEnvAppsRouteRouteWithChildren =
-  AuthedOrgActiveEnvEnvAppsRouteRoute._addFileChildren(
-    AuthedOrgActiveEnvEnvAppsRouteRouteChildren,
+const AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren =
+  AuthedOrgActiveEnvEnvSlugAppsRouteRoute._addFileChildren(
+    AuthedOrgActiveEnvEnvSlugAppsRouteRouteChildren,
+  )
+
+interface AuthedOrgActiveEnvEnvSlugRouteRouteChildren {
+  AuthedOrgActiveEnvEnvSlugAppsRouteRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
+}
+
+const AuthedOrgActiveEnvEnvSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugRouteRouteChildren =
+  {
+    AuthedOrgActiveEnvEnvSlugAppsRouteRoute:
+      AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren,
+  }
+
+const AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren =
+  AuthedOrgActiveEnvEnvSlugRouteRoute._addFileChildren(
+    AuthedOrgActiveEnvEnvSlugRouteRouteChildren,
   )
 
 interface AuthedOrgActiveRouteChildren {
-  AuthedOrgActiveEnvEnvAppsRouteRoute: typeof AuthedOrgActiveEnvEnvAppsRouteRouteWithChildren
+  AuthedOrgActiveEnvEnvSlugRouteRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
 }
 
 const AuthedOrgActiveRouteChildren: AuthedOrgActiveRouteChildren = {
-  AuthedOrgActiveEnvEnvAppsRouteRoute:
-    AuthedOrgActiveEnvEnvAppsRouteRouteWithChildren,
+  AuthedOrgActiveEnvEnvSlugRouteRoute:
+    AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren,
 }
 
 const AuthedOrgActiveRouteWithChildren = AuthedOrgActiveRoute._addFileChildren(

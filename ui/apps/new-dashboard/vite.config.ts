@@ -13,6 +13,10 @@ export default defineConfig({
       ),
     },
   },
+  ssr: {
+    noExternal: [],
+    external: ["next"],
+  },
   plugins: [
     tsConfigPaths({
       projects: ["./tsconfig.json"],

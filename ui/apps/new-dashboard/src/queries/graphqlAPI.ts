@@ -58,3 +58,5 @@ export const graphqlAPI = new GraphQLClient(
     responseMiddleware: throwNotFoundError,
   },
 );
+
+export default graphqlAPI;

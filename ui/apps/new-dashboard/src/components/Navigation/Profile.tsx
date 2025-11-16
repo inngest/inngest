@@ -1,6 +1,7 @@
 import { useLocation } from "@tanstack/react-router";
 import { ProfileMenu } from "./ProfileMenu";
 import { ProfileDisplayType } from "@/queries/server-only/profile";
+import { Image } from "@unpic/react";
 
 export const Profile = ({
   collapsed,
@@ -32,7 +33,7 @@ export const Profile = ({
         >
           <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
             {profile.orgProfilePic ? (
-              <img
+              <Image
                 src={profile.orgProfilePic}
                 className="h-8 w-8 rounded-full object-cover"
                 width={32}

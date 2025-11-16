@@ -17,9 +17,9 @@ export const Route = createFileRoute("/_authed/_org-active")({
       },
     ],
   }),
-  loader: async ({ params }: { params: { env?: string } }) => {
-    const env = params.env
-      ? await getEnvironment({ data: { environmentSlug: params.env } })
+  loader: async ({ params }: { params: { envSlug?: string } }) => {
+    const env = params.envSlug
+      ? await getEnvironment({ data: { environmentSlug: params.envSlug } })
       : undefined;
 
     if (!env) {
