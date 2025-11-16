@@ -892,8 +892,8 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				},
 				Amount:               1,
 				CurrentTime:          baseTime,
-				Duration:             1 * time.Minute,  // Max allowed duration
-				MaximumLifetime:      24 * time.Hour,   // Max allowed lifetime
+				Duration:             1 * time.Minute, // Max allowed duration
+				MaximumLifetime:      24 * time.Hour,  // Max allowed lifetime
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -1192,11 +1192,12 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 	functionID := uuid.New()
 
 	tests := []struct {
-		name        string
-		constraints []ConstraintItem
-		mi          MigrationIdentifier
-		wantErr     bool
-		errMsgs     []string
+		name          string
+		constraints   []ConstraintItem
+		configuration ConstraintConfig
+		mi            MigrationIdentifier
+		wantErr       bool
+		errMsgs       []string
 	}{
 		{
 			name: "valid - only concurrency constraint",
@@ -1216,7 +1217,18 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "valid - only throttle constraint",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindThrottle},
+				{Kind: ConstraintKindThrottle, Throttle: &ThrottleConstraint{
+					EvaluatedKeyHash:  "key-hash",
+					KeyExpressionHash: "expr-hash",
+				}},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
 			},
 			mi: MigrationIdentifier{
 				QueueShard: "test",
@@ -1226,7 +1238,18 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 		{
 			name: "valid - only rate limit constraint",
 			constraints: []ConstraintItem{
-				{Kind: ConstraintKindRateLimit},
+				{Kind: ConstraintKindRateLimit, RateLimit: &RateLimitConstraint{
+					KeyExpressionHash: "expr-hash",
+					EvaluatedKeyHash:  "key-hash",
+				}},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						KeyExpressionHash: "expr-hash",
+					},
+				},
 			},
 			mi: MigrationIdentifier{
 				IsRateLimit: true,
@@ -1394,13 +1417,11 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request := CapacityAcquireRequest{
-				IdempotencyKey: "test-key",
-				AccountID:      accountID,
-				EnvID:          envID,
-				FunctionID:     functionID,
-				Configuration: ConstraintConfig{
-					FunctionVersion: 1,
-				},
+				IdempotencyKey:       "test-key",
+				AccountID:            accountID,
+				EnvID:                envID,
+				FunctionID:           functionID,
+				Configuration:        tt.configuration,
 				Constraints:          tt.constraints,
 				Amount:               1,
 				CurrentTime:          baseTime,
@@ -1774,11 +1795,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                    enums.ThrottleScopeFn,
+							Scope:                     enums.ThrottleScopeFn,
 							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                    10,
-							Burst:                    20,
-							Period:                   60,
+							Limit:                     10,
+							Burst:                     20,
+							Period:                    60,
 						},
 					},
 				},
@@ -2122,11 +2143,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                    enums.ThrottleScopeFn,
+							Scope:                     enums.ThrottleScopeFn,
 							ThrottleKeyExpressionHash: "throttle-key-1",
-							Limit:                    10,
-							Burst:                    20,
-							Period:                   60,
+							Limit:                     10,
+							Burst:                     20,
+							Period:                    60,
 						},
 					},
 				},
@@ -2164,11 +2185,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                    enums.ThrottleScopeFn,
+							Scope:                     enums.ThrottleScopeFn,
 							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                    10,
-							Burst:                    20,
-							Period:                   60,
+							Limit:                     10,
+							Burst:                     20,
+							Period:                    60,
 						},
 					},
 				},
@@ -2505,17 +2526,17 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 						},
 					},
 				},
-				Amount:               25, // Exceeds MaximumAmount of 20
-				CurrentTime:          baseTime,
-				Duration:             30 * time.Second,
-				MaximumLifetime:      time.Minute,
+				Amount:          25, // Exceeds MaximumAmount of 20
+				CurrentTime:     baseTime,
+				Duration:        30 * time.Second,
+				MaximumLifetime: time.Minute,
 				LeaseIdempotencyKeys: []string{ // Create 25 keys to match amount
-						"lease-key-0", "lease-key-1", "lease-key-2", "lease-key-3", "lease-key-4",
-						"lease-key-5", "lease-key-6", "lease-key-7", "lease-key-8", "lease-key-9",
-						"lease-key-10", "lease-key-11", "lease-key-12", "lease-key-13", "lease-key-14",
-						"lease-key-15", "lease-key-16", "lease-key-17", "lease-key-18", "lease-key-19",
-						"lease-key-20", "lease-key-21", "lease-key-22", "lease-key-23", "lease-key-24",
-					},
+					"lease-key-0", "lease-key-1", "lease-key-2", "lease-key-3", "lease-key-4",
+					"lease-key-5", "lease-key-6", "lease-key-7", "lease-key-8", "lease-key-9",
+					"lease-key-10", "lease-key-11", "lease-key-12", "lease-key-13", "lease-key-14",
+					"lease-key-15", "lease-key-16", "lease-key-17", "lease-key-18", "lease-key-19",
+					"lease-key-20", "lease-key-21", "lease-key-22", "lease-key-23", "lease-key-24",
+				},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
 					Location: LeaseLocationItemLease,

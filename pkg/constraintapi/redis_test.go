@@ -32,7 +32,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		WithRateLimitClient(rc),
 		WithQueueShards(map[string]rueidis.Client{}),
 		WithClock(clock),
-		WithNumScavengerShards(4),
+		WithNumScavengerShards(1),
 		WithQueueStateKeyPrefix("q:v1"),
 		WithRateLimitKeyPrefix("rl"),
 	)
@@ -241,7 +241,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 			"test": rc,
 		}),
 		WithClock(clock),
-		WithNumScavengerShards(4),
+		WithNumScavengerShards(1),
 		WithQueueStateKeyPrefix("q:v1"),
 		WithRateLimitKeyPrefix("rl"),
 	)
