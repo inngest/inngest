@@ -134,11 +134,12 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 			FunctionCount: len(group.FunctionSlugs),
 			SyncID:        group.SyncID,
 
-			Id:         conn.ConnectionId,
-			GatewayId:  conn.GatewayId,
-			InstanceId: conn.Data.InstanceId,
-			Status:     status,
-			WorkerIP:   conn.WorkerIP,
+			Id:                   conn.ConnectionId,
+			GatewayId:            conn.GatewayId,
+			InstanceId:           conn.Data.InstanceId,
+			Status:               status,
+			WorkerIP:             conn.WorkerIP,
+			MaxWorkerConcurrency: getMaxWorkerConcurrency(conn),
 
 			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
 			LastHeartbeatAt: ptr.Time(lastHeartbeatAt),
