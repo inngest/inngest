@@ -591,7 +591,7 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to extend lease which will try to read the corrupted state
-		_, err = te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
+		resp, err := te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
 			IdempotencyKey: "extend-invalid",
 			AccountID:      te.AccountID,
 			LeaseID:        ulid.Make(),
@@ -600,7 +600,8 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 		})
 
 		// Should handle gracefully (specific error handling depends on implementation)
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Equal(t, 3, resp.internalDebugState.Status)
 	})
 
 	t.Run("Missing Lease Details", func(t *testing.T) {
@@ -639,6 +640,8 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 	})
 
 	t.Run("Operation Idempotency Edge Cases", func(t *testing.T) {
+		te.Redis.FlushAll()
+
 		config := ConstraintConfig{
 			FunctionVersion: 1,
 			Concurrency: ConcurrencyConfig{
@@ -649,6 +652,8 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 		constraints := []ConstraintItem{
 			te.NewTestDataBuilder().CreateBasicConcurrencyConstraint(5),
 		}
+
+		enableDebugLogs = true
 
 		// First request
 		resp1, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
@@ -671,6 +676,7 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+		t.Log(resp1.internalDebugState.Debug)
 		require.Len(t, resp1.Leases, 1)
 
 		// Duplicate request with same idempotency key should return cached result

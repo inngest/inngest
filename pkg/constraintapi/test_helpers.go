@@ -67,13 +67,13 @@ func (te *TestEnvironment) Cleanup() {
 
 // RedisStateSnapshot captures the complete Redis state for comparison
 type RedisStateSnapshot struct {
-	Keys         []string            `json:"keys"`
-	Hashes       map[string][]string `json:"hashes"`
-	SortedSets   map[string][]string `json:"sorted_sets"`
-	Strings      map[string]string   `json:"strings"`
-	TTLs         map[string]int      `json:"ttls"`
-	ZSetScores   map[string]map[string]float64 `json:"zset_scores"`
-	KeysByType   map[string][]string `json:"keys_by_type"`
+	Keys       []string                      `json:"keys"`
+	Hashes     map[string][]string           `json:"hashes"`
+	SortedSets map[string][]string           `json:"sorted_sets"`
+	Strings    map[string]string             `json:"strings"`
+	TTLs       map[string]int                `json:"ttls"`
+	ZSetScores map[string]map[string]float64 `json:"zset_scores"`
+	KeysByType map[string][]string           `json:"keys_by_type"`
 }
 
 // CaptureRedisState captures the complete current Redis state
@@ -114,7 +114,7 @@ func (te *TestEnvironment) CaptureRedisState() *RedisStateSnapshot {
 			members, _ := te.Redis.ZMembers(key)
 			sort.Strings(members)
 			snapshot.SortedSets[key] = members
-			
+
 			// Capture scores
 			snapshot.ZSetScores[key] = make(map[string]float64)
 			for _, member := range members {
@@ -132,7 +132,7 @@ func (te *TestEnvironment) CompareRedisState(before, after *RedisStateSnapshot, 
 	// Check for key count changes
 	beforeCount := len(before.Keys)
 	afterCount := len(after.Keys)
-	
+
 	if beforeCount != afterCount {
 		te.t.Logf("%s: Key count changed from %d to %d", operation, beforeCount, afterCount)
 	}
@@ -174,7 +174,7 @@ func (te *TestEnvironment) CompareRedisState(before, after *RedisStateSnapshot, 
 // VerifyNoResourceLeaks ensures no unexpected keys remain after operations
 func (te *TestEnvironment) VerifyNoResourceLeaks(initialSnapshot *RedisStateSnapshot, allowedKeys []string) {
 	currentSnapshot := te.CaptureRedisState()
-	
+
 	allowedKeySet := make(map[string]bool)
 	for _, key := range initialSnapshot.Keys {
 		allowedKeySet[key] = true
@@ -225,8 +225,8 @@ func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintIte
 			total := itemsCount + leasesCount
 			constraintKey := fmt.Sprintf("constraint_%d", i)
 			if expected, ok := expectedCounts[constraintKey]; ok {
-				require.Equal(cv.te.t, expected, total, 
-					"In-progress count mismatch for constraint %d: items=%d, leases=%d, total=%d, expected=%d", 
+				require.Equal(cv.te.t, expected, total,
+					"In-progress count mismatch for constraint %d: items=%d, leases=%d, total=%d, expected=%d",
 					i, itemsCount, leasesCount, total, expected)
 			}
 		}
@@ -236,21 +236,21 @@ func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintIte
 // VerifyLeaseDetails checks that lease details are properly stored and consistent
 func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdempotencyKey, expectedRunID, expectedOpKey string) {
 	leaseDetailsKey := cv.te.CapacityManager.keyLeaseDetails(cv.te.KeyPrefix, cv.te.AccountID, leaseID)
-	
+
 	require.True(cv.te.t, cv.te.Redis.Exists(leaseDetailsKey), "Lease details key should exist: %s", leaseDetailsKey)
-	
+
 	if expectedIdempotencyKey != "" {
 		lik := cv.te.Redis.HGet(leaseDetailsKey, "lik")
 		require.NotEmpty(cv.te.t, lik, "Lease idempotency key should be stored")
 		require.Equal(cv.te.t, expectedIdempotencyKey, lik, "Lease idempotency key mismatch")
 	}
-	
+
 	if expectedRunID != "" {
 		rid := cv.te.Redis.HGet(leaseDetailsKey, "rid")
 		require.NotEmpty(cv.te.t, rid, "Run ID should be stored")
 		require.Equal(cv.te.t, expectedRunID, rid, "Run ID mismatch")
 	}
-	
+
 	if expectedOpKey != "" {
 		oik := cv.te.Redis.HGet(leaseDetailsKey, "oik")
 		require.NotEmpty(cv.te.t, oik, "Operation idempotency key should be stored")
@@ -261,22 +261,22 @@ func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdem
 // VerifyAccountLeases checks that account leases are properly tracked
 func (cv *ConstraintVerifier) VerifyAccountLeases(expectedLeases []ulid.ULID) {
 	accountLeasesKey := cv.te.CapacityManager.keyAccountLeases(cv.te.KeyPrefix, cv.te.AccountID)
-	
+
 	if len(expectedLeases) == 0 {
 		require.False(cv.te.t, cv.te.Redis.Exists(accountLeasesKey), "Account leases key should not exist when no leases expected")
 		return
 	}
-	
+
 	require.True(cv.te.t, cv.te.Redis.Exists(accountLeasesKey), "Account leases key should exist")
-	
+
 	members, _ := cv.te.Redis.ZMembers(accountLeasesKey)
 	require.Len(cv.te.t, members, len(expectedLeases), "Account leases count mismatch")
-	
+
 	expectedLeaseIDs := make(map[string]bool)
 	for _, leaseID := range expectedLeases {
 		expectedLeaseIDs[leaseID.String()] = true
 	}
-	
+
 	for _, member := range members {
 		require.True(cv.te.t, expectedLeaseIDs[member], "Unexpected lease in account leases: %s", member)
 	}
@@ -285,7 +285,7 @@ func (cv *ConstraintVerifier) VerifyAccountLeases(expectedLeases []ulid.ULID) {
 // VerifyScavengerShard checks that scavenger shard is properly maintained
 func (cv *ConstraintVerifier) VerifyScavengerShard(expectedScore float64, shouldExist bool) {
 	scavengerShardKey := cv.te.CapacityManager.keyScavengerShard(cv.te.KeyPrefix, 0)
-	
+
 	if !shouldExist {
 		score, _ := cv.te.Redis.ZScore(scavengerShardKey, cv.te.AccountID.String())
 		if score == 0 {
@@ -294,7 +294,7 @@ func (cv *ConstraintVerifier) VerifyScavengerShard(expectedScore float64, should
 		require.Fail(cv.te.t, "Account should not be in scavenger shard")
 		return
 	}
-	
+
 	score, _ := cv.te.Redis.ZScore(scavengerShardKey, cv.te.AccountID.String())
 	require.NotEqual(cv.te.t, 0.0, score, "Account should be in scavenger shard")
 	require.Equal(cv.te.t, expectedScore, score, "Scavenger shard score mismatch")
@@ -313,14 +313,14 @@ func (te *TestEnvironment) NewIdempotencyVerifier() *IdempotencyVerifier {
 // VerifyOperationIdempotency checks that operation idempotency keys are properly set
 func (iv *IdempotencyVerifier) VerifyOperationIdempotency(operation, idempotencyKey string, expectedTTL int, shouldExist bool) {
 	opIdempotencyKey := iv.te.CapacityManager.keyOperationIdempotency(iv.te.KeyPrefix, iv.te.AccountID, operation, idempotencyKey)
-	
+
 	if !shouldExist {
 		require.False(iv.te.t, iv.te.Redis.Exists(opIdempotencyKey), "Operation idempotency key should not exist: %s", opIdempotencyKey)
 		return
 	}
-	
+
 	require.True(iv.te.t, iv.te.Redis.Exists(opIdempotencyKey), "Operation idempotency key should exist: %s", opIdempotencyKey)
-	
+
 	if expectedTTL > 0 {
 		ttl := iv.te.Redis.TTL(opIdempotencyKey)
 		require.True(iv.te.t, ttl > 0, "Operation idempotency key should have TTL")
@@ -331,14 +331,14 @@ func (iv *IdempotencyVerifier) VerifyOperationIdempotency(operation, idempotency
 // VerifyConstraintCheckIdempotency checks constraint check idempotency keys
 func (iv *IdempotencyVerifier) VerifyConstraintCheckIdempotency(idempotencyKey string, expectedTTL int, shouldExist bool) {
 	checkIdempotencyKey := iv.te.CapacityManager.keyConstraintCheckIdempotency(iv.te.KeyPrefix, iv.te.AccountID, idempotencyKey)
-	
+
 	if !shouldExist {
 		require.False(iv.te.t, iv.te.Redis.Exists(checkIdempotencyKey), "Constraint check idempotency key should not exist")
 		return
 	}
-	
+
 	require.True(iv.te.t, iv.te.Redis.Exists(checkIdempotencyKey), "Constraint check idempotency key should exist")
-	
+
 	if expectedTTL > 0 {
 		ttl := iv.te.Redis.TTL(checkIdempotencyKey)
 		require.True(iv.te.t, ttl > 0, "Constraint check idempotency key should have TTL")
@@ -362,17 +362,17 @@ func (rv *RateLimitStateVerifier) VerifyRateLimitState(key string, expectedMinTA
 		rv.te.t.Logf("Rate limit key does not exist: %s", key)
 		return
 	}
-	
+
 	tatStr, _ := rv.te.Redis.Get(key)
 	require.NotEmpty(rv.te.t, tatStr, "Rate limit TAT value should exist")
-	
+
 	tat, err := strconv.ParseInt(tatStr, 10, 64)
 	require.NoError(rv.te.t, err, "TAT value should be parseable as int64")
-	
+
 	if expectedMinTAT > 0 {
 		require.True(rv.te.t, tat >= expectedMinTAT, "TAT value %d should be >= %d", tat, expectedMinTAT)
 	}
-	
+
 	if expectedMaxTAT > 0 {
 		require.True(rv.te.t, tat <= expectedMaxTAT, "TAT value %d should be <= %d", tat, expectedMaxTAT)
 	}
@@ -391,7 +391,7 @@ func (te *TestEnvironment) NewTestDataBuilder() *TestDataBuilder {
 // CreateBasicConcurrencyConstraint creates a basic concurrency constraint for testing
 func (tb *TestDataBuilder) CreateBasicConcurrencyConstraint(limit int) ConstraintItem {
 	inProgressKey := fmt.Sprintf("{%s}:concurrency:test:%s", tb.te.KeyPrefix, tb.te.FunctionID)
-	
+
 	return ConstraintItem{
 		Kind: ConstraintKindConcurrency,
 		Concurrency: &ConcurrencyConstraint{
@@ -463,10 +463,11 @@ func (te *TestEnvironment) AdvanceTimeAndRedis(duration time.Duration) {
 func (te *TestEnvironment) LogRedisState(prefix string) {
 	snapshot := te.CaptureRedisState()
 	te.t.Logf("%s - Redis state: %d keys", prefix, len(snapshot.Keys))
-	
+
 	for keyType, keys := range snapshot.KeysByType {
 		if len(keys) > 0 {
 			te.t.Logf("  %s keys (%d): %v", keyType, len(keys), keys)
 		}
 	}
 }
+
