@@ -649,8 +649,17 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			},
 		}
 
+		inProgressKey := fmt.Sprintf("{%s}:concurrency:test:%s", te.KeyPrefix, te.FunctionID)
+
 		constraints := []ConstraintItem{
-			te.NewTestDataBuilder().CreateBasicConcurrencyConstraint(5),
+			{
+				Kind: ConstraintKindConcurrency,
+				Concurrency: &ConcurrencyConstraint{
+					Mode:              enums.ConcurrencyModeStep,
+					Scope:             enums.ConcurrencyScopeFn,
+					InProgressItemKey: inProgressKey,
+				},
+			},
 		}
 
 		enableDebugLogs = true

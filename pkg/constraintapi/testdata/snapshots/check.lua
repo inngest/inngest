@@ -149,7 +149,7 @@ for index, value in ipairs(constraints) do
 		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.h, nowMS, value.t.p, value.t.l, value.t.b)
+		local throttleRes = throttleCapacity(value.t.eh, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
 		constraintRetryAfter = throttleRes[2] 
 		local usage = {}

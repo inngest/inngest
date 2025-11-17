@@ -1209,6 +1209,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 					},
 				},
 			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
+			},
 			mi: MigrationIdentifier{
 				QueueShard: "test",
 			},
@@ -1300,6 +1303,9 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 						InProgressItemKey: "test-key-2",
 					},
 				},
+			},
+			configuration: ConstraintConfig{
+				FunctionVersion: 1,
 			},
 			mi: MigrationIdentifier{
 				QueueShard: "test",

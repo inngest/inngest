@@ -38,7 +38,6 @@ end
 local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
-	debug(keyRequestState)
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
@@ -46,9 +45,11 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 end
 local requestDetails = cjson.decode(requestStateStr)
 local constraints = requestDetails.s
-for _, value in ipairs(constraints) do
-	if value.k == 2 then
-		call("ZREM", value.c.ilk, currentLeaseID)
+debug("debugging release")
+for _, c in ipairs(constraints) do
+	if c.k == 2 then
+		debug("removing in progress lease", c.c.ilk)
+		call("ZREM", c.c.ilk, currentLeaseID)
 	end
 end
 call("DEL", keyLeaseDetails)
@@ -62,6 +63,8 @@ end
 requestDetails.a = requestDetails.a - 1
 if requestDetails.a == 0 then
 	call("DEL", keyRequestState)
+else
+	call("SET", keyRequestState, cjson.encode(requestDetails))
 end
 local res = {}
 res["s"] = 3

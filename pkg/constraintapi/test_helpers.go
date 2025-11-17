@@ -41,7 +41,7 @@ func NewTestEnvironment(t *testing.T) *TestEnvironment {
 		WithQueueShards(map[string]rueidis.Client{
 			"test": rc,
 		}),
-		WithNumScavengerShards(4),
+		WithNumScavengerShards(1),
 		WithQueueStateKeyPrefix("q:v1"),
 		WithRateLimitKeyPrefix("rl"),
 	)
@@ -226,8 +226,8 @@ func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintIte
 			constraintKey := fmt.Sprintf("constraint_%d", i)
 			if expected, ok := expectedCounts[constraintKey]; ok {
 				require.Equal(cv.te.t, expected, total,
-					"In-progress count mismatch for constraint %d: items=%d, leases=%d, total=%d, expected=%d",
-					i, itemsCount, leasesCount, total, expected)
+					"In-progress count mismatch for constraint %d: items=%d, leases=%d, total=%d, expected=%d, all=%s",
+					i, itemsCount, leasesCount, total, expected, cv.te.Redis.Dump())
 			}
 		}
 	}
@@ -388,20 +388,6 @@ func (te *TestEnvironment) NewTestDataBuilder() *TestDataBuilder {
 	return &TestDataBuilder{te: te}
 }
 
-// CreateBasicConcurrencyConstraint creates a basic concurrency constraint for testing
-func (tb *TestDataBuilder) CreateBasicConcurrencyConstraint(limit int) ConstraintItem {
-	inProgressKey := fmt.Sprintf("{%s}:concurrency:test:%s", tb.te.KeyPrefix, tb.te.FunctionID)
-
-	return ConstraintItem{
-		Kind: ConstraintKindConcurrency,
-		Concurrency: &ConcurrencyConstraint{
-			Mode:              0, // ConcurrencyModeStep
-			Scope:             2, // ConcurrencyScopeFn
-			InProgressItemKey: inProgressKey,
-		},
-	}
-}
-
 // CreateBasicRateLimitConstraint creates a basic rate limit constraint for testing
 func (tb *TestDataBuilder) CreateBasicRateLimitConstraint(limit int, period int) ConstraintItem {
 	return ConstraintItem{
@@ -470,4 +456,3 @@ func (te *TestEnvironment) LogRedisState(prefix string) {
 		}
 	}
 }
-

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -27,12 +28,11 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Concurrency: ConcurrencyConfig{
 				FunctionConcurrency: 5,
 			},
-			RateLimit: []RateLimitConfig{
+			Throttle: []ThrottleConfig{
 				{
-					Scope:             enums.RateLimitScopeFn,
-					Limit:             10,
-					Period:            60,
-					KeyExpressionHash: "consistency-test",
+					Limit:                     10,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "consistency-test",
 				},
 			},
 		}
@@ -47,14 +47,14 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 				},
 			},
 			{
-				Kind: ConstraintKindRateLimit,
-				RateLimit: &RateLimitConstraint{
-					Scope:             enums.RateLimitScopeFn,
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
 					KeyExpressionHash: "consistency-test",
 					EvaluatedKeyHash:  "test-value",
 				},
 			},
 		}
+		var err error
 
 		// Acquire multiple leases
 		acquireResp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
@@ -111,14 +111,21 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		finalState := te.CaptureRedisState()
 		te.CompareRedisState(afterAcquireState, finalState, "After Release")
 
+		_, err = te.Redis.Get(te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, "consistency-acquire-1"))
+		require.Error(t, err)
+
 		// Verify all capacity is restored - only idempotency keys should remain
 		expectedRemainingKeys := []string{
 			te.CapacityManager.keyOperationIdempotency(te.KeyPrefix, te.AccountID, "acq", "consistency-acquire-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "consistency-acquire-1"),
 		}
 		for i := 1; i <= 3; i++ {
 			expectedRemainingKeys = append(expectedRemainingKeys,
 				te.CapacityManager.keyOperationIdempotency(te.KeyPrefix, te.AccountID, "rel", fmt.Sprintf("consistency-release-%d", i)))
 		}
+
+		// NOTE: Throttle keys are stored _without_ prefix
+		expectedRemainingKeys = append(expectedRemainingKeys, "consistency-test")
 
 		te.VerifyNoResourceLeaks(initialState, expectedRemainingKeys)
 
@@ -133,6 +140,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 	})
 
 	t.Run("Partial Acquisition State Consistency", func(t *testing.T) {
+		te.Redis.FlushAll()
 
 		config := ConstraintConfig{
 			FunctionVersion: 1,
@@ -204,6 +212,8 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 	})
 
 	t.Run("Extend Lease State Consistency", func(t *testing.T) {
+		te.Redis.FlushAll()
+
 		config := ConstraintConfig{
 			FunctionVersion: 1,
 			Concurrency: ConcurrencyConfig{
@@ -221,6 +231,8 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 				},
 			},
 		}
+
+		var err error
 
 		// Acquire a lease
 		acquireResp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
@@ -246,7 +258,15 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		require.Len(t, acquireResp.Leases, 1)
 
 		originalLease := acquireResp.Leases[0]
-		originalExpiry := ulid.Time(originalLease.LeaseID.Time())
+		originalExpiry := originalLease.LeaseID.Timestamp()
+
+		cv := te.NewConstraintVerifier()
+		cv.VerifyScavengerShard(float64(originalExpiry.UnixMilli()), true)
+
+		accountScore, err := te.Redis.ZScore(te.CapacityManager.keyScavengerShard(te.KeyPrefix, 0), te.AccountID.String())
+		require.NoError(t, err)
+
+		require.Equal(t, float64(originalExpiry.UnixMilli()), accountScore)
 
 		// Capture state before extension
 		beforeExtendState := te.CaptureRedisState()
@@ -262,32 +282,53 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, extendResp.LeaseID)
-		require.Equal(t, originalLease.LeaseID, *extendResp.LeaseID)
+		require.NotEqual(t, originalLease.LeaseID, *extendResp.LeaseID)
+		require.NotEqual(t, originalExpiry, extendResp.LeaseID.Timestamp())
 
 		afterExtendState := te.CaptureRedisState()
 		te.CompareRedisState(beforeExtendState, afterExtendState, "After Extend")
 
 		// Verify lease details are updated but capacity count remains the same
-		cv := te.NewConstraintVerifier()
 		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 1}) // Still 1 lease
 
-		// Verify account leases still track the same lease (but with updated expiry)
-		cv.VerifyAccountLeases([]ulid.ULID{originalLease.LeaseID})
+		// Verify account leases track the new lease (with updated expiry)
+		cv.VerifyAccountLeases([]ulid.ULID{*extendResp.LeaseID})
+
+		t.Log(extendResp.LeaseID.Timestamp().UnixMilli())
+
+		leaseScore, err := te.Redis.ZScore(te.CapacityManager.keyAccountLeases(te.KeyPrefix, te.AccountID), extendResp.LeaseID.String())
+		require.NoError(t, err)
+		require.Equal(t, float64(extendResp.LeaseID.Timestamp().UnixMilli()), leaseScore)
+
+		accountScore, err = te.Redis.ZScore(te.CapacityManager.keyScavengerShard(te.KeyPrefix, 0), te.AccountID.String())
+		require.NoError(t, err)
+		require.Equal(t, float64(extendResp.LeaseID.Timestamp().UnixMilli()), accountScore)
+
+		t.Log(te.Redis.Dump())
 
 		// Verify scavenger shard score is updated with new expiry
-		cv.VerifyScavengerShard(float64(originalExpiry.Add(10*time.Second).UnixMilli()), true)
+		cv.VerifyScavengerShard(float64(extendResp.LeaseID.Timestamp().UnixMilli()), true)
 
 		// Verify lease details contain extension information
-		cv.VerifyLeaseDetails(originalLease.LeaseID, "extend-lease-1", "", "extend-operation")
+		cv.VerifyLeaseDetails(
+			*extendResp.LeaseID,
+			"extend-lease-1",
+			"",
+			util.XXHash("extend-acquire"),
+		)
+
+		enableDebugLogs = true
 
 		// Clean up
-		_, err = te.CapacityManager.Release(context.Background(), &CapacityReleaseRequest{
+		resp, err := te.CapacityManager.Release(context.Background(), &CapacityReleaseRequest{
 			IdempotencyKey: "extend-release",
 			AccountID:      te.AccountID,
-			LeaseID:        originalLease.LeaseID,
+			LeaseID:        *extendResp.LeaseID,
 			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
 		require.NoError(t, err)
+
+		t.Log(resp.internalDebugState.Debug)
 
 		// Verify complete cleanup
 		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 0})
@@ -296,6 +337,8 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 	})
 
 	t.Run("Idempotency Key TTL Consistency", func(t *testing.T) {
+		te.Redis.FlushAll()
+
 		config := ConstraintConfig{
 			FunctionVersion: 1,
 			Concurrency: ConcurrencyConfig{
@@ -363,10 +406,16 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 
 		// Verify no other resource leaks exist after TTL cleanup
 		finalState := te.CaptureRedisState()
-		require.Empty(t, finalState.Keys, "No keys should remain after TTL cleanup")
+		require.Equal(t, finalState.Keys,
+			[]string{
+				te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "ttl-test"),
+			},
+			"No keys should remain after TTL cleanup")
 	})
 
 	t.Run("Multi-Constraint State Consistency", func(t *testing.T) {
+		te.Redis.FlushAll()
+
 		initialState := te.CaptureRedisState()
 
 		config := ConstraintConfig{
@@ -374,12 +423,11 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Concurrency: ConcurrencyConfig{
 				FunctionConcurrency: 3,
 			},
-			RateLimit: []RateLimitConfig{
+			Throttle: []ThrottleConfig{
 				{
-					Scope:             enums.RateLimitScopeFn,
-					Limit:             5,
-					Period:            60,
-					KeyExpressionHash: "multi-constraint",
+					Limit:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-expr",
 				},
 			},
 		}
@@ -394,10 +442,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 				},
 			},
 			{
-				Kind: ConstraintKindRateLimit,
-				RateLimit: &RateLimitConstraint{
-					Scope:             enums.RateLimitScopeFn,
-					KeyExpressionHash: "multi-constraint",
+				Kind: ConstraintKindThrottle,
+				Throttle: &ThrottleConstraint{
+					KeyExpressionHash: "throttle-expr",
 					EvaluatedKeyHash:  "multi-value",
 				},
 			},
@@ -420,7 +467,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 				Service:  ServiceExecutor,
 				Location: LeaseLocationItemLease,
 			},
-			Migration: MigrationIdentifier{IsRateLimit: true},
+			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
 
 		require.NoError(t, err)
@@ -430,19 +477,13 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		cv := te.NewConstraintVerifier()
 		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 2}) // 2 leases in concurrency
 
-		// Verify rate limit state is updated
-		rateLimitKey := fmt.Sprintf("{%s}:multi-value", te.CapacityManager.rateLimitKeyPrefix)
-		rv := te.NewRateLimitStateVerifier()
-		currentTime := clock.Now().UnixNano()
-		rv.VerifyRateLimitState(rateLimitKey, currentTime, currentTime+int64(time.Hour))
-
 		// Release leases and verify both constraints are properly cleaned up
 		for i, lease := range acquireResp.Leases {
 			_, err := te.CapacityManager.Release(context.Background(), &CapacityReleaseRequest{
 				IdempotencyKey: fmt.Sprintf("multi-release-%d", i+1),
 				AccountID:      te.AccountID,
 				LeaseID:        lease.LeaseID,
-				Migration:      MigrationIdentifier{IsRateLimit: true},
+				Migration:      MigrationIdentifier{QueueShard: "test"},
 			})
 			require.NoError(t, err)
 		}
@@ -450,15 +491,13 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		// Verify concurrency constraint is cleaned up
 		cv.VerifyInProgressCounts(constraints, map[string]int{"constraint_0": 0})
 
-		// Verify rate limit state remains (TAT persists beyond lease lifecycle)
-		rv.VerifyRateLimitState(rateLimitKey, currentTime, currentTime+int64(time.Hour))
-
 		// Verify only expected keys remain (rate limit state + idempotency keys)
 		expectedRemainingKeys := []string{
-			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.rateLimitKeyPrefix, te.AccountID, "acq", "multi-acquire"),
-			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.rateLimitKeyPrefix, te.AccountID, "rel", "multi-release-1"),
-			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.rateLimitKeyPrefix, te.AccountID, "rel", "multi-release-2"),
-			rateLimitKey,
+			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "acq", "multi-acquire"),
+			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-1"),
+			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-2"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-acquire"),
+			"multi-value", // throttle key
 		}
 
 		te.VerifyNoResourceLeaks(initialState, expectedRemainingKeys)

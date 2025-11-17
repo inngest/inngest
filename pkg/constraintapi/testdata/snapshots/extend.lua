@@ -111,9 +111,9 @@ call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, 
 call("DEL", keyOldLeaseDetails)
 call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), newLeaseID)
 call("ZREM", keyAccountLeases, currentLeaseID)
-local accountScore = call("ZSCORE", keyScavengerShard, accountID)
-if accountScore == nil or accountScore == false or tonumber(accountScore) > leaseExpiryMS then
-	call("ZADD", keyScavengerShard, tonumber(leaseExpiryMS), accountID)
+local earliestScore = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if earliestScore ~= nil and earliestScore ~= false and earliestScore[2] ~= nil then
+	call("ZADD", keyScavengerShard, tonumber(earliestScore[2]), accountID)
 end
 local res = {}
 res["s"] = 4

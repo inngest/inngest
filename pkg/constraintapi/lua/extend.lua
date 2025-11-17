@@ -158,10 +158,10 @@ call("DEL", keyOldLeaseDetails)
 call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), newLeaseID)
 call("ZREM", keyAccountLeases, currentLeaseID)
 
--- Update scavenger shard score (do not process account too early)
-local accountScore = call("ZSCORE", keyScavengerShard, accountID)
-if accountScore == nil or accountScore == false or tonumber(accountScore) > leaseExpiryMS then
-	call("ZADD", keyScavengerShard, tonumber(leaseExpiryMS), accountID)
+local earliestScore = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if earliestScore ~= nil and earliestScore ~= false and earliestScore[2] ~= nil then
+	-- Update to earliest score
+	call("ZADD", keyScavengerShard, tonumber(earliestScore[2]), accountID)
 end
 
 ---@type { s: integer, lid: string }
