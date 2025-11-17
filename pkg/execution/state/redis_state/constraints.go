@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -201,18 +200,19 @@ func (q *queue) itemLeaseConstraintCheck(
 ) (itemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
 
-	if partition.AccountID == uuid.Nil ||
-		partition.EnvID == nil ||
-		partition.FunctionID == nil {
+	if shadowPart.AccountID == nil ||
+		shadowPart.EnvID == nil ||
+		shadowPart.FunctionID == nil {
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	if q.capacityManager == nil ||
 		q.useConstraintAPI == nil {
+
 		return itemLeaseConstraintCheckResult{}, nil
 	}
 
-	useAPI, fallback := q.useConstraintAPI(ctx, partition.AccountID)
+	useAPI, fallback := q.useConstraintAPI(ctx, *shadowPart.AccountID)
 	if !useAPI {
 		return itemLeaseConstraintCheckResult{}, nil
 	}
@@ -229,8 +229,8 @@ func (q *queue) itemLeaseConstraintCheck(
 	idempotencyKey := item.ID
 
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID: partition.AccountID,
-		EnvID:     *partition.EnvID,
+		AccountID: *shadowPart.AccountID,
+		EnvID:     *shadowPart.EnvID,
 		// TODO: Double check if the item ID works for idempotency:
 		// - Consistent across the same attempt
 		// - Do we need to re-evaluate per retry?
@@ -239,7 +239,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		LeaseRunIDs: map[string]ulid.ULID{
 			idempotencyKey: item.Data.Identifier.RunID,
 		},
-		FunctionID:      *partition.FunctionID,
+		FunctionID:      *shadowPart.FunctionID,
 		CurrentTime:     now,
 		Duration:        QueueLeaseDuration,
 		Configuration:   constraintConfigFromConstraints(constraints),
@@ -250,6 +250,10 @@ func (q *queue) itemLeaseConstraintCheck(
 			Service:           constraintapi.ServiceExecutor,
 			Location:          constraintapi.LeaseLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		},
+		Migration: constraintapi.MigrationIdentifier{
+			IsRateLimit: false,
+			QueueShard:  q.primaryQueueShard.Name,
 		},
 	})
 	if err != nil {

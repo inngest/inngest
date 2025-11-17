@@ -368,14 +368,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			return fmt.Errorf("could not create contraint API: %w", err)
 		}
 
-		queueOpts = append(queueOpts, redis_state.WithCapacityManager(capacityManager))
+		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
 		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
 			return true, true
 		}))
 
+		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
+
 		capacityManager = cm
 
-		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
+		l.Warn("EXPERIMENTAL: Enabling Constraint API")
 	}
 
 	if opts.RetryInterval > 0 {
@@ -935,8 +937,13 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			fnLimit = accountLimit
 		}
 
+		fnVersion := fn.FunctionVersion
+		if fnVersion <= 0 {
+			fnVersion = 1
+		}
+
 		constraints := redis_state.PartitionConstraintConfig{
-			FunctionVersion: fn.FunctionVersion,
+			FunctionVersion: fnVersion,
 
 			Concurrency: redis_state.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,

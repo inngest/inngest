@@ -428,6 +428,7 @@ func (s *scavengerService) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			l.Info("context canceled, stopping scavenger loop")
 			return nil
 		case <-t:
 		}
