@@ -14,7 +14,6 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
 
   //
   // If no alwaysVisibleCount is specified or there aren't more pills than the limit, show all
-  //
   if (!alwaysVisibleCount || pills.length <= alwaysVisibleCount) {
     return (
       <div className="flex items-center gap-1">
@@ -29,7 +28,6 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
 
   //
   // If we have more pills than alwaysVisibleCount, use the "+X" condensed view
-  //
   const hiddenPills = pills.slice(alwaysVisibleCount);
   const alwaysVisiblePills = pills.slice(0, alwaysVisibleCount);
 
