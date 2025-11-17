@@ -125,7 +125,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		}
 
 		// NOTE: Throttle keys are stored _without_ prefix
-		expectedRemainingKeys = append(expectedRemainingKeys, "consistency-test")
+		expectedRemainingKeys = append(expectedRemainingKeys, "test-value")
 
 		te.VerifyNoResourceLeaks(initialState, expectedRemainingKeys)
 
