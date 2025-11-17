@@ -564,14 +564,6 @@ export type Deploy = {
   workspaceID: Scalars['UUID'];
 };
 
-export type EditWorkflowInput = {
-  description?: InputMaybe<Scalars['String']>;
-  disable?: InputMaybe<Scalars['Time']>;
-  promote?: InputMaybe<Scalars['Time']>;
-  version: Scalars['Int'];
-  workflowID: Scalars['ID'];
-};
-
 export type EntitlementBool = {
   __typename?: 'EntitlementBool';
   enabled: Scalars['Boolean'];
@@ -603,6 +595,7 @@ export type EntitlementExecutions = {
   __typename?: 'EntitlementExecutions';
   limit: Maybe<Scalars['Int']>;
   overageAllowed: Scalars['Boolean'];
+  usage: Scalars['Int'];
 };
 
 export type EntitlementInt = {
@@ -1094,8 +1087,11 @@ export enum InsightsColumnType {
 export type InsightsQueryStatement = {
   __typename?: 'InsightsQueryStatement';
   createdAt: Scalars['Time'];
+  creator: Scalars['String'];
   id: Scalars['ULID'];
+  lastEditor: Scalars['String'];
   name: Scalars['String'];
+  shared: Scalars['Boolean'];
   sql: Scalars['String'];
   updatedAt: Scalars['Time'];
 };
@@ -1187,7 +1183,6 @@ export type Mutation = {
   deleteSigningKey: SigningKey;
   disableDatadogConnection: Scalars['UUID'];
   disableEnvironmentAutoArchive: Workspace;
-  editWorkflow: Maybe<WorkflowVersionResponse>;
   enableDatadogConnection: DatadogConnectionStatus;
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
@@ -1201,6 +1196,7 @@ export type Mutation = {
   rotateSigningKey: SigningKey;
   setAccountEntitlement: Scalars['UUID'];
   setUpAccount: Maybe<SetUpAccountPayload>;
+  shareInsightsQuery: InsightsQueryStatement;
   submitChurnSurvey: Scalars['Boolean'];
   syncNewApp: SyncResponse;
   unarchiveApp: App;
@@ -1365,11 +1361,6 @@ export type MutationDisableEnvironmentAutoArchiveArgs = {
 };
 
 
-export type MutationEditWorkflowArgs = {
-  input: EditWorkflowInput;
-};
-
-
 export type MutationEnableDatadogConnectionArgs = {
   envID: Scalars['UUID'];
   organizationID: Scalars['UUID'];
@@ -1438,6 +1429,11 @@ export type MutationSetAccountEntitlementArgs = {
   entitlementName: Scalars['String'];
   overrideStrategy: Scalars['String'];
   value: Scalars['Int'];
+};
+
+
+export type MutationShareInsightsQueryArgs = {
+  id: Scalars['ULID'];
 };
 
 

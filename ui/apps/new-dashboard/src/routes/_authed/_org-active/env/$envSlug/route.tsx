@@ -2,6 +2,7 @@ import { ArchivedEnvBanner } from "@/components/ArchivedEnvBanner";
 import { EnvironmentProvider } from "@/components/Environments/environment-context";
 import { Alert } from "@inngest/components/Alert";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { SharedContextProvider } from "@/components/SharedContext/SharedContextProvider";
 
 import { Route as OrgActiveRoute } from "@/routes/_authed/_org-active";
 
@@ -22,7 +23,9 @@ function EnvLayout() {
     <>
       <ArchivedEnvBanner env={env} />
       <EnvironmentProvider env={env}>
-        <Outlet />
+        <SharedContextProvider>
+          <Outlet />
+        </SharedContextProvider>
       </EnvironmentProvider>
     </>
   ) : (

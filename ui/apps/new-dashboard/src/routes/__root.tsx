@@ -10,15 +10,14 @@ import {
 } from "@tanstack/react-router";
 
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
+import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
+import URQLProviderWrapper from "@/components/URQL/URQLProvider";
+import { navCollapsed } from "@/data/nav";
 import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
 import globalsCss from "@inngest/components/AppRoot/globals.css?url";
-import { ThemeProvider } from "next-themes";
-import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
 import { TooltipProvider } from "@inngest/components/Tooltip";
-import { fetchClerkAuth } from "@/data/clerk";
-import { navCollapsed } from "@/data/nav";
 import { QueryClient } from "@tanstack/react-query";
-import URQLProviderWrapper from "@/components/URQL/URQLProvider";
+import { ThemeProvider } from "next-themes";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -59,14 +58,7 @@ export const Route = createRootRouteWithContext<{
       },
     ],
   }),
-  beforeLoad: async () => {
-    const { userId, token } = await fetchClerkAuth();
 
-    return {
-      userId,
-      token,
-    };
-  },
   loader: async () => {
     return {
       navCollapsed: await navCollapsed(),

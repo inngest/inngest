@@ -9,8 +9,13 @@ import { useEffect, useState } from "react";
 import AppFAQ from "@/components/Apps/AppFAQ";
 import { Apps } from "@/components/Apps/Apps";
 import { StatusMenu } from "@/components/Apps/StatusMenu";
+import { Header } from "@inngest/components/Header/NewHeader";
+import { AppInfo } from "./route";
+import { Button } from "@inngest/components/Button/NewButton";
+import { pathCreator } from "@/utils/urls";
+import { RiAddLine } from "@remixicon/react";
 
-type AppsSearchParams = {
+export type AppsSearchParams = {
   archived?: string;
 };
 
@@ -68,30 +73,48 @@ function AppsPage() {
     envSlug === staticSlugs.production && !hasProductionApps;
 
   return (
-    <div className="bg-canvasBase mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
-      {isLoading ? (
-        <div className="mb-4 flex items-center justify-center">
-          <div className="mt-[50px] w-full max-w-4xl">
-            <SkeletonCard />
+    <>
+      <Header
+        breadcrumb={[{ text: "Apps" }]}
+        backNav
+        infoIcon={<AppInfo />}
+        action={
+          (!isArchived || displayOnboarding) && (
+            <Button
+              kind="primary"
+              label="Sync new app"
+              href={pathCreator.createApp({ envSlug })}
+              icon={<RiAddLine />}
+              iconSide="left"
+            />
+          )
+        }
+      />
+      <div className="bg-canvasBase mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
+        {isLoading ? (
+          <div className="mb-4 flex items-center justify-center">
+            <div className="mt-[50px] w-full max-w-4xl">
+              <SkeletonCard />
+            </div>
           </div>
-        </div>
-      ) : (
-        <>
-          {displayOnboarding ? (
-            <>
-              <EmptyOnboardingCard />
-              <AppFAQ />
-            </>
-          ) : (
-            <>
-              <div className="relative flex w-full flex-row justify-start">
-                <StatusMenu archived={isArchived} envSlug={envSlug} />
-              </div>
-              <Apps isArchived={isArchived} />
-            </>
-          )}
-        </>
-      )}
-    </div>
+        ) : (
+          <>
+            {displayOnboarding ? (
+              <>
+                <EmptyOnboardingCard />
+                <AppFAQ />
+              </>
+            ) : (
+              <>
+                <div className="relative flex w-full flex-row justify-start">
+                  <StatusMenu archived={isArchived} envSlug={envSlug} />
+                </div>
+                <Apps isArchived={isArchived} />
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 }
