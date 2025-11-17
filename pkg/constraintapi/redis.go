@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -133,6 +134,29 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, acco
 // keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
 func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUID, leaseID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseID)
+}
+
+func (r *redisCapacityManager) KeyInProgressLeasesAccount(accountID uuid.UUID) string {
+	return ConcurrencyConstraint{
+		Scope: enums.ConcurrencyScopeAccount,
+		Mode:  enums.ConcurrencyModeStep,
+	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, uuid.Nil, uuid.Nil)
+}
+
+func (r *redisCapacityManager) KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string {
+	return ConcurrencyConstraint{
+		Scope: enums.ConcurrencyScopeFn,
+		Mode:  enums.ConcurrencyModeStep,
+	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, uuid.Nil, fnID)
+}
+
+func (r *redisCapacityManager) KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string {
+	return ConcurrencyConstraint{
+		Scope:             scope,
+		Mode:              enums.ConcurrencyModeStep,
+		KeyExpressionHash: keyExpressionHash,
+		EvaluatedKeyHash:  evaluatedKeyHash,
+	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, entityID, entityID)
 }
 
 // clientAndPrefix returns the Redis client and Lua key prefix for the first stage of the Constraint API.

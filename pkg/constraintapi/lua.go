@@ -158,6 +158,9 @@ type SerializedThrottleConstraint struct {
 
 	// p = Period (embedded from config)
 	Period int `json:"p"`
+
+	// k = Key (fully-qualified Redis key)
+	Key string `json:"k,omitempty"`
 }
 
 // SerializedRateLimitConstraint represents a minimal version of RateLimitConstraint
@@ -274,6 +277,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(ci.Throttle.Scope),
 				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
+				Key:               fmt.Sprintf("{%s}:throttle:%s", keyPrefix, ci.Throttle.EvaluatedKeyHash),
 			}
 
 			// Find matching throttle config

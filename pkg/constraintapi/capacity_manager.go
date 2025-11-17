@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -14,6 +15,17 @@ type CapacityManager interface {
 	Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError)
 	ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError)
 	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
+}
+
+type RolloutKeyGenerator interface {
+	KeyInProgressLeasesAccount(accountID uuid.UUID) string
+	KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string
+	KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string
+}
+
+type RolloutManager interface {
+	CapacityManager
+	RolloutKeyGenerator
 }
 
 // MigrationIdentifier includes hints for the Constraint API which will be removed

@@ -289,7 +289,7 @@ local requested = requestDetails.r
 ---@type integer
 local configVersion = requestDetails.cv
 
----@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
+---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
 
 -- Handle operation idempotency
@@ -349,7 +349,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 3 then
 		-- throttle
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.eh, nowMS, value.t.p, value.t.l, value.t.b)
+		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
 		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
 	end
@@ -416,7 +416,7 @@ for i = 1, granted, 1 do
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
 			-- throttle
-			throttleUpdate(value.t.eh, nowMS, value.t.p, value.t.l, 1)
+			throttleUpdate(value.t.k, nowMS, value.t.p, value.t.l, 1)
 		end
 	end
 
