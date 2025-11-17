@@ -1,13 +1,456 @@
 package constraintapi
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util"
 )
+
+func TestConstraintEnforcement(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	testCases := []struct {
+		name string
+
+		config      ConstraintConfig
+		constraints []ConstraintItem
+		mi          MigrationIdentifier
+
+		beforeAcquire func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, clock clockwork.FakeClock)
+
+		afterAcquire func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityAcquireResponse)
+
+		expectNoLeases bool
+
+		afterExtend  func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityExtendLeaseResponse)
+		afterRelease func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityReleaseResponse)
+	}{
+		{
+			name: "account concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 10,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityAcquireResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 7)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					keyInProgressLeases,
+					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.Leases[0].LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.Leases[0].LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.Leases[0].LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterExtend: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityExtendLeaseResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 8)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					keyInProgressLeases,
+					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterRelease: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityReleaseResponse) {
+				// Keys should be cleaned up
+				keys := r.Keys()
+				require.Len(t, keys, 4)
+				require.Subset(t, []string{
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+				}, keys)
+			},
+		},
+
+		{
+			name: "account concurrency limited due to legacy concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 10,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, clock clockwork.FakeClock) {
+				// Simulate existing concurrency usage (in progress item Leased by queue)
+				for i := range 10 {
+					_, err := r.ZAdd(
+						fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						float64(clock.Now().Add(time.Second).UnixMilli()),
+						fmt.Sprintf("queueItem%d", i),
+					)
+					require.NoError(t, err)
+				}
+			},
+			expectNoLeases: true,
+			afterAcquire: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityAcquireResponse) {
+				require.Equal(t, 0, len(resp.Leases))
+			},
+		},
+
+		{
+			name: "function concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					FunctionConcurrency: 10,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityAcquireResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 7)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					keyInProgressLeases,
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.Leases[0].LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.Leases[0].LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.Leases[0].LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterExtend: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityExtendLeaseResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 8)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					keyInProgressLeases,
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterRelease: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityReleaseResponse) {
+				// Keys should be cleaned up
+				keys := r.Keys()
+				require.Len(t, keys, 4)
+				require.Subset(t, []string{
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+				}, keys)
+			},
+		},
+
+		{
+			name: "custom concurrency",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:              enums.ConcurrencyModeStep,
+							Scope:             enums.ConcurrencyScopeEnv,
+							KeyExpressionHash: "static-key",
+							Limit:             5,
+						},
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeEnv,
+						Mode:              enums.ConcurrencyModeStep,
+						KeyExpressionHash: "static-key",
+						EvaluatedKeyHash:  "inngest",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:e:%s:%s", fnID, util.XXHash("inngest")),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			afterAcquire: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityAcquireResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 7)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
+					keyInProgressLeases,
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.Leases[0].LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.Leases[0].LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.Leases[0].LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterExtend: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityExtendLeaseResponse) {
+				// All keys should exist
+				keys := r.Keys()
+				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+				require.Len(t, keys, 8)
+				require.Subset(t, []string{
+					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
+					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
+					keyInProgressLeases,
+				}, keys)
+
+				// In progress leases should have a single item
+				mem, err := r.ZMembers(keyInProgressLeases)
+				require.NoError(t, err)
+				require.Len(t, mem, 1)
+				require.Contains(t, mem, resp.LeaseID.String())
+
+				// Score must be lease expiry
+				score, err := r.ZScore(keyInProgressLeases, resp.LeaseID.String())
+				require.NoError(t, err)
+
+				require.Equal(t, float64(resp.LeaseID.Timestamp().UnixMilli()), score)
+			},
+			afterRelease: func(t *testing.T, r *miniredis.Miniredis, rc rueidis.Client, cm *redisCapacityManager, config ConstraintConfig, constraints []ConstraintItem, resp *CapacityReleaseResponse) {
+				// Keys should be cleaned up
+				keys := r.Keys()
+				require.Len(t, keys, 4)
+				require.Subset(t, []string{
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+				}, keys)
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := miniredis.RunT(t)
+			ctx := context.Background()
+
+			rc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{r.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+			defer rc.Close()
+
+			clock := clockwork.NewFakeClock()
+
+			cm, err := NewRedisCapacityManager(
+				WithRateLimitClient(rc),
+				WithQueueShards(map[string]rueidis.Client{
+					"test": rc,
+				}),
+				WithClock(clock),
+				WithNumScavengerShards(1),
+				WithQueueStateKeyPrefix("q:v1"),
+				WithRateLimitKeyPrefix("rl"),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, cm)
+
+			if test.beforeAcquire != nil {
+				test.beforeAcquire(t, r, rc, cm, test.config, test.constraints, clock)
+			}
+
+			acquireResp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
+				Migration:            test.mi,
+				AccountID:            accountID,
+				IdempotencyKey:       "acquire",
+				Constraints:          test.constraints,
+				Amount:               1,
+				EnvID:                envID,
+				FunctionID:           fnID,
+				Configuration:        test.config,
+				LeaseIdempotencyKeys: []string{"item1"},
+				LeaseRunIDs:          make(map[string]ulid.ULID),
+				CurrentTime:          clock.Now(),
+				Duration:             5 * time.Second,
+				MaximumLifetime:      time.Hour,
+				Source: LeaseSource{
+					Service:           ServiceExecutor,
+					Location:          LeaseLocationItemLease,
+					RunProcessingMode: RunProcessingModeBackground,
+				},
+			})
+			require.NoError(t, err)
+
+			if test.afterAcquire != nil {
+				test.afterAcquire(t, r, rc, cm, test.config, test.constraints, acquireResp)
+			}
+
+			if test.expectNoLeases {
+				require.Len(t, acquireResp.Leases, 0)
+				return
+			}
+
+			require.Len(t, acquireResp.Leases, 1)
+
+			clock.Advance(2 * time.Second)
+			r.FastForward(2 * time.Second)
+			r.SetTime(clock.Now())
+
+			extendResp, err := cm.ExtendLease(ctx, &CapacityExtendLeaseRequest{
+				IdempotencyKey: "extend",
+				LeaseID:        acquireResp.Leases[0].LeaseID,
+				AccountID:      accountID,
+				Duration:       5 * time.Second,
+				Migration:      test.mi,
+			})
+			require.NoError(t, err)
+
+			if test.afterExtend != nil {
+				test.afterExtend(t, r, rc, cm, test.config, test.constraints, extendResp)
+			}
+
+			releaseResp, err := cm.Release(ctx, &CapacityReleaseRequest{
+				AccountID:      accountID,
+				IdempotencyKey: "release",
+				Migration:      test.mi,
+				LeaseID:        *extendResp.LeaseID,
+			})
+			require.NoError(t, err)
+
+			if test.afterRelease != nil {
+				test.afterRelease(t, r, rc, cm, test.config, test.constraints, releaseResp)
+			}
+		})
+	}
+}
 
 func TestConcurrencyConstraint_InProgressLeasesKey(t *testing.T) {
 	// Test UUIDs
@@ -261,4 +704,3 @@ func TestConcurrencyConstraint_InProgressLeasesKey_KeyFormat(t *testing.T) {
 		assert.NotEqual(t, keyAccount, keyFn, "account and function scoped keys should be different")
 	})
 }
-
