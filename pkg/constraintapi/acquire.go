@@ -110,6 +110,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
+	l = l.With(
+		"account_id", req.AccountID,
+		"env_id", req.EnvID,
+		"fn_id", req.FunctionID,
+	)
+
 	now := r.clock.Now()
 
 	// TODO: Add metric for this
@@ -212,7 +218,11 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
-		l.Trace("successful acquire call", "status", parsedResponse.Status)
+		l.Trace(
+			"successful acquire call",
+			"status", parsedResponse.Status,
+			"leases", leases,
+		)
 
 		// success or idempotency
 		return &CapacityAcquireResponse{

@@ -19,10 +19,16 @@ type extendLeaseScriptResponse struct {
 // ExtendLease implements CapacityManager.
 func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
+
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
+
+	l = l.With(
+		"account_id", req.AccountID,
+		"lease_id", req.LeaseID,
+	)
 
 	now := r.clock.Now()
 

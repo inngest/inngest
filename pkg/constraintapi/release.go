@@ -26,6 +26,11 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
+	l = l.With(
+		"account_id", req.AccountID,
+		"lease_id", req.LeaseID,
+	)
+
 	// Retrieve client and key prefix for current constraints
 	// NOTE: We will no longer need this once we move to a dedicated store for constraint state
 	keyPrefix, client, err := r.clientAndPrefix(req.Migration)
