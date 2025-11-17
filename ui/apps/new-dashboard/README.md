@@ -1,49 +1,172 @@
-## Introduction
+# Inngest Dashboard
 
-Clerk is a developer-first authentication and user management solution. It provides pre-built components and hooks for sign-in, sign-up, user profile, and organization management. Clerk is designed to be easy to use and customize, and can be integrated into any TanStack Start application.
+This is the web application for Inngest Cloud. It’s a Tanstack Start app that uses GraphQL to communicate
+with the [Inngest Cloud "App API"](https://github.com/inngest/monorepo). The app is hosted on Vercel and is the
+primary way to interact with Inngest Cloud.
 
-After following the [Clerk TanStack Start quickstart](https://clerk.com/docs/quickstarts/tanstack-start?utm_source=DevRel&utm_medium=docs&utm_campaign=templates&utm_content=08-05-2023&utm_term=clerk-tanstack-start-quickstart), you will have learned how to:
+## Setup
 
-- Create a new TanStack Start application
-- Install `@clerk/tanstack-react-start`
-- Set up your environment keys
-- Add `clerkMiddleware()` to your app
-- Wrap your Root Component with `<ClerkProvider />`
-- Use Clerk components to protect your content
-- Embed the `<SignInButton />` and `<SignOutButton />`
-- Deploy your application
+Before being able to run the app for the first time, you need to follow the steps below:
 
-## Running the template
+### Prerequisites
 
-```bash
-git clone https://github.com/clerk/clerk-tanstack-start-quickstart
+- Set up the [Cloud monorepo](https://github.com/inngest/monorepo) and have all backend services running locally
+- [Node.js](https://nodejs.org/en/download/)
+- Join the company's Vercel account
+
+### Instructions
+
+1. Clone this repository
+2. Install [`pnpm`](https://pnpm.io/) with
+   [Corepack](https://nodejs.org/docs/latest-v18.x/api/corepack.html) by running
+   `corepack enable; corepack prepare`
+3. Install dependencies by running `pnpm install`
+4. Link local project to our `ui` Vercel project by running `pnpm vercel link -p ui`
+   - Make sure the command prints out `Linked to inngest/ui` and not a `ui` project in your personal scope
+5. Download environment variables by running `pnpm env:pull`
+
+## Developing
+
+### Running the App
+
+#### Development Mode
+
+To start the app in development mode, run the following command:
+
+```sh
+$ pnpm dev
 ```
 
-To run the example locally, you need to:
+This will start a local server that will automatically rebuild the app and refresh the page when you
+make changes to the code. The app will be available at
+[http://localhost:5173](http://localhost:5173).
 
-1. Sign up for a Clerk account at [https://clerk.com](https://www.clerk.com?utm_source=DevRel&utm_medium=docs&utm_campaign=templates&utm_content=08-05-2023&utm_term=clerk-tanstack-start-quickstart).
+This is how you will run the app most of the time.
 
-2. Go to the [Clerk dashboard](https://dashboard.clerk.com) and create an application.
+#### Production Mode
 
-3. Set the required Clerk environment variables as shown in [the example `env` file](./.env.example).
+To run the app in production mode, run the following commands in order:
 
-4. `npm install` the required dependencies.
+```sh
+# Build the app for production usage
+$ pnpm build
 
-5. `npm run dev` to launch the development server.
+# Start the app in production mode
+$ pnpm start
+```
 
-## Learn more
+This can be useful for testing the app in production mode locally.
 
-To learn more about Clerk and TanStack Start, check out the following resources:
+### Code Linting
 
-- [Quickstart: Get started with TanStack Start and Clerk](https://clerk.com/docs/quickstarts/tanstack-start?utm_source=DevRel&utm_medium=docs&utm_campaign=templates&utm_content=08-05-2023&utm_term=clerk-tanstack-start-quickstart)
-- [Clerk Documentation](https://clerk.com/docs?utm_source=DevRel&utm_medium=docs&utm_campaign=templates&utm_content=08-05-2023&utm_term=clerk-tanstack-start-quickstart)
+Code linting is handled by [ESLint](https://eslint.org/). You can use the following command for
+linting all project's files:
 
-## Found an issue or want to leave feedback
+```sh
+$ pnpm lint
+```
 
-Feel free to create a support thread on our [Discord](https://clerk.com/discord). Our support team will be happy to assist you in the `#support` channel.
+Staged files are automatically linted before commits. Be sure to **fix all linting errors before
+committing**.
 
-## Connect with us
+We recommend using an [editor integration for ESLint](https://eslint.org/docs/user-guide/integrations).
 
-You can discuss ideas, ask questions, and meet others from the community in our [Discord](https://discord.com/invite/b5rXHjAg7A).
+### Code Formatting
 
-If you prefer, you can also find support through our [Twitter](https://twitter.com/ClerkDev), or you can [email](mailto:support@clerk.dev) us!
+Code formatting is handled by [Prettier](https://prettier.io/). You can use the following command to
+format all project’s files:
+
+```sh
+$ pnpm format
+```
+
+Staged files are automatically formatted when committing.
+
+We recommend using an [editor integration for Prettier](https://prettier.io/docs/en/editors.html).
+
+### Environment Variables
+
+Environment variables are managed with the [Vercel CLI](https://vercel.com/docs/cli/env). Use the
+following commands to manage them:
+
+```sh
+# Link the project on Vercel
+$ pnpm vercel link -p ui # and follow the steps
+
+# Download development environment variables for running the app locally
+$ pnpm env:pull
+
+# Add a new environment variable
+$ pnpm env:add
+
+# Remove an environment variable
+$ pnpm env:rm
+```
+
+Check the [Tanstack Start Documentation](https://tanstack.com/start/latest/docs/framework/react/overview)
+for more information.
+
+You should **never commit environment variables** to the repository. If you need to add a new
+environment variable, add it with the `pnpm env:add` command and then download it with the
+`pnpm env:pull` command.
+
+### Sign In
+
+Once you've run `make test-events` in the [Backend Monorepo](https://github.com/inngest/monorepo),
+you can sign in using these credentials:
+
+- Username: `test@example.com`
+- Password: `testing123`
+
+## Style Guide
+
+### Naming Conventions
+
+- ID abbreviations should follow our Backend conventions.
+
+```javascript
+// Good
+const environmentID = "";
+
+// Bad
+const environmentId = "";
+```
+
+- Naming (for both copy and code) should follow our [Product nomenclature](https://www.notion.so/inngest/Nomenclature-Taxonomy-aba427349a724183b90784f0b80d5a35).
+
+```javascript
+// Good - terminology we use for external comms
+const environment = "";
+
+// Bad - deprecated terminology
+const workspace = "";
+```
+
+### Language and Copy Conventions
+
+- The default language of the project is English(US).
+
+```javascript
+// Good
+function analyzeStats() {
+  console.log(foo);
+}
+
+// Bad
+function analyseStats() {
+  console.log(foo);
+}
+```
+
+- Use Title Case when adding copy of headings, titles, tags, navbar items and buttons.
+
+```javascript
+// Good
+<button>Click Me</button>;
+
+// Bad
+<button>Click me</button>;
+
+// Bad
+<button>click me</button>;
+```
