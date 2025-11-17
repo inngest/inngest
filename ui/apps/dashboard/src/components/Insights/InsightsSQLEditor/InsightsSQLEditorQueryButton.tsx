@@ -1,10 +1,9 @@
 'use client';
 
 import { Button } from '@inngest/components/Button/Button';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiCommandLine, RiCornerDownLeftFill } from '@remixicon/react';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { KeyboardShortcut } from '../KeyboardShortcut';
 import { useDocumentShortcuts } from './actions/handleShortcuts';
 import { getCanRunQuery } from './utils';
 
@@ -14,15 +13,7 @@ function QueryButtonLabel({ disabled, isRunning }: { disabled: boolean; isRunnin
   return (
     <div className="flex items-center gap-2">
       <span>Run query</span>
-      <div
-        className={cn(
-          'flex shrink-0 gap-0.5 rounded-[4px] px-1 py-0.5',
-          disabled ? 'bg-muted' : 'bg-primary-moderate'
-        )}
-      >
-        <RiCommandLine className="h-4 w-4" />
-        <RiCornerDownLeftFill className="h-4 w-4" />
-      </div>
+      <KeyboardShortcut disabled={disabled} keys={['cmd', 'ctrl', 'enter']} />
     </div>
   );
 }
