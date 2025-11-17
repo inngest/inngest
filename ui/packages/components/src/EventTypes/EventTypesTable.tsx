@@ -1,8 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
@@ -18,9 +16,10 @@ import {
   type PageInfo,
 } from '@inngest/components/types/eventType';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
-import { useSearchParam } from '../hooks/useSearchParam';
+import { useSearchParam } from '../hooks/useNewSearchParams';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
 import { useColumns } from './columns';
 
@@ -34,8 +33,8 @@ export function EventTypesTable({
   emptyActions: React.ReactNode;
   eventTypeActions: (props: Row<EventType>) => React.ReactElement;
   pathCreator: {
-    function: (params: { functionSlug: string }) => Route;
-    eventType: (params: { eventName: string }) => Route;
+    function: (params: { functionSlug: string }) => string;
+    eventType: (params: { eventName: string }) => string;
   };
   getEventTypes: ({
     cursor,
@@ -52,7 +51,7 @@ export function EventTypesTable({
     eventName: string;
   }) => Promise<Pick<EventType, 'volume' | 'name'>>;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
   const [sorting, setSorting] = useState<SortingState>([
     {
@@ -207,7 +206,9 @@ export function EventTypesTable({
               }
             />
           }
-          onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
+          onRowClick={(row) =>
+            navigate({ to: pathCreator.eventType({ eventName: row.original.name }) })
+          }
           getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
         />
         <InfiniteScrollTrigger

@@ -16,7 +16,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
-import { useLocalStorage } from 'react-use';
+import * as pkg from 'react-use';
 
 import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
@@ -34,6 +34,8 @@ import RunsStatusFilter from './RunsStatusFilter';
 import RunsTable from './RunsTable';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
+
+const { useLocalStorage } = pkg;
 
 type Props = {
   data: Run[];

@@ -19,6 +19,7 @@ import { Route as AuthedOrgActiveEnvEnvSlugRouteRouteImport } from './routes/_au
 import { Route as AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport } from './routes/_authed/_org-active/env/$envSlug/apps/route'
 import { Route as AuthedOrgActiveEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/_org-active/env/$envSlug/runs/index'
 import { Route as AuthedOrgActiveEnvEnvSlugFunctionsIndexRouteImport } from './routes/_authed/_org-active/env/$envSlug/functions/index'
+import { Route as AuthedOrgActiveEnvEnvSlugEventTypesIndexRouteImport } from './routes/_authed/_org-active/env/$envSlug/event-types/index'
 import { Route as AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport } from './routes/_authed/_org-active/env/$envSlug/apps/index'
 
 const SignOutRoute = SignOutRouteImport.update({
@@ -73,6 +74,12 @@ const AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute =
     path: '/functions/',
     getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
   } as any)
+const AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute =
+  AuthedOrgActiveEnvEnvSlugEventTypesIndexRouteImport.update({
+    id: '/event-types/',
+    path: '/event-types/',
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedOrgActiveEnvEnvSlugAppsIndexRoute =
   AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport.update({
     id: '/',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
   '/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
   '/env/$envSlug/apps/': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
+  '/env/$envSlug/event-types': typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/functions': typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/runs': typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute
 }
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/sign-up/$': typeof SignUpSplatRoute
   '/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
   '/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
+  '/env/$envSlug/event-types': typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute
   '/env/$envSlug/functions': typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute
   '/env/$envSlug/runs': typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute
 }
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/_authed/_org-active/env/$envSlug': typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren
   '/_authed/_org-active/env/$envSlug/apps': typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
   '/_authed/_org-active/env/$envSlug/apps/': typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute
+  '/_authed/_org-active/env/$envSlug/event-types/': typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute
   '/_authed/_org-active/env/$envSlug/functions/': typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute
   '/_authed/_org-active/env/$envSlug/runs/': typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute
 }
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug'
     | '/env/$envSlug/apps'
     | '/env/$envSlug/apps/'
+    | '/env/$envSlug/event-types'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/runs'
   fileRoutesByTo: FileRoutesByTo
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/env/$envSlug'
     | '/env/$envSlug/apps'
+    | '/env/$envSlug/event-types'
     | '/env/$envSlug/functions'
     | '/env/$envSlug/runs'
   id:
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
     | '/_authed/_org-active/env/$envSlug'
     | '/_authed/_org-active/env/$envSlug/apps'
     | '/_authed/_org-active/env/$envSlug/apps/'
+    | '/_authed/_org-active/env/$envSlug/event-types/'
     | '/_authed/_org-active/env/$envSlug/functions/'
     | '/_authed/_org-active/env/$envSlug/runs/'
   fileRoutesById: FileRoutesById
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRouteImport
       parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute
     }
+    '/_authed/_org-active/env/$envSlug/event-types/': {
+      id: '/_authed/_org-active/env/$envSlug/event-types/'
+      path: '/event-types'
+      fullPath: '/env/$envSlug/event-types'
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRouteImport
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute
+    }
     '/_authed/_org-active/env/$envSlug/apps/': {
       id: '/_authed/_org-active/env/$envSlug/apps/'
       path: '/'
@@ -259,6 +279,7 @@ const AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren =
 
 interface AuthedOrgActiveEnvEnvSlugRouteRouteChildren {
   AuthedOrgActiveEnvEnvSlugAppsRouteRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren
+  AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute: typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute
   AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute
   AuthedOrgActiveEnvEnvSlugRunsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute
 }
@@ -267,6 +288,8 @@ const AuthedOrgActiveEnvEnvSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugRout
   {
     AuthedOrgActiveEnvEnvSlugAppsRouteRoute:
       AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren,
+    AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute:
+      AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute,
     AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute:
       AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute,
     AuthedOrgActiveEnvEnvSlugRunsIndexRoute:
