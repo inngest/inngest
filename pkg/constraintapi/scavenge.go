@@ -435,6 +435,7 @@ func (s *scavengerService) Run(ctx context.Context) error {
 		res, err := s.cm.Scavenge(ctx, s.opt...)
 		if err != nil {
 			l.Error("scavenging expired leases failed", "err", err)
+			continue
 		}
 
 		metrics.IncrConstraintAPIScavengerTotalAccountsCounter(ctx, int64(res.TotalAccountsCount), metrics.CounterOpt{
