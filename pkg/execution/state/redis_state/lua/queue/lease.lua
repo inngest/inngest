@@ -40,6 +40,11 @@ local keyActiveRunsCustomConcurrencyKey2  = KEYS[17]
 
 local throttleKey             = KEYS[18]
 
+local keyInProgressLeasesAcct      = KEYS[19]
+local keyInProgressLeasesFn        = KEYS[20]
+local keyInProgressLeasesCustom1   = KEYS[21]
+local keyInProgressLeasesCustom2   = KEYS[22]
+
 local queueID      						= ARGV[1]
 local partitionID 					  = ARGV[2]
 local accountId       				= ARGV[3]
@@ -118,22 +123,38 @@ if checkConstraints == 1 then
   -- leasing the partition and do not need to be checked again (only one worker can run a partition at
   -- once, and the capacity is kept in memory after leasing a partition)
   if customConcurrencyKey1 > 0 then
-      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
+      local customCap = check_concurrency(currentTime, keyInProgressCustomConcurrencyKey1, customConcurrencyKey1)
+      if exists_without_ending(keyInProgressLeasesCustom1, ":-") then
+        customCap = customCap + check_concurrency(currentTime, keyInProgressLeasesCustom1, customConcurrencyKey1)
+      end
+      if customCap <= 0 then
           return -4
       end
   end
   if customConcurrencyKey2 > 0 then
-      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
+      local customCap = check_concurrency(currentTime, keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
+      if exists_without_ending(keyInProgressLeasesCustom2, ":-") then
+        customCap = customCap + check_concurrency(currentTime, keyInProgressLeasesCustom2, customConcurrencyKey2)
+      end
+      if customCap <= 0 then
           return -5
       end
   end
   if concurrencyPartition > 0 then
-      if check_concurrency(currentTime, keyInProgressPartition, concurrencyPartition) <= 0 then
+      local partCap = check_concurrency(currentTime, keyInProgressPartition, concurrencyPartition)
+      if exists_without_ending(keyInProgressLeasesFn, ":-") then
+        partCap = partCap + check_concurrency(currentTime, keyInProgressLeasesFn, concurrencyPartition)
+      end
+      if partCap <= 0 then
           return -3
       end
   end
   if concurrencyAcct > 0 then
-      if check_concurrency(currentTime, keyInProgressAccount, concurrencyAcct) <= 0 then
+      local accountCap = check_concurrency(currentTime, keyInProgressAccount, concurrencyAcct)
+      if exists_without_ending(keyInProgressLeasesAcct, ":-") then
+        accountCap = accountCap + check_concurrency(currentTime, keyInProgressLeasesAcct, concurrencyAcct)
+      end
+      if accountCap <= 0 then
           return -6
       end
   end
