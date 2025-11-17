@@ -4,8 +4,6 @@ import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEd
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 import { useActiveTab, useTabManagerActions } from '../../InsightsTabManager/TabManagerContext';
-import { HOME_TAB, TEMPLATES_TAB } from '../../InsightsTabManager/constants';
-import type { Tab } from '../../types';
 import { useSaveTabActions } from '../SaveTabContext';
 import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
