@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
@@ -18,6 +19,8 @@ type releaseScriptResponse struct {
 
 // Release implements CapacityManager.
 func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError) {
+	l := logger.StdlibLogger(ctx)
+
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
@@ -73,13 +76,16 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 
 	switch parsedResponse.Status {
 	case 1, 2:
-		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
+		l.Trace("capacity lease already cleaned up in release")
+
+		// TODO: Track status (1: cleaned up, 2: cleaned up)
 		return res, nil
 	case 3:
+		l.Trace("capacity released")
+
 		// TODO: track success
 		return res, nil
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
-

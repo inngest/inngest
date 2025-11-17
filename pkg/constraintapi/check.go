@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
@@ -90,6 +91,8 @@ type checkScriptResponse struct {
 
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
+	l := logger.StdlibLogger(ctx)
+
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid request: %w", err)
@@ -164,6 +167,8 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 
 	switch parsedResponse.Status {
 	case 1:
+		l.Trace("successful check request")
+
 		return &CapacityCheckResponse{
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
@@ -176,4 +181,3 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		return nil, nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
-

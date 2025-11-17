@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 )
@@ -17,6 +18,7 @@ type extendLeaseScriptResponse struct {
 
 // ExtendLease implements CapacityManager.
 func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExtendLeaseRequest) (*CapacityExtendLeaseResponse, errs.InternalError) {
+	l := logger.StdlibLogger(ctx)
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
@@ -87,13 +89,16 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 
 	switch parsedResponse.Status {
 	case 1, 2, 3:
+		l.Trace("capacity lease in extend call already cleaned up")
+
 		// TODO: Track status (1: cleaned up, 2: cleaned up or lease superseded, 3: lease expired)
 		return res, nil
 	case 4:
+		l.Trace("extended capacity lease")
+
 		// TODO: track success
 		return res, nil
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
 }
-

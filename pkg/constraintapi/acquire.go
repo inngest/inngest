@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
@@ -102,6 +103,8 @@ type acquireScriptResponse struct {
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	l := logger.StdlibLogger(ctx)
+
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
@@ -209,6 +212,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	switch parsedResponse.Status {
 	case 1, 3:
+		l.Trace("successful acquire call", "status", parsedResponse.Status)
+
 		// success or idempotency
 		return &CapacityAcquireResponse{
 			Leases:              leases,
@@ -218,6 +223,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}, nil
 
 	case 2:
+		l.Trace("acquire call lacking capacity", "status", parsedResponse.Status)
+
 		// lacking capacity
 		return &CapacityAcquireResponse{
 			Leases:              leases,
