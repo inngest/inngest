@@ -6,7 +6,7 @@ import {
 import { useMemo } from "react";
 
 import { Button } from "@inngest/components/Button/NewButton";
-import { EventTypesTable } from "@inngest/components/EventTypes/EventTypesTable";
+import { EventTypesTable } from "@inngest/components/EventTypes/NewEventTypesTable";
 import { Header } from "@inngest/components/Header/NewHeader";
 import { RefreshButton } from "@inngest/components/Refresh/NewRefreshButton";
 import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
