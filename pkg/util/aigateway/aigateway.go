@@ -3,11 +3,15 @@ package aigateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net/url"
 
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/sashabaranov/go-openai"
+)
+
+var (
+	ErrNoOpenAIChoicesError = errors.New("no choices returned in openai api response")
 )
 
 // ParsedRequest represents the parsed request data for a given inference request.
@@ -15,10 +19,11 @@ import (
 // Note that this is not stored, and instead is computed just in time for each input
 // depending on the UI.
 type ParsedInferenceRequest struct {
-	URL                 url.URL  `json:"url"`
+	// FIXME: URL is weird here as it marshals wonkily
+	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
-	Temprature          float32  `json:"temperature,omitempty"`
+	Temperature         float32  `json:"temperature,omitempty"`
 	TopP                float32  `json:"top_p,omitempty"`
 	MaxTokens           int      `json:"max_tokens,omitempty"`
 	MaxCompletionTokens int      `json:"max_completion_tokens,omitempty"`
@@ -125,9 +130,10 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 		}
 
 		return ParsedInferenceRequest{
+			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
-			Temprature:          rf.Temperature,
+			Temperature:         rf.Temperature,
 			TopP:                rf.TopP,
 			MaxTokens:           rf.MaxTokens,
 			MaxCompletionTokens: rf.MaxCompletionTokens,
@@ -199,7 +205,7 @@ func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error
 				ID:        r.ID,
 				TokensIn:  int32(r.Usage.PromptTokens),
 				TokensOut: int32(r.Usage.CompletionTokens),
-			}, fmt.Errorf("no choices returned in openai api response")
+			}, ErrNoOpenAIChoicesError
 		}
 
 		choice := r.Choices[0]

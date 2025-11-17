@@ -56,6 +56,8 @@ type OtelSpan struct {
 	DebugSessionID ulid.ULID `json:"debug_session_id,omitempty,omitzero"`
 
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
+
+	Metadata []*SpanMetadata `json:"metadata,omitempty,omitzero"`
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {
@@ -183,6 +185,8 @@ type Span struct {
 	Events             []SpanEvent       `json:"events"`
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
+
+	Metadata []SpanMetadata `json:"metadata"`
 
 	// Children is a virtual field used for reconstructing the trace tree.
 	// This field is not expected to be stored in the DB
@@ -333,6 +337,11 @@ type SpanLink struct {
 	SpanID     string            `json:"span_id"`
 	TraceState string            `json:"trace_state"`
 	Attributes map[string]string `json:"attr"`
+}
+
+type SpanMetadata struct {
+	Kind   meta.MetadataKind `json:"kind"`
+	Values meta.RawMetadata  `json:"values"`
 }
 
 // TraceRun represents a function run backed by a trace
