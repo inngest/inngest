@@ -49,8 +49,14 @@ func WithIdempotency(key string, ttl time.Duration) RateLimitOptionFn {
 	}
 }
 
+type RateLimitResult struct {
+	Limited        bool
+	RetryAfter     time.Duration
+	IdempotencyHit bool
+}
+
 type RateLimiter interface {
-	RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error)
+	RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error)
 }
 
 // RateLimitKey returns the rate limiting key given a function ID, rate limit config,

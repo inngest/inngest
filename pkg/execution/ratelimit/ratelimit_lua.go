@@ -23,7 +23,7 @@ func newLuaGCRARateLimiter(ctx context.Context, r rueidis.Client, prefix string)
 }
 
 // RateLimit implements RateLimiter, returning (limited, retryAfter, error).
-func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error) {
+func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error) {
 	o := &rateLimitOptions{
 		now:                  time.Now(),
 		useLuaImplementation: true,
@@ -35,7 +35,7 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 
 	dur, err := str2duration.ParseDuration(c.Period)
 	if err != nil {
-		return true, -1, err // limited = true on error
+		return nil, err // limited = true on error
 	}
 
 	burst := int(c.Limit / 10)
@@ -57,11 +57,11 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 
 	res, err := scripts["ratelimit"].Exec(ctx, l.r, keys, args).AsIntSlice()
 	if err != nil {
-		return true, 0, fmt.Errorf("could not invoke rate limit: %w", err) // limited = true on error
+		return nil, fmt.Errorf("could not invoke rate limit: %w", err) // limited = true on error
 	}
 
 	if len(res) != 2 {
-		return true, 0, fmt.Errorf("invalid rate limit response: %w", err) // limited = true on error
+		return nil, fmt.Errorf("invalid rate limit response: %w", err) // limited = true on error
 	}
 
 	switch res[0] {
@@ -71,11 +71,22 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 		if retryAfterNS < 0 {
 			retryAfterNS = 0
 		}
-		return true, time.Duration(retryAfterNS), nil // limited = true
+		return &RateLimitResult{
+			Limited:    true,
+			RetryAfter: time.Duration(retryAfterNS),
+		}, nil
 		// ok
 	case 1:
-		return false, 0, nil // limited = false
+		return &RateLimitResult{
+			Limited: false,
+		}, nil // limited = false
+		// idempotency
+	case 2:
+		return &RateLimitResult{
+			Limited:        false,
+			IdempotencyHit: true,
+		}, nil
 	default:
-		return true, 0, fmt.Errorf("invalid return status %v", res[0]) // limited = true on error
+		return nil, fmt.Errorf("invalid return status %v", res[0]) // limited = true on error
 	}
 }
