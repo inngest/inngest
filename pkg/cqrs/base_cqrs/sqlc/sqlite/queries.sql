@@ -483,7 +483,7 @@ SELECT
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
-WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+WHERE run_id = ? AND account_id = ?
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
@@ -492,6 +492,16 @@ AND
 ORDER BY start_time;
 
 -- name: GetLatestExecutionSpanByStepID :one
+WITH latest_attempt AS (
+  SELECT
+    max(attributes->>'$."_inngest.step.attempt"')
+  FROM spans a
+  WHERE a.run_id = sqlc.arg(run_id) AND a.account_id = sqlc.arg(account_id)
+  GROUP BY dynamic_span_id
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  LIMIT 1
+)
 SELECT
   run_id,
   trace_id,
@@ -506,13 +516,13 @@ SELECT
     'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
     'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
-FROM spans
-WHERE run_id = sqlc.arg(run_id) AND account_id = sqlc.arg(account_id) AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+FROM spans b
+WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id)
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
 AND
-  SUM(attributes->>'$."_inngest.step.attempt"' = MAX(attributes->>'$."_inngest.step.attempt"') OVER ()) > 0
+  SUM(attributes->>'$."_inngest.step.attempt"' = (SELECT * FROM latest_attempt)) > 0
 ORDER BY start_time;
 
 -- name: GetSpanBySpanID :one
