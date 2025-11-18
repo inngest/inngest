@@ -96,6 +96,136 @@ func (c DecrbyKey) Decrement(decrement int64) DecrbyDecrement {
 	return (DecrbyDecrement)(c)
 }
 
+type Delex Incomplete
+
+func (b Builder) Delex() (c Delex) {
+	c = Delex{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "DELEX")
+	return c
+}
+
+func (c Delex) Key(key string) DelexKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (DelexKey)(c)
+}
+
+type DelexConditionIfdeq Incomplete
+
+func (c DelexConditionIfdeq) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type DelexConditionIfdne Incomplete
+
+func (c DelexConditionIfdne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type DelexConditionIfeq Incomplete
+
+func (c DelexConditionIfeq) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type DelexConditionIfne Incomplete
+
+func (c DelexConditionIfne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type DelexKey Incomplete
+
+func (c DelexKey) Ifeq(ifeq string) DelexConditionIfeq {
+	c.cs.s = append(c.cs.s, "IFEQ", ifeq)
+	return (DelexConditionIfeq)(c)
+}
+
+func (c DelexKey) Ifne(ifne string) DelexConditionIfne {
+	c.cs.s = append(c.cs.s, "IFNE", ifne)
+	return (DelexConditionIfne)(c)
+}
+
+func (c DelexKey) Ifdeq(ifdeq string) DelexConditionIfdeq {
+	c.cs.s = append(c.cs.s, "IFDEQ", ifdeq)
+	return (DelexConditionIfdeq)(c)
+}
+
+func (c DelexKey) Ifdne(ifdne string) DelexConditionIfdne {
+	c.cs.s = append(c.cs.s, "IFDNE", ifdne)
+	return (DelexConditionIfdne)(c)
+}
+
+func (c DelexKey) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type Delifeq Incomplete
+
+func (b Builder) Delifeq() (c Delifeq) {
+	c = Delifeq{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "DELIFEQ")
+	return c
+}
+
+func (c Delifeq) Key(key string) DelifeqKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (DelifeqKey)(c)
+}
+
+type DelifeqKey Incomplete
+
+func (c DelifeqKey) Value(value string) DelifeqValue {
+	c.cs.s = append(c.cs.s, value)
+	return (DelifeqValue)(c)
+}
+
+type DelifeqValue Incomplete
+
+func (c DelifeqValue) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type Digest Incomplete
+
+func (b Builder) Digest() (c Digest) {
+	c = Digest{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "DIGEST")
+	return c
+}
+
+func (c Digest) Key(key string) DigestKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (DigestKey)(c)
+}
+
+type DigestKey Incomplete
+
+func (c DigestKey) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
 type Get Incomplete
 
 func (b Builder) Get() (c Get) {
@@ -643,6 +773,264 @@ func (c MsetKeyValue) Build() Completed {
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
+type Msetex Incomplete
+
+func (b Builder) Msetex() (c Msetex) {
+	c = Msetex{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "MSETEX")
+	return c
+}
+
+func (c Msetex) Numkeys(numkeys int64) MsetexNumkeys {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numkeys, 10))
+	return (MsetexNumkeys)(c)
+}
+
+type MsetexConditionNx Incomplete
+
+func (c MsetexConditionNx) ExSeconds(seconds int64) MsetexExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (MsetexExpirationExSeconds)(c)
+}
+
+func (c MsetexConditionNx) PxMilliseconds(milliseconds int64) MsetexExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (MsetexExpirationPxMilliseconds)(c)
+}
+
+func (c MsetexConditionNx) ExatTimestamp(timestamp int64) MsetexExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (MsetexExpirationExatTimestamp)(c)
+}
+
+func (c MsetexConditionNx) PxatMillisecondsTimestamp(millisecondsTimestamp int64) MsetexExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (MsetexExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c MsetexConditionNx) Keepttl() MsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (MsetexExpirationKeepttl)(c)
+}
+
+func (c MsetexConditionNx) Ex(duration time.Duration) MsetexExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (MsetexExpirationExSecTyped)(c)
+}
+
+func (c MsetexConditionNx) Px(duration time.Duration) MsetexExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (MsetexExpirationPxMsTyped)(c)
+}
+
+func (c MsetexConditionNx) Exat(timestamp time.Time) MsetexExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (MsetexExpirationExatTimestampTyped)(c)
+}
+
+func (c MsetexConditionNx) Pxat(timestamp time.Time) MsetexExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (MsetexExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c MsetexConditionNx) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexConditionXx Incomplete
+
+func (c MsetexConditionXx) ExSeconds(seconds int64) MsetexExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (MsetexExpirationExSeconds)(c)
+}
+
+func (c MsetexConditionXx) PxMilliseconds(milliseconds int64) MsetexExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (MsetexExpirationPxMilliseconds)(c)
+}
+
+func (c MsetexConditionXx) ExatTimestamp(timestamp int64) MsetexExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (MsetexExpirationExatTimestamp)(c)
+}
+
+func (c MsetexConditionXx) PxatMillisecondsTimestamp(millisecondsTimestamp int64) MsetexExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (MsetexExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c MsetexConditionXx) Keepttl() MsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (MsetexExpirationKeepttl)(c)
+}
+
+func (c MsetexConditionXx) Ex(duration time.Duration) MsetexExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (MsetexExpirationExSecTyped)(c)
+}
+
+func (c MsetexConditionXx) Px(duration time.Duration) MsetexExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (MsetexExpirationPxMsTyped)(c)
+}
+
+func (c MsetexConditionXx) Exat(timestamp time.Time) MsetexExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (MsetexExpirationExatTimestampTyped)(c)
+}
+
+func (c MsetexConditionXx) Pxat(timestamp time.Time) MsetexExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (MsetexExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c MsetexConditionXx) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationExSecTyped Incomplete
+
+func (c MsetexExpirationExSecTyped) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationExSeconds Incomplete
+
+func (c MsetexExpirationExSeconds) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationExatTimestamp Incomplete
+
+func (c MsetexExpirationExatTimestamp) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationExatTimestampTyped Incomplete
+
+func (c MsetexExpirationExatTimestampTyped) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationKeepttl Incomplete
+
+func (c MsetexExpirationKeepttl) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationPxMilliseconds Incomplete
+
+func (c MsetexExpirationPxMilliseconds) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationPxMsTyped Incomplete
+
+func (c MsetexExpirationPxMsTyped) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationPxatMillisecondsTimestamp Incomplete
+
+func (c MsetexExpirationPxatMillisecondsTimestamp) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexExpirationPxatMsTimestampTyped Incomplete
+
+func (c MsetexExpirationPxatMsTimestampTyped) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexKeyValue Incomplete
+
+func (c MsetexKeyValue) KeyValue(key string, value string) MsetexKeyValue {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key, value)
+	return c
+}
+
+func (c MsetexKeyValue) Nx() MsetexConditionNx {
+	c.cs.s = append(c.cs.s, "NX")
+	return (MsetexConditionNx)(c)
+}
+
+func (c MsetexKeyValue) Xx() MsetexConditionXx {
+	c.cs.s = append(c.cs.s, "XX")
+	return (MsetexConditionXx)(c)
+}
+
+func (c MsetexKeyValue) ExSeconds(seconds int64) MsetexExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (MsetexExpirationExSeconds)(c)
+}
+
+func (c MsetexKeyValue) PxMilliseconds(milliseconds int64) MsetexExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (MsetexExpirationPxMilliseconds)(c)
+}
+
+func (c MsetexKeyValue) ExatTimestamp(timestamp int64) MsetexExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (MsetexExpirationExatTimestamp)(c)
+}
+
+func (c MsetexKeyValue) PxatMillisecondsTimestamp(millisecondsTimestamp int64) MsetexExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (MsetexExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c MsetexKeyValue) Keepttl() MsetexExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (MsetexExpirationKeepttl)(c)
+}
+
+func (c MsetexKeyValue) Ex(duration time.Duration) MsetexExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (MsetexExpirationExSecTyped)(c)
+}
+
+func (c MsetexKeyValue) Px(duration time.Duration) MsetexExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (MsetexExpirationPxMsTyped)(c)
+}
+
+func (c MsetexKeyValue) Exat(timestamp time.Time) MsetexExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (MsetexExpirationExatTimestampTyped)(c)
+}
+
+func (c MsetexKeyValue) Pxat(timestamp time.Time) MsetexExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (MsetexExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c MsetexKeyValue) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type MsetexNumkeys Incomplete
+
+func (c MsetexNumkeys) KeyValue() MsetexKeyValue {
+	return (MsetexKeyValue)(c)
+}
+
 type Msetnx Incomplete
 
 func (b Builder) Msetnx() (c Msetnx) {
@@ -727,6 +1115,234 @@ func (c Set) Key(key string) SetKey {
 	}
 	c.cs.s = append(c.cs.s, key)
 	return (SetKey)(c)
+}
+
+type SetConditionIfdeq Incomplete
+
+func (c SetConditionIfdeq) Get() SetGet {
+	c.cs.s = append(c.cs.s, "GET")
+	return (SetGet)(c)
+}
+
+func (c SetConditionIfdeq) ExSeconds(seconds int64) SetExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (SetExpirationExSeconds)(c)
+}
+
+func (c SetConditionIfdeq) PxMilliseconds(milliseconds int64) SetExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (SetExpirationPxMilliseconds)(c)
+}
+
+func (c SetConditionIfdeq) ExatTimestamp(timestamp int64) SetExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (SetExpirationExatTimestamp)(c)
+}
+
+func (c SetConditionIfdeq) PxatMillisecondsTimestamp(millisecondsTimestamp int64) SetExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (SetExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c SetConditionIfdeq) Keepttl() SetExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (SetExpirationKeepttl)(c)
+}
+
+func (c SetConditionIfdeq) Ex(duration time.Duration) SetExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (SetExpirationExSecTyped)(c)
+}
+
+func (c SetConditionIfdeq) Px(duration time.Duration) SetExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (SetExpirationPxMsTyped)(c)
+}
+
+func (c SetConditionIfdeq) Exat(timestamp time.Time) SetExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (SetExpirationExatTimestampTyped)(c)
+}
+
+func (c SetConditionIfdeq) Pxat(timestamp time.Time) SetExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (SetExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c SetConditionIfdeq) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type SetConditionIfdne Incomplete
+
+func (c SetConditionIfdne) Get() SetGet {
+	c.cs.s = append(c.cs.s, "GET")
+	return (SetGet)(c)
+}
+
+func (c SetConditionIfdne) ExSeconds(seconds int64) SetExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (SetExpirationExSeconds)(c)
+}
+
+func (c SetConditionIfdne) PxMilliseconds(milliseconds int64) SetExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (SetExpirationPxMilliseconds)(c)
+}
+
+func (c SetConditionIfdne) ExatTimestamp(timestamp int64) SetExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (SetExpirationExatTimestamp)(c)
+}
+
+func (c SetConditionIfdne) PxatMillisecondsTimestamp(millisecondsTimestamp int64) SetExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (SetExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c SetConditionIfdne) Keepttl() SetExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (SetExpirationKeepttl)(c)
+}
+
+func (c SetConditionIfdne) Ex(duration time.Duration) SetExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (SetExpirationExSecTyped)(c)
+}
+
+func (c SetConditionIfdne) Px(duration time.Duration) SetExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (SetExpirationPxMsTyped)(c)
+}
+
+func (c SetConditionIfdne) Exat(timestamp time.Time) SetExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (SetExpirationExatTimestampTyped)(c)
+}
+
+func (c SetConditionIfdne) Pxat(timestamp time.Time) SetExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (SetExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c SetConditionIfdne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type SetConditionIfeq Incomplete
+
+func (c SetConditionIfeq) Get() SetGet {
+	c.cs.s = append(c.cs.s, "GET")
+	return (SetGet)(c)
+}
+
+func (c SetConditionIfeq) ExSeconds(seconds int64) SetExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (SetExpirationExSeconds)(c)
+}
+
+func (c SetConditionIfeq) PxMilliseconds(milliseconds int64) SetExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (SetExpirationPxMilliseconds)(c)
+}
+
+func (c SetConditionIfeq) ExatTimestamp(timestamp int64) SetExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (SetExpirationExatTimestamp)(c)
+}
+
+func (c SetConditionIfeq) PxatMillisecondsTimestamp(millisecondsTimestamp int64) SetExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (SetExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c SetConditionIfeq) Keepttl() SetExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (SetExpirationKeepttl)(c)
+}
+
+func (c SetConditionIfeq) Ex(duration time.Duration) SetExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (SetExpirationExSecTyped)(c)
+}
+
+func (c SetConditionIfeq) Px(duration time.Duration) SetExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (SetExpirationPxMsTyped)(c)
+}
+
+func (c SetConditionIfeq) Exat(timestamp time.Time) SetExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (SetExpirationExatTimestampTyped)(c)
+}
+
+func (c SetConditionIfeq) Pxat(timestamp time.Time) SetExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (SetExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c SetConditionIfeq) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type SetConditionIfne Incomplete
+
+func (c SetConditionIfne) Get() SetGet {
+	c.cs.s = append(c.cs.s, "GET")
+	return (SetGet)(c)
+}
+
+func (c SetConditionIfne) ExSeconds(seconds int64) SetExpirationExSeconds {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(seconds, 10))
+	return (SetExpirationExSeconds)(c)
+}
+
+func (c SetConditionIfne) PxMilliseconds(milliseconds int64) SetExpirationPxMilliseconds {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(milliseconds, 10))
+	return (SetExpirationPxMilliseconds)(c)
+}
+
+func (c SetConditionIfne) ExatTimestamp(timestamp int64) SetExpirationExatTimestamp {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp, 10))
+	return (SetExpirationExatTimestamp)(c)
+}
+
+func (c SetConditionIfne) PxatMillisecondsTimestamp(millisecondsTimestamp int64) SetExpirationPxatMillisecondsTimestamp {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(millisecondsTimestamp, 10))
+	return (SetExpirationPxatMillisecondsTimestamp)(c)
+}
+
+func (c SetConditionIfne) Keepttl() SetExpirationKeepttl {
+	c.cs.s = append(c.cs.s, "KEEPTTL")
+	return (SetExpirationKeepttl)(c)
+}
+
+func (c SetConditionIfne) Ex(duration time.Duration) SetExpirationExSecTyped {
+	c.cs.s = append(c.cs.s, "EX", strconv.FormatInt(int64(duration/time.Second), 10))
+	return (SetExpirationExSecTyped)(c)
+}
+
+func (c SetConditionIfne) Px(duration time.Duration) SetExpirationPxMsTyped {
+	c.cs.s = append(c.cs.s, "PX", strconv.FormatInt(int64(duration/time.Millisecond), 10))
+	return (SetExpirationPxMsTyped)(c)
+}
+
+func (c SetConditionIfne) Exat(timestamp time.Time) SetExpirationExatTimestampTyped {
+	c.cs.s = append(c.cs.s, "EXAT", strconv.FormatInt(timestamp.Unix(), 10))
+	return (SetExpirationExatTimestampTyped)(c)
+}
+
+func (c SetConditionIfne) Pxat(timestamp time.Time) SetExpirationPxatMsTimestampTyped {
+	c.cs.s = append(c.cs.s, "PXAT", strconv.FormatInt(timestamp.UnixMilli(), 10))
+	return (SetExpirationPxatMsTimestampTyped)(c)
+}
+
+func (c SetConditionIfne) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 type SetConditionNx Incomplete
@@ -975,6 +1591,26 @@ func (c SetValue) Nx() SetConditionNx {
 func (c SetValue) Xx() SetConditionXx {
 	c.cs.s = append(c.cs.s, "XX")
 	return (SetConditionXx)(c)
+}
+
+func (c SetValue) Ifeq(ifeq string) SetConditionIfeq {
+	c.cs.s = append(c.cs.s, "IFEQ", ifeq)
+	return (SetConditionIfeq)(c)
+}
+
+func (c SetValue) Ifne(ifne string) SetConditionIfne {
+	c.cs.s = append(c.cs.s, "IFNE", ifne)
+	return (SetConditionIfne)(c)
+}
+
+func (c SetValue) Ifdeq(ifdeq string) SetConditionIfdeq {
+	c.cs.s = append(c.cs.s, "IFDEQ", ifdeq)
+	return (SetConditionIfdeq)(c)
+}
+
+func (c SetValue) Ifdne(ifdne string) SetConditionIfdne {
+	c.cs.s = append(c.cs.s, "IFDNE", ifdne)
+	return (SetConditionIfdne)(c)
 }
 
 func (c SetValue) Get() SetGet {

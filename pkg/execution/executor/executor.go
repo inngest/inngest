@@ -715,7 +715,7 @@ func (e *executor) schedule(
 					impl = "lua"
 				}
 
-				limited, _, err := e.rateLimiter.RateLimit(
+				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
@@ -734,7 +734,7 @@ func (e *executor) schedule(
 					return nil, fmt.Errorf("could not check rate limit: %w", err)
 				}
 
-				if limited {
+				if res.Limited {
 					// Do nothing.
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
@@ -746,11 +746,16 @@ func (e *executor) schedule(
 					return nil, ErrFunctionRateLimited
 				}
 
+				status := "allowed"
+				if res.IdempotencyHit {
+					status = "idempotent"
+				}
+
 				metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
 						"impl":   impl,
-						"status": "allowed",
+						"status": status,
 					},
 				})
 			case ratelimit.ErrNotRateLimited:

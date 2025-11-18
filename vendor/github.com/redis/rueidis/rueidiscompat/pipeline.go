@@ -39,15 +39,15 @@ import (
 // Pipeliner is a mechanism to realise Redis Pipeline technique.
 //
 // Pipelining is a technique to extremely speed up processing by packing
-// operations to batches, send them at once to Redis and read a replies in a
+// operations to batches, send them at once to Redis and read a reply in a
 // single step.
 // See https://redis.io/topics/pipelining
 //
-// Pay attention, that Pipeline is not a transaction, so you can get unexpected
+// Pay attention that Pipeline is not a transaction, so you can get unexpected
 // results in case of big pipelines and small read/write timeouts.
-// Redis client has retransmission logic in case of timeouts, pipeline
-// can be retransmitted and commands can be executed more then once.
-// To avoid this: it is good idea to use reasonable bigger read/write timeouts
+// Redis client has retransmission logic in case of timeouts, pipelines
+// can be retransmitted, and commands can be executed more than once.
+// To avoid this: it is a good idea to use reasonable bigger read/write timeouts
 // depends on your batch size and/or use TxPipeline.
 type Pipeliner interface {
 	CoreCmdable
@@ -541,6 +541,12 @@ func (c *Pipeline) BitField(ctx context.Context, key string, args ...any) *IntSl
 	return ret
 }
 
+func (c *Pipeline) BitFieldRO(ctx context.Context, key string, args ...any) *IntSliceCmd {
+	ret := c.comp.BitFieldRO(ctx, key, args...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 func (c *Pipeline) Scan(ctx context.Context, cursor uint64, match string, count int64) *ScanCmd {
 	ret := c.comp.Scan(ctx, cursor, match, count)
 	c.rets = append(c.rets, ret)
@@ -561,6 +567,12 @@ func (c *Pipeline) SScan(ctx context.Context, key string, cursor uint64, match s
 
 func (c *Pipeline) HScan(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd {
 	ret := c.comp.HScan(ctx, key, cursor, match, count)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HScanNoValues(ctx context.Context, key string, cursor uint64, match string, count int64) *ScanCmd {
+	ret := c.comp.HScanNoValues(ctx, key, cursor, match, count)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -615,6 +627,12 @@ func (c *Pipeline) HKeys(ctx context.Context, key string) *StringSliceCmd {
 
 func (c *Pipeline) HLen(ctx context.Context, key string) *IntCmd {
 	ret := c.comp.HLen(ctx, key)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HStrLen(ctx context.Context, key, field string) *IntCmd {
+	ret := c.comp.HStrLen(ctx, key, field)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -739,6 +757,36 @@ func (c *Pipeline) HPTTL(ctx context.Context, key string, fields ...string) *Int
 	return ret
 }
 
+func (c *Pipeline) HGetDel(ctx context.Context, key string, fields ...string) *StringSliceCmd {
+	ret := c.comp.HGetDel(ctx, key, fields...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HGetEX(ctx context.Context, key string, fields ...string) *StringSliceCmd {
+	ret := c.comp.HGetEX(ctx, key, fields...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HGetEXWithArgs(ctx context.Context, key string, options *HGetEXOptions, fields ...string) *StringSliceCmd {
+	ret := c.comp.HGetEXWithArgs(ctx, key, options, fields...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HSetEX(ctx context.Context, key string, fieldsAndValues ...string) *IntCmd {
+	ret := c.comp.HSetEX(ctx, key, fieldsAndValues...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) HSetEXWithArgs(ctx context.Context, key string, options *HSetEXOptions, fieldsAndValues ...string) *IntCmd {
+	ret := c.comp.HSetEXWithArgs(ctx, key, options, fieldsAndValues...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 func (c *Pipeline) BLPop(ctx context.Context, timeout time.Duration, keys ...string) *StringSliceCmd {
 	ret := c.comp.BLPop(ctx, timeout, keys...)
 	c.rets = append(c.rets, ret)
@@ -759,6 +807,12 @@ func (c *Pipeline) BRPop(ctx context.Context, timeout time.Duration, keys ...str
 
 func (c *Pipeline) BRPopLPush(ctx context.Context, source, destination string, timeout time.Duration) *StringCmd {
 	ret := c.comp.BRPopLPush(ctx, source, destination, timeout)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) LCS(ctx context.Context, q *LCSQuery) *LCSCmd {
+	ret := c.comp.LCS(ctx, q)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -1591,6 +1645,12 @@ func (c *Pipeline) ClientUnblockWithError(ctx context.Context, id int64) *IntCmd
 	return ret
 }
 
+func (c *Pipeline) ClientInfo(ctx context.Context) *ClientInfoCmd {
+	ret := c.comp.ClientInfo(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 func (c *Pipeline) ConfigGet(ctx context.Context, parameter string) *StringStringMapCmd {
 	ret := c.comp.ConfigGet(ctx, parameter)
 	c.rets = append(c.rets, ret)
@@ -1677,6 +1737,24 @@ func (c *Pipeline) ShutdownSave(ctx context.Context) *StatusCmd {
 
 func (c *Pipeline) ShutdownNoSave(ctx context.Context) *StatusCmd {
 	ret := c.comp.ShutdownNoSave(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) SlaveOf(ctx context.Context, host, port string) *StatusCmd {
+	ret := c.comp.SlaveOf(ctx, host, port)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) SlowLogGet(ctx context.Context, num int64) *SlowLogCmd {
+	ret := c.comp.SlowLogGet(ctx, num)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) SlowLogReset(ctx context.Context) *StatusCmd {
+	ret := c.comp.SlowLogReset(ctx)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -1867,6 +1945,12 @@ func (c *Pipeline) PubSubShardNumSub(ctx context.Context, channels ...string) *S
 	return ret
 }
 
+func (c *Pipeline) ClusterMyShardID(ctx context.Context) *StringCmd {
+	ret := c.comp.ClusterMyShardID(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 func (c *Pipeline) ClusterSlots(ctx context.Context) *ClusterSlotsCmd {
 	ret := c.comp.ClusterSlots(ctx)
 	c.rets = append(c.rets, ret)
@@ -1881,6 +1965,12 @@ func (c *Pipeline) ClusterShards(ctx context.Context) *ClusterShardsCmd {
 
 func (c *Pipeline) ClusterNodes(ctx context.Context) *StringCmd {
 	ret := c.comp.ClusterNodes(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ClusterLinks(ctx context.Context) *ClusterLinksCmd {
+	ret := c.comp.ClusterLinks(ctx)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -2053,8 +2143,56 @@ func (c *Pipeline) GeoHash(ctx context.Context, key string, members ...string) *
 	return ret
 }
 
+func (c *Pipeline) FunctionStats(ctx context.Context) *FunctionStatsCmd {
+	ret := c.comp.FunctionStats(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 func (c *Pipeline) ACLDryRun(ctx context.Context, username string, command ...any) *StringCmd {
 	ret := c.comp.ACLDryRun(ctx, username, command...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLLog(ctx context.Context, count int64) *ACLLogCmd {
+	ret := c.comp.ACLLog(ctx, count)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLSetUser(ctx context.Context, username string, rules ...string) *StatusCmd {
+	ret := c.comp.ACLSetUser(ctx, username, rules...)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLDelUser(ctx context.Context, username string) *IntCmd {
+	ret := c.comp.ACLDelUser(ctx, username)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLLogReset(ctx context.Context) *StatusCmd {
+	ret := c.comp.ACLLogReset(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLCat(ctx context.Context) *StringSliceCmd {
+	ret := c.comp.ACLCat(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLList(ctx context.Context) *StringSliceCmd {
+	ret := c.comp.ACLList(ctx)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
+func (c *Pipeline) ACLCatArgs(ctx context.Context, options *ACLCatArgs) *StringSliceCmd {
+	ret := c.comp.ACLCatArgs(ctx, options)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -2880,8 +3018,8 @@ func (c *Pipeline) FTAliasUpdate(ctx context.Context, index string, alias string
 	return ret
 }
 
-func (c *Pipeline) FTAlter(ctx context.Context, index string, skipInitalScan bool, definition []interface{}) *StatusCmd {
-	ret := c.comp.FTAlter(ctx, index, skipInitalScan, definition)
+func (c *Pipeline) FTAlter(ctx context.Context, index string, skipInitialScan bool, definition []interface{}) *StatusCmd {
+	ret := c.comp.FTAlter(ctx, index, skipInitialScan, definition)
 	c.rets = append(c.rets, ret)
 	return ret
 }
@@ -3012,6 +3150,12 @@ func (c *Pipeline) FTTagVals(ctx context.Context, index string, field string) *S
 	return ret
 }
 
+func (c *Pipeline) ModuleLoadex(ctx context.Context, conf *ModuleLoadexConfig) *StringCmd {
+	ret := c.comp.ModuleLoadex(ctx, conf)
+	c.rets = append(c.rets, ret)
+	return ret
+}
+
 // Len returns the number of queued commands.
 func (c *Pipeline) Len() int {
 	return len(c.comp.client.(*proxy).cmds)
@@ -3047,8 +3191,9 @@ func (c *Pipeline) Discard() {
 // Exec executes all previously queued commands using one
 // client-server roundtrip.
 //
-// Exec always returns list of commands and error of the first failed
-// command if any.
+// Exec always returns a list of commands and error of the first failed
+//
+//	command, if any.
 func (c *Pipeline) Exec(ctx context.Context) ([]Cmder, error) {
 	p := c.comp.client.(*proxy)
 	if len(p.cmds) == 0 {
@@ -3065,6 +3210,7 @@ func (c *Pipeline) Exec(ctx context.Context) ([]Cmder, error) {
 		if r.NonRedisError() != nil {
 			err = r.NonRedisError()
 		}
+		rets[i].SetErr(nil)
 		rets[i].from(r)
 	}
 

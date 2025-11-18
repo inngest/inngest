@@ -1,6 +1,7 @@
 package rueidis
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -8,11 +9,12 @@ import (
 )
 
 type queue interface {
-	PutOne(m Completed) chan RedisResult
-	PutMulti(m []Completed, resps []RedisResult) chan RedisResult
+	PutOne(ctx context.Context, m Completed) (chan RedisResult, error)
+	PutMulti(ctx context.Context, m []Completed, resps []RedisResult) (chan RedisResult, error)
 	NextWriteCmd() (Completed, []Completed, chan RedisResult)
 	WaitForWrite() (Completed, []Completed, chan RedisResult)
-	NextResultCh() (Completed, []Completed, chan RedisResult, []RedisResult, *sync.Cond)
+	NextResultCh() (Completed, []Completed, chan RedisResult, []RedisResult)
+	FinishResult()
 }
 
 var _ queue = (*ring)(nil)
@@ -33,6 +35,7 @@ func newRing(factor int) *ring {
 }
 
 type ring struct {
+	resc  *sync.Cond
 	store []node // store's size must be 2^N to work with the mask
 	_     cpu.CacheLinePad
 	write uint32
@@ -53,7 +56,7 @@ type node struct {
 	slept bool
 }
 
-func (r *ring) PutOne(m Completed) chan RedisResult {
+func (r *ring) PutOne(_ context.Context, m Completed) (chan RedisResult, error) {
 	n := &r.store[atomic.AddUint32(&r.write, 1)&r.mask]
 	n.c1.L.Lock()
 	for n.mark != 0 {
@@ -66,10 +69,10 @@ func (r *ring) PutOne(m Completed) chan RedisResult {
 	if s {
 		n.c2.Broadcast()
 	}
-	return n.ch
+	return n.ch, nil
 }
 
-func (r *ring) PutMulti(m []Completed, resps []RedisResult) chan RedisResult {
+func (r *ring) PutMulti(_ context.Context, m []Completed, resps []RedisResult) (chan RedisResult, error) {
 	n := &r.store[atomic.AddUint32(&r.write, 1)&r.mask]
 	n.c1.L.Lock()
 	for n.mark != 0 {
@@ -83,7 +86,7 @@ func (r *ring) PutMulti(m []Completed, resps []RedisResult) chan RedisResult {
 	if s {
 		n.c2.Broadcast()
 	}
-	return n.ch
+	return n.ch, nil
 }
 
 // NextWriteCmd should be only called by one dedicated thread
@@ -120,11 +123,11 @@ func (r *ring) WaitForWrite() (one Completed, multi []Completed, ch chan RedisRe
 }
 
 // NextResultCh should be only called by one dedicated thread
-func (r *ring) NextResultCh() (one Completed, multi []Completed, ch chan RedisResult, resps []RedisResult, cond *sync.Cond) {
+func (r *ring) NextResultCh() (one Completed, multi []Completed, ch chan RedisResult, resps []RedisResult) {
 	r.read2++
 	p := r.read2 & r.mask
 	n := &r.store[p]
-	cond = n.c1
+	r.resc = n.c1
 	n.c1.L.Lock()
 	if n.mark == 2 {
 		one, multi, ch, resps = n.one, n.multi, n.ch, n.resps
@@ -136,4 +139,13 @@ func (r *ring) NextResultCh() (one Completed, multi []Completed, ch chan RedisRe
 		r.read2--
 	}
 	return
+}
+
+// FinishResult should be only called by one dedicated thread
+func (r *ring) FinishResult() {
+	if r.resc != nil {
+		r.resc.L.Unlock()
+		r.resc.Signal()
+		r.resc = nil
+	}
 }

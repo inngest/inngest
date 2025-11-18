@@ -63,18 +63,18 @@ local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_t
 	if not tat then
 		return now_ns
 	end
-	
+
 	local raw_tat = tonumber(tat)
 	if not raw_tat then
 		return now_ns -- Reset if tonumber failed
 	end
-	
+
 	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
 	-- If value was clamped, commit the normalization immediately
 	if raw_tat ~= clamped_tat then
 		redis.call("SET", key, clamped_tat, "KEEPTTL")
 	end
-	
+
 	return clamped_tat
 end
 
@@ -150,7 +150,7 @@ local function gcraUpdate(key, now_ns, period_ns, limit, capacity, burst)
 	-- calculate emission interval (tau) - time between each token
 	-- This matches throttled library: quota.MaxRate.period
 	local emission_interval = period_ns / limit
-	
+
 	-- Calculate delay_variation_tolerance for bounds checking
 	local total_capacity = (burst or 0) + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
@@ -181,7 +181,7 @@ end
 
 -- If idempotency key is set, do not perform check again
 if idempotencyTTL > 0 and redis.call("EXISTS", idempotencyKey) == 1 then
-	return { 1, 0 }
+	return { 2, 0 }
 end
 
 -- Check if capacity > 0

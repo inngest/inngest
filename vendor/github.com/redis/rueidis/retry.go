@@ -14,11 +14,11 @@ const (
 )
 
 // RetryDelayFn returns the delay that should be used before retrying the
-// attempt. Will return negative delay if the delay could not be determined or do not retry.
+// attempt. Will return a negative delay if the delay could not be determined or does not retry.
 type RetryDelayFn func(attempts int, cmd Completed, err error) time.Duration
 
 // defaultRetryDelayFn delays the next retry exponentially without considering the error.
-// max delay is 1 second.
+// Max delay is 1 second.
 // This "Equal Jitter" delay produced by this implementation is not monotonic increasing. ref: https://aws.amazon.com/ko/blogs/architecture/exponential-backoff-and-jitter/
 func defaultRetryDelayFn(attempts int, _ Completed, _ error) time.Duration {
 	base := 1 << min(defaultMaxRetries, attempts)
@@ -28,7 +28,7 @@ func defaultRetryDelayFn(attempts int, _ Completed, _ error) time.Duration {
 
 type retryHandler interface {
 	// RetryDelay returns the delay that should be used before retrying the
-	// attempt. Will return negative delay if the delay could not be determined or do
+	// attempt. Will return a negative delay if the delay could not be determined or does
 	// not retry.
 	// If the delay is zero, the next retry should be attempted immediately.
 	RetryDelay(attempts int, cmd Completed, err error) time.Duration
