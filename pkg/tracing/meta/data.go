@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 
+	"github.com/99designs/gqlgen/graphql"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -15,6 +17,27 @@ var ErrInvalidMetadataOp = errors.New("invalid metadata op")
 var DefaultMetadataExtractor MetadataExtractor
 
 type RawMetadata map[string]json.RawMessage
+
+var _ graphql.ContextMarshaler = RawMetadata(nil)
+var _ graphql.ContextUnmarshaler = (*RawMetadata)(nil)
+
+func (m RawMetadata) MarshalGQLContext(ctx context.Context, w io.Writer) error {
+	return json.NewEncoder(w).Encode(m)
+}
+
+func (m *RawMetadata) UnmarshalGQLContext(ctx context.Context, v any) error {
+	vm, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("cannot unmarshal %T as RawMetadata", v)
+	}
+
+	clear(*m)
+	for k, v := range vm {
+		(*m)[k], _ = json.Marshal(v)
+	}
+
+	return nil
+}
 
 func (m *RawMetadata) FromStruct(v any) error {
 	// TODO: reflect stuff so we don't need to remarshal?
@@ -191,8 +214,7 @@ func ExtractWarningMetadata(err error) WarningMetadata {
 
 func extractMetadataWarnings(err error) []*MetadataWarningError {
 	var warning *MetadataWarningError
-	type joinedError interface{ Unwrap() []error }
-	var joinedErr joinedError
+	var joinedErr interface{ Unwrap() []error }
 	switch {
 	case errors.As(err, &joinedErr):
 		var ret []*MetadataWarningError
@@ -206,4 +228,24 @@ func extractMetadataWarnings(err error) []*MetadataWarningError {
 	default:
 		return nil
 	}
+}
+
+type RawMetadataUpdate struct {
+	Wrapped struct { // Eliminate method name collisions
+		Kind   MetadataKind `json:"kind"`
+		Op     MetadataOp   `json:"op"`
+		Values RawMetadata  `json:"values"`
+	}
+}
+
+func (m RawMetadataUpdate) Kind() MetadataKind {
+	return m.Wrapped.Kind
+}
+
+func (m RawMetadataUpdate) Op() MetadataOp {
+	return m.Wrapped.Op
+}
+
+func (m RawMetadataUpdate) Serialize() (RawMetadata, error) {
+	return m.Wrapped.Values, nil
 }
