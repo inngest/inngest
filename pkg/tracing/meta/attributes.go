@@ -52,6 +52,9 @@ var Attrs = struct {
 	// Function attributes
 	IsFunctionOutput attr[*bool]
 
+	// Retryable records whether the attempt is retryable.
+	Retryable attr[*bool]
+
 	// Step attributes
 	StepID           attr[*string]
 	StepName         attr[*string]
@@ -164,6 +167,7 @@ var Attrs = struct {
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),
 	StepGatewayResponseStatusCode:      IntAttr("step.gateway.response.status_code"),
 	StepHasOutput:                      BoolAttr("step.has_output"),
+	Retryable:                          BoolAttr("retryable"),
 	StepID:                             StringAttr("step.id"),
 	StepInvokeFinishEventID:            ULIDAttr("step.invoke.finish.event.id"),
 	StepInvokeFunctionID:               StringAttr("step.invoke.function.id"),
