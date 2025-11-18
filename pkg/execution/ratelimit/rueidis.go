@@ -62,7 +62,7 @@ type rueidisStore struct {
 	disableGracefulScientificNotationParsing bool
 }
 
-func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (bool, time.Duration, error) {
+func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error) {
 	o := &rateLimitOptions{}
 	for _, opt := range options {
 		opt(o)
@@ -73,7 +73,15 @@ func (r *rueidisStore) RateLimit(ctx context.Context, key string, c inngest.Rate
 		return r.luaRateLimiter.RateLimit(ctx, key, c, options...)
 	}
 
-	return rateLimit(ctx, r, key, c)
+	limited, retryAfter, err := rateLimit(ctx, r, key, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RateLimitResult{
+		Limited:    limited,
+		RetryAfter: retryAfter,
+	}, nil
 }
 
 // GetWithTime returns the value of the key if it is in the store
