@@ -238,6 +238,14 @@ type RawMetadataUpdate struct {
 	}
 }
 
+func (m RawMetadataUpdate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.Wrapped)
+}
+
+func (m *RawMetadataUpdate) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &m.Wrapped)
+}
+
 func (m RawMetadataUpdate) Kind() MetadataKind {
 	return m.Wrapped.Kind
 }
