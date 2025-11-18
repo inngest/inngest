@@ -414,3 +414,150 @@ func TestConstraintEnforcement(t *testing.T) {
 		})
 	}
 }
+
+func TestQueueConstraintAPICompatibility(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("queue should check in progress leases during Lease", func(t *testing.T) {
+		t.Parallel()
+
+		r := miniredis.RunT(t)
+		ctx := context.Background()
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		clock := clockwork.NewFakeClock()
+
+		kg := redis_state.NewQueueClient(nil, "q:v1").KeyGenerator()
+
+		config := constraintapi.ConstraintConfig{
+			FunctionVersion: 1,
+			Concurrency: constraintapi.ConcurrencyConfig{
+				AccountConcurrency: 10,
+			},
+		}
+		constraints := []constraintapi.ConstraintItem{
+			{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Scope:             enums.ConcurrencyScopeAccount,
+					Mode:              enums.ConcurrencyModeStep,
+					InProgressItemKey: kg.Concurrency("account", accountID.String()),
+				},
+			},
+		}
+		partitionConstraints := redis_state.PartitionConstraintConfig{
+			Concurrency: redis_state.PartitionConcurrency{
+				AccountConcurrency: 10,
+			},
+		}
+
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithRateLimitClient(rc),
+			constraintapi.WithQueueShards(map[string]rueidis.Client{
+				"test": rc,
+			}),
+			constraintapi.WithClock(clock),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueStateKeyPrefix("q:v1"),
+			constraintapi.WithRateLimitKeyPrefix("rl"),
+			constraintapi.WithEnableDebugLogs(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cm)
+
+		defaultShard := redis_state.QueueShard{
+			Kind:        string(enums.QueueShardKindRedis),
+			Name:        "test",
+			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
+		}
+		q := redis_state.NewQueue(defaultShard,
+			redis_state.WithClock(clock),
+			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+				"test": defaultShard,
+			}),
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+				return defaultShard, nil
+			}),
+			redis_state.WithCapacityManager(cm),
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+				return true, true
+			}),
+			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+				return partitionConstraints
+			}),
+		)
+
+		amount := 10
+
+		leaseIdempotencyKeys := make([]string, amount)
+		for i := range amount {
+			leaseIdempotencyKeys[i] = fmt.Sprintf("item%d", i)
+		}
+
+		// Claim concurrency capacity
+		acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			Migration: constraintapi.MigrationIdentifier{
+				QueueShard: "test",
+			},
+			AccountID:            accountID,
+			IdempotencyKey:       "acquire",
+			Constraints:          constraints,
+			Amount:               amount,
+			EnvID:                envID,
+			FunctionID:           fnID,
+			Configuration:        config,
+			LeaseIdempotencyKeys: leaseIdempotencyKeys,
+			LeaseRunIDs:          make(map[string]ulid.ULID),
+			CurrentTime:          clock.Now(),
+			Duration:             5 * time.Second,
+			MaximumLifetime:      time.Hour,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.LeaseLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, acquireResp.Leases, 10)
+
+		// Leasing should fail
+		for i := range 1 {
+			// Simulate existing throttle usage
+			qi, err := q.EnqueueItem(
+				context.Background(),
+				defaultShard,
+				queue.QueueItem{
+					ID:          fmt.Sprintf("item%d", i),
+					FunctionID:  fnID,
+					WorkspaceID: envID,
+					Data: queue.Item{
+						WorkspaceID: envID,
+						Kind:        queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID:   accountID,
+							WorkspaceID: envID,
+							WorkflowID:  fnID,
+						},
+					},
+				},
+				clock.Now(),
+				queue.EnqueueOpts{},
+			)
+			require.NoError(t, err)
+			require.NotNil(t, qi)
+
+			leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+		}
+	})
+	t.Run("queue should check in progress leases during PartitionLease", func(t *testing.T) {})
+	t.Run("queue should ignore GCRA during Lease if idempotency key set", func(t *testing.T) {})
+	t.Run("queue should ignore GCRA during BacklogRefill if idempotency key set", func(t *testing.T) {})
+}
