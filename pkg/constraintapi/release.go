@@ -49,7 +49,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	}
 
 	enableDebugLogsVal := "0"
-	if enableDebugLogs {
+	if enableDebugLogs || r.enableDebugLogs {
 		enableDebugLogsVal = "1"
 	}
 

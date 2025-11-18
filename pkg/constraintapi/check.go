@@ -122,7 +122,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	}
 
 	enableDebugLogsVal := "0"
-	if enableDebugLogs {
+	if enableDebugLogs || r.enableDebugLogs {
 		enableDebugLogsVal = "1"
 	}
 

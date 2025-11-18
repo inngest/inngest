@@ -164,7 +164,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	}
 
 	enableDebugLogsVal := "0"
-	if enableDebugLogs {
+	if enableDebugLogs || r.enableDebugLogs {
 		enableDebugLogsVal = "1"
 	}
 

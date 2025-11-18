@@ -57,7 +57,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	enableDebugLogsVal := "0"
-	if enableDebugLogs {
+	if enableDebugLogs || r.enableDebugLogs {
 		enableDebugLogsVal = "1"
 	}
 

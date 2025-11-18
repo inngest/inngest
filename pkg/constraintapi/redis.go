@@ -42,6 +42,8 @@ type redisCapacityManager struct {
 	queueStateKeyPrefix string
 
 	numScavengerShards int
+
+	enableDebugLogs bool
 }
 
 type redisCapacityManagerOption func(m *redisCapacityManager)
@@ -79,6 +81,12 @@ func WithClock(clock clockwork.Clock) redisCapacityManagerOption {
 func WithNumScavengerShards(numShards int) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.numScavengerShards = numShards
+	}
+}
+
+func WithEnableDebugLogs(enableDebugLogs bool) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.enableDebugLogs = enableDebugLogs
 	}
 }
 

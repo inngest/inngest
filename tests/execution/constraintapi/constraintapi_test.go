@@ -178,6 +178,85 @@ func TestConstraintEnforcement(t *testing.T) {
 			amount:              10,
 			expectedLeaseAmount: 10,
 		},
+
+		{
+			// This test checks ensures that Throttl constraint state set in the queue is respected by the Constraint API
+			name: "existing throttle should be respected",
+			config: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []constraintapi.ThrottleConfig{
+					{
+						Scope:                     enums.ThrottleScopeFn,
+						Period:                    60,
+						Limit:                     1,
+						Burst:                     0,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+					Throttle: &constraintapi.ThrottleConstraint{
+						Scope:             enums.ThrottleScopeFn,
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "throttle-key",
+					},
+				},
+			},
+			mi: constraintapi.MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				clock := deps.clock
+				q := deps.q
+				r := deps.r
+
+				// Simulate existing throttle usage
+				qi, err := q.EnqueueItem(
+					context.Background(),
+					deps.shard,
+					queue.QueueItem{
+						ID:          "item1",
+						FunctionID:  fnID,
+						WorkspaceID: envID,
+						Data: queue.Item{
+							WorkspaceID: envID,
+							Kind:        queue.KindStart,
+							Identifier: state.Identifier{
+								AccountID:   accountID,
+								WorkspaceID: envID,
+								WorkflowID:  fnID,
+							},
+							Throttle: &queue.Throttle{
+								KeyExpressionHash: "expr-hash",
+								Key:               "throttle-key",
+								Period:            60,
+								Limit:             1,
+								Burst:             1,
+							},
+						},
+					},
+					clock.Now(),
+					queue.EnqueueOpts{},
+				)
+				require.NoError(t, err)
+				require.NotNil(t, qi)
+
+				leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+
+				r.Exists(kg.ThrottleKey(qi.Data.Throttle))
+			},
+			amount:              1,
+			expectedLeaseAmount: 0,
+			afterAcquire: func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse) {
+				require.Len(t, resp.Leases, 0)
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, "throttle-key", resp.LimitingConstraints[0].Throttle.EvaluatedKeyHash)
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -205,6 +284,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				constraintapi.WithNumScavengerShards(1),
 				constraintapi.WithQueueStateKeyPrefix("q:v1"),
 				constraintapi.WithRateLimitKeyPrefix("rl"),
+				constraintapi.WithEnableDebugLogs(true),
 			)
 			require.NoError(t, err)
 			require.NotNil(t, cm)
@@ -269,6 +349,8 @@ func TestConstraintEnforcement(t *testing.T) {
 				},
 			})
 			require.NoError(t, err)
+
+			t.Log(acquireResp.Debug())
 
 			if test.afterAcquire != nil {
 				test.afterAcquire(t, deps, acquireResp)

@@ -196,6 +196,11 @@ type CapacityAcquireResponse struct {
 	internalDebugState acquireScriptResponse
 }
 
+// Debug returns INTERNAL debug information
+func (ac *CapacityAcquireResponse) Debug() []string {
+	return ac.internalDebugState.Debug
+}
+
 type CapacityExtendLeaseRequest struct {
 	// IdempotencyKey is the operation idempotency key
 	IdempotencyKey string
