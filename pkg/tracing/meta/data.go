@@ -230,30 +230,24 @@ func extractMetadataWarnings(err error) []*MetadataWarningError {
 	}
 }
 
+type RawMetadataUpdateBody struct {
+	Kind   MetadataKind `json:"kind"`
+	Op     MetadataOp   `json:"op"`
+	Values RawMetadata  `json:"values"`
+}
+
 type RawMetadataUpdate struct {
-	Wrapped struct { // Eliminate method name collisions
-		Kind   MetadataKind `json:"kind"`
-		Op     MetadataOp   `json:"op"`
-		Values RawMetadata  `json:"values"`
-	}
-}
-
-func (m RawMetadataUpdate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.Wrapped)
-}
-
-func (m *RawMetadataUpdate) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &m.Wrapped)
+	RawMetadataUpdateBody
 }
 
 func (m RawMetadataUpdate) Kind() MetadataKind {
-	return m.Wrapped.Kind
+	return m.RawMetadataUpdateBody.Kind
 }
 
 func (m RawMetadataUpdate) Op() MetadataOp {
-	return m.Wrapped.Op
+	return m.RawMetadataUpdateBody.Op
 }
 
 func (m RawMetadataUpdate) Serialize() (RawMetadata, error) {
-	return m.Wrapped.Values, nil
+	return m.RawMetadataUpdateBody.Values, nil
 }
