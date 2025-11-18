@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useQuery } from 'urql';
 
+import { SaveTabProvider } from '@/components/Insights/InsightsSQLEditor/SaveTabContext';
+import { useDocumentShortcuts } from '@/components/Insights/InsightsSQLEditor/actions/handleShortcuts';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
@@ -22,22 +24,32 @@ export default function InsightsPage() {
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });
 
-  const activeSavedQueryId = tabs.find((t) => t.id === activeTabId)?.savedQueryId;
+  useDocumentShortcuts([
+    {
+      combo: { alt: true, code: 'KeyT', metaOrCtrl: true },
+      handler: actions.createNewTab,
+    },
+  ]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeSavedQueryId = activeTab?.savedQueryId;
 
   return (
     <StoredQueriesProvider tabManagerActions={actions}>
-      <TabManagerProvider actions={actions}>
-        <SchemasProvider>
-          <div className="flex h-full w-full flex-1 overflow-hidden">
-            {isQueryHelperPanelVisible && (
-              <div className="w-[240px] flex-shrink-0">
-                <QueryHelperPanel activeSavedQueryId={activeSavedQueryId} />
-              </div>
-            )}
-            <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
-          </div>
-        </SchemasProvider>
-      </TabManagerProvider>
+      <SaveTabProvider>
+        <TabManagerProvider actions={actions} activeTab={activeTab}>
+          <SchemasProvider>
+            <div className="flex h-full w-full flex-1 overflow-hidden">
+              {isQueryHelperPanelVisible && (
+                <div className="w-[240px] flex-shrink-0">
+                  <QueryHelperPanel activeSavedQueryId={activeSavedQueryId} />
+                </div>
+              )}
+              <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+            </div>
+          </SchemasProvider>
+        </TabManagerProvider>
+      </SaveTabProvider>
     </StoredQueriesProvider>
   );
 }

@@ -40,6 +40,14 @@ const (
 	DebugGetPartitionStatusProcedure = "/debug.v1.Debug/GetPartitionStatus"
 	// DebugGetQueueItemProcedure is the fully-qualified name of the Debug's GetQueueItem RPC.
 	DebugGetQueueItemProcedure = "/debug.v1.Debug/GetQueueItem"
+	// DebugGetPauseProcedure is the fully-qualified name of the Debug's GetPause RPC.
+	DebugGetPauseProcedure = "/debug.v1.Debug/GetPause"
+	// DebugGetIndexProcedure is the fully-qualified name of the Debug's GetIndex RPC.
+	DebugGetIndexProcedure = "/debug.v1.Debug/GetIndex"
+	// DebugBlockPeekProcedure is the fully-qualified name of the Debug's BlockPeek RPC.
+	DebugBlockPeekProcedure = "/debug.v1.Debug/BlockPeek"
+	// DebugBlockDeletedProcedure is the fully-qualified name of the Debug's BlockDeleted RPC.
+	DebugBlockDeletedProcedure = "/debug.v1.Debug/BlockDeleted"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
@@ -51,6 +59,14 @@ type DebugClient interface {
 	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
 	// GetQueueItem retrieves the queue item object from the queue
 	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
+	// GetPause retrieves a single pause item.
+	GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error)
+	// BlockPeek retrieves pause IDs from a specific block.
+	BlockPeek(context.Context, *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error)
+	// BlockDeleted retrieves deleted pause IDs from a specific block.
+	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -82,6 +98,30 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("GetQueueItem")),
 			connect.WithClientOptions(opts...),
 		),
+		getPause: connect.NewClient[v1.PauseRequest, v1.PauseResponse](
+			httpClient,
+			baseURL+DebugGetPauseProcedure,
+			connect.WithSchema(debugMethods.ByName("GetPause")),
+			connect.WithClientOptions(opts...),
+		),
+		getIndex: connect.NewClient[v1.IndexRequest, v1.IndexResponse](
+			httpClient,
+			baseURL+DebugGetIndexProcedure,
+			connect.WithSchema(debugMethods.ByName("GetIndex")),
+			connect.WithClientOptions(opts...),
+		),
+		blockPeek: connect.NewClient[v1.BlockPeekRequest, v1.BlockPeekResponse](
+			httpClient,
+			baseURL+DebugBlockPeekProcedure,
+			connect.WithSchema(debugMethods.ByName("BlockPeek")),
+			connect.WithClientOptions(opts...),
+		),
+		blockDeleted: connect.NewClient[v1.BlockDeletedRequest, v1.BlockDeletedResponse](
+			httpClient,
+			baseURL+DebugBlockDeletedProcedure,
+			connect.WithSchema(debugMethods.ByName("BlockDeleted")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -90,6 +130,10 @@ type debugClient struct {
 	getPartition       *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
 	getPartitionStatus *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
 	getQueueItem       *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
+	getPause           *connect.Client[v1.PauseRequest, v1.PauseResponse]
+	getIndex           *connect.Client[v1.IndexRequest, v1.IndexResponse]
+	blockPeek          *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
+	blockDeleted       *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -107,6 +151,26 @@ func (c *debugClient) GetQueueItem(ctx context.Context, req *connect.Request[v1.
 	return c.getQueueItem.CallUnary(ctx, req)
 }
 
+// GetPause calls debug.v1.Debug.GetPause.
+func (c *debugClient) GetPause(ctx context.Context, req *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error) {
+	return c.getPause.CallUnary(ctx, req)
+}
+
+// GetIndex calls debug.v1.Debug.GetIndex.
+func (c *debugClient) GetIndex(ctx context.Context, req *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error) {
+	return c.getIndex.CallUnary(ctx, req)
+}
+
+// BlockPeek calls debug.v1.Debug.BlockPeek.
+func (c *debugClient) BlockPeek(ctx context.Context, req *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error) {
+	return c.blockPeek.CallUnary(ctx, req)
+}
+
+// BlockDeleted calls debug.v1.Debug.BlockDeleted.
+func (c *debugClient) BlockDeleted(ctx context.Context, req *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error) {
+	return c.blockDeleted.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	// GetPartition retrieves the partition data from the database
@@ -116,6 +180,14 @@ type DebugHandler interface {
 	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
 	// GetQueueItem retrieves the queue item object from the queue
 	GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error)
+	// GetPause retrieves a single pause item.
+	GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error)
+	// GetIndex retrieves block information for a pause index.
+	GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error)
+	// BlockPeek retrieves pause IDs from a specific block.
+	BlockPeek(context.Context, *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error)
+	// BlockDeleted retrieves deleted pause IDs from a specific block.
+	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -143,6 +215,30 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("GetQueueItem")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetPauseHandler := connect.NewUnaryHandler(
+		DebugGetPauseProcedure,
+		svc.GetPause,
+		connect.WithSchema(debugMethods.ByName("GetPause")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetIndexHandler := connect.NewUnaryHandler(
+		DebugGetIndexProcedure,
+		svc.GetIndex,
+		connect.WithSchema(debugMethods.ByName("GetIndex")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugBlockPeekHandler := connect.NewUnaryHandler(
+		DebugBlockPeekProcedure,
+		svc.BlockPeek,
+		connect.WithSchema(debugMethods.ByName("BlockPeek")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugBlockDeletedHandler := connect.NewUnaryHandler(
+		DebugBlockDeletedProcedure,
+		svc.BlockDeleted,
+		connect.WithSchema(debugMethods.ByName("BlockDeleted")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
@@ -151,6 +247,14 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugGetPartitionStatusHandler.ServeHTTP(w, r)
 		case DebugGetQueueItemProcedure:
 			debugGetQueueItemHandler.ServeHTTP(w, r)
+		case DebugGetPauseProcedure:
+			debugGetPauseHandler.ServeHTTP(w, r)
+		case DebugGetIndexProcedure:
+			debugGetIndexHandler.ServeHTTP(w, r)
+		case DebugBlockPeekProcedure:
+			debugBlockPeekHandler.ServeHTTP(w, r)
+		case DebugBlockDeletedProcedure:
+			debugBlockDeletedHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -170,4 +274,20 @@ func (UnimplementedDebugHandler) GetPartitionStatus(context.Context, *connect.Re
 
 func (UnimplementedDebugHandler) GetQueueItem(context.Context, *connect.Request[v1.QueueItemRequest]) (*connect.Response[v1.QueueItemResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetQueueItem is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetPause(context.Context, *connect.Request[v1.PauseRequest]) (*connect.Response[v1.PauseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetPause is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetIndex(context.Context, *connect.Request[v1.IndexRequest]) (*connect.Response[v1.IndexResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetIndex is not implemented"))
+}
+
+func (UnimplementedDebugHandler) BlockPeek(context.Context, *connect.Request[v1.BlockPeekRequest]) (*connect.Response[v1.BlockPeekResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.BlockPeek is not implemented"))
+}
+
+func (UnimplementedDebugHandler) BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.BlockDeleted is not implemented"))
 }

@@ -427,10 +427,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	pauseMgr := pauses.NewRedisOnlyManager(sm)
+
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		executor.WithPauseManager(pauseMgr),
 		executor.WithDriverV1(drivers...),
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
@@ -516,7 +518,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
-		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+		runner.WithPauseManager(pauseMgr),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
 		runner.WithBatchManager(batcher),
@@ -576,7 +578,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
-			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			Queue:              rq,
@@ -695,6 +696,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Cron:          croner,
 			ShardSelector: shardSelector,
 			Port:          ds.Opts.DebugAPIPort,
+			PauseManager:  pauseMgr,
 		}))
 	}
 

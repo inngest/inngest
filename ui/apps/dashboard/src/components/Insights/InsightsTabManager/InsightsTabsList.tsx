@@ -5,6 +5,12 @@ import { Alert } from '@inngest/components/Alert/Alert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import Tabs from '@inngest/components/Tabs/Tabs';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import {
   RiAddLine,
   RiBookReadLine,
   RiCircleFill,
@@ -14,6 +20,7 @@ import {
   RiHome4Line,
 } from '@remixicon/react';
 
+import { KeyboardShortcutTooltip } from '@/components/Insights/KeyboardShortcutTooltip';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import type { Tab } from '@/components/Insights/types';
 import { hasDiffWithSavedQuery } from './InsightsTabManager';
@@ -42,49 +49,58 @@ export function InsightsTabsList({
 
   return (
     <>
-      <Tabs
-        onClose={(tabId: string) => {
-          const tab = tabs.find((t) => t.id === tabId);
-          if (tab === undefined) return;
+      <TooltipProvider>
+        <Tabs
+          onClose={(tabId: string) => {
+            const tab = tabs.find((t) => t.id === tabId);
+            if (tab === undefined) return;
 
-          if (hasDiffWithSavedQuery(queries.data, tab)) {
-            setPendingCloseTabId(tabId);
-            return;
-          }
+            if (hasDiffWithSavedQuery(queries.data, tab)) {
+              setPendingCloseTabId(tabId);
+              return;
+            }
 
-          tabManagerActions.closeTab(tabId);
-        }}
-        onValueChange={tabManagerActions.focusTab}
-        value={activeTabId}
-      >
-        <Tabs.List>
-          <Tabs.IconTab
-            icon={<ActionTabIcon size={16} />}
-            onClick={onToggleQueryHelperPanelVisibility}
-            title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
-          />
-          <Tabs.IconTab
-            icon={<RiHome4Line size={16} />}
-            onClick={() => tabManagerActions.focusTab(HOME_TAB.id)}
-            value={HOME_TAB.id}
-          />
-          {tabs
-            .filter((tab) => tab.id !== HOME_TAB.id)
-            .map((tab) => (
-              <Tabs.Tab
-                iconBefore={<IndicatorTabIcon tab={tab} />}
-                key={tab.id}
-                title={tab.name}
-                value={tab.id}
-              />
-            ))}
-          <Tabs.IconTab
-            icon={<RiAddLine size={16} />}
-            onClick={tabManagerActions.createNewTab}
-            title="Add new tab"
-          />
-        </Tabs.List>
-      </Tabs>
+            tabManagerActions.closeTab(tabId);
+          }}
+          onValueChange={tabManagerActions.focusTab}
+          value={activeTabId}
+        >
+          <Tabs.List>
+            <Tabs.IconTab
+              icon={<ActionTabIcon size={16} />}
+              onClick={onToggleQueryHelperPanelVisibility}
+              title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
+            />
+            <Tabs.IconTab
+              icon={<RiHome4Line size={16} />}
+              onClick={() => tabManagerActions.focusTab(HOME_TAB.id)}
+              value={HOME_TAB.id}
+            />
+            {tabs
+              .filter((tab) => tab.id !== HOME_TAB.id)
+              .map((tab) => (
+                <Tabs.Tab
+                  iconBefore={<IndicatorTabIcon tab={tab} />}
+                  key={tab.id}
+                  title={tab.name}
+                  value={tab.id}
+                />
+              ))}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Tabs.IconTab
+                  icon={<RiAddLine size={16} />}
+                  onClick={tabManagerActions.createNewTab}
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                Add new tab (
+                <KeyboardShortcutTooltip combo={{ alt: true, key: 'T', metaOrCtrl: true }} />)
+              </TooltipContent>
+            </Tooltip>
+          </Tabs.List>
+        </Tabs>
+      </TooltipProvider>
 
       <AlertModal
         cancelButtonLabel="Cancel"

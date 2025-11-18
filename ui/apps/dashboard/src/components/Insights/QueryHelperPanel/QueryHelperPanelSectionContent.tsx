@@ -14,7 +14,7 @@ export interface QueryHelperPanelSectionContentProps {
     error: undefined | string;
     isLoading: boolean;
   };
-  sectionType: 'history' | 'saved';
+  sectionType: 'history' | 'saved' | 'shared';
 }
 
 export function QueryHelperPanelSectionContent({
@@ -34,14 +34,23 @@ export function QueryHelperPanelSectionContent({
     return <QueryHelperPanelStaticMessage>Failed to load queries</QueryHelperPanelStaticMessage>;
   }
 
+  // TODO: Update message for shared queries to reference right-clicking on query when implemented.
   if (!data?.length) {
     return (
       <QueryHelperPanelSectionContentNoData
-        primary={sectionType === 'history' ? 'No query history' : 'No saved queries'}
+        primary={
+          sectionType === 'history'
+            ? 'No query history'
+            : sectionType === 'saved'
+            ? 'No saved queries'
+            : 'No shared queries'
+        }
         secondary={
           sectionType === 'history'
             ? 'You will find the last 10 queries that ran successfully here.'
-            : 'Click the save query button to easily access your queries later.'
+            : sectionType === 'saved'
+            ? 'Click the save query button to easily access your queries later.'
+            : 'Share queries with your org.'
         }
         sectionType={sectionType}
       />

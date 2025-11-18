@@ -51,7 +51,9 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 		BlockSize:        lowBlockSize, // Very low limit to ensure flushing happens quickly
 		CompactionLimit:  1,
 		CompactionSample: 1.0, // Always compact for testing
+		CompactionLeaser: leaser,
 		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 	})
 	require.NoError(t, err)
 
@@ -252,4 +254,20 @@ func (m *mockBlockStore) IndexExists(ctx context.Context, i Index) (bool, error)
 
 func (m *mockBlockStore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
 	return nil, nil
+}
+
+func (m *mockBlockStore) GetBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error) {
+	return nil, nil
+}
+
+func (m *mockBlockStore) GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockBlockStore) GetBlockPauseIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockBlockStore) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
+	return nil, 0, nil
 }

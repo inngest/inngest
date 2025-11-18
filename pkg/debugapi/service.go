@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/cron"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -32,15 +33,17 @@ func NewDebugAPI(o Opts) service.Service {
 		state:     o.State,
 		croner:    o.Cron,
 		findShard: o.ShardSelector,
+		pm:        o.PauseManager,
 	}
 }
 
 type Opts struct {
-	Log   logger.Logger
-	DB    cqrs.Manager
-	Queue redis_state.QueueManager
-	State state.Manager
-	Cron  cron.CronManager
+	Log          logger.Logger
+	DB           cqrs.Manager
+	Queue        redis_state.QueueManager
+	State        state.Manager
+	Cron         cron.CronManager
+	PauseManager pauses.Manager
 
 	ShardSelector redis_state.ShardSelector
 
@@ -59,6 +62,7 @@ type debugAPI struct {
 	queue  redis_state.QueueManager
 	state  state.Manager
 	croner cron.CronManager
+	pm     pauses.Manager
 }
 
 func (d *debugAPI) Name() string {
