@@ -4,12 +4,45 @@ import { useQuery } from "@tanstack/react-query";
 import { useClient } from "urql";
 
 import { useEnvironment } from "@/components/Environments/environment-context";
-import {
-  GetEventTypesV2Document,
-  GetEventTypeVolumeV2Document,
-  GetEventTypeDocument,
-  GetAllEventNamesDocument,
-} from "@/gql/graphql";
+import { graphql } from "@/gql";
+
+const query = graphql(`
+  query GetEventTypesV2(
+    $envID: ID!
+    $cursor: String
+    $archived: Boolean
+    $nameSearch: String
+  ) {
+    environment: workspace(id: $envID) {
+      eventTypesV2(
+        after: $cursor
+        first: 40
+        filter: { archived: $archived, nameSearch: $nameSearch }
+      ) {
+        edges {
+          node {
+            name
+            functions {
+              edges {
+                node {
+                  id
+                  slug
+                  name
+                }
+              }
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+          hasPreviousPage
+          startCursor
+        }
+      }
+    }
+  }
+`);
 
 type QueryVariables = {
   archived: boolean;
@@ -24,7 +57,7 @@ export function useEventTypes() {
     async ({ cursor, archived, nameSearch }: QueryVariables) => {
       const result = await client
         .query(
-          GetEventTypesV2Document,
+          query,
           {
             envID,
             archived,
@@ -64,6 +97,28 @@ type VolumeQueryVariables = {
   eventName: string;
 };
 
+const volumeQuery = graphql(`
+  query GetEventTypeVolumeV2(
+    $envID: ID!
+    $eventName: String!
+    $startTime: Time!
+    $endTime: Time!
+  ) {
+    environment: workspace(id: $envID) {
+      eventType(name: $eventName) {
+        name
+        usage(opts: { period: hour, from: $startTime, to: $endTime }) {
+          total
+          data {
+            count
+            slot
+          }
+        }
+      }
+    }
+  }
+`);
+
 export function useEventTypeVolume() {
   const envID = useEnvironment().id;
   const client = useClient();
@@ -77,7 +132,7 @@ export function useEventTypeVolume() {
       const endTime = new Date().toISOString();
       const result = await client
         .query(
-          GetEventTypeVolumeV2Document,
+          volumeQuery,
           {
             envID,
             eventName,
@@ -115,6 +170,25 @@ export function useEventTypeVolume() {
   );
 }
 
+const eventTypeQuery = graphql(`
+  query GetEventType($envID: ID!, $eventName: String!) {
+    environment: workspace(id: $envID) {
+      eventType(name: $eventName) {
+        name
+        functions {
+          edges {
+            node {
+              id
+              slug
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+`);
+
 export function useEventType({ eventName }: { eventName: string }) {
   const envID = useEnvironment().id;
   const client = useClient();
@@ -123,7 +197,7 @@ export function useEventType({ eventName }: { eventName: string }) {
     queryKey: ["event-type", envID, eventName],
     queryFn: async () => {
       const result = await client
-        .query(GetEventTypeDocument, { envID, eventName })
+        .query(eventTypeQuery, { envID, eventName })
         .toPromise();
 
       if (result.error) {
@@ -144,17 +218,27 @@ export function useEventType({ eventName }: { eventName: string }) {
   });
 }
 
+export const allEventTypesQuery = graphql(`
+  query GetAllEventNames($envID: ID!) {
+    environment: workspace(id: $envID) {
+      eventTypesV2(first: 40, filter: {}) {
+        edges {
+          node {
+            name
+          }
+        }
+      }
+    }
+  }
+`);
+
 export function useAllEventTypes() {
   const envID = useEnvironment().id;
   const client = useClient();
 
   return useCallback(async () => {
     const result = await client
-      .query(
-        GetAllEventNamesDocument,
-        { envID },
-        { requestPolicy: "network-only" },
-      )
+      .query(allEventTypesQuery, { envID }, { requestPolicy: "network-only" })
       .toPromise();
 
     if (result.error) {

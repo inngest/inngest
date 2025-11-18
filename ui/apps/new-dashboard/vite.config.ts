@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   ssr: {
-    noExternal: [],
+    noExternal: ["@headlessui/tailwindcss"],
     external: ["next"],
   },
   plugins: [
