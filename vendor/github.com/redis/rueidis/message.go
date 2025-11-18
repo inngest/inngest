@@ -1,6 +1,8 @@
 package rueidis
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,8 +24,8 @@ var Nil = &RedisError{typ: typeNull}
 // ErrParse is a parse error that occurs when a Redis message cannot be parsed correctly.
 var errParse = errors.New("rueidis: parse error")
 
-// IsRedisNil is a handy method to check if error is a redis nil response.
-// All redis nil response returns as an error.
+// IsRedisNil is a handy method to check if the error is a redis nil response.
+// All redis nil responses returned as an error.
 func IsRedisNil(err error) bool {
 	return err == Nil
 }
@@ -41,20 +43,28 @@ func IsRedisBusyGroup(err error) bool {
 	return false
 }
 
-// IsRedisErr is a handy method to check if error is a redis ERR response.
+// IsRedisErr is a handy method to check if the error is a redis ERR response.
 func IsRedisErr(err error) (ret *RedisError, ok bool) {
 	ret, ok = err.(*RedisError)
 	return ret, ok && ret != Nil
 }
 
-// RedisError is an error response or a nil message from redis instance
+// RedisError is an error response or a nil message from the redis instance
 type RedisError RedisMessage
+
+// string retrieves the contained string of the RedisError
+func (m *RedisError) string() string {
+	if m.bytes == nil {
+		return ""
+	}
+	return unsafe.String(m.bytes, m.intlen)
+}
 
 func (r *RedisError) Error() string {
 	if r.IsNil() {
 		return "redis nil message"
 	}
-	return r.string
+	return r.string()
 }
 
 // IsNil checks if it is a redis nil message.
@@ -62,18 +72,26 @@ func (r *RedisError) IsNil() bool {
 	return r.typ == typeNull
 }
 
-// IsMoved checks if it is a redis MOVED message and returns moved address.
+// IsMoved checks if it is a redis MOVED message and returns the moved address.
 func (r *RedisError) IsMoved() (addr string, ok bool) {
-	if ok = strings.HasPrefix(r.string, "MOVED"); ok {
-		addr = fixIPv6HostPort(strings.Split(r.string, " ")[2])
+	if ok = strings.HasPrefix(r.string(), "MOVED"); ok {
+		addr = fixIPv6HostPort(strings.Split(r.string(), " ")[2])
 	}
 	return
 }
 
 // IsAsk checks if it is a redis ASK message and returns ask address.
 func (r *RedisError) IsAsk() (addr string, ok bool) {
-	if ok = strings.HasPrefix(r.string, "ASK"); ok {
-		addr = fixIPv6HostPort(strings.Split(r.string, " ")[2])
+	if ok = strings.HasPrefix(r.string(), "ASK"); ok {
+		addr = fixIPv6HostPort(strings.Split(r.string(), " ")[2])
+	}
+	return
+}
+
+// IsRedirect checks if it is a redis REDIRECT message and returns redirect address.
+func (r *RedisError) IsRedirect() (addr string, ok bool) {
+	if ok = strings.HasPrefix(r.string(), "REDIRECT"); ok {
+		addr = fixIPv6HostPort(strings.Split(r.string(), " ")[1])
 	}
 	return
 }
@@ -89,27 +107,27 @@ func fixIPv6HostPort(addr string) string {
 
 // IsTryAgain checks if it is a redis TRYAGAIN message and returns ask address.
 func (r *RedisError) IsTryAgain() bool {
-	return strings.HasPrefix(r.string, "TRYAGAIN")
+	return strings.HasPrefix(r.string(), "TRYAGAIN")
 }
 
 // IsLoading checks if it is a redis LOADING message
 func (r *RedisError) IsLoading() bool {
-	return strings.HasPrefix(r.string, "LOADING")
+	return strings.HasPrefix(r.string(), "LOADING")
 }
 
 // IsClusterDown checks if it is a redis CLUSTERDOWN message and returns ask address.
 func (r *RedisError) IsClusterDown() bool {
-	return strings.HasPrefix(r.string, "CLUSTERDOWN")
+	return strings.HasPrefix(r.string(), "CLUSTERDOWN")
 }
 
 // IsNoScript checks if it is a redis NOSCRIPT message.
 func (r *RedisError) IsNoScript() bool {
-	return strings.HasPrefix(r.string, "NOSCRIPT")
+	return strings.HasPrefix(r.string(), "NOSCRIPT")
 }
 
 // IsBusyGroup checks if it is a redis BUSYGROUP message.
 func (r *RedisError) IsBusyGroup() bool {
-	return strings.HasPrefix(r.string, "BUSYGROUP")
+	return strings.HasPrefix(r.string(), "BUSYGROUP")
 }
 
 func newResult(val RedisMessage, err error) RedisResult {
@@ -362,6 +380,36 @@ func (r RedisResult) AsXRead() (v map[string][]XRangeEntry, err error) {
 	return
 }
 
+// AsXRangeSlice delegates to RedisMessage.AsXRangeSlice
+func (r RedisResult) AsXRangeSlice() (v XRangeSlice, err error) {
+	if r.err != nil {
+		err = r.err
+	} else {
+		v, err = r.val.AsXRangeSlice()
+	}
+	return
+}
+
+// AsXRangeSlices delegates to RedisMessage.AsXRangeSlices
+func (r RedisResult) AsXRangeSlices() (v []XRangeSlice, err error) {
+	if r.err != nil {
+		err = r.err
+	} else {
+		v, err = r.val.AsXRangeSlices()
+	}
+	return
+}
+
+// AsXReadSlices delegates to RedisMessage.AsXReadSlices
+func (r RedisResult) AsXReadSlices() (v map[string][]XRangeSlice, err error) {
+	if r.err != nil {
+		err = r.err
+	} else {
+		v, err = r.val.AsXReadSlices()
+	}
+	return
+}
+
 func (r RedisResult) AsLMPop() (v KeyValues, err error) {
 	if r.err != nil {
 		err = r.err
@@ -521,50 +569,174 @@ func (r *prettyRedisResult) MarshalJSON() ([]byte, error) {
 
 // RedisMessage is a redis response message, it may be a nil response
 type RedisMessage struct {
-	attrs   *RedisMessage
-	string  string
-	values  []RedisMessage
-	integer int64
-	typ     byte
-	ttl     [7]byte
+	attrs *RedisMessage
+	bytes *byte
+	array *RedisMessage
+
+	// intlen is used for a simple number or
+	// in conjunction with an array or bytes to store the length of array or string
+	intlen int64
+	typ    byte
+	ttl    [7]byte
 }
 
-// IsNil check if message is a redis nil response
+func (m *RedisMessage) string() string {
+	if m.bytes == nil {
+		return ""
+	}
+	return unsafe.String(m.bytes, m.intlen)
+}
+
+func (m *RedisMessage) values() []RedisMessage {
+	if m.array == nil {
+		return nil
+	}
+	return unsafe.Slice(m.array, m.intlen)
+}
+
+func (m *RedisMessage) setString(s string) {
+	m.bytes = unsafe.StringData(s)
+	m.intlen = int64(len(s))
+}
+
+func (m *RedisMessage) setValues(values []RedisMessage) {
+	m.array = unsafe.SliceData(values)
+	m.intlen = int64(len(values))
+}
+
+func (m *RedisMessage) cachesize() int {
+	n := 9 // typ (1) + length (8) TODO: can we use VarInt instead of fixed 8 bytes for length?
+	switch m.typ {
+	case typeInteger, typeNull, typeBool:
+	case typeArray, typeMap, typeSet:
+		for _, val := range m.values() {
+			n += val.cachesize()
+		}
+	default:
+		n += len(m.string())
+	}
+	return n
+}
+
+func (m *RedisMessage) serialize(o *bytes.Buffer) {
+	var buf [8]byte // TODO: can we use VarInt instead of fixed 8 bytes for length?
+	o.WriteByte(m.typ)
+	switch m.typ {
+	case typeInteger, typeNull, typeBool:
+		binary.BigEndian.PutUint64(buf[:], uint64(m.intlen))
+		o.Write(buf[:])
+	case typeArray, typeMap, typeSet:
+		binary.BigEndian.PutUint64(buf[:], uint64(len(m.values())))
+		o.Write(buf[:])
+		for _, val := range m.values() {
+			val.serialize(o)
+		}
+	default:
+		binary.BigEndian.PutUint64(buf[:], uint64(len(m.string())))
+		o.Write(buf[:])
+		o.WriteString(m.string())
+	}
+}
+
+var ErrCacheUnmarshal = errors.New("cache unmarshal error")
+
+func (m *RedisMessage) unmarshalView(c int64, buf []byte) (int64, error) {
+	var err error
+	if int64(len(buf)) < c+9 {
+		return 0, ErrCacheUnmarshal
+	}
+	m.typ = buf[c]
+	c += 1
+	size := int64(binary.BigEndian.Uint64(buf[c : c+8]))
+	c += 8 // TODO: can we use VarInt instead of fixed 8 bytes for length?
+	switch m.typ {
+	case typeInteger, typeNull, typeBool:
+		m.intlen = size
+	case typeArray, typeMap, typeSet:
+		m.setValues(make([]RedisMessage, size))
+		for i := range m.values() {
+			if c, err = m.values()[i].unmarshalView(c, buf); err != nil {
+				break
+			}
+		}
+	default:
+		if int64(len(buf)) < c+size {
+			return 0, ErrCacheUnmarshal
+		}
+		m.setString(BinaryString(buf[c : c+size]))
+		c += size
+	}
+	return c, err
+}
+
+// CacheSize returns the buffer size needed by the CacheMarshal.
+func (m *RedisMessage) CacheSize() int {
+	return m.cachesize() + 7 // 7 for ttl
+}
+
+// CacheMarshal writes serialized RedisMessage to the provided buffer.
+// If the provided buffer is nil, CacheMarshal will allocate one.
+// Note that an output format is not compatible with different client versions.
+func (m *RedisMessage) CacheMarshal(buf []byte) []byte {
+	if buf == nil {
+		buf = make([]byte, 0, m.CacheSize())
+	}
+	o := bytes.NewBuffer(buf)
+	o.Write(m.ttl[:7])
+	m.serialize(o)
+	return o.Bytes()
+}
+
+// CacheUnmarshalView construct the RedisMessage from the buffer produced by CacheMarshal.
+// Note that the buffer can't be reused after CacheUnmarshalView since it uses unsafe.String on top of the buffer.
+func (m *RedisMessage) CacheUnmarshalView(buf []byte) error {
+	if len(buf) < 7 {
+		return ErrCacheUnmarshal
+	}
+	copy(m.ttl[:7], buf[:7])
+	if _, err := m.unmarshalView(7, buf); err != nil {
+		return err
+	}
+	m.attrs = cacheMark
+	return nil
+}
+
+// IsNil check if the message is a redis nil response
 func (m *RedisMessage) IsNil() bool {
 	return m.typ == typeNull
 }
 
-// IsInt64 check if message is a redis RESP3 int response
+// IsInt64 check if the message is a redis RESP3 int response
 func (m *RedisMessage) IsInt64() bool {
 	return m.typ == typeInteger
 }
 
-// IsFloat64 check if message is a redis RESP3 double response
+// IsFloat64 check if the message is a redis RESP3 double response
 func (m *RedisMessage) IsFloat64() bool {
 	return m.typ == typeFloat
 }
 
-// IsString check if message is a redis string response
+// IsString check if the message is a redis string response
 func (m *RedisMessage) IsString() bool {
 	return m.typ == typeBlobString || m.typ == typeSimpleString
 }
 
-// IsBool check if message is a redis RESP3 bool response
+// IsBool check if the message is a redis RESP3 bool response
 func (m *RedisMessage) IsBool() bool {
 	return m.typ == typeBool
 }
 
-// IsArray check if message is a redis array response
+// IsArray check if the message is a redis array response
 func (m *RedisMessage) IsArray() bool {
 	return m.typ == typeArray || m.typ == typeSet
 }
 
-// IsMap check if message is a redis RESP3 map response
+// IsMap check if the message is a redis RESP3 map response
 func (m *RedisMessage) IsMap() bool {
 	return m.typ == typeMap
 }
 
-// Error check if message is a redis error response, including nil response
+// Error check if the message is a redis error response, including nil response
 func (m *RedisMessage) Error() error {
 	if m.typ == typeNull {
 		return Nil
@@ -572,25 +744,25 @@ func (m *RedisMessage) Error() error {
 	if m.typ == typeSimpleErr || m.typ == typeBlobErr {
 		// kvrocks: https://github.com/redis/rueidis/issues/152#issuecomment-1333923750
 		mm := *m
-		mm.string = strings.TrimPrefix(m.string, "ERR ")
+		mm.setString(strings.TrimPrefix(m.string(), "ERR "))
 		return (*RedisError)(&mm)
 	}
 	return nil
 }
 
-// ToString check if message is a redis string response, and return it
+// ToString check if the message is a redis string response and return it
 func (m *RedisMessage) ToString() (val string, err error) {
 	if m.IsString() {
-		return m.string, nil
+		return m.string(), nil
 	}
-	if m.IsInt64() || m.values != nil {
+	if m.IsInt64() || m.array != nil {
 		typ := m.typ
 		return "", fmt.Errorf("%w: redis message type %s is not a string", errParse, typeNames[typ])
 	}
-	return m.string, m.Error()
+	return m.string(), m.Error()
 }
 
-// AsReader check if message is a redis string response and wrap it with the strings.NewReader
+// AsReader check if the message is a redis string response and wrap it with the strings.NewReader
 func (m *RedisMessage) AsReader() (reader io.Reader, err error) {
 	str, err := m.ToString()
 	if err != nil {
@@ -599,7 +771,7 @@ func (m *RedisMessage) AsReader() (reader io.Reader, err error) {
 	return strings.NewReader(str), nil
 }
 
-// AsBytes check if message is a redis string response and return it as an immutable []byte
+// AsBytes check if the message is a redis string response and return it as an immutable []byte
 func (m *RedisMessage) AsBytes() (bs []byte, err error) {
 	str, err := m.ToString()
 	if err != nil {
@@ -608,20 +780,19 @@ func (m *RedisMessage) AsBytes() (bs []byte, err error) {
 	return unsafe.Slice(unsafe.StringData(str), len(str)), nil
 }
 
-// DecodeJSON check if message is a redis string response and treat it as json, then unmarshal it into provided value
+// DecodeJSON check if the message is a redis string response and treat it as JSON, then unmarshal it into the provided value
 func (m *RedisMessage) DecodeJSON(v any) (err error) {
-	str, err := m.ToString()
+	b, err := m.AsBytes()
 	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(strings.NewReader(str))
-	return decoder.Decode(v)
+	return json.Unmarshal(b, v)
 }
 
-// AsInt64 check if message is a redis string response, and parse it as int64
+// AsInt64 check if the message is a redis string response and parse it as int64
 func (m *RedisMessage) AsInt64() (val int64, err error) {
 	if m.IsInt64() {
-		return m.integer, nil
+		return m.intlen, nil
 	}
 	v, err := m.ToString()
 	if err != nil {
@@ -630,10 +801,10 @@ func (m *RedisMessage) AsInt64() (val int64, err error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
-// AsUint64 check if message is a redis string response, and parse it as uint64
+// AsUint64 check if the message is a redis string response and parse it as uint64
 func (m *RedisMessage) AsUint64() (val uint64, err error) {
 	if m.IsInt64() {
-		return uint64(m.integer), nil
+		return uint64(m.intlen), nil
 	}
 	v, err := m.ToString()
 	if err != nil {
@@ -642,20 +813,20 @@ func (m *RedisMessage) AsUint64() (val uint64, err error) {
 	return strconv.ParseUint(v, 10, 64)
 }
 
-// AsBool checks if message is non-nil redis response, and parses it as bool
+// AsBool checks if the message is a non-nil response and parses it as bool
 func (m *RedisMessage) AsBool() (val bool, err error) {
 	if err = m.Error(); err != nil {
 		return
 	}
 	switch m.typ {
 	case typeBlobString, typeSimpleString:
-		val = m.string == "OK"
+		val = m.string() == "OK"
 		return
 	case typeInteger:
-		val = m.integer != 0
+		val = m.intlen != 0
 		return
 	case typeBool:
-		val = m.integer == 1
+		val = m.intlen == 1
 		return
 	default:
 		typ := m.typ
@@ -663,10 +834,10 @@ func (m *RedisMessage) AsBool() (val bool, err error) {
 	}
 }
 
-// AsFloat64 check if message is a redis string response, and parse it as float64
+// AsFloat64 check if the message is a redis string response and parse it as float64
 func (m *RedisMessage) AsFloat64() (val float64, err error) {
 	if m.IsFloat64() {
-		return util.ToFloat64(m.string)
+		return util.ToFloat64(m.string())
 	}
 	v, err := m.ToString()
 	if err != nil {
@@ -675,10 +846,10 @@ func (m *RedisMessage) AsFloat64() (val float64, err error) {
 	return util.ToFloat64(v)
 }
 
-// ToInt64 check if message is a redis RESP3 int response, and return it
+// ToInt64 check if the message is a redis RESP3 int response and return it
 func (m *RedisMessage) ToInt64() (val int64, err error) {
 	if m.IsInt64() {
-		return m.integer, nil
+		return m.intlen, nil
 	}
 	if err = m.Error(); err != nil {
 		return 0, err
@@ -687,10 +858,10 @@ func (m *RedisMessage) ToInt64() (val int64, err error) {
 	return 0, fmt.Errorf("%w: redis message type %s is not a RESP3 int64", errParse, typeNames[typ])
 }
 
-// ToBool check if message is a redis RESP3 bool response, and return it
+// ToBool check if the message is a redis RESP3 bool response and return it
 func (m *RedisMessage) ToBool() (val bool, err error) {
 	if m.IsBool() {
-		return m.integer == 1, nil
+		return m.intlen == 1, nil
 	}
 	if err = m.Error(); err != nil {
 		return false, err
@@ -699,10 +870,10 @@ func (m *RedisMessage) ToBool() (val bool, err error) {
 	return false, fmt.Errorf("%w: redis message type %s is not a RESP3 bool", errParse, typeNames[typ])
 }
 
-// ToFloat64 check if message is a redis RESP3 double response, and return it
+// ToFloat64 check if the message is a redis RESP3 double response and return it
 func (m *RedisMessage) ToFloat64() (val float64, err error) {
 	if m.IsFloat64() {
-		return util.ToFloat64(m.string)
+		return util.ToFloat64(m.string())
 	}
 	if err = m.Error(); err != nil {
 		return 0, err
@@ -711,10 +882,10 @@ func (m *RedisMessage) ToFloat64() (val float64, err error) {
 	return 0, fmt.Errorf("%w: redis message type %s is not a RESP3 float64", errParse, typeNames[typ])
 }
 
-// ToArray check if message is a redis array/set response, and return it
+// ToArray check if the message is a redis array/set response and return it
 func (m *RedisMessage) ToArray() ([]RedisMessage, error) {
 	if m.IsArray() {
-		return m.values, nil
+		return m.values(), nil
 	}
 	if err := m.Error(); err != nil {
 		return nil, err
@@ -723,8 +894,8 @@ func (m *RedisMessage) ToArray() ([]RedisMessage, error) {
 	return nil, fmt.Errorf("%w: redis message type %s is not a array", errParse, typeNames[typ])
 }
 
-// AsStrSlice check if message is a redis array/set response, and convert to []string.
-// redis nil element and other non string element will be present as zero.
+// AsStrSlice check if the message is a redis array/set response and convert to []string.
+// redis nil element and other non-string elements will be present as zero.
 func (m *RedisMessage) AsStrSlice() ([]string, error) {
 	values, err := m.ToArray()
 	if err != nil {
@@ -732,13 +903,13 @@ func (m *RedisMessage) AsStrSlice() ([]string, error) {
 	}
 	s := make([]string, 0, len(values))
 	for _, v := range values {
-		s = append(s, v.string)
+		s = append(s, v.string())
 	}
 	return s, nil
 }
 
-// AsIntSlice check if message is a redis array/set response, and convert to []int64.
-// redis nil element and other non integer element will be present as zero.
+// AsIntSlice check if the message is a redis array/set response and convert to []int64.
+// redis nil element and other non-integer elements will be present as zero.
 func (m *RedisMessage) AsIntSlice() ([]int64, error) {
 	values, err := m.ToArray()
 	if err != nil {
@@ -746,19 +917,19 @@ func (m *RedisMessage) AsIntSlice() ([]int64, error) {
 	}
 	s := make([]int64, len(values))
 	for i, v := range values {
-		if len(v.string) != 0 {
-			if s[i], err = strconv.ParseInt(v.string, 10, 64); err != nil {
+		if len(v.string()) != 0 {
+			if s[i], err = strconv.ParseInt(v.string(), 10, 64); err != nil {
 				return nil, err
 			}
 		} else {
-			s[i] = v.integer
+			s[i] = v.intlen
 		}
 	}
 	return s, nil
 }
 
-// AsFloatSlice check if message is a redis array/set response, and convert to []float64.
-// redis nil element and other non float element will be present as zero.
+// AsFloatSlice check if the message is a redis array/set response and convert to []float64.
+// redis nil element and other non-float elements will be present as zero.
 func (m *RedisMessage) AsFloatSlice() ([]float64, error) {
 	values, err := m.ToArray()
 	if err != nil {
@@ -766,18 +937,18 @@ func (m *RedisMessage) AsFloatSlice() ([]float64, error) {
 	}
 	s := make([]float64, len(values))
 	for i, v := range values {
-		if len(v.string) != 0 {
-			if s[i], err = util.ToFloat64(v.string); err != nil {
+		if len(v.string()) != 0 {
+			if s[i], err = util.ToFloat64(v.string()); err != nil {
 				return nil, err
 			}
 		} else {
-			s[i] = float64(v.integer)
+			s[i] = float64(v.intlen)
 		}
 	}
 	return s, nil
 }
 
-// AsBoolSlice checks if message is a redis array/set response, and converts it to []bool.
+// AsBoolSlice checks if the message is a redis array/set response and converts it to []bool.
 // Redis nil elements and other non-boolean elements will be represented as false.
 func (m *RedisMessage) AsBoolSlice() ([]bool, error) {
 	values, err := m.ToArray()
@@ -797,7 +968,7 @@ type XRangeEntry struct {
 	ID          string
 }
 
-// AsXRangeEntry check if message is a redis array/set response of length 2, and convert to XRangeEntry
+// AsXRangeEntry check if the message is a redis array/set response of length 2 and convert to XRangeEntry
 func (m *RedisMessage) AsXRangeEntry() (XRangeEntry, error) {
 	values, err := m.ToArray()
 	if err != nil {
@@ -823,7 +994,7 @@ func (m *RedisMessage) AsXRangeEntry() (XRangeEntry, error) {
 	}, nil
 }
 
-// AsXRange check if message is a redis array/set response, and convert to []XRangeEntry
+// AsXRange check if the message is a redis array/set response and convert to []XRangeEntry
 func (m *RedisMessage) AsXRange() ([]XRangeEntry, error) {
 	values, err := m.ToArray()
 	if err != nil {
@@ -846,21 +1017,118 @@ func (m *RedisMessage) AsXRead() (ret map[string][]XRangeEntry, err error) {
 		return nil, err
 	}
 	if m.IsMap() {
-		ret = make(map[string][]XRangeEntry, len(m.values)/2)
-		for i := 0; i < len(m.values); i += 2 {
-			if ret[m.values[i].string], err = m.values[i+1].AsXRange(); err != nil {
+		ret = make(map[string][]XRangeEntry, len(m.values())/2)
+		for i := 0; i < len(m.values()); i += 2 {
+			if ret[m.values()[i].string()], err = m.values()[i+1].AsXRange(); err != nil {
 				return nil, err
 			}
 		}
 		return ret, nil
 	}
 	if m.IsArray() {
-		ret = make(map[string][]XRangeEntry, len(m.values))
-		for _, v := range m.values {
-			if !v.IsArray() || len(v.values) != 2 {
-				return nil, fmt.Errorf("got %d, wanted 2", len(v.values))
+		ret = make(map[string][]XRangeEntry, len(m.values()))
+		for _, v := range m.values() {
+			if !v.IsArray() || len(v.values()) != 2 {
+				return nil, fmt.Errorf("got %d, wanted 2", len(v.values()))
 			}
-			if ret[v.values[0].string], err = v.values[1].AsXRange(); err != nil {
+			if ret[v.values()[0].string()], err = v.values()[1].AsXRange(); err != nil {
+				return nil, err
+			}
+		}
+		return ret, nil
+	}
+	typ := m.typ
+	return nil, fmt.Errorf("%w: redis message type %s is not a map/array/set", errParse, typeNames[typ])
+}
+
+// New slice-based structures that preserve order and duplicates
+type XRangeSlice struct {
+	ID          string
+	FieldValues []XRangeFieldValue
+}
+
+type XRangeFieldValue struct {
+	Field string
+	Value string
+}
+
+// AsXRangeSlice converts a RedisMessage to XRangeSlice (preserves order and duplicates)
+func (m *RedisMessage) AsXRangeSlice() (XRangeSlice, error) {
+	values, err := m.ToArray()
+	if err != nil {
+		return XRangeSlice{}, err
+	}
+	if len(values) != 2 {
+		return XRangeSlice{}, fmt.Errorf("got %d, wanted 2", len(values))
+	}
+	id, err := values[0].ToString()
+	if err != nil {
+		return XRangeSlice{}, err
+	}
+	// Handle the field-values array
+	fieldArray, err := values[1].ToArray()
+	if err != nil {
+		if IsRedisNil(err) {
+			return XRangeSlice{ID: id, FieldValues: nil}, nil
+		}
+		return XRangeSlice{}, err
+	}
+	// Convert pairs to slice (preserving order)
+	fieldValues := make([]XRangeFieldValue, 0, len(fieldArray)/2)
+	for i := 0; i < cap(fieldValues); i++ {
+		field := fieldArray[i*2].string()
+		value := fieldArray[i*2+1].string()
+		fieldValues = append(fieldValues, XRangeFieldValue{
+			Field: field,
+			Value: value,
+		})
+	}
+	return XRangeSlice{
+		ID:          id,
+		FieldValues: fieldValues,
+	}, nil
+}
+
+// AsXRangeSlices converts multiple XRange entries to slice format
+func (m *RedisMessage) AsXRangeSlices() ([]XRangeSlice, error) {
+	values, err := m.ToArray()
+	if err != nil {
+		return nil, err
+	}
+	msgs := make([]XRangeSlice, 0, len(values))
+	for _, v := range values {
+		msg, err := v.AsXRangeSlice()
+		if err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs, nil
+}
+
+// AsXReadSlices converts XREAD/XREADGROUP response to use slice format
+func (m *RedisMessage) AsXReadSlices() (map[string][]XRangeSlice, error) {
+	if err := m.Error(); err != nil {
+		return nil, err
+	}
+	var ret map[string][]XRangeSlice
+	var err error
+	if m.IsMap() {
+		ret = make(map[string][]XRangeSlice, len(m.values())/2)
+		for i := 0; i < len(m.values()); i += 2 {
+			if ret[m.values()[i].string()], err = m.values()[i+1].AsXRangeSlices(); err != nil {
+				return nil, err
+			}
+		}
+		return ret, nil
+	}
+	if m.IsArray() {
+		ret = make(map[string][]XRangeSlice, len(m.values()))
+		for _, v := range m.values() {
+			if !v.IsArray() || len(v.values()) != 2 {
+				return nil, fmt.Errorf("got %d, wanted 2", len(v.values()))
+			}
+			if ret[v.values()[0].string()], err = v.values()[1].AsXRangeSlices(); err != nil {
 				return nil, err
 			}
 		}
@@ -895,7 +1163,7 @@ func (m *RedisMessage) AsZScore() (s ZScore, err error) {
 	return toZScore(arr)
 }
 
-// AsZScores converts ZRANGE WITHSCROES, ZDIFF WITHSCROES and ZPOPMAX/ZPOPMIN command with count > 1 responses to []ZScore
+// AsZScores converts ZRANGE WITHSCORES, ZDIFF WITHSCORES and ZPOPMAX/ZPOPMIN command with count > 1 responses to []ZScore
 func (m *RedisMessage) AsZScores() ([]ZScore, error) {
 	arr, err := m.ToArray()
 	if err != nil {
@@ -904,7 +1172,7 @@ func (m *RedisMessage) AsZScores() ([]ZScore, error) {
 	if len(arr) > 0 && arr[0].IsArray() {
 		scores := make([]ZScore, len(arr))
 		for i, v := range arr {
-			if scores[i], err = toZScore(v.values); err != nil {
+			if scores[i], err = toZScore(v.values()); err != nil {
 				return nil, err
 			}
 		}
@@ -926,7 +1194,7 @@ type ScanEntry struct {
 	Cursor   uint64
 }
 
-// AsScanEntry check if message is a redis array/set response of length 2, and convert to ScanEntry.
+// AsScanEntry check if the message is a redis array/set response of length 2 and convert to ScanEntry.
 func (m *RedisMessage) AsScanEntry() (e ScanEntry, err error) {
 	msgs, err := m.ToArray()
 	if err != nil {
@@ -942,30 +1210,30 @@ func (m *RedisMessage) AsScanEntry() (e ScanEntry, err error) {
 	return ScanEntry{}, fmt.Errorf("%w: redis message type %s is not a scan response or its length is not at least 2", errParse, typeNames[typ])
 }
 
-// AsMap check if message is a redis array/set response, and convert to map[string]RedisMessage
+// AsMap check if the message is a redis array/set response and convert to map[string]RedisMessage
 func (m *RedisMessage) AsMap() (map[string]RedisMessage, error) {
 	if err := m.Error(); err != nil {
 		return nil, err
 	}
-	if (m.IsMap() || m.IsArray()) && len(m.values)%2 == 0 {
-		return toMap(m.values)
+	if (m.IsMap() || m.IsArray()) && len(m.values())%2 == 0 {
+		return toMap(m.values())
 	}
 	typ := m.typ
 	return nil, fmt.Errorf("%w: redis message type %s is not a map/array/set or its length is not even", errParse, typeNames[typ])
 }
 
-// AsStrMap check if message is a redis map/array/set response, and convert to map[string]string.
-// redis nil element and other non string element will be present as zero.
+// AsStrMap check if the message is a redis map/array/set response and convert to map[string]string.
+// redis nil element and other non-string elements will be present as zero.
 func (m *RedisMessage) AsStrMap() (map[string]string, error) {
 	if err := m.Error(); err != nil {
 		return nil, err
 	}
-	if (m.IsMap() || m.IsArray()) && len(m.values)%2 == 0 {
-		r := make(map[string]string, len(m.values)/2)
-		for i := 0; i < len(m.values); i += 2 {
-			k := m.values[i]
-			v := m.values[i+1]
-			r[k.string] = v.string
+	if (m.IsMap() || m.IsArray()) && len(m.values())%2 == 0 {
+		r := make(map[string]string, len(m.values())/2)
+		for i := 0; i < len(m.values()); i += 2 {
+			k := m.values()[i]
+			v := m.values()[i+1]
+			r[k.string()] = v.string()
 		}
 		return r, nil
 	}
@@ -973,25 +1241,25 @@ func (m *RedisMessage) AsStrMap() (map[string]string, error) {
 	return nil, fmt.Errorf("%w: redis message type %s is not a map/array/set or its length is not even", errParse, typeNames[typ])
 }
 
-// AsIntMap check if message is a redis map/array/set response, and convert to map[string]int64.
-// redis nil element and other non integer element will be present as zero.
+// AsIntMap check if the message is a redis map/array/set response and convert to map[string]int64.
+// redis nil element and other non-integer elements will be present as zero.
 func (m *RedisMessage) AsIntMap() (map[string]int64, error) {
 	if err := m.Error(); err != nil {
 		return nil, err
 	}
-	if (m.IsMap() || m.IsArray()) && len(m.values)%2 == 0 {
+	if (m.IsMap() || m.IsArray()) && len(m.values())%2 == 0 {
 		var err error
-		r := make(map[string]int64, len(m.values)/2)
-		for i := 0; i < len(m.values); i += 2 {
-			k := m.values[i]
-			v := m.values[i+1]
+		r := make(map[string]int64, len(m.values())/2)
+		for i := 0; i < len(m.values()); i += 2 {
+			k := m.values()[i]
+			v := m.values()[i+1]
 			if k.typ == typeBlobString || k.typ == typeSimpleString {
-				if len(v.string) != 0 {
-					if r[k.string], err = strconv.ParseInt(v.string, 0, 64); err != nil {
+				if len(v.string()) != 0 {
+					if r[k.string()], err = strconv.ParseInt(v.string(), 0, 64); err != nil {
 						return nil, err
 					}
 				} else if v.typ == typeInteger || v.typ == typeNull {
-					r[k.string] = v.integer
+					r[k.string()] = v.intlen
 				}
 			}
 		}
@@ -1010,9 +1278,9 @@ func (m *RedisMessage) AsLMPop() (kvs KeyValues, err error) {
 	if err = m.Error(); err != nil {
 		return KeyValues{}, err
 	}
-	if len(m.values) >= 2 {
-		kvs.Key = m.values[0].string
-		kvs.Values, err = m.values[1].AsStrSlice()
+	if len(m.values()) >= 2 {
+		kvs.Key = m.values()[0].string()
+		kvs.Values, err = m.values()[1].AsStrSlice()
 		return
 	}
 	typ := m.typ
@@ -1028,9 +1296,9 @@ func (m *RedisMessage) AsZMPop() (kvs KeyZScores, err error) {
 	if err = m.Error(); err != nil {
 		return KeyZScores{}, err
 	}
-	if len(m.values) >= 2 {
-		kvs.Key = m.values[0].string
-		kvs.Values, err = m.values[1].AsZScores()
+	if len(m.values()) >= 2 {
+		kvs.Key = m.values()[0].string()
+		kvs.Values, err = m.values()[1].AsZScores()
 		return
 	}
 	typ := m.typ
@@ -1048,27 +1316,27 @@ func (m *RedisMessage) AsFtSearch() (total int64, docs []FtSearchDoc, err error)
 		return 0, nil, err
 	}
 	if m.IsMap() {
-		for i := 0; i < len(m.values); i += 2 {
-			switch m.values[i].string {
+		for i := 0; i < len(m.values()); i += 2 {
+			switch m.values()[i].string() {
 			case "total_results":
-				total = m.values[i+1].integer
+				total = m.values()[i+1].intlen
 			case "results":
-				records := m.values[i+1].values
+				records := m.values()[i+1].values()
 				docs = make([]FtSearchDoc, len(records))
 				for d, record := range records {
-					for j := 0; j < len(record.values); j += 2 {
-						switch record.values[j].string {
+					for j := 0; j < len(record.values()); j += 2 {
+						switch record.values()[j].string() {
 						case "id":
-							docs[d].Key = record.values[j+1].string
+							docs[d].Key = record.values()[j+1].string()
 						case "extra_attributes":
-							docs[d].Doc, _ = record.values[j+1].AsStrMap()
+							docs[d].Doc, _ = record.values()[j+1].AsStrMap()
 						case "score":
-							docs[d].Score, _ = strconv.ParseFloat(record.values[j+1].string, 64)
+							docs[d].Score, _ = strconv.ParseFloat(record.values()[j+1].string(), 64)
 						}
 					}
 				}
 			case "error":
-				for _, e := range m.values[i+1].values {
+				for _, e := range m.values()[i+1].values() {
 					e := e
 					return 0, nil, (*RedisError)(&e)
 				}
@@ -1076,36 +1344,36 @@ func (m *RedisMessage) AsFtSearch() (total int64, docs []FtSearchDoc, err error)
 		}
 		return
 	}
-	if len(m.values) > 0 {
-		total = m.values[0].integer
+	if len(m.values()) > 0 {
+		total = m.values()[0].intlen
 		wscore := false
 		wattrs := false
 		offset := 1
-		if len(m.values) > 2 {
-			if m.values[2].string == "" {
+		if len(m.values()) > 2 {
+			if m.values()[2].string() == "" {
 				wattrs = true
 				offset++
 			} else {
-				_, err1 := strconv.ParseFloat(m.values[1].string, 64)
-				_, err2 := strconv.ParseFloat(m.values[2].string, 64)
+				_, err1 := strconv.ParseFloat(m.values()[1].string(), 64)
+				_, err2 := strconv.ParseFloat(m.values()[2].string(), 64)
 				wscore = err1 != nil && err2 == nil
 				offset++
 			}
 		}
-		if len(m.values) > 3 && m.values[3].string == "" {
+		if len(m.values()) > 3 && m.values()[3].string() == "" {
 			wattrs = true
 			offset++
 		}
-		docs = make([]FtSearchDoc, 0, (len(m.values)-1)/offset)
-		for i := 1; i < len(m.values); i++ {
-			doc := FtSearchDoc{Key: m.values[i].string}
+		docs = make([]FtSearchDoc, 0, (len(m.values())-1)/offset)
+		for i := 1; i < len(m.values()); i++ {
+			doc := FtSearchDoc{Key: m.values()[i].string()}
 			if wscore {
 				i++
-				doc.Score, _ = strconv.ParseFloat(m.values[i].string, 64)
+				doc.Score, _ = strconv.ParseFloat(m.values()[i].string(), 64)
 			}
 			if wattrs {
 				i++
-				doc.Doc, _ = m.values[i].AsStrMap()
+				doc.Doc, _ = m.values()[i].AsStrMap()
 			}
 			docs = append(docs, doc)
 		}
@@ -1120,23 +1388,23 @@ func (m *RedisMessage) AsFtAggregate() (total int64, docs []map[string]string, e
 		return 0, nil, err
 	}
 	if m.IsMap() {
-		for i := 0; i < len(m.values); i += 2 {
-			switch m.values[i].string {
+		for i := 0; i < len(m.values()); i += 2 {
+			switch m.values()[i].string() {
 			case "total_results":
-				total = m.values[i+1].integer
+				total = m.values()[i+1].intlen
 			case "results":
-				records := m.values[i+1].values
+				records := m.values()[i+1].values()
 				docs = make([]map[string]string, len(records))
 				for d, record := range records {
-					for j := 0; j < len(record.values); j += 2 {
-						switch record.values[j].string {
+					for j := 0; j < len(record.values()); j += 2 {
+						switch record.values()[j].string() {
 						case "extra_attributes":
-							docs[d], _ = record.values[j+1].AsStrMap()
+							docs[d], _ = record.values()[j+1].AsStrMap()
 						}
 					}
 				}
 			case "error":
-				for _, e := range m.values[i+1].values {
+				for _, e := range m.values()[i+1].values() {
 					e := e
 					return 0, nil, (*RedisError)(&e)
 				}
@@ -1144,10 +1412,10 @@ func (m *RedisMessage) AsFtAggregate() (total int64, docs []map[string]string, e
 		}
 		return
 	}
-	if len(m.values) > 0 {
-		total = m.values[0].integer
-		docs = make([]map[string]string, len(m.values)-1)
-		for d, record := range m.values[1:] {
+	if len(m.values()) > 0 {
+		total = m.values()[0].intlen
+		docs = make([]map[string]string, len(m.values())-1)
+		for d, record := range m.values()[1:] {
 			docs[d], _ = record.AsStrMap()
 		}
 		return
@@ -1157,9 +1425,9 @@ func (m *RedisMessage) AsFtAggregate() (total int64, docs []map[string]string, e
 }
 
 func (m *RedisMessage) AsFtAggregateCursor() (cursor, total int64, docs []map[string]string, err error) {
-	if m.IsArray() && len(m.values) == 2 && (m.values[0].IsArray() || m.values[0].IsMap()) {
-		total, docs, err = m.values[0].AsFtAggregate()
-		cursor = m.values[1].integer
+	if m.IsArray() && len(m.values()) == 2 && (m.values()[0].IsArray() || m.values()[0].IsMap()) {
+		total, docs, err = m.values()[0].AsFtAggregate()
+		cursor = m.values()[1].intlen
 	} else {
 		total, docs, err = m.AsFtAggregate()
 	}
@@ -1181,17 +1449,17 @@ func (m *RedisMessage) AsGeosearch() ([]GeoLocation, error) {
 	for _, v := range arr {
 		var loc GeoLocation
 		if v.IsString() {
-			loc.Name = v.string
+			loc.Name = v.string()
 		} else {
-			info := v.values
+			info := v.values()
 			var i int
 
 			//name
-			loc.Name = info[i].string
+			loc.Name = info[i].string()
 			i++
 			//distance
-			if i < len(info) && info[i].string != "" {
-				loc.Dist, err = util.ToFloat64(info[i].string)
+			if i < len(info) && info[i].string() != "" {
+				loc.Dist, err = util.ToFloat64(info[i].string())
 				if err != nil {
 					return nil, err
 				}
@@ -1199,12 +1467,12 @@ func (m *RedisMessage) AsGeosearch() ([]GeoLocation, error) {
 			}
 			//hash
 			if i < len(info) && info[i].IsInt64() {
-				loc.GeoHash = info[i].integer
+				loc.GeoHash = info[i].intlen
 				i++
 			}
 			//coordinates
-			if i < len(info) && info[i].values != nil {
-				cord := info[i].values
+			if i < len(info) && info[i].array != nil {
+				cord := info[i].values()
 				if len(cord) < 2 {
 					return nil, fmt.Errorf("got %d, expected 2", len(info))
 				}
@@ -1217,10 +1485,10 @@ func (m *RedisMessage) AsGeosearch() ([]GeoLocation, error) {
 	return geoLocations, nil
 }
 
-// ToMap check if message is a redis RESP3 map response, and return it
+// ToMap check if the message is a redis RESP3 map response and return it
 func (m *RedisMessage) ToMap() (map[string]RedisMessage, error) {
 	if m.IsMap() {
-		return toMap(m.values)
+		return toMap(m.values())
 	}
 	if err := m.Error(); err != nil {
 		return nil, err
@@ -1229,34 +1497,34 @@ func (m *RedisMessage) ToMap() (map[string]RedisMessage, error) {
 	return nil, fmt.Errorf("%w: redis message type %s is not a RESP3 map", errParse, typeNames[typ])
 }
 
-// ToAny turns message into go any value
+// ToAny turns the message into go any value
 func (m *RedisMessage) ToAny() (any, error) {
 	if err := m.Error(); err != nil {
 		return nil, err
 	}
 	switch m.typ {
 	case typeFloat:
-		return util.ToFloat64(m.string)
+		return util.ToFloat64(m.string())
 	case typeBlobString, typeSimpleString, typeVerbatimString, typeBigNumber:
-		return m.string, nil
+		return m.string(), nil
 	case typeBool:
-		return m.integer == 1, nil
+		return m.intlen == 1, nil
 	case typeInteger:
-		return m.integer, nil
+		return m.intlen, nil
 	case typeMap:
-		vs := make(map[string]any, len(m.values)/2)
-		for i := 0; i < len(m.values); i += 2 {
-			if v, err := m.values[i+1].ToAny(); err != nil && !IsRedisNil(err) {
-				vs[m.values[i].string] = err
+		vs := make(map[string]any, len(m.values())/2)
+		for i := 0; i < len(m.values()); i += 2 {
+			if v, err := m.values()[i+1].ToAny(); err != nil && !IsRedisNil(err) {
+				vs[m.values()[i].string()] = err
 			} else {
-				vs[m.values[i].string] = v
+				vs[m.values()[i].string()] = v
 			}
 		}
 		return vs, nil
 	case typeSet, typeArray:
-		vs := make([]any, len(m.values))
-		for i := 0; i < len(m.values); i++ {
-			if v, err := m.values[i].ToAny(); err != nil && !IsRedisNil(err) {
+		vs := make([]any, len(m.values()))
+		for i := 0; i < len(m.values()); i++ {
+			if v, err := m.values()[i].ToAny(); err != nil && !IsRedisNil(err) {
 				vs[i] = err
 			} else {
 				vs[i] = v
@@ -1268,7 +1536,7 @@ func (m *RedisMessage) ToAny() (any, error) {
 	return nil, fmt.Errorf("%w: redis message type %s is not a supported in ToAny", errParse, typeNames[typ])
 }
 
-// IsCacheHit check if message is from client side cache
+// IsCacheHit check if the message is from the client side cache
 func (m *RedisMessage) IsCacheHit() bool {
 	return m.attrs == cacheMark
 }
@@ -1329,7 +1597,7 @@ func toMap(values []RedisMessage) (map[string]RedisMessage, error) {
 	r := make(map[string]RedisMessage, len(values)/2)
 	for i := 0; i < len(values); i += 2 {
 		if values[i].typ == typeBlobString || values[i].typ == typeSimpleString {
-			r[values[i].string] = values[i+1]
+			r[values[i].string()] = values[i+1]
 			continue
 		}
 		typ := values[i].typ
@@ -1340,20 +1608,34 @@ func toMap(values []RedisMessage) (map[string]RedisMessage, error) {
 
 func (m *RedisMessage) approximateSize() (s int) {
 	s += messageStructSize
-	s += len(m.string)
-	for _, v := range m.values {
+	s += len(m.string())
+	for _, v := range m.values() {
 		s += v.approximateSize()
 	}
 	return
 }
 
-// String returns human-readable representation of RedisMessage
+// String returns the human-readable representation of RedisMessage
 func (m *RedisMessage) String() string {
 	v, _ := (*prettyRedisMessage)(m).MarshalJSON()
 	return string(v)
 }
 
 type prettyRedisMessage RedisMessage
+
+func (m *prettyRedisMessage) string() string {
+	if m.bytes == nil {
+		return ""
+	}
+	return unsafe.String(m.bytes, m.intlen)
+}
+
+func (m *prettyRedisMessage) values() []RedisMessage {
+	if m.array == nil {
+		return nil
+	}
+	return unsafe.Slice(m.array, m.intlen)
+}
 
 // MarshalJSON implements json.Marshaler interface
 func (m *prettyRedisMessage) MarshalJSON() ([]byte, error) {
@@ -1377,17 +1659,33 @@ func (m *prettyRedisMessage) MarshalJSON() ([]byte, error) {
 	}
 	switch m.typ {
 	case typeFloat, typeBlobString, typeSimpleString, typeVerbatimString, typeBigNumber:
-		obj.Value = m.string
+		obj.Value = m.string()
 	case typeBool:
-		obj.Value = m.integer == 1
+		obj.Value = m.intlen == 1
 	case typeInteger:
-		obj.Value = m.integer
+		obj.Value = m.intlen
 	case typeMap, typeSet, typeArray:
-		values := make([]prettyRedisMessage, len(m.values))
-		for i, value := range m.values {
+		values := make([]prettyRedisMessage, len(m.values()))
+		for i, value := range m.values() {
 			values[i] = prettyRedisMessage(value)
 		}
 		obj.Value = values
 	}
 	return json.Marshal(obj)
+}
+
+func slicemsg(typ byte, values []RedisMessage) RedisMessage {
+	return RedisMessage{
+		typ:    typ,
+		array:  unsafe.SliceData(values),
+		intlen: int64(len(values)),
+	}
+}
+
+func strmsg(typ byte, value string) RedisMessage {
+	return RedisMessage{
+		typ:    typ,
+		bytes:  unsafe.StringData(value),
+		intlen: int64(len(value)),
+	}
 }

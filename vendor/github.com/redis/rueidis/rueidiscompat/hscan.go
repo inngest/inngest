@@ -43,7 +43,7 @@ type Scanner interface {
 }
 
 var (
-	// List of built-in decoders indexed by their numeric constant values (eg: reflect.Bool = 1).
+	// List of built-in decoders indexed by their numeric constant values (e.g.: reflect.Bool = 1).
 	decoders = []decoderFunc{
 		reflect.Bool:          decodeBool,
 		reflect.Int:           decodeInt,

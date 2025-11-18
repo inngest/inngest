@@ -1070,13 +1070,13 @@ github.com/prometheus/procfs/internal/util
 github.com/protocolbuffers/txtpbfmt/ast
 github.com/protocolbuffers/txtpbfmt/parser
 github.com/protocolbuffers/txtpbfmt/unquote
-# github.com/redis/rueidis v1.0.51
-## explicit; go 1.21
+# github.com/redis/rueidis v1.0.68
+## explicit; go 1.23.0
 github.com/redis/rueidis
 github.com/redis/rueidis/internal/cmds
 github.com/redis/rueidis/internal/util
-# github.com/redis/rueidis/rueidiscompat v1.0.51
-## explicit; go 1.21
+# github.com/redis/rueidis/rueidiscompat v1.0.68
+## explicit; go 1.23.0
 github.com/redis/rueidis/rueidiscompat
 # github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
 ## explicit; go 1.12

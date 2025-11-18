@@ -48,6 +48,100 @@ func (c XackKey) Group(group string) XackGroup {
 	return (XackGroup)(c)
 }
 
+type Xackdel Incomplete
+
+func (b Builder) Xackdel() (c Xackdel) {
+	c = Xackdel{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "XACKDEL")
+	return c
+}
+
+func (c Xackdel) Key(key string) XackdelKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (XackdelKey)(c)
+}
+
+type XackdelActionAcked Incomplete
+
+func (c XackdelActionAcked) Ids() XackdelIdsBlockIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XackdelIdsBlockIds)(c)
+}
+
+type XackdelActionDelref Incomplete
+
+func (c XackdelActionDelref) Ids() XackdelIdsBlockIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XackdelIdsBlockIds)(c)
+}
+
+type XackdelActionKeepref Incomplete
+
+func (c XackdelActionKeepref) Ids() XackdelIdsBlockIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XackdelIdsBlockIds)(c)
+}
+
+type XackdelGroup Incomplete
+
+func (c XackdelGroup) Keepref() XackdelActionKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XackdelActionKeepref)(c)
+}
+
+func (c XackdelGroup) Delref() XackdelActionDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XackdelActionDelref)(c)
+}
+
+func (c XackdelGroup) Acked() XackdelActionAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XackdelActionAcked)(c)
+}
+
+func (c XackdelGroup) Ids() XackdelIdsBlockIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XackdelIdsBlockIds)(c)
+}
+
+type XackdelIdsBlockId Incomplete
+
+func (c XackdelIdsBlockId) Id(id ...string) XackdelIdsBlockId {
+	c.cs.s = append(c.cs.s, id...)
+	return c
+}
+
+func (c XackdelIdsBlockId) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XackdelIdsBlockIds Incomplete
+
+func (c XackdelIdsBlockIds) Numids(numids int64) XackdelIdsBlockNumids {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numids, 10))
+	return (XackdelIdsBlockNumids)(c)
+}
+
+type XackdelIdsBlockNumids Incomplete
+
+func (c XackdelIdsBlockNumids) Id(id ...string) XackdelIdsBlockId {
+	c.cs.s = append(c.cs.s, id...)
+	return (XackdelIdsBlockId)(c)
+}
+
+type XackdelKey Incomplete
+
+func (c XackdelKey) Group(group string) XackdelGroup {
+	c.cs.s = append(c.cs.s, group)
+	return (XackdelGroup)(c)
+}
+
 type Xadd Incomplete
 
 func (b Builder) Xadd() (c Xadd) {
@@ -125,6 +219,21 @@ func (c XaddNomkstream) Id(id string) XaddId {
 
 type XaddTrimLimit Incomplete
 
+func (c XaddTrimLimit) Keepref() XaddTrimReferenceKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XaddTrimReferenceKeepref)(c)
+}
+
+func (c XaddTrimLimit) Delref() XaddTrimReferenceDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XaddTrimReferenceDelref)(c)
+}
+
+func (c XaddTrimLimit) Acked() XaddTrimReferenceAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XaddTrimReferenceAcked)(c)
+}
+
 func (c XaddTrimLimit) Id(id string) XaddId {
 	c.cs.s = append(c.cs.s, id)
 	return (XaddId)(c)
@@ -142,6 +251,27 @@ type XaddTrimOperatorExact Incomplete
 func (c XaddTrimOperatorExact) Threshold(threshold string) XaddTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XaddTrimThreshold)(c)
+}
+
+type XaddTrimReferenceAcked Incomplete
+
+func (c XaddTrimReferenceAcked) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
+type XaddTrimReferenceDelref Incomplete
+
+func (c XaddTrimReferenceDelref) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
+}
+
+type XaddTrimReferenceKeepref Incomplete
+
+func (c XaddTrimReferenceKeepref) Id(id string) XaddId {
+	c.cs.s = append(c.cs.s, id)
+	return (XaddId)(c)
 }
 
 type XaddTrimStrategyMaxlen Incomplete
@@ -183,6 +313,21 @@ type XaddTrimThreshold Incomplete
 func (c XaddTrimThreshold) Limit(count int64) XaddTrimLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(count, 10))
 	return (XaddTrimLimit)(c)
+}
+
+func (c XaddTrimThreshold) Keepref() XaddTrimReferenceKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XaddTrimReferenceKeepref)(c)
+}
+
+func (c XaddTrimThreshold) Delref() XaddTrimReferenceDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XaddTrimReferenceDelref)(c)
+}
+
+func (c XaddTrimThreshold) Acked() XaddTrimReferenceAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XaddTrimReferenceAcked)(c)
 }
 
 func (c XaddTrimThreshold) Id(id string) XaddId {
@@ -512,6 +657,93 @@ type XdelKey Incomplete
 func (c XdelKey) Id(id ...string) XdelId {
 	c.cs.s = append(c.cs.s, id...)
 	return (XdelId)(c)
+}
+
+type Xdelex Incomplete
+
+func (b Builder) Xdelex() (c Xdelex) {
+	c = Xdelex{cs: get(), ks: b.ks}
+	c.cs.s = append(c.cs.s, "XDELEX")
+	return c
+}
+
+func (c Xdelex) Key(key string) XdelexKey {
+	if c.ks&NoSlot == NoSlot {
+		c.ks = NoSlot | slot(key)
+	} else {
+		c.ks = check(c.ks, slot(key))
+	}
+	c.cs.s = append(c.cs.s, key)
+	return (XdelexKey)(c)
+}
+
+type XdelexConditionAcked Incomplete
+
+func (c XdelexConditionAcked) Ids() XdelexIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XdelexIds)(c)
+}
+
+type XdelexConditionDelref Incomplete
+
+func (c XdelexConditionDelref) Ids() XdelexIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XdelexIds)(c)
+}
+
+type XdelexConditionKeepref Incomplete
+
+func (c XdelexConditionKeepref) Ids() XdelexIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XdelexIds)(c)
+}
+
+type XdelexId Incomplete
+
+func (c XdelexId) Id(id ...string) XdelexId {
+	c.cs.s = append(c.cs.s, id...)
+	return c
+}
+
+func (c XdelexId) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XdelexIds Incomplete
+
+func (c XdelexIds) Numids(numids int64) XdelexNumids {
+	c.cs.s = append(c.cs.s, strconv.FormatInt(numids, 10))
+	return (XdelexNumids)(c)
+}
+
+type XdelexKey Incomplete
+
+func (c XdelexKey) Keepref() XdelexConditionKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XdelexConditionKeepref)(c)
+}
+
+func (c XdelexKey) Delref() XdelexConditionDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XdelexConditionDelref)(c)
+}
+
+func (c XdelexKey) Acked() XdelexConditionAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XdelexConditionAcked)(c)
+}
+
+func (c XdelexKey) Ids() XdelexIds {
+	c.cs.s = append(c.cs.s, "IDS")
+	return (XdelexIds)(c)
+}
+
+type XdelexNumids Incomplete
+
+func (c XdelexNumids) Id(id ...string) XdelexId {
+	c.cs.s = append(c.cs.s, id...)
+	return (XdelexId)(c)
 }
 
 type XgroupCreate Incomplete
@@ -1148,7 +1380,19 @@ func (c XreadgroupBlock) Noack() XreadgroupNoack {
 	return (XreadgroupNoack)(c)
 }
 
+func (c XreadgroupBlock) Claim(claim string) XreadgroupClaim {
+	c.cs.s = append(c.cs.s, "CLAIM", claim)
+	return (XreadgroupClaim)(c)
+}
+
 func (c XreadgroupBlock) Streams() XreadgroupStreams {
+	c.cs.s = append(c.cs.s, "STREAMS")
+	return (XreadgroupStreams)(c)
+}
+
+type XreadgroupClaim Incomplete
+
+func (c XreadgroupClaim) Streams() XreadgroupStreams {
 	c.cs.s = append(c.cs.s, "STREAMS")
 	return (XreadgroupStreams)(c)
 }
@@ -1164,6 +1408,11 @@ func (c XreadgroupCount) Block(milliseconds int64) XreadgroupBlock {
 func (c XreadgroupCount) Noack() XreadgroupNoack {
 	c.cs.s = append(c.cs.s, "NOACK")
 	return (XreadgroupNoack)(c)
+}
+
+func (c XreadgroupCount) Claim(claim string) XreadgroupClaim {
+	c.cs.s = append(c.cs.s, "CLAIM", claim)
+	return (XreadgroupClaim)(c)
 }
 
 func (c XreadgroupCount) Streams() XreadgroupStreams {
@@ -1187,6 +1436,11 @@ func (c XreadgroupGroup) Block(milliseconds int64) XreadgroupBlock {
 func (c XreadgroupGroup) Noack() XreadgroupNoack {
 	c.cs.s = append(c.cs.s, "NOACK")
 	return (XreadgroupNoack)(c)
+}
+
+func (c XreadgroupGroup) Claim(claim string) XreadgroupClaim {
+	c.cs.s = append(c.cs.s, "CLAIM", claim)
+	return (XreadgroupClaim)(c)
 }
 
 func (c XreadgroupGroup) Streams() XreadgroupStreams {
@@ -1229,6 +1483,11 @@ func (c XreadgroupKey) Id(id ...string) XreadgroupId {
 }
 
 type XreadgroupNoack Incomplete
+
+func (c XreadgroupNoack) Claim(claim string) XreadgroupClaim {
+	c.cs.s = append(c.cs.s, "CLAIM", claim)
+	return (XreadgroupClaim)(c)
+}
 
 func (c XreadgroupNoack) Streams() XreadgroupStreams {
 	c.cs.s = append(c.cs.s, "STREAMS")
@@ -1396,6 +1655,21 @@ func (c XtrimKey) Minid() XtrimTrimStrategyMinid {
 
 type XtrimTrimLimit Incomplete
 
+func (c XtrimTrimLimit) Keepref() XtrimTrimReferenceKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XtrimTrimReferenceKeepref)(c)
+}
+
+func (c XtrimTrimLimit) Delref() XtrimTrimReferenceDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XtrimTrimReferenceDelref)(c)
+}
+
+func (c XtrimTrimLimit) Acked() XtrimTrimReferenceAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XtrimTrimReferenceAcked)(c)
+}
+
 func (c XtrimTrimLimit) Build() Completed {
 	c.cs.Build()
 	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
@@ -1413,6 +1687,27 @@ type XtrimTrimOperatorExact Incomplete
 func (c XtrimTrimOperatorExact) Threshold(threshold string) XtrimTrimThreshold {
 	c.cs.s = append(c.cs.s, threshold)
 	return (XtrimTrimThreshold)(c)
+}
+
+type XtrimTrimReferenceAcked Incomplete
+
+func (c XtrimTrimReferenceAcked) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XtrimTrimReferenceDelref Incomplete
+
+func (c XtrimTrimReferenceDelref) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
+}
+
+type XtrimTrimReferenceKeepref Incomplete
+
+func (c XtrimTrimReferenceKeepref) Build() Completed {
+	c.cs.Build()
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
 type XtrimTrimStrategyMaxlen Incomplete
@@ -1454,6 +1749,21 @@ type XtrimTrimThreshold Incomplete
 func (c XtrimTrimThreshold) Limit(count int64) XtrimTrimLimit {
 	c.cs.s = append(c.cs.s, "LIMIT", strconv.FormatInt(count, 10))
 	return (XtrimTrimLimit)(c)
+}
+
+func (c XtrimTrimThreshold) Keepref() XtrimTrimReferenceKeepref {
+	c.cs.s = append(c.cs.s, "KEEPREF")
+	return (XtrimTrimReferenceKeepref)(c)
+}
+
+func (c XtrimTrimThreshold) Delref() XtrimTrimReferenceDelref {
+	c.cs.s = append(c.cs.s, "DELREF")
+	return (XtrimTrimReferenceDelref)(c)
+}
+
+func (c XtrimTrimThreshold) Acked() XtrimTrimReferenceAcked {
+	c.cs.s = append(c.cs.s, "ACKED")
+	return (XtrimTrimReferenceAcked)(c)
 }
 
 func (c XtrimTrimThreshold) Build() Completed {

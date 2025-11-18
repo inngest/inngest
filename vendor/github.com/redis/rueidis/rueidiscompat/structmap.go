@@ -84,7 +84,7 @@ func newStructSpec(t reflect.Type, fieldTag string) *structSpec {
 			continue
 		}
 
-		// Added a check for Pointer here. If it's a Pointer use the built-in decoder of the element.
+		// Added a check for Pointer here. If it's a Pointer, use the built-in decoder of the element.
 		// This works, because in Scan() #129-131
 		// if isPtr && v.IsNil() {
 		//     v.Set(reflect.New(v.Type().Elem()))
