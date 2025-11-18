@@ -790,6 +790,51 @@ func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSe
 	return sqliteRows, nil
 }
 
+func (q NormalizedQueries) GetRunSpanByRunID(ctx context.Context, args sqlc_sqlite.GetRunSpanByRunIDParams) (*sqlc_sqlite.GetRunSpanByRunIDRow, error) {
+	row, err := q.db.GetRunSpanByRunID(ctx, GetRunSpanByRunIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetStepSpanByStepID(ctx context.Context, args sqlc_sqlite.GetStepSpanByStepIDParams) (*sqlc_sqlite.GetStepSpanByStepIDRow, error) {
+	row, err := q.db.GetStepSpanByStepID(ctx, GetStepSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, args sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptParams) (*sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptRow, error) {
+	row, err := q.db.GetExecutionSpanByStepIDAndAttempt(ctx, GetExecutionSpanByStepIDAndAttemptParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetLatestExecutionSpanByStepID(ctx context.Context, args sqlc_sqlite.GetLatestExecutionSpanByStepIDParams) (*sqlc_sqlite.GetLatestExecutionSpanByStepIDRow, error) {
+	row, err := q.db.GetLatestExecutionSpanByStepID(ctx, GetLatestExecutionSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetSpanBySpanID(ctx context.Context, args sqlc_sqlite.GetSpanBySpanIDParams) (*sqlc_sqlite.GetSpanBySpanIDRow, error) {
+	row, err := q.db.GetSpanBySpanID(ctx, GetSpanBySpanIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
 func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {
 	rows, err := q.db.GetSpanOutput(ctx, spanIds)
 	if err != nil {

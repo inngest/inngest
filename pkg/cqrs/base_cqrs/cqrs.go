@@ -151,6 +151,108 @@ func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ul
 	return allDebugRuns, nil
 }
 
+var _ normalizedSpan = (*sqlc.GetRunSpanByRunIDRow)(nil)
+
+func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetRunSpanByRunID(ctx, sqlc.GetRunSpanByRunIDParams{
+		RunID:     runID.String(),
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting span by run ID", "error", err)
+		return nil, err
+	}
+
+	otelSpans, err := mapRootSpansFromRows(ctx, []*sqlc.GetRunSpanByRunIDRow{span})
+	if err != nil {
+		return nil, err
+	}
+
+	return otelSpans, nil
+}
+
+func (w wrapper) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetStepSpanByStepID(ctx, sqlc.GetStepSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	otelSpans, err := mapRootSpansFromRows(ctx, []*sqlc.GetStepSpanByStepIDRow{span})
+	if err != nil {
+		return nil, err
+	}
+
+	return otelSpans, nil
+}
+
+func (w wrapper) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetExecutionSpanByStepIDAndAttempt(ctx, sqlc.GetExecutionSpanByStepIDAndAttemptParams{
+		RunID:       runID.String(),
+		StepID:      stepID,
+		StepAttempt: int64(attempt),
+		AccountID:   accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	otelSpans, err := mapRootSpansFromRows(ctx, []*sqlc.GetExecutionSpanByStepIDAndAttemptRow{span})
+	if err != nil {
+		return nil, err
+	}
+
+	return otelSpans, nil
+}
+
+func (w wrapper) GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetLatestExecutionSpanByStepID(ctx, sqlc.GetLatestExecutionSpanByStepIDParams{
+		RunID:     runID.String(),
+		StepID:    stepID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step execution span by step ID and attempt", "error", err)
+		return nil, err
+	}
+
+	otelSpans, err := mapRootSpansFromRows(ctx, []*sqlc.GetLatestExecutionSpanByStepIDRow{span})
+	if err != nil {
+		return nil, err
+	}
+
+	return otelSpans, nil
+}
+
+func (w wrapper) GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	// Ignore the workspace ID for now.
+	span, err := w.q.GetSpanBySpanID(ctx, sqlc.GetSpanBySpanIDParams{
+		RunID:     runID.String(),
+		SpanID:    spanID,
+		AccountID: accountID.String(),
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting step span by step ID", "error", err)
+		return nil, err
+	}
+
+	otelSpans, err := mapRootSpansFromRows(ctx, []*sqlc.GetSpanBySpanIDRow{span})
+	if err != nil {
+		return nil, err
+	}
+
+	return otelSpans, nil
+}
+
 type IODynamicRef struct {
 	OutputRef string
 	InputRef  string

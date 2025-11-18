@@ -555,6 +555,68 @@ func (q *Queries) GetEventsIDbound(ctx context.Context, arg GetEventsIDboundPara
 	return items, nil
 }
 
+const getExecutionSpanByStepIDAndAttempt = `-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = CAST(?4 AS INTEGER)) > 0
+ORDER BY start_time
+`
+
+type GetExecutionSpanByStepIDAndAttemptParams struct {
+	RunID       string
+	AccountID   string
+	StepID      string
+	StepAttempt int64
+}
+
+type GetExecutionSpanByStepIDAndAttemptRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error) {
+	row := q.db.QueryRowContext(ctx, getExecutionSpanByStepIDAndAttempt,
+		arg.RunID,
+		arg.AccountID,
+		arg.StepID,
+		arg.StepAttempt,
+	)
+	var i GetExecutionSpanByStepIDAndAttemptRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
 const getFunctionByID = `-- name: GetFunctionByID :one
 SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id = ?
 `
@@ -965,6 +1027,62 @@ func (q *Queries) GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, e
 	return &i, err
 }
 
+const getLatestExecutionSpanByStepID = `-- name: GetLatestExecutionSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?1 AND account_id = ?2 AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = MAX(attributes->>'$."_inngest.step.attempt"') OVER ()) > 0
+ORDER BY start_time
+`
+
+type GetLatestExecutionSpanByStepIDParams struct {
+	RunID     string
+	AccountID string
+	StepID    string
+}
+
+type GetLatestExecutionSpanByStepIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getLatestExecutionSpanByStepID, arg.RunID, arg.AccountID, arg.StepID)
+	var i GetLatestExecutionSpanByStepIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
 const getLatestQueueSnapshotChunks = `-- name: GetLatestQueueSnapshotChunks :many
 SELECT chunk_id, data
 FROM queue_snapshot_chunks
@@ -1037,6 +1155,109 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 		return nil, err
 	}
 	return items, nil
+}
+
+const getRunSpanByRunID = `-- name: GetRunSpanByRunID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetRunSpanByRunIDParams struct {
+	RunID     string
+	AccountID string
+}
+
+type GetRunSpanByRunIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getRunSpanByRunID, arg.RunID, arg.AccountID)
+	var i GetRunSpanByRunIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
+}
+
+const getSpanBySpanID = `-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND span_id = ? AND account_id = ?
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetSpanBySpanIDParams struct {
+	RunID     string
+	SpanID    string
+	AccountID string
+}
+
+type GetSpanBySpanIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSpanBySpanID, arg.RunID, arg.SpanID, arg.AccountID)
+	var i GetSpanBySpanIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
 }
 
 const getSpanOutput = `-- name: GetSpanOutput :many
@@ -1276,6 +1497,67 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpan
 		return nil, err
 	}
 	return items, nil
+}
+
+const getStepSpanByStepID = `-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = ? AND execSpans.account_id = ?
+  GROUP BY dynamic_span_id
+  HAVING SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+  ORDER BY start_time
+  LIMIT 1
+)
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetStepSpanByStepIDParams struct {
+	RunID     string
+	AccountID string
+	StepID    string
+}
+
+type GetStepSpanByStepIDRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*GetStepSpanByStepIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getStepSpanByStepID, arg.RunID, arg.AccountID, arg.StepID)
+	var i GetStepSpanByStepIDRow
+	err := row.Scan(
+		&i.RunID,
+		&i.TraceID,
+		&i.DynamicSpanID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.ParentSpanID,
+		&i.SpanFragments,
+	)
+	return &i, err
 }
 
 const getTraceRun = `-- name: GetTraceRun :one
