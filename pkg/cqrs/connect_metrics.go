@@ -17,8 +17,8 @@ type ConnectionMetric struct {
 	ConnectionID ulid.ULID `json:"connection_id"`
 	GatewayID    ulid.ULID `json:"gateway_id"`
 
-	TotalCapacity   int64 `json:"total_capacity"`
-	CurrentCapacity int64 `json:"current_capacity"`
+	TotalCapacity     int64 `json:"total_capacity"`
+	AvailableCapacity int64 `json:"available_capacity"`
 
 	Timestamp  time.Time `json:"timestamp"`
 	RecordedAt time.Time `json:"recorded_at"`

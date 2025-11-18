@@ -74,8 +74,8 @@ func (m *metricsLifecycle) recordConnectionMetric(ctx context.Context, conn *sta
 		ConnectionID: conn.ConnectionId,
 		GatewayID:    conn.GatewayId,
 
-		TotalCapacity:   workerCap.Total,
-		CurrentCapacity: workerCap.Available,
+		TotalCapacity:     workerCap.Total,
+		AvailableCapacity: workerCap.Available,
 
 		Timestamp:  time.Now().Truncate(time.Minute), // track minute level metrics
 		RecordedAt: time.Now(),                       // always records the latest value for the minute
