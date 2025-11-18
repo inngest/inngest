@@ -280,6 +280,22 @@ func TestAddAttr(t *testing.T) {
 			require.Len(t, attrs.Attrs, 1)
 			require.Equal(t, &value, attrs.Attrs[0].value)
 		})
+
+		t.Run("TruncatedStringAttr", func(t *testing.T) {
+			attrs := NewAttrSet()
+			key := "slice-test"
+			value := "1234567"
+			expected := "12345"
+			truncatedStrAttr := TruncatedStringAttr(key, 5)
+
+			AddAttr(attrs, truncatedStrAttr, &value)
+			require.Len(t, attrs.Attrs, 1)
+			require.Equal(t, &value, attrs.Attrs[0].value)
+
+			serialized := attrs.Serialize()
+			require.Len(t, serialized, 1)
+			require.Equal(t, expected, serialized[0].Value.AsString())
+		})
 	})
 
 	t.Run("works with custom JSON attribute", func(t *testing.T) {
