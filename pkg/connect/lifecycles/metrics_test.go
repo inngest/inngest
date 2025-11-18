@@ -142,7 +142,7 @@ func TestNewMetricsLifecycle(t *testing.T) {
 	stateManager := &MockStateManager{}
 
 	lifecycle := NewMetricsLifecycle(writer, stateManager)
-	
+
 	require.NotNil(t, lifecycle)
 	assert.Implements(t, (*connect.ConnectGatewayLifecycleListener)(nil), lifecycle)
 }
@@ -211,7 +211,7 @@ func TestMetricsLifecycle_OnConnected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			writer := &MockConnectionMetricsWriter{}
 			stateManager := &MockStateManager{}
-			
+
 			lifecycle := &metricsLifecycle{
 				writer:       writer,
 				stateManager: stateManager,
@@ -231,7 +231,7 @@ func TestMetricsLifecycle_OnConnected(t *testing.T) {
 						metric.ConnectionID == tt.connection.ConnectionId &&
 						metric.GatewayID == tt.connection.GatewayId &&
 						metric.TotalCapacity == tt.workerCapacity.Total &&
-						metric.CurrentCapacity == tt.workerCapacity.Available &&
+						metric.AvailableCapacity == tt.workerCapacity.Available &&
 						!metric.Timestamp.IsZero() &&
 						!metric.RecordedAt.IsZero()
 				})).Return(tt.insertErr)
@@ -250,7 +250,7 @@ func TestMetricsLifecycle_OnConnected(t *testing.T) {
 func TestMetricsLifecycle_OnReady(t *testing.T) {
 	writer := &MockConnectionMetricsWriter{}
 	stateManager := &MockStateManager{}
-	
+
 	lifecycle := &metricsLifecycle{
 		writer:       writer,
 		stateManager: stateManager,
@@ -279,7 +279,7 @@ func TestMetricsLifecycle_OnReady(t *testing.T) {
 	writer.On("InsertConnectionMetric", ctx, mock.MatchedBy(func(metric *cqrs.ConnectionMetric) bool {
 		return metric.InstanceID == "ready-instance" &&
 			metric.TotalCapacity == 200 &&
-			metric.CurrentCapacity == 150
+			metric.AvailableCapacity == 150
 	})).Return(nil)
 
 	lifecycle.OnReady(ctx, connection)
@@ -291,7 +291,7 @@ func TestMetricsLifecycle_OnReady(t *testing.T) {
 func TestMetricsLifecycle_OnHeartbeat(t *testing.T) {
 	writer := &MockConnectionMetricsWriter{}
 	stateManager := &MockStateManager{}
-	
+
 	lifecycle := &metricsLifecycle{
 		writer:       writer,
 		stateManager: stateManager,
@@ -320,7 +320,7 @@ func TestMetricsLifecycle_OnHeartbeat(t *testing.T) {
 	writer.On("InsertConnectionMetric", ctx, mock.MatchedBy(func(metric *cqrs.ConnectionMetric) bool {
 		return metric.InstanceID == "heartbeat-instance" &&
 			metric.TotalCapacity == 300 &&
-			metric.CurrentCapacity == 275
+			metric.AvailableCapacity == 275
 	})).Return(nil)
 
 	lifecycle.OnHeartbeat(ctx, connection)
@@ -332,7 +332,7 @@ func TestMetricsLifecycle_OnHeartbeat(t *testing.T) {
 func TestMetricsLifecycle_NoOpMethods(t *testing.T) {
 	writer := &MockConnectionMetricsWriter{}
 	stateManager := &MockStateManager{}
-	
+
 	lifecycle := &metricsLifecycle{
 		writer:       writer,
 		stateManager: stateManager,
@@ -364,7 +364,7 @@ func TestMetricsLifecycle_NoOpMethods(t *testing.T) {
 func TestMetricsLifecycle_TimestampTruncation(t *testing.T) {
 	writer := &MockConnectionMetricsWriter{}
 	stateManager := &MockStateManager{}
-	
+
 	lifecycle := &metricsLifecycle{
 		writer:       writer,
 		stateManager: stateManager,
@@ -399,13 +399,13 @@ func TestMetricsLifecycle_TimestampTruncation(t *testing.T) {
 	lifecycle.OnConnected(ctx, connection)
 
 	require.NotNil(t, capturedMetric)
-	
+
 	// Verify timestamp is truncated to minute
 	expectedTruncated := capturedMetric.RecordedAt.Truncate(time.Minute)
 	assert.Equal(t, expectedTruncated, capturedMetric.Timestamp)
-	
+
 	// Verify RecordedAt is more precise
-	assert.True(t, capturedMetric.RecordedAt.After(capturedMetric.Timestamp) || 
+	assert.True(t, capturedMetric.RecordedAt.After(capturedMetric.Timestamp) ||
 		capturedMetric.RecordedAt.Equal(capturedMetric.Timestamp))
 
 	stateManager.AssertExpectations(t)
