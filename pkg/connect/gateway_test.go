@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	gosync "sync"
 	"testing"
 	"time"
@@ -1527,146 +1526,6 @@ func TestEstablishConnectionInvalidConnectionId(t *testing.T) {
 	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
 }
 
-// TestEstablishConnectionValidInstanceId tests valid instance ID acceptance
-func TestEstablishConnectionValidInstanceId(t *testing.T) {
-	validInstanceIDs := []struct {
-		name       string
-		instanceID string
-	}{
-		{name: "simple alphanumeric", instanceID: "worker123"},
-		{name: "with underscore", instanceID: "worker_123"},
-		{name: "with hyphen", instanceID: "worker-123"},
-		{name: "max length", instanceID: strings.Repeat("a", 256)},
-		{name: "single char", instanceID: "a"},
-		{name: "mixed case with symbols", instanceID: "Worker_Test-123"},
-	}
-
-	for _, tt := range validInstanceIDs {
-		t.Run(tt.name, func(t *testing.T) {
-			res := createTestingGateway(t, testingParameters{
-				noConnect: true,
-			})
-
-			ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
-				Subprotocols: []string{types.GatewaySubProtocol},
-			})
-			require.NoError(t, err)
-			defer func() { _ = ws.CloseNow() }()
-
-			// Wait for hello message
-			msg := awaitNextMessage(t, ws, 2*time.Second)
-			require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
-
-			connID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-			caps, err := json.Marshal(sdk.Capabilities{
-				InBandSync: sdk.InBandSyncV1,
-				TrustProbe: sdk.TrustProbeV1,
-				Connect:    sdk.ConnectV1,
-			})
-			require.NoError(t, err)
-
-			testApp := &connect.AppConfiguration{
-				AppName:    "test-app",
-				AppVersion: ptr.String("v1"),
-				Functions:  []byte(`[{"name":"test-fn","id":"test-app-test-fn","triggers":[{"event":"hello/world"}],"steps":{"step":{"id":"step","name":"test-fn","runtime":{"url":"ws://connect?fnId=test-app-test-fn&step=step"},"retries":null}}}]`),
-			}
-
-			// Send connect message with valid instance ID
-			reqData := &connect.WorkerConnectRequestData{
-				ConnectionId: connID.String(),
-				InstanceId:   tt.instanceID,
-				AuthData: &connect.AuthData{
-					SessionToken: "test-session-token",
-					SyncToken:    "test-sync-token",
-				},
-				Capabilities:             caps,
-				Apps:                     []*connect.AppConfiguration{testApp},
-				WorkerManualReadinessAck: false,
-				SystemAttributes: &connect.SystemAttributes{
-					CpuCores: 4,
-					MemBytes: 1024 * 1024 * 1024,
-					Os:       "linux-test",
-				},
-				SdkVersion:  "test-sdk",
-				SdkLanguage: "test-lang",
-				StartedAt:   timestamppb.Now(),
-			}
-
-			connectMsg, err := proto.Marshal(reqData)
-			require.NoError(t, err)
-
-			err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
-				Kind:    connect.GatewayMessageType_WORKER_CONNECT,
-				Payload: connectMsg,
-			})
-			require.NoError(t, err)
-
-			// Should receive CONNECTION_READY message, not closure
-			msg = awaitNextMessage(t, ws, 5*time.Second)
-			require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind, "should accept valid instance ID: %s", tt.instanceID)
-		})
-	}
-}
-
-// TestEstablishConnectionInvalidInstanceId tests invalid instance ID validation
-func TestEstablishConnectionInvalidInstanceId(t *testing.T) {
-	invalidInstanceIDs := []struct {
-		name       string
-		instanceID string
-	}{
-		{name: "with space", instanceID: "worker 123"},
-		{name: "with special char", instanceID: "worker@123"},
-		{name: "too long", instanceID: strings.Repeat("a", 257)},
-		{name: "empty", instanceID: ""},
-		{name: "with unicode", instanceID: "worker🚀"},
-	}
-
-	for _, tt := range invalidInstanceIDs {
-		t.Run(tt.name, func(t *testing.T) {
-			res := createTestingGateway(t, testingParameters{
-				noConnect: true,
-			})
-
-			ws, _, err := websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
-				Subprotocols: []string{types.GatewaySubProtocol},
-			})
-			require.NoError(t, err)
-			defer func() { _ = ws.CloseNow() }()
-
-			// Wait for hello message
-			msg := awaitNextMessage(t, ws, 2*time.Second)
-			require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
-
-			connID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-			// Send connect message with invalid instance ID
-			reqData := &connect.WorkerConnectRequestData{
-				ConnectionId: connID.String(),
-				InstanceId:   tt.instanceID,
-				AuthData: &connect.AuthData{
-					SessionToken: "test-session-token",
-					SyncToken:    "test-sync-token",
-				},
-				Apps: []*connect.AppConfiguration{},
-			}
-
-			connectMsg, err := proto.Marshal(reqData)
-			require.NoError(t, err)
-
-			err = wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
-				Kind:    connect.GatewayMessageType_WORKER_CONNECT,
-				Payload: connectMsg,
-			})
-			require.NoError(t, err)
-
-			status, reason := awaitClosure(t, ws, 2*time.Second)
-			require.Equal(t, websocket.StatusPolicyViolation, status)
-			require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
-		})
-	}
-}
-
 // TestEstablishConnectionMissingInstanceId tests missing instance ID
 func TestEstablishConnectionMissingInstanceId(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
@@ -1708,52 +1567,6 @@ func TestEstablishConnectionMissingInstanceId(t *testing.T) {
 	status, reason := awaitClosure(t, ws, 2*time.Second)
 	require.Equal(t, websocket.StatusPolicyViolation, status)
 	require.Equal(t, syscode.CodeConnectWorkerHelloInvalidPayload, reason)
-}
-
-// TestInstanceIDRegex tests the reInstanceIDRegex validation
-func TestInstanceIDRegex(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		// Valid cases
-		{name: "simple alphanumeric", input: "worker123", expected: true},
-		{name: "with underscore", input: "worker_123", expected: true},
-		{name: "with hyphen", input: "worker-123", expected: true},
-		{name: "with underscore and hyphen", input: "worker_test-123", expected: true},
-		{name: "all lowercase", input: "abcdefghijklmnopqrstuvwxyz", expected: true},
-		{name: "all uppercase", input: "ABCDEFGHIJKLMNOPQRSTUVWXYZ", expected: true},
-		{name: "all numbers", input: "1234567890", expected: true},
-		{name: "single character", input: "a", expected: true},
-		{name: "single number", input: "1", expected: true},
-		{name: "single underscore", input: "_", expected: true},
-		{name: "single hyphen", input: "-", expected: true},
-		{name: "mixed case with symbols", input: "Worker_Test-123", expected: true},
-		{name: "max length (256 chars)", input: strings.Repeat("a", 256), expected: true},
-
-		// Invalid cases
-		{name: "empty string", input: "", expected: false},
-		{name: "with space", input: "worker 123", expected: false},
-		{name: "with dot", input: "worker.123", expected: false},
-		{name: "with slash", input: "worker/123", expected: false},
-		{name: "with special characters", input: "worker@123", expected: false},
-		{name: "with plus", input: "worker+123", expected: false},
-		{name: "with equals", input: "worker=123", expected: false},
-		{name: "with brackets", input: "worker[123]", expected: false},
-		{name: "with parens", input: "worker(123)", expected: false},
-		{name: "with unicode", input: "worker🚀", expected: false},
-		{name: "with newline", input: "worker\n123", expected: false},
-		{name: "with tab", input: "worker\t123", expected: false},
-		{name: "too long (257 chars)", input: strings.Repeat("a", 257), expected: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := reInstanceIDRegex.MatchString(tt.input)
-			require.Equal(t, tt.expected, result, "regex validation failed for input: %q", tt.input)
-		})
-	}
 }
 
 // TestCloseWithConnectError tests the closeWithConnectError function

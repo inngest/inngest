@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,8 +38,6 @@ const (
 	DefaultAppsPerConnection = 10
 	MaxAppsPerConnection     = 100
 )
-
-var reInstanceIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,256}$`)
 
 func isConnectionClosedErr(err error) bool {
 	if err == nil {
@@ -1122,15 +1119,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	// add extra validation for Instance ID
-	if !reInstanceIDRegex.MatchString(initialMessageData.InstanceId) {
-		return nil, &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        "Invalid instance ID in SDK connect message",
-		}
-	}
-
 	var authResp *auth.Response
 	{
 		// Run auth, add to distributed state
@@ -1248,15 +1236,6 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "instance ID is required",
-			}
-		}
-
-		// add extra validation for Instance ID
-		if !reInstanceIDRegex.MatchString(initialMessageData.InstanceId) {
-			return nil, &connecterrors.SocketError{
-				SysCode:    syscode.CodeConnectWorkerHelloInvalidPayload,
-				StatusCode: websocket.StatusPolicyViolation,
-				Msg:        "Invalid instance ID in SDK connect message",
 			}
 		}
 
