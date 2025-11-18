@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
 // Opts represents options for the APIv1 router.
@@ -64,6 +65,9 @@ type Opts struct {
 
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
+
+	// MetadataExtractor groups metadata extractors for multiple metadata sources.
+	MetadataExtractor meta.MetadataExtractor
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -145,6 +149,7 @@ func (a *router) setup() {
 			r.Get("/runs/{runID}", a.GetFunctionRun)
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
 
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 

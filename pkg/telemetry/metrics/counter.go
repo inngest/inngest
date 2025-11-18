@@ -698,3 +698,12 @@ func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_spans_total",
+		Description: "Total number of metadata spans",
+		Tags:        opts.Tags,
+	})
+}

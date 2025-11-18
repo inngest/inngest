@@ -418,3 +418,129 @@ FROM spans
 WHERE span_id IN (sqlc.slice('ids'))
 LIMIT 2;
 
+-- name: GetRunSpanByRunID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = ? AND execSpans.account_id = ?
+  GROUP BY dynamic_span_id
+  HAVING SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  ORDER BY start_time
+  LIMIT 1
+)
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND account_id = ?
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = CAST(sqlc.arg(step_attempt) AS INTEGER)) > 0
+ORDER BY start_time;
+
+-- name: GetLatestExecutionSpanByStepID :one
+WITH latest_attempt AS (
+  SELECT
+    max(attributes->>'$."_inngest.step.attempt"')
+  FROM spans a
+  WHERE a.run_id = sqlc.arg(run_id) AND a.account_id = sqlc.arg(account_id)
+  GROUP BY dynamic_span_id
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+  LIMIT 1
+)
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans b
+WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id)
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = (SELECT * FROM latest_attempt)) > 0
+ORDER BY start_time;
+
+-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ? AND span_id = ? AND account_id = ?
+GROUP BY dynamic_span_id
+ORDER BY start_time;

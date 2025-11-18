@@ -1,9 +1,11 @@
 package loader
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,7 @@ const (
 	DiscoveryStepSpanName    = "Discovery step"
 	GenericExecutionSpanName = "Execution"
 	FinalizationSpanName     = "Finalization"
+	MetadataSpanName         = "Metadata"
 )
 
 var ErrSkipSuccess = fmt.Errorf("skip success span")
@@ -211,12 +214,31 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			ServiceName:  span.Attributes.UserlandServiceName,
 			SpanAttrs:    &filteredAttrsStr,
 		}
-
 	}
 
 	name := span.GetStepName()
 	if isUserland {
 		name = *userlandSpan.SpanName
+	}
+
+	var metadata []*models.RunTraceSpanMetadata
+	for _, md := range span.Metadata {
+		gqlMetadata := &models.RunTraceSpanMetadata{
+			Kind: string(md.Kind),
+		}
+
+		for key, val := range md.Values {
+			gqlMetadata.Values = append(gqlMetadata.Values, &models.RunTraceSpanMetadataValue{
+				Key:   key,
+				Value: val,
+			})
+		}
+
+		slices.SortFunc(gqlMetadata.Values, func(a, b *models.RunTraceSpanMetadataValue) int {
+			return cmp.Compare(a.Key, b.Key)
+		})
+
+		metadata = append(metadata, gqlMetadata)
 	}
 
 	gqlSpan := &models.RunTraceSpan{
@@ -239,6 +261,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		SpanTypeName:   span.Name,
 		IsUserland:     isUserland,
 		UserlandSpan:   userlandSpan,
+		Metadata:       metadata,
 	}
 
 	// If this was a discovery span, we may not want to show it.
@@ -436,19 +459,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
 		}
 
-		// If we only have a single child, this span isn't a userland span,
-		// but the single child is, return its children.
-		//
-		// We do this because userland spans are always underneath an
-		// `"inngest.execution"` span created by an SDK, which houses useful
-		// information about the environment, versions, scope, etc.
-		//
-		// Critically, this means we also ignore the `"inggest.execution"`
-		// span itself, as we never want to display it to the user.
-		if !gqlSpan.IsUserland && len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].IsUserland {
-			gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
-		}
-
 		// For the run span, the start is the first child span's start
 		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
 			if (gqlSpan.StartedAt == nil || !haveSetRunStartTime) && gqlSpan.ChildrenSpans[0].StartedAt != nil {
@@ -461,37 +471,18 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			}
 		}
 
-		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
-		if isStep {
-			// Step spans should not show attempts if they only have one and
-			// have resolved
-			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
-				// However, we preserve any userland spans from the
-				// successful execution if we have any.
-				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
-			}
-		}
-
 		// Give spans some more meaningful names if somehow we don't have the
 		// correct information. This shouldn't be possible, but is a final
 		// pass to ensure we filter out internal-looking span names.
 		switch gqlSpan.Name {
 		case meta.SpanNameRun:
-			{
-				gqlSpan.Name = RunSpanName
-			}
+			gqlSpan.Name = RunSpanName
 		case meta.SpanNameStep:
-			{
-				gqlSpan.Name = UnknownStepSpanName
-			}
+			gqlSpan.Name = UnknownStepSpanName
 		case meta.SpanNameStepDiscovery:
-			{
-				gqlSpan.Name = DiscoveryStepSpanName
-			}
+			gqlSpan.Name = DiscoveryStepSpanName
 		case meta.SpanNameExecution:
-			{
-				gqlSpan.Name = GenericExecutionSpanName
-			}
+			gqlSpan.Name = GenericExecutionSpanName
 		}
 	}
 
@@ -507,7 +498,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
-	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland {
+	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland || gqlSpan.Name == MetadataSpanName {
 		startedAt := span.GetStartedAtTime()
 		endedAt := span.GetEndedAtTime()
 		if startedAt != nil && endedAt != nil {
