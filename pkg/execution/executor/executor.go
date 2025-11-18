@@ -3578,7 +3578,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				runCtx,
 				"executor.handleGeneratorAIGatewayRequestMetadata",
 				// TODO: non-adhoc metadata
-				meta.AnyStructuredMetadata("inngest.ai.request", parsed, meta.MetadataOpMerge),
+				meta.AnyStructuredMetadata("inngest.ai", parsed, meta.MetadataOpMerge),
 			)
 			if err != nil {
 				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
@@ -3613,7 +3613,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				runCtx,
 				"executor.handleGeneratorAIGatewayResponseMetadata",
 				// TODO: non-adhoc metadata
-				meta.AnyStructuredMetadata("inngest.ai.response", parsed, meta.MetadataOpMerge),
+				meta.AnyStructuredMetadata("inngest.ai", parsed, meta.MetadataOpMerge),
 			)
 			if err != nil {
 				e.log.Debug("error creating metadata span for successful gateway request during handleGeneratorAIGateway", "error", err)
