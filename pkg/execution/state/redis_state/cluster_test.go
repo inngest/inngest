@@ -75,6 +75,10 @@ func (f *fakeClient) Nodes() map[string]rueidis.Client {
 	panic("implement me")
 }
 
+func (f *fakeClient) Mode() rueidis.ClientMode {
+	return f.rc.Mode()
+}
+
 func newFakeClient(rc rueidis.Client) rueidis.Client {
 	return &fakeClient{rc: rc}
 }
