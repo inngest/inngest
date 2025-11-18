@@ -38,10 +38,11 @@ func TestConstraintEnforcement(t *testing.T) {
 	type testCase struct {
 		name string
 
-		amount      int
-		config      constraintapi.ConstraintConfig
-		constraints []constraintapi.ConstraintItem
-		mi          constraintapi.MigrationIdentifier
+		amount           int
+		config           constraintapi.ConstraintConfig
+		constraints      []constraintapi.ConstraintItem
+		queueConstraints redis_state.PartitionConstraintConfig
+		mi               constraintapi.MigrationIdentifier
 
 		beforeAcquire func(t *testing.T, deps *deps)
 
@@ -204,6 +205,15 @@ func TestConstraintEnforcement(t *testing.T) {
 					},
 				},
 			},
+			queueConstraints: redis_state.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: &redis_state.PartitionThrottle{
+					ThrottleKeyExpressionHash: "expr-hash",
+					Period:                    60,
+					Limit:                     1,
+					Burst:                     0,
+				},
+			},
 			mi: constraintapi.MigrationIdentifier{
 				QueueShard: "test",
 			},
@@ -212,42 +222,48 @@ func TestConstraintEnforcement(t *testing.T) {
 				q := deps.q
 				r := deps.r
 
-				// Simulate existing throttle usage
-				qi, err := q.EnqueueItem(
-					context.Background(),
-					deps.shard,
-					queue.QueueItem{
-						ID:          "item1",
-						FunctionID:  fnID,
-						WorkspaceID: envID,
-						Data: queue.Item{
+				for i := range 1 {
+					clock.Advance(time.Millisecond)
+					deps.r.FastForward(time.Millisecond)
+					deps.r.SetTime(clock.Now())
+
+					// Simulate existing throttle usage
+					qi, err := q.EnqueueItem(
+						context.Background(),
+						deps.shard,
+						queue.QueueItem{
+							ID:          fmt.Sprintf("item%d", i),
+							FunctionID:  fnID,
 							WorkspaceID: envID,
-							Kind:        queue.KindStart,
-							Identifier: state.Identifier{
-								AccountID:   accountID,
+							Data: queue.Item{
 								WorkspaceID: envID,
-								WorkflowID:  fnID,
-							},
-							Throttle: &queue.Throttle{
-								KeyExpressionHash: "expr-hash",
-								Key:               "throttle-key",
-								Period:            60,
-								Limit:             1,
-								Burst:             1,
+								Kind:        queue.KindStart,
+								Identifier: state.Identifier{
+									AccountID:   accountID,
+									WorkspaceID: envID,
+									WorkflowID:  fnID,
+								},
+								Throttle: &queue.Throttle{
+									KeyExpressionHash: "expr-hash",
+									Key:               "throttle-key",
+									Period:            60,
+									Limit:             1,
+									Burst:             1,
+								},
 							},
 						},
-					},
-					clock.Now(),
-					queue.EnqueueOpts{},
-				)
-				require.NoError(t, err)
-				require.NotNil(t, qi)
+						clock.Now(),
+						queue.EnqueueOpts{},
+					)
+					require.NoError(t, err)
+					require.NotNil(t, qi)
 
-				leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
-				require.NoError(t, err)
-				require.NotNil(t, leaseID)
+					leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
+					require.NoError(t, err)
+					require.NotNil(t, leaseID)
 
-				r.Exists(kg.ThrottleKey(qi.Data.Throttle))
+					r.Exists(kg.ThrottleKey(qi.Data.Throttle))
+				}
 			},
 			amount:              1,
 			expectedLeaseAmount: 0,
@@ -305,6 +321,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				redis_state.WithCapacityManager(cm),
 				redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
 					return true, true
+				}),
+				redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+					return test.queueConstraints
 				}),
 			)
 
