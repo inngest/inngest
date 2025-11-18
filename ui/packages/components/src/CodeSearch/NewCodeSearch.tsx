@@ -9,6 +9,8 @@ import {
   createRules,
 } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco, type Monaco } from '@monaco-editor/react';
+//
+//TANSTACK TODO: these cause errors in tanstack start (though this component still works)
 import { languages, type editor } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';

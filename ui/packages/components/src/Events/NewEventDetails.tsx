@@ -6,11 +6,12 @@ import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
-import { useDevServer } from '@inngest/components/utils/useDevServer';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link as TanstackLink } from '@tanstack/react-router';
 
+import { CodeBlock } from '../CodeBlock';
 import {
   IDElement,
   LazyElementWrapper,
@@ -227,7 +228,7 @@ export function EventDetails({
             </div>
             {!payloadError && (
               <div className="border-subtle border-t pl-px">
-                {/* <CodeBlock
+                <CodeBlock
                   loading={isPendingPayload}
                   header={{ title: 'Payload' }}
                   tab={{
@@ -248,7 +249,7 @@ export function EventDetails({
                         ]
                       : []
                   }
-                /> */}
+                />
               </div>
             )}
             {payloadError && <ErrorCard error={payloadError} reset={() => refetchPayload()} />}

@@ -1,5 +1,3 @@
-'use-client';
-
 import { languages } from 'monaco-editor';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
