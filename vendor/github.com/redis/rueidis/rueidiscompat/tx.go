@@ -46,6 +46,7 @@ func (c *TxPipeline) Exec(ctx context.Context) ([]Cmder, error) {
 		err = TxFailedErr
 	}
 	for i, r := range results {
+		rets[i].SetErr(nil)
 		rets[i].from(*(*rueidis.RedisResult)(unsafe.Pointer(&proxyresult{
 			err: resp[i+1].NonRedisError(),
 			val: r,
@@ -104,6 +105,10 @@ func (p *txproxy) Dedicate() (client rueidis.DedicatedClient, cancel func()) {
 }
 
 func (p *txproxy) Nodes() map[string]rueidis.Client {
+	panic("not implemented")
+}
+
+func (p *txproxy) Mode() rueidis.ClientMode {
 	panic("not implemented")
 }
 

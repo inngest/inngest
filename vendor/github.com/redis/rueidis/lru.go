@@ -317,7 +317,7 @@ func (c *lru) Delete(keys []RedisMessage) {
 		}
 	} else {
 		for _, k := range keys {
-			c.purge(k.string, c.store[k.string])
+			c.purge(k.string(), c.store[k.string()])
 		}
 	}
 	c.mu.Unlock()

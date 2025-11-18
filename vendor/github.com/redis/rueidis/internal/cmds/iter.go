@@ -21,6 +21,13 @@ func (c HsetFieldValue) FieldValueIter(seq iter.Seq2[string, string]) HsetFieldV
 	return c
 }
 
+func (c HsetexFieldValue) FieldValueIter(seq iter.Seq2[string, string]) HsetexFieldValue {
+	for field, value := range seq {
+		c.cs.s = append(c.cs.s, field, value)
+	}
+	return c
+}
+
 func (c XaddFieldValue) FieldValueIter(seq iter.Seq2[string, string]) XaddFieldValue {
 	for field, value := range seq {
 		c.cs.s = append(c.cs.s, field, value)
