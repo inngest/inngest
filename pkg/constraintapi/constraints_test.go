@@ -26,7 +26,6 @@ func TestConstraintEnforcement(t *testing.T) {
 		clock clockwork.FakeClock
 		r     *miniredis.Miniredis
 		rc    rueidis.Client
-		// q     redis_state.QueueProcessor
 
 		config      ConstraintConfig
 		constraints []ConstraintItem
@@ -194,6 +193,119 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
+			name: "ignore account concurrency claimed by expired capacity lease",
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: ConcurrencyConfig{
+					AccountConcurrency: 10,
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+					},
+				},
+			},
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				r := deps.r
+				clock := deps.clock
+				cm := deps.cm
+				// Claim capacity initially
+
+				leaseIdempotencyKeys := make([]string, 10)
+				for i := range 10 {
+					leaseIdempotencyKeys[i] = fmt.Sprintf("oldItem%d", i)
+				}
+
+				var err error
+
+				res, err := cm.Acquire(context.Background(), &CapacityAcquireRequest{
+					IdempotencyKey: "before-acquire-acquire-call",
+					AccountID:      accountID,
+					EnvID:          envID,
+					FunctionID:     fnID,
+
+					Duration: 5 * time.Second,
+
+					Configuration:        deps.config,
+					Constraints:          deps.constraints,
+					Amount:               10,
+					LeaseIdempotencyKeys: leaseIdempotencyKeys,
+
+					CurrentTime:     clock.Now(),
+					MaximumLifetime: time.Minute,
+
+					Source: LeaseSource{
+						Service:           ServiceAPI,
+						Location:          LeaseLocationPartitionLease,
+						RunProcessingMode: RunProcessingModeBackground,
+					},
+
+					Migration: MigrationIdentifier{
+						QueueShard: "test",
+					},
+				})
+				require.NoError(t, err)
+				require.Len(t, res.Leases, 10)
+
+				// Expect in progress leases set to be populated
+				mem, err := r.ZMembers(cm.KeyInProgressLeasesAccount(accountID))
+				require.NoError(t, err)
+				require.Len(t, mem, 10)
+
+				// Fast forward to expire lease (but do not scavenge yet)
+				clock.Advance(10 * time.Second)
+				r.FastForward(10 * time.Second)
+				r.SetTime(clock.Now())
+			},
+			amount:              10,
+			expectedLeaseAmount: 10,
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				r := deps.r
+				cm := deps.cm
+				rc := deps.rc
+				clock := deps.clock
+
+				// Even though there's an expired lease, we expect to claim 10 new leases with expired concurrency capacity
+				require.Len(t, resp.Leases, 10)
+
+				// Expect in progress leases set to be populated with expired and non-expired items
+				mem, err := r.ZMembers(cm.KeyInProgressLeasesAccount(accountID))
+				require.NoError(t, err)
+				require.Len(t, mem, 20)
+
+				expiry := fmt.Sprintf("%d", clock.Now().UnixMilli())
+
+				// Count expired
+				cmd := rc.B().Zcount().
+					Key(cm.KeyInProgressLeasesAccount(accountID)).
+					Min("-inf").
+					Max(expiry).
+					Build()
+				count, err := rc.Do(context.Background(), cmd).ToInt64()
+				require.NoError(t, err)
+				require.Equal(t, int64(10), count)
+
+				// Count active
+				cmd = rc.B().Zcount().
+					Key(cm.KeyInProgressLeasesAccount(accountID)).
+					Min(expiry).
+					Max("+inf").
+					Build()
+				count, err = rc.Do(context.Background(), cmd).ToInt64()
+				require.NoError(t, err)
+				require.Equal(t, int64(10), count)
+			},
+		},
+
+		{
 			name: "account concurrency partially limited due to legacy concurrency",
 			config: ConstraintConfig{
 				FunctionVersion: 1,
@@ -230,44 +342,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			amount:              10,
 			expectedLeaseAmount: 5,
 		},
-
-		// {
-		// 	name: "account concurrency limited due to legacy concurrency with queue",
-		// 	config: ConstraintConfig{
-		// 		FunctionVersion: 1,
-		// 		Concurrency: ConcurrencyConfig{
-		// 			AccountConcurrency: 10,
-		// 		},
-		// 	},
-		// 	constraints: []ConstraintItem{
-		// 		{
-		// 			Kind: ConstraintKindConcurrency,
-		// 			Concurrency: &ConcurrencyConstraint{
-		// 				Scope:             enums.ConcurrencyScopeAccount,
-		// 				Mode:              enums.ConcurrencyModeStep,
-		// 				InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-		// 			},
-		// 		},
-		// 	},
-		// 	mi: MigrationIdentifier{
-		// 		QueueShard: "test",
-		// 	},
-		// 	beforeAcquire: func(t *testing.T, deps *deps) {
-		// 		r := deps.r
-		// 		clock := deps.clock
-		// 		// Simulate existing concurrency usage (in progress item Leased by queue)
-		// 		for i := range 5 { // 5/10
-		// 			_, err := r.ZAdd(
-		// 				fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
-		// 				float64(clock.Now().Add(time.Second).UnixMilli()),
-		// 				fmt.Sprintf("queueItem%d", i),
-		// 			)
-		// 			require.NoError(t, err)
-		// 		}
-		// 	},
-		// 	amount:              10,
-		// 	expectedLeaseAmount: 5,
-		// },
 
 		{
 			name: "function concurrency",
@@ -511,24 +585,6 @@ func TestConstraintEnforcement(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cm)
 
-			// defaultShard := redis_state.QueueShard{
-			// 	Name:        "test",
-			// 	RedisClient: redis_state.NewQueueClient(rc, "{q:v1}"),
-			// }
-			// q := redis_state.NewQueue(defaultShard,
-			// 	redis_state.WithClock(clock),
-			// 	redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
-			// 		"test": defaultShard,
-			// 	}),
-			// 	redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
-			// 		return defaultShard, nil
-			// 	}),
-			// 	redis_state.WithCapacityManager(cm),
-			// 	redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
-			// 		return true, true
-			// 	}),
-			// )
-
 			deps := &deps{
 				config:      test.config,
 				constraints: test.constraints,
@@ -536,7 +592,6 @@ func TestConstraintEnforcement(t *testing.T) {
 				clock:       clock,
 				r:           r,
 				rc:          rc,
-				// q:           q,
 			}
 
 			if test.beforeAcquire != nil {
