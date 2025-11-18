@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/aigateway"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -116,6 +117,10 @@ func DriverResponseAttrs(
 		} else {
 			meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, fnOutput)
 		}
+	}
+
+	if resp.Retryable() {
+		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
 	}
 
 	size := resp.OutputSize
