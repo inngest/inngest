@@ -2,12 +2,11 @@ import type { InvokeRunPayload } from "@inngest/components/SharedContext/useInvo
 import { useMutation } from "urql";
 
 import { useEnvironment } from "@/components/Environments/environment-context";
-// TANSTACK TODO Re-enable InvokeFunctionDocument import once tsx components are migrated
-// import { InvokeFunctionDocument } from "@/gql/graphql";
+import { InvokeFunctionDocument } from "@/gql/graphql";
 
 export const useInvokeRun = () => {
   const env = useEnvironment();
-  const [, invokeFunction] = useMutation<any>(null as any);
+  const [, invokeFunction] = useMutation(InvokeFunctionDocument);
 
   return async ({ functionSlug, data, user, envID }: InvokeRunPayload) => {
     return await invokeFunction({
