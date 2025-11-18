@@ -1253,7 +1253,7 @@ func TestGetWorkerCapacities(t *testing.T) {
 	t.Run("returns unlimited capacity when no limit set", func(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 		require.Equal(t, int64(0), caps.Total)
 		require.False(t, caps.IsAtCapacity())
 		require.True(t, caps.IsAvailable())
@@ -1553,7 +1553,7 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), caps.Total)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 
 		// TTL should be expired
 		setKey := mgr.workerRequestsKey(envID, instanceID)
@@ -1881,7 +1881,7 @@ func TestWorkerCapacityEndToEnd(t *testing.T) {
 		// Should return unlimited
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 		require.Equal(t, int64(0), caps.Total)
 		require.False(t, caps.IsAtCapacity())
 		require.True(t, caps.IsAvailable())
@@ -2300,7 +2300,7 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		caps, err := mgr.GetWorkerCapacities(ctx, envID, instanceID)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), caps.Total) // No capacity limit due to expired key
-		require.Equal(t, int64(consts.ConnectWorkerNoConcurrencyLimitForRequests), caps.Available)
+		require.Equal(t, int64(consts.ConnectWorkerCapacityForNoConcurrencyLimit), caps.Available)
 
 		// But new assignments should still work (no limit)
 		err = mgr.AssignRequestToWorker(ctx, envID, instanceID, "req-3")
