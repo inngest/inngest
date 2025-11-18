@@ -81,7 +81,7 @@ func TestWorkerCapacity_IsAvailable(t *testing.T) {
 			name: "returns true when Available equals no concurrency limit constant",
 			capacity: WorkerCapacity{
 				Total:     10,
-				Available: consts.ConnectWorkerNoConcurrencyLimitForRequests,
+				Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
 			},
 			expected: true,
 		},
@@ -145,7 +145,7 @@ func TestWorkerCapacity_IsAtCapacity(t *testing.T) {
 			name: "returns false when Available equals no concurrency limit constant",
 			capacity: WorkerCapacity{
 				Total:     10,
-				Available: consts.ConnectWorkerNoConcurrencyLimitForRequests,
+				Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
 			},
 			expected: false,
 		},
