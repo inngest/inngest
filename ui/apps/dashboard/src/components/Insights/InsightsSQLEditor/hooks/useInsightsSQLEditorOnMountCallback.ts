@@ -3,8 +3,11 @@
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
-import { handleShortcuts } from '../actions/handleShortcuts';
+import { useActiveTab, useTabManagerActions } from '../../InsightsTabManager/TabManagerContext';
+import { useSaveTabActions } from '../SaveTabContext';
+import { bindEditorShortcuts } from '../actions/handleShortcuts';
 import { markTemplateVars } from '../actions/markTemplateVars';
+import { getCanRunQuery } from '../utils';
 import { useLatest, useLatestCallback } from './useLatestCallback';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
@@ -13,18 +16,35 @@ type UseInsightsSQLEditorOnMountCallbackReturn = {
 
 export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMountCallbackReturn {
   const { query, runQuery, status } = useInsightsStateMachineContext();
+  const { saveTab } = useSaveTabActions();
+  const { tabManagerActions } = useTabManagerActions();
+  const { activeTab } = useActiveTab();
 
   const latestQueryRef = useLatest(query);
   const isRunningRef = useLatest(status === 'loading');
+  const activeTabRef = useLatest(activeTab);
+  const saveTabRef = useLatest(saveTab);
 
   const onMount: SQLEditorMountCallback = useLatestCallback((editor, monaco) => {
-    const shortcutsDisposable = handleShortcuts(
-      editor,
-      monaco,
-      latestQueryRef,
-      isRunningRef,
-      runQuery
-    );
+    const shortcutsDisposable = bindEditorShortcuts(editor, [
+      {
+        combo: { keyCode: monaco.KeyCode.Enter, metaOrCtrl: true },
+        handler: () => {
+          if (getCanRunQuery(latestQueryRef.current, isRunningRef.current)) runQuery();
+        },
+      },
+      {
+        combo: { alt: true, keyCode: monaco.KeyCode.KeyS, metaOrCtrl: true },
+        handler: () => {
+          const currentTab = activeTabRef.current;
+          if (currentTab !== undefined) saveTabRef.current(currentTab);
+        },
+      },
+      {
+        combo: { alt: true, keyCode: monaco.KeyCode.KeyT, metaOrCtrl: true },
+        handler: tabManagerActions.createNewTab,
+      },
+    ]);
 
     const markersDisposable = markTemplateVars(editor, monaco);
 
