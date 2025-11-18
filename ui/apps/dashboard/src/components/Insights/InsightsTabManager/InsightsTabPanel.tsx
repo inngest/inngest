@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@inngest/components/Link/Link';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 
@@ -33,6 +34,23 @@ export function InsightsTabPanel({
 }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [hasSpace, setHasSpace] = useState(true);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new ResizeObserver(() => {
+      const header = section.querySelector('header');
+      if (!header) return;
+
+      setHasSpace(header.clientWidth >= 800);
+    });
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
 
   // TODO: Adjust home tab to AI panel
   if (isHomeTab) return <InsightsTabPanelTemplatesTab />;
@@ -46,20 +64,22 @@ export function InsightsTabPanel({
         minSplitPercentage={20}
         maxSplitPercentage={80}
         first={
-          <Section
-            actions={
-              <>
-                <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
-                <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
-                <InsightsSQLEditorSaveQueryButton tab={tab} />
-                <InsightsSQLEditorQueryButton />
-              </>
-            }
-            className="h-full"
-            title={<InsightsSQLEditorQueryTitle tab={tab} />}
-          >
-            <InsightsSQLEditor />
-          </Section>
+          <div ref={sectionRef}>
+            <Section
+              actions={
+                <>
+                  {hasSpace && <InsightsSQLEditorQueryEditHistoryButton tab={tab} />}
+                  <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
+                  <InsightsSQLEditorSaveQueryButton tab={tab} />
+                  <InsightsSQLEditorQueryButton />
+                </>
+              }
+              className="h-full"
+              title={<InsightsSQLEditorQueryTitle tab={tab} />}
+            >
+              <InsightsSQLEditor />
+            </Section>
+          </div>
         }
         orientation="vertical"
         second={
