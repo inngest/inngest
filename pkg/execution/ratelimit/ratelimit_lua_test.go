@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -200,7 +199,6 @@ func TestLuaRateLimit_ExistingVsFreshState(t *testing.T) {
 			"Total capacity should be the same, but distributed differently")
 	})
 }
-
 
 func TestLuaRateLimit_RetryAfterValidation(t *testing.T) {
 	ctx := context.Background()
@@ -754,157 +752,12 @@ func TestLuaRateLimit_Idempotency(t *testing.T) {
 func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("large nanosecond timestamps causing scientific notation", func(t *testing.T) {
-		t.Skip("this should produce scientific notation but does not -- the root cause is likely a more complex combination")
-
-		r, rc, throttledStore, clock := initRedis(t)
-		defer rc.Close()
-
-		config := inngest.RateLimit{
-			Limit:  100,
-			Period: "1h",
-		}
-
-		key := "scientific-notation-test"
-
-		// Phase 1: Create throttled state (first request)
-		t.Logf("Phase 1: Creating initial throttled state at time %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
-		limited1, retry1, err := rateLimit(ctx, throttledStore, key, config)
-		require.NoError(t, err)
-		require.False(t, limited1) // Should be allowed (not limited)
-		t.Logf("First request: limited=%v, retry=%v", limited1, retry1)
-
-		currentVal, err := r.Get(prefix + key)
-		require.NoError(t, err)
-		t.Logf("First key: %v", currentVal)
-
-		// Phase 2: Advance clock by 1 second
-		t.Logf("Phase 2: Advancing clock by 1 second")
-		clock.Advance(1 * time.Second)
-		r.FastForward(1 * time.Second)
-		r.SetTime(clock.Now())
-		t.Logf("Clock advanced to %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
-
-		// Phase 3: Make request using Lua implementation (this should work)
-		t.Logf("Phase 3: Making request with Lua implementation")
-		luaLimiter := newLuaGCRARateLimiter(ctx, rc, prefix)
-		res2, err := luaLimiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
-		require.NoError(t, err)
-		require.False(t, res2.Limited) // Should not be rate limited
-		t.Logf("Lua request: limited=%v, retry=%v", res2.Limited, res2.RetryAfter)
-
-		currentVal, err = r.Get(prefix + key)
-		require.NoError(t, err)
-		t.Logf("Second key: %v", currentVal)
-
-		// Phase 4: Advance clock by another second
-		t.Logf("Phase 4: Advancing clock by another second")
-		clock.Advance(1 * time.Second)
-		r.FastForward(1 * time.Second)
-		r.SetTime(clock.Now())
-		t.Logf("Clock advanced to %v (ns: %d)", clock.Now(), clock.Now().UnixNano())
-
-		// Phase 5: Continue with throttled state - this should trigger the scientific notation issue
-		// The Lua script has stored a very large nanosecond timestamp that gets serialized in scientific notation
-		t.Logf("Phase 5: Attempting throttled implementation (this may fail with scientific notation parsing)")
-
-		// This is where the bug should manifest - AsInt64() trying to parse scientific notation
-		_, _, err = rateLimit(ctx, throttledStore, key, config)
-		require.Error(t, err)
-		t.Logf("ERROR (expected): %v", err)
-		// Check if it's the specific scientific notation parsing error
-		if strings.Contains(err.Error(), "strconv.ParseInt") && strings.Contains(err.Error(), "invalid syntax") {
-			t.Logf("SUCCESS: Reproduced the scientific notation parsing issue!")
-			t.Logf("Error details: %v", err)
-		} else {
-			t.Fatalf("Unexpected error (not the scientific notation issue): %v", err)
-		}
-
-		// Additional verification: try to directly observe the Redis value that might be in scientific notation
-		redisKey := prefix + key
-		cmd := rc.B().Get().Key(redisKey).Build()
-		result, err := rc.Do(ctx, cmd).ToString()
-		if err == nil {
-			t.Logf("Raw Redis value: %s", result)
-			// Check if it's in scientific notation
-			if strings.Contains(result, "e+") || strings.Contains(result, "E+") {
-				t.Logf("CONFIRMED: Redis value is in scientific notation format!")
-			}
-		}
-	})
-
-	t.Run("direct scientific notation parsing failure", func(t *testing.T) {
-		r, rc, throttledStore, _ := initRedis(t)
-
-		defer rc.Close()
-
-		// NOTE: Explicitly disable graceful parsing here so we get to see the error
-		throttledStore.disableGracefulScientificNotationParsing = true
-
-		config := inngest.RateLimit{
-			Limit:  1,
-			Period: "1h",
-		}
-
-		key := "scientific-notation-direct-test"
-		redisKey := prefix + key
-
-		// Directly set a scientific notation value in Redis that mimics what we observed
-		// This is the exact value format that caused the issue: "1.7628952937785e+18"
-		scientificValue := "1.7628952937785e+18"
-
-		t.Logf("Manually setting Redis key %s to scientific notation value: %s", redisKey, scientificValue)
-		err := r.Set(redisKey, scientificValue)
-		require.NoError(t, err)
-
-		// Verify the value was set
-		storedValue, err := r.Get(redisKey)
-		require.NoError(t, err)
-		t.Logf("Confirmed stored value: %s", storedValue)
-
-		// Now try to use the throttled implementation which should fail when trying to parse this
-		t.Logf("Attempting to use throttled implementation with scientific notation value in Redis...")
-
-		// This should fail with the AsInt64() parsing error
-		limited, retry, err := rateLimit(ctx, throttledStore, key, config)
-
-		// We expect this to fail with a parsing error
-		require.Error(t, err)
-		t.Logf("Got expected error: %v", err)
-
-		// Verify it's the specific scientific notation parsing error
-		require.True(t, strings.Contains(err.Error(), "strconv.ParseInt") ||
-			strings.Contains(err.Error(), "invalid syntax") ||
-			strings.Contains(err.Error(), "failed to get key value"),
-			"Expected parsing error, got: %v", err)
-
-		t.Logf("SUCCESS: Reproduced scientific notation parsing failure!")
-		t.Logf("Error details: %v", err)
-		t.Logf("Limited: %v, Retry: %v", limited, retry)
-
-		// Also test the direct Redis parsing that would happen in GetWithTime
-		cmd := rc.B().Get().Key(redisKey).Build()
-		result := rc.Do(ctx, cmd)
-
-		// Try to parse as int64 - this should fail
-		_, parseErr := result.AsInt64()
-		require.Error(t, parseErr)
-		t.Logf("Direct AsInt64() parsing also failed as expected: %v", parseErr)
-
-		// But ToString should work
-		strResult, err := result.ToString()
-		require.NoError(t, err)
-		t.Logf("ToString() works fine: %s", strResult)
-	})
-
 	t.Run("with graceful handling, no more syntax errors should be surfaced", func(t *testing.T) {
-		r, rc, throttledStore, clock := initRedis(t)
+		r, rc, clock := initRedis(t)
 
 		defer rc.Close()
 
-		// With graceful parsing, we should be handled gracefully
-		throttledStore.disableGracefulScientificNotationParsing = false
-
+		limiter := New(ctx, rc, "{rl}:")
 		config := inngest.RateLimit{
 			Limit:  50,
 			Period: "1h",
@@ -928,10 +781,10 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 
 		// Run a couple rate limit operations in sequence to ensure we keep using the valid value
 		for range 5 {
-			limited, retry, err := rateLimit(ctx, throttledStore, key, config)
+			res, err := limiter.RateLimit(ctx, key, config)
 			require.NoError(t, err)
-			require.False(t, limited)
-			require.Equal(t, time.Duration(-1), retry)
+			require.False(t, res.Limited)
+			require.Equal(t, time.Duration(0), res.RetryAfter)
 
 			clock.Advance(1 * time.Second)
 			r.FastForward(1 * time.Second)
@@ -940,7 +793,7 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 	})
 
 	t.Run("force lua to write scientific notation with artificially large number", func(t *testing.T) {
-		r, rc, throttledStore, _ := initRedis(t)
+		r, rc, clock := initRedis(t)
 		defer rc.Close()
 
 		limiter := New(ctx, rc, prefix)
@@ -985,7 +838,7 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 		t.Logf("ToString() works fine: %s", strResult)
 
 		// Should fail because it's clamped to the maximum
-		limited, retry, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		res, err := limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 
 		// We expect this to fail with a parsing error
 		require.NoError(t, err)
@@ -1006,19 +859,19 @@ func TestLuaRateLimit_ScientificNotationParsing(t *testing.T) {
 
 		require.InDelta(t, int(expectedMax), normalizedValue, 10)
 
-		require.True(t, limited)
-		require.Equal(t, time.Hour+6*time.Minute, retry.Round(time.Minute))
+		require.True(t, res.Limited)
+		require.Equal(t, time.Hour+6*time.Minute, res.RetryAfter.Round(time.Minute))
 
-		clock.Advance(retry + time.Minute)
-		r.FastForward(retry + time.Minute)
+		clock.Advance(res.RetryAfter + time.Minute)
+		r.FastForward(res.RetryAfter + time.Minute)
 		r.SetTime(clock.Now())
 
 		// Should allow another request
-		limited, retry, err = limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
+		res, err = limiter.RateLimit(ctx, key, config, WithNow(clock.Now()))
 
 		require.NoError(t, err)
-		require.False(t, limited)
-		require.Equal(t, time.Duration(0), retry)
+		require.False(t, res.Limited)
+		require.Equal(t, time.Duration(0), res.RetryAfter)
 	})
 }
 
