@@ -27,6 +27,7 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
+// prettier-ignore
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -36,9 +37,7 @@ const GetVolumeMetrics = graphql(`
     $until: Time
     $scope: MetricsScope!
   ) {
-    accountConcurrency: metrics(
-      opts: { name: "steps_running", from: $from, to: $until }
-    ) {
+    accountConcurrency: metrics(opts: { name: "steps_running", from: $from, to: $until }) {
       data {
         bucket
         value

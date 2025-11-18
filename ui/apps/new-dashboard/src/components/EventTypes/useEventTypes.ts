@@ -6,13 +6,9 @@ import { useClient } from "urql";
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { graphql } from "@/gql";
 
+// prettier-ignore
 const query = graphql(`
-  query GetEventTypesV2(
-    $envID: ID!
-    $cursor: String
-    $archived: Boolean
-    $nameSearch: String
-  ) {
+  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean, $nameSearch: String) {
     environment: workspace(id: $envID) {
       eventTypesV2(
         after: $cursor
@@ -97,13 +93,9 @@ type VolumeQueryVariables = {
   eventName: string;
 };
 
+// prettier-ignore
 const volumeQuery = graphql(`
-  query GetEventTypeVolumeV2(
-    $envID: ID!
-    $eventName: String!
-    $startTime: Time!
-    $endTime: Time!
-  ) {
+  query GetEventTypeVolumeV2($envID: ID!, $eventName: String!, $startTime: Time!, $endTime: Time!) {
     environment: workspace(id: $envID) {
       eventType(name: $eventName) {
         name
@@ -170,6 +162,7 @@ export function useEventTypeVolume() {
   );
 }
 
+// prettier-ignore
 const eventTypeQuery = graphql(`
   query GetEventType($envID: ID!, $eventName: String!) {
     environment: workspace(id: $envID) {
@@ -218,6 +211,7 @@ export function useEventType({ eventName }: { eventName: string }) {
   });
 }
 
+// prettier-ignore
 export const allEventTypesQuery = graphql(`
   query GetAllEventNames($envID: ID!) {
     environment: workspace(id: $envID) {
