@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiCodeBlock, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
+import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
 
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorInstanceContext';
@@ -55,14 +55,14 @@ export function QueryActionsMenu({
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {editorRef && (
-          <DropdownMenuItem className="text-basis px-4" onSelect={handleFormatSQL}>
-            <RiCodeBlock className="size-4" />
-            <span>Format</span>
+          <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={handleFormatSQL}>
+            <RiAlignLeft className="size-4" />
+            <span>Prettify SQL</span>
           </DropdownMenuItem>
         )}
         {isActualQueryAndUnshared(query) && (
           <DropdownMenuItem
-            className="text-basis px-4"
+            className="text-basis px-4 outline-none"
             onSelect={() => {
               if (query === undefined || isQuerySnapshot(query)) return;
               shareQuery(query.id);
@@ -73,7 +73,7 @@ export function QueryActionsMenu({
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
-          className="text-error px-4"
+          className="text-error px-4 outline-none"
           onSelect={() => {
             if (query === undefined) return;
             onSelectDelete(query);

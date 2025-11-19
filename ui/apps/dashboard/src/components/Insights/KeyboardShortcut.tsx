@@ -5,12 +5,18 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiCommandLine } from '@remixicon/react';
 
 type KeyboardShortcutProps = {
+  backgroundColor?: string;
   className?: string;
-  disabled?: boolean;
+  color?: string;
   keys: Array<'cmd' | 'ctrl' | 'alt' | 'shift' | 'enter' | string>;
 };
 
-export function KeyboardShortcut({ className, disabled = false, keys }: KeyboardShortcutProps) {
+export function KeyboardShortcut({
+  backgroundColor,
+  className,
+  color,
+  keys,
+}: KeyboardShortcutProps) {
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
@@ -73,11 +79,15 @@ export function KeyboardShortcut({ className, disabled = false, keys }: Keyboard
 
   const renderedKeys = keys.map(renderKey).filter(Boolean);
 
+  // Determine background color - default to transparent if not provided
+  const bgColor = backgroundColor !== undefined ? backgroundColor : 'bg-transparent';
+
   return (
     <div
       className={cn(
         'flex shrink-0 items-center gap-0.5 rounded-[4px] px-1 py-0.5',
-        disabled ? 'bg-muted' : 'bg-primary-moderate',
+        bgColor,
+        color,
         className
       )}
     >
