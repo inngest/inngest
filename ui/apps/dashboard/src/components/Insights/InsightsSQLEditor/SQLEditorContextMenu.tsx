@@ -74,7 +74,7 @@ export function SQLEditorContextMenu({
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPrettifySQL}>
           <span>Prettify SQL</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['shift', 'alt', 'F']} />
+            <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
           </span>
         </DropdownMenuItem>
         <div className="border-subtle my-1 border-t" />
@@ -85,7 +85,7 @@ export function SQLEditorContextMenu({
         >
           <span>Cut</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'X']} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'X']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -95,26 +95,26 @@ export function SQLEditorContextMenu({
         >
           <span>Copy</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'C']} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'C']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPaste}>
           <span>Paste</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'V']} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'V']} />
           </span>
         </DropdownMenuItem>
         <div className="border-subtle my-1 border-t" />
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onRunQuery}>
           <span>Run query</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'enter']} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'enter']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onSaveQuery}>
           <span>Save query</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'alt', 'S']} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'alt', 'S']} />
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
