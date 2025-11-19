@@ -78,20 +78,28 @@ func TestWorkerCapacity_IsAvailable(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "returns true when Available equals no concurrency limit constant",
+			name: "returns false when Available equals no concurrency limit constant",
 			capacity: WorkerCapacity{
 				Total:     10,
 				Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
 			},
+			expected: false,
+		},
+		{
+			name: "returns true when Available is negative",
+			capacity: WorkerCapacity{
+				Total:     10,
+				Available: -1,
+			},
 			expected: true,
 		},
 		{
-			name: "returns false when Available is negative but not the special constant",
+			name: "returns true when Available is less than 0",
 			capacity: WorkerCapacity{
 				Total:     10,
-				Available: -2,
+				Available: -1,
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "returns true when Available is 1",
@@ -130,22 +138,6 @@ func TestWorkerCapacity_IsAtCapacity(t *testing.T) {
 			capacity: WorkerCapacity{
 				Total:     10,
 				Available: 5,
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when Available is negative",
-			capacity: WorkerCapacity{
-				Total:     10,
-				Available: -1,
-			},
-			expected: false,
-		},
-		{
-			name: "returns false when Available equals no concurrency limit constant",
-			capacity: WorkerCapacity{
-				Total:     10,
-				Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
 			},
 			expected: false,
 		},

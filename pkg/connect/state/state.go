@@ -422,9 +422,10 @@ func (w *WorkerCapacity) IsUnlimited() bool {
 }
 
 func (w *WorkerCapacity) IsAvailable() bool {
-	return w.Available > 0 || w.IsUnlimited()
+	// // allow negative values to indicate unlimited capacity as well though it shouldn't happen
+	return w.Available != 0 || w.IsUnlimited()
 }
 
 func (w *WorkerCapacity) IsAtCapacity() bool {
-	return w.Available == 0 && !w.IsUnlimited() // Total > 0 means there is a limit set
+	return !w.IsAvailable() // Total > 0 means there is a limit set
 }
