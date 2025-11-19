@@ -564,14 +564,6 @@ export type Deploy = {
   workspaceID: Scalars['UUID'];
 };
 
-export type EditWorkflowInput = {
-  description?: InputMaybe<Scalars['String']>;
-  disable?: InputMaybe<Scalars['Time']>;
-  promote?: InputMaybe<Scalars['Time']>;
-  version: Scalars['Int'];
-  workflowID: Scalars['ID'];
-};
-
 export type EntitlementBool = {
   __typename?: 'EntitlementBool';
   enabled: Scalars['Boolean'];
@@ -1191,7 +1183,6 @@ export type Mutation = {
   deleteSigningKey: SigningKey;
   disableDatadogConnection: Scalars['UUID'];
   disableEnvironmentAutoArchive: Workspace;
-  editWorkflow: Maybe<WorkflowVersionResponse>;
   enableDatadogConnection: DatadogConnectionStatus;
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
@@ -1367,11 +1358,6 @@ export type MutationDisableDatadogConnectionArgs = {
 
 export type MutationDisableEnvironmentAutoArchiveArgs = {
   id: Scalars['ID'];
-};
-
-
-export type MutationEditWorkflowArgs = {
-  input: EditWorkflowInput;
 };
 
 
