@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/tanstack-react-start";
 import { Button } from "@inngest/components/Button/index";
 import { Link } from "@inngest/components/Link";
 import { isAfter, sub } from "@inngest/components/utils/date";

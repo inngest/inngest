@@ -1,0 +1,23 @@
+"use client";
+
+import { SQLEditor } from "@inngest/components/SQLEditor/SQLEditor";
+
+import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
+import { SQL_COMPLETION_CONFIG } from "./constants";
+import { useInsightsSQLEditorOnMountCallback } from "./hooks/useInsightsSQLEditorOnMountCallback";
+
+export function InsightsSQLEditor() {
+  const { onChange, query } = useInsightsStateMachineContext();
+  const { onMount } = useInsightsSQLEditorOnMountCallback();
+
+  return (
+    <div className="h-full min-h-0 overflow-hidden">
+      <SQLEditor
+        completionConfig={SQL_COMPLETION_CONFIG}
+        content={query}
+        onChange={onChange}
+        onMount={onMount}
+      />
+    </div>
+  );
+}

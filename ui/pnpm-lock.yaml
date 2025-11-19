@@ -487,6 +487,9 @@ importers:
       '@headlessui/tailwindcss':
         specifier: ^0.1.2
         version: 0.1.3(tailwindcss@3.4.18(ts-node@10.9.1(@types/node@24.9.2)(typescript@5.9.2)))
+      '@inngest/use-agent':
+        specifier: ^0.4.0
+        version: 0.4.0(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.2)(uuid@13.0.0)
       '@launchdarkly/node-server-sdk':
         specifier: ^9.0.3
         version: 9.0.3
@@ -571,9 +574,15 @@ importers:
       type-fest:
         specifier: ^3.7.2
         version: 3.7.2
+      ulid:
+        specifier: ^2.3.0
+        version: 2.3.0
       urql:
         specifier: ^4.0.5
         version: 4.0.5(graphql@16.8.1)(react@18.2.0)
+      uuid:
+        specifier: ^13.0.0
+        version: 13.0.0
       zod:
         specifier: ^3.22.4
         version: 3.25.76
@@ -16287,9 +16296,51 @@ snapshots:
       - supports-color
       - typescript
 
+  '@inngest/realtime@0.4.0(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.9.2)':
+    dependencies:
+      '@standard-schema/spec': 1.0.0
+      debug: 4.4.1(supports-color@5.5.0)
+      inngest: 3.40.3(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.9.2)
+      react: 18.2.0
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@sveltejs/kit'
+      - '@vercel/node'
+      - aws-lambda
+      - encoding
+      - express
+      - fastify
+      - h3
+      - hono
+      - koa
+      - next
+      - supports-color
+      - typescript
+
   '@inngest/use-agent@0.4.0(@vercel/node@5.1.16(rollup@2.79.2))(express@5.1.0)(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.1.3)(uuid@13.0.0)':
     dependencies:
       '@inngest/realtime': 0.4.0(@vercel/node@5.1.16(rollup@2.79.2))(express@5.1.0)(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.1.3)
+      '@tanstack/react-query': 5.90.2(react@18.2.0)
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+      uuid: 13.0.0
+    transitivePeerDependencies:
+      - '@sveltejs/kit'
+      - '@vercel/node'
+      - aws-lambda
+      - encoding
+      - express
+      - fastify
+      - h3
+      - hono
+      - koa
+      - next
+      - supports-color
+      - typescript
+
+  '@inngest/use-agent@0.4.0(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.2)(uuid@13.0.0)':
+    dependencies:
+      '@inngest/realtime': 0.4.0(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.9.2)
       '@tanstack/react-query': 5.90.2(react@18.2.0)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -23878,6 +23929,37 @@ snapshots:
       express: 5.1.0
       next: 14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       typescript: 5.1.3
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
+  inngest@3.40.3(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.9.2):
+    dependencies:
+      '@bufbuild/protobuf': 2.8.0
+      '@inngest/ai': 0.1.6
+      '@jpwilliams/waitgroup': 2.1.1
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/auto-instrumentations-node': 0.56.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/context-async-hooks': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/instrumentation': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
+      '@types/debug': 4.1.12
+      canonicalize: 1.0.8
+      chalk: 4.1.2
+      cross-fetch: 4.1.0
+      debug: 4.4.1(supports-color@5.5.0)
+      hash.js: 1.1.7
+      json-stringify-safe: 5.0.1
+      ms: 2.1.3
+      serialize-error-cjs: 0.1.4
+      strip-ansi: 5.2.0
+      temporal-polyfill: 0.2.5
+      zod: 3.22.4
+    optionalDependencies:
+      next: 14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      typescript: 5.9.2
     transitivePeerDependencies:
       - encoding
       - supports-color
