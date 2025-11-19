@@ -12,6 +12,8 @@ import type { SQLCompletionConfig } from './types';
 
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
 
+export type SQLEditorInstance = editor.IStandaloneCodeEditor;
+
 export type SQLEditorProps = {
   completionConfig: SQLCompletionConfig;
   content: string;

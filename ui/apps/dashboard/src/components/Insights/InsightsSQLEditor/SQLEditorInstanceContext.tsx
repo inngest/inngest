@@ -1,10 +1,10 @@
 'use client';
 
 import { createContext, useContext, useRef, type ReactNode } from 'react';
-import type { editor } from 'monaco-editor';
+import type { SQLEditorInstance } from '@inngest/components/SQLEditor/SQLEditor';
 
 type SQLEditorInstanceContextValue = {
-  editorRef: React.MutableRefObject<editor.IStandaloneCodeEditor | null>;
+  editorRef: React.MutableRefObject<SQLEditorInstance | null>;
 };
 
 const SQLEditorInstanceContext = createContext<SQLEditorInstanceContextValue | null>(null);
@@ -14,7 +14,7 @@ type SQLEditorInstanceProviderProps = {
 };
 
 export function SQLEditorInstanceProvider({ children }: SQLEditorInstanceProviderProps) {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<SQLEditorInstance | null>(null);
 
   return (
     <SQLEditorInstanceContext.Provider value={{ editorRef }}>
