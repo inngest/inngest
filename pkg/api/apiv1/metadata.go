@@ -22,12 +22,20 @@ import (
 )
 
 type MetadataOpts struct {
-	Allow AllowMetadata
+	Flag AllowMetadataFlag
 
 	SpanExtractor metadata.SpanExtractor
 }
 
-type AllowMetadata func(ctx context.Context, accountID uuid.UUID) bool
+type AllowMetadataFlag func(ctx context.Context, accountID uuid.UUID) bool
+
+func (am AllowMetadataFlag) Enabled(ctx context.Context, accountID uuid.UUID) bool {
+	if am == nil {
+		return false
+	}
+
+	return am(ctx, accountID)
+}
 
 func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -37,7 +45,7 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !a.opts.MetadataOpts.Allow(ctx, auth.AccountID()) {
+	if !a.opts.MetadataOpts.Flag.Enabled(ctx, auth.AccountID()) {
 		_ = publicerr.WriteHTTP(w, publicerr.Errorf(403, "Metadata is not enabled for this account"))
 		return
 	}

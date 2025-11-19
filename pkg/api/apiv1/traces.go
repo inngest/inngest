@@ -274,7 +274,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		attrs.Merge(tenantAttrs)
 	}
 
-	if a.opts.MetadataOpts.Allow(ctx, auth.AccountID()) && a.opts.MetadataOpts.SpanExtractor != nil {
+	if a.opts.MetadataOpts.Flag.Enabled(ctx, auth.AccountID()) && a.opts.MetadataOpts.SpanExtractor != nil {
 		md, err := a.opts.MetadataOpts.SpanExtractor.ExtractSpanMetadata(ctx, s)
 		if err != nil {
 			warnings := metadata.ExtractWarnings(err)

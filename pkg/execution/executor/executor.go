@@ -407,6 +407,14 @@ func WithUseLuaRateLimitImplementation(fn func(ctx context.Context, accountID uu
 // AllowStepMetadata determines if key queues should be enabled for the account
 type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
 
+func (am AllowStepMetadata) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if am == nil {
+		return false
+	}
+
+	return am(ctx, acctID)
+}
+
 func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).allowStepMetadata = md
@@ -1517,7 +1525,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if e.allowStepMetadata != nil && e.allowStepMetadata(ctx, instance.Metadata().ID.Tenant.AccountID) {
+		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
 			for _, opcode := range resp.Generator {
 				for _, metadata := range opcode.Metadata {
 					// TODO: validate metadata kinds & sizes

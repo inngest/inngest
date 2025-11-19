@@ -604,7 +604,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{
-				Allow: func(ctx context.Context, accountID uuid.UUID) bool {
+				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
 					return enableStepMetadata
 				},
 				SpanExtractor: metadata.SpanExtractors{},
