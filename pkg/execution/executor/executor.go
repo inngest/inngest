@@ -653,7 +653,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.useConstraintAPI,
 		req,
 		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
-			return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
+				return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+			}, util.WithBoundaries(2*time.Second))
 		})
 }
 

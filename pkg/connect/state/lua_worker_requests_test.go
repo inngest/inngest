@@ -9,6 +9,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +27,7 @@ func TestIncrWorkerRequestsLuaScript(t *testing.T) {
 
 	ctx := context.Background()
 	envID := uuid.New()
-	instanceID := "test-instance"
+	instanceID := util.XXHash("test-instance")
 
 	// Helper to get Redis keys
 	workerTotalCapacityKey := fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
@@ -228,7 +229,7 @@ func TestDecrWorkerRequestsLuaScript(t *testing.T) {
 
 	ctx := context.Background()
 	envID := uuid.New()
-	instanceID := "test-instance"
+	instanceID := util.XXHash("test-instance")
 
 	// Helper to get Redis keys
 	workerTotalCapacityKey := fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
@@ -413,7 +414,7 @@ func TestWorkerRequestsLuaScriptsIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	envID := uuid.New()
-	instanceID := "test-instance"
+	instanceID := util.XXHash("test-instance")
 
 	workerTotalCapacityKey := fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
 	workerRequestsKey := fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)

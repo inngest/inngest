@@ -3,6 +3,7 @@ import { type Metadata } from 'next';
 import { AppRoot } from '@inngest/components/AppRoot';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 
+import Analytics from '@/components/Analytics';
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
 import PageViewTracker from '@/components/PageViewTracker';
 import ClerkProvider from './Provider';
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClientFeatureFlagProvider>
           <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
           <PageViewTracker />
+          <Analytics />
         </ClientFeatureFlagProvider>
       </ClerkProvider>
     </AppRoot>

@@ -3,12 +3,13 @@ package rueidis
 import (
 	"context"
 	"errors"
+	"iter"
 	"time"
 
 	intl "github.com/redis/rueidis/internal/cmds"
 )
 
-// MGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within same slot into multiple GETs
+// MGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within the same slot into multiple GETs
 func MGetCache(client Client, ctx context.Context, ttl time.Duration, keys []string) (ret map[string]RedisMessage, err error) {
 	if len(keys) == 0 {
 		return make(map[string]RedisMessage), nil
@@ -28,6 +29,8 @@ func isCacheDisabled(client Client) bool {
 	switch c := client.(type) {
 	case *singleClient:
 		return c.DisableCache
+	case *standalone:
+		return c.primary.Load().DisableCache
 	case *sentinelClient:
 		return c.mOpt != nil && c.mOpt.DisableCache
 	case *clusterClient:
@@ -36,14 +39,14 @@ func isCacheDisabled(client Client) bool {
 	return false
 }
 
-// MGet is a helper that consults the redis directly with multiple keys by grouping keys within same slot into MGET or multiple GETs
+// MGet is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MGET or multiple GETs
 func MGet(client Client, ctx context.Context, keys []string) (ret map[string]RedisMessage, err error) {
 	if len(keys) == 0 {
 		return make(map[string]RedisMessage), nil
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientMGet(client, ctx, client.B().Mget().Key(keys...).Build(), keys)
 	}
 
@@ -55,14 +58,14 @@ func MGet(client Client, ctx context.Context, keys []string) (ret map[string]Red
 	return doMultiGet(client, ctx, cmds.s, keys)
 }
 
-// MSet is a helper that consults the redis directly with multiple keys by grouping keys within same slot into MSETs or multiple SETs
+// MSet is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MSETs or multiple SETs
 func MSet(client Client, ctx context.Context, kvs map[string]string) map[string]error {
 	if len(kvs) == 0 {
 		return make(map[string]error)
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientMSet(client, ctx, "MSET", kvs, make(map[string]error, len(kvs)))
 	}
 
@@ -74,14 +77,14 @@ func MSet(client Client, ctx context.Context, kvs map[string]string) map[string]
 	return doMultiSet(client, ctx, cmds.s)
 }
 
-// MDel is a helper that consults the redis directly with multiple keys by grouping keys within same slot into DELs
+// MDel is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into DELs
 func MDel(client Client, ctx context.Context, keys []string) map[string]error {
 	if len(keys) == 0 {
 		return make(map[string]error)
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientMDel(client, ctx, keys)
 	}
 
@@ -93,14 +96,14 @@ func MDel(client Client, ctx context.Context, keys []string) map[string]error {
 	return doMultiSet(client, ctx, cmds.s)
 }
 
-// MSetNX is a helper that consults the redis directly with multiple keys by grouping keys within same slot into MSETNXs or multiple SETNXs
+// MSetNX is a helper that consults the redis directly with multiple keys by grouping keys within the same slot into MSETNXs or multiple SETNXs
 func MSetNX(client Client, ctx context.Context, kvs map[string]string) map[string]error {
 	if len(kvs) == 0 {
 		return make(map[string]error)
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientMSet(client, ctx, "MSETNX", kvs, make(map[string]error, len(kvs)))
 	}
 
@@ -112,7 +115,7 @@ func MSetNX(client Client, ctx context.Context, kvs map[string]string) map[strin
 	return doMultiSet(client, ctx, cmds.s)
 }
 
-// JsonMGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within same slot into multiple JSON.GETs
+// JsonMGetCache is a helper that consults the client-side caches with multiple keys by grouping keys within the same slot into multiple JSON.GETs
 func JsonMGetCache(client Client, ctx context.Context, ttl time.Duration, keys []string, path string) (ret map[string]RedisMessage, err error) {
 	if len(keys) == 0 {
 		return make(map[string]RedisMessage), nil
@@ -125,14 +128,14 @@ func JsonMGetCache(client Client, ctx context.Context, ttl time.Duration, keys [
 	return doMultiCache(client, ctx, cmds.s, keys)
 }
 
-// JsonMGet is a helper that consults redis directly with multiple keys by grouping keys within same slot into JSON.MGETs or multiple JSON.GETs
+// JsonMGet is a helper that consults redis directly with multiple keys by grouping keys within the same slot into JSON.MGETs or multiple JSON.GETs
 func JsonMGet(client Client, ctx context.Context, keys []string, path string) (ret map[string]RedisMessage, err error) {
 	if len(keys) == 0 {
 		return make(map[string]RedisMessage), nil
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientMGet(client, ctx, client.B().JsonMget().Key(keys...).Path(path).Build(), keys)
 	}
 
@@ -144,14 +147,14 @@ func JsonMGet(client Client, ctx context.Context, keys []string, path string) (r
 	return doMultiGet(client, ctx, cmds.s, keys)
 }
 
-// JsonMSet is a helper that consults redis directly with multiple keys by grouping keys within same slot into JSON.MSETs or multiple JOSN.SETs
+// JsonMSet is a helper that consults redis directly with multiple keys by grouping keys within the same slot into JSON.MSETs or multiple JSON.SETs
 func JsonMSet(client Client, ctx context.Context, kvs map[string]string, path string) map[string]error {
 	if len(kvs) == 0 {
 		return make(map[string]error)
 	}
 
 	switch client.(type) {
-	case *singleClient, *sentinelClient:
+	case *singleClient, *standalone, *sentinelClient:
 		return clientJSONMSet(client, ctx, kvs, path, make(map[string]error, len(kvs)))
 	}
 
@@ -163,7 +166,7 @@ func JsonMSet(client Client, ctx context.Context, kvs map[string]string, path st
 	return doMultiSet(client, ctx, cmds.s)
 }
 
-// DecodeSliceOfJSON is a helper that struct-scans each RedisMessage into dest, which must be a slice of pointer.
+// DecodeSliceOfJSON is a helper that struct-scans each RedisMessage into dest, which must be a slice of the pointer.
 func DecodeSliceOfJSON[T any](result RedisResult, dest *[]T) error {
 	values, err := result.ToArray()
 	if err != nil {
@@ -277,3 +280,49 @@ func arrayToKV(m map[string]RedisMessage, arr []RedisMessage, keys []string) map
 // ErrMSetNXNotSet is used in the MSetNX helper when the underlying MSETNX response is 0.
 // Ref: https://redis.io/commands/msetnx/
 var ErrMSetNXNotSet = errors.New("MSETNX: no key was set")
+
+type Scanner struct {
+	next func(cursor uint64) (ScanEntry, error)
+	err  error
+}
+
+func NewScanner(next func(cursor uint64) (ScanEntry, error)) *Scanner {
+	return &Scanner{next: next}
+}
+
+func (s *Scanner) scan() iter.Seq[[]string] {
+	return func(yield func([]string) bool) {
+		var e ScanEntry
+		for e, s.err = s.next(0); s.err == nil && yield(e.Elements) && e.Cursor != 0; {
+			e, s.err = s.next(e.Cursor)
+		}
+	}
+}
+
+func (s *Scanner) Iter() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for vs := range s.scan() {
+			for _, v := range vs {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (s *Scanner) Iter2() iter.Seq2[string, string] {
+	return func(yield func(string, string) bool) {
+		for vs := range s.scan() {
+			for i := 0; i+1 < len(vs); i += 2 {
+				if !yield(vs[i], vs[i+1]) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (s *Scanner) Err() error {
+	return s.err
+}

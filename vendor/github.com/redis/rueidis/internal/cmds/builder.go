@@ -55,6 +55,11 @@ func PutCompletedForce(c Completed) {
 	Put(c.cs)
 }
 
+// PutCacheableForce recycles the Cacheable regardless of the c.cs.r
+func PutCacheableForce(c Cacheable) {
+	Put(c.cs)
+}
+
 // PutCompleted recycles the Completed
 func PutCompleted(c Completed) {
 	if c.cs.r == 0 {
@@ -80,7 +85,7 @@ func (b Builder) Arbitrary(token ...string) (c Arbitrary) {
 }
 
 // Keys calculate which key slot the command belongs to.
-// Users must use Keys to construct the key part of the command, otherwise
+// Users must use Keys to construct the key part of the command; otherwise,
 // the command will not be sent to correct redis node.
 func (c Arbitrary) Keys(keys ...string) Arbitrary {
 	if c.ks&NoSlot == NoSlot {

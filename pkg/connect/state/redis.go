@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -1098,12 +1099,12 @@ func (r *redisConnectionStateManager) GetAllActiveWorkerRequests(ctx context.Con
 
 // workerCapacityKey returns the Redis key for storing a worker's capacity limit
 func (r *redisConnectionStateManager) workerCapacityKey(envID uuid.UUID, instanceID string) string {
-	return fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), instanceID)
+	return fmt.Sprintf("{%s}:worker-capacity:%s", envID.String(), util.XXHash(instanceID))
 }
 
 // workerRequestsKey returns the Redis key for storing a worker's active leases as a sorted set
 func (r *redisConnectionStateManager) workerRequestsKey(envID uuid.UUID, instanceID string) string {
-	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
+	return fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), util.XXHash(instanceID))
 }
 
 // requestWorkerKey returns the Redis key for storing the mapping from request ID to worker instance ID
