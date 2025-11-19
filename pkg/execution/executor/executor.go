@@ -1517,7 +1517,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if e.allowStepMetadata(ctx, instance.Metadata().ID.Tenant.AccountID) {
+		if e.allowStepMetadata != nil && e.allowStepMetadata(ctx, instance.Metadata().ID.Tenant.AccountID) {
 			for _, opcode := range resp.Generator {
 				for _, metadata := range opcode.Metadata {
 					// TODO: validate metadata kinds & sizes
