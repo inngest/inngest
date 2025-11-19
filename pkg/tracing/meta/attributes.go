@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
 )
@@ -132,6 +133,10 @@ var Attrs = struct {
 	// AI attributes
 	AIRequestMetadata  attr[*aigateway.ParsedInferenceRequest]
 	AIResponseMetadata attr[*aigateway.ParsedInferenceResponse]
+
+	Metadata     attr[*metadata.Values]
+	MetadataKind attr[*metadata.Kind]
+	MetadataOp   attr[*metadata.Opcode]
 }{
 	internalError: StringAttr("internal.error"),
 
@@ -199,4 +204,8 @@ var Attrs = struct {
 	UserlandName:                       StringAttr("userland.name"),
 	DebugSessionID:                     ULIDAttr("debug.session.id"),
 	DebugRunID:                         ULIDAttr("debug.run.id"),
+
+	Metadata:     JsonAttr[metadata.Values]("metadata.values"),
+	MetadataKind: StringishAttr[metadata.Kind]("metadata.kind"),
+	MetadataOp:   TextAttr[enums.MetadataOpcode]("metadata.op"),
 }

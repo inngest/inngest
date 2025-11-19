@@ -47,6 +47,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
@@ -403,6 +404,16 @@ func WithUseLuaRateLimitImplementation(fn func(ctx context.Context, accountID uu
 	}
 }
 
+// AllowStepMetadata determines if key queues should be enabled for the account
+type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).allowStepMetadata = md
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -457,6 +468,8 @@ type executor struct {
 	tracerProvider tracing.TracerProvider
 
 	useLuaRateLimitImplementation func(ctx context.Context, accountID uuid.UUID) bool
+
+	allowStepMetadata AllowStepMetadata
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -1476,7 +1489,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		// For most executions, we now set the status of the execution span.
+		//For most executions, we now set the status of the execution span.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
@@ -1502,6 +1515,23 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
 			return nil, err
+		}
+
+		if e.allowStepMetadata(ctx, instance.Metadata().ID.Tenant.AccountID) {
+			for _, opcode := range resp.Generator {
+				for _, metadata := range opcode.Metadata {
+					// TODO: validate metadata kinds & sizes
+					_, err := e.createMetadataSpan(
+						ctx,
+						&instance,
+						"executor.ExecutePostMetadata",
+						metadata,
+					)
+					if err != nil {
+						l.Warn("error creating metadata span", "error", err)
+					}
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
@@ -2775,7 +2805,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		copied := *op
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
-			// parellel step individually.
+			// parallel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {
@@ -4699,4 +4729,16 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured) (*meta.SpanReference, error) {
+	return tracing.CreateMetadataSpan(
+		ctx,
+		e.tracerProvider,
+		runCtx.ExecutionSpan(),
+		location,
+		pkgName,
+		runCtx.Metadata(),
+		md,
+	)
 }

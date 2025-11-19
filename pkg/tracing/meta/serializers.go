@@ -4,6 +4,7 @@ package meta
 
 import (
 	"context"
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -253,6 +254,23 @@ func TruncatedStringAttr(key string, length int) attr[*string] {
 	}
 }
 
+func StringishAttr[T ~string](key string) attr[*T] {
+	return attr[*T]{
+		key: withPrefix(key),
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			return attribute.String(withPrefix(key), string(*v))
+		},
+		deserialize: func(v any) (*T, bool) {
+			s, ok := v.(T)
+			return &s, ok
+		},
+	}
+}
+
 func StringSliceAttr(key string) attr[*[]string] {
 	return attr[*[]string]{
 		key: withPrefix(key),
@@ -480,6 +498,35 @@ func StepOpAttr(key string) attr[*enums.Opcode] {
 			if opStr, ok := v.(string); ok {
 				if op, err := enums.OpcodeString(opStr); err == nil {
 					return &op, true
+				}
+			}
+
+			return nil, false
+		},
+	}
+}
+
+func TextAttr[T any, TPtr interface {
+	*T
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+}](key string) attr[*T] {
+	return attr[*T]{
+		key: withPrefix(key),
+		serialize: func(v *T) attribute.KeyValue {
+			if v == nil {
+				return BlankAttr
+			}
+
+			text, _ := ((TPtr)(v)).MarshalText()
+
+			return attribute.String(withPrefix(key), string(text))
+		},
+		deserialize: func(v any) (*T, bool) {
+			if str, ok := v.(string); ok {
+				var ret T
+				if err := (TPtr)(&ret).UnmarshalText([]byte(str)); err != nil {
+					return &ret, true
 				}
 			}
 

@@ -447,3 +447,129 @@ FROM spans
 WHERE span_id IN (SELECT UNNEST(sqlc.slice('ids')::TEXT[]))
 LIMIT 2;
 
+-- name: GetRunSpanByRunID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND account_id = sqlc.arg(account_id) AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetStepSpanByStepID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE span_id IN (
+  SELECT
+    parent_span_id
+  FROM spans execSpans
+  WHERE execSpans.run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND execSpans.account_id = sqlc.arg(account_id)
+  GROUP BY dynamic_span_id
+  HAVING SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+  ORDER BY start_time
+  LIMIT 1
+)
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetExecutionSpanByStepIDAndAttempt :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND account_id = sqlc.arg(account_id)
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = sqlc.arg(step_attempt)::bigint) > 0
+ORDER BY start_time;
+
+-- name: GetLatestExecutionSpanByStepID :one
+WITH latest_attempt AS (
+  SELECT
+    max(attributes->>'$."_inngest.step.attempt"')
+  FROM spans a
+  WHERE a.run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND a.account_id = sqlc.arg(account_id)
+  GROUP BY dynamic_span_id
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+  LIMIT 1
+)
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans b
+WHERE b.run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND b.account_id = sqlc.arg(account_id)
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+AND
+  SUM(attributes->>'$."_inngest.step.attempt"' = (SELECT * FROM latest_attempt)) > 0
+ORDER BY start_time;
+
+-- name: GetSpanBySpanID :one
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND span_id = sqlc.arg(span_id) AND account_id = sqlc.arg(account_id)
+GROUP BY dynamic_span_id
+ORDER BY start_time;
