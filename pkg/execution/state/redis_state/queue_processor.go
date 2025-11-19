@@ -853,7 +853,11 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 	// When Constraint API is enabled, disable capacity checks on PartitionLease.
 	// This is necessary as capacity was already granted to individual items, and
 	// constraints like concurrency were consumed.
-	disableLeaseChecks := p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil
+	var disableLeaseChecks bool
+	if p.AccountID != uuid.Nil && q.capacityManager != nil && q.useConstraintAPI != nil {
+		enableConstraintAPI, _ := q.useConstraintAPI(ctx, p.AccountID)
+		disableLeaseChecks = enableConstraintAPI
+	}
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
