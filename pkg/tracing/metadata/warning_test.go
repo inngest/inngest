@@ -71,7 +71,7 @@ func TestExtractWarnings(t *testing.T) {
 					&WarningError{Key: "key1", Err: io.EOF},
 					&WarningError{Key: "key1", Err: io.EOF},
 				),
-				&WarningError{Key: "key1", Err: io.EOF},
+				fmt.Errorf("wrapped: %w", &WarningError{Key: "key1", Err: io.EOF}),
 			),
 		)
 		require.Len(t, warnings, 1)
