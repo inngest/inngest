@@ -26,9 +26,7 @@ export default function Analytics() {
   }, [pathname, searchParams, lastUrl]);
 
   useEffect(() => {
-    console.log('identifying??');
     if (!isSignedIn || !organization) return;
-    console.log('identifying', user, organization);
     // See tracking plan for traits
     analytics.identify(user.externalId, {
       email: user.primaryEmailAddress?.emailAddress,
