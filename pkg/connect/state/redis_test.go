@@ -13,6 +13,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -2317,7 +2318,7 @@ func TestWorkerCapacityManager_FastForwardEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Manually set short TTL on the worker requests set to simulate edge case
-		workerRequestsKey := fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), instanceID)
+		workerRequestsKey := fmt.Sprintf("{%s}:worker-requests-set:%s", envID.String(), util.XXHash(instanceID))
 		r.SetTTL(workerRequestsKey, time.Second)
 
 		// FastForward past the set TTL but not the individual request lease duration
