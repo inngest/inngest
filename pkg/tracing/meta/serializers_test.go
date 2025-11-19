@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -137,6 +138,26 @@ func TestAddAttr(t *testing.T) {
 				}
 			}
 			require.True(t, found, "StringAttr should be serialized correctly")
+		})
+
+		t.Run("StringishAttr", func(t *testing.T) {
+			type S string
+			key := "stringish-test"
+			value := S("test-stringish")
+			stringishAttr := StringishAttr[S](key)
+
+			AddAttr(attrs, stringishAttr, &value)
+			serialized := attrs.Serialize()
+
+			expectedKey := withPrefix(key)
+			found := false
+			for _, kv := range serialized {
+				if string(kv.Key) == expectedKey && kv.Value.AsString() == string(value) {
+					found = true
+					break
+				}
+			}
+			require.True(t, found, "StringishAttr should be serialized correctly")
 		})
 
 		t.Run("IntAttr", func(t *testing.T) {
@@ -318,6 +339,22 @@ func TestAddAttr(t *testing.T) {
 		AddAttr(attrs, jsonAttr, &newValue)
 		require.Len(t, attrs.Attrs, 1, "should still have only one attribute")
 		require.Equal(t, &newValue, attrs.Attrs[0].value, "JSON value should be updated")
+	})
+
+	t.Run("works with custom Text attribute", func(t *testing.T) {
+		attrs := NewAttrSet()
+		key := "json-test"
+		value := hexInt(42)
+		expected := "0x2a"
+		jsonAttr := TextAttr[hexInt](key)
+
+		AddAttr(attrs, jsonAttr, &value)
+		require.Len(t, attrs.Attrs, 1)
+		require.Equal(t, &value, attrs.Attrs[0].value)
+
+		serialized := attrs.Serialize()
+		require.Len(t, serialized, 1)
+		require.Equal(t, expected, serialized[0].Value.AsString())
 	})
 
 	t.Run("empty attribute set works correctly", func(t *testing.T) {
@@ -746,4 +783,20 @@ func TestExtractTypedValues(t *testing.T) {
 		assert.Nil(t, ev.StepOp)
 		assert.Nil(t, ev.ResponseHeaders)
 	})
+}
+
+type hexInt int64
+
+func (t hexInt) MarshalText() ([]byte, error) {
+	return fmt.Appendf(nil, "0x%x", int64(t)), nil
+}
+
+func (t *hexInt) UnmarshalText(b []byte) error {
+	i, err := strconv.ParseInt(string(b), 16, 64)
+	if err != nil {
+		return err
+	}
+
+	*t = hexInt(i)
+	return nil
 }

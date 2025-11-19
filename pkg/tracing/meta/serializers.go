@@ -265,8 +265,9 @@ func StringishAttr[T ~string](key string) attr[*T] {
 			return attribute.String(withPrefix(key), string(*v))
 		},
 		deserialize: func(v any) (*T, bool) {
-			s, ok := v.(T)
-			return &s, ok
+			s, ok := v.(string)
+			tStr := T(s)
+			return &tStr, ok
 		},
 	}
 }
