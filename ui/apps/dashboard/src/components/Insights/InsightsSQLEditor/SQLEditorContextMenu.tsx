@@ -81,21 +81,21 @@ export function SQLEditorContextMenu({
         <DropdownMenuItem
           className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
           disabled={!contextMenu.hasSelection}
-          onSelect={onCopy}
-        >
-          <span>Copy</span>
-          <span className="ml-auto">
-            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'C']} />
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-          disabled={!contextMenu.hasSelection}
           onSelect={onCut}
         >
           <span>Cut</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'X']} />
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+          disabled={!contextMenu.hasSelection}
+          onSelect={onCopy}
+        >
+          <span>Copy</span>
+          <span className="ml-auto">
+            <KeyboardShortcut color="text-gray-500" keys={['cmd', 'ctrl', 'C']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPaste}>
