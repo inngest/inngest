@@ -7,9 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
+import { RiCodeBlock, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
 
 import type { InsightsQueryStatement } from '@/gql/graphql';
+import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorInstanceContext';
 import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
 import { isQuerySnapshot } from './queries';
 import type { QuerySnapshot } from './types';
@@ -31,10 +32,34 @@ export function QueryActionsMenu({
 }: QueryActionsMenuProps) {
   const { shareQuery } = useStoredQueries();
 
+  // Try to get editor instance, but don't fail if context is not available
+  let editorRef: React.MutableRefObject<any> | null = null;
+  try {
+    const context = useSQLEditorInstance();
+    editorRef = context.editorRef;
+  } catch {
+    // Context not available, editor features will be disabled
+  }
+
+  const handleFormatSQL = () => {
+    if (!editorRef) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    // Trigger the format document action
+    editor.getAction('editor.action.formatDocument')?.run();
+  };
+
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
+        {editorRef && (
+          <DropdownMenuItem className="text-basis px-4" onSelect={handleFormatSQL}>
+            <RiCodeBlock className="size-4" />
+            <span>Format</span>
+          </DropdownMenuItem>
+        )}
         {isActualQueryAndUnshared(query) && (
           <DropdownMenuItem
             className="text-basis px-4"

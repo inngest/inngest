@@ -5,7 +5,7 @@ import { FONT, LINE_HEIGHT } from '../utils/monaco';
 export const EDITOR_OPTIONS: editor.IEditorOptions = {
   autoClosingBrackets: 'always',
   autoClosingQuotes: 'always',
-  contextmenu: false,
+  contextmenu: true,
   fixedOverflowWidgets: true,
   fontFamily: FONT.font,
   fontSize: FONT.size,
