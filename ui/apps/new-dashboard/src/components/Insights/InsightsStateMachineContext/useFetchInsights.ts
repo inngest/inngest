@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback } from "react";
 import { useClient } from "urql";
 

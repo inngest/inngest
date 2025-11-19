@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { cn } from "@inngest/components/utils/classNames";
 import { RiCommandLine } from "@remixicon/react";

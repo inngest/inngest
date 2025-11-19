@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import { RiContractRightLine } from "@remixicon/react";
 

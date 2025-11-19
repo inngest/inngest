@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useRef, useState } from "react";
 import { Search } from "@inngest/components/Forms/Search";
 import { InfiniteScrollTrigger } from "@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger";

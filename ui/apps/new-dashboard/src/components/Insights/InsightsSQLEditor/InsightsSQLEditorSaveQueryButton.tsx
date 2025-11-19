@@ -1,6 +1,4 @@
-"use client";
-
-import { Button } from "@inngest/components/Button/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import {
   Tooltip,
   TooltipContent,

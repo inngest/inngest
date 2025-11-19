@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo } from "react";
 import { TextCell, TimeCell } from "@inngest/components/Table";
 import type { ColumnDef } from "@tanstack/react-table";

@@ -1,8 +1,6 @@
-"use client";
-
 import { Fragment, type ReactElement } from "react";
 import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { Skeleton } from "@inngest/components/Skeleton";
 
 import type { SchemaEntry } from "./SchemasContext/types";

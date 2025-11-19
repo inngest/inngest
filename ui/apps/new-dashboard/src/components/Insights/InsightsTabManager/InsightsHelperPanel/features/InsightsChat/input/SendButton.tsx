@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { RiArrowUpLine } from "@remixicon/react";
 
 type SendButtonProps = {

@@ -1,6 +1,4 @@
-"use client";
-
-import { Link } from "@inngest/components/Link/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import { RiChatPollLine } from "@remixicon/react";
 
 export function EmptyState() {

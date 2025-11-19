@@ -1,5 +1,3 @@
-"use client";
-
 import { RiTableView } from "@remixicon/react";
 
 type IconLayoutWrapperProps = {

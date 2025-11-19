@@ -1,5 +1,3 @@
-"use client";
-
 import type { InsightsQueryStatement } from "@/gql/graphql";
 import type { QuerySnapshot } from "../types";
 import { QueryHelperPanelSectionContentNoData } from "./QueryHelperPanelSectionContentNoData";

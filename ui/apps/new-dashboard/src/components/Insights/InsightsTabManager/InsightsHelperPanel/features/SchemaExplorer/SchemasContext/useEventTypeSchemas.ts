@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback } from "react";
 import type { PageInfo } from "@inngest/components/types/eventType";
 import { useClient } from "urql";

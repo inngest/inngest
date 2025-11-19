@@ -1,6 +1,4 @@
-"use client";
-
-import { Link } from "@inngest/components/Link/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import { Resizable } from "@inngest/components/Resizable/Resizable";
 
 import type { Tab } from "@/components/Insights/types";

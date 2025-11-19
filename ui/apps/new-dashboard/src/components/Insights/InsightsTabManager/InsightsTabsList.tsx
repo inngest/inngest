@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Alert } from "@inngest/components/Alert/Alert";
 import { AlertModal } from "@inngest/components/Modal/AlertModal";

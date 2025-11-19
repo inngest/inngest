@@ -1,8 +1,6 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { AlertModal } from "@inngest/components/Modal/AlertModal";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import { cn } from "@inngest/components/utils/classNames";

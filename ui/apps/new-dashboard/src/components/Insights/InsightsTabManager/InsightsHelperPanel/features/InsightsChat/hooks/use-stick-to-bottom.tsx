@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 export const useStickToBottom = () => {

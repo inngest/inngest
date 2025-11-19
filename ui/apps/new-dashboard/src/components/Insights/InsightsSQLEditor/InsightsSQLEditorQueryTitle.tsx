@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@inngest/components/Forms/Input";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";

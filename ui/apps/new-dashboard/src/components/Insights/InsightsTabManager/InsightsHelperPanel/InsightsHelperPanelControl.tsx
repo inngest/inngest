@@ -1,7 +1,5 @@
-"use client";
-
 import { type ReactElement } from "react";
-import { Link } from "@inngest/components/Link/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import { cn } from "@inngest/components/utils/classNames";
 
 export interface HelperItem {

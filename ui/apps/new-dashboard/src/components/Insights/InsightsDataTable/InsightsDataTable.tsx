@@ -1,5 +1,3 @@
-"use client";
-
 import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
 import { EmptyState } from "./states/EmptyState";
 import { ErrorState } from "./states/ErrorState";

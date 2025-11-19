@@ -1,7 +1,5 @@
-"use client";
-
 import { useMemo } from "react";
-import { Button } from "@inngest/components/Button/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import {
   DropdownMenu,
   DropdownMenuContent,

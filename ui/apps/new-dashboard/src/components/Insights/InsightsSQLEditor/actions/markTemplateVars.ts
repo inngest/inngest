@@ -1,5 +1,3 @@
-"use client";
-
 import type { SQLEditorMountCallback } from "@inngest/components/SQLEditor/SQLEditor";
 
 type Editor = Parameters<SQLEditorMountCallback>[0];

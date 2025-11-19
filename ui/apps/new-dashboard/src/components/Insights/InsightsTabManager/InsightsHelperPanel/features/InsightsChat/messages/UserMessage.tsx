@@ -1,5 +1,3 @@
-"use client";
-
 import type { MessagePart } from "@inngest/use-agent";
 
 export const UserMessage = ({ part }: { part: MessagePart }) => {

@@ -1,5 +1,3 @@
-"use client";
-
 import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
 import type { InsightsFetchResult } from "@/components/Insights/InsightsStateMachineContext/types";
 

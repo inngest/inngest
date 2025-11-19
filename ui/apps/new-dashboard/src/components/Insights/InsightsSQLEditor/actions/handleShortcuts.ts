@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import type { SQLEditorMountCallback } from "@inngest/components/SQLEditor/SQLEditor";
 

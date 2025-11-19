@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useMemo } from "react";
 import { useQuery, type CombinedError } from "urql";
 

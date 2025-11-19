@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useLayoutEffect, useRef } from "react";
 
 // Uses a ref to ensure that the latest value is always available.

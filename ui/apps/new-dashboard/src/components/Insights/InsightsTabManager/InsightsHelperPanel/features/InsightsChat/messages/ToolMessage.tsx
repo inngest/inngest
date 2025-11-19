@@ -1,7 +1,5 @@
-"use client";
-
 import { Disclosure } from "@headlessui/react";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import { cn } from "@inngest/components/utils/classNames";
 import { type ToolPartFor } from "@inngest/use-agent";

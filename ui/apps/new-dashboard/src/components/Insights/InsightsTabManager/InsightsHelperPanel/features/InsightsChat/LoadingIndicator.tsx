@@ -1,5 +1,3 @@
-"use client";
-
 import { RiLoader2Line } from "@remixicon/react";
 
 export const LoadingIndicator = ({ text = "Thinking…" }: { text?: string }) => {
