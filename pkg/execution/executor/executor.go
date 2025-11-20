@@ -283,7 +283,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -413,7 +413,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager  constraintapi.CapacityManager
+	capacityManager  constraintapi.RolloutManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
 
 	fl                  state.FunctionLoader

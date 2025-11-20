@@ -26,7 +26,7 @@ const (
 
 func WithConstraints[T any](
 	ctx context.Context,
-	capacityManager constraintapi.CapacityManager,
+	capacityManager constraintapi.RolloutManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
 	idempotencyKey string,

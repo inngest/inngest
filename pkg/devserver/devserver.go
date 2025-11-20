@@ -348,7 +348,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	const rateLimitPrefix = "ratelimit"
-	var capacityManager constraintapi.CapacityManager
+	var capacityManager constraintapi.RolloutManager
 	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
 	if enableConstraintAPI {
 		shards := make(map[string]rueidis.Client)
