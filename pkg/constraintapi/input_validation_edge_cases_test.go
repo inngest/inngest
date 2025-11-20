@@ -122,8 +122,8 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Amount:               1,
 			LeaseIdempotencyKeys: []string{"large-duration-lease"},
 			CurrentTime:          clock.Now(),
-			Duration:             23 * time.Hour, // Very large
-			MaximumLifetime:      24 * time.Hour, // Larger lifetime
+			Duration:             2 * time.Hour, // Very large
+			MaximumLifetime:      3 * time.Hour, // Larger lifetime
 			Configuration:        config,
 			Constraints:          constraints,
 			Source: LeaseSource{

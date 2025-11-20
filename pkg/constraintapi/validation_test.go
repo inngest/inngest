@@ -565,7 +565,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				Amount:               1,
 				CurrentTime:          baseTime,
 				Duration:             1 * time.Minute,
-				MaximumLifetime:      24 * time.Hour,
+				MaximumLifetime:      3 * time.Hour,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -893,7 +893,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Amount:               1,
 				CurrentTime:          baseTime,
 				Duration:             1 * time.Minute, // Max allowed duration
-				MaximumLifetime:      24 * time.Hour,  // Max allowed lifetime
+				MaximumLifetime:      3 * time.Hour,   // Max allowed lifetime
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
@@ -926,7 +926,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				Amount:               1,
 				CurrentTime:          time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
 				Duration:             1 * time.Minute,
-				MaximumLifetime:      24 * time.Hour,
+				MaximumLifetime:      3 * time.Hour,
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,

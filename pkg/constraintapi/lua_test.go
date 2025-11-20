@@ -56,7 +56,7 @@ func TestSerializedConstraintItem(t *testing.T) {
 				Limit:                     200,
 				Burst:                     300,
 				Period:                    60,
-				ThrottleKeyExpressionHash: "throttle-key",
+				ThrottleKeyExpressionHash: "throttle-expr",
 			},
 		},
 	}
@@ -98,11 +98,11 @@ func TestSerializedConstraintItem(t *testing.T) {
 				Kind: ConstraintKindThrottle,
 				Throttle: &ThrottleConstraint{
 					Scope:             enums.ThrottleScopeFn,
-					KeyExpressionHash: "throttle-key",
-					EvaluatedKeyHash:  "throttle-eval",
+					KeyExpressionHash: "throttle-expr",
+					EvaluatedKeyHash:  "throttle-key",
 				},
 			},
-			expected: `{"k":3,"t":{"h":"throttle-key","eh":"throttle-eval","l":200,"b":300,"p":60}}`,
+			expected: `{"k":3,"t":{"h":"throttle-expr","eh":"throttle-key","l":200,"b":300,"p":60,"k":"{test-prefix}:throttle:throttle-key"}}`,
 		},
 		{
 			name: "Concurrency constraint with standard function step limit",

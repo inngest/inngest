@@ -184,7 +184,7 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressTotal
 	elseif value.k == 3 then
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.eh, nowMS, value.t.p, value.t.l, value.t.b)
+		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
 		constraintRetryAfter = toInteger(throttleRes[2]) 
 	end
@@ -230,7 +230,7 @@ for i = 1, granted, 1 do
 		elseif value.k == 2 then
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
-			throttleUpdate(value.t.eh, nowMS, value.t.p, value.t.l, 1)
+			throttleUpdate(value.t.k, nowMS, value.t.p, value.t.l, 1)
 		end
 	end
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)

@@ -125,7 +125,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		}
 
 		// NOTE: Throttle keys are stored _without_ prefix
-		expectedRemainingKeys = append(expectedRemainingKeys, "test-value")
+		expectedRemainingKeys = append(expectedRemainingKeys, "{q:v1}:throttle:test-value")
 
 		te.VerifyNoResourceLeaks(initialState, expectedRemainingKeys)
 
@@ -497,7 +497,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-1"),
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-2"),
 			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-acquire"),
-			"multi-value", // throttle key
+			"{q:v1}:throttle:multi-value", // throttle key
 		}
 
 		te.VerifyNoResourceLeaks(initialState, expectedRemainingKeys)

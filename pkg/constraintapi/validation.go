@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MaximumLeaseLifetime = 24 * time.Hour
+	MaximumLeaseLifetime = 3 * time.Hour
 	MinimumDuration      = 2 * time.Second
 	MaximumDuration      = 1 * time.Minute
 	MaximumAmount        = 20
@@ -148,6 +148,10 @@ func (r *CapacityAcquireRequest) Valid() error {
 
 	if r.MaximumLifetime > MaximumLeaseLifetime {
 		errs = multierror.Append(errs, fmt.Errorf("exceeds maximum lease lifetime of %s", MaximumLeaseLifetime))
+	}
+
+	if r.Duration > r.MaximumLifetime {
+		errs = multierror.Append(errs, fmt.Errorf("duration cannot be greater than maximum lifetime"))
 	}
 
 	if r.Source.Service == ServiceUnknown {
