@@ -1,6 +1,3 @@
-"use client";
-
-import { notFound } from "next/navigation";
 import { Skeleton } from "@inngest/components/Skeleton";
 
 import { useEnvironment } from "@/components/Environments/environment-context";
@@ -55,7 +52,11 @@ export default function Keys() {
   }
 
   if (error || !keys) {
-    notFound();
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <p className="text-subtle text-sm">Failed to load keys</p>
+      </div>
+    );
   }
 
   const orderedKeys = keys.sort(sortFunction);

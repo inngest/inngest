@@ -1,8 +1,4 @@
-"use client";
-
-import { type Route } from "next";
-import NextLink from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Time } from "@inngest/components/Time";
 import { cn } from "@inngest/components/utils/classNames";
 import { RiTimeLine } from "@remixicon/react";
@@ -26,7 +22,8 @@ const pageFilters: { [key: string]: string[] } = {
 
 export default function KeysListItem({ list }: KeysListItemProps) {
   const env = useEnvironment();
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const page = getManageKey(pathname);
 
   // Change once there's a way to get the route param in a server component
@@ -52,8 +49,8 @@ export default function KeysListItem({ list }: KeysListItemProps) {
 
         return (
           <li key={key.id} className="border-subtle text-basis border-b">
-            <NextLink
-              href={eventPathname as Route}
+            <Link
+              to={eventPathname}
               className={cn(
                 "hover:bg-canvasMuted block px-4 py-3",
                 isActive && "bg-canvasSubtle",
@@ -70,7 +67,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
                   copyable={false}
                 />
               </div>
-            </NextLink>
+            </Link>
           </li>
         );
       })}

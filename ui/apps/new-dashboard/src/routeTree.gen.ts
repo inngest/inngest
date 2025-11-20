@@ -16,15 +16,19 @@ import { Route as SignUpSplatRouteImport } from "./routes/sign-up.$";
 import { Route as SignInSplatRouteImport } from "./routes/sign-in.$";
 import { Route as AuthedOrgActiveRouteImport } from "./routes/_authed/_org-active";
 import { Route as AuthedOrgActiveEnvEnvSlugRouteRouteImport } from "./routes/_authed/_org-active/env/$envSlug/route";
+import { Route as AuthedOrgActiveEnvEnvSlugManageRouteRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/route";
 import { Route as AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport } from "./routes/_authed/_org-active/env/$envSlug/apps/route";
 import { Route as AuthedOrgActiveEnvEnvSlugRunsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/runs/index";
 import { Route as AuthedOrgActiveEnvEnvSlugMetricsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/metrics/index";
-import { Route as AuthedOrgActiveEnvEnvSlugManageIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/index";
 import { Route as AuthedOrgActiveEnvEnvSlugInsightsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/insights/index";
 import { Route as AuthedOrgActiveEnvEnvSlugFunctionsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/index";
 import { Route as AuthedOrgActiveEnvEnvSlugEventsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/events/index";
 import { Route as AuthedOrgActiveEnvEnvSlugEventTypesIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/event-types/index";
 import { Route as AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/apps/index";
+import { Route as AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/$ingestKeys/route";
+import { Route as AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/signing-key/index";
+import { Route as AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/$ingestKeys/index";
+import { Route as AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/index";
 
 const SignOutRoute = SignOutRouteImport.update({
   id: "/sign-out",
@@ -60,6 +64,12 @@ const AuthedOrgActiveEnvEnvSlugRouteRoute =
     path: "/env/$envSlug",
     getParentRoute: () => AuthedOrgActiveRoute,
   } as any);
+const AuthedOrgActiveEnvEnvSlugManageRouteRoute =
+  AuthedOrgActiveEnvEnvSlugManageRouteRouteImport.update({
+    id: "/manage",
+    path: "/manage",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
+  } as any);
 const AuthedOrgActiveEnvEnvSlugAppsRouteRoute =
   AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport.update({
     id: "/apps",
@@ -76,12 +86,6 @@ const AuthedOrgActiveEnvEnvSlugMetricsIndexRoute =
   AuthedOrgActiveEnvEnvSlugMetricsIndexRouteImport.update({
     id: "/metrics/",
     path: "/metrics/",
-    getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
-  } as any);
-const AuthedOrgActiveEnvEnvSlugManageIndexRoute =
-  AuthedOrgActiveEnvEnvSlugManageIndexRouteImport.update({
-    id: "/manage/",
-    path: "/manage/",
     getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
   } as any);
 const AuthedOrgActiveEnvEnvSlugInsightsIndexRoute =
@@ -114,6 +118,30 @@ const AuthedOrgActiveEnvEnvSlugAppsIndexRoute =
     path: "/",
     getParentRoute: () => AuthedOrgActiveEnvEnvSlugAppsRouteRoute,
   } as any);
+const AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute =
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteImport.update({
+    id: "/$ingestKeys",
+    path: "/$ingestKeys",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugManageRouteRoute,
+  } as any);
+const AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute =
+  AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRouteImport.update({
+    id: "/signing-key/",
+    path: "/signing-key/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugManageRouteRoute,
+  } as any);
+const AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute =
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute,
+  } as any);
+const AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute =
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport.update({
+    id: "/$keyID/",
+    path: "/$keyID/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute,
+  } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
@@ -122,14 +150,18 @@ export interface FileRoutesByFullPath {
   "/sign-up/$": typeof SignUpSplatRoute;
   "/env/$envSlug": typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren;
   "/env/$envSlug/apps": typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren;
+  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren;
+  "/env/$envSlug/manage/$ingestKeys": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
   "/env/$envSlug/apps/": typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute;
   "/env/$envSlug/event-types": typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute;
   "/env/$envSlug/events": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/env/$envSlug/functions": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/env/$envSlug/insights": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
-  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/env/$envSlug/metrics": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
+  "/env/$envSlug/manage/$ingestKeys/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
+  "/env/$envSlug/manage/signing-key": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
@@ -137,14 +169,17 @@ export interface FileRoutesByTo {
   "/sign-in/$": typeof SignInSplatRoute;
   "/sign-up/$": typeof SignUpSplatRoute;
   "/env/$envSlug": typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren;
+  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/apps": typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute;
   "/env/$envSlug/event-types": typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute;
   "/env/$envSlug/events": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/env/$envSlug/functions": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/env/$envSlug/insights": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
-  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/env/$envSlug/metrics": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
+  "/env/$envSlug/manage/$ingestKeys": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
+  "/env/$envSlug/manage/signing-key": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -156,14 +191,18 @@ export interface FileRoutesById {
   "/sign-up/$": typeof SignUpSplatRoute;
   "/_authed/_org-active/env/$envSlug": typeof AuthedOrgActiveEnvEnvSlugRouteRouteWithChildren;
   "/_authed/_org-active/env/$envSlug/apps": typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren;
+  "/_authed/_org-active/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren;
+  "/_authed/_org-active/env/$envSlug/manage/$ingestKeys": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
   "/_authed/_org-active/env/$envSlug/apps/": typeof AuthedOrgActiveEnvEnvSlugAppsIndexRoute;
   "/_authed/_org-active/env/$envSlug/event-types/": typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute;
   "/_authed/_org-active/env/$envSlug/events/": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/_authed/_org-active/env/$envSlug/functions/": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/_authed/_org-active/env/$envSlug/insights/": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
-  "/_authed/_org-active/env/$envSlug/manage/": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/_authed/_org-active/env/$envSlug/metrics/": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/_authed/_org-active/env/$envSlug/runs/": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
+  "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
+  "/_authed/_org-active/env/$envSlug/manage/signing-key/": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -174,14 +213,18 @@ export interface FileRouteTypes {
     | "/sign-up/$"
     | "/env/$envSlug"
     | "/env/$envSlug/apps"
+    | "/env/$envSlug/manage"
+    | "/env/$envSlug/manage/$ingestKeys"
     | "/env/$envSlug/apps/"
     | "/env/$envSlug/event-types"
     | "/env/$envSlug/events"
     | "/env/$envSlug/functions"
     | "/env/$envSlug/insights"
-    | "/env/$envSlug/manage"
     | "/env/$envSlug/metrics"
-    | "/env/$envSlug/runs";
+    | "/env/$envSlug/runs"
+    | "/env/$envSlug/manage/$ingestKeys/"
+    | "/env/$envSlug/manage/signing-key"
+    | "/env/$envSlug/manage/$ingestKeys/$keyID";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
@@ -189,14 +232,17 @@ export interface FileRouteTypes {
     | "/sign-in/$"
     | "/sign-up/$"
     | "/env/$envSlug"
+    | "/env/$envSlug/manage"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/event-types"
     | "/env/$envSlug/events"
     | "/env/$envSlug/functions"
     | "/env/$envSlug/insights"
-    | "/env/$envSlug/manage"
     | "/env/$envSlug/metrics"
-    | "/env/$envSlug/runs";
+    | "/env/$envSlug/runs"
+    | "/env/$envSlug/manage/$ingestKeys"
+    | "/env/$envSlug/manage/signing-key"
+    | "/env/$envSlug/manage/$ingestKeys/$keyID";
   id:
     | "__root__"
     | "/"
@@ -207,14 +253,18 @@ export interface FileRouteTypes {
     | "/sign-up/$"
     | "/_authed/_org-active/env/$envSlug"
     | "/_authed/_org-active/env/$envSlug/apps"
+    | "/_authed/_org-active/env/$envSlug/manage"
+    | "/_authed/_org-active/env/$envSlug/manage/$ingestKeys"
     | "/_authed/_org-active/env/$envSlug/apps/"
     | "/_authed/_org-active/env/$envSlug/event-types/"
     | "/_authed/_org-active/env/$envSlug/events/"
     | "/_authed/_org-active/env/$envSlug/functions/"
     | "/_authed/_org-active/env/$envSlug/insights/"
-    | "/_authed/_org-active/env/$envSlug/manage/"
     | "/_authed/_org-active/env/$envSlug/metrics/"
-    | "/_authed/_org-active/env/$envSlug/runs/";
+    | "/_authed/_org-active/env/$envSlug/runs/"
+    | "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/"
+    | "/_authed/_org-active/env/$envSlug/manage/signing-key/"
+    | "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -276,6 +326,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRouteImport;
       parentRoute: typeof AuthedOrgActiveRoute;
     };
+    "/_authed/_org-active/env/$envSlug/manage": {
+      id: "/_authed/_org-active/env/$envSlug/manage";
+      path: "/manage";
+      fullPath: "/env/$envSlug/manage";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageRouteRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute;
+    };
     "/_authed/_org-active/env/$envSlug/apps": {
       id: "/_authed/_org-active/env/$envSlug/apps";
       path: "/apps";
@@ -295,13 +352,6 @@ declare module "@tanstack/react-router" {
       path: "/metrics";
       fullPath: "/env/$envSlug/metrics";
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRouteImport;
-      parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute;
-    };
-    "/_authed/_org-active/env/$envSlug/manage/": {
-      id: "/_authed/_org-active/env/$envSlug/manage/";
-      path: "/manage";
-      fullPath: "/env/$envSlug/manage";
-      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIndexRouteImport;
       parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute;
     };
     "/_authed/_org-active/env/$envSlug/insights/": {
@@ -339,6 +389,34 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugAppsIndexRouteImport;
       parentRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRoute;
     };
+    "/_authed/_org-active/env/$envSlug/manage/$ingestKeys": {
+      id: "/_authed/_org-active/env/$envSlug/manage/$ingestKeys";
+      path: "/$ingestKeys";
+      fullPath: "/env/$envSlug/manage/$ingestKeys";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugManageRouteRoute;
+    };
+    "/_authed/_org-active/env/$envSlug/manage/signing-key/": {
+      id: "/_authed/_org-active/env/$envSlug/manage/signing-key/";
+      path: "/signing-key";
+      fullPath: "/env/$envSlug/manage/signing-key";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugManageRouteRoute;
+    };
+    "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/": {
+      id: "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/";
+      path: "/";
+      fullPath: "/env/$envSlug/manage/$ingestKeys/";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute;
+    };
+    "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/": {
+      id: "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/";
+      path: "/$keyID";
+      fullPath: "/env/$envSlug/manage/$ingestKeys/$keyID";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute;
+    };
   }
 }
 
@@ -357,13 +435,49 @@ const AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren =
     AuthedOrgActiveEnvEnvSlugAppsRouteRouteChildren,
   );
 
+interface AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteChildren {
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
+}
+
+const AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteChildren: AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteChildren =
+  {
+    AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute:
+      AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute,
+    AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute:
+      AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute,
+  };
+
+const AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteWithChildren =
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute._addFileChildren(
+    AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteChildren,
+  );
+
+interface AuthedOrgActiveEnvEnvSlugManageRouteRouteChildren {
+  AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
+  AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute: typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+}
+
+const AuthedOrgActiveEnvEnvSlugManageRouteRouteChildren: AuthedOrgActiveEnvEnvSlugManageRouteRouteChildren =
+  {
+    AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute:
+      AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRouteWithChildren,
+    AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute:
+      AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute,
+  };
+
+const AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren =
+  AuthedOrgActiveEnvEnvSlugManageRouteRoute._addFileChildren(
+    AuthedOrgActiveEnvEnvSlugManageRouteRouteChildren,
+  );
+
 interface AuthedOrgActiveEnvEnvSlugRouteRouteChildren {
   AuthedOrgActiveEnvEnvSlugAppsRouteRoute: typeof AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren;
+  AuthedOrgActiveEnvEnvSlugManageRouteRoute: typeof AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren;
   AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute: typeof AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute;
   AuthedOrgActiveEnvEnvSlugEventsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   AuthedOrgActiveEnvEnvSlugInsightsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
-  AuthedOrgActiveEnvEnvSlugManageIndexRoute: typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   AuthedOrgActiveEnvEnvSlugMetricsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   AuthedOrgActiveEnvEnvSlugRunsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
 }
@@ -372,6 +486,8 @@ const AuthedOrgActiveEnvEnvSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugRout
   {
     AuthedOrgActiveEnvEnvSlugAppsRouteRoute:
       AuthedOrgActiveEnvEnvSlugAppsRouteRouteWithChildren,
+    AuthedOrgActiveEnvEnvSlugManageRouteRoute:
+      AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren,
     AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute:
       AuthedOrgActiveEnvEnvSlugEventTypesIndexRoute,
     AuthedOrgActiveEnvEnvSlugEventsIndexRoute:
@@ -380,8 +496,6 @@ const AuthedOrgActiveEnvEnvSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugRout
       AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute,
     AuthedOrgActiveEnvEnvSlugInsightsIndexRoute:
       AuthedOrgActiveEnvEnvSlugInsightsIndexRoute,
-    AuthedOrgActiveEnvEnvSlugManageIndexRoute:
-      AuthedOrgActiveEnvEnvSlugManageIndexRoute,
     AuthedOrgActiveEnvEnvSlugMetricsIndexRoute:
       AuthedOrgActiveEnvEnvSlugMetricsIndexRoute,
     AuthedOrgActiveEnvEnvSlugRunsIndexRoute:

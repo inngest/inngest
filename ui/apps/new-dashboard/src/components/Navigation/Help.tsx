@@ -1,6 +1,3 @@
-"use client";
-
-import NextLink from "next/link";
 import { Listbox } from "@headlessui/react";
 import { MenuItem } from "@inngest/components/Menu/MenuItem";
 import {
@@ -13,10 +10,11 @@ import {
   RiRoadMapLine,
 } from "@remixicon/react";
 
-import { useSystemStatus } from "@/app/(organization-active)/support/statusPage";
 import { pathCreator } from "@/utils/urls";
 import useOnboardingStep from "../Onboarding/useOnboardingStep";
 import SystemStatusIcon from "./SystemStatusIcon";
+import { Link } from "@tanstack/react-router";
+import { useSystemStatus } from "../Support/SystemStatus";
 
 export const Help = ({
   collapsed,
@@ -39,7 +37,7 @@ export const Help = ({
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border ring-0 focus:outline-none">
-          <NextLink
+          <a
             href="https://www.inngest.com/docs?ref=support-center"
             target="_blank"
           >
@@ -52,8 +50,8 @@ export const Help = ({
                 <div>Inngest Documentation</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="/support" target="_blank">
+          </a>
+          <a href="/support" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="support"
@@ -63,8 +61,8 @@ export const Help = ({
                 <div>Support</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="https://www.inngest.com/discord" target="_blank">
+          </a>
+          <a href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="discord"
@@ -74,9 +72,9 @@ export const Help = ({
                 <div>Join Discord</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </a>
           <hr className="border-subtle" />
-          <NextLink href="https://roadmap.inngest.com/roadmap" target="_blank">
+          <a href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="roadmap"
@@ -86,8 +84,8 @@ export const Help = ({
                 <div>Inngest Roadmap</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="https://status.inngest.com" target="_blank">
+          </a>
+          <a href="https://status.inngest.com" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="status"
@@ -100,8 +98,8 @@ export const Help = ({
                 <div>Status</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="https://www.inngest.com/changelog" target="_blank">
+          </a>
+          <a href="https://www.inngest.com/changelog" target="_blank">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="releaseNotes"
@@ -111,10 +109,10 @@ export const Help = ({
                 <div>Release Notes</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </a>
           <hr className="border-subtle" />
-          <NextLink
-            href={pathCreator.onboardingSteps({
+          <Link
+            to={pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,
               ref: "app-navbar-help",
             })}
@@ -129,7 +127,7 @@ export const Help = ({
                 <div>Show onboarding guide</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
         </Listbox.Options>
       </div>
     </Listbox>

@@ -5,12 +5,12 @@ import ChildEmptyState from "@/components/Manage/ChildEmptyState";
 import { ManageHeader } from "@/components/Manage/Header";
 
 export const Route = createFileRoute(
-  "/_authed/_org-active/env/$envSlug/manage/",
+  "/_authed/_org-active/env/$envSlug/manage",
 )({
-  component: ManageComponent,
+  component: ManageLayoutComponent,
 });
 
-function ManageComponent() {
+function ManageLayoutComponent() {
   const { env } = OrgActiveRoute.useLoaderData();
 
   if (env.hasParent) {

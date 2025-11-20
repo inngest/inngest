@@ -1,9 +1,10 @@
-import { usePathname } from "next/navigation";
+import { useLocation } from "@tanstack/react-router";
 
 import { getManageKey } from "@/utils/urls";
 
 export default function useManagePageTerminology() {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const page = getManageKey(pathname);
 
   type ContentProps = {

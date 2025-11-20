@@ -1,9 +1,6 @@
-"use client";
-
 import { useState } from "react";
-import { type Route } from "next";
-import { useRouter } from "next/navigation";
-import { Button } from "@inngest/components/Button";
+import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@inngest/components/Button/NewButton";
 import { Input } from "@inngest/components/Forms/Input";
 import { Modal } from "@inngest/components/Modal";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
@@ -13,7 +10,7 @@ import { useMutation } from "urql";
 
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { graphql } from "@/gql";
-import { defaultTransform } from "./[keyID]/TransformEvent";
+import { defaultTransform } from "./transformHelpers";
 import useManagePageTerminology from "./useManagePageTerminology";
 
 const CreateSourceKey = graphql(`
@@ -30,7 +27,7 @@ export default function CreateKeyButton() {
   const currentContent = useManagePageTerminology();
   const environment = useEnvironment();
   const [{ fetching }, createSourceKey] = useMutation(CreateSourceKey);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   if (!currentContent) {
     return null;
@@ -61,13 +58,17 @@ export default function CreateKeyButton() {
           toast.error(`${currentContent.name} could not be created`);
         } else {
           toast.success(`${currentContent.name} was successfully created`);
-          router.refresh();
 
           const newKeyID = result.data?.key.id;
           if (newKeyID) {
-            router.push(
-              `/env/${environment.slug}/manage/${currentContent.param}/${newKeyID}` as Route,
-            );
+            navigate({
+              to: "/env/$envSlug/manage/$ingestKeys/$keyID",
+              params: {
+                envSlug: environment.slug,
+                ingestKeys: currentContent.param,
+                keyID: newKeyID,
+              },
+            });
           }
         }
       });

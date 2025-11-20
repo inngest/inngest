@@ -1,7 +1,5 @@
-"use client";
-
+import { useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 
 type ScrollControlProps = {
   containerId: string;
@@ -12,7 +10,8 @@ type ScrollControlProps = {
 // Use a single overflow scrollbar for the page and hide it when not needed.
 // This would be added to ./Layout.tsx if we decide to go this route.
 export default function ScrollControl({ containerId }: ScrollControlProps) {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
 
   // (dylan): Can we do a conditional class application using cn util instead of useEffect?
   useEffect(() => {

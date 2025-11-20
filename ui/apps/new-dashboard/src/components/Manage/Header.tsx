@@ -1,4 +1,4 @@
-import { Header } from "@inngest/components/Header/Header";
+import { Header } from "@inngest/components/Header/NewHeader";
 
 import CreateKeyButton from "@/components/Manage/CreateKeyButton";
 import { EventKeyInfo } from "./EventKeyInfo";

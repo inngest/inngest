@@ -556,6 +556,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      quickjs-emscripten:
+        specifier: ^0.11.0
+        version: 0.11.0
       react:
         specifier: ^18.2.0
         version: 18.2.0
