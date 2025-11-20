@@ -51,7 +51,7 @@ export const ConnectWorkerPercentage = ({
       </div>
       <div className="flex h-full flex-row items-center overflow-visible">
         <Chart
-          option={chartData ? getLineChartOptions(chartData) : {}}
+          option={chartData ? getLineChartOptions(chartData, chartData.legendData) : {}}
           className="relative h-full w-full overflow-visible"
           group="metricsDashboard"
         />
@@ -90,7 +90,7 @@ export const ConnectWorkerTotalCapacity = ({
       </div>
       <div className="flex h-full flex-row items-center overflow-visible">
         <Chart
-          option={chartData ? getLineChartOptions(chartData) : {}}
+          option={chartData ? getLineChartOptions(chartData, chartData.legendData) : {}}
           className="relative h-full w-full overflow-visible"
           group="metricsDashboard"
         />
