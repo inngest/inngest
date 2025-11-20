@@ -318,8 +318,13 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
-            <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
-            <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
+            {/* Only show Connect worker metrics if there's data */}
+            {data?.workspace?.workerPercentageUsed?.metrics?.length > 0 && (
+              <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
+            )}
+            {data?.workspace?.workerTotalCapacity?.metrics?.length > 0 && (
+              <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
+            )}
           </div>
         </>
       )}
