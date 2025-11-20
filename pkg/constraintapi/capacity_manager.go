@@ -28,6 +28,21 @@ type RolloutManager interface {
 	RolloutKeyGenerator
 }
 
+type wrappedManager struct {
+	CapacityManager
+	keyGenerator
+}
+
+func NewRolloutManager(cm CapacityManager, queueStatePrefix string, rateLimitPrefix string) RolloutManager {
+	return &wrappedManager{
+		keyGenerator: keyGenerator{
+			rateLimitKeyPrefix:  rateLimitPrefix,
+			queueStateKeyPrefix: queueStatePrefix,
+		},
+		CapacityManager: cm,
+	}
+}
+
 // MigrationIdentifier includes hints for the Constraint API which will be removed
 // once all constraint state is moved to a dedicated data store
 //

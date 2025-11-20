@@ -25,6 +25,8 @@ const (
 var enableDebugLogs = false
 
 type redisCapacityManager struct {
+	keyGenerator
+
 	// Until fully rolled out, the Constraint API will use the existing data stores
 	// for accessing and modifying existing constraint state, as well as lease-related state.
 	//
@@ -93,7 +95,9 @@ func WithEnableDebugLogs(enableDebugLogs bool) redisCapacityManagerOption {
 func NewRedisCapacityManager(
 	options ...redisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
-	manager := &redisCapacityManager{}
+	manager := &redisCapacityManager{
+		keyGenerator: keyGenerator{},
+	}
 
 	for _, rcmo := range options {
 		rcmo(manager)
@@ -110,6 +114,9 @@ func NewRedisCapacityManager(
 	if manager.numScavengerShards == 0 {
 		manager.numScavengerShards = 64
 	}
+
+	manager.keyGenerator.queueStateKeyPrefix = manager.queueStateKeyPrefix
+	manager.keyGenerator.rateLimitKeyPrefix = manager.rateLimitKeyPrefix
 
 	return manager, nil
 }
@@ -144,21 +151,26 @@ func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUI
 	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseID)
 }
 
-func (r *redisCapacityManager) KeyInProgressLeasesAccount(accountID uuid.UUID) string {
+type keyGenerator struct {
+	rateLimitKeyPrefix  string
+	queueStateKeyPrefix string
+}
+
+func (r *keyGenerator) KeyInProgressLeasesAccount(accountID uuid.UUID) string {
 	return ConcurrencyConstraint{
 		Scope: enums.ConcurrencyScopeAccount,
 		Mode:  enums.ConcurrencyModeStep,
 	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, uuid.Nil, uuid.Nil)
 }
 
-func (r *redisCapacityManager) KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string {
+func (r *keyGenerator) KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string {
 	return ConcurrencyConstraint{
 		Scope: enums.ConcurrencyScopeFn,
 		Mode:  enums.ConcurrencyModeStep,
 	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, uuid.Nil, fnID)
 }
 
-func (r *redisCapacityManager) KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string {
+func (r *keyGenerator) KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string {
 	return ConcurrencyConstraint{
 		Scope:             scope,
 		Mode:              enums.ConcurrencyModeStep,
