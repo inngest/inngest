@@ -698,3 +698,48 @@ func IncrPausesLegacyDeletionCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_total_accounts_total",
+		Description: "Total number of accounts found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerExpiredAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_expired_accounts_total",
+		Description: "Total number of accounts with expired leases found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerScannedAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_accounts_peeked_total",
+		Description: "Total number of accounts peeked by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerTotalExpiredLeasesCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_expired_leases_total",
+		Description: "Total number of expired leases found by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_reclaimed_total",
+		Description: "Total number of expired leases reclaimed by Constraint API scavenger",
+		Tags:        opts.Tags,
+	})
+}

@@ -283,7 +283,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -413,7 +413,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager  constraintapi.CapacityManager
+	capacityManager  constraintapi.RolloutManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
 
 	fl                  state.FunctionLoader
@@ -637,15 +637,29 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 }
 
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
+
+	key := idempotencyKey(req, runID)
+
 	// Check constraints and acquire lease
 	return WithConstraints(
 		ctx,
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
+		key,
 		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+				return e.schedule(ctx, req, runID, key, performChecks, fallbackIdempotencyKey)
 			}, util.WithBoundaries(2*time.Second))
 		})
 }
@@ -658,6 +672,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func (e *executor) schedule(
 	ctx context.Context,
 	req execution.ScheduleRequest,
+	runID ulid.ULID,
+	// key is the idempotency key
+	key string,
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
@@ -677,19 +694,6 @@ func (e *executor) schedule(
 		"fn_v", req.Function.FunctionVersion,
 		"evt_id", req.Events[0].GetInternalID(),
 	)
-
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	var runID ulid.ULID
-
-	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
-	} else {
-		runID = *req.RunID
-	}
-
-	key := idempotencyKey(req, runID)
 
 	if performChecks {
 		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true

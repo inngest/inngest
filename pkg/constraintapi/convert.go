@@ -225,33 +225,11 @@ func LeaseServiceFromProto(service pb.ConstraintApiLeaseService) LeaseService {
 	}
 }
 
-func LeaseResourceKindToProto(kind LeaseResourceKind) pb.ConstraintApiLeaseResourceKind {
-	switch kind {
-	case LeaseResourceEvent:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT
-	case LeaseResourceQueueItem:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM
-	default:
-		return pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_UNSPECIFIED
-	}
-}
-
-func LeaseResourceKindFromProto(kind pb.ConstraintApiLeaseResourceKind) LeaseResourceKind {
-	switch kind {
-	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_EVENT:
-		return LeaseResourceEvent
-	case pb.ConstraintApiLeaseResourceKind_CONSTRAINT_API_LEASE_RESOURCE_KIND_QUEUE_ITEM:
-		return LeaseResourceQueueItem
-	default:
-		return LeaseResourceUnknown
-	}
-}
-
 func RateLimitConfigToProto(config RateLimitConfig) *pb.RateLimitConfig {
 	return &pb.RateLimitConfig{
 		Scope:             RateLimitScopeToProto(config.Scope),
 		Limit:             int32(config.Limit),
-		Period:            config.Period,
+		Period:            int32(config.Period),
 		KeyExpressionHash: config.KeyExpressionHash,
 	}
 }
@@ -263,7 +241,7 @@ func RateLimitConfigFromProto(pbConfig *pb.RateLimitConfig) RateLimitConfig {
 	return RateLimitConfig{
 		Scope:             RateLimitScopeFromProto(pbConfig.Scope),
 		Limit:             int(pbConfig.Limit),
-		Period:            pbConfig.Period,
+		Period:            int(pbConfig.Period),
 		KeyExpressionHash: pbConfig.KeyExpressionHash,
 	}
 }
@@ -414,6 +392,7 @@ func ConcurrencyConstraintToProto(constraint ConcurrencyConstraint) *pb.Concurre
 		Scope:             ConcurrencyScopeToProto(constraint.Scope),
 		KeyExpressionHash: constraint.KeyExpressionHash,
 		EvaluatedKeyHash:  constraint.EvaluatedKeyHash,
+		InProgressItemKey: constraint.InProgressItemKey,
 	}
 }
 
@@ -426,6 +405,7 @@ func ConcurrencyConstraintFromProto(pbConstraint *pb.ConcurrencyConstraint) Conc
 		Scope:             ConcurrencyScopeFromProto(pbConstraint.Scope),
 		KeyExpressionHash: pbConstraint.KeyExpressionHash,
 		EvaluatedKeyHash:  pbConstraint.EvaluatedKeyHash,
+		InProgressItemKey: pbConstraint.InProgressItemKey,
 	}
 }
 
@@ -558,6 +538,23 @@ func LeaseSourceFromProto(pbSource *pb.LeaseSource) LeaseSource {
 	}
 }
 
+func MigrationIdentifierToProto(migration MigrationIdentifier) *pb.MigrationIdentifier {
+	return &pb.MigrationIdentifier{
+		IsRateLimit: migration.IsRateLimit,
+		QueueShard:  migration.QueueShard,
+	}
+}
+
+func MigrationIdentifierFromProto(pbMigration *pb.MigrationIdentifier) MigrationIdentifier {
+	if pbMigration == nil {
+		return MigrationIdentifier{}
+	}
+	return MigrationIdentifier{
+		IsRateLimit: pbMigration.IsRateLimit,
+		QueueShard:  pbMigration.QueueShard,
+	}
+}
+
 func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckRequest {
 	if req == nil {
 		return nil
@@ -626,10 +623,17 @@ func CapacityCheckResponseToProto(resp *CapacityCheckResponse) *pb.CapacityCheck
 		usage[i] = ConstraintUsageToProto(u)
 	}
 
+	var retryAfter *timestamppb.Timestamp
+	if !resp.RetryAfter.IsZero() {
+		retryAfter = timestamppb.New(resp.RetryAfter)
+	}
+
 	return &pb.CapacityCheckResponse{
 		AvailableCapacity:   int32(resp.AvailableCapacity),
 		LimitingConstraints: limitingConstraints,
 		Usage:               usage,
+		FairnessReduction:   int32(resp.FairnessReduction),
+		RetryAfter:          retryAfter,
 	}
 }
 
@@ -648,10 +652,17 @@ func CapacityCheckResponseFromProto(pbResp *pb.CapacityCheckResponse) *CapacityC
 		usage[i] = ConstraintUsageFromProto(u)
 	}
 
+	var retryAfter time.Time
+	if pbResp.RetryAfter != nil {
+		retryAfter = pbResp.RetryAfter.AsTime()
+	}
+
 	return &CapacityCheckResponse{
 		AvailableCapacity:   int(pbResp.AvailableCapacity),
 		LimitingConstraints: limitingConstraints,
 		Usage:               usage,
+		FairnessReduction:   int(pbResp.FairnessReduction),
+		RetryAfter:          retryAfter,
 	}
 }
 
@@ -665,6 +676,11 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		constraints[i] = ConstraintItemToProto(item)
 	}
 
+	leaseRunIDs := make(map[string]string)
+	for leaseIdempotencyKey, runID := range req.LeaseRunIDs {
+		leaseRunIDs[leaseIdempotencyKey] = runID.String()
+	}
+
 	return &pb.CapacityAcquireRequest{
 		IdempotencyKey:       req.IdempotencyKey,
 		AccountId:            req.AccountID.String(),
@@ -674,7 +690,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		Constraints:          constraints,
 		Amount:               int32(req.Amount),
 		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
-		ResourceKind:         LeaseResourceKindToProto(req.ResourceKind),
+		LeaseRunIds:          leaseRunIDs,
 		CurrentTime:          timestamppb.New(req.CurrentTime),
 		Duration:             durationpb.New(req.Duration),
 		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
@@ -728,6 +744,15 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		blockingThreshold = pbReq.BlockingThreshold.AsDuration()
 	}
 
+	leaseRunIDs := make(map[string]ulid.ULID)
+	for leaseIdempotencyKey, runID := range pbReq.LeaseRunIds {
+		parsed, err := ulid.Parse(runID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid run ID: %w", err)
+		}
+		leaseRunIDs[leaseIdempotencyKey] = parsed
+	}
+
 	return &CapacityAcquireRequest{
 		IdempotencyKey:       pbReq.IdempotencyKey,
 		AccountID:            accountID,
@@ -737,7 +762,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		Constraints:          constraints,
 		Amount:               int(pbReq.Amount),
 		LeaseIdempotencyKeys: pbReq.LeaseIdempotencyKeys,
-		ResourceKind:         LeaseResourceKindFromProto(pbReq.ResourceKind),
+		LeaseRunIDs:          leaseRunIDs,
 		CurrentTime:          currentTime,
 		Duration:             duration,
 		MaximumLifetime:      maximumLifetime,
@@ -765,6 +790,7 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 		Leases:              leases,
 		LimitingConstraints: limitingConstraints,
 		RetryAfter:          timestamppb.New(resp.RetryAfter),
+		FairnessReduction:   int32(resp.FairnessReduction),
 	}
 }
 
@@ -796,6 +822,7 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 		Leases:              leases,
 		LimitingConstraints: limitingConstraints,
 		RetryAfter:          retryAfter,
+		FairnessReduction:   int(pbResp.FairnessReduction),
 	}, nil
 }
 
@@ -808,6 +835,7 @@ func CapacityExtendLeaseRequestToProto(req *CapacityExtendLeaseRequest) *pb.Capa
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
 		Duration:       durationpb.New(req.Duration),
+		Migration:      MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -836,6 +864,7 @@ func CapacityExtendLeaseRequestFromProto(pbReq *pb.CapacityExtendLeaseRequest) (
 		AccountID:      accountID,
 		LeaseID:        leaseID,
 		Duration:       duration,
+		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 
@@ -882,6 +911,7 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 		IdempotencyKey: req.IdempotencyKey,
 		AccountId:      req.AccountID.String(),
 		LeaseId:        req.LeaseID.String(),
+		Migration:      MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -904,6 +934,7 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 		IdempotencyKey: pbReq.IdempotencyKey,
 		AccountID:      accountID,
 		LeaseID:        leaseID,
+		Migration:      MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 

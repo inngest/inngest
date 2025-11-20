@@ -218,7 +218,7 @@ type QueueProcessor interface {
 	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
-	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration) (*ulid.ULID, int, error)
+	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...partitionLeaseOpt) (*ulid.ULID, int, error)
 	PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error
 }
 
@@ -789,7 +789,7 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
-func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
+func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt {
 	return func(q *queue) {
 		q.capacityManager = capacityManager
 	}
@@ -960,7 +960,7 @@ type queue struct {
 
 	enableJobPromotion bool
 
-	capacityManager  constraintapi.CapacityManager
+	capacityManager  constraintapi.RolloutManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
 }
 
@@ -1209,6 +1209,60 @@ func (qp QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 		return kg.Concurrency("account", "-")
 	}
 	return kg.Concurrency("account", qp.AccountID.String())
+}
+
+func (qp QueuePartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+	if qp.IsSystem() {
+		return kg.Concurrency("", "")
+	}
+	if qp.AccountID == uuid.Nil {
+		return kg.Concurrency("", "")
+	}
+	return cm.KeyInProgressLeasesAccount(qp.AccountID)
+}
+
+func (sp QueueShadowPartition) acctInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+	if sp.SystemQueueName != nil {
+		return kg.Concurrency("", "")
+	}
+	if sp.AccountID == nil {
+		return kg.Concurrency("", "")
+	}
+	return cm.KeyInProgressLeasesAccount(*sp.AccountID)
+}
+
+func (qp QueuePartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+	// Enable system partitions to use the queueName override instead of the fnId
+	if qp.IsSystem() {
+		return kg.Concurrency("", "")
+	}
+	if qp.FunctionID == nil || qp.AccountID == uuid.Nil {
+		return kg.Concurrency("", "")
+	}
+	return cm.KeyInProgressLeasesFunction(qp.AccountID, *qp.FunctionID)
+}
+
+func (sp QueueShadowPartition) fnInProgressLeasesKey(kg QueueKeyGenerator, cm constraintapi.RolloutKeyGenerator) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+	// Enable system partitions to use the queueName override instead of the fnId
+	if sp.SystemQueueName != nil {
+		return kg.Concurrency("", "")
+	}
+	if sp.FunctionID == nil || sp.AccountID == nil {
+		return kg.Concurrency("", "")
+	}
+	return cm.KeyInProgressLeasesFunction(*sp.AccountID, *sp.FunctionID)
 }
 
 // customConcurrencyKey returns the concurrency key if this partition represents
@@ -2269,6 +2323,11 @@ func (q *queue) Lease(
 		o.backlog.customKeyActiveRuns(kg, 2),        // Set for active runs with custom concurrency key 2
 
 		kg.ThrottleKey(item.Data.Throttle),
+
+		o.sp.acctInProgressLeasesKey(kg, q.capacityManager),
+		o.sp.fnInProgressLeasesKey(kg, q.capacityManager),
+		o.backlog.inProgressLeasesCustomKey(q.capacityManager, kg, o.sp.AccountID, 1),
+		o.backlog.inProgressLeasesCustomKey(q.capacityManager, kg, o.sp.AccountID, 2),
 	}
 
 	partConcurrency := o.constraints.Concurrency.FunctionConcurrency
@@ -2581,6 +2640,9 @@ func (q *queue) PartitionLease(
 		// concurrency limits prior to leasing, as an optimization.
 		p.acctConcurrencyKey(kg),
 		p.fnConcurrencyKey(kg),
+
+		p.acctInProgressLeasesKey(kg, q.capacityManager),
+		p.fnInProgressLeasesKey(kg, q.capacityManager),
 	}
 
 	args, err := StrSlice([]any{
