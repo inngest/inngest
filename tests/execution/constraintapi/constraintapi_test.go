@@ -553,8 +553,9 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			require.NotNil(t, qi)
 
 			leaseID, err := q.Lease(context.Background(), qi, 5*time.Second, clock.Now(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
+			require.Error(t, err)
+			require.Nil(t, leaseID)
+			require.ErrorContains(t, err, "at account concurrency limit")
 		}
 	})
 	t.Run("queue should check in progress leases during PartitionLease", func(t *testing.T) {})
