@@ -72,8 +72,6 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		case data.Target.SpanID != nil:
 			err = errors.New("target.step_id must be defined if target.span_id is defined")
 		}
-	case data.Target.StepAttempt == nil && data.Target.SpanID != nil:
-		err = errors.New("target.step_attempt must be defined if target.span_id is defined")
 	}
 
 	if err != nil {
