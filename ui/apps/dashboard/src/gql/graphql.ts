@@ -1610,8 +1610,6 @@ export type Query = {
   plans: Array<Maybe<BillingPlan>>;
   runCountTimeSeries: Array<TimeSeries>;
   session: Maybe<Session>;
-  workerPercentageUsedTimeSeries: Array<TimeSeries>;
-  workerTotalCapacityTimeSeries: Array<TimeSeries>;
   workspace: Workspace;
   workspaces: Maybe<Array<Workspace>>;
 };
@@ -1672,18 +1670,6 @@ export type QueryMetricsArgs = {
 
 export type QueryRunCountTimeSeriesArgs = {
   timeOptions: TimeSeriesOptions;
-};
-
-
-export type QueryWorkerPercentageUsedTimeSeriesArgs = {
-  timeOptions: TimeSeriesOptions;
-  workspaceID: Scalars['ID'];
-};
-
-
-export type QueryWorkerTotalCapacityTimeSeriesArgs = {
-  timeOptions: TimeSeriesOptions;
-  workspaceID: Scalars['ID'];
 };
 
 

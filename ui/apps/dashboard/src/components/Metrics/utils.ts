@@ -217,18 +217,27 @@ export const mapEntityLines = (
 ) => {
   const dark = isDark();
 
+  const series = metrics.map((f, i) => {
+    // For worker metrics, use tagValue as the series name if available
+    const seriesName = f.tagValue || entities[f.id]?.name || `Series ${i + 1}`;
+
+    return {
+      ...seriesOptions,
+      name: seriesName,
+      data: f.data.map(({ value }) => value),
+      itemStyle: {
+        color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+      },
+      areaStyle,
+    };
+  });
+
+  // Generate legend data from series names
+  const legendData = series.map((s) => s.name);
+
   return {
     xAxis: getXAxis(metrics),
-    series: metrics.map((f, i) => {
-      return {
-        ...seriesOptions,
-        name: entities[f.id]?.name,
-        data: f.data.map(({ value }) => value),
-        itemStyle: {
-          color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
-        },
-        areaStyle,
-      };
-    }),
+    series,
+    legendData,
   };
 };
