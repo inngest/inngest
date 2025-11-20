@@ -36,7 +36,7 @@ const KEYWORDS = [
 const TABLES = ['events'] as const;
 
 // Common columns available on the events table
-const COLUMNS = ['name', 'data'] as const;
+const COLUMNS = ['name', 'data', 'id', 'ts', 'v'] as const;
 
 // Convert ClickHouse functions to the format expected by autocomplete
 const CLICKHOUSE_FUNCTIONS = availableClickhouseFunctions.map((name) => ({
