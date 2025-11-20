@@ -396,13 +396,6 @@ type ExecutorRealtimeConfig struct {
 	PublishURL string
 }
 
-func WithUseLuaRateLimitImplementation(fn func(ctx context.Context, accountID uuid.UUID) bool) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).useLuaRateLimitImplementation = fn
-		return nil
-	}
-}
-
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -455,8 +448,6 @@ type executor struct {
 
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
-
-	useLuaRateLimitImplementation func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -710,26 +701,18 @@ func (e *executor) schedule(
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				// Enable new pure Lua implementation on a per-account basis
-				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
-				impl := "throttled"
-				if useLuaRL {
-					impl = "lua"
-				}
-
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
-					ratelimit.WithUseLuaImplementation(useLuaRL),
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"impl":   impl,
+							"impl":   "lua",
 							"status": "error",
 						},
 					})
@@ -741,7 +724,7 @@ func (e *executor) schedule(
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"impl":   impl,
+							"impl":   "lua",
 							"status": "limited",
 						},
 					})
@@ -756,7 +739,7 @@ func (e *executor) schedule(
 				metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"impl":   impl,
+						"impl":   "lua",
 						"status": status,
 					},
 				})
