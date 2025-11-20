@@ -10,6 +10,7 @@ import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
+import { ConnectWorkerPercentage, ConnectWorkerTotalCapacity } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
@@ -220,6 +221,24 @@ const GetVolumeMetrics = graphql(`
         }
       }
     }
+
+    workerPercentageUsedTimeSeries: workerPercentageUsedTimeSeries(
+      timeOptions: { from: $from, until: $until }
+    ) {
+      data {
+        bucket
+        value
+      }
+    }
+
+    workerTotalCapacityTimeSeries: workerTotalCapacityTimeSeries(
+      timeOptions: { from: $from, until: $until }
+    ) {
+      data {
+        bucket
+        value
+      }
+    }
   }
 `);
 
@@ -287,6 +306,8 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
+            <ConnectWorkerPercentage data={data?.workerPercentageUsedTimeSeries} />
+            <ConnectWorkerTotalCapacity data={data?.workerTotalCapacityTimeSeries} />
           </div>
         </>
       )}
