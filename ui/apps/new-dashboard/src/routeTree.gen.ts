@@ -19,6 +19,7 @@ import { Route as AuthedOrgActiveEnvEnvSlugRouteRouteImport } from "./routes/_au
 import { Route as AuthedOrgActiveEnvEnvSlugAppsRouteRouteImport } from "./routes/_authed/_org-active/env/$envSlug/apps/route";
 import { Route as AuthedOrgActiveEnvEnvSlugRunsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/runs/index";
 import { Route as AuthedOrgActiveEnvEnvSlugMetricsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/metrics/index";
+import { Route as AuthedOrgActiveEnvEnvSlugManageIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/index";
 import { Route as AuthedOrgActiveEnvEnvSlugInsightsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/insights/index";
 import { Route as AuthedOrgActiveEnvEnvSlugFunctionsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/index";
 import { Route as AuthedOrgActiveEnvEnvSlugEventsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/events/index";
@@ -77,6 +78,12 @@ const AuthedOrgActiveEnvEnvSlugMetricsIndexRoute =
     path: "/metrics/",
     getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
   } as any);
+const AuthedOrgActiveEnvEnvSlugManageIndexRoute =
+  AuthedOrgActiveEnvEnvSlugManageIndexRouteImport.update({
+    id: "/manage/",
+    path: "/manage/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugRouteRoute,
+  } as any);
 const AuthedOrgActiveEnvEnvSlugInsightsIndexRoute =
   AuthedOrgActiveEnvEnvSlugInsightsIndexRouteImport.update({
     id: "/insights/",
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/events": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/env/$envSlug/functions": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/env/$envSlug/insights": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
+  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/env/$envSlug/metrics": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
 }
@@ -134,6 +142,7 @@ export interface FileRoutesByTo {
   "/env/$envSlug/events": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/env/$envSlug/functions": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/env/$envSlug/insights": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
+  "/env/$envSlug/manage": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/env/$envSlug/metrics": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
 }
@@ -152,6 +161,7 @@ export interface FileRoutesById {
   "/_authed/_org-active/env/$envSlug/events/": typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   "/_authed/_org-active/env/$envSlug/functions/": typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   "/_authed/_org-active/env/$envSlug/insights/": typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
+  "/_authed/_org-active/env/$envSlug/manage/": typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   "/_authed/_org-active/env/$envSlug/metrics/": typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   "/_authed/_org-active/env/$envSlug/runs/": typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
 }
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/events"
     | "/env/$envSlug/functions"
     | "/env/$envSlug/insights"
+    | "/env/$envSlug/manage"
     | "/env/$envSlug/metrics"
     | "/env/$envSlug/runs";
   fileRoutesByTo: FileRoutesByTo;
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/events"
     | "/env/$envSlug/functions"
     | "/env/$envSlug/insights"
+    | "/env/$envSlug/manage"
     | "/env/$envSlug/metrics"
     | "/env/$envSlug/runs";
   id:
@@ -200,6 +212,7 @@ export interface FileRouteTypes {
     | "/_authed/_org-active/env/$envSlug/events/"
     | "/_authed/_org-active/env/$envSlug/functions/"
     | "/_authed/_org-active/env/$envSlug/insights/"
+    | "/_authed/_org-active/env/$envSlug/manage/"
     | "/_authed/_org-active/env/$envSlug/metrics/"
     | "/_authed/_org-active/env/$envSlug/runs/";
   fileRoutesById: FileRoutesById;
@@ -284,6 +297,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRouteImport;
       parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute;
     };
+    "/_authed/_org-active/env/$envSlug/manage/": {
+      id: "/_authed/_org-active/env/$envSlug/manage/";
+      path: "/manage";
+      fullPath: "/env/$envSlug/manage";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugRouteRoute;
+    };
     "/_authed/_org-active/env/$envSlug/insights/": {
       id: "/_authed/_org-active/env/$envSlug/insights/";
       path: "/insights";
@@ -343,6 +363,7 @@ interface AuthedOrgActiveEnvEnvSlugRouteRouteChildren {
   AuthedOrgActiveEnvEnvSlugEventsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugEventsIndexRoute;
   AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute;
   AuthedOrgActiveEnvEnvSlugInsightsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugInsightsIndexRoute;
+  AuthedOrgActiveEnvEnvSlugManageIndexRoute: typeof AuthedOrgActiveEnvEnvSlugManageIndexRoute;
   AuthedOrgActiveEnvEnvSlugMetricsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugMetricsIndexRoute;
   AuthedOrgActiveEnvEnvSlugRunsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugRunsIndexRoute;
 }
@@ -359,6 +380,8 @@ const AuthedOrgActiveEnvEnvSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugRout
       AuthedOrgActiveEnvEnvSlugFunctionsIndexRoute,
     AuthedOrgActiveEnvEnvSlugInsightsIndexRoute:
       AuthedOrgActiveEnvEnvSlugInsightsIndexRoute,
+    AuthedOrgActiveEnvEnvSlugManageIndexRoute:
+      AuthedOrgActiveEnvEnvSlugManageIndexRoute,
     AuthedOrgActiveEnvEnvSlugMetricsIndexRoute:
       AuthedOrgActiveEnvEnvSlugMetricsIndexRoute,
     AuthedOrgActiveEnvEnvSlugRunsIndexRoute:

@@ -7,16 +7,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NotFound from "./components/Error/NotFound";
 import { DefaultCatchBoundary } from "./components/Error/DefaultCatchBoundary";
 
-const QueryWrapper = ({
-  queryClient,
-  children,
-}: {
-  queryClient: QueryClient;
-  children: React.ReactNode;
-}) => (
-  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-);
-
 export const getRouter = () => {
   const queryClient = new QueryClient();
 
@@ -27,7 +17,9 @@ export const getRouter = () => {
     defaultErrorComponent: DefaultCatchBoundary,
     defaultNotFoundComponent: () => <NotFound />,
     Wrap: (props: { children: React.ReactNode }) => (
-      <QueryWrapper queryClient={queryClient}>{props.children}</QueryWrapper>
+      <QueryClientProvider client={queryClient}>
+        {props.children}
+      </QueryClientProvider>
     ),
   });
 
