@@ -217,14 +217,26 @@ export const mapEntityLines = (
 ) => {
   const dark = isDark();
 
-  const series = metrics.map((f, i) => {
+  // Create series with names first
+  const seriesWithNames = metrics.map((f, index) => {
     // For worker metrics, use tagValue as the series name if available
-    const seriesName = f.tagValue || entities[f.id]?.name || `Series ${i + 1}`;
+    const seriesName = f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
 
     return {
-      ...seriesOptions,
+      metric: f,
       name: seriesName,
-      data: f.data.map(({ value }) => value),
+    };
+  });
+
+  // Sort by name to ensure consistent color assignment across charts
+  seriesWithNames.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Create series with sorted color assignment
+  const series = seriesWithNames.map((item, i) => {
+    return {
+      ...seriesOptions,
+      name: item.name,
+      data: item.metric.data.map(({ value }) => value),
       itemStyle: {
         color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
       },
@@ -232,7 +244,7 @@ export const mapEntityLines = (
     };
   });
 
-  // Generate legend data from series names
+  // Generate legend data from series names (already sorted)
   const legendData = series.map((s) => s.name);
 
   return {
