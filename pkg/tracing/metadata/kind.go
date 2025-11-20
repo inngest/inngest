@@ -14,8 +14,8 @@ var (
 const (
 	MaxKindLength = 128
 
-	KindPrefixInngest = "inngest."
-	KindPrefixUser    = "user."
+	KindPrefixInngest  = "inngest."
+	KindPrefixUserland = "userland."
 
 	KindInngestAI       Kind = "inngest.ai"
 	KindInngestHTTP     Kind = "inngest.http"
@@ -31,7 +31,7 @@ func (k Kind) IsInngest() bool {
 }
 
 func (k Kind) IsUser() bool {
-	return strings.HasPrefix(string(k), KindPrefixUser)
+	return strings.HasPrefix(string(k), KindPrefixUserland)
 }
 
 func (k Kind) Validate() error {
