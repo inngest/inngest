@@ -1,5 +1,5 @@
 local function count_concurrency(key, nowMS)
-	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	local count = redis.call("ZCOUNT", key, tostring(nowMS), "+inf")
 	if count == nil then
 		return 0
 	end
