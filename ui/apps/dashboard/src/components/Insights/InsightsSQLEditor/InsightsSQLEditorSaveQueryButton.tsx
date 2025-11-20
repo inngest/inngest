@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
+import { RiSaveLine } from '@remixicon/react';
 
 import { KeyboardShortcutTooltip } from '../KeyboardShortcutTooltip';
 import type { Tab } from '../types';
@@ -20,9 +20,7 @@ type InsightsSQLEditorSaveQueryButtonProps = {
 };
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
-  const { canSave, isSaved, isSaving, saveTab } = useSaveTab(tab);
-
-  const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
+  const { canSave, isSaving, saveTab } = useSaveTab(tab);
 
   useDocumentShortcuts([
     {
@@ -39,10 +37,12 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
             appearance="outlined"
             className="font-medium"
             disabled={!canSave}
-            icon={<Icon className={cn(!canSave ? 'text-disabled' : 'text-muted')} size={16} />}
+            icon={
+              <RiSaveLine className={cn(!canSave ? 'text-disabled' : 'text-muted')} size={16} />
+            }
             iconSide="left"
             kind="secondary"
-            label={`${isSaved ? 'Update' : 'Save'} query`}
+            label="Save"
             loading={isSaving}
             onClick={() => {
               saveTab();

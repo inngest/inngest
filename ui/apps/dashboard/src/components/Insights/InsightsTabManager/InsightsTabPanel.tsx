@@ -48,12 +48,14 @@ export function InsightsTabPanel({
         first={
           <Section
             actions={
-              <>
-                <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
+              <div className="relative flex gap-2">
+                <div className="absolute right-full -z-10">
+                  <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
+                </div>
                 <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
                 <InsightsSQLEditorSaveQueryButton tab={tab} />
                 <InsightsSQLEditorQueryButton />
-              </>
+              </div>
             }
             className="h-full"
             title={<InsightsSQLEditorQueryTitle tab={tab} />}

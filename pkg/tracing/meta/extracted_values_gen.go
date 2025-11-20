@@ -37,6 +37,7 @@ type ExtractedValues struct {
 	InternalLocation *string
 	internalError *string
 	IsFunctionOutput *bool
+	Retryable *bool
 	StepID *string
 	StepName *string
 	StepOp *enums.Opcode
