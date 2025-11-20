@@ -58,7 +58,7 @@ if disableLeaseChecks ~= 1 then
       -- concurrency keys.
       local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
       if exists_without_ending(keyInProgressLeasesAcct, ":-") then
-        acctCap = acctCap + check_concurrency(currentTime, keyInProgressLeasesAcct, acctConcurrency)
+        acctCap = acctCap - count_concurrency(keyInProgressLeasesAcct, currentTime)
       end
       if acctCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
@@ -75,7 +75,7 @@ if disableLeaseChecks ~= 1 then
       -- concurrency keys.
       local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
       if exists_without_ending(keyInProgressLeasesFn, ":-") then
-        fnCap = fnCap + check_concurrency(currentTime, keyInProgressLeasesFn, fnConcurrency)
+        fnCap = fnCap - count_concurrency(keyInProgressLeasesFn, currentTime)
       end
       if fnCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)

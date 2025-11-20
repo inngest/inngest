@@ -125,7 +125,7 @@ if checkConstraints == 1 then
   if customConcurrencyKey1 > 0 then
       local customCap = check_concurrency(currentTime, keyInProgressCustomConcurrencyKey1, customConcurrencyKey1)
       if exists_without_ending(keyInProgressLeasesCustom1, ":-") then
-        customCap = customCap + check_concurrency(currentTime, keyInProgressLeasesCustom1, customConcurrencyKey1)
+        customCap = customCap - count_concurrency(keyInProgressLeasesCustom1, currentTime)
       end
       if customCap <= 0 then
           return -4
@@ -134,7 +134,7 @@ if checkConstraints == 1 then
   if customConcurrencyKey2 > 0 then
       local customCap = check_concurrency(currentTime, keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
       if exists_without_ending(keyInProgressLeasesCustom2, ":-") then
-        customCap = customCap + check_concurrency(currentTime, keyInProgressLeasesCustom2, customConcurrencyKey2)
+        customCap = customCap - count_concurrency(keyInProgressLeasesCustom2, currentTime)
       end
       if customCap <= 0 then
           return -5
@@ -143,7 +143,7 @@ if checkConstraints == 1 then
   if concurrencyPartition > 0 then
       local partCap = check_concurrency(currentTime, keyInProgressPartition, concurrencyPartition)
       if exists_without_ending(keyInProgressLeasesFn, ":-") then
-        partCap = partCap + check_concurrency(currentTime, keyInProgressLeasesFn, concurrencyPartition)
+        partCap = partCap - count_concurrency(keyInProgressLeasesFn, currentTime)
       end
       if partCap <= 0 then
           return -3
@@ -152,7 +152,7 @@ if checkConstraints == 1 then
   if concurrencyAcct > 0 then
       local accountCap = check_concurrency(currentTime, keyInProgressAccount, concurrencyAcct)
       if exists_without_ending(keyInProgressLeasesAcct, ":-") then
-        accountCap = accountCap + check_concurrency(currentTime, keyInProgressLeasesAcct, concurrencyAcct)
+        accountCap = accountCap - count_concurrency(keyInProgressLeasesAcct, currentTime)
       end
       if accountCap <= 0 then
           return -6
