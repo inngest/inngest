@@ -3,7 +3,6 @@ package meta
 import (
 	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"testing"
 	"time"
@@ -801,8 +800,6 @@ func TestExtractTypedValues(t *testing.T) {
 
 		ev, err := ExtractTypedValues(context.Background(), attrs)
 		require.NoError(t, err)
-
-		log.Println("Extracted Metadata:", ev.Metadata, ev.MetadataKind, ev.MetadataOp)
 
 		assert.Equal(t, op, *ev.MetadataOp)
 		assert.Equal(t, values, *ev.Metadata)
