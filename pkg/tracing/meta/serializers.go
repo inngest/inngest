@@ -526,7 +526,7 @@ func TextAttr[T any, TPtr interface {
 		deserialize: func(v any) (*T, bool) {
 			if str, ok := v.(string); ok {
 				var ret T
-				if err := (TPtr)(&ret).UnmarshalText([]byte(str)); err != nil {
+				if err := (TPtr)(&ret).UnmarshalText([]byte(str)); err == nil {
 					return &ret, true
 				}
 			}

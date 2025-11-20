@@ -3,11 +3,14 @@ package meta
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -782,6 +785,28 @@ func TestExtractTypedValues(t *testing.T) {
 		assert.Nil(t, ev.DynamicStatus)
 		assert.Nil(t, ev.StepOp)
 		assert.Nil(t, ev.ResponseHeaders)
+	})
+
+	t.Run("Metadata Attributes", func(t *testing.T) {
+		values := metadata.Values{
+			"key": []byte(`"value"`),
+		}
+		kind := metadata.KindInngestAI
+		op := enums.MetadataOpcodeSet
+		attrs := map[string]any{
+			"_inngest.metadata.values": "{\"key\":\"value\"}",
+			"_inngest.metadata.kind":   "inngest.ai",
+			"_inngest.metadata.op":     "set",
+		}
+
+		ev, err := ExtractTypedValues(context.Background(), attrs)
+		require.NoError(t, err)
+
+		log.Println("Extracted Metadata:", ev.Metadata, ev.MetadataKind, ev.MetadataOp)
+
+		assert.Equal(t, op, *ev.MetadataOp)
+		assert.Equal(t, values, *ev.Metadata)
+		assert.Equal(t, kind, *ev.MetadataKind)
 	})
 }
 
