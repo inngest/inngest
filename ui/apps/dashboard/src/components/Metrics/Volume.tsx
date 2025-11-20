@@ -221,22 +221,34 @@ const GetVolumeMetrics = graphql(`
         }
       }
     }
-
-    workerPercentageUsedTimeSeries: workerPercentageUsedTimeSeries(
-      timeOptions: { from: $from, until: $until }
-    ) {
-      data {
-        bucket
-        value
+    workspace(id: $workspaceId) {
+      workerPercentageUsed: scopedMetrics(
+        filter: { name: "worker_percentage_used", scope: ENV, from: $from, until: $until }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
       }
     }
-
-    workerTotalCapacityTimeSeries: workerTotalCapacityTimeSeries(
-      timeOptions: { from: $from, until: $until }
-    ) {
-      data {
-        bucket
-        value
+    workspace(id: $workspaceId) {
+      workerTotalCapacity: scopedMetrics(
+        filter: { name: "worker_total_capacity", scope: ENV, from: $from, until: $until }
+      ) {
+        metrics {
+          id
+          tagName
+          tagValue
+          data {
+            value
+            bucket
+          }
+        }
       }
     }
   }
@@ -306,8 +318,8 @@ export const MetricsVolume = ({
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />
-            <ConnectWorkerPercentage data={data?.workerPercentageUsedTimeSeries} />
-            <ConnectWorkerTotalCapacity data={data?.workerTotalCapacityTimeSeries} />
+            <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
+            <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
           </div>
         </>
       )}

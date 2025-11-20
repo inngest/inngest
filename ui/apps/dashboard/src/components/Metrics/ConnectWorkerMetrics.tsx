@@ -1,34 +1,26 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
-import { resolveColor } from '@inngest/components/utils/colors';
-import { isDark } from '@inngest/components/utils/theme';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
-import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
+import type { EntityLookup } from './Dashboard';
+import { getLineChartOptions, mapEntityLines } from './utils';
 
 export const ConnectWorkerPercentage = ({
-  data,
+  workspace,
+  entities,
 }: {
-  data?: VolumeMetricsQuery['workerPercentageUsedTimeSeries'];
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
 }) => {
-  const dark = isDark();
+  const metrics = workspace && mapEntityLines(workspace.workerPercentageUsed.metrics, entities);
 
-  const chartData = data
+  // Override yAxis for percentage formatting
+  const chartData = metrics
     ? {
-        xAxis: getXAxis(data),
-        series: [
-          {
-            ...seriesOptions,
-            name: 'Worker Percentage Used',
-            data: data.data.map(({ value }) => value),
-            itemStyle: {
-              color: resolveColor(lineColors[0]![0]!, dark, lineColors[0]?.[1]),
-            },
-          },
-        ],
+        ...metrics,
         yAxis: {
-          type: 'value',
+          type: 'value' as const,
           max: 100,
           min: 0,
           axisLabel: {
@@ -69,27 +61,13 @@ export const ConnectWorkerPercentage = ({
 };
 
 export const ConnectWorkerTotalCapacity = ({
-  data,
+  workspace,
+  entities,
 }: {
-  data?: VolumeMetricsQuery['workerTotalCapacityTimeSeries'];
+  workspace?: VolumeMetricsQuery['workspace'];
+  entities: EntityLookup;
 }) => {
-  const dark = isDark();
-
-  const chartData = data
-    ? {
-        xAxis: getXAxis(data),
-        series: [
-          {
-            ...seriesOptions,
-            name: 'Total Capacity',
-            data: data.data.map(({ value }) => value),
-            itemStyle: {
-              color: resolveColor(lineColors[1]![0]!, dark, lineColors[1]?.[1]),
-            },
-          },
-        ],
-      }
-    : null;
+  const chartData = workspace && mapEntityLines(workspace.workerTotalCapacity.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">
