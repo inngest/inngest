@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ProfileDisplayType } from "@/queries/server-only/profile";
 import Logo from "../Navigation/Logo";
 import { Profile } from "../Navigation/Profile";
+import { ProfileDisplayType } from "@/data/profile";
 
 export default function SideBar({
   collapsed: serverCollapsed,
   profile,
 }: {
   collapsed: boolean | undefined;
-  profile: ProfileDisplayType;
+  profile?: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +45,7 @@ export default function SideBar({
       <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="flex grow flex-col justify-between">
         <div className="mx-4 h-full"></div>
-        <Profile collapsed={collapsed} profile={profile} />
+        {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
     </nav>
   );

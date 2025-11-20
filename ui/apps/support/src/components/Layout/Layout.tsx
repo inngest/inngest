@@ -1,12 +1,11 @@
 import { type ReactNode } from "react";
 
-import { ProfileDisplayType } from "@/queries/server-only/profile";
-
 import SideBar from "./SideBar";
+import { ProfileDisplayType } from "@/data/profile";
 
 type LayoutProps = {
   collapsed: boolean | undefined;
-  profile: ProfileDisplayType;
+  profile?: ProfileDisplayType;
   children: ReactNode;
 };
 
