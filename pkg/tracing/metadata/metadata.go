@@ -113,3 +113,11 @@ func (m Update) Op() Opcode {
 func (m Update) Serialize() (Values, error) {
 	return m.RawUpdate.Values, nil
 }
+
+func (m Update) Validate() error {
+	if err := m.RawUpdate.Kind.Validate(); err != nil {
+		return fmt.Errorf("invalid kind: %w", err)
+	}
+
+	return nil
+}

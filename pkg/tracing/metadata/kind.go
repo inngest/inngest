@@ -1,10 +1,19 @@
 package metadata
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 type Kind string
 
+var (
+	ErrKindTooLong = errors.New("kind exceeds maximum length")
+)
+
 const (
+	MaxKindLength = 128
+
 	KindPrefixInngest = "inngest."
 	KindPrefixUser    = "user."
 
@@ -23,4 +32,12 @@ func (k Kind) IsInngest() bool {
 
 func (k Kind) IsUser() bool {
 	return strings.HasPrefix(string(k), KindPrefixUser)
+}
+
+func (k Kind) Validate() error {
+	if len(k) > MaxKindLength {
+		return ErrKindTooLong
+	}
+
+	return nil
 }

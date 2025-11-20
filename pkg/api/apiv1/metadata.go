@@ -80,6 +80,13 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata target"))
 	}
 
+	for _, md := range data.Metadata {
+		if err := md.Validate(); err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid metadata"))
+			return
+		}
+	}
+
 	err = a.AddRunMetadata(ctx, auth, runID, &data)
 	switch {
 	// TODO: better cases for specific errors

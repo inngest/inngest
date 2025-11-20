@@ -1528,6 +1528,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
 			for _, opcode := range resp.Generator {
 				for _, metadata := range opcode.Metadata {
+					if err := metadata.Validate(); err != nil {
+						l.Warn("invalid metadata in driver response", "error", err)
+						continue
+					}
+
 					// TODO: validate metadata kinds & sizes
 					_, err := e.createMetadataSpan(
 						ctx,
