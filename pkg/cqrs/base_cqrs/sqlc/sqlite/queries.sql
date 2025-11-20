@@ -436,7 +436,8 @@ SELECT
 FROM spans
 WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
 GROUP BY dynamic_span_id
-ORDER BY start_time;
+ORDER BY start_time ASC
+LIMIT 1;
 
 -- name: GetStepSpanByStepID :one
 SELECT
@@ -465,7 +466,8 @@ WHERE span_id IN (
   LIMIT 1
 )
 GROUP BY dynamic_span_id
-ORDER BY start_time;
+ORDER BY start_time ASC
+LIMIT 1;
 
 -- name: GetExecutionSpanByStepIDAndAttempt :one
 SELECT
@@ -489,19 +491,10 @@ HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
 AND
   SUM(attributes->>'$."_inngest.step.attempt"' = CAST(sqlc.arg(step_attempt) AS INTEGER)) > 0
-ORDER BY start_time;
+ORDER BY start_time ASC
+LIMIT 1;
 
 -- name: GetLatestExecutionSpanByStepID :one
-WITH latest_attempt AS (
-  SELECT
-    max(attributes->>'$."_inngest.step.attempt"')
-  FROM spans a
-  WHERE a.run_id = sqlc.arg(run_id) AND a.account_id = sqlc.arg(account_id)
-  GROUP BY dynamic_span_id
-  HAVING
-    SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
-  LIMIT 1
-)
 SELECT
   run_id,
   trace_id,
@@ -521,9 +514,8 @@ WHERE b.run_id = sqlc.arg(run_id) AND b.account_id = sqlc.arg(account_id)
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(sqlc.arg(step_id) AS TEXT)) > 0
-AND
-  SUM(attributes->>'$."_inngest.step.attempt"' = (SELECT * FROM latest_attempt)) > 0
-ORDER BY start_time;
+ORDER BY start_time DESC
+LIMIT 1;
 
 -- name: GetSpanBySpanID :one
 SELECT
@@ -543,4 +535,5 @@ SELECT
 FROM spans
 WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id
-ORDER BY start_time;
+ORDER BY start_time ASC
+LIMIT 1;
