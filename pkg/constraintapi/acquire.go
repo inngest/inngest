@@ -171,6 +171,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	keys := []string{
 		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
+		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}

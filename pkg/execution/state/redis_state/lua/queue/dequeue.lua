@@ -49,12 +49,16 @@ local singletonRunKey          = KEYS[31]
 local keyItemIndexA            = KEYS[32]   -- custom item index 1
 local keyItemIndexB            = KEYS[33]  -- custom item index 2
 
+local keyPartitionScavengerIndex  = KEYS[34]
+
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
 local backlogID      = ARGV[3]
 local accountID      = ARGV[4]
 local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
+
+local updateConstraintState = tonumber(ARGV[7])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -80,26 +84,62 @@ if idempotencyTTL > 0 then
 	redis.call("SETEX", keyIdempotency, idempotencyTTL, "")
 end
 
--- This removes the current queue item from the concurrency/in-progress queue,
--- ensures the concurrency index/scavenger queue is updated to the next earliest in-progress item,
--- and updates the global and account partition pointers to the next earliest item score
-local function handleDequeueConcurrency(keyConcurrency)
-	redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
+-- Remove item from scavenger index
+redis.call("ZREM", keyPartitionScavengerIndex, queueID)
+
+
+if updateConstraintState == 1 then
+  -- This removes the current queue item from the concurrency/in-progress queue,
+  -- ensures the concurrency index/scavenger queue is updated to the next earliest in-progress item,
+  -- and updates the global and account partition pointers to the next earliest item score
+  local function handleDequeueConcurrency(keyConcurrency)
+    redis.call("ZREM", keyConcurrency, item.id) -- remove from concurrency/in-progress queue
+  end
+
+  handleDequeueConcurrency(keyInProgressPartition)
+
+  if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
+    handleDequeueConcurrency(keyInProgressCustomConcurrencyKey1)
+  end
+
+  if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
+    handleDequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+  end
+
+  if exists_without_ending(keyInProgressAccount, ":-") then
+    -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+    -- and Lease for respective ZADD calls.
+    redis.call("ZREM", keyInProgressAccount, item.id)
+  end
+
+  -- Remove item from active sets
+  removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
+  removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 end
 
-handleDequeueConcurrency(keyInProgressPartition)
-
--- Get the earliest item in the partition concurrency set.  We may be dequeueing
+-- Get the earliest item in the new scavenger index and old partition concurrency set.  We may be dequeueing
 -- the only in-progress job and should remove this from the partition concurrency
 -- pointers, if this exists.
 --
 -- This ensures that scavengeres have updated pointer queues without the currently
 -- leased job, if exists.
 local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-if concurrencyScores == false then
+local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if scavengerIndexScores == false and concurrencyScores == false then
   redis.call("ZREM", concurrencyPointer, partitionID)
 else
-  local earliestLease = tonumber(concurrencyScores[2])
+  -- Either scavenger index or partition in progress set includes more items
+
+  local earliestLease = nil
+  if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
+    earliestLease = tonumber(scavengerIndexScores[2])
+  end
+
+  -- Fall back to in progress set
+  if earliestLease == nil or (concurrencyScores ~= false and concurrencyScores ~= nil and tonumber(concurrencyScores[2]) < earliestLease) then
+    earliestLease = tonumber(concurrencyScores[2])
+  end
+
   if earliestLease == nil then
     redis.call("ZREM", concurrencyPointer, partitionID)
   else
@@ -131,24 +171,6 @@ if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
       end
   end
 end
-
-if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
-  handleDequeueConcurrency(keyInProgressCustomConcurrencyKey1)
-end
-
-if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
-  handleDequeueConcurrency(keyInProgressCustomConcurrencyKey2)
-end
-
-if exists_without_ending(keyInProgressAccount, ":-") then
-  -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
-  -- and Lease for respective ZADD calls.
-  redis.call("ZREM", keyInProgressAccount, item.id)
-end
-
--- Remove item from active sets
-removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
-removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
