@@ -129,7 +129,12 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	for _, md := range req.Metadata {
-		// TODO: validate metadata kinds & sizes
+		if err := md.Validate(); err != nil {
+			return publicerr.Wrap(err, 400, "Invalid metadata")
+		}
+
+		// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
+		// limits.
 		_, err := tracing.CreateMetadataSpan(
 			ctx,
 			a.opts.TracerProvider,

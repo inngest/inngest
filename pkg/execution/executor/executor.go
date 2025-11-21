@@ -1509,6 +1509,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 
 		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
+			l := l.With("step_metadata", true)
 			for _, opcode := range resp.Generator {
 				for _, metadata := range opcode.Metadata {
 					if err := metadata.Validate(); err != nil {
@@ -1516,7 +1517,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						continue
 					}
 
-					// TODO: validate metadata kinds & sizes
+					// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
+					// limits.
 					_, err := e.createMetadataSpan(
 						ctx,
 						&instance,
