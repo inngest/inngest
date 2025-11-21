@@ -116,7 +116,7 @@ if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or lea
 	return cjson.encode(res)
 end
 
-local leaseIdempotencyKey = leaseDetails[1]
+local hashedLeaseIdempotencyKey = leaseDetails[1]
 local hashedOperationIdempotencyKey = leaseDetails[2]
 local leaseRunID = leaseDetails[3]
 
@@ -158,7 +158,16 @@ for _, value in ipairs(constraints) do
 end
 
 -- update lease details
-call("HSET", keyNewLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+call(
+	"HSET",
+	keyNewLeaseDetails,
+	"lik",
+	hashedLeaseIdempotencyKey,
+	"rid",
+	leaseRunID,
+	"oik",
+	hashedOperationIdempotencyKey
+)
 call("DEL", keyOldLeaseDetails)
 
 -- update account leases for scavenger (do not clean up active lease)
