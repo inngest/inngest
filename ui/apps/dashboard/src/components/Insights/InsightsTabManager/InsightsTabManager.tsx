@@ -132,11 +132,20 @@ export function useInsightsTabManager(
   const actions = useMemo(
     () => ({
       breakQueryAssociation: (savedQueryId: string) => {
-        setTabs((prevTabs) =>
-          prevTabs.map((tab) =>
-            tab.savedQueryId === savedQueryId ? { ...tab, savedQueryId: undefined } : tab
-          )
-        );
+        setTabs((prevTabs) => {
+          // Find the tab associated with this savedQueryId
+          const tabToClose = prevTabs.find((tab) => tab.savedQueryId === savedQueryId);
+
+          if (tabToClose) {
+            // Close the tab entirely when query is deleted
+            const newTabs = prevTabs.filter((tab) => tab.id !== tabToClose.id);
+            const newActiveTabId = getNewActiveTabAfterClose(prevTabs, tabToClose.id, activeTabId);
+            if (newActiveTabId !== undefined) setActiveTabId(newActiveTabId);
+            return newTabs;
+          }
+
+          return prevTabs;
+        });
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
