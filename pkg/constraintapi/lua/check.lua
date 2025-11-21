@@ -4,7 +4,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 ---@type string[]
@@ -18,6 +18,9 @@ local keyOperationIdempotency = KEYS[2]
 
 ---@type { e: string, f: string, s: {}[], cv: integer? }
 local requestDetails = cjson.decode(ARGV[1])
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local keyPrefix = ARGV[2]
 local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) --[[@as integer]]
@@ -27,10 +30,11 @@ local enableDebugLogs = tonumber(ARGV[7]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -200,6 +204,9 @@ local configVersion = requestDetails.cv
 
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 -- Compute constraint capacity
 ---@type integer?

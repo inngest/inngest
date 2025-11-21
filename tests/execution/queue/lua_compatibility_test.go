@@ -2,11 +2,13 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -14,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/tests/execution/queue/helper"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -58,7 +61,7 @@ func TestLuaCompatibility(t *testing.T) {
 			Name:       "Basic Garnet",
 			ServerType: "garnet",
 			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage("ghcr.io/microsoft/garnet:1.0.84"),
+				helper.WithImage("ghcr.io/microsoft/garnet:1.0.87"),
 				helper.WithConfiguration(&helper.GarnetConfiguration{
 					EnableLua: true,
 				}),
@@ -346,6 +349,82 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err)
 
 				t.Log(res[1], parsed)
+			})
+
+			t.Run("acquiring capacity works", func(t *testing.T) {
+				shard := setup(t)
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(false),
+					constraintapi.WithNumScavengerShards(4),
+					constraintapi.WithQueueShards(map[string]rueidis.Client{
+						shard.Name: shard.RedisClient.Client(),
+					}),
+					constraintapi.WithQueueStateKeyPrefix("q:v1"),
+					constraintapi.WithRateLimitClient(shard.RedisClient.Client()),
+					constraintapi.WithRateLimitKeyPrefix("rl"),
+				)
+				require.NoError(t, err)
+
+				config := constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						AccountConcurrency:  10,
+						FunctionConcurrency: 5,
+					},
+				}
+
+				accountID := uuid.New()
+				envID := uuid.New()
+				functionID := uuid.New()
+
+				constraints := []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						},
+					},
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", functionID),
+						},
+					},
+				}
+
+				resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey:       "acquire-test",
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           functionID,
+					Configuration:        config,
+					Constraints:          constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					LeaseRunIDs:          nil,
+					CurrentTime:          time.Now(),
+					Duration:             5 * time.Second,
+					MaximumLifetime:      time.Hour,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.LeaseLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeSync,
+					},
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+				require.Equal(t, 1, len(resp.Leases))
 			})
 		})
 	}
