@@ -10,7 +10,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 ---@type string[]
@@ -34,6 +34,9 @@ local leaseExpiryMS = tonumber(ARGV[5])
 local keyPrefix = ARGV[6]
 ---@type string[]
 local initialLeaseIDs = cjson.decode(ARGV[7])
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
+end
 local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
@@ -41,10 +44,11 @@ local enableDebugLogs = tonumber(ARGV[11]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -291,6 +295,9 @@ local configVersion = requestDetails.cv
 
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -400,6 +407,12 @@ local grantedLeases = {}
 
 -- Update constraints
 for i = 1, granted, 1 do
+	if not requestDetails.lik then
+		return redis.error_reply("ERR requestDetails.lik is nil during update")
+	end
+	if not initialLeaseIDs then
+		return redis.error_reply("ERR initialLeaseIDs is nil during update")
+	end
 	local leaseIdempotencyKey = requestDetails.lik[i]
 	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
