@@ -1,7 +1,15 @@
+local function count_concurrency(key, nowMS)
+	local count = redis.call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return tonumber(count)
+end
+
 -- Checks whether there's capacity in the given concurrency queue, given a limit and the
 -- current time in milliseconds.
 local function check_concurrency(now_ms, key, limit)
-	local count = redis.call("ZCOUNT", key, tostring(now_ms), "+inf")
+	local count = count_concurrency(key, now_ms)
 	return tonumber(limit) - tonumber(count)
 end
 
