@@ -1099,6 +1099,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 						},
 					},
 				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityCheckRequest{
 				AccountId:  accountID.String(),
@@ -1124,6 +1128,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 						},
 					},
 				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 		},
 		{
@@ -1140,6 +1148,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []ThrottleConfig{},
 				},
 				Constraints: []ConstraintItem{},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityCheckRequest{
 				AccountId:  accountID.String(),
@@ -1154,6 +1166,10 @@ func TestCapacityCheckRequestConversion(t *testing.T) {
 					Throttle: []*pb.ThrottleConfig{},
 				},
 				Constraints: []*pb.ConstraintItem{},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 		},
 		{
@@ -1371,6 +1387,10 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          LeaseLocationItemLease,
 					RunProcessingMode: RunProcessingModeBackground,
 				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "test-key-123",
@@ -1409,6 +1429,10 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
 				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 		},
 		{
@@ -1428,6 +1452,10 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 				Constraints: []ConstraintItem{},
 				Amount:      0,
 				LeaseRunIDs: map[string]ulid.ULID{},
+				Migration: MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
+				},
 			},
 			expected: &pb.CapacityAcquireRequest{
 				IdempotencyKey: "minimal",
@@ -1453,6 +1481,10 @@ func TestCapacityAcquireRequestConversion(t *testing.T) {
 					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
 					Location:          pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED,
 					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+				Migration: &pb.MigrationIdentifier{
+					IsRateLimit: false,
+					QueueShard:  "test",
 				},
 			},
 		},
