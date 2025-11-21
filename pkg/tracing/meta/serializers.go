@@ -181,6 +181,10 @@ func (a attr[T]) DeserializeValue(v any) (any, bool) {
 	return a.deserialize(v)
 }
 
+func (a attr[T]) DeserializeTypedValue(v any) (T, bool) {
+	return a.deserialize(v)
+}
+
 func Attr[T any](attr attr[T], value T) SerializableAttr {
 	return SerializableAttr{
 		serialize: func(v any) (attribute.KeyValue, bool) {
