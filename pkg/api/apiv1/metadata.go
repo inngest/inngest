@@ -62,8 +62,7 @@ func (a router) addRunMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch {
-	case data.Target.StepID == nil:
+	if data.Target.StepID == nil {
 		switch {
 		case data.Target.StepIndex != nil:
 			err = errors.New("target.step_id must be defined if target.step_index is defined")
