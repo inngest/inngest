@@ -222,8 +222,8 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      workerPercentageUsed: scopedMetrics(
-        filter: { name: "worker_percentage_used", scope: ENV, from: $from, until: $until }
+      workerPercentageUsed: connectWorkerMetrics(
+        filter: { name: "worker_percentage_used", from: $from, until: $until }
       ) {
         metrics {
           id
@@ -237,8 +237,8 @@ const GetVolumeMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      workerTotalCapacity: scopedMetrics(
-        filter: { name: "worker_total_capacity", scope: ENV, from: $from, until: $until }
+      workerTotalCapacity: connectWorkerMetrics(
+        filter: { name: "worker_total_capacity", from: $from, until: $until }
       ) {
         metrics {
           id
