@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { Trigger } from "@inngest/components/TriggerDetails/TriggerDetails";
+import type { Trigger } from "@inngest/components/TriggerDetails/NewTriggerDetails";
 import { useClient } from "urql";
 
 import { useEnvironment } from "@/components/Environments/environment-context";

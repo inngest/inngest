@@ -1,4 +1,4 @@
-import { languages } from 'monaco-editor';
+import type { languages } from 'monaco-editor';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import tailwindConfig from '../../tailwind.config';

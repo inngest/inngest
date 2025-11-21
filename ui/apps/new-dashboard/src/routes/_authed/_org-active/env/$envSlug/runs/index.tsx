@@ -1,7 +1,7 @@
 import { Button } from "@inngest/components/Button/NewButton";
 import { Header } from "@inngest/components/Header/NewHeader";
 import { RiRefreshLine } from "@remixicon/react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
 import { Runs } from "@/components/Runs/Runs";
 import { useRef } from "react";
 import { type RefreshRunsRef } from "@/components/Runs/Runs";
@@ -32,7 +32,9 @@ function RunsComponent() {
           </div>
         }
       />
-      <Runs scope="env" ref={ref} />
+      <ClientOnly>
+        <Runs scope="env" ref={ref} />
+      </ClientOnly>
     </>
   );
 }

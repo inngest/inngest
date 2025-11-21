@@ -1,5 +1,5 @@
 import EventsPage from "@/components/Events/EventsPage";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
 
 import EventsFeedback from "@/components/Surveys/EventsFeedback";
 
@@ -14,7 +14,9 @@ function EventsComponent() {
 
   return (
     <>
-      <EventsPage environmentSlug={envSlug} showHeader />
+      <ClientOnly>
+        <EventsPage environmentSlug={envSlug} showHeader />
+      </ClientOnly>
       <EventsFeedback />
     </>
   );

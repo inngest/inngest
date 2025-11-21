@@ -17,14 +17,20 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ["@headlessui/tailwindcss"],
-    external: ["next", "monaco-editor", "@monaco-editor/react"],
+    external: [
+      "monaco-editor",
+      "@monaco-editor/react",
+      "node:stream",
+      "node:stream/web",
+      "node:async_hooks",
+    ],
   },
   plugins: [
+    tanstackStart(),
     nitroV2Plugin(),
     tsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
-    tanstackStart(),
     viteReact(),
   ],
 });

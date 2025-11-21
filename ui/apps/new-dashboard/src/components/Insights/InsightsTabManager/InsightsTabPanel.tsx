@@ -57,9 +57,7 @@ export function InsightsTabPanel({
             className="h-full"
             title={<InsightsSQLEditorQueryTitle tab={tab} />}
           >
-            <ClientOnly fallback={<div>Loading...</div>}>
-              <InsightsSQLEditor />
-            </ClientOnly>
+            <InsightsSQLEditor />
           </Section>
         }
         orientation="vertical"

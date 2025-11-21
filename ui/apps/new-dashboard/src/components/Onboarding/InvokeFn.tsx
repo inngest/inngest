@@ -174,7 +174,7 @@ export default function InvokeFn() {
           </Alert>
         )}
         {hasEventTrigger && (
-          <ClientOnly fallback={<div>Loading...</div>}>
+          <ClientOnly>
             <CodeBlock.Wrapper>
               <CodeBlock
                 header={{ title: "Invoke function" }}
