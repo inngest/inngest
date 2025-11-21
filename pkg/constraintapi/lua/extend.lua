@@ -4,7 +4,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 -- This table is used when decoding ulid timestamps.
@@ -82,10 +82,11 @@ local enableDebugLogs = tonumber(ARGV[8]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -133,6 +134,9 @@ end
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(requestStateStr)
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 
 -- At this point, we know that
 -- - The request state still exists and
@@ -141,6 +145,9 @@ local requestDetails = cjson.decode(requestStateStr)
 
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 for _, value in ipairs(constraints) do
 	-- for concurrency constraints, update score to new expiry
