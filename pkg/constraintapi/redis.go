@@ -141,9 +141,13 @@ func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID 
 	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, util.XXHash(idempotencyKey))
 }
 
+func keyConstraintCheckIdempotency(prefix string, accountID uuid.UUID, idempotencyKey string) string {
+	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, util.XXHash(idempotencyKey))
+}
+
 // keyConstraintCheckIdempotency returns the operation idempotency key for constraint check retries
 func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, accountID uuid.UUID, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, util.XXHash(idempotencyKey))
+	return keyConstraintCheckIdempotency(prefix, accountID, idempotencyKey)
 }
 
 // keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
@@ -177,6 +181,15 @@ func (r *keyGenerator) KeyInProgressLeasesCustom(accountID uuid.UUID, scope enum
 		KeyExpressionHash: keyExpressionHash,
 		EvaluatedKeyHash:  evaluatedKeyHash,
 	}.InProgressLeasesKey(r.queueStateKeyPrefix, accountID, entityID, entityID)
+}
+
+func (r *keyGenerator) KeyConstraintCheckIdempotency(mi MigrationIdentifier, accountID uuid.UUID, leaseIdempotencyKey string) string {
+	prefix := r.queueStateKeyPrefix
+	if mi.IsRateLimit {
+		prefix = r.rateLimitKeyPrefix
+	}
+
+	return keyConstraintCheckIdempotency(prefix, accountID, leaseIdempotencyKey)
 }
 
 // clientAndPrefix returns the Redis client and Lua key prefix for the first stage of the Constraint API.
