@@ -397,7 +397,7 @@ type ExecutorRealtimeConfig struct {
 	PublishURL string
 }
 
-// AllowStepMetadata determines if key queues should be enabled for the account
+// AllowStepMetadata determines if step metadata should be enabled for the account
 type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
 
 func (am AllowStepMetadata) Enabled(ctx context.Context, acctID uuid.UUID) bool {
