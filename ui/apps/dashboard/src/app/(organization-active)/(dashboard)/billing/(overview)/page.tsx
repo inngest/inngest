@@ -7,12 +7,7 @@ import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import {
-  isEnterprisePlan,
-  isHobbyFreePlan,
-  isHobbyPlan,
-  type Plan,
-} from '@/components/Billing/Plans/utils';
+import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -64,18 +59,16 @@ export default async function Page() {
     legacyNoRunsPlan = entitlements.runCount.limit === null;
 
     const getBillingModel = (
-      plan: Plan,
       entitlements: EntitlementUsageWithMetricsQuery['account']['entitlements']
     ) => {
-      if (isHobbyPlan(plan)) return 'hobby-executions';
-      if (plan.slug === 'pro-2025-08-08' || plan.slug === 'pro-2025-06-04') return 'pro-executions';
-      if (isEnterprisePlan(plan) && entitlements.executions.limit !== null)
-        return 'enterprise-executions';
-      return 'legacy-steps-runs';
+      if (entitlements.executions.limit !== null) return 'executions';
+      return 'steps-runs';
     };
 
-    const billingModel = getBillingModel(currentPlan, entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']);
-    const isExecutionBasedPlan = billingModel !== 'legacy-steps-runs';
+    const billingModel = getBillingModel(
+      entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']
+    );
+    const isExecutionBasedPlan = billingModel === 'executions';
 
     runs = {
       title: 'Runs',
