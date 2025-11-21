@@ -438,6 +438,7 @@ export enum ConnectV1WorkerConnectionsOrderByField {
 
 export type ConnectV1WorkerMetricsFilter = {
   from: Scalars['Time'];
+  instanceIDs?: InputMaybe<Array<Scalars['String']>>;
   name: Scalars['String'];
   until?: InputMaybe<Scalars['Time']>;
 };
