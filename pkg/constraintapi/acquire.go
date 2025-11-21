@@ -102,7 +102,6 @@ type acquireScriptResponse struct {
 	Debug               flexibleStringArray `json:"d"`
 }
 
-
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
 
@@ -189,6 +188,14 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
+
+	l.Trace(
+		"prepared acquire call",
+		"req", req,
+		"state", requestState,
+		"keys", keys,
+		"args", args,
+	)
 
 	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {

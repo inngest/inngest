@@ -89,7 +89,6 @@ type checkScriptResponse struct {
 	Debug             flexibleStringArray `json:"d"`
 }
 
-
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
@@ -141,6 +140,13 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
+
+	l.Trace(
+		"prepared acquire call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
 
 	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
