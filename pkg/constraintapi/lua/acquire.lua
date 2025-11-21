@@ -413,8 +413,8 @@ for i = 1, granted, 1 do
 	if not initialLeaseIDs then
 		return redis.error_reply("ERR initialLeaseIDs is nil during update")
 	end
-	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
+	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 
 	for _, value in ipairs(constraints) do
@@ -435,16 +435,30 @@ for i = 1, granted, 1 do
 
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
 
-	-- Store lease details (lease idempotency key, associated run ID, operation idempotency key for request details)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
+	call(
+		"HSET",
+		keyLeaseDetails,
+		"lik",
+		hashedLeaseIdempotencyKey,
+		"rid",
+		leaseRunID,
+		"oik",
+		hashedOperationIdempotencyKey
+	)
 
 	-- Add lease to scavenger set of account leases
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 
+	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
+	local keyLeaseConstraintCheckIdempotency =
+		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
+
 	---@type { lid: string, lik: string }
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
-	leaseObject["lik"] = leaseIdempotencyKey
+	leaseObject["lik"] = hashedLeaseIdempotencyKey
 
 	table.insert(grantedLeases, leaseObject)
 end

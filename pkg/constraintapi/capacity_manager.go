@@ -21,6 +21,7 @@ type RolloutKeyGenerator interface {
 	KeyInProgressLeasesAccount(accountID uuid.UUID) string
 	KeyInProgressLeasesFunction(accountID uuid.UUID, fnID uuid.UUID) string
 	KeyInProgressLeasesCustom(accountID uuid.UUID, scope enums.ConcurrencyScope, entityID uuid.UUID, keyExpressionHash, evaluatedKeyHash string) string
+	KeyConstraintCheckIdempotency(mi MigrationIdentifier, accountID uuid.UUID, leaseIdempotencyKey string) string
 }
 
 type RolloutManager interface {
