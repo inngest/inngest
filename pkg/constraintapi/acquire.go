@@ -44,10 +44,10 @@ type redisRequestState struct {
 	// This is enforced during ExtendLease.
 	MaximumLifetimeMillis int64 `json:"l,omitempty"`
 
-	// LeaseIdempotencyKeys stores the idempotency used to generate leases
-	LeaseIdempotencyKeys []string `json:"lik,omitempty"`
+	// HashedLeaseIdempotencyKeys stores the hashed idempotency keys used to generate leases
+	HashedLeaseIdempotencyKeys []string `json:"lik,omitempty"`
 
-	// LeaseRunIDs stores the run IDs associated with lease IDs
+	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 }
 
@@ -60,13 +60,26 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 		MaximumLifetimeMillis:   req.MaximumLifetime.Milliseconds(),
 		ConfigVersion:           req.Configuration.FunctionVersion,
 
-		LeaseRunIDs:          req.LeaseRunIDs,
-		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
-
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
 	}
+
+	// Hash lease idempotency keys
+	hashedLeaseIdempotencyKeys := make([]string, len(req.LeaseIdempotencyKeys))
+	for i, leaseIdempotencyKey := range req.LeaseIdempotencyKeys {
+		hashedLeaseIdempotencyKeys[i] = util.XXHash(leaseIdempotencyKey)
+	}
+
+	state.HashedLeaseIdempotencyKeys = hashedLeaseIdempotencyKeys
+
+	// Ensure to hash lease idempotency key in run ID map
+	leaseRunIDs := make(map[string]ulid.ULID)
+	for k, u := range req.LeaseRunIDs {
+		leaseRunIDs[util.XXHash(k)] = u
+	}
+
+	state.LeaseRunIDs = leaseRunIDs
 
 	// Sort and serialize constraints with embedded configuration limits
 	constraints := req.Constraints
@@ -158,7 +171,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	keys := []string{
 		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", req.IdempotencyKey),
-		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}
