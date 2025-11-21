@@ -24,7 +24,7 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 
 	kindTag := spanMetadata.Kind().String()
 	if spanMetadata.Kind().IsUser() {
-		kindTag = fmt.Sprintf("%s*", metadata.KindPrefixUser)
+		kindTag = fmt.Sprintf("%s*", metadata.KindPrefixUserland)
 	}
 
 	metrics.IncrMetadataSpansTotal(ctx, metrics.CounterOpt{
