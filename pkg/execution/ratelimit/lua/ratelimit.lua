@@ -188,7 +188,7 @@ end
 local res = gcraCapacity(key, now_ns, period_ns, limit, burst)
 if res[2] == 0 then
 	-- Not rate limited, perform the update
-	gcraUpdate(key, now_ns, period_ns, limit, 1)
+	gcraUpdate(key, now_ns, period_ns, limit, 1, burst)
 
 	if idempotencyTTL > 0 then
 		redis.call("SET", idempotencyKey, tostring(now_ns), "EX", idempotencyTTL)

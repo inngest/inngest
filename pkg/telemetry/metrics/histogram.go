@@ -329,3 +329,25 @@ func HistogramPauseBlockCompactionDuration(ctx context.Context, delay time.Durat
 		Boundaries:  PausesBoundaries,
 	})
 }
+
+func HistogramConstraintAPIScavengerShardProcessDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_process_duration",
+		Description: "Distribution of scavenger shard processing time duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_lease_age",
+		Description: "Distribution of scavenger expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}

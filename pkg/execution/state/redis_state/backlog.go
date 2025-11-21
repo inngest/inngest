@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -551,6 +552,23 @@ func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
 	return key.activeRunsKey(kg)
 }
 
+func (b QueueBacklog) inProgressLeasesCustomKey(cm constraintapi.RolloutKeyGenerator, kg QueueKeyGenerator, accountID *uuid.UUID, n int) string {
+	if cm == nil {
+		return kg.Concurrency("", "")
+	}
+
+	if accountID == nil {
+		return kg.Concurrency("", "")
+	}
+
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.inProgressLeasesKey(cm, *accountID)
+}
+
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
@@ -561,6 +579,10 @@ func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 
 func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
 	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
+}
+
+func (b BacklogConcurrencyKey) inProgressLeasesKey(cm constraintapi.RolloutKeyGenerator, accountID uuid.UUID) string {
+	return cm.KeyInProgressLeasesCustom(accountID, b.Scope, b.EntityID, b.HashedKeyExpression, b.HashedValue)
 }
 
 // activeKey returns backlog compound active key

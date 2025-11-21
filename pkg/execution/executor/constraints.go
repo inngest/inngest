@@ -26,9 +26,10 @@ const (
 
 func WithConstraints[T any](
 	ctx context.Context,
-	capacityManager constraintapi.CapacityManager,
+	capacityManager constraintapi.RolloutManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	idempotencyKey string,
 	fn func(
 		ctx context.Context,
 		// performChecks determines whether constraint checks must be performed
@@ -66,12 +67,19 @@ func WithConstraints[T any](
 		return fn(ctx, true, "")
 	}
 
+	// If no rate limits are configured, simply run the function
+	if len(constraints) == 0 {
+		// TODO: Should we skip constraint checks in this case?
+		return fn(ctx, true, "")
+	}
+
 	// Perform constraint check to acquire lease
 	checkResult, err := CheckConstraints(
 		ctx,
 		capacityManager,
 		useConstraintAPI,
 		req,
+		idempotencyKey,
 		fallback,
 		constraints,
 	)
@@ -130,12 +138,16 @@ func WithConstraints[T any](
 			// Use previous lease as idempotency key
 			// This works because each lease is expected to extend once, after which a new lease
 			// is generated. This means idempotency can be used for graceful retries.
-			idempotencyKey := lID.String()
+			operationIempotencyKey := lID.String()
 
 			res, err := capacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
-				IdempotencyKey: idempotencyKey,
+				IdempotencyKey: operationIempotencyKey,
 				AccountID:      req.AccountID,
 				LeaseID:        lID,
+				Migration: constraintapi.MigrationIdentifier{
+					IsRateLimit: true,
+				},
+				Duration: ScheduleLeaseDuration,
 			})
 			if err != nil {
 				l.Error("could not extend schedule capacity lease", "err", err)
@@ -168,13 +180,16 @@ func WithConstraints[T any](
 			lID := *leaseID
 
 			// Use previous lease as idempotency key
-			idempotencyKey := lID.String()
+			operationIdempotencyKey := lID.String()
 
 			go func() {
 				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 					AccountID:      req.AccountID,
 					LeaseID:        lID,
-					IdempotencyKey: idempotencyKey,
+					IdempotencyKey: operationIdempotencyKey,
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: true,
+					},
 				})
 				if internalErr != nil {
 					l.Error("failed to release capacity", "err", internalErr)
@@ -237,28 +252,11 @@ func CheckConstraints(
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
+	idempotencyKey string,
 	fallback bool,
 	constraints []constraintapi.ConstraintItem,
 ) (checkResult, error) {
 	l := logger.StdlibLogger(ctx)
-
-	// Retrieve idempotency key to acquire lease
-	// NOTE: To allow for retries between multiple executors, this should be
-	// consistent between calls to CheckConstraints
-	idempotencyKey := req.Events[0].GetInternalID().String()
-	if req.IdempotencyKey != nil {
-		idempotencyKey = *req.IdempotencyKey
-	}
-
-	// Log missing idempotency key
-	if idempotencyKey == "" {
-		l.Warn("missing idempotency key in schedule call", "req", req)
-
-		// Do not send request to Constraint API
-		return checkResult{
-			mustCheck: true,
-		}, nil
-	}
 
 	// NOTE: Schedule may be called from within new-runs or the API
 	// In case of the API, we want to ensure the source is properly reflected in constraint checks
@@ -277,21 +275,33 @@ func CheckConstraints(
 	// TODO: Fetch account concurrency
 	var accountConcurrency int
 
+	configuration, err := queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function)
+	if err != nil {
+		return checkResult{}, fmt.Errorf("could not create configuration for acquire: %w", err)
+	}
+
 	res, internalErr := capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            req.AccountID,
 		IdempotencyKey:       idempotencyKey,
-		ResourceKind:         constraintapi.LeaseResourceEvent,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
-		EnvID:                req.WorkspaceID,
-		FunctionID:           req.Function.ID,
-		Configuration:        queue.ConvertToConstraintConfiguration(accountConcurrency, req.Function),
-		Constraints:          constraints,
-		Amount:               1,
-		CurrentTime:          time.Now(),
-		Duration:             ScheduleLeaseDuration,
-		MaximumLifetime:      5 * time.Minute, // This lease should be short!
-		Source:               source,
-		BlockingThreshold:    0, // Disable this for now
+		// NOTE: We cannot provide a run ID at this point because
+		// we may be retrying a previous Schedule() attempt which
+		// already set a run ID. This will only be known after
+		// the create state call within schedule().
+		// LeaseRunIDs: []ulid.ULID,
+		EnvID:             req.WorkspaceID,
+		FunctionID:        req.Function.ID,
+		Configuration:     configuration,
+		Constraints:       constraints,
+		Amount:            1,
+		CurrentTime:       time.Now(),
+		Duration:          ScheduleLeaseDuration,
+		MaximumLifetime:   5 * time.Minute, // This lease should be short!
+		Source:            source,
+		BlockingThreshold: 0, // Disable this for now
+		Migration: constraintapi.MigrationIdentifier{
+			IsRateLimit: true,
+		},
 	})
 	if internalErr != nil {
 		l.Error("acquiring capacity lease failed", "err", internalErr)

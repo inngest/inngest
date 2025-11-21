@@ -36,12 +36,19 @@ export const EDITOR_OPTIONS: editor.IEditorOptions = {
     vertical: 'visible',
     verticalScrollbarSize: 10,
   },
+  quickSuggestions: {
+    other: true,
+    comments: false,
+    strings: true,
+  },
   suggest: {
     showFunctions: true,
     showKeywords: true,
     showSnippets: true,
     showWords: false,
   },
+  suggestOnTriggerCharacters: true,
+  acceptSuggestionOnEnter: 'on',
   wordWrap: 'off',
   wrappingStrategy: 'advanced',
 };
