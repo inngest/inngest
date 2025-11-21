@@ -11,9 +11,9 @@ import (
 )
 
 type extendLeaseScriptResponse struct {
-	Status  int       `json:"s"`
-	Debug   []string  `json:"d"`
-	LeaseID ulid.ULID `json:"lid"`
+	Status  int                 `json:"s"`
+	Debug   flexibleStringArray `json:"d"`
+	LeaseID ulid.ULID           `json:"lid"`
 }
 
 // ExtendLease implements CapacityManager.
@@ -74,6 +74,13 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
+
+	l.Trace(
+		"prepared extend call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
 
 	rawRes, err := scripts["extend"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
