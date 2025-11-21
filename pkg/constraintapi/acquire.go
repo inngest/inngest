@@ -96,11 +96,12 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints []int    `json:"lc"`
-	FairnessReduction   int      `json:"fr"`
-	RetryAt             int      `json:"ra"`
-	Debug               []string `json:"d"`
+	LimitingConstraints flexibleIntArray    `json:"lc"`
+	FairnessReduction   int                 `json:"fr"`
+	RetryAt             int                 `json:"ra"`
+	Debug               flexibleStringArray `json:"d"`
 }
+
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
@@ -211,7 +212,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	var limitingConstraints []ConstraintItem
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
-		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
 			limitingConstraints[i] = sortedConstraints[limitingConstraintIndex-1]
 		}
 	}
