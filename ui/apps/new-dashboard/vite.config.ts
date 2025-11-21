@@ -1,4 +1,6 @@
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitroV2Plugin } from "@tanstack/nitro-v2-vite-plugin";
+
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import viteReact from "@vitejs/plugin-react";
@@ -15,9 +17,10 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ["@headlessui/tailwindcss"],
-    external: ["next"],
+    external: ["next", "monaco-editor", "@monaco-editor/react"],
   },
   plugins: [
+    nitroV2Plugin(),
     tsConfigPaths({
       projects: ["./tsconfig.json"],
     }),

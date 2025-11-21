@@ -7,9 +7,9 @@ import {
 import { methodTypes, type AppKind } from "@inngest/components/types/app";
 import { RiExternalLinkLine } from "@remixicon/react";
 
-import { type FlattenedApp } from "@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps";
 import { syncKind, syncStatusText } from "@/components/SyncStatusPill";
 import { pathCreator } from "@/utils/urls";
+import type { FlattenedApp } from "./useApps";
 
 const getAppCardContent = ({
   app,

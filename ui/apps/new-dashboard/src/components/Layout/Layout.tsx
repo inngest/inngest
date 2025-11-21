@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 
-import { ProfileDisplayType } from "@/queries/server-only/profile";
+import { type ProfileDisplayType } from "@/queries/server-only/profile";
 import type { Environment } from "@/utils/environments";
 import SideBar from "./SideBar";
 

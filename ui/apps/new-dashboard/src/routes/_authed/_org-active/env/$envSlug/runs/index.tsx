@@ -4,7 +4,7 @@ import { RiRefreshLine } from "@remixicon/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Runs } from "@/components/Runs/Runs";
 import { useRef } from "react";
-import { RefreshRunsRef } from "@/components/Runs/Runs";
+import { type RefreshRunsRef } from "@/components/Runs/Runs";
 
 export const Route = createFileRoute("/_authed/_org-active/env/$envSlug/runs/")(
   {

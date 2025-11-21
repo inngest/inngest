@@ -11,7 +11,7 @@ import getAppCardContent from "@/components/Apps/AppCardContent";
 import { pathCreator } from "@/utils/urls";
 import { isSyncStatusHiddenOnAppCard } from "../SyncStatusPill";
 import { useWorkersCount } from "../Workers/useWorker";
-import { FlattenedApp } from "./useApps";
+import { type FlattenedApp } from "./useApps";
 import { ValidateModal } from "./ValidateButton/ValidateModal";
 import { useNavigate } from "@tanstack/react-router";
 import { ArchiveModal } from "./ArchiveModal";

@@ -15,7 +15,7 @@ import { RiMore2Line, RiPencilLine, RiDeleteBinLine } from "@remixicon/react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { Secret, SecretKind } from "@/components/Secret/Secret";
+import { Secret, type SecretKind } from "@/components/Secret/Secret";
 import EditKeyNameModal from "@/components/Manage/EditKeyNameModal";
 import TransformEvent from "@/components/Manage/TransformEvent";
 import DeleteKeyModal from "@/components/Manage/DeleteKeyModal";

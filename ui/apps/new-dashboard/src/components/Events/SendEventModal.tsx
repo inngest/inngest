@@ -5,7 +5,7 @@ import { Modal } from "@inngest/components/Modal/Modal";
 import TabCards from "@inngest/components/TabCards/TabCards";
 import ky from "ky";
 import { toast } from "sonner";
-import { type JsonValue } from "type-fest";
+
 import { useQuery } from "urql";
 import { z } from "zod";
 
@@ -172,7 +172,7 @@ export function SendEventModal({
       const formData = new FormData(form);
       const jsonString = formData.get("code") as string;
 
-      let jsonEvent: JsonValue;
+      let jsonEvent: any;
       try {
         jsonEvent = JSON.parse(jsonString);
       } catch (error) {

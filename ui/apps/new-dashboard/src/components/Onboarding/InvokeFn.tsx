@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { Alert } from "@inngest/components/Alert/Alert";
 import { Button } from "@inngest/components/Button";
 import { CodeBlock } from "@inngest/components/CodeBlock/CodeBlock";
@@ -15,6 +15,7 @@ import { OnboardingSteps } from "../Onboarding/types";
 import { invokeFunction, prefetchFunctions } from "./actions";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
+import { useNavigate } from "@tanstack/react-router";
 
 const initialCode = JSON.stringify(
   {
@@ -46,7 +47,7 @@ export default function InvokeFn() {
     useState<FunctionOption | null>(null);
   const [rawPayload, setRawPayload] = useState(initialCode);
   const [isFnInvoked, setIsFnInvoked] = useState(false);
-  const router = useRouter();
+  const navigate = useNavigate();
   const tracking = useOnboardingTracking();
 
   const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
@@ -230,7 +231,7 @@ export default function InvokeFn() {
                       invokedFunction: selectedFunction,
                     },
                   });
-                  router.push(pathCreator.apps({ envSlug: "production" }));
+                  navigate({ to: pathCreator.apps({ envSlug: "production" }) });
                 }}
               />
             </div>
@@ -245,7 +246,7 @@ export default function InvokeFn() {
                     invokedFunction: selectedFunction,
                   },
                 });
-                router.push(pathCreator.runs({ envSlug: "production" }));
+                navigate({ to: pathCreator.runs({ envSlug: "production" }) });
               }}
             />
           )}

@@ -1,9 +1,9 @@
 import { graphql } from "@/gql";
 import { graphqlAPI } from "../graphqlAPI";
 import {
-  Organization,
-  OrganizationMembership,
-  User,
+  type Organization,
+  type OrganizationMembership,
+  type User,
 } from "@clerk/tanstack-react-start/server";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";

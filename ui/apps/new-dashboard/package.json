@@ -10,7 +10,8 @@
     "graphql-codegen": "graphql-codegen -r dotenv/config",
     "start": "vite start",
     "format": "prettier --write .",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.26.5",
@@ -21,6 +22,7 @@
     "@launchdarkly/node-server-sdk": "^9.0.3",
     "@remixicon/react": "^4.7.0",
     "@sindresorhus/slugify": "^3.0.0",
+    "@tanstack/nitro-v2-vite-plugin": "^1.132.31",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",
     "@tanstack/react-router": "1.134.4",
@@ -34,6 +36,7 @@
     "@urql/exchange-retry": "^1.2.0",
     "cmdk": "^1.0.4",
     "dotenv": "^17.2.3",
+    "framer-motion": "^10.16.4",
     "graphql": "16.8.1",
     "graphql-config": "^4.5.0",
     "graphql-request": "^6.1.0",
@@ -48,8 +51,8 @@
     "srvx": "0.8.15",
     "type-fest": "^3.7.2",
     "ulid": "^2.3.0",
-    "uuid": "^13.0.0",
     "urql": "^4.0.5",
+    "uuid": "^13.0.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
