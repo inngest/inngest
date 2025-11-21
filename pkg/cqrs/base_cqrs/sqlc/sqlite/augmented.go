@@ -102,3 +102,56 @@ func (r *GetSpansByDebugSessionIDRow) GetParentSpanID() sql.NullString  { return
 func (r *GetSpansByDebugSessionIDRow) GetStartTime() interface{}        { return r.StartTime }
 func (r *GetSpansByDebugSessionIDRow) GetEndTime() interface{}          { return r.EndTime }
 func (r *GetSpansByDebugSessionIDRow) GetSpanFragments() any            { return r.SpanFragments }
+
+func (r *GetRunSpanByRunIDRow) GetTraceID() string               { return r.TraceID }
+func (r *GetRunSpanByRunIDRow) GetRunID() string                 { return r.RunID }
+func (r *GetRunSpanByRunIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
+func (r *GetRunSpanByRunIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
+func (r *GetRunSpanByRunIDRow) GetStartTime() any                { return r.StartTime }
+func (r *GetRunSpanByRunIDRow) GetEndTime() any                  { return r.EndTime }
+
+func (r *GetRunSpanByRunIDRow) GetSpanFragments() any { return r.SpanFragments }
+
+func (r *GetStepSpanByStepIDRow) GetTraceID() string               { return r.TraceID }
+func (r *GetStepSpanByStepIDRow) GetRunID() string                 { return r.RunID }
+func (r *GetStepSpanByStepIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
+func (r *GetStepSpanByStepIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
+func (r *GetStepSpanByStepIDRow) GetStartTime() any                { return r.StartTime }
+func (r *GetStepSpanByStepIDRow) GetEndTime() any                  { return r.EndTime }
+
+func (r *GetStepSpanByStepIDRow) GetSpanFragments() any { return r.SpanFragments }
+
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetTraceID() string { return r.TraceID }
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetRunID() string   { return r.RunID }
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetDynamicSpanID() sql.NullString {
+	return r.DynamicSpanID
+}
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetParentSpanID() sql.NullString {
+	return r.ParentSpanID
+}
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetStartTime() any { return r.StartTime }
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetEndTime() any   { return r.EndTime }
+
+func (r *GetExecutionSpanByStepIDAndAttemptRow) GetSpanFragments() any { return r.SpanFragments }
+
+func (r *GetLatestExecutionSpanByStepIDRow) GetTraceID() string { return r.TraceID }
+func (r *GetLatestExecutionSpanByStepIDRow) GetRunID() string   { return r.RunID }
+func (r *GetLatestExecutionSpanByStepIDRow) GetDynamicSpanID() sql.NullString {
+	return r.DynamicSpanID
+}
+func (r *GetLatestExecutionSpanByStepIDRow) GetParentSpanID() sql.NullString {
+	return r.ParentSpanID
+}
+func (r *GetLatestExecutionSpanByStepIDRow) GetStartTime() any { return r.StartTime }
+func (r *GetLatestExecutionSpanByStepIDRow) GetEndTime() any   { return r.EndTime }
+
+func (r *GetLatestExecutionSpanByStepIDRow) GetSpanFragments() any { return r.SpanFragments }
+
+func (r *GetSpanBySpanIDRow) GetTraceID() string               { return r.TraceID }
+func (r *GetSpanBySpanIDRow) GetRunID() string                 { return r.RunID }
+func (r *GetSpanBySpanIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
+func (r *GetSpanBySpanIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
+func (r *GetSpanBySpanIDRow) GetStartTime() any                { return r.StartTime }
+func (r *GetSpanBySpanIDRow) GetEndTime() any                  { return r.EndTime }
+
+func (r *GetSpanBySpanIDRow) GetSpanFragments() any { return r.SpanFragments }
