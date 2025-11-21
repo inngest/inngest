@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SignIn } from "@clerk/tanstack-react-start";
 import SplitView from "@/components/SignIn/SplitView";
-import { Alert } from "@inngest/components/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import SignInRedirectErrors, {
   hasErrorMessage,
 } from "@/components/SignIn/Errors";

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { Search } from "@inngest/components/Forms/Search";
 import { StatusDot } from "@inngest/components/Status/StatusDot";
 import useDebounce from "@inngest/components/hooks/useDebounce";
 
-import Toaster from "@/components/Toaster";
+import Toaster from "@/components/Toast/Toaster";
 import LoadingIcon from "@/icons/LoadingIcon";
 import { useEnvironments } from "@/queries";
 import { EnvironmentType, type Environment } from "@/utils/environments";

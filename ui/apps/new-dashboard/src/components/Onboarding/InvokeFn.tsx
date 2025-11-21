@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { CodeBlock } from "@inngest/components/CodeBlock/CodeBlock";
 import { parseCode } from "@inngest/components/InvokeButton/utils";
-import { Link } from "@inngest/components/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import { Select, type Option } from "@inngest/components/Select/Select";
 import { RiCheckboxCircleFill } from "@remixicon/react";
 import { toast } from "sonner";

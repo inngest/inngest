@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { MenuItem } from "@inngest/components/Menu/MenuItem";
 import SegmentedProgressBar from "@inngest/components/ProgressBar/SegmentedProgressBar";
 import {

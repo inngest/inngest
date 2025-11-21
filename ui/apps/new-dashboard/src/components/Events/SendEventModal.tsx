@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { Alert } from "@inngest/components/Alert";
-import { Button } from "@inngest/components/Button";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Button } from "@inngest/components/Button/NewButton";
 import { Modal } from "@inngest/components/Modal/Modal";
 import TabCards from "@inngest/components/TabCards/TabCards";
 import ky from "ky";

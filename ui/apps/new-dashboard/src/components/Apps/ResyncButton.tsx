@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { methodTypes } from "@inngest/components/types/app";
 import { RiRefreshLine } from "@remixicon/react";
 

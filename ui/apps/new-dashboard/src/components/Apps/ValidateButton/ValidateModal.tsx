@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
-import { Alert } from "@inngest/components/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Input } from "@inngest/components/Forms/Input";
 import { Modal } from "@inngest/components/Modal";

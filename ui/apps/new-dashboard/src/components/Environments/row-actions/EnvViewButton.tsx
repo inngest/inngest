@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 
 import { type Environment } from "@/utils/environments";
 import { pathCreator } from "@/utils/urls";

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button } from "@inngest/components/Button";
-import { Link } from "@inngest/components/Link";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Link } from "@inngest/components/Link/NewLink";
 import { RiCloseLine } from "@remixicon/react";
 
 const ALERT_NAME = "inngest-dismissLaunchWeekAlert";

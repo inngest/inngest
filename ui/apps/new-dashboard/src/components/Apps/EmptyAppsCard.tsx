@@ -1,5 +1,5 @@
 import EmptyCard from "@inngest/components/Apps/EmptyCard";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { RiAddLine, RiExternalLinkLine } from "@remixicon/react";
 
 import { pathCreator } from "@/utils/urls";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert } from "@inngest/components/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { AlertModal } from "@inngest/components/Modal/AlertModal";
 import { useMutation } from "urql";
 

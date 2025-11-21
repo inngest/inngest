@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button";
-import { Pill } from "@inngest/components/Pill";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Pill } from "@inngest/components/Pill/NewPill";
 import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
 import { useQuery } from "urql";
 

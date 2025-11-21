@@ -1,4 +1,4 @@
-import { Pill } from "@inngest/components/Pill";
+import { Pill } from "@inngest/components/Pill/NewPill";
 import {
   Tooltip,
   TooltipContent,

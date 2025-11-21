@@ -1,8 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { InlineCode } from "@inngest/components/Code/InlineCode";
-import { Link } from "@inngest/components/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import TabCards from "@inngest/components/TabCards/TabCards";
 import { IconSpinner } from "@inngest/components/icons/Spinner";
 import { IconCloudflare } from "@inngest/components/icons/platforms/Cloudflare";

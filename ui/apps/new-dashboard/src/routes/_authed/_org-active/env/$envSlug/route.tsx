@@ -1,6 +1,6 @@
 import { ArchivedEnvBanner } from "@/components/ArchivedEnvBanner";
 import { EnvironmentProvider } from "@/components/Environments/environment-context";
-import { Alert } from "@inngest/components/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { SharedContextProvider } from "@/components/SharedContext/SharedContextProvider";
 

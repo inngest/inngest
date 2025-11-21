@@ -1,5 +1,5 @@
 import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
-import { Link } from "@inngest/components/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 
 export default function CommonVercelErrors() {
   return (

@@ -1,9 +1,6 @@
-import { Link } from "@inngest/components/Link/Link";
-import {
-  HorizontalPillList,
-  Pill,
-  PillContent,
-} from "@inngest/components/Pill";
+import { Link } from "@inngest/components/Link/NewLink";
+import { Pill, PillContent } from "@inngest/components/Pill/NewPill";
+import { HorizontalPillList } from "@inngest/components/Pill/NewHorizontalPillList";
 import { methodTypes, type AppKind } from "@inngest/components/types/app";
 import { RiExternalLinkLine } from "@remixicon/react";
 

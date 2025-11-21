@@ -1,5 +1,5 @@
 import { Listbox } from "@headlessui/react";
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { RiArchive2Line, RiMore2Line } from "@remixicon/react";
 
 export type EventActions = {
