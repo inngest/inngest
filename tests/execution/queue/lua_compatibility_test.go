@@ -398,7 +398,7 @@ func TestLuaCompatibility(t *testing.T) {
 					},
 				}
 
-				resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+				acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
 						QueueShard:  shard.Name,
@@ -423,8 +423,36 @@ func TestLuaCompatibility(t *testing.T) {
 				})
 
 				require.NoError(t, err)
-				require.NotNil(t, resp)
-				require.Equal(t, 1, len(resp.Leases))
+				require.NotNil(t, acquireResp)
+				require.Equal(t, 1, len(acquireResp.Leases))
+
+				extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey: "extend-test",
+					AccountID:      accountID,
+					Duration:       5 * time.Second,
+					LeaseID:        acquireResp.Leases[0].LeaseID,
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, extendResp)
+				require.NotNil(t, extendResp.LeaseID)
+
+				releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey: "release-test",
+					AccountID:      accountID,
+					LeaseID:        *extendResp.LeaseID,
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, releaseResp)
 			})
 		})
 	}
