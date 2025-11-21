@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=MetadataOpcode -type=MetadataOpcode -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=MetadataOpcode -type=MetadataOpcode -json -text -transform=snake
 package enums
 
 type MetadataOpcode int
