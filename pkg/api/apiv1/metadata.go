@@ -174,7 +174,7 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 			span, err = a.opts.TraceReader.GetExecutionSpanByStepIDAndAttempt(ctx, runID, stepID, *target.StepAttempt, auth.AccountID(), auth.WorkspaceID())
 		}
 	default:
-		span, err = a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *target.StepID, auth.AccountID(), auth.WorkspaceID())
+		span, err = a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *target.SpanID, auth.AccountID(), auth.WorkspaceID())
 	}
 
 	switch {
