@@ -14,6 +14,7 @@ import {
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
 import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import type { EntitlementUsageQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 function kbyteDisplayValue(kibibytes: number): string {
@@ -55,8 +56,13 @@ export default async function Page() {
     tooltipContent: 'A single durable function execution.',
   };
 
-  const isExecutionBasedPlan =
-    currentPlan.slug === 'pro-2025-08-08' || currentPlan.slug === 'pro-2025-06-04';
+  const getBillingModel = (entitlements: EntitlementUsageQuery['account']['entitlements']) => {
+    if (entitlements.executions.limit !== null) return 'executions';
+    return 'steps-runs';
+  };
+
+  const billingModel = getBillingModel(entitlements);
+  const isExecutionBasedPlan = billingModel === 'executions';
   const steps: Data = {
     title: isExecutionBasedPlan ? 'Executions' : 'Steps',
     description: `${
@@ -153,9 +159,11 @@ export default async function Page() {
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
-          {!isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
-          {isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />}
+          {billingModel === 'steps-runs' && !legacyNoRunsPlan && (
+            <LimitBar data={runs} className="my-4" />
+          )}
+          {billingModel === 'steps-runs' && <LimitBar data={steps} className="mb-6" />}
+          {billingModel === 'executions' && <LimitBar data={executions} className="mb-6" />}
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}
