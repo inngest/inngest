@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
+import { ClientOnly, useNavigate } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button";
 import { Card } from "@inngest/components/Card/Card";
 import { InlineCode } from "@inngest/components/Code";
@@ -40,7 +41,7 @@ export default function CreateApp() {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || "");
   const currentTabContent =
     tabs.find((tab) => tab.title === activeTab) || tabs[0];
-  const router = useRouter();
+  const navigate = useNavigate();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
   const tracking = useOnboardingTracking();
 
@@ -67,17 +68,19 @@ export default function CreateApp() {
         Run the following CLI command on your machine to get the Inngest Dev
         Server started locally:
       </p>
-      <CommandBlock.Wrapper>
-        <CommandBlock.Header className="flex items-center justify-between pr-4">
-          <CommandBlock.Tabs
-            tabs={tabs}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
-          <CommandBlock.CopyButton content={currentTabContent?.content} />
-        </CommandBlock.Header>
-        <CommandBlock currentTabContent={currentTabContent} />
-      </CommandBlock.Wrapper>
+      <ClientOnly fallback={<div>Loading...</div>}>
+        <CommandBlock.Wrapper>
+          <CommandBlock.Header className="flex items-center justify-between pr-4">
+            <CommandBlock.Tabs
+              tabs={tabs}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+            <CommandBlock.CopyButton content={currentTabContent?.content} />
+          </CommandBlock.Header>
+          <CommandBlock currentTabContent={currentTabContent} />
+        </CommandBlock.Wrapper>
+      </ClientOnly>
       <Card className="my-6">
         <div className="flex items-center justify-between gap-2 p-4">
           <div>
@@ -132,7 +135,9 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: "btn-click", label: "next" },
             });
-            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+            navigate({
+              to: pathCreator.onboardingSteps({ step: nextStepName }),
+            });
           }}
         />
         <Button
@@ -147,7 +152,9 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: "btn-click", label: "skip" },
             });
-            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+            navigate({
+              to: pathCreator.onboardingSteps({ step: nextStepName }),
+            });
           }}
         />
       </div>

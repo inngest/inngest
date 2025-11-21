@@ -1,5 +1,3 @@
-"use client";
-
 import { Listbox } from "@headlessui/react";
 import { Button } from "@inngest/components/Button";
 import { RiArchive2Line, RiMore2Line } from "@remixicon/react";

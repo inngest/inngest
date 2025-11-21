@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { useLocation } from "@tanstack/react-router";
+import { useLocation, ClientOnly } from "@tanstack/react-router";
 import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Link } from "@inngest/components/Link/NewLink";
@@ -202,17 +202,19 @@ export default function TransformEvents({
         />
       </div>
       <div className="mb-6">
-        <CodeBlock
-          header={{
-            title: "Transform Function",
-          }}
-          tab={{
-            content: rawTransform ?? defaultTransform,
-            readOnly: false,
-            language: "javascript",
-            handleChange: handleTransformCodeChange,
-          }}
-        />
+        <ClientOnly fallback={<div>Loading...</div>}>
+          <CodeBlock
+            header={{
+              title: "Transform Function",
+            }}
+            tab={{
+              content: rawTransform ?? defaultTransform,
+              readOnly: false,
+              language: "javascript",
+              handleChange: handleTransformCodeChange,
+            }}
+          />
+        </ClientOnly>
       </div>
       {outputError && (
         <Alert severity="error" className="mb-4">
@@ -225,32 +227,36 @@ export default function TransformEvents({
           <p className="text-subtle mb-6 text-sm">
             Paste the incoming JSON payload here to test your transform.
           </p>
-          <CodeBlock
-            header={{
-              title: "Webhook Payload",
-            }}
-            tab={{
-              content: incoming,
-              readOnly: false,
-              language: "json",
-              handleChange: handleIncomingCodeChange,
-            }}
-          />
+          <ClientOnly fallback={<div>Loading...</div>}>
+            <CodeBlock
+              header={{
+                title: "Webhook Payload",
+              }}
+              tab={{
+                content: incoming,
+                readOnly: false,
+                language: "json",
+                handleChange: handleIncomingCodeChange,
+              }}
+            />
+          </ClientOnly>
         </div>
         <div className="w-6/12">
           <h2 className="pb-1 text-lg font-semibold">Transformed Event</h2>
           <p className="text-subtle mb-6 text-sm">
             Preview the transformed JSON payload here.
           </p>
-          <CodeBlock
-            header={{
-              title: "Event Payload",
-            }}
-            tab={{
-              content: output,
-              language: "json",
-            }}
-          />
+          <ClientOnly fallback={<div>Loading...</div>}>
+            <CodeBlock
+              header={{
+                title: "Event Payload",
+              }}
+              tab={{
+                content: output,
+                language: "json",
+              }}
+            />
+          </ClientOnly>
           {transformWarningOnKey && (
             <Alert severity="warning" className="mt-4">
               The resulting output is missing a{" "}

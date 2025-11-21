@@ -1,4 +1,4 @@
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { Alert } from "@inngest/components/Alert/Alert";
 import { Button } from "@inngest/components/Button";
 import { InlineCode } from "@inngest/components/Code/InlineCode";
@@ -25,7 +25,7 @@ export default function DeployApp() {
   const currentStepName = OnboardingSteps.DeployApp;
   const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
-  const router = useRouter();
+  const navigate = useNavigate();
   const env = useEnvironment();
   const res = useDefaultEventKey({ envID: env.id });
   const defaultEventKey = res.data?.defaultKey.presharedKey || "Unknown key";
@@ -140,10 +140,10 @@ export default function DeployApp() {
                   hostingProvider: "all",
                 },
               });
-              router.push(
-                pathCreator.onboardingSteps({ step: nextStepName }) +
-                  "?nonVercel=true",
-              );
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>
@@ -167,7 +167,7 @@ export default function DeployApp() {
                     hostingProvider: "vercel",
                   },
                 });
-                router.push(pathCreator.vercel());
+                navigate({ to: pathCreator.vercel() });
               }}
             />
           </div>
@@ -207,7 +207,10 @@ export default function DeployApp() {
                     },
                   });
                   setInstallingVercelFromOnboarding(true);
-                  router.push(`https://vercel.com/integrations/inngest/new`);
+                  window.open(
+                    `https://vercel.com/integrations/inngest/new`,
+                    "_blank",
+                  );
                 }}
                 disabled={isLoading}
               />
@@ -247,9 +250,9 @@ export default function DeployApp() {
                     hostingProvider: "vercel",
                   },
                 });
-                router.push(
-                  pathCreator.onboardingSteps({ step: nextStepName }),
-                );
+                navigate({
+                  to: pathCreator.onboardingSteps({ step: nextStepName }),
+                });
               }}
             />
           )}
@@ -297,10 +300,10 @@ export default function DeployApp() {
                   hostingProvider: "cloudflare",
                 },
               });
-              router.push(
-                pathCreator.onboardingSteps({ step: nextStepName }) +
-                  "?nonVercel=true",
-              );
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>
@@ -351,10 +354,10 @@ export default function DeployApp() {
                   hostingProvider: "flyio",
                 },
               });
-              router.push(
-                pathCreator.onboardingSteps({ step: nextStepName }) +
-                  "?nonVercel=true",
-              );
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>

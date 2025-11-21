@@ -1,6 +1,4 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button";
 import {
   DropdownMenu,
@@ -18,7 +16,7 @@ type Props = {
 };
 
 export function EnvKeysDropdownButton({ env }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <DropdownMenu>
@@ -33,14 +31,16 @@ export function EnvKeysDropdownButton({ env }: Props) {
       <DropdownMenuContent>
         <DropdownMenuItem
           className="text-basis text-sm"
-          onSelect={() => router.push(pathCreator.keys({ envSlug: env.slug }))}
+          onSelect={() =>
+            navigate({ to: pathCreator.keys({ envSlug: env.slug }) })
+          }
         >
           Manage event keys
         </DropdownMenuItem>
         <DropdownMenuItem
           className="text-basis text-sm"
           onSelect={() =>
-            router.push(pathCreator.signingKeys({ envSlug: env.slug }))
+            navigate({ to: pathCreator.signingKeys({ envSlug: env.slug }) })
           }
         >
           Manage signing key

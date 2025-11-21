@@ -1,6 +1,4 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { Button, SplitButton } from "@inngest/components/Button";
 import {
   DropdownMenu,
@@ -20,7 +18,7 @@ type BranchEnvironmentActionsProps = {
 export function BranchEnvironmentActions({
   branchParent,
 }: BranchEnvironmentActionsProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <SplitButton
@@ -49,7 +47,9 @@ export function BranchEnvironmentActions({
             <DropdownMenuItem
               className="text-basis text-sm"
               onSelect={() =>
-                router.push(pathCreator.keys({ envSlug: branchParent.slug }))
+                navigate({
+                  to: pathCreator.keys({ envSlug: branchParent.slug }),
+                })
               }
             >
               Manage event keys
@@ -57,9 +57,9 @@ export function BranchEnvironmentActions({
             <DropdownMenuItem
               className="text-basis text-sm"
               onSelect={() =>
-                router.push(
-                  pathCreator.signingKeys({ envSlug: branchParent.slug }),
-                )
+                navigate({
+                  to: pathCreator.signingKeys({ envSlug: branchParent.slug }),
+                })
               }
             >
               Manage signing key

@@ -1,5 +1,6 @@
 import { Link } from "@inngest/components/Link/NewLink";
 import { Resizable } from "@inngest/components/Resizable/Resizable";
+import { ClientOnly } from "@tanstack/react-router";
 
 import type { Tab } from "@/components/Insights/types";
 import { InsightsDataTable } from "../InsightsDataTable/InsightsDataTable";
@@ -56,7 +57,9 @@ export function InsightsTabPanel({
             className="h-full"
             title={<InsightsSQLEditorQueryTitle tab={tab} />}
           >
-            <InsightsSQLEditor />
+            <ClientOnly fallback={<div>Loading...</div>}>
+              <InsightsSQLEditor />
+            </ClientOnly>
           </Section>
         }
         orientation="vertical"

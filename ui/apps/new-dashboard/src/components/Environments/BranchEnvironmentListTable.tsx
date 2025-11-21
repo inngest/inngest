@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
 import { usePaginationUI } from "@inngest/components/Pagination";
 import { StatusDot } from "@inngest/components/Status/StatusDot";

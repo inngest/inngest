@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Button } from "@inngest/components/Button/Button";
 import { RiArchive2Line } from "@remixicon/react";

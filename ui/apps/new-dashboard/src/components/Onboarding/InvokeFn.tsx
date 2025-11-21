@@ -15,7 +15,7 @@ import { OnboardingSteps } from "../Onboarding/types";
 import { invokeFunction, prefetchFunctions } from "./actions";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, ClientOnly } from "@tanstack/react-router";
 
 const initialCode = JSON.stringify(
   {
@@ -174,17 +174,19 @@ export default function InvokeFn() {
           </Alert>
         )}
         {hasEventTrigger && (
-          <CodeBlock.Wrapper>
-            <CodeBlock
-              header={{ title: "Invoke function" }}
-              tab={{
-                content: rawPayload,
-                readOnly: false,
-                language: "json",
-                handleChange: setRawPayload,
-              }}
-            />
-          </CodeBlock.Wrapper>
+          <ClientOnly fallback={<div>Loading...</div>}>
+            <CodeBlock.Wrapper>
+              <CodeBlock
+                header={{ title: "Invoke function" }}
+                tab={{
+                  content: rawPayload,
+                  readOnly: false,
+                  language: "json",
+                  handleChange: setRawPayload,
+                }}
+              />
+            </CodeBlock.Wrapper>
+          </ClientOnly>
         )}
         {!hasEventTrigger && selectedFunction && (
           <p className="text-sm">

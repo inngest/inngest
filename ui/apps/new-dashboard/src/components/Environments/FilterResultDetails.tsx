@@ -1,5 +1,3 @@
-"use client";
-
 type FilterResultDetailsProps = {
   size: number;
 };

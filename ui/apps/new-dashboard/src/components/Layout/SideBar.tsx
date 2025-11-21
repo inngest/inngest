@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 
 import type { ProfileDisplayType } from "@/queries/server-only/profile";

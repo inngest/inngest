@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { Button } from "@inngest/components/Button";
 import { Search } from "@inngest/components/Forms/Search";

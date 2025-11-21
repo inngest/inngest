@@ -1,5 +1,3 @@
-"use client";
-
 import { useBooleanFlag } from "./hooks";
 
 type Props = {

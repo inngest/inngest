@@ -1,8 +1,5 @@
-"use client";
-
 import { useMemo } from "react";
-import type { Route } from "next";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@clerk/nextjs";
 import * as Sentry from "@sentry/nextjs";
 import { authExchange } from "@urql/exchange-auth";
@@ -38,7 +35,7 @@ export default function URQLProviderWrapper({
 
 export function URQLProvider({ children }: { children: React.ReactNode }) {
   const { getToken, signOut } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const client = useMemo(() => {
     return createClient({
@@ -64,11 +61,10 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
               // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
               Sentry.captureException(error);
               signOut(() => {
-                router.push(
-                  `${
-                    process.env.NEXT_PUBLIC_SIGN_IN_PATH || "/sign-in"
-                  }?error=${SignInRedirectErrors.Unauthenticated}` as Route,
-                );
+                navigate({
+                  to: process.env.NEXT_PUBLIC_SIGN_IN_PATH || "/sign-in",
+                  search: { error: SignInRedirectErrors.Unauthenticated },
+                });
               });
             }
           },
@@ -95,7 +91,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
         fetchExchange,
       ],
     });
-  }, [getToken, router, signOut]);
+  }, [getToken, navigate, signOut]);
 
   return <Provider value={client}>{children}</Provider>;
 }

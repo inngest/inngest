@@ -1,4 +1,4 @@
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button";
 import { Pill } from "@inngest/components/Pill";
 import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
@@ -35,7 +35,7 @@ export default function LatestLogsList({
   eventName,
 }: LatestLogsListProps) {
   const environment = useEnvironment();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [{ data: LatestLogsResponse, fetching: fetchingLatestLogs }] = useQuery(
     {
@@ -102,12 +102,12 @@ export default function LatestLogsList({
                       className="hover:bg-canvasSubtle/50 cursor-pointer truncate transition-all"
                       key={e.id}
                       onClick={() =>
-                        router.push(
-                          pathCreator.eventPopout({
+                        navigate({
+                          to: pathCreator.eventPopout({
                             envSlug: environmentSlug,
                             eventID: e.id,
                           }),
-                        )
+                        })
                       }
                     >
                       <td className="flex items-center gap-6 p-4">

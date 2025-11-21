@@ -1,5 +1,3 @@
-"use client";
-
 import { trackEvent, useTrackingUser } from "@/utils/tracking";
 import { OnboardingSteps, steps, type OnboardingStep } from "./types";
 import useOnboardingStep from "./useOnboardingStep";

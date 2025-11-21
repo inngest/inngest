@@ -17,6 +17,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { ClientOnly } from '@tanstack/react-router';
 
 import CodeSearch from '../CodeSearch/NewCodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
@@ -317,13 +318,15 @@ export function EventsTable({
               />
             </div>
             <div className="border-subtle border-b">
-              <CodeSearch
-                onSearch={onSearchChange}
-                placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
-                value={search}
-                preset="events"
-                searchError={searchError}
-              />
+              <ClientOnly fallback={<div>Loading...</div>}>
+                <CodeSearch
+                  onSearch={onSearchChange}
+                  placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
+                  value={search}
+                  preset="events"
+                  searchError={searchError}
+                />
+              </ClientOnly>
             </div>
           </>
         )}

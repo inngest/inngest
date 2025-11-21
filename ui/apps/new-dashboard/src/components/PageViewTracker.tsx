@@ -1,4 +1,5 @@
-// "use client";
+//
+// TANSTACK TODO: get working with clerk & tanstack start
 
 // import { useEffect, useState } from "react";
 // import {

@@ -1,5 +1,3 @@
-"use client";
-
 import StepsMenu from "@inngest/components/Steps/StepsMenu";
 import {
   RiDiscordLine,

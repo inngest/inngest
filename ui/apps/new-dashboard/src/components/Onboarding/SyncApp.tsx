@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Alert } from "@inngest/components/Alert/Alert";
 import { Button } from "@inngest/components/Button";
 import { Input } from "@inngest/components/Forms/Input";
@@ -39,11 +39,11 @@ export default function SyncApp() {
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
-  const router = useRouter();
+  const navigate = useNavigate();
   const tracking = useOnboardingTracking();
 
-  const searchParams = useSearchParams();
-  const fromNonVercel = searchParams.get("nonVercel") === "true";
+  const search = useSearch({ strict: false }) as { nonVercel?: string };
+  const fromNonVercel = search.nonVercel === "true";
 
   const loadVercelSyncs = async () => {
     try {
@@ -229,9 +229,9 @@ export default function SyncApp() {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: { type: "btn-click", label: "skip" },
                   });
-                  router.push(
-                    pathCreator.onboardingSteps({ step: nextStepName }),
-                  );
+                  navigate({
+                    to: pathCreator.onboardingSteps({ step: nextStepName }),
+                  });
                 }}
               />
             </div>
@@ -247,9 +247,9 @@ export default function SyncApp() {
                     syncMethod: "manual",
                   },
                 });
-                router.push(
-                  pathCreator.onboardingSteps({ step: nextStepName }),
-                );
+                navigate({
+                  to: pathCreator.onboardingSteps({ step: nextStepName }),
+                });
               }}
             />
           )}
@@ -350,7 +350,9 @@ export default function SyncApp() {
                   syncMethod: "vercel",
                 },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+              });
             }}
           />
         </TabCards.Content>
