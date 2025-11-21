@@ -15,7 +15,7 @@ type luaGCRARateLimiter struct {
 	prefix string
 }
 
-func newLuaGCRARateLimiter(ctx context.Context, r rueidis.Client, prefix string) RateLimiter {
+func New(ctx context.Context, r rueidis.Client, prefix string) RateLimiter {
 	return &luaGCRARateLimiter{
 		r:      r,
 		prefix: prefix,
@@ -25,9 +25,8 @@ func newLuaGCRARateLimiter(ctx context.Context, r rueidis.Client, prefix string)
 // RateLimit implements RateLimiter, returning (limited, retryAfter, error).
 func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error) {
 	o := &rateLimitOptions{
-		now:                  time.Now(),
-		useLuaImplementation: true,
-		idempotencyKey:       "-",
+		now:            time.Now(),
+		idempotencyKey: "-",
 	}
 	for _, opt := range options {
 		opt(o)

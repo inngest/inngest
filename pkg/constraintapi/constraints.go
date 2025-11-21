@@ -1,6 +1,11 @@
 package constraintapi
 
-import "github.com/inngest/inngest/pkg/enums"
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
+)
 
 type ConstraintKind string
 
@@ -9,6 +14,10 @@ const (
 	ConstraintKindConcurrency ConstraintKind = "concurrency"
 	ConstraintKindThrottle    ConstraintKind = "throttle"
 )
+
+func (k ConstraintKind) IsQueueConstraint() bool {
+	return k == ConstraintKindConcurrency || k == ConstraintKindThrottle
+}
 
 type RateLimitConstraint struct {
 	Scope enums.RateLimitScope
@@ -28,6 +37,39 @@ type ConcurrencyConstraint struct {
 	// KeyExpressionHash is the hashed key expression. If this is set, this refers to a custom concurrency key.
 	KeyExpressionHash string
 	EvaluatedKeyHash  string
+
+	// InProgressItemKey is the fully-qualified Redis key storing the in-progress (concurrency) ZSET for this constraint
+	// This is included for consistency purposes and will be phased out once all constraint state is moved to the new data store
+	InProgressItemKey string
+}
+
+func (c ConcurrencyConstraint) InProgressLeasesKey(prefix string, accountID, envID, functionID uuid.UUID) string {
+	switch c.Mode {
+	case enums.ConcurrencyModeStep:
+	case enums.ConcurrencyModeRun:
+		// TODO: How are we going to enforce run level concurrency?
+	}
+
+	var scopeID string
+	var entityID uuid.UUID
+	switch c.Scope {
+	case enums.ConcurrencyScopeAccount:
+		scopeID = "a"
+		entityID = accountID
+	case enums.ConcurrencyScopeEnv:
+		scopeID = "e"
+		entityID = envID
+	case enums.ConcurrencyScopeFn:
+		scopeID = "f"
+		entityID = functionID
+	}
+
+	var keyID string
+	if c.KeyExpressionHash != "" {
+		keyID = fmt.Sprintf("<%s:%s>", c.KeyExpressionHash, c.EvaluatedKeyHash)
+	}
+
+	return fmt.Sprintf("{%s}:%s:state:concurrency:%s:%s%s", prefix, accountID, scopeID, entityID, keyID)
 }
 
 type ThrottleConstraint struct {

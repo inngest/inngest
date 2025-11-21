@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -73,6 +74,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -173,6 +175,8 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
+
+	services := []service.Service{}
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    opts.InMemory,
@@ -342,6 +346,40 @@ func start(ctx context.Context, opts StartOpts) error {
 			return redis_state.PartitionPausedInfo{}
 		}),
 	}
+
+	const rateLimitPrefix = "ratelimit"
+	var capacityManager constraintapi.RolloutManager
+	enableConstraintAPI := os.Getenv("ENABLE_CONSTRAINT_API") == "true"
+	if enableConstraintAPI {
+		shards := make(map[string]rueidis.Client)
+		for k, qs := range queueShards {
+			shards[k] = qs.RedisClient.Client()
+		}
+
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithClock(clockwork.NewRealClock()),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueShards(shards),
+			constraintapi.WithRateLimitClient(unshardedRc),
+			constraintapi.WithQueueStateKeyPrefix(redis_state.QueueDefaultKey),
+			constraintapi.WithRateLimitKeyPrefix(rateLimitPrefix),
+		)
+		if err != nil {
+			return fmt.Errorf("could not create contraint API: %w", err)
+		}
+
+		queueOpts = append(queueOpts, redis_state.WithCapacityManager(cm))
+		queueOpts = append(queueOpts, redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+
+		services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
+
+		capacityManager = cm
+
+		l.Warn("EXPERIMENTAL: Enabling Constraint API")
+	}
+
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
 			backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval)*time.Second),
@@ -349,7 +387,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
-	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
+	rl := ratelimit.New(ctx, unshardedRc, fmt.Sprintf("{%s}:", rateLimitPrefix))
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
@@ -429,7 +467,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	pauseMgr := pauses.NewRedisOnlyManager(sm)
 
-	exec, err := executor.NewExecutor(
+	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(pauseMgr),
@@ -490,7 +528,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tp),
-	)
+	}
+
+	if capacityManager != nil {
+		executorOpts = append(executorOpts, executor.WithCapacityManager(capacityManager))
+		executorOpts = append(executorOpts, executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}))
+	}
+
+	exec, err := executor.NewExecutor(executorOpts...)
 	if err != nil {
 		return err
 	}
@@ -685,7 +732,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+	services = append(services, ds, runner, executorSvc, ds.Apiservice, connGateway)
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
@@ -890,8 +937,13 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			fnLimit = accountLimit
 		}
 
+		fnVersion := fn.FunctionVersion
+		if fnVersion <= 0 {
+			fnVersion = 1
+		}
+
 		constraints := redis_state.PartitionConstraintConfig{
-			FunctionVersion: fn.FunctionVersion,
+			FunctionVersion: fnVersion,
 
 			Concurrency: redis_state.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
