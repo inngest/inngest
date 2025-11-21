@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -182,7 +183,7 @@ func WithConstraints[T any](
 			// Use previous lease as idempotency key
 			operationIdempotencyKey := lID.String()
 
-			go func() {
+			service.Go(func() {
 				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 					AccountID:      req.AccountID,
 					LeaseID:        lID,
@@ -192,9 +193,12 @@ func WithConstraints[T any](
 					},
 				})
 				if internalErr != nil {
-					l.Error("failed to release capacity", "err", internalErr)
+					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
+						"account_id": req.AccountID.String(),
+						"lease_id":   lID.String(),
+					}))
 				}
-			}()
+			})
 		}
 	}()
 

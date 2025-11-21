@@ -19,6 +19,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -1349,25 +1350,34 @@ func (q *queue) process(
 	}()
 
 	// When capacity is leased, release it after requeueing/dequeueing the item.
-	// This MUST happen to free up concurrency capacity in a timely manner for
-	// the next worker to lease a queue item.
+	// This is optional and best-effort to free up concurrency capacity as quickly as possible
+	// for the next worker to lease a queue item.
 	if capacityLeaseID != nil {
-		defer func() {
+		defer service.Go(func() {
+			if capacityLeaseID == nil {
+				return
+			}
+
+			currentLeaseID := *capacityLeaseID
+
 			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
-				LeaseID:        *capacityLeaseID,
+				LeaseID:        currentLeaseID,
 				Migration: constraintapi.MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  q.primaryQueueShard.Name,
 				},
 			})
 			if err != nil {
-				q.log.ReportError(err, "failed to release capacity")
+				q.log.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
+					"account_id": p.AccountID.String(),
+					"lease_id":   currentLeaseID.String(),
+				}))
 			}
 
 			q.log.Trace("released capacity", "res", res)
-		}()
+		})
 	}
 
 	select {
