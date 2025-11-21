@@ -44,6 +44,9 @@ local keyInProgressLeasesAcct      = KEYS[19]
 local keyInProgressLeasesFn        = KEYS[20]
 local keyInProgressLeasesCustom1   = KEYS[21]
 local keyInProgressLeasesCustom2   = KEYS[22]
+local keyConstraintCheckIdempotency= KEYS[23]
+
+local keyPartitionScavengerIndex = KEYS[24]
 
 local queueID      						= ARGV[1]
 local partitionID 					  = ARGV[2]
@@ -61,11 +64,9 @@ local customConcurrencyKey2   = tonumber(ARGV[10])
 local marshaledConstraints    = ARGV[11]
 
 -- key queues v2
-local checkConstraints    = tonumber(ARGV[12])
-local refilledFromBacklog = tonumber(ARGV[13])
+local refilledFromBacklog = tonumber(ARGV[12])
 
--- constraint API rollout
-local fallbackIdempotencyKey = ARGV[14]
+local checkConstraints    = tonumber(ARGV[13])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -98,11 +99,6 @@ item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
 -- NOTE: we can probably skip this entire section if item comes from backlog?
 if checkConstraints == 1 then
-  -- TODO: If Constraint API already approved lease, we do not want to double-spend capacity!
-  if fallbackIdempotencyKey ~= "" then
-    -- TODO: Check if idempotency key is set
-  end
-
   local constraints = cjson.decode(marshaledConstraints)
 
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
@@ -112,7 +108,13 @@ if checkConstraints == 1 then
 	-- with o(1) operations vs o(log(n)).
   local itemHasThrottle = item.data ~= nil and item.data.throttle ~= nil
   local throttleConstraintExists = constraints.t ~= nil and constraints.t.p > 0
-	if itemHasThrottle and throttleConstraintExists and refilledFromBacklog == 0 then
+	if
+    itemHasThrottle
+    and throttleConstraintExists
+    and refilledFromBacklog == 0
+    -- Handle fallback for Constraint API (Acquire script succeeded, request failed transiently)
+    and redis.call("EXISTS", keyConstraintCheckIdempotency) ~= 1
+  then
 		local throttleResult = gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b)
 		if throttleResult == false then
 			return -7
@@ -164,29 +166,17 @@ end
 item.leaseID = newLeaseID
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
-local function handleLease(keyConcurrency, concurrencyLimit)
-	if concurrencyLimit > 0 then
-		-- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
-		redis.call("ZADD", keyConcurrency, nextTime, item.id)
-	end
-end
-
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 -- and stored in functionConcurrencyKey.
 redis.call("ZREM", keyReadyQueue, item.id)
 
-if exists_without_ending(keyInProgressAccount, ":-") then
-  -- Always add this to acct level concurrency queues
-  redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
-end
-
--- Always add this to fn level concurrency queues for scavenging
-redis.call("ZADD", keyInProgressPartition, nextTime, item.id)
+-- Always add to partition scavenging index
+redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
--- concurrency queue such that we get a previously lost job if possible.
-local inProgressScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+-- scavenger index such that we get a previously lost job if possible.
+local inProgressScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if inProgressScores ~= false then
   local earliestLease = tonumber(inProgressScores[2])
   -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
@@ -197,15 +187,34 @@ if inProgressScores ~= false then
   redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
 end
 
-if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") == true then
+-- Update in progress items sets / concurrency constraint state if we checked them
+if checkConstraints == 1 then
+  local function handleLease(keyConcurrency, concurrencyLimit)
+    if concurrencyLimit > 0 then
+      -- Add item to in-progress/concurrency queue and set score to lease expiry time to be picked up by scavenger
+      redis.call("ZADD", keyConcurrency, nextTime, item.id)
+    end
+  end
+
+  if exists_without_ending(keyInProgressAccount, ":-") then
+    -- Always add this to acct level concurrency queues
+    redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
+  end
+
+  -- Always add this to fn level concurrency queues for scavenging
+  redis.call("ZADD", keyInProgressPartition, nextTime, item.id)
+
+  if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") == true then
   handleLease(keyInProgressCustomConcurrencyKey1, customConcurrencyKey1)
-end
+  end
 
-if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
+  if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
   handleLease(keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
-end
+  end
 
-addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
-addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
+  -- Update active sets for BacklogRefill
+  addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
+  addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
+end
 
 return 0
