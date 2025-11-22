@@ -490,7 +490,12 @@ func (q *queue) processShadowPartitionBacklog(
 		return nil, false, nil
 	}
 
-	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, q.primaryQueueShard.RedisClient.KeyGenerator())
+	// NOTE: This idempotency key is simply used for retrying Acquire
+	// We do not use the same key for multiple processShadowPartitionBacklog attempts
+	now := q.clock.Now()
+	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
+
+	constraintCheckRes, err := q.backlogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, q.primaryQueueShard.RedisClient.KeyGenerator(), operationIdempotencyKey, now)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
 	}
@@ -515,7 +520,16 @@ func (q *queue) processShadowPartitionBacklog(
 		"backlog_process_duration",
 		q.clock.Now(),
 		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraintCheckRes.itemsToRefill, constraints)
+			return q.BacklogRefill(
+				ctx,
+				backlog,
+				shadowPart,
+				refillUntil,
+				constraintCheckRes.itemsToRefill,
+				constraints,
+				WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
+				WithBacklogRefillDisableConstraintChecks(constraintCheckRes.skipConstraintChecks),
+			)
 		},
 		map[string]any{
 			//	"partition_id": shadowPart.PartitionID,
