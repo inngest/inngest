@@ -31,6 +31,9 @@ import { Route as AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRouteImport } fr
 import { Route as AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/$ingestKeys/index";
 import { Route as AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/$slug/index";
 import { Route as AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/index";
+import { Route as AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/$slug/runs/index";
+import { Route as AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/$slug/replays/index";
+import { Route as AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport } from "./routes/_authed/_org-active/env/$envSlug/functions/$slug/cancellations/index";
 
 const SignOutRoute = SignOutRouteImport.update({
   id: "/sign-out",
@@ -156,6 +159,24 @@ const AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute =
     path: "/$keyID/",
     getParentRoute: () => AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute,
   } as any);
+const AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute =
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRouteImport.update({
+    id: "/runs/",
+    path: "/runs/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute,
+  } as any);
+const AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute =
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRouteImport.update({
+    id: "/replays/",
+    path: "/replays/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute,
+  } as any);
+const AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute =
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport.update({
+    id: "/cancellations/",
+    path: "/cancellations/",
+    getParentRoute: () => AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute,
+  } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
@@ -177,6 +198,9 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/functions/$slug/": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute;
   "/env/$envSlug/manage/$ingestKeys/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
   "/env/$envSlug/manage/signing-key": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/env/$envSlug/functions/$slug/cancellations": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
+  "/env/$envSlug/functions/$slug/replays": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute;
+  "/env/$envSlug/functions/$slug/runs": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRoutesByTo {
@@ -196,6 +220,9 @@ export interface FileRoutesByTo {
   "/env/$envSlug/functions/$slug": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute;
   "/env/$envSlug/manage/$ingestKeys": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
   "/env/$envSlug/manage/signing-key": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/env/$envSlug/functions/$slug/cancellations": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
+  "/env/$envSlug/functions/$slug/replays": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute;
+  "/env/$envSlug/functions/$slug/runs": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRoutesById {
@@ -221,6 +248,9 @@ export interface FileRoutesById {
   "/_authed/_org-active/env/$envSlug/functions/$slug/": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute;
   "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysIndexRoute;
   "/_authed/_org-active/env/$envSlug/manage/signing-key/": typeof AuthedOrgActiveEnvEnvSlugManageSigningKeyIndexRoute;
+  "/_authed/_org-active/env/$envSlug/functions/$slug/cancellations/": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
+  "/_authed/_org-active/env/$envSlug/functions/$slug/replays/": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute;
+  "/_authed/_org-active/env/$envSlug/functions/$slug/runs/": typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/": typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
 }
 export interface FileRouteTypes {
@@ -245,6 +275,9 @@ export interface FileRouteTypes {
     | "/env/$envSlug/functions/$slug/"
     | "/env/$envSlug/manage/$ingestKeys/"
     | "/env/$envSlug/manage/signing-key"
+    | "/env/$envSlug/functions/$slug/cancellations"
+    | "/env/$envSlug/functions/$slug/replays"
+    | "/env/$envSlug/functions/$slug/runs"
     | "/env/$envSlug/manage/$ingestKeys/$keyID";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -264,6 +297,9 @@ export interface FileRouteTypes {
     | "/env/$envSlug/functions/$slug"
     | "/env/$envSlug/manage/$ingestKeys"
     | "/env/$envSlug/manage/signing-key"
+    | "/env/$envSlug/functions/$slug/cancellations"
+    | "/env/$envSlug/functions/$slug/replays"
+    | "/env/$envSlug/functions/$slug/runs"
     | "/env/$envSlug/manage/$ingestKeys/$keyID";
   id:
     | "__root__"
@@ -288,6 +324,9 @@ export interface FileRouteTypes {
     | "/_authed/_org-active/env/$envSlug/functions/$slug/"
     | "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/"
     | "/_authed/_org-active/env/$envSlug/manage/signing-key/"
+    | "/_authed/_org-active/env/$envSlug/functions/$slug/cancellations/"
+    | "/_authed/_org-active/env/$envSlug/functions/$slug/replays/"
+    | "/_authed/_org-active/env/$envSlug/functions/$slug/runs/"
     | "/_authed/_org-active/env/$envSlug/manage/$ingestKeys/$keyID/";
   fileRoutesById: FileRoutesById;
 }
@@ -455,6 +494,27 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport;
       parentRoute: typeof AuthedOrgActiveEnvEnvSlugManageIngestKeysRouteRoute;
     };
+    "/_authed/_org-active/env/$envSlug/functions/$slug/runs/": {
+      id: "/_authed/_org-active/env/$envSlug/functions/$slug/runs/";
+      path: "/runs";
+      fullPath: "/env/$envSlug/functions/$slug/runs";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute;
+    };
+    "/_authed/_org-active/env/$envSlug/functions/$slug/replays/": {
+      id: "/_authed/_org-active/env/$envSlug/functions/$slug/replays/";
+      path: "/replays";
+      fullPath: "/env/$envSlug/functions/$slug/replays";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute;
+    };
+    "/_authed/_org-active/env/$envSlug/functions/$slug/cancellations/": {
+      id: "/_authed/_org-active/env/$envSlug/functions/$slug/cancellations/";
+      path: "/cancellations";
+      fullPath: "/env/$envSlug/functions/$slug/cancellations";
+      preLoaderRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport;
+      parentRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRoute;
+    };
   }
 }
 
@@ -511,12 +571,21 @@ const AuthedOrgActiveEnvEnvSlugManageRouteRouteWithChildren =
 
 interface AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRouteChildren {
   AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute;
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute;
+  AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute: typeof AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute;
 }
 
 const AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRouteChildren: AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRouteChildren =
   {
     AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute:
       AuthedOrgActiveEnvEnvSlugFunctionsSlugIndexRoute,
+    AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute:
+      AuthedOrgActiveEnvEnvSlugFunctionsSlugCancellationsIndexRoute,
+    AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute:
+      AuthedOrgActiveEnvEnvSlugFunctionsSlugReplaysIndexRoute,
+    AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute:
+      AuthedOrgActiveEnvEnvSlugFunctionsSlugRunsIndexRoute,
   };
 
 const AuthedOrgActiveEnvEnvSlugFunctionsSlugRouteRouteWithChildren =
