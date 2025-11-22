@@ -68,12 +68,13 @@ export const entitlementUsageDocument = graphql(`
         }
       }
       entitlements {
-        executions {
-          # DISABLE USAGE FOR NOW - SEE EXE-1011
-          #usage
-          limit
-          overageAllowed
-        }
+        # Disable entitlements here as it queries the usage table as well - see monorepo for now
+        #executions {
+        # DISABLE USAGE FOR NOW - SEE EXE-1011
+        #usage
+        #  limit
+        #  overageAllowed
+        #}
         runCount {
           #usage
           limit
