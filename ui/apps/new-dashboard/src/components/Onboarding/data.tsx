@@ -61,6 +61,8 @@ export const invokeFn = async ({
 }: Pick<InvokeFunctionMutationVariables, "data" | "functionSlug" | "user">) => {
   const environment = await getProductionEnvironment();
 
+  //
+  // TANSTACK TODO: fix type error
   return await graphqlAPI.request<{ invokeFunction: InvokeFunctionMutation }>(
     InvokeFunctionOnboardingDocument,
     {
