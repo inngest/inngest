@@ -159,6 +159,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	switch err {
 	case nil:
 		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at, "op", ci.Op)
+		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
 		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at, "op", ci.Op)
 		return nil
