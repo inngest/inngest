@@ -69,22 +69,23 @@ export const entitlementUsageDocument = graphql(`
       }
       entitlements {
         executions {
-          usage
+          # DISABLE USAGE FOR NOW - SEE EXE-1011
+          #usage
           limit
           overageAllowed
         }
         runCount {
-          usage
+          #usage
           limit
           overageAllowed
         }
         stepCount {
-          usage
+          #usage
           limit
           overageAllowed
         }
         concurrency {
-          usage
+          #usage
           limit
         }
         eventSize {
