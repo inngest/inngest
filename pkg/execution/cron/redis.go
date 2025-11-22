@@ -127,7 +127,8 @@ func (c *redisCronManager) CronHealthCheckJobID(at time.Time) string {
 
 // Sync enqueues a system job of kind "cron-sync" to the system queue.
 func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
-	l := c.log.With("action", "redisCronManager.Sync", "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
+	kind := queue.KindCronSync
+	l := c.log.With("action", "redisCronManager.Sync", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
 
 	switch ci.Op {
 	case enums.CronOpProcess, enums.CronHealthCheck:
@@ -136,8 +137,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 
 	maxAttempts := consts.MaxRetries + 1
-	kind := queue.KindCronSync
-	at := ulid.Time(ci.ID.Time())
+	at := time.Now()
 	jobID := ci.SyncID()
 
 	err := c.q.Enqueue(ctx, queue.Item{
@@ -158,10 +158,10 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}, at, queue.EnqueueOpts{})
 	switch err {
 	case nil:
-		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at, "op", ci.Op)
+		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at)
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at, "op", ci.Op)
+		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at)
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing cron sync job")
@@ -169,10 +169,11 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 }
 
-func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
+func (c *redisCronManager) nextHealthCheckTime(cur time.Time) time.Time {
+	now := time.Now()
 	base := now.Truncate(c.opt.healthCheckInterval)
 	next := base.Add(c.opt.healthCheckInterval).Add(time.Duration(-1*c.opt.healthCheckLeadTimeSeconds) * time.Second)
-	if !next.After(now) {
+	if !next.After(now) || !next.After(cur) {
 		next = next.Add(c.opt.healthCheckInterval)
 	}
 	return next
@@ -188,7 +189,7 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	jobID := fmt.Sprintf("adhoc-%s", c.CronHealthCheckJobID(now))
 
-	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "now", now)
+	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "queue", kind, "ci", ci)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -201,10 +202,10 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	switch err {
 	case nil:
-		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID, "ci", ci)
+		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID)
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Debug("adhoc cron-health-check already exists", "jobID", jobID, "ci", ci)
+		l.Debug("adhoc cron-health-check already exists", "jobID", jobID)
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing adhoc cron-health-check job")
@@ -213,16 +214,15 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 }
 
 // enqueues a cronItem{op:healthcheck} of {kind:cron-health-check} into system queue.
-func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
+func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context, cur time.Time) error {
 
-	now := time.Now()
-	nextCheck := c.nextHealthCheckTime(now)
+	nextCheck := c.nextHealthCheckTime(cur)
 
 	maxAttempts := consts.MaxRetries + 1
 	kind := queue.KindCronHealthCheck
 	jobID := c.CronHealthCheckJobID(nextCheck)
 
-	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "now", now, "nextCheck", nextCheck)
+	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "cur", cur, "nextCheck", nextCheck)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -273,7 +273,8 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
 // While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
-	l := c.log.With("action", "redisCronManager.ScheduleNext", "fnID", ci.FunctionID, "fnVersion", ci.FunctionVersion, "cronExpr", ci.Expression)
+	kind := queue.KindCron
+	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
 
 	from := ci.ID.Timestamp()
 
@@ -311,7 +312,6 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	}
 
 	// enqueue new schedule
-	kind := queue.KindCron
 	maxAttempts := consts.MaxRetries + 1
 
 	err = c.q.Enqueue(ctx, queue.Item{

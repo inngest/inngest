@@ -1298,7 +1298,7 @@ func TestRedisCronManager(t *testing.T) {
 			clock.Advance(specificTime.Sub(clock.Now()))
 
 			// Call enqueue next first time
-			err := cm.EnqueueNextHealthCheck(ctx)
+			err := cm.EnqueueNextHealthCheck(ctx, clock.Now())
 			require.NoError(t, err)
 
 			// Get count of queue items in the partition
@@ -1306,7 +1306,7 @@ func TestRedisCronManager(t *testing.T) {
 			queueItemCount1, _ := rc.Do(ctx, cmd).AsInt64()
 
 			// Call enqueue next second time (should be idempotent)
-			err = cm.EnqueueNextHealthCheck(ctx)
+			err = cm.EnqueueNextHealthCheck(ctx, clock.Now())
 			require.NoError(t, err)
 
 			// Get count of queue items in the partition
