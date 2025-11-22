@@ -626,14 +626,21 @@ type BacklogRefillResult struct {
 }
 
 type backlogRefillOptions struct {
-	fallbackIdempotencyKey string
+	constraintCheckIdempotencyKey string
+	disableConstraintChecks       bool
 }
 
 type backlogRefillOptionFn func(o *backlogRefillOptions)
 
-func WithBacklogRefillFallbackIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
+func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) backlogRefillOptionFn {
 	return func(o *backlogRefillOptions) {
-		o.fallbackIdempotencyKey = idempotencyKey
+		o.constraintCheckIdempotencyKey = idempotencyKey
+	}
+}
+
+func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) backlogRefillOptionFn {
+	return func(o *backlogRefillOptions) {
+		o.disableConstraintChecks = disableConstraintChecks
 	}
 }
 
@@ -712,19 +719,27 @@ func (q *queue) BacklogRefill(
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 
 		kg.PartitionNormalizeSet(sp.PartitionID),
+
+		// Constraint API rollout
+		q.keyConstraintCheckIdempotency(sp.AccountID, o.constraintCheckIdempotencyKey),
 	}
 
-	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
+	// Don't check constraints if
+	// - key queues have been disabled for this function (refill as quickly as possible)
+	// - capacity leases were successfully acquired
+	checkConstraints := sp.keyQueuesEnabled(ctx, q)
+	if o.disableConstraintChecks {
+		checkConstraints = false
+	}
 
-	enableKeyQueuesVal := "0"
-	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
-	if enableKeyQueues {
-		enableKeyQueuesVal = "1"
+	checkConstraintsVal := "1"
+	if !checkConstraints {
+		checkConstraintsVal = "0"
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
 	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
-	shouldSpotCheckActiveSet := enableKeyQueues && rand.Intn(100) <= refillProbability
+	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -745,11 +760,8 @@ func (q *queue) BacklogRefill(
 		throttlePeriod,
 
 		kg.QueuePrefix(),
-		enableKeyQueuesVal,
+		checkConstraintsVal,
 		shouldSpotCheckActiveSet,
-
-		// constraint API rollout
-		o.fallbackIdempotencyKey,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

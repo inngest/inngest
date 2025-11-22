@@ -20,8 +20,7 @@ type backlogRefillConstraintCheckResult struct {
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
-	fallbackIdempotencyKey string
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
 func convertLimitingConstraint(
@@ -81,6 +80,8 @@ func (q *queue) backlogRefillConstraintCheck(
 	constraints PartitionConstraintConfig,
 	items []*osqueue.QueueItem,
 	kg QueueKeyGenerator,
+	operationIdempotencyKey string,
+	now time.Time,
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
@@ -108,16 +109,10 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	now := q.clock.Now()
-
-	// NOTE: This idempotency key is simply used for retrying Acquire
-	// We do not use the same key for multiple processShadowPartitionBacklog attempts
-	idempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
-
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
-		IdempotencyKey:       idempotencyKey,
+		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
@@ -144,8 +139,7 @@ func (q *queue) backlogRefillConstraintCheck(
 
 		// Attempt to fall back to BacklogRefill -- ignore GCRA with fallbackIdempotencyKey
 		return &backlogRefillConstraintCheckResult{
-			itemsToRefill:          itemIDs,
-			fallbackIdempotencyKey: idempotencyKey,
+			itemsToRefill: itemIDs,
 		}, nil
 	}
 
@@ -185,7 +179,7 @@ type itemLeaseConstraintCheckResult struct {
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
 func (q *queue) itemLeaseConstraintCheck(
@@ -390,6 +384,10 @@ func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID strin
 	}
 
 	if q.capacityManager == nil {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	if itemID == "" {
 		return fmt.Sprintf("%s:-", kg.QueuePrefix())
 	}
 
