@@ -237,6 +237,30 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
+	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
+
+	if len(r.lifecycles) > 0 {
+		for _, hook := range r.lifecycles {
+			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
+				AccountID:           req.AccountID,
+				EnvID:               req.EnvID,
+				FunctionID:          req.FunctionID,
+				Configuration:       req.Configuration,
+				Constraints:         req.Constraints,
+				LimitingConstraints: limitingConstraints,
+				FairnessReduction:   parsedResponse.FairnessReduction,
+				RetryAfter:          retryAfter,
+				RequestedAmount:     req.Amount,
+				Duration:            req.Duration,
+				Source:              req.Source,
+				GrantedLeases:       leases,
+			})
+			if err != nil {
+				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
+			}
+		}
+	}
+
 	switch parsedResponse.Status {
 	case 1, 3:
 		l.Trace(
@@ -260,7 +284,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return &CapacityAcquireResponse{
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
-			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			RetryAfter:          retryAfter,
 			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
 		}, nil

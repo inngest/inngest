@@ -109,6 +109,20 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	case 4:
 		l.Trace("extended capacity lease")
 
+		if len(r.lifecycles) > 0 {
+			for _, hook := range r.lifecycles {
+				err := hook.OnCapacityLeaseExtended(ctx, OnCapacityLeaseExtendedData{
+					AccountID:  req.AccountID,
+					Duration:   req.Duration,
+					OldLeaseID: req.LeaseID,
+					NewLeaseID: parsedResponse.LeaseID,
+				})
+				if err != nil {
+					return nil, errs.Wrap(0, false, "extend lifecycle failed: %w", err)
+				}
+			}
+		}
+
 		// TODO: track success
 		return res, nil
 	default:
