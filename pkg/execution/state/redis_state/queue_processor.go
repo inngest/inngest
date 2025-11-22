@@ -1107,7 +1107,7 @@ func (q *queue) process(
 	continuationCtr := i.PCtr
 	capacityLeaseID := i.capacityLeaseID
 
-	constraintsManagedByAPI := !capacityLeaseID.IsZero()
+	constraintsManagedByAPI := capacityLeaseID != nil && !capacityLeaseID.IsZero()
 
 	var err error
 	leaseID := qi.LeaseID
