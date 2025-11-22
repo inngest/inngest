@@ -169,11 +169,10 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 }
 
-func (c *redisCronManager) nextHealthCheckTime(cur time.Time) time.Time {
-	now := time.Now()
+func (c *redisCronManager) nextHealthCheckTime(now time.Time) time.Time {
 	base := now.Truncate(c.opt.healthCheckInterval)
 	next := base.Add(c.opt.healthCheckInterval).Add(time.Duration(-1*c.opt.healthCheckLeadTimeSeconds) * time.Second)
-	if !next.After(now) || !next.After(cur) {
+	if !next.After(now) {
 		next = next.Add(c.opt.healthCheckInterval)
 	}
 	return next
@@ -214,15 +213,16 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 }
 
 // enqueues a cronItem{op:healthcheck} of {kind:cron-health-check} into system queue.
-func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context, cur time.Time) error {
+func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 
-	nextCheck := c.nextHealthCheckTime(cur)
+	now := time.Now()
+	nextCheck := c.nextHealthCheckTime(now)
 
 	maxAttempts := consts.MaxRetries + 1
 	kind := queue.KindCronHealthCheck
 	jobID := c.CronHealthCheckJobID(nextCheck)
 
-	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "cur", cur, "nextCheck", nextCheck)
+	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
