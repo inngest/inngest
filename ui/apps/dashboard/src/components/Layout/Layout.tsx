@@ -29,9 +29,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         <IncidentBanner />
 
-        <Suspense>
-          <BillingBanner />
-        </Suspense>
+        <Suspense>{/* <BillingBanner /> */}</Suspense>
 
         <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
 
