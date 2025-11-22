@@ -77,16 +77,16 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 }
 
 type checkScriptResponse struct {
-	Status              int   `json:"s"`
-	AvailableCapacity   int   `json:"a"`
-	LimitingConstraints []int `json:"lc"`
+	Status              int              `json:"s"`
+	AvailableCapacity   int              `json:"a"`
+	LimitingConstraints flexibleIntArray `json:"lc"`
 	ConstraintUsage     []struct {
 		Usage int `json:"u"`
 		Limit int `json:"l"`
 	} `json:"cu"`
-	FairnessReduction int      `json:"fr"`
-	RetryAt           int      `json:"ra"`
-	Debug             []string `json:"d"`
+	FairnessReduction int                 `json:"fr"`
+	RetryAt           int                 `json:"ra"`
+	Debug             flexibleStringArray `json:"d"`
 }
 
 // Check implements CapacityManager.
@@ -141,6 +141,13 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		return nil, nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
+	l.Trace(
+		"prepared acquire call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
+
 	rawRes, err := scripts["check"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, nil, errs.Wrap(0, false, "check script failed: %w", err)
@@ -155,7 +162,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	var limitingConstraints []ConstraintItem
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
-		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
 			limitingConstraints[i] = req.Constraints[limitingConstraintIndex-1]
 		}
 	}

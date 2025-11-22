@@ -1,6 +1,6 @@
 local cjson = cjson
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 local KEYS = KEYS
 local ARGV = ARGV
@@ -16,6 +16,9 @@ local nowNS = tonumber(ARGV[4])
 local leaseExpiryMS = tonumber(ARGV[5])
 local keyPrefix = ARGV[6]
 local initialLeaseIDs = cjson.decode(ARGV[7])
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
+end
 local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
@@ -23,7 +26,8 @@ local enableDebugLogs = tonumber(ARGV[11]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 local function getConcurrencyCount(key)
@@ -152,6 +156,9 @@ end
 local requested = requestDetails.r
 local configVersion = requestDetails.cv
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
@@ -219,8 +226,14 @@ end
 local granted = availableCapacity
 local grantedLeases = {}
 for i = 1, granted, 1 do
-	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
+	if not requestDetails.lik then
+		return redis.error_reply("ERR requestDetails.lik is nil during update")
+	end
+	if not initialLeaseIDs then
+		return redis.error_reply("ERR initialLeaseIDs is nil during update")
+	end
+	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 	for _, value in ipairs(constraints) do
 		if skipGCRA then
@@ -234,11 +247,23 @@ for i = 1, granted, 1 do
 		end
 	end
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+	call(
+		"HSET",
+		keyLeaseDetails,
+		"lik",
+		hashedLeaseIdempotencyKey,
+		"rid",
+		leaseRunID,
+		"oik",
+		hashedOperationIdempotencyKey
+	)
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
+	local keyLeaseConstraintCheckIdempotency =
+		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
-	leaseObject["lik"] = leaseIdempotencyKey
+	leaseObject["lik"] = hashedLeaseIdempotencyKey
 	table.insert(grantedLeases, leaseObject)
 end
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))

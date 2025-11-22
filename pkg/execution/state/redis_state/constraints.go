@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -15,12 +16,11 @@ import (
 
 type backlogRefillConstraintCheckResult struct {
 	itemsToRefill        []string
-	itemCapacityLeases   map[string]ulid.ULID
+	itemCapacityLeases   []ulid.ULID
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
-	fallbackIdempotencyKey string
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
 func convertLimitingConstraint(
@@ -80,6 +80,8 @@ func (q *queue) backlogRefillConstraintCheck(
 	constraints PartitionConstraintConfig,
 	items []*osqueue.QueueItem,
 	kg QueueKeyGenerator,
+	operationIdempotencyKey string,
+	now time.Time,
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
@@ -107,16 +109,10 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	now := q.clock.Now()
-
-	// NOTE: This idempotency key is simply used for retrying Acquire
-	// We do not use the same key for multiple processShadowPartitionBacklog attempts
-	idempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
-
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
-		IdempotencyKey:       idempotencyKey,
+		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
@@ -143,8 +139,7 @@ func (q *queue) backlogRefillConstraintCheck(
 
 		// Attempt to fall back to BacklogRefill -- ignore GCRA with fallbackIdempotencyKey
 		return &backlogRefillConstraintCheckResult{
-			itemsToRefill:          itemIDs,
-			fallbackIdempotencyKey: idempotencyKey,
+			itemsToRefill: itemIDs,
 		}, nil
 	}
 
@@ -163,11 +158,11 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	itemsToRefill := make([]string, len(res.Leases))
-	itemCapacityLeases := make(map[string]ulid.ULID, len(res.Leases))
+	itemCapacityLeases := make([]ulid.ULID, len(res.Leases))
 	for i, l := range res.Leases {
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
-		itemCapacityLeases[l.IdempotencyKey] = l.LeaseID
+		itemCapacityLeases[i] = l.LeaseID
 	}
 
 	return &backlogRefillConstraintCheckResult{
@@ -184,8 +179,7 @@ type itemLeaseConstraintCheckResult struct {
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
-	fallbackIdempotencyKey string
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
 func (q *queue) itemLeaseConstraintCheck(
@@ -199,6 +193,13 @@ func (q *queue) itemLeaseConstraintCheck(
 	kg QueueKeyGenerator,
 ) (itemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
+
+	// Disable lease checks for system queues
+	if shadowPart.SystemQueueName != nil {
+		return itemLeaseConstraintCheckResult{
+			skipConstraintChecks: true,
+		}, nil
+	}
 
 	if shadowPart.AccountID == nil ||
 		shadowPart.EnvID == nil ||
@@ -264,9 +265,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		}
 
 		// Fallback to Lease (with idempotency)
-		return itemLeaseConstraintCheckResult{
-			fallbackIdempotencyKey: idempotencyKey,
-		}, nil
+		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	constraint := enums.QueueConstraintNotLimited
@@ -375,4 +374,25 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 	}
 
 	return constraints
+}
+
+func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID string) string {
+	kg := q.primaryQueueShard.RedisClient.KeyGenerator()
+
+	if accountID == nil || *accountID == uuid.Nil {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	if q.capacityManager == nil {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	if itemID == "" {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	return q.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
+		IsRateLimit: false,
+		QueueShard:  q.primaryQueueShard.Name,
+	}, *accountID, itemID)
 }

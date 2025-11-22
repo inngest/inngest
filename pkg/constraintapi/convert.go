@@ -571,6 +571,7 @@ func CapacityCheckRequestToProto(req *CapacityCheckRequest) *pb.CapacityCheckReq
 		FunctionId:    req.FunctionID.String(),
 		Configuration: ConstraintConfigToProto(req.Configuration),
 		Constraints:   constraints,
+		Migration:     MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -605,6 +606,7 @@ func CapacityCheckRequestFromProto(pbReq *pb.CapacityCheckRequest) (*CapacityChe
 		FunctionID:    functionID,
 		Configuration: ConstraintConfigFromProto(pbReq.Configuration),
 		Constraints:   constraints,
+		Migration:     MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 
@@ -696,6 +698,7 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		MaximumLifetime:      durationpb.New(req.MaximumLifetime),
 		BlockingThreshold:    durationpb.New(req.BlockingThreshold),
 		Source:               LeaseSourceToProto(req.Source),
+		Migration:            MigrationIdentifierToProto(req.Migration),
 	}
 }
 
@@ -768,6 +771,7 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		MaximumLifetime:      maximumLifetime,
 		BlockingThreshold:    blockingThreshold,
 		Source:               LeaseSourceFromProto(pbReq.Source),
+		Migration:            MigrationIdentifierFromProto(pbReq.Migration),
 	}, nil
 }
 

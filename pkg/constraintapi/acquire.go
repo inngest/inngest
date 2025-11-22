@@ -44,10 +44,10 @@ type redisRequestState struct {
 	// This is enforced during ExtendLease.
 	MaximumLifetimeMillis int64 `json:"l,omitempty"`
 
-	// LeaseIdempotencyKeys stores the idempotency used to generate leases
-	LeaseIdempotencyKeys []string `json:"lik,omitempty"`
+	// HashedLeaseIdempotencyKeys stores the hashed idempotency keys used to generate leases
+	HashedLeaseIdempotencyKeys []string `json:"lik,omitempty"`
 
-	// LeaseRunIDs stores the run IDs associated with lease IDs
+	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 }
 
@@ -60,13 +60,26 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 		MaximumLifetimeMillis:   req.MaximumLifetime.Milliseconds(),
 		ConfigVersion:           req.Configuration.FunctionVersion,
 
-		LeaseRunIDs:          req.LeaseRunIDs,
-		LeaseIdempotencyKeys: req.LeaseIdempotencyKeys,
-
 		// These keys are set during Acquire and Release respectively
 		GrantedAmount: 0,
 		ActiveAmount:  0,
 	}
+
+	// Hash lease idempotency keys
+	hashedLeaseIdempotencyKeys := make([]string, len(req.LeaseIdempotencyKeys))
+	for i, leaseIdempotencyKey := range req.LeaseIdempotencyKeys {
+		hashedLeaseIdempotencyKeys[i] = util.XXHash(leaseIdempotencyKey)
+	}
+
+	state.HashedLeaseIdempotencyKeys = hashedLeaseIdempotencyKeys
+
+	// Ensure to hash lease idempotency key in run ID map
+	leaseRunIDs := make(map[string]ulid.ULID)
+	for k, u := range req.LeaseRunIDs {
+		leaseRunIDs[util.XXHash(k)] = u
+	}
+
+	state.LeaseRunIDs = leaseRunIDs
 
 	// Sort and serialize constraints with embedded configuration limits
 	constraints := req.Constraints
@@ -96,10 +109,10 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints []int    `json:"lc"`
-	FairnessReduction   int      `json:"fr"`
-	RetryAt             int      `json:"ra"`
-	Debug               []string `json:"d"`
+	LimitingConstraints flexibleIntArray    `json:"lc"`
+	FairnessReduction   int                 `json:"fr"`
+	RetryAt             int                 `json:"ra"`
+	Debug               flexibleStringArray `json:"d"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -189,6 +202,14 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
 
+	l.Trace(
+		"prepared acquire call",
+		"req", req,
+		"state", requestState,
+		"keys", keys,
+		"args", args,
+	)
+
 	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
 		return nil, errs.Wrap(0, false, "acquire script failed: %w", err)
@@ -211,7 +232,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	var limitingConstraints []ConstraintItem
 	if len(parsedResponse.LimitingConstraints) > 0 {
 		limitingConstraints = make([]ConstraintItem, len(parsedResponse.LimitingConstraints))
-		for i, limitingConstraintIndex := range parsedResponse.LimitingConstraints {
+		for i, limitingConstraintIndex := range []int(parsedResponse.LimitingConstraints) {
 			limitingConstraints[i] = sortedConstraints[limitingConstraintIndex-1]
 		}
 	}
