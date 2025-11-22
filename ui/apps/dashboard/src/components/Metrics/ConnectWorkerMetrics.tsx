@@ -40,7 +40,7 @@ export const ConnectWorkerPercentage = ({
             action={
               <Link
                 className="text-sm"
-                href="https://www.inngest.com/docs/platform/connect"
+                href="https://www.inngest.com/docs/setup/connect"
                 target="_new"
               >
                 Learn more about Connect Workers.
@@ -79,7 +79,7 @@ export const ConnectWorkerTotalCapacity = ({
             action={
               <Link
                 className="text-sm"
-                href="https://www.inngest.com/docs/platform/connect"
+                href="https://www.inngest.com/docs/setup/connect"
                 target="_new"
               >
                 Learn more about Connect Workers.
