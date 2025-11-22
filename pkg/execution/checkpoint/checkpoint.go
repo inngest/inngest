@@ -325,6 +325,7 @@ func (c checkpointer) CheckpointAsyncSteps(ctx context.Context, input AsyncCheck
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
+					Seed:       []byte(op.ID + op.Timing.String()),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
