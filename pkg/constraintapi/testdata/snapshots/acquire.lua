@@ -232,8 +232,8 @@ for i = 1, granted, 1 do
 	if not initialLeaseIDs then
 		return redis.error_reply("ERR initialLeaseIDs is nil during update")
 	end
-	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
+	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 	for _, value in ipairs(constraints) do
 		if skipGCRA then
@@ -247,11 +247,23 @@ for i = 1, granted, 1 do
 		end
 	end
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+	call(
+		"HSET",
+		keyLeaseDetails,
+		"lik",
+		hashedLeaseIdempotencyKey,
+		"rid",
+		leaseRunID,
+		"oik",
+		hashedOperationIdempotencyKey
+	)
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
+	local keyLeaseConstraintCheckIdempotency =
+		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
-	leaseObject["lik"] = leaseIdempotencyKey
+	leaseObject["lik"] = hashedLeaseIdempotencyKey
 	table.insert(grantedLeases, leaseObject)
 end
 call("SET", keyConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))

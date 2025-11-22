@@ -79,12 +79,13 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := deps.r.Keys()
 				keyInProgressLeases := deps.constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 7)
+				require.Len(t, keys, 8)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
@@ -110,13 +111,14 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 8)
+				require.Len(t, keys, 9)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
@@ -141,12 +143,13 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// Keys should be cleaned up
 				keys := r.Keys()
-				require.Len(t, keys, 4)
+				require.Len(t, keys, 5)
 				require.Subset(t, []string{
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 				}, keys)
 			},
 		},
@@ -373,16 +376,17 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 7)
+				require.Len(t, keys, 8)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
-				}, keys)
+				}, keys, r.Dump())
 
 				// In progress leases should have a single item
 				mem, err := r.ZMembers(keyInProgressLeases)
@@ -404,13 +408,14 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 8)
+				require.Len(t, keys, 9)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
@@ -434,12 +439,13 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// Keys should be cleaned up
 				keys := r.Keys()
-				require.Len(t, keys, 4)
+				require.Len(t, keys, 5)
 				require.Subset(t, []string{
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 				}, keys)
 			},
 		},
@@ -484,12 +490,13 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 7)
+				require.Len(t, keys, 8)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
@@ -515,13 +522,14 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
-				require.Len(t, keys, 8)
+				require.Len(t, keys, 9)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
@@ -545,12 +553,13 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				// Keys should be cleaned up
 				keys := r.Keys()
-				require.Len(t, keys, 4)
+				require.Len(t, keys, 5)
 				require.Subset(t, []string{
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 				}, keys)
 			},
 		},
