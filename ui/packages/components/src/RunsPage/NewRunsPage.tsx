@@ -18,7 +18,7 @@ import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/reac
 import { type VisibilityState } from '@tanstack/react-table';
 import useLocalStorage from 'react-use/lib/useLocalStorage';
 
-import CodeSearch from '../CodeSearch/CodeSearch';
+import CodeSearch from '../CodeSearch/NewCodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
