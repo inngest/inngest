@@ -319,14 +319,12 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             {/* Only show Connect worker metrics if there's data */}
-            {data?.workspace?.workerPercentageUsed?.metrics?.length &&
-              data?.workspace?.workerPercentageUsed?.metrics?.length > 0 && (
-                <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
-              )}
-            {data?.workspace?.workerTotalCapacity?.metrics?.length &&
-              data?.workspace?.workerTotalCapacity?.metrics?.length > 0 && (
-                <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
-              )}
+            {data && data?.workspace?.workerPercentageUsed?.metrics?.length > 0 && (
+              <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
+            )}
+            {data && data?.workspace?.workerTotalCapacity?.metrics?.length > 0 && (
+              <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
+            )}
           </div>
         </>
       )}
