@@ -748,6 +748,12 @@ func (q *queue) BacklogRefill(
 	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
 	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
 
+	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
+	capacityLeaseIDs := o.capacityLeaseIDs
+	if capacityLeaseIDs == nil {
+		capacityLeaseIDs = []ulid.ULID{}
+	}
+
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,
@@ -770,7 +776,7 @@ func (q *queue) BacklogRefill(
 		checkConstraintsVal,
 		shouldSpotCheckActiveSet,
 
-		o.capacityLeaseIDs,
+		capacityLeaseIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
