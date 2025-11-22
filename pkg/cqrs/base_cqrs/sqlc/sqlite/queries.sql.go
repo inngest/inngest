@@ -1459,7 +1459,7 @@ func (q *Queries) GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([
 const getWorkerConnection = `-- name: GetWorkerConnection :one
 ;
 
-SELECT account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
+SELECT account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at, recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os FROM worker_connections WHERE account_id = ?1 AND workspace_id = ?2 AND id = ?3
 `
 
 type GetWorkerConnectionParams struct {
@@ -1481,6 +1481,7 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 		&i.InstanceID,
 		&i.Status,
 		&i.WorkerIp,
+		&i.MaxWorkerConcurrency,
 		&i.ConnectedAt,
 		&i.LastHeartbeatAt,
 		&i.DisconnectedAt,
@@ -1972,10 +1973,10 @@ func (q *Queries) InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) 
 const insertWorkerConnection = `-- name: InsertWorkerConnection :exec
 
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
@@ -1989,6 +1990,7 @@ DO UPDATE SET
     instance_id = excluded.instance_id,
     status = excluded.status,
     worker_ip = excluded.worker_ip,
+    max_worker_concurrency = excluded.max_worker_concurrency,
 
     connected_at = excluded.connected_at,
     last_heartbeat_at = excluded.last_heartbeat_at,
@@ -2012,31 +2014,32 @@ DO UPDATE SET
 `
 
 type InsertWorkerConnectionParams struct {
-	AccountID        uuid.UUID
-	WorkspaceID      uuid.UUID
-	AppName          string
-	AppID            *uuid.UUID
-	ID               ulid.ULID
-	GatewayID        ulid.ULID
-	InstanceID       string
-	Status           int64
-	WorkerIp         string
-	ConnectedAt      int64
-	LastHeartbeatAt  sql.NullInt64
-	DisconnectedAt   sql.NullInt64
-	RecordedAt       int64
-	InsertedAt       int64
-	DisconnectReason sql.NullString
-	GroupHash        []byte
-	SdkLang          string
-	SdkVersion       string
-	SdkPlatform      string
-	SyncID           *uuid.UUID
-	AppVersion       sql.NullString
-	FunctionCount    int64
-	CpuCores         int64
-	MemBytes         int64
-	Os               string
+	AccountID            uuid.UUID
+	WorkspaceID          uuid.UUID
+	AppName              string
+	AppID                *uuid.UUID
+	ID                   ulid.ULID
+	GatewayID            ulid.ULID
+	InstanceID           string
+	Status               int64
+	WorkerIp             string
+	MaxWorkerConcurrency int64
+	ConnectedAt          int64
+	LastHeartbeatAt      sql.NullInt64
+	DisconnectedAt       sql.NullInt64
+	RecordedAt           int64
+	InsertedAt           int64
+	DisconnectReason     sql.NullString
+	GroupHash            []byte
+	SdkLang              string
+	SdkVersion           string
+	SdkPlatform          string
+	SyncID               *uuid.UUID
+	AppVersion           sql.NullString
+	FunctionCount        int64
+	CpuCores             int64
+	MemBytes             int64
+	Os                   string
 }
 
 // Worker Connections
@@ -2051,6 +2054,7 @@ func (q *Queries) InsertWorkerConnection(ctx context.Context, arg InsertWorkerCo
 		arg.InstanceID,
 		arg.Status,
 		arg.WorkerIp,
+		arg.MaxWorkerConcurrency,
 		arg.ConnectedAt,
 		arg.LastHeartbeatAt,
 		arg.DisconnectedAt,

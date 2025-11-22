@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"strings"
 	"time"
+
+	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -26,11 +27,12 @@ type WorkerConnection struct {
 	AppID *uuid.UUID `json:"app_id"`
 
 	// Connection attributes
-	Id         ulid.ULID               `json:"id"`
-	GatewayId  ulid.ULID               `json:"gateway_id"`
-	InstanceId string                  `json:"instance_id"`
-	Status     connpb.ConnectionStatus `json:"status"`
-	WorkerIP   string                  `json:"worker_ip"`
+	Id                   ulid.ULID               `json:"id"`
+	GatewayId            ulid.ULID               `json:"gateway_id"`
+	InstanceId           string                  `json:"instance_id"`
+	Status               connpb.ConnectionStatus `json:"status"`
+	WorkerIP             string                  `json:"worker_ip"`
+	MaxWorkerConcurrency int64                   `json:"max_worker_concurrency"`
 
 	// Timestamps
 	ConnectedAt     time.Time  `json:"connected_at"`

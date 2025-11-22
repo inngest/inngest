@@ -196,6 +196,14 @@ function SubComponent({ row }: { row: Row<Worker> }) {
         }
       />
       <DescriptionListItem className="col-span-3" term="Worker IP" detail={row.original.workerIp} />
+      <DescriptionListItem
+        term="Max concurrency"
+        detail={
+          row.original.maxWorkerConcurrency === 0
+            ? 'no-limit'
+            : row.original.maxWorkerConcurrency.toString()
+        }
+      />
     </dl>
   );
 }
