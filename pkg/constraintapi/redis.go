@@ -50,58 +50,58 @@ type redisCapacityManager struct {
 	lifecycles []ConstraintAPILifecycleHooks
 }
 
-type redisCapacityManagerOption func(m *redisCapacityManager)
+type RedisCapacityManagerOption func(m *redisCapacityManager)
 
-func WithQueueShards(shards map[string]rueidis.Client) redisCapacityManagerOption {
+func WithQueueShards(shards map[string]rueidis.Client) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.queueShards = shards
 	}
 }
 
-func WithQueueStateKeyPrefix(prefix string) redisCapacityManagerOption {
+func WithQueueStateKeyPrefix(prefix string) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.queueStateKeyPrefix = prefix
 	}
 }
 
-func WithRateLimitClient(client rueidis.Client) redisCapacityManagerOption {
+func WithRateLimitClient(client rueidis.Client) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.rateLimitClient = client
 	}
 }
 
-func WithRateLimitKeyPrefix(prefix string) redisCapacityManagerOption {
+func WithRateLimitKeyPrefix(prefix string) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.rateLimitKeyPrefix = prefix
 	}
 }
 
-func WithClock(clock clockwork.Clock) redisCapacityManagerOption {
+func WithClock(clock clockwork.Clock) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.clock = clock
 	}
 }
 
-func WithNumScavengerShards(numShards int) redisCapacityManagerOption {
+func WithNumScavengerShards(numShards int) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.numScavengerShards = numShards
 	}
 }
 
-func WithEnableDebugLogs(enableDebugLogs bool) redisCapacityManagerOption {
+func WithEnableDebugLogs(enableDebugLogs bool) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.enableDebugLogs = enableDebugLogs
 	}
 }
 
-func WithLifecycles(lifecycles ...ConstraintAPILifecycleHooks) redisCapacityManagerOption {
+func WithLifecycles(lifecycles ...ConstraintAPILifecycleHooks) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.lifecycles = lifecycles
 	}
 }
 
 func NewRedisCapacityManager(
-	options ...redisCapacityManagerOption,
+	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
 	manager := &redisCapacityManager{
 		keyGenerator: keyGenerator{},
