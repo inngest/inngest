@@ -5223,7 +5223,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpiry := now.Add(leaseDur)
 
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
@@ -5244,17 +5243,14 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, constraints.Concurrency.CustomConcurrencyKeys, 1)
 
 			// key queue v2 accounting
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.customKeyInProgress(kg, 1))
-			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
-			require.Equal(t, backlog.customKeyInProgress(kg, 1), custom1.concurrencyKey(kg))
+			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.False(t, r.Exists(shadowPartition.inProgressKey(kg)))
+			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// expect classic partition concurrency to include item
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+			require.False(t, r.Exists(kg.Concurrency("account", accountId.String())))
+			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+			require.False(t, r.Exists(custom1.concurrencyKey(kg)))
 		})
 	})
 
@@ -5382,7 +5378,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpiry := now.Add(leaseDur)
 
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
@@ -5403,26 +5398,24 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, constraints.Concurrency.CustomConcurrencyKeys, 2)
 
 			// key queue v2 accounting
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.False(t, r.Exists(shadowPartition.inProgressKey(kg)))
 
 			// first key
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.customKeyInProgress(kg, 1))
-			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
+			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// second key
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
-			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 2)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 2), qi.ID)))
+			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 2)))
 
 			// expect classic partition concurrency to include item
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
+			require.False(t, r.Exists(kg.Concurrency("account", accountId.String())))
+			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 			// first key
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+			require.False(t, r.Exists(custom1.concurrencyKey(kg)))
 			// second key
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom2.concurrencyKey(kg), qi.ID)))
+			require.False(t, r.Exists(custom2.concurrencyKey(kg)))
 		})
 	})
 
@@ -5483,7 +5476,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpiry := now.Add(leaseDur)
 
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
@@ -5503,13 +5495,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// key queue v2 accounting
 			// should not track account concurrency for system partition
 			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.False(t, r.Exists(shadowPartition.inProgressKey(kg)))
 			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// expect classic partition concurrency to include item
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", sysQueueName), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
+			require.False(t, r.Exists(kg.Concurrency("p", sysQueueName)))
+			require.False(t, r.Exists(fnPart.concurrencyKey(kg)))
 		})
 	})
 }
@@ -5580,7 +5572,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5756,7 +5748,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -5941,7 +5933,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -6084,7 +6076,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -6220,7 +6212,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		// put item in progress, this is tested separately
 		leaseDur := 5 * time.Second
-		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
