@@ -296,7 +296,7 @@ if refill > 0 then
       updatedData.rat = nowMS
 
       -- Update item with Capacity Lease ID if lease acquired
-      if #itemCapacityLeaseIDs > 0 then
+      if itemCapacityLeaseIDs ~= nil and #itemCapacityLeaseIDs > 0 then
         updatedData.clid = itemCapacityLeaseIDs[i]
       end
 
