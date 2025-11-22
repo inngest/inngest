@@ -88,7 +88,13 @@ local checkConstraints = tonumber(ARGV[16])
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
 -- Constraint API rollout
-local itemCapacityLeaseIDs   = cjson.decode(ARGV[18])
+local itemCapacityLeaseIDs = {}
+if ARGV[18] ~= nil and ARGV[18] ~= "" and ARGV[18] ~= "null" then
+  local success, result = pcall(cjson.decode, ARGV[18])
+  if success and type(result) == "table" then
+    itemCapacityLeaseIDs = result
+  end
+end
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
