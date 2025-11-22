@@ -87,6 +87,9 @@ local checkConstraints = tonumber(ARGV[16])
 
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
+-- Constraint API rollout
+local itemCapacityLeaseIDs   = cjson.decode(ARGV[18])
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -291,6 +294,11 @@ if refill > 0 then
       local updatedData = cjson.decode(itemData)
       updatedData.rf = backlogID
       updatedData.rat = nowMS
+
+      -- Update item with Capacity Lease ID if lease acquired
+      if #itemCapacityLeaseIDs > 0 then
+        updatedData.clid = itemCapacityLeaseIDs[i]
+      end
 
       if checkConstraints == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
