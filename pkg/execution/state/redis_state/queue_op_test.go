@@ -80,7 +80,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -224,7 +224,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -388,7 +388,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -503,7 +503,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
