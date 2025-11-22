@@ -757,7 +757,6 @@ func TestQueueSystemPartitions(t *testing.T) {
 				},
 			}
 		}),
-		WithDisableLeaseChecksForSystemQueues(false),
 	)
 	ctx := context.Background()
 
@@ -4530,9 +4529,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
 		)
 		ctx := context.Background()
 
@@ -4706,9 +4702,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
 					Concurrency: PartitionConcurrency{
@@ -4830,9 +4823,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
@@ -4972,9 +4962,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
 			WithEnqueueSystemPartitionsToBacklog(true),
 		)
 		ctx := context.Background()
@@ -5055,9 +5042,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -5101,14 +5085,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
-			leaseExpiry := now.Add(leaseDur)
 
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
 			denies := newLeaseDenyList()
 			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5118,18 +5101,16 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			shadowPartition := q.ItemShadowPartition(ctx, item1)
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
-			// key queue v2 accounting
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			// NOTE: With the Constraint API, disabling lease checks also removes constraint state updates. We still add the item to the new scavenger index,
+			// but no longer populate the in progress sets.
+			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.False(t, r.Exists(shadowPartition.inProgressKey(kg)))
 			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
-			// expect classic partition concurrency to include item
-			// TODO Do we actually want to update previous accounting?
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
+			require.False(t, r.Exists(kg.Concurrency("account", accountId.String())))
+			require.False(t, r.Exists(fnPart.concurrencyKey(kg)))
 		})
 	})
 
@@ -5154,9 +5135,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
@@ -5252,7 +5230,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := newLeaseDenyList()
 			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5301,9 +5279,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
@@ -5414,7 +5389,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := newLeaseDenyList()
 			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, custom2.Queue()))
 
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5473,9 +5448,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -5518,7 +5490,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			denies := newLeaseDenyList()
 			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5565,9 +5537,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -5611,7 +5580,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -5714,9 +5683,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -5790,7 +5756,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -5885,9 +5851,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -5978,7 +5941,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now().Truncate(time.Minute)
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
@@ -6087,9 +6050,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithEnqueueSystemPartitionsToBacklog(true),
 		)
 		ctx := context.Background()
@@ -6124,7 +6084,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -6211,9 +6171,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -6263,7 +6220,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		// put item in progress, this is tested separately
 		leaseDur := 5 * time.Second
-		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -6364,9 +6321,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 			WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 				refreshCalled = true
@@ -6475,9 +6429,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 		)
 		ctx := context.Background()
@@ -6734,10 +6685,6 @@ func TestQueueActiveCounters(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableLeaseChecksForSystemQueues(false),
 	)
 	ctx := context.Background()
 
@@ -7302,10 +7249,6 @@ func TestInvalidScoreOnRefill(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableLeaseChecksForSystemQueues(false),
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 			return constraints
 		}),

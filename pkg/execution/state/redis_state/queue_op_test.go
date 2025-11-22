@@ -40,9 +40,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -83,7 +80,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -157,9 +154,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -230,7 +224,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -306,9 +300,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			defaultShard,
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 		)
 		ctx := context.Background()
@@ -397,7 +388,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
@@ -479,9 +470,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -515,7 +503,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			now := q.clock.Now()
 			leaseDur := 5 * time.Second
 			leaseExpires := now.Add(leaseDur)
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil, LeaseOptionDisableConstraintChecks(true))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
