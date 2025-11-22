@@ -95,6 +95,18 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	case 3:
 		l.Trace("capacity released")
 
+		if len(r.lifecycles) > 0 {
+			for _, hook := range r.lifecycles {
+				err := hook.OnCapacityLeaseReleased(ctx, OnCapacityLeaseReleasedData{
+					AccountID: req.AccountID,
+					LeaseID:   req.LeaseID,
+				})
+				if err != nil {
+					return nil, errs.Wrap(0, false, "release lifecycle failed: %w", err)
+				}
+			}
+		}
+
 		// TODO: track success
 		return res, nil
 	default:

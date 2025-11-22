@@ -46,6 +46,8 @@ type redisCapacityManager struct {
 	numScavengerShards int
 
 	enableDebugLogs bool
+
+	lifecycles []ConstraintAPILifecycleHooks
 }
 
 type redisCapacityManagerOption func(m *redisCapacityManager)
@@ -89,6 +91,12 @@ func WithNumScavengerShards(numShards int) redisCapacityManagerOption {
 func WithEnableDebugLogs(enableDebugLogs bool) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.enableDebugLogs = enableDebugLogs
+	}
+}
+
+func WithLifecycles(lifecycles []ConstraintAPILifecycleHooks) redisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.lifecycles = lifecycles
 	}
 }
 
