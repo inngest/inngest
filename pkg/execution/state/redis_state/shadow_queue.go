@@ -529,6 +529,7 @@ func (q *queue) processShadowPartitionBacklog(
 				constraints,
 				WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
 				WithBacklogRefillDisableConstraintChecks(constraintCheckRes.skipConstraintChecks),
+				WithBacklogRefillItemCapacityLeaseIDs(constraintCheckRes.itemCapacityLeases)
 			)
 		},
 		map[string]any{

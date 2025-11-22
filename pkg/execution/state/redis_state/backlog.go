@@ -628,6 +628,7 @@ type BacklogRefillResult struct {
 type backlogRefillOptions struct {
 	constraintCheckIdempotencyKey string
 	disableConstraintChecks       bool
+	capacityLeaseIDs              []ulid.ULID
 }
 
 type backlogRefillOptionFn func(o *backlogRefillOptions)
@@ -641,6 +642,12 @@ func WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey string) backl
 func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) backlogRefillOptionFn {
 	return func(o *backlogRefillOptions) {
 		o.disableConstraintChecks = disableConstraintChecks
+	}
+}
+
+func WithBacklogRefillItemCapacityLeaseIDs(itemCapacityLeaseIDs []ulid.ULID) backlogRefillOptionFn {
+	return func(o *backlogRefillOptions) {
+		o.capacityLeaseIDs = itemCapacityLeaseIDs
 	}
 }
 
@@ -762,6 +769,8 @@ func (q *queue) BacklogRefill(
 		kg.QueuePrefix(),
 		checkConstraintsVal,
 		shouldSpotCheckActiveSet,
+
+		o.capacityLeaseIDs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
