@@ -36,7 +36,7 @@ type CronHealthChecker interface {
 	HealthCheck(ctx context.Context, functionID uuid.UUID, expr string, fnVersion int) (CronHealthCheckStatus, error)
 
 	// Enqueues the next periodic global cron-health-check system job
-	EnqueueNextHealthCheck(ctx context.Context, cur time.Time) error
+	EnqueueNextHealthCheck(ctx context.Context) error
 
 	// Enqueues an ad-hoc cron-health-check system job *now*
 	// This could be for a specific function, a specific account or globally for all crons.

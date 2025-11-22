@@ -971,7 +971,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 	}
 
 	// enqueue next health check.
-	return s.croner.EnqueueNextHealthCheck(ctx, hcTime)
+	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
 func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
