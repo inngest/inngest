@@ -9,9 +9,8 @@ import { IconCloudflare } from "@inngest/components/icons/platforms/Cloudflare";
 import { IconFlyIo } from "@inngest/components/icons/platforms/FlyIo";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiCheckboxCircleFill, RiCloudLine } from "@remixicon/react";
-import { useLocalStorage } from "react-use";
+import useLocalStorage from "react-use/lib/useLocalStorage";
 
-import { useVercelIntegration } from "@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration";
 import { Secret } from "@/components/Secret";
 import { useDefaultEventKey } from "@/queries/useDefaultEventKey";
 import { pathCreator } from "@/utils/urls";
@@ -20,6 +19,7 @@ import { OnboardingSteps } from "../Onboarding/types";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
 import { getNextStepName } from "./utils";
+import { useVercelIntegration } from "@/queries/useVercelIntegration";
 
 export default function DeployApp() {
   const currentStepName = OnboardingSteps.DeployApp;
@@ -142,6 +142,7 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
+                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}
@@ -302,6 +303,7 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
+                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}
@@ -356,6 +358,7 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
+                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}

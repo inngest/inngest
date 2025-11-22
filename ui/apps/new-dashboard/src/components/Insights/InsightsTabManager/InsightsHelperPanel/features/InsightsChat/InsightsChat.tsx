@@ -10,6 +10,10 @@ import { ResponsivePromptInput } from "./input/InputField";
 import { AssistantMessage } from "./messages/AssistantMessage";
 import { ToolMessage } from "./messages/ToolMessage";
 import { UserMessage } from "./messages/UserMessage";
+import type { InsightsAgentConfig } from "./useInsightsAgent";
+import { type ToolPartFor } from "@inngest/use-agent";
+
+type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, "generate_sql">;
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -180,7 +184,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
                               return (
                                 <ToolMessage
                                   key={i}
-                                  part={part}
+                                  part={part as GenerateSqlPart}
                                   onSqlChange={onSqlChange}
                                   runQuery={runQuery}
                                 />

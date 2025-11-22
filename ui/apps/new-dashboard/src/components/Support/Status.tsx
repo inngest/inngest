@@ -24,6 +24,7 @@ const statusEventSchema = z.object({
 
 const incidentSchema = statusEventSchema.extend({
   status: z.enum(["identified", "investigating", "monitoring"]),
+  // @ts-expect-error: TANSTACK TODO: figure out how to type this
   current_worst_impact: impactSchema,
 });
 

@@ -1,8 +1,7 @@
 import type { PropsWithChildren } from "react";
-import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import * as Sentry from "@sentry/nextjs";
+import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 
-import { getLaunchDarklyClient } from "@/launchDarkly";
+import { getLaunchDarklyClient } from "./ServerLaunchDarkly";
 
 type Props = PropsWithChildren<{
   defaultValue?: boolean;
@@ -27,9 +26,18 @@ export async function getBooleanFlag(
   flag: string,
   { defaultValue = false }: { defaultValue?: boolean } = {},
 ): Promise<boolean> {
-  const user = await currentUser();
+  const { userId, orgId } = await auth();
+
+  if (!userId) {
+    throw new Error("ServerLaunchdarkly init failed: user is not logged in");
+  }
+
   const clerk = clerkClient();
-  const { orgId } = auth();
+  const user = await clerkClient().users.getUser(userId);
+
+  if (!user) {
+    throw new Error("ServerLaunchdarkly init failed: user is not logged in");
+  }
 
   let organization:
     | Awaited<ReturnType<typeof clerk.organizations.getOrganization>>
@@ -68,7 +76,8 @@ export async function getBooleanFlag(
     const variation = await client.variation(flag, context, defaultValue);
     return variation;
   } catch (err) {
-    Sentry.captureException(err);
+    // TANSTACK TODO: Uncomment this when Sentry is migrated
+    // Sentry.captureException(err);
     console.error("Failed to get LaunchDarkly variation", err);
     return false;
   }

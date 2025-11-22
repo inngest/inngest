@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useAuth } from "@clerk/nextjs";
-import * as Sentry from "@sentry/nextjs";
+import { useAuth } from "@clerk/tanstack-react-start";
+// import * as Sentry from "@sentry/nextjs";
 import { authExchange } from "@urql/exchange-auth";
 import { requestPolicyExchange } from "@urql/exchange-request-policy";
 import { retryExchange } from "@urql/exchange-retry";
@@ -13,8 +13,7 @@ import {
   fetchExchange,
   mapExchange,
 } from "urql";
-
-import SignInRedirectErrors from "@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors";
+import SignInRedirectErrors from "@/components/SignIn/Errors";
 
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
@@ -59,7 +58,8 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
             // Handle unauthenticated errors after (1) trying to refresh the token and (2) retrying the operation.
             if (isUnauthenticatedError(error)) {
               // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
-              Sentry.captureException(error);
+              // TANSTACK TODO: add Sentry capture here once sentry lands
+              // Sentry.captureException(error);
               signOut(() => {
                 navigate({
                   to: process.env.NEXT_PUBLIC_SIGN_IN_PATH || "/sign-in",

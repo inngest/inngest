@@ -25,12 +25,7 @@ const query = graphql(`
     environment: workspace(id: $envID) {
       workerConnections(
         first: $first
-        filter: {
-          appIDs: [$appID]
-          from: $startTime
-          status: $status
-          timeField: $timeField
-        }
+        filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
         orderBy: $orderBy
         after: $cursor
       ) {
@@ -143,12 +138,7 @@ const countQuery = graphql(`
   ) {
     environment: workspace(id: $envID) {
       workerConnections(
-        filter: {
-          appIDs: [$appID]
-          from: $startTime
-          status: $status
-          timeField: $timeField
-        }
+        filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
         orderBy: [{ field: $timeField, direction: DESC }]
       ) {
         totalCount

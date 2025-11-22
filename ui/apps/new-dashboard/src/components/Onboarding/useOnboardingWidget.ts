@@ -1,6 +1,5 @@
+import { getProdApps } from "@/queries/server-only/apps";
 import { useEffect, useState } from "react";
-
-import { getProdApps } from "@/components/Onboarding/actions";
 
 const useOnboardingWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +15,8 @@ const useOnboardingWidget = () => {
         }
         const result = await getProdApps();
         const hasAppsOrUnattachedSyncs = result
-          ? result.apps.length > 0 || result.unattachedSyncs.length > 0
+          ? result.environment.apps.length > 0 ||
+            result.environment.unattachedSyncs.length > 0
           : // In case of data fetching error, we don't wanna fail the page
             true;
         // Show widget by default when user doesn't have prod apps

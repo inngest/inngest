@@ -22,7 +22,7 @@ export const Route = createFileRoute("/sign-in/$")({
 });
 
 function RouteComponent() {
-  const { redirect_url, error } = Route.useSearch();
+  const { error } = Route.useSearch();
 
   return (
     <SplitView>

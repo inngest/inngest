@@ -39,18 +39,8 @@ export const syncNewApp = async (appURL: string) => {
 };
 
 export const InvokeFunctionOnboardingDocument = graphql(`
-  mutation InvokeFunctionOnboarding(
-    $envID: UUID!
-    $data: Map
-    $functionSlug: String!
-    $user: Map
-  ) {
-    invokeFunction(
-      envID: $envID
-      data: $data
-      functionSlug: $functionSlug
-      user: $user
-    )
+  mutation InvokeFunctionOnboarding($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
+    invokeFunction(envID: $envID, data: $data, functionSlug: $functionSlug, user: $user)
   }
 `);
 

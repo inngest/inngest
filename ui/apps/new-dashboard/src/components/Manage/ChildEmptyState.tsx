@@ -18,14 +18,14 @@ export default function ChildEmptyState() {
             <Button
               kind="primary"
               appearance="outlined"
-              to={`/env/${staticSlugs.branch}/manage/keys`}
+              href={`/env/${staticSlugs.branch}/manage/keys`}
               label="Manage Event Keys"
             />
 
             <Button
               kind="primary"
               appearance="outlined"
-              to={`/env/${staticSlugs.branch}/manage/signing-key`}
+              href={`/env/${staticSlugs.branch}/manage/signing-key`}
               label="Manage Signing Keys"
             />
           </div>

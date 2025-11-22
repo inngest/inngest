@@ -5,7 +5,7 @@ import {
   type UseAgentsReturn,
 } from "@inngest/use-agent";
 
-import type { ToolManifest } from "@/app/api/inngest/functions/agents/types";
+import type { ToolManifest } from "@/data/api/inngest/functions/agents/types";
 
 export type ClientState = {
   sqlQuery: string;

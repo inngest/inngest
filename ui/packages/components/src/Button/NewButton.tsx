@@ -1,7 +1,7 @@
 import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { Link, type LinkComponentProps, type ToPathOption } from '@tanstack/react-router';
+import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 import { cn } from '../utils/classNames';
 import {

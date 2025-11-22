@@ -1,7 +1,3 @@
-#
-# TANSTACK TODO: ignore everything during to keep PR diffs to a minimum
-# re-enable afterwards and push a prettier only PR
-**/*
 **/build
 **/public
 pnpm-lock.yaml

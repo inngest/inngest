@@ -13,9 +13,7 @@ const query = graphql(`
   ) {
     environment: workspace(id: $envID) {
       function: workflowBySlug(slug: $functionSlug) {
-        cancellationRunCount(
-          input: { queuedAtMin: $queuedAtMin, queuedAtMax: $queuedAtMax }
-        )
+        cancellationRunCount(input: { queuedAtMin: $queuedAtMin, queuedAtMax: $queuedAtMax })
       }
     }
   }

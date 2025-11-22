@@ -6,12 +6,7 @@ import { useEnvironment } from "@/components/Environments/environment-context";
 import { graphql } from "@/gql";
 
 const GET_EVENT_TYPE_SCHEMAS_QUERY = graphql(`
-  query GetEventTypeSchemas(
-    $envID: ID!
-    $cursor: String
-    $nameSearch: String
-    $archived: Boolean
-  ) {
+  query GetEventTypeSchemas($envID: ID!, $cursor: String, $nameSearch: String, $archived: Boolean) {
     environment: workspace(id: $envID) {
       eventTypesV2(
         after: $cursor

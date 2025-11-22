@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   baseFetchSkipped,
   baseFetchSucceeded,

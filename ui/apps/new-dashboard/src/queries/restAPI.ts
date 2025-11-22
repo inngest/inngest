@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import ky from "ky";
 
 export { HTTPError } from "ky";
@@ -8,7 +8,7 @@ const restAPI = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        const { getToken } = auth();
+        const { getToken } = await auth();
         const sessionToken = await getToken();
 
         // TODO: Does this need to be changed for Vercel Marketplace? Vercel

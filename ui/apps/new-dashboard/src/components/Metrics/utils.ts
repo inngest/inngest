@@ -16,9 +16,19 @@ import type { MetricsData, MetricsResponse, ScopedMetric } from "@/gql/graphql";
 import tailwindConfig from "../../../tailwind.config";
 import type { EntityLookup, EntityType } from "./Dashboard";
 
+const resolvedConfig = resolveConfig(tailwindConfig);
 const {
   theme: { colors, backgroundColor, textColor, borderColor },
-} = resolveConfig(tailwindConfig);
+} = resolvedConfig;
+
+// Type assertion for extended colors that aren't in DefaultColors
+const extendedColors = colors as typeof colors & {
+  accent: { subtle: string };
+  primary: { moderate: string };
+  secondary: { moderate: string };
+  tertiary: { moderate: string };
+  quaternary: { coolxIntense: string };
+};
 
 export type LineChartData = {
   xAxis: {
@@ -32,11 +42,11 @@ export type LineChartData = {
 };
 
 export const lineColors = [
-  [colors.accent.subtle, "#ec9923"],
-  [colors.primary.moderate, "#2c9b63"],
-  [colors.secondary.moderate, "#2389f1"],
-  [colors.tertiary.moderate, "#f54a3f"],
-  [colors.quaternary.coolxIntense, "#6222df"],
+  [extendedColors.accent.subtle, "#ec9923"],
+  [extendedColors.primary.moderate, "#2c9b63"],
+  [extendedColors.secondary.moderate, "#2389f1"],
+  [extendedColors.tertiary.moderate, "#f54a3f"],
+  [extendedColors.quaternary.coolxIntense, "#6222df"],
 ];
 
 export const seriesOptions: LineSeriesOption = {

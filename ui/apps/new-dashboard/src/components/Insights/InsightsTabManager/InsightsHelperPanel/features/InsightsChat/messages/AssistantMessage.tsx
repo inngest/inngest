@@ -1,4 +1,3 @@
-import React from "react";
 import type { TextUIPart } from "@inngest/use-agent";
 
 type AssistantMessageProps = {

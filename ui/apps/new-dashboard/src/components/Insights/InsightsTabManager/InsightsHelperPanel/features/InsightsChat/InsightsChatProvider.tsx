@@ -1,4 +1,6 @@
-import React, {
+import type { AgentStatus, ToolOutputOf } from "@inngest/use-agent";
+import { useQuery } from "@tanstack/react-query";
+import {
   createContext,
   useCallback,
   useContext,
@@ -7,8 +9,6 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import type { AgentStatus, ToolOutputOf } from "@inngest/use-agent";
-import { useQuery } from "@tanstack/react-query";
 
 import { useAllEventTypes } from "@/components/EventTypes/useEventTypes";
 import {

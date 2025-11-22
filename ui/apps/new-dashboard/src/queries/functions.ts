@@ -6,15 +6,9 @@ import type { GetFunctionQuery } from "@/gql/graphql";
 import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const GetFunctionsUsageDocument = graphql(`
-  query GetFunctionsUsage(
-    $environmentID: ID!
-    $page: Int
-    $archived: Boolean
-    $pageSize: Int
-  ) {
+  query GetFunctionsUsage($environmentID: ID!, $page: Int, $archived: Boolean, $pageSize: Int) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived)
-        @paginated(perPage: $pageSize, page: $page) {
+      workflows(archived: $archived) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -24,37 +18,25 @@ const GetFunctionsUsageDocument = graphql(`
         data {
           id
           slug
-          dailyStarts: usage(
-            opts: { period: "hour", range: "day" }
-            event: "started"
-          ) {
+          dailyStarts: usage(opts: { period: "hour", range: "day" }, event: "started") {
             total
             data {
               count
             }
           }
-          dailyCompleted: usage(
-            opts: { period: "hour", range: "day" }
-            event: "completed"
-          ) {
+          dailyCompleted: usage(opts: { period: "hour", range: "day" }, event: "completed") {
             total
             data {
               count
             }
           }
-          dailyCancelled: usage(
-            opts: { period: "hour", range: "day" }
-            event: "cancelled"
-          ) {
+          dailyCancelled: usage(opts: { period: "hour", range: "day" }, event: "cancelled") {
             total
             data {
               count
             }
           }
-          dailyFailures: usage(
-            opts: { period: "hour", range: "day" }
-            event: "errored"
-          ) {
+          dailyFailures: usage(opts: { period: "hour", range: "day" }, event: "errored") {
             total
             data {
               count
@@ -75,8 +57,7 @@ const GetFunctionsDocument = graphql(`
     $pageSize: Int
   ) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived, search: $search)
-        @paginated(perPage: $pageSize, page: $page) {
+      workflows(archived: $archived, search: $search) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -250,18 +231,10 @@ export const useFunction = ({
 };
 
 const GetFunctionUsageDocument = graphql(`
-  query GetFunctionUsage(
-    $id: ID!
-    $environmentID: ID!
-    $startTime: Time!
-    $endTime: Time!
-  ) {
+  query GetFunctionUsage($id: ID!, $environmentID: ID!, $startTime: Time!, $endTime: Time!) {
     workspace(id: $environmentID) {
       workflow(id: $id) {
-        dailyStarts: usage(
-          opts: { from: $startTime, to: $endTime }
-          event: "started"
-        ) {
+        dailyStarts: usage(opts: { from: $startTime, to: $endTime }, event: "started") {
           period
           total
           data {
@@ -269,10 +242,7 @@ const GetFunctionUsageDocument = graphql(`
             count
           }
         }
-        dailyCancelled: usage(
-          opts: { from: $startTime, to: $endTime }
-          event: "cancelled"
-        ) {
+        dailyCancelled: usage(opts: { from: $startTime, to: $endTime }, event: "cancelled") {
           period
           total
           data {
@@ -280,10 +250,7 @@ const GetFunctionUsageDocument = graphql(`
             count
           }
         }
-        dailyCompleted: usage(
-          opts: { from: $startTime, to: $endTime }
-          event: "completed"
-        ) {
+        dailyCompleted: usage(opts: { from: $startTime, to: $endTime }, event: "completed") {
           period
           total
           data {
@@ -291,10 +258,7 @@ const GetFunctionUsageDocument = graphql(`
             count
           }
         }
-        dailyFailures: usage(
-          opts: { from: $startTime, to: $endTime }
-          event: "errored"
-        ) {
+        dailyFailures: usage(opts: { from: $startTime, to: $endTime }, event: "errored") {
           period
           total
           data {

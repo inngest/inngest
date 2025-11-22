@@ -9,11 +9,7 @@ import { graphql } from "@/gql";
 import { pathCreator } from "@/utils/urls";
 
 const mutation = graphql(`
-  mutation RerunFunctionRun(
-    $environmentID: ID!
-    $functionID: ID!
-    $functionRunID: ULID!
-  ) {
+  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {
     retryWorkflowRun(
       input: { workspaceID: $environmentID, workflowID: $functionID }
       workflowRunID: $functionRunID

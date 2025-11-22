@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Button, SplitButton } from "@inngest/components/Button/NewButton";
+import { Button } from "@inngest/components/Button/NewButton";
+import { SplitButton } from "@inngest/components/Button/SplitButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
