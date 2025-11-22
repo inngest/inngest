@@ -3,6 +3,10 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -13,9 +17,6 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func BenchmarkKeyQueues(b *testing.B) {
@@ -39,10 +40,6 @@ func BenchmarkKeyQueues(b *testing.B) {
 			return true
 		}),
 		WithEnqueueSystemPartitionsToBacklog(false),
-		WithDisableLeaseChecksForSystemQueues(false),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
 		WithKindToQueueMapping(map[string]string{
 			osqueue.KindPause:           osqueue.KindPause,
 			osqueue.KindDebounce:        osqueue.KindDebounce,
