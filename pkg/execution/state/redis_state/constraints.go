@@ -16,7 +16,7 @@ import (
 
 type backlogRefillConstraintCheckResult struct {
 	itemsToRefill        []string
-	itemCapacityLeases   map[string]ulid.ULID
+	itemCapacityLeases   []ulid.ULID
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
@@ -158,11 +158,11 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	itemsToRefill := make([]string, len(res.Leases))
-	itemCapacityLeases := make(map[string]ulid.ULID, len(res.Leases))
+	itemCapacityLeases := make([]ulid.ULID, len(res.Leases))
 	for i, l := range res.Leases {
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
-		itemCapacityLeases[l.IdempotencyKey] = l.LeaseID
+		itemCapacityLeases[i] = l.LeaseID
 	}
 
 	return &backlogRefillConstraintCheckResult{
