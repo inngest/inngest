@@ -35,6 +35,9 @@ const requestMiddleware: RequestMiddleware = async (request) => {
     };
   }
 
+  console.log("TANSTACK TEST: sessionToken:", sessionToken);
+  console.log("TANSTACK TEST: request URL:", request.url);
+
   return {
     ...request,
     headers,
@@ -46,6 +49,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
  * handled gracefully by an enclosing `not-found` file.
  */
 const throwNotFoundError: ResponseMiddleware = (response) => {
+  console.log("TANSTACK TEST: response:", response);
   if (response instanceof Error && response.message.includes("not found")) {
     notFound();
   }
