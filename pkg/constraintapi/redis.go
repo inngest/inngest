@@ -94,7 +94,7 @@ func WithEnableDebugLogs(enableDebugLogs bool) redisCapacityManagerOption {
 	}
 }
 
-func WithLifecycles(lifecycles []ConstraintAPILifecycleHooks) redisCapacityManagerOption {
+func WithLifecycles(lifecycles ...ConstraintAPILifecycleHooks) redisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.lifecycles = lifecycles
 	}
