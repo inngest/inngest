@@ -118,6 +118,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		expectedRemainingKeys := []string{
 			te.CapacityManager.keyOperationIdempotency(te.KeyPrefix, te.AccountID, "acq", "consistency-acquire-1"),
 			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "consistency-acquire-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-2"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-3"),
 		}
 		for i := 1; i <= 3; i++ {
 			expectedRemainingKeys = append(expectedRemainingKeys,
@@ -312,7 +315,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		// Verify lease details contain extension information
 		cv.VerifyLeaseDetails(
 			*extendResp.LeaseID,
-			"extend-lease-1",
+			util.XXHash("extend-lease-1"),
 			"",
 			util.XXHash("extend-acquire"),
 		)
@@ -406,9 +409,11 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 
 		// Verify no other resource leaks exist after TTL cleanup
 		finalState := te.CaptureRedisState()
-		require.Equal(t, finalState.Keys,
+		require.Len(t, finalState.Keys, 2)
+		require.Subset(t, finalState.Keys,
 			[]string{
 				te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "ttl-test"),
+				te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "ttl-lease-1"),
 			},
 			"No keys should remain after TTL cleanup")
 	})
@@ -497,6 +502,8 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-1"),
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-2"),
 			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-acquire"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-lease-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-lease-2"),
 			"{q:v1}:throttle:multi-value", // throttle key
 		}
 
