@@ -5,7 +5,6 @@ import {
   type GetVercelAppsQuery,
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
-  type ProductionAppsQuery,
   type SyncResponse,
 } from "@/gql/graphql";
 import { graphqlAPI } from "@/queries/graphqlAPI";
@@ -178,17 +177,6 @@ export const GetVercelAppsOnboardingDocument = graphql(`
     }
   }
 `);
-
-export const getProductionApps = async () => {
-  const environment = await getProductionEnvironment();
-
-  return await graphqlAPI.request<ProductionAppsQuery>(
-    GetProductionAppsDocument,
-    {
-      envID: environment.id,
-    },
-  );
-};
 
 export const GetProductionAppsDocument = graphql(`
   query ProductionApps($envID: ID!) {

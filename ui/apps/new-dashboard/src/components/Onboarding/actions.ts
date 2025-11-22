@@ -1,8 +1,8 @@
 import { type InvokeFunctionMutationVariables } from "@/gql/graphql";
 import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
+import { createServerFn } from "@tanstack/react-start";
 import {
   getInvokeFunctionLookups,
-  getProductionApps,
   getVercelApps,
   invokeFn,
   preloadInvokeFunctionLookups,
@@ -10,7 +10,6 @@ import {
   type UnattachedSync,
   type VercelApp,
 } from "./data";
-import { createServerFn } from "@tanstack/react-start";
 
 export async function syncAppManually(appURL: string) {
   try {
@@ -70,19 +69,6 @@ export async function prefetchFunctions() {
 
   return functions;
 }
-
-export const getProdApps = createServerFn({ method: "GET" }).handler(
-  async () => {
-    try {
-      const response = await getProductionApps();
-      const { apps, unattachedSyncs } = response.environment;
-      return { apps, unattachedSyncs };
-    } catch (error) {
-      console.error("Error fetching production apps:", error);
-      return null;
-    }
-  },
-);
 
 export type VercelSyncsResponse = {
   apps: VercelApp[];

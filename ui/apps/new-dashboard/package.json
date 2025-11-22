@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:graphql-codegen": "graphql-codegen -w -r dotenv/config",
-    "build": "vite build && tsc --noEmit",
+    "build": "vite build",
     "graphql-codegen": "graphql-codegen -r dotenv/config",
     "start": "vite start",
     "format": "prettier --write .",

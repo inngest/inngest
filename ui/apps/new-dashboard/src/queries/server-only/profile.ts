@@ -1,12 +1,13 @@
 import { graphql } from "@/gql";
-import { graphqlAPI } from "../graphqlAPI";
 import {
+  auth,
+  clerkClient,
   type Organization,
   type OrganizationMembership,
   type User,
 } from "@clerk/tanstack-react-start/server";
-import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
+import { graphqlAPI } from "../graphqlAPI";
 
 export type ProfileType = {
   user: User;
