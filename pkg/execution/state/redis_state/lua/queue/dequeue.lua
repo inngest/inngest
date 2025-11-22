@@ -46,10 +46,10 @@ local keyActiveRunsCustomConcurrencyKey2  = KEYS[29]
 local keyIdempotency           = KEYS[30]
 local singletonRunKey          = KEYS[31]
 
-local keyItemIndexA            = KEYS[32]   -- custom item index 1
-local keyItemIndexB            = KEYS[33]  -- custom item index 2
+local keyPartitionScavengerIndex  = KEYS[32]
 
-local keyPartitionScavengerIndex  = KEYS[34]
+local keyItemIndexA            = KEYS[33]   -- custom item index 1
+local keyItemIndexB            = KEYS[34]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
