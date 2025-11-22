@@ -574,24 +574,6 @@ func WithEnqueueSystemPartitionsToBacklog(enqueueToBacklog bool) QueueOpt {
 	}
 }
 
-func WithDisableLeaseChecksForSystemQueues(disableChecks bool) QueueOpt {
-	return func(q *queue) {
-		q.disableLeaseChecksForSystemQueues = disableChecks
-	}
-}
-
-// DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
-// leasing should be disabled or not
-type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
-
-type DisableSystemQueueLeaseChecks func(ctx context.Context) bool
-
-func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
-	return func(q *queue) {
-		q.disableLeaseChecks = lc
-	}
-}
-
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
 // continue to process a shadow partition's backlog.
 // This helps with reducing churn on leases for the shadow partition and allow handling
@@ -718,10 +700,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			return false
 		},
 		enqueueSystemQueuesToBacklog: false,
-		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
-		disableLeaseChecksForSystemQueues: true,
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
@@ -836,9 +814,6 @@ type queue struct {
 	// activeCheckerLeaseLock ensures that there are no data races writing to
 	// or reading from activeCheckerLeaseID in parallel.
 	activeCheckerLeaseLock *sync.RWMutex
-
-	disableLeaseChecks                DisableLeaseChecks
-	disableLeaseChecksForSystemQueues bool
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -2620,10 +2595,7 @@ func (q *queue) PartitionLease(
 		return nil, 0, fmt.Errorf("error generating id: %w", err)
 	}
 
-	disableLeaseChecks := p.IsSystem() && q.disableLeaseChecksForSystemQueues
-	if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
-		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
-	}
+	disableLeaseChecks := p.IsSystem()
 	if o.disableLeaseChecks {
 		disableLeaseChecks = o.disableLeaseChecks
 	}
@@ -3542,17 +3514,19 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			return len(itemIDs), counter, nil
 		}
 
-		peekedFromIndex, _, err := scavengePartition(kg.PartitionScavengerIndex(partition))
+		peekedFromIndex, scavengedFromIndex, err := scavengePartition(kg.PartitionScavengerIndex(partition))
 		if err != nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from scavenger index: %w", err))
 			continue
 		}
+		counter += scavengedFromIndex
 
-		peekedFromInProgressKey, _, err := scavengePartition(queueKey)
+		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey)
 		if err != nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from in progress key: %w", err))
 			continue
 		}
+		counter += scavengedFromInProgressKey
 
 		if peekedFromInProgressKey+peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
 			// Atomically attempt to drop empty pointer if we've processed all items

@@ -62,9 +62,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
 		WithClock(clock),
 	)
 	ctx := context.Background()
@@ -269,9 +266,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -390,10 +384,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 				return enqueueToBacklog
 			}),
 			WithEnqueueSystemPartitionsToBacklog(false),
-			WithDisableLeaseChecksForSystemQueues(false),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -544,10 +534,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 				return enqueueToBacklog
 			}),
 			WithEnqueueSystemPartitionsToBacklog(false),
-			WithDisableLeaseChecksForSystemQueues(false),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -699,9 +685,6 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		WithClock(clock),
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 	)
 
@@ -930,9 +913,6 @@ func TestQueueShadowScanner(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
 	)
 
 	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
@@ -997,9 +977,6 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		WithClock(clock),
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 		WithRunMode(QueueRunMode{
 			Sequential:                        true,
@@ -1719,9 +1696,6 @@ func TestRefillConstraints(t *testing.T) {
 				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
-				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-					return true
-				}),
 				WithRunMode(QueueRunMode{
 					Sequential:                        true,
 					Scavenger:                         true,
@@ -2017,10 +1991,6 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				return enqueueToBacklog
 			}),
 			WithEnqueueSystemPartitionsToBacklog(false),
-			WithDisableLeaseChecksForSystemQueues(false),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -2163,10 +2133,6 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				return enqueueToBacklog
 			}),
 			WithEnqueueSystemPartitionsToBacklog(false),
-			WithDisableLeaseChecksForSystemQueues(false),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -2263,9 +2229,6 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WithClock(clock),
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 		WithRunMode(QueueRunMode{
 			Sequential:                        true,
