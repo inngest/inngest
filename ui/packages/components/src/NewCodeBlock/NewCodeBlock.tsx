@@ -17,7 +17,7 @@ import {
   RiExpandDiagonalLine,
 } from '@remixicon/react';
 import { JSONTree } from 'react-json-tree';
-import { useLocalStorage } from 'react-use';
+import useLocalStorage from 'react-use/lib/useLocalStorage';
 
 import { Alert } from '../Alert';
 import { Fullscreen } from '../Fullscreen/Fullscreen';
