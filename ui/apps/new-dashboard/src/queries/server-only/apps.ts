@@ -6,7 +6,6 @@ import {
 import { workspacesToEnvironments } from "@/utils/environments";
 import { createServerFn } from "@tanstack/react-start";
 import graphqlAPI from "../graphqlAPI";
-import { getProfile } from "./profile";
 
 export const getProdApps = createServerFn({
   method: "GET",
