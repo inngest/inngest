@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"testing"
@@ -323,9 +324,60 @@ func TestLuaCompatibility(t *testing.T) {
 				refillItems, err := getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
-				require.NotNil(t, leaseID)
+				require.NotNil(t, res)
+				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refilled)
+
+				// Add second item with capacity lease
+				capacityLeaseID := ulid.MustNew(ulid.Timestamp(refillUntil.Add(5*time.Second)), rand.Reader)
+				item2 := queue.QueueItem{
+					FunctionID: functionID,
+					Data: queue.Item{
+						Kind: queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID: accountID,
+							RunID:     runID,
+						},
+						Throttle: &queue.Throttle{
+							Limit:               5,
+							Burst:               0,
+							Period:              60,
+							Key:                 keyHash,
+							UnhashedThrottleKey: throttleKey,
+							KeyExpressionHash:   exprHash,
+						},
+					},
+				}
+
+				// Enqueue to backlog
+				qi2, err := q.EnqueueItem(ctx, shard, item2, now, queue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				refillItems, err = getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
+				require.NoError(t, err)
+
+				// Refill with capacity lease awareness
+				res, err = q.BacklogRefill(
+					ctx,
+					&backlog,
+					&sp,
+					refillUntil,
+					refillItems,
+					constraints,
+					redis_state.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
+					redis_state.WithBacklogRefillDisableConstraintChecks(true),
+					redis_state.WithBacklogRefillItemCapacityLeaseIDs([]ulid.ULID{capacityLeaseID}),
+				)
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refilled)
+
+				refilled, err := q.ItemByID(ctx, qi2.ID)
+				require.NoError(t, err)
+				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLeaseID.String())
 			})
 
 			t.Run("current time is returned for rate limiting", func(t *testing.T) {
