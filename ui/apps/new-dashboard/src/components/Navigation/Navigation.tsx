@@ -25,7 +25,9 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
         } w-full justify-between gap-x-1 gap-y-2`}
       >
         <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>
-          <Environments activeEnv={activeEnv} collapsed={collapsed} />
+          {activeEnv && (
+            <Environments activeEnv={activeEnv} collapsed={collapsed} />
+          )}
         </Suspense>
 
         {activeEnv && <KeysMenu activeEnv={activeEnv} collapsed={collapsed} />}

@@ -7,7 +7,7 @@ import SideBar from "./SideBar";
 type LayoutProps = {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile: ProfileDisplayType;
+  profile?: ProfileDisplayType;
   children: ReactNode;
 };
 

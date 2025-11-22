@@ -22,7 +22,7 @@ export default function SideBar({
 }: {
   collapsed: boolean | undefined;
   activeEnv?: Environment;
-  profile: ProfileDisplayType;
+  profile?: ProfileDisplayType;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +73,7 @@ export default function SideBar({
           {/* <Integrations collapsed={collapsed} />
           <Help collapsed={collapsed} showWidget={showWidget} /> */}
         </div>
-        <Profile collapsed={collapsed} profile={profile} />
+        {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>
     </nav>
   );

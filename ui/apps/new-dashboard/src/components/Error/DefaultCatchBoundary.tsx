@@ -1,11 +1,9 @@
-import {
-  ErrorComponent,
-  Link,
-  rootRouteId,
-  useMatch,
-  useRouter,
-} from "@tanstack/react-router";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Error } from "@inngest/components/Error/Error";
+import { Header } from "@inngest/components/Header/NewHeader";
 import type { ErrorComponentProps } from "@tanstack/react-router";
+import { rootRouteId, useMatch, useRouter } from "@tanstack/react-router";
+import Layout from "../Layout/Layout";
 
 export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
@@ -14,40 +12,44 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
     select: (state) => state.id === rootRouteId,
   });
 
-  console.error(error);
+  console.error(error.message);
 
   return (
-    <div className="min-w-0 flex-1 p-4 flex flex-col items-center justify-center gap-6">
-      <ErrorComponent error={error} />
-      <div className="flex gap-2 items-center flex-wrap">
-        <button
-          onClick={() => {
-            router.invalidate();
-          }}
-          className={`px-2 py-1 bg-gray-600 dark:bg-gray-700 rounded text-white uppercase font-extrabold`}
-        >
-          Try Again
-        </button>
-        {isRoot ? (
-          <Link
-            to="/"
-            className={`px-2 py-1 bg-gray-600 dark:bg-gray-700 rounded text-white uppercase font-extrabold`}
-          >
-            Home
-          </Link>
-        ) : (
-          <Link
-            to="/"
-            className={`px-2 py-1 bg-gray-600 dark:bg-gray-700 rounded text-white uppercase font-extrabold`}
-            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-              e.preventDefault();
-              window.history.back();
+    <Layout collapsed={false}>
+      <Header breadcrumb={[{ text: "Error" }]} />
+      <div className="flex flex-col justify-start items-start gap">
+        <Error message={error.message} />
+
+        <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
+          <Button
+            kind="secondary"
+            appearance="outlined"
+            onClick={() => {
+              router.invalidate();
             }}
-          >
-            Go Back
-          </Link>
-        )}
+            label="Try Again"
+          />
+
+          {isRoot ? (
+            <Button
+              to="/"
+              kind="secondary"
+              appearance="outlined"
+              label="Home"
+            />
+          ) : (
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.preventDefault();
+                window.history.back();
+              }}
+              label="Go Back"
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }
