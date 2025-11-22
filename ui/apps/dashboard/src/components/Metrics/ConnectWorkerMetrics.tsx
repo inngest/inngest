@@ -36,7 +36,7 @@ export const ConnectWorkerPercentage = ({
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Connect Worker Usage{' '}
           <Info
-            text="Percentage of Connect worker capacity currently being used."
+            text="Percentage of Connect worker capacity currently being used. For workers with no concurrency limit, this will be 0%."
             action={
               <Link
                 className="text-sm"
@@ -75,7 +75,7 @@ export const ConnectWorkerTotalCapacity = ({
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Connect Worker Total Capacity{' '}
           <Info
-            text="Total capacity available across all Connect workers."
+            text="Total capacity available across all Connect workers. For workers with no concurrency limit, this will be 0."
             action={
               <Link
                 className="text-sm"

@@ -6,6 +6,7 @@ import { graphql } from '@/gql';
 import { MetricsScope } from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
@@ -269,6 +270,10 @@ export const MetricsVolume = ({
 
   const env = useEnvironment();
 
+  const { value: connectMetricsEnabled, isReady: connectMetricsReady } = useBooleanFlag(
+    'connect-worker-concurrency-metrics'
+  );
+
   const variables = {
     workspaceId: env.id,
     from: from.toISOString(),
@@ -319,12 +324,18 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             {/* Only show Connect worker metrics if there's data */}
-            {data && data?.workspace?.workerPercentageUsed?.metrics?.length > 0 && (
-              <ConnectWorkerPercentage workspace={data?.workspace} entities={entities} />
-            )}
-            {data && data?.workspace?.workerTotalCapacity?.metrics?.length > 0 && (
-              <ConnectWorkerTotalCapacity workspace={data?.workspace} entities={entities} />
-            )}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerPercentageUsed.metrics.length > 0 && (
+                <ConnectWorkerPercentage workspace={data.workspace} entities={entities} />
+              )}
+            {connectMetricsEnabled &&
+              connectMetricsReady &&
+              data &&
+              data.workspace.workerTotalCapacity.metrics.length > 0 && (
+                <ConnectWorkerTotalCapacity workspace={data.workspace} entities={entities} />
+              )}
           </div>
         </>
       )}
