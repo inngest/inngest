@@ -401,7 +401,7 @@ func TestLuaCompatibility(t *testing.T) {
 				checkResp, userErr, internalErr := cm.Check(ctx, &constraintapi.CapacityCheckRequest{
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
-						QueueShard:  "test",
+						QueueShard:  shard.Name,
 					},
 					AccountID:     accountID,
 					EnvID:         envID,
@@ -416,7 +416,7 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Len(t, checkResp.Usage, 2)
 				require.Equal(t, 10, checkResp.Usage[0].Limit)
 				require.Equal(t, 0, checkResp.Usage[0].Used)
-				require.Equal(t, 5, checkResp.Usage[1].Used)
+				require.Equal(t, 5, checkResp.Usage[1].Limit)
 				require.Equal(t, 0, checkResp.Usage[1].Used)
 
 				acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
