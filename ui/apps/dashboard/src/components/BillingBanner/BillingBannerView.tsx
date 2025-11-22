@@ -5,16 +5,15 @@ import { ContextualBanner } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
 import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 
-import { type EntitlementUsageQuery } from '@/gql/graphql';
+// import { type EntitlementUsageQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { parseEntitlementUsage } from './parse';
 
-export function BillingBannerView({
-  entitlementUsage,
-}: {
-  entitlementUsage: EntitlementUsageQuery['account']['entitlements'];
+export function BillingBannerView({}: // entitlementUsage,
+{
+  // entitlementUsage: EntitlementUsageQuery['account']['entitlements'];
 }) {
-  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(entitlementUsage);
+  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(/*entitlementUsage*/);
 
   const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
 

@@ -14,5 +14,5 @@ export async function BillingBanner() {
     return null;
   }
 
-  return <BillingBannerView entitlementUsage={data.entitlements} />;
+  return <BillingBannerView /*  entitlementUsage={data.entitlements} */ />;
 }
