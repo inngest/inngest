@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "@inngest/components/Link/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import { formatDistanceToNow } from "@inngest/components/utils/date";
 
@@ -8,6 +8,7 @@ import { pathCreator } from "@/utils/urls";
 import { useEnvironment } from "../Environments/environment-context";
 import type { EntityLookup } from "./Dashboard";
 import { sum } from "./utils";
+import type { FileRouteTypes } from "@tanstack/react-router";
 
 export type CompletedByFunctionType =
   FunctionStatusMetricsQuery["workspace"]["completedByFunction"];
@@ -93,10 +94,12 @@ export const FailedRate = ({
           <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
             <Link
               className="text-basis text-xs font-light leading-none hover:no-underline"
-              href={`${pathCreator.function({
-                envSlug: env.slug,
-                functionSlug: r.slug,
-              })}/runs`}
+              to={
+                `${pathCreator.function({
+                  envSlug: env.slug,
+                  functionSlug: r.slug,
+                })}/runs` as FileRouteTypes["to"]
+              }
             >
               <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">
                 {r.name}

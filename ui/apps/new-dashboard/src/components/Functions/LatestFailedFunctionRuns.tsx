@@ -6,7 +6,7 @@ import { useQuery } from "urql";
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { graphql } from "@/gql";
 import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, type FileRouteTypes } from "@tanstack/react-router";
 
 const GetFailedFunctionRunsDocument = graphql(`
   query GetFailedFunctionRuns(
@@ -89,9 +89,11 @@ export default function LatestFailedFunctionRuns({
         <Button
           appearance="outlined"
           kind="secondary"
-          href={`/env/${environmentSlug}/functions/${encodeURIComponent(
-            functionSlug,
-          )}/runs`}
+          to={
+            `/env/${environmentSlug}/functions/${encodeURIComponent(
+              functionSlug,
+            )}/runs` as FileRouteTypes["to"]
+          }
           label="View all runs"
         />
       </header>

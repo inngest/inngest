@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 
 import { pathCreator } from "@/utils/urls";
 
@@ -21,7 +21,7 @@ export function ExpandedRowActions({
     <div className="flex items-center gap-2">
       <Button
         label="Go to event type"
-        href={
+        to={
           eventName ? pathCreator.eventType({ envSlug, eventName }) : undefined
         }
         appearance="outlined"

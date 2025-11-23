@@ -1,4 +1,4 @@
-import { Banner } from "@inngest/components/Banner";
+import { Banner } from "@inngest/components/Banner/NewBanner";
 
 import type { Environment } from "@/utils/environments";
 import { pathCreator } from "@/utils/urls";
@@ -15,7 +15,7 @@ export function ArchivedEnvBanner({ env }: { env: Environment }) {
       <Banner.Link
         severity="warning"
         className="inline-flex"
-        href={pathCreator.envs()}
+        to={pathCreator.envs()}
       >
         environments page
       </Banner.Link>

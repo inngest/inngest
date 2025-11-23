@@ -61,7 +61,7 @@ export const AppInfoCard = ({
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && app.externalID && (
             <Link
-              href={pathCreator.appSyncs({
+              to={pathCreator.appSyncs({
                 envSlug: env.slug,
                 externalAppID: encodeURIComponent(app.externalID),
               })}

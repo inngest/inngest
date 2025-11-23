@@ -142,7 +142,6 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
-                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}
@@ -303,7 +302,6 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
-                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}
@@ -358,7 +356,6 @@ export default function DeployApp() {
               });
               navigate({
                 to: pathCreator.onboardingSteps({ step: nextStepName }),
-                // @ts-expect-error: TANSTACK TODO: remove after this route exists
                 search: { nonVercel: "true" },
               });
             }}

@@ -1,5 +1,5 @@
 import { Button } from "@inngest/components/Button/NewButton";
-import { MenuItem } from "@inngest/components/Menu/MenuItem";
+import { MenuItem } from "@inngest/components/Menu/NewMenuItem";
 import SegmentedProgressBar from "@inngest/components/ProgressBar/SegmentedProgressBar";
 import {
   Tooltip,
@@ -17,7 +17,7 @@ import { onboardingWidgetContent } from "../Onboarding/content";
 import { OnboardingSteps, steps } from "../Onboarding/types";
 import useOnboardingStep from "../Onboarding/useOnboardingStep";
 import { useOnboardingTracking } from "../Onboarding/useOnboardingTracking";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, type FileRouteTypes } from "@tanstack/react-router";
 
 export default function OnboardingWidget({
   collapsed,
@@ -39,10 +39,12 @@ export default function OnboardingWidget({
     <>
       {collapsed && (
         <MenuItem
-          href={pathCreator.onboardingSteps({
-            step: nextStep ? nextStep.name : lastCompletedStep?.name,
-            ref: "app-onboarding-widget",
-          })}
+          to={
+            pathCreator.onboardingSteps({
+              step: nextStep ? nextStep.name : lastCompletedStep?.name,
+              ref: "app-onboarding-widget",
+            }) as FileRouteTypes["to"]
+          }
           className="border-muted border"
           collapsed={collapsed}
           text="Onboarding guide"

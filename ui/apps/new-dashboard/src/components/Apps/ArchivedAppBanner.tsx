@@ -48,7 +48,7 @@ export function ArchivedAppBanner({ externalAppID }: Props) {
       <Banner.Link
         severity="warning"
         className="inline-flex"
-        href={pathCreator.app({ externalAppID, envSlug: env.slug })}
+        to={pathCreator.app({ externalAppID, envSlug: env.slug })}
       >
         here
       </Banner.Link>

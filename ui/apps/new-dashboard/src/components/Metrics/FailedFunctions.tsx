@@ -10,6 +10,7 @@ import { pathCreator } from "@/utils/urls";
 import type { EntityLookup } from "./Dashboard";
 import { FailedRate } from "./FailedRate";
 import { getLineChartOptions, mapEntityLines, sum } from "./utils";
+import type { FileRouteTypes } from "@tanstack/react-router";
 
 export type CompletedType =
   FunctionStatusMetricsQuery["workspace"]["completed"];
@@ -68,9 +69,11 @@ export const FailedFunctions = ({
           icon={<RiArrowRightUpLine />}
           iconSide="left"
           label="View all"
-          href={`${pathCreator.runs({
-            envSlug: env.slug,
-          })}?filterStatus=%5B"FAILED"%5D`}
+          to={
+            `${pathCreator.runs({
+              envSlug: env.slug,
+            })}?filterStatus=%5B"FAILED"%5D` as FileRouteTypes["to"]
+          }
         />
       </div>
       <div className="flex h-full flex-row items-center">

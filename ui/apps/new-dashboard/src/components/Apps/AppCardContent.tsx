@@ -40,7 +40,7 @@ const getAppCardContent = ({
 
   const footerHeaderSecondaryCTA =
     !app.error && app.functionCount > 0 ? (
-      <Link size="small" href={pathCreator.functions({ envSlug: envSlug })}>
+      <Link size="small" to={pathCreator.functions({ envSlug: envSlug })}>
         View functions
       </Link>
     ) : null;
@@ -74,7 +74,6 @@ const getAppCardContent = ({
                 >
                   <td className="py-2">
                     <Link
-                      // @ts-expect-error - TANSTACK TODO
                       to={pathCreator.function({
                         envSlug,
                         functionSlug: func.slug,
@@ -90,7 +89,7 @@ const getAppCardContent = ({
                         return (
                           <Pill
                             appearance="outlined"
-                            href={
+                            to={
                               trigger.type === "EVENT"
                                 ? pathCreator.eventType({
                                     envSlug,

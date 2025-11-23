@@ -276,7 +276,7 @@ export function SendEventModal({
               There are no Event Keys for this environment. Please create an
               Event Key in{" "}
               <Alert.Link
-                href={pathCreator.keys({ envSlug: environment.slug })}
+                to={pathCreator.keys({ envSlug: environment.slug })}
                 severity="warning"
               >
                 the Manage tab

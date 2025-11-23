@@ -29,7 +29,7 @@ export function BranchEnvironmentActions({
           className="rounded-r-none border-r-0 text-sm"
           kind="primary"
           label="Sync new app"
-          href={pathCreator.apps({ envSlug: branchParent.slug })}
+          to={pathCreator.apps({ envSlug: branchParent.slug })}
           size="medium"
         />
       }

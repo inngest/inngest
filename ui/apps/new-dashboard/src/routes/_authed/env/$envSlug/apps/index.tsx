@@ -68,7 +68,7 @@ function AppsPage() {
             <Button
               kind="primary"
               label="Sync new app"
-              href={pathCreator.createApp({ envSlug })}
+              to={pathCreator.createApp({ envSlug })}
               icon={<RiAddLine />}
               iconSide="left"
             />

@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, type FileRouteTypes } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Pill } from "@inngest/components/Pill/NewPill";
 import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
@@ -64,10 +64,12 @@ export default function LatestLogsList({
         <Button
           appearance="outlined"
           kind="secondary"
-          href={`${pathCreator.eventType({
-            envSlug: environmentSlug,
-            eventName: eventName,
-          })}/events`}
+          to={
+            `${pathCreator.eventType({
+              envSlug: environmentSlug,
+              eventName: eventName,
+            })}/events` as FileRouteTypes["to"]
+          }
           label="View all events"
         />
       </header>

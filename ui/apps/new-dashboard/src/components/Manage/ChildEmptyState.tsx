@@ -1,6 +1,7 @@
 import { Button } from "@inngest/components/Button/NewButton";
 
 import { staticSlugs } from "@/utils/environments";
+import type { FileRouteTypes } from "@tanstack/react-router";
 
 export default function ChildEmptyState() {
   return (
@@ -18,14 +19,18 @@ export default function ChildEmptyState() {
             <Button
               kind="primary"
               appearance="outlined"
-              href={`/env/${staticSlugs.branch}/manage/keys`}
+              to={
+                `/env/${staticSlugs.branch}/manage/keys` as FileRouteTypes["to"]
+              }
               label="Manage Event Keys"
             />
 
             <Button
               kind="primary"
               appearance="outlined"
-              href={`/env/${staticSlugs.branch}/manage/signing-key`}
+              to={
+                `/env/${staticSlugs.branch}/manage/signing-key` as FileRouteTypes["to"]
+              }
               label="Manage Signing Keys"
             />
           </div>
