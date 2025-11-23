@@ -287,7 +287,7 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	// We use robfig cron library to find the next time this cron is supposed to run. If there is no time in the next 5 years this cron will run, robfig.cron.Next returns a zero time.
 	// Since we don't allow specifying year as part of the cron expression, these expressions will never run. It is therefore safe to return without scheduling the next run.
 	if next.IsZero() {
-		l.Warn("next schedule is zero, returning")
+		l.Warn("next schedule is zero, returning", "from", from)
 		return nil, nil
 	}
 
