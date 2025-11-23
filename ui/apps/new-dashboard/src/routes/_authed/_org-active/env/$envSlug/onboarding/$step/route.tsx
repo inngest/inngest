@@ -1,4 +1,9 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 
 import PageHeader from "@/components/Onboarding/PageHeader";
 import { isValidStep } from "@/components/Onboarding/types";
