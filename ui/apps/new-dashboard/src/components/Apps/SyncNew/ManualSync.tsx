@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { Button } from "@inngest/components/Button/NewButton";
 import { InlineCode } from "@inngest/components/Code";
 import { Input } from "@inngest/components/Forms/Input";
-import { Link } from "@inngest/components/Link/NewLink";
+import { Link } from "@inngest/components/Link";
 import { useNavigate } from "@tanstack/react-router";
-import useLocalStorage from "react-use/lib/useLocalStorage";
+import useLocalStorage from "react-use/esm/useLocalStorage";
 
 import { toast } from "sonner";
 import { useMutation } from "urql";

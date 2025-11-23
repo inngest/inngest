@@ -25,7 +25,7 @@ export default defineConfig({
     ],
   },
   ssr: {
-    noExternal: ["@headlessui/tailwindcss"],
+    noExternal: ["@headlessui/tailwindcss", "react-use"],
     external: [
       "monaco-editor",
       "@monaco-editor/react",

@@ -9,7 +9,7 @@ import { IconCloudflare } from "@inngest/components/icons/platforms/Cloudflare";
 import { IconFlyIo } from "@inngest/components/icons/platforms/FlyIo";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiCheckboxCircleFill, RiCloudLine } from "@remixicon/react";
-import useLocalStorage from "react-use/lib/useLocalStorage";
+import useLocalStorage from "react-use/esm/useLocalStorage";
 
 import { Secret } from "@/components/Secret";
 import { useDefaultEventKey } from "@/queries/useDefaultEventKey";
