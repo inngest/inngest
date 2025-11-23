@@ -4,7 +4,7 @@ import { HorizontalPillList } from "@inngest/components/Pill/NewHorizontalPillLi
 import { methodTypes, type AppKind } from "@inngest/components/types/app";
 import { RiExternalLinkLine } from "@remixicon/react";
 
-import { syncKind, syncStatusText } from "@/components/SyncStatusPill";
+import { syncKind, syncStatusText } from "@/components/Apps/SyncStatusPill";
 import { pathCreator } from "@/utils/urls";
 import type { FlattenedApp } from "./useApps";
 
@@ -74,7 +74,8 @@ const getAppCardContent = ({
                 >
                   <td className="py-2">
                     <Link
-                      href={pathCreator.function({
+                      // @ts-expect-error - TANSTACK TODO
+                      to={pathCreator.function({
                         envSlug,
                         functionSlug: func.slug,
                       })}

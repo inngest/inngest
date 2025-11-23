@@ -4,7 +4,7 @@ import { ClientOnly, useNavigate } from "@tanstack/react-router";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Card } from "@inngest/components/Card/Card";
 import { InlineCode } from "@inngest/components/Code";
-import CommandBlock from "@inngest/components/CodeBlock/CommandBlock";
+import CommandBlock from "@inngest/components/CodeBlock/NewCommandBlock";
 import { Link } from "@inngest/components/Link/NewLink";
 import { IconSpinner } from "@inngest/components/icons/Spinner";
 import { useDevServer } from "@inngest/components/utils/useDevServer";

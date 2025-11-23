@@ -19,6 +19,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         standalone={standalone}
         getTrigger={getTrigger}
         runID={runID}
+        newStack={true}
         pollInterval={DEFAULT_POLL_INTERVAL}
       />
     </div>

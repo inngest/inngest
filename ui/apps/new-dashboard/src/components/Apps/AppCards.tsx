@@ -9,7 +9,7 @@ import { methodTypes } from "@inngest/components/types/app";
 import { ActionsMenu } from "@/components/Apps/ActionsMenu";
 import getAppCardContent from "@/components/Apps/AppCardContent";
 import { pathCreator } from "@/utils/urls";
-import { isSyncStatusHiddenOnAppCard } from "../SyncStatusPill";
+import { isSyncStatusHiddenOnAppCard } from "./SyncStatusPill";
 import { useWorkersCount } from "../Workers/useWorker";
 import { type FlattenedApp } from "./useApps";
 import { ValidateModal } from "./ValidateButton/ValidateModal";

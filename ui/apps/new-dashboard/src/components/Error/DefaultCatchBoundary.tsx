@@ -15,41 +15,33 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   console.error(error.message);
 
   return (
-    <Layout collapsed={false}>
-      <Header breadcrumb={[{ text: "Error" }]} />
-      <div className="flex flex-col justify-start items-start gap">
-        <Error message={error.message} />
+    <div className="flex flex-col justify-start items-start gap">
+      <Error message={error.message} />
 
-        <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
+      <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
+        <Button
+          kind="secondary"
+          appearance="outlined"
+          onClick={() => {
+            router.invalidate();
+          }}
+          label="Try Again"
+        />
+
+        {isRoot ? (
+          <Button to="/" kind="secondary" appearance="outlined" label="Home" />
+        ) : (
           <Button
             kind="secondary"
             appearance="outlined"
-            onClick={() => {
-              router.invalidate();
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              window.history.back();
             }}
-            label="Try Again"
+            label="Go Back"
           />
-
-          {isRoot ? (
-            <Button
-              to="/"
-              kind="secondary"
-              appearance="outlined"
-              label="Home"
-            />
-          ) : (
-            <Button
-              kind="secondary"
-              appearance="outlined"
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.preventDefault();
-                window.history.back();
-              }}
-              label="Go Back"
-            />
-          )}
-        </div>
+        )}
       </div>
-    </Layout>
+    </div>
   );
 }

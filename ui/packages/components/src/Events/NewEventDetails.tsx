@@ -11,7 +11,7 @@ import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link as TanstackLink } from '@tanstack/react-router';
 
-import { CodeBlock } from '../CodeBlock';
+import { CodeBlock } from '../CodeBlock/NewCodeBlock';
 import {
   IDElement,
   LazyElementWrapper,
