@@ -11,7 +11,7 @@ import {
 } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { type editor } from 'monaco-editor';
+import type { editor } from 'monaco-editor';
 
 import { isDark } from '../utils/theme';
 

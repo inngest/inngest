@@ -18,7 +18,7 @@ import {
   RiExpandDiagonalLine,
 } from '@remixicon/react';
 import type { editor } from 'monaco-editor';
-import useLocalStorage from 'react-use/lib/useLocalStorage';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
 import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { isDark } from '../utils/theme';
