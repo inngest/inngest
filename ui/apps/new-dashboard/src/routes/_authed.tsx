@@ -48,15 +48,6 @@ export const Route = createFileRoute("/_authed")({
       navCollapsed: await navCollapsed(),
     };
   },
-  errorComponent: ({ error }) => {
-    if (error.message === "Not authenticated") {
-      return "not authenticated";
-    }
-
-    //
-    // TANSTACK TODO: render a nice shell layout
-    throw error;
-  },
 });
 
 function Authed() {
