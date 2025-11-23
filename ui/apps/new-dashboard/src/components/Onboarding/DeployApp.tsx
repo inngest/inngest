@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
 import { InlineCode } from "@inngest/components/Code/InlineCode";
 import { Link } from "@inngest/components/Link/NewLink";

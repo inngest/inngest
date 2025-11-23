@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Input } from "@inngest/components/Forms/Input";
 import { Link } from "@inngest/components/Link/NewLink";
@@ -19,15 +19,15 @@ import { pathCreator } from "@/utils/urls";
 import { OnboardingSteps } from "../Onboarding/types";
 import { SyncFailure } from "../SyncFailure";
 import CommonVercelErrors from "./CommonVercelErrors";
+
 import {
-  getVercelSyncs,
-  syncAppManually,
   type VercelSyncsResponse,
-} from "./actions";
-import { type VercelApp } from "./data";
+  type VercelApp,
+} from "@/queries/server-only/vercel";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
 import { getNextStepName } from "./utils";
+import { getVercelSyncs, syncAppManually } from "@/queries/server-only/vercel";
 
 export default function SyncApp() {
   const currentStepName = OnboardingSteps.SyncApp;
@@ -105,7 +105,11 @@ export default function SyncApp() {
     setError(null);
     setApp("");
     try {
-      const { success, error, appName } = await syncAppManually(inputValue);
+      const { success, error, appName } = await syncAppManually({
+        data: {
+          appURL: inputValue,
+        },
+      });
       if (success) {
         setApp(appName);
         updateCompletedSteps(currentStepName, {
@@ -115,7 +119,7 @@ export default function SyncApp() {
           },
         });
       } else {
-        setError(error);
+        setError(error as CodedError);
       }
     } catch (err) {
       setError({ message: "An unexpected error occurred", code: "", data: "" });

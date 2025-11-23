@@ -1,6 +1,6 @@
-import { Button } from "@inngest/components/Button";
+import { Button } from "@inngest/components/Button/NewButton";
 import { CodeLine } from "@inngest/components/CodeLine";
-import { Link } from "@inngest/components/Link";
+import { Link } from "@inngest/components/Link/NewLink";
 import TabCards from "@inngest/components/TabCards/TabCards";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiCodeLine, RiInputCursorMove } from "@remixicon/react";

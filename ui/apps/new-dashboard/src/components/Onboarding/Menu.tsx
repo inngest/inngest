@@ -1,4 +1,4 @@
-import StepsMenu from "@inngest/components/Steps/StepsMenu";
+import StepsMenu from "@inngest/components/Steps/NewStepsMenu";
 import {
   RiDiscordLine,
   RiExternalLinkLine,

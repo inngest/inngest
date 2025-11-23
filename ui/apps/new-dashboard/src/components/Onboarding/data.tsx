@@ -1,7 +1,5 @@
 import { graphql } from "@/gql";
 import {
-  type App,
-  type Deploy,
   type GetVercelAppsQuery,
   type InvokeFunctionMutation,
   type InvokeFunctionMutationVariables,
@@ -193,20 +191,3 @@ export const getVercelApps = async () => {
     },
   );
 };
-
-export type VercelApp = Pick<App, "id" | "name" | "externalID"> & {
-  latestSync: Pick<
-    Deploy,
-    | "id"
-    | "error"
-    | "platform"
-    | "vercelDeploymentID"
-    | "vercelProjectID"
-    | "status"
-  > | null;
-};
-
-export type UnattachedSync = Pick<
-  Deploy,
-  "lastSyncedAt" | "error" | "url" | "vercelDeploymentURL"
->;

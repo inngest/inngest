@@ -1,13 +1,10 @@
-import { lazy, Suspense } from "react";
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 
 import PageHeader from "@/components/Onboarding/PageHeader";
 import { isValidStep } from "@/components/Onboarding/types";
 import { pathCreator } from "@/utils/urls";
 
-//
-// Lazy load Menu to prevent hydration errors. It requires window info
-const Menu = lazy(() => import("@/components/Onboarding/Menu"));
+import Menu from "@/components/Onboarding/Menu";
 
 export const Route = createFileRoute(
   "/_authed/_org-active/env/$envSlug/onboarding/$step",
@@ -30,9 +27,7 @@ function OnboardingStepLayout() {
         <PageHeader stepName={step} />
         <Outlet />
       </main>
-      <Suspense fallback={<div />}>
-        <Menu envSlug={envSlug} stepName={step} />
-      </Suspense>
+      <Menu envSlug={envSlug} stepName={step} />
     </div>
   );
 }

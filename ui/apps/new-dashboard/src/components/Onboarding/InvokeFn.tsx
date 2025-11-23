@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 
-import { Alert } from "@inngest/components/Alert/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
-import { CodeBlock } from "@inngest/components/CodeBlock/CodeBlock";
+import { CodeBlock } from "@inngest/components/CodeBlock/NewCodeBlock";
 import { parseCode } from "@inngest/components/InvokeButton/utils";
 import { Link } from "@inngest/components/Link/NewLink";
-import { Select, type Option } from "@inngest/components/Select/Select";
+import { Select, type Option } from "@inngest/components/Select/NewSelect";
 import { RiCheckboxCircleFill } from "@remixicon/react";
 import { toast } from "sonner";
 
 import { FunctionTriggerTypes } from "@/gql/graphql";
 import { pathCreator } from "@/utils/urls";
 import { OnboardingSteps } from "../Onboarding/types";
-import { invokeFunction, prefetchFunctions } from "./actions";
+import {
+  invokeFunction,
+  prefetchFunctions,
+} from "@/queries/server-only/functions";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
 import { useNavigate, ClientOnly } from "@tanstack/react-router";
@@ -86,9 +89,11 @@ export default function InvokeFn() {
     }
     try {
       const { success, error } = await invokeFunction({
-        functionSlug: selectedFunction.slug,
-        user: payload.user,
-        data: payload.data,
+        data: {
+          functionSlug: selectedFunction.slug,
+          user: payload.user,
+          data: payload.data,
+        },
       });
       if (success) {
         updateCompletedSteps(currentStepName, {
