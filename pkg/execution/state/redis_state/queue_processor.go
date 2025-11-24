@@ -1369,7 +1369,7 @@ func (q *queue) process(
 
 			currentLeaseID := *capacityLeaseID
 
-			res, err := q.capacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+			res, err := q.capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
 				LeaseID:        currentLeaseID,
