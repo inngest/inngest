@@ -6,8 +6,8 @@ import { formatDayString } from '@inngest/components/utils/date';
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
-import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
+// import { LimitBar, type Data } from '@/components/Billing/LimitBar';
+import { isHobbyFreePlan /*isHobbyPlan*/ } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -40,7 +40,7 @@ export default async function Page() {
     await getEntitlementUsage();
     await getBillingDetails();
   };
-
+  /*
   const isCurrentHobbyPlan = isHobbyPlan(currentPlan);
 
   const legacyNoRunsPlan = entitlements.runCount.limit === null;
@@ -82,7 +82,7 @@ export default async function Page() {
     limit: entitlements.executions.limit || null,
     overageAllowed: entitlements.executions.overageAllowed,
     tooltipContent: 'Combined total of runs and steps executed.',
-  };
+  };*/
 
   const nextInvoiceDate = currentSubscription?.nextInvoiceDate
     ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
@@ -153,9 +153,9 @@ export default async function Page() {
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
+          {/* {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
           {!isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
-          {isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />}
+          {isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />} */}
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}
