@@ -4748,5 +4748,6 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		pkgName,
 		runCtx.Metadata(),
 		md,
+		enums.MetadataScopeStepAttempt,
 	)
 }

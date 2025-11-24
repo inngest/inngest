@@ -13,6 +13,8 @@ import (
 
 type Opcode = enums.MetadataOpcode
 
+type Scope = enums.MetadataScope
+
 type Structured interface {
 	Kind() Kind
 	Serialize() (Values, error)
