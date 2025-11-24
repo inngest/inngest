@@ -16,7 +16,7 @@ function KeysComponent() {
 
   const shouldShowAlert =
     currentContent?.param === "keys" &&
-    env.type === EnvironmentType.BranchParent;
+    env?.type === EnvironmentType.BranchParent;
 
   return (
     <div className="flex h-full w-full flex-col">

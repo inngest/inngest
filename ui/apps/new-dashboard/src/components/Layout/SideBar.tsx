@@ -5,6 +5,9 @@ import type { Environment } from "@/utils/environments";
 import Logo from "../Navigation/Logo";
 import Navigation from "../Navigation/Navigation";
 import { Profile } from "../Navigation/Profile";
+import { Integrations } from "../Navigation/Integrations";
+import { Help } from "../Navigation/Help";
+import useOnboardingWidget from "../Onboarding/useOnboardingWidget";
 // import useOnboardingWidget from "../Onboarding/useOnboardingWidget";
 
 // Disable SSR in Onboarding Widget, to prevent hydration errors. It requires windows info
@@ -27,7 +30,7 @@ export default function SideBar({
   const navRef = useRef<HTMLDivElement>(null);
 
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
-  // const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
+  const { showWidget } = useOnboardingWidget();
 
   const autoCollapse = () =>
     typeof window !== "undefined" &&
@@ -70,8 +73,8 @@ export default function SideBar({
           {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
           )} */}
-          {/* <Integrations collapsed={collapsed} />
-          <Help collapsed={collapsed} showWidget={showWidget} /> */}
+          <Integrations collapsed={collapsed} />
+          <Help collapsed={collapsed} showWidget={showWidget} />
         </div>
         {profile && <Profile collapsed={collapsed} profile={profile} />}
       </div>

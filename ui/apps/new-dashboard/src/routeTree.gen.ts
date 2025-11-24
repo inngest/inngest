@@ -14,7 +14,17 @@ import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as SignUpSplatRouteImport } from "./routes/sign-up.$";
 import { Route as SignInSplatRouteImport } from "./routes/sign-in.$";
+import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settings/route";
+import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
+import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
+import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from "./routes/_authed/env/$envSlug/route";
+import { Route as AuthedSettingsUserIndexRouteImport } from "./routes/_authed/settings/user/index";
+import { Route as AuthedSettingsOrganizationIndexRouteImport } from "./routes/_authed/settings/organization/index";
+import { Route as AuthedSettingsIntegrationsIndexRouteImport } from "./routes/_authed/settings/integrations/index";
+import { Route as AuthedBillingUsageIndexRouteImport } from "./routes/_authed/billing/usage/index";
+import { Route as AuthedBillingPlansIndexRouteImport } from "./routes/_authed/billing/plans/index";
+import { Route as AuthedBillingPaymentsIndexRouteImport } from "./routes/_authed/billing/payments/index";
 import { Route as AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport } from "./routes/_authed/env/$envSlug/unattached-syncs/route";
 import { Route as AuthedEnvEnvSlugOnboardingRouteRouteImport } from "./routes/_authed/env/$envSlug/onboarding/route";
 import { Route as AuthedEnvEnvSlugManageRouteRouteImport } from "./routes/_authed/env/$envSlug/manage/route";
@@ -76,11 +86,65 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: "/sign-in/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
+  id: "/settings",
+  path: "/settings",
+  getParentRoute: () => AuthedRoute,
+} as any);
+const AuthedBillingRouteRoute = AuthedBillingRouteRouteImport.update({
+  id: "/billing",
+  path: "/billing",
+  getParentRoute: () => AuthedRoute,
+} as any);
+const AuthedCreateEnvironmentIndexRoute =
+  AuthedCreateEnvironmentIndexRouteImport.update({
+    id: "/create-environment/",
+    path: "/create-environment/",
+    getParentRoute: () => AuthedRoute,
+  } as any);
+const AuthedBillingIndexRoute = AuthedBillingIndexRouteImport.update({
+  id: "/",
+  path: "/",
+  getParentRoute: () => AuthedBillingRouteRoute,
+} as any);
 const AuthedEnvEnvSlugRouteRoute = AuthedEnvEnvSlugRouteRouteImport.update({
   id: "/env/$envSlug",
   path: "/env/$envSlug",
   getParentRoute: () => AuthedRoute,
 } as any);
+const AuthedSettingsUserIndexRoute = AuthedSettingsUserIndexRouteImport.update({
+  id: "/user/",
+  path: "/user/",
+  getParentRoute: () => AuthedSettingsRouteRoute,
+} as any);
+const AuthedSettingsOrganizationIndexRoute =
+  AuthedSettingsOrganizationIndexRouteImport.update({
+    id: "/organization/",
+    path: "/organization/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsIndexRoute =
+  AuthedSettingsIntegrationsIndexRouteImport.update({
+    id: "/integrations/",
+    path: "/integrations/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedBillingUsageIndexRoute = AuthedBillingUsageIndexRouteImport.update({
+  id: "/usage/",
+  path: "/usage/",
+  getParentRoute: () => AuthedBillingRouteRoute,
+} as any);
+const AuthedBillingPlansIndexRoute = AuthedBillingPlansIndexRouteImport.update({
+  id: "/plans/",
+  path: "/plans/",
+  getParentRoute: () => AuthedBillingRouteRoute,
+} as any);
+const AuthedBillingPaymentsIndexRoute =
+  AuthedBillingPaymentsIndexRouteImport.update({
+    id: "/payments/",
+    path: "/payments/",
+    getParentRoute: () => AuthedBillingRouteRoute,
+  } as any);
 const AuthedEnvEnvSlugUnattachedSyncsRouteRoute =
   AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport.update({
     id: "/unattached-syncs",
@@ -301,13 +365,23 @@ const AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute =
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/sign-out": typeof SignOutRoute;
+  "/billing": typeof AuthedBillingRouteRouteWithChildren;
+  "/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/sign-in/$": typeof SignInSplatRoute;
   "/sign-up/$": typeof SignUpSplatRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/billing/": typeof AuthedBillingIndexRoute;
+  "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   "/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
+  "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
+  "/billing/plans": typeof AuthedBillingPlansIndexRoute;
+  "/billing/usage": typeof AuthedBillingUsageIndexRoute;
+  "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
+  "/settings/organization": typeof AuthedSettingsOrganizationIndexRoute;
+  "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   "/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
   "/env/$envSlug/event-types/$eventTypeName": typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren;
@@ -344,11 +418,20 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/sign-out": typeof SignOutRoute;
+  "/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/sign-in/$": typeof SignInSplatRoute;
   "/sign-up/$": typeof SignUpSplatRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/billing": typeof AuthedBillingIndexRoute;
+  "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
+  "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
+  "/billing/plans": typeof AuthedBillingPlansIndexRoute;
+  "/billing/usage": typeof AuthedBillingUsageIndexRoute;
+  "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
+  "/settings/organization": typeof AuthedSettingsOrganizationIndexRoute;
+  "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsIndexRoute;
   "/env/$envSlug/debugger": typeof AuthedEnvEnvSlugDebuggerIndexRoute;
   "/env/$envSlug/event-types": typeof AuthedEnvEnvSlugEventTypesIndexRoute;
@@ -381,13 +464,23 @@ export interface FileRoutesById {
   "/": typeof IndexRoute;
   "/_authed": typeof AuthedRouteWithChildren;
   "/sign-out": typeof SignOutRoute;
+  "/_authed/billing": typeof AuthedBillingRouteRouteWithChildren;
+  "/_authed/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/sign-in/$": typeof SignInSplatRoute;
   "/sign-up/$": typeof SignUpSplatRoute;
   "/_authed/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/_authed/billing/": typeof AuthedBillingIndexRoute;
+  "/_authed/create-environment/": typeof AuthedCreateEnvironmentIndexRoute;
   "/_authed/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/_authed/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/_authed/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   "/_authed/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
+  "/_authed/billing/payments/": typeof AuthedBillingPaymentsIndexRoute;
+  "/_authed/billing/plans/": typeof AuthedBillingPlansIndexRoute;
+  "/_authed/billing/usage/": typeof AuthedBillingUsageIndexRoute;
+  "/_authed/settings/integrations/": typeof AuthedSettingsIntegrationsIndexRoute;
+  "/_authed/settings/organization/": typeof AuthedSettingsOrganizationIndexRoute;
+  "/_authed/settings/user/": typeof AuthedSettingsUserIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   "/_authed/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
   "/_authed/env/$envSlug/event-types/$eventTypeName": typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren;
@@ -426,13 +519,23 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/sign-out"
+    | "/billing"
+    | "/settings"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/env/$envSlug"
+    | "/billing/"
+    | "/create-environment"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
     | "/env/$envSlug/unattached-syncs"
+    | "/billing/payments"
+    | "/billing/plans"
+    | "/billing/usage"
+    | "/settings/integrations"
+    | "/settings/organization"
+    | "/settings/user"
     | "/env/$envSlug/apps/$externalID"
     | "/env/$envSlug/apps/sync-new"
     | "/env/$envSlug/event-types/$eventTypeName"
@@ -469,11 +572,20 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/sign-out"
+    | "/settings"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/env/$envSlug"
+    | "/billing"
+    | "/create-environment"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
+    | "/billing/payments"
+    | "/billing/plans"
+    | "/billing/usage"
+    | "/settings/integrations"
+    | "/settings/organization"
+    | "/settings/user"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/debugger"
     | "/env/$envSlug/event-types"
@@ -505,13 +617,23 @@ export interface FileRouteTypes {
     | "/"
     | "/_authed"
     | "/sign-out"
+    | "/_authed/billing"
+    | "/_authed/settings"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/_authed/env/$envSlug"
+    | "/_authed/billing/"
+    | "/_authed/create-environment/"
     | "/_authed/env/$envSlug/apps"
     | "/_authed/env/$envSlug/manage"
     | "/_authed/env/$envSlug/onboarding"
     | "/_authed/env/$envSlug/unattached-syncs"
+    | "/_authed/billing/payments/"
+    | "/_authed/billing/plans/"
+    | "/_authed/billing/usage/"
+    | "/_authed/settings/integrations/"
+    | "/_authed/settings/organization/"
+    | "/_authed/settings/user/"
     | "/_authed/env/$envSlug/apps/$externalID"
     | "/_authed/env/$envSlug/apps/sync-new"
     | "/_authed/env/$envSlug/event-types/$eventTypeName"
@@ -591,12 +713,82 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignInSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/_authed/settings": {
+      id: "/_authed/settings";
+      path: "/settings";
+      fullPath: "/settings";
+      preLoaderRoute: typeof AuthedSettingsRouteRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
+    "/_authed/billing": {
+      id: "/_authed/billing";
+      path: "/billing";
+      fullPath: "/billing";
+      preLoaderRoute: typeof AuthedBillingRouteRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
+    "/_authed/create-environment/": {
+      id: "/_authed/create-environment/";
+      path: "/create-environment";
+      fullPath: "/create-environment";
+      preLoaderRoute: typeof AuthedCreateEnvironmentIndexRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
+    "/_authed/billing/": {
+      id: "/_authed/billing/";
+      path: "/";
+      fullPath: "/billing/";
+      preLoaderRoute: typeof AuthedBillingIndexRouteImport;
+      parentRoute: typeof AuthedBillingRouteRoute;
+    };
     "/_authed/env/$envSlug": {
       id: "/_authed/env/$envSlug";
       path: "/env/$envSlug";
       fullPath: "/env/$envSlug";
       preLoaderRoute: typeof AuthedEnvEnvSlugRouteRouteImport;
       parentRoute: typeof AuthedRoute;
+    };
+    "/_authed/settings/user/": {
+      id: "/_authed/settings/user/";
+      path: "/user";
+      fullPath: "/settings/user";
+      preLoaderRoute: typeof AuthedSettingsUserIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/organization/": {
+      id: "/_authed/settings/organization/";
+      path: "/organization";
+      fullPath: "/settings/organization";
+      preLoaderRoute: typeof AuthedSettingsOrganizationIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/": {
+      id: "/_authed/settings/integrations/";
+      path: "/integrations";
+      fullPath: "/settings/integrations";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/billing/usage/": {
+      id: "/_authed/billing/usage/";
+      path: "/usage";
+      fullPath: "/billing/usage";
+      preLoaderRoute: typeof AuthedBillingUsageIndexRouteImport;
+      parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    "/_authed/billing/plans/": {
+      id: "/_authed/billing/plans/";
+      path: "/plans";
+      fullPath: "/billing/plans";
+      preLoaderRoute: typeof AuthedBillingPlansIndexRouteImport;
+      parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    "/_authed/billing/payments/": {
+      id: "/_authed/billing/payments/";
+      path: "/payments";
+      fullPath: "/billing/payments";
+      preLoaderRoute: typeof AuthedBillingPaymentsIndexRouteImport;
+      parentRoute: typeof AuthedBillingRouteRoute;
     };
     "/_authed/env/$envSlug/unattached-syncs": {
       id: "/_authed/env/$envSlug/unattached-syncs";
@@ -853,6 +1045,38 @@ declare module "@tanstack/react-router" {
   }
 }
 
+interface AuthedBillingRouteRouteChildren {
+  AuthedBillingIndexRoute: typeof AuthedBillingIndexRoute;
+  AuthedBillingPaymentsIndexRoute: typeof AuthedBillingPaymentsIndexRoute;
+  AuthedBillingPlansIndexRoute: typeof AuthedBillingPlansIndexRoute;
+  AuthedBillingUsageIndexRoute: typeof AuthedBillingUsageIndexRoute;
+}
+
+const AuthedBillingRouteRouteChildren: AuthedBillingRouteRouteChildren = {
+  AuthedBillingIndexRoute: AuthedBillingIndexRoute,
+  AuthedBillingPaymentsIndexRoute: AuthedBillingPaymentsIndexRoute,
+  AuthedBillingPlansIndexRoute: AuthedBillingPlansIndexRoute,
+  AuthedBillingUsageIndexRoute: AuthedBillingUsageIndexRoute,
+};
+
+const AuthedBillingRouteRouteWithChildren =
+  AuthedBillingRouteRoute._addFileChildren(AuthedBillingRouteRouteChildren);
+
+interface AuthedSettingsRouteRouteChildren {
+  AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute;
+  AuthedSettingsOrganizationIndexRoute: typeof AuthedSettingsOrganizationIndexRoute;
+  AuthedSettingsUserIndexRoute: typeof AuthedSettingsUserIndexRoute;
+}
+
+const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
+  AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
+  AuthedSettingsOrganizationIndexRoute: AuthedSettingsOrganizationIndexRoute,
+  AuthedSettingsUserIndexRoute: AuthedSettingsUserIndexRoute,
+};
+
+const AuthedSettingsRouteRouteWithChildren =
+  AuthedSettingsRouteRoute._addFileChildren(AuthedSettingsRouteRouteChildren);
+
 interface AuthedEnvEnvSlugAppsExternalIDRouteRouteChildren {
   AuthedEnvEnvSlugAppsExternalIDIndexRoute: typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute: typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
@@ -1083,11 +1307,17 @@ const AuthedEnvEnvSlugRouteRouteWithChildren =
   );
 
 interface AuthedRouteChildren {
+  AuthedBillingRouteRoute: typeof AuthedBillingRouteRouteWithChildren;
+  AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren;
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute;
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedBillingRouteRoute: AuthedBillingRouteRouteWithChildren,
+  AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
+  AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
 };
 
 const AuthedRouteWithChildren =

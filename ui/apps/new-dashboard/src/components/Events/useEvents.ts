@@ -80,7 +80,7 @@ export function useEvents() {
       includeInternalEvents,
     }: EventsQueryVariables) => {
       // TODO: use params when available in the API
-      console.log(source);
+
       const result = await client
         .query(
           eventsQuery,

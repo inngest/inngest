@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authed")({
       ? await getEnvironment({ data: { environmentSlug: params.envSlug } })
       : undefined;
 
-    if (!env) {
+    if (params.envSlug && !env) {
       throw notFound({ data: { error: "Environment not found" } });
     }
 

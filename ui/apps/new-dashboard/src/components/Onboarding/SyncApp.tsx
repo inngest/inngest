@@ -92,8 +92,6 @@ export default function SyncApp() {
     };
   }, []);
 
-  console.log("vercel", vercelSyncs);
-
   const hasSuccessfulSync = vercelSyncs?.apps.some(
     (app) =>
       app.latestSync?.status === "success" ||

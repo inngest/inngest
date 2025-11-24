@@ -4,7 +4,7 @@ import ky from "ky";
 export { HTTPError } from "ky";
 
 const restAPI = ky.create({
-  prefixUrl: `${process.env.NEXT_PUBLIC_API_URL}/v1`,
+  prefixUrl: `${import.meta.env.VITE_API_URL}/v1`,
   hooks: {
     beforeRequest: [
       async (request) => {

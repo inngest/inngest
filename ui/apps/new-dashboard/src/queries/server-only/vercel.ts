@@ -70,3 +70,7 @@ export const syncAppManually = createServerFn({ method: "POST" })
       }
     },
   );
+
+type CreateVercelIntegrationParams = {
+  vercelAuthorizationCode: string;
+};

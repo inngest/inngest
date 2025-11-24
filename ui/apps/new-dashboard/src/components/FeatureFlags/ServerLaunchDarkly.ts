@@ -4,6 +4,7 @@ let launchDarklyClient: LDClient;
 
 function initialize() {
   const launchDarklySDKKey = process.env.LAUNCH_DARKLY_SDK_KEY;
+
   if (!launchDarklySDKKey) {
     throw new Error("LAUNCH_DARKLY_SDK_KEY environment variable is not set.");
   }

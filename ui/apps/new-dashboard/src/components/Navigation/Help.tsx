@@ -1,5 +1,5 @@
 import { Listbox } from "@headlessui/react";
-import { MenuItem } from "@inngest/components/Menu/MenuItem";
+import { MenuItem } from "@inngest/components/Menu/NewMenuItem";
 import {
   RiArticleLine,
   RiBookReadLine,

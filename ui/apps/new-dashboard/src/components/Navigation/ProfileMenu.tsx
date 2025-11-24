@@ -38,7 +38,6 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
           <Link to="/settings/user" resetScroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -50,7 +49,6 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </div>
             </Listbox.Option>
           </Link>
-          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
           <Link to="/settings/organization" resetScroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -62,8 +60,12 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </div>
             </Listbox.Option>
           </Link>
-          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
-          <Link to="/settings/organization/organization-members" scroll={false}>
+
+          <Link
+            //@ts-expect-error - TANSTACK TODO: fix when routes land
+            to="/settings/organization/organization-members"
+            resetScroll={false}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
