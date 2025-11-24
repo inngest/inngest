@@ -537,6 +537,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 
 		var fragmentAttr struct {
+			Scope  *metadata.Scope  `json:"_inngest.metadata.scope"`
 			Kind   *metadata.Kind   `json:"_inngest.metadata.kind"`
 			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
 			Values *string          `json:"_inngest.metadata"`
@@ -547,6 +548,9 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 
 		switch {
+		case fragmentAttr.Scope == nil:
+			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
+			continue // TODO: err
 		case fragmentAttr.Kind == nil:
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span kind")
 			continue // TODO: err
@@ -564,6 +568,16 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			logger.StdlibLogger(ctx).Warn(
 				"mismatch in metadata kind during rollup, skipping",
 				"kinds", []metadata.Kind{ret.Kind, *fragmentAttr.Kind},
+			)
+			continue
+		}
+
+		if ret.Scope == enums.MetadataScopeUnknown && *fragmentAttr.Scope != enums.MetadataScopeUnknown {
+			ret.Scope = *fragmentAttr.Scope
+		} else if ret.Scope != *fragmentAttr.Scope {
+			logger.StdlibLogger(ctx).Warn(
+				"mismatch in metadata scope during rollup, skipping",
+				"scopes", []metadata.Scope{ret.Scope, *fragmentAttr.Scope},
 			)
 			continue
 		}

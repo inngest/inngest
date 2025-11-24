@@ -341,6 +341,7 @@ type SpanLink struct {
 }
 
 type SpanMetadata struct {
+	Scope  metadata.Scope  `json:"scope"`
 	Kind   metadata.Kind   `json:"kind"`
 	Values metadata.Values `json:"values"`
 }

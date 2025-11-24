@@ -13,6 +13,8 @@ import (
 
 type Opcode = enums.MetadataOpcode
 
+type Scope = enums.MetadataScope
+
 type Structured interface {
 	Kind() Kind
 	Serialize() (Values, error)
@@ -96,6 +98,11 @@ type RawUpdate struct {
 	Kind   Kind   `json:"kind"`
 	Op     Opcode `json:"op"`
 	Values Values `json:"values"`
+}
+
+type ScopedUpdate struct {
+	Scope Scope `json:"scope"`
+	Update
 }
 
 type Update struct {

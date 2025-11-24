@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -109,7 +110,7 @@ type AddRunMetadataRequest struct {
 }
 
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
-	parentSpan, err := a.getParentSpan(ctx, auth, runID, &req.Target)
+	parentSpan, scope, err := a.getParentSpan(ctx, auth, runID, &req.Target)
 	if err != nil {
 		return err
 	}
@@ -144,6 +145,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			pkgName,
 			nil,
 			md,
+			scope,
 			addTenantIDs,
 		)
 		if err != nil {
@@ -154,12 +156,14 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	return nil
 }
 
-func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, error) {
+func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {
+	var scope metadata.Scope
 	var span *cqrs.OtelSpan
 	var err error
 
 	switch {
 	case target.StepID == nil:
+		scope = enums.MetadataScopeRun
 		span, err = a.opts.TraceReader.GetRunSpanByRunID(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	case target.StepAttempt == nil || target.SpanID == nil:
 		var stepID string
@@ -173,21 +177,26 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 		}
 
 		if target.StepAttempt == nil {
+			scope = enums.MetadataScopeStep
 			span, err = a.opts.TraceReader.GetStepSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
 		} else if *target.StepAttempt < 0 {
+			scope = enums.MetadataScopeStepAttempt
 			span, err = a.opts.TraceReader.GetLatestExecutionSpanByStepID(ctx, runID, stepID, auth.AccountID(), auth.WorkspaceID())
 		} else {
+			scope = enums.MetadataScopeStepAttempt
 			span, err = a.opts.TraceReader.GetExecutionSpanByStepIDAndAttempt(ctx, runID, stepID, *target.StepAttempt, auth.AccountID(), auth.WorkspaceID())
 		}
 	default:
+		scope = enums.MetadataScopeExtendedTrace
+		// TODO: require that this is a extended trace span
 		span, err = a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *target.SpanID, auth.AccountID(), auth.WorkspaceID())
 	}
 
 	switch {
 	// TODO: specific err cases
 	case err != nil:
-		return nil, publicerr.Wrap(err, 404, "Unable to find metadata target")
+		return nil, 0, publicerr.Wrap(err, 404, "Unable to find metadata target")
 	}
 
-	return span, nil
+	return span, scope, nil
 }
