@@ -36,9 +36,6 @@ func WithConstraints[T any](
 		// performChecks determines whether constraint checks must be performed
 		// This may be false when the Constraint API was used to enforce constraints.
 		performChecks bool,
-		// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
-		// failed (and we don't know if it succeeded on the API)
-		fallbackIdempotencyKey string,
 	) (T, error),
 ) (T, error) {
 	l := logger.StdlibLogger(ctx)
@@ -51,7 +48,7 @@ func WithConstraints[T any](
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// Read feature flag
@@ -59,19 +56,19 @@ func WithConstraints[T any](
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
 		l.Error("failed to get schedule constraints", "err", err)
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// If no rate limits are configured, simply run the function
 	if len(constraints) == 0 {
 		// TODO: Should we skip constraint checks in this case?
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// Perform constraint check to acquire lease
@@ -86,12 +83,12 @@ func WithConstraints[T any](
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
-		return fn(ctx, true, checkResult.fallbackIdempotencyKey)
+		return fn(ctx, true)
 	}
 
 	// If the current action is not allowed, return
@@ -112,7 +109,7 @@ func WithConstraints[T any](
 		l.Warn("acquire request did not return lease ID")
 
 		// Pretend the API request failed
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	leaseID := checkResult.leaseID
@@ -204,7 +201,7 @@ func WithConstraints[T any](
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
-	return fn(userCtx, false, "")
+	return fn(userCtx, false)
 }
 
 type checkResult struct {
@@ -216,9 +213,6 @@ type checkResult struct {
 
 	// mustCheck instructs the caller to perform constraint checks (rate limit)
 	mustCheck bool
-
-	// fallbackIdempotencyKey is the idempotency key that MUST be provided to further constraint checks in case of fallbacks
-	fallbackIdempotencyKey string
 }
 
 func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintItem, error) {
@@ -311,8 +305,7 @@ func CheckConstraints(
 
 		if fallback {
 			return checkResult{
-				mustCheck:              true,
-				fallbackIdempotencyKey: idempotencyKey,
+				mustCheck: true,
 			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
@@ -332,8 +325,7 @@ func CheckConstraints(
 	return checkResult{
 		allowed: true,
 
-		leaseID:                &lease.LeaseID,
-		fallbackIdempotencyKey: lease.IdempotencyKey,
+		leaseID: &lease.LeaseID,
 
 		// We already checked constraints
 		mustCheck: false,
