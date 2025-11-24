@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -63,18 +64,19 @@ func TestHTTPMetadataExtractor_HTTPSpan(t *testing.T) {
 	}
 
 	extractor := NewHTTPMetadataExtractor()
-	metadata, err := extractor.ExtractMetadata(context.Background(), span)
+	md, err := extractor.ExtractMetadata(context.Background(), span)
 
 	require.NoError(t, err)
 
-	require.NotNil(t, metadata, "Expected metadata for HTTP span")
-	require.Len(t, metadata, 1, "Expected exactly one metadata item")
+	require.NotNil(t, md, "Expected metadata for HTTP span")
+	require.Len(t, md, 1, "Expected exactly one metadata item")
 
-	assert.Equal(t, meta.MetadataKind("inngest.http"), metadata[0].Kind())
-	assert.Equal(t, meta.MetadataOpMerge, metadata[0].Op())
+	assert.Equal(t, metadata.Kind("inngest.http"), md[0].Kind())
+
+	assert.Equal(t, enums.MetadataOpcodeMerge, md[0].Op())
 
 	// Verify the extracted data content
-	raw, err := metadata[0].Serialize()
+	raw, err := md[0].Serialize()
 	require.NoError(t, err)
 
 	var data map[string]any
