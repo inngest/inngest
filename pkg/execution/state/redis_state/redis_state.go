@@ -1293,48 +1293,6 @@ func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signa
 	return p, nil
 }
 
-func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByID"), redis_telemetry.ScopePauses)
-
-	pause := m.u.Pauses()
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	keys := make([]string, len(ids))
-	for n, id := range ids {
-		keys[n] = pause.kg.Pause(ctx, id)
-	}
-
-	cmd := pause.Client().B().Mget().Key(keys...).Build()
-	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var merr error
-
-	pauses := []*state.Pause{}
-	for _, item := range strings {
-		if len(item) == 0 {
-			continue
-		}
-
-		pause := &state.Pause{}
-		err = json.Unmarshal([]byte(item), pause)
-		if err != nil {
-			merr = errors.Join(merr, err)
-			continue
-		}
-		pauses = append(pauses, pause)
-	}
-
-	return pauses, merr
-}
-
 func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
 	pauses := m.u.Pauses()
