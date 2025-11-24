@@ -678,9 +678,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.useConstraintAPI,
 		req,
 		key,
-		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				return e.schedule(ctx, req, runID, key, performChecks, fallbackIdempotencyKey)
+				return e.schedule(ctx, req, runID, key, performChecks)
 			}, util.WithBoundaries(2*time.Second))
 		})
 }
@@ -699,9 +699,6 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
-	// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
-	// failed (and we don't know if it succeeded on the API)
-	fallbackIdempotencyKey string,
 ) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
@@ -717,9 +714,6 @@ func (e *executor) schedule(
 	)
 
 	if performChecks {
-		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
-		_ = fallbackIdempotencyKey
-
 		// Attempt to rate-limit the incoming function.
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
