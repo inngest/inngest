@@ -227,15 +227,14 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 	// The only constraint we care about in run scheduling is rate limiting.
 	// Throttle + concurrency constraints are checked in the queue.
 	if req.Function.RateLimit != nil {
+		rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
+		if err != nil {
+			return nil, fmt.Errorf("could not get rate limit key: %w", err)
+		}
+
 		var rateLimitKeyExpr string
-		var rateLimitKey string
 		if req.Function.RateLimit.Key != nil {
 			rateLimitKeyExpr = *req.Function.RateLimit.Key
-			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
-			if err != nil {
-				return nil, fmt.Errorf("could not get rate limit key: %w", err)
-			}
-			rateLimitKey = key
 		}
 
 		requests = append(requests, constraintapi.ConstraintItem{
