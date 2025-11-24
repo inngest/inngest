@@ -3,7 +3,8 @@ package extractors
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -15,16 +16,16 @@ type AIMetadata struct {
 	OperationName string `json:"operation_name"`
 }
 
-func (ms AIMetadata) Kind() meta.MetadataKind {
+func (ms AIMetadata) Kind() metadata.Kind {
 	return "inngest.ai"
 }
 
-func (ms AIMetadata) Op() meta.MetadataOp {
-	return meta.MetadataOpMerge
+func (ms AIMetadata) Op() metadata.Opcode {
+	return enums.MetadataOpcodeMerge
 }
 
-func (ms AIMetadata) Serialize() (meta.RawMetadata, error) {
-	var rawMetadata meta.RawMetadata
+func (ms AIMetadata) Serialize() (metadata.Values, error) {
+	var rawMetadata metadata.Values
 	err := rawMetadata.FromStruct(ms)
 	if err != nil {
 		return nil, err
@@ -39,13 +40,13 @@ func NewAIMetadataExtractor() *AIMetadataExtractor {
 	return &AIMetadataExtractor{}
 }
 
-func (e *AIMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]meta.StructuredMetadata, error) {
+func (e *AIMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
 	if !e.isLikelyAISpan(span) {
 		return nil, nil // TODO: should this be an explicit "nah, didn't find any" return?
 	}
 
 	aiMetadata := e.extractAIMetadata(span)
-	return []meta.StructuredMetadata{aiMetadata}, nil
+	return []metadata.Structured{aiMetadata}, nil
 }
 
 var aiAttributeKeys = map[string]bool{
@@ -66,22 +67,22 @@ func (e *AIMetadataExtractor) isLikelyAISpan(span *tracev1.Span) bool {
 }
 
 func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
-	var metadata AIMetadata
+	var md AIMetadata
 
 	for _, attr := range span.Attributes {
 		switch attr.Key {
 		case "gen_ai.usage.input_tokens":
-			metadata.InputTokens = attr.Value.GetIntValue()
+			md.InputTokens = attr.Value.GetIntValue()
 		case "gen_ai.usage.output_tokens":
-			metadata.OutputTokens = attr.Value.GetIntValue()
+			md.OutputTokens = attr.Value.GetIntValue()
 		case "gen_ai.request.model":
-			metadata.Model = attr.Value.GetStringValue()
+			md.Model = attr.Value.GetStringValue()
 		case "gen_ai.system":
-			metadata.System = attr.Value.GetStringValue()
+			md.System = attr.Value.GetStringValue()
 		case "gen_ai.operation.name":
-			metadata.OperationName = attr.Value.GetStringValue()
+			md.OperationName = attr.Value.GetStringValue()
 		}
 	}
 
-	return metadata
+	return md
 }

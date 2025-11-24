@@ -3,7 +3,8 @@ package extractors
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -19,16 +20,16 @@ type HTTPMetadata struct {
 	Path                *string `json:"path,omitempty"`
 }
 
-func (m HTTPMetadata) Kind() meta.MetadataKind {
+func (m HTTPMetadata) Kind() metadata.Kind {
 	return "inngest.http"
 }
 
-func (m HTTPMetadata) Op() meta.MetadataOp {
-	return meta.MetadataOpMerge
+func (m HTTPMetadata) Op() metadata.Opcode {
+	return enums.MetadataOpcodeMerge
 }
 
-func (m HTTPMetadata) Serialize() (meta.RawMetadata, error) {
-	var rawMetadata meta.RawMetadata
+func (m HTTPMetadata) Serialize() (metadata.Values, error) {
+	var rawMetadata metadata.Values
 	err := rawMetadata.FromStruct(m)
 	if err != nil {
 		return nil, err
@@ -43,13 +44,13 @@ func NewHTTPMetadataExtractor() *HTTPMetadataExtractor {
 	return &HTTPMetadataExtractor{}
 }
 
-func (e *HTTPMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]meta.StructuredMetadata, error) {
+func (e *HTTPMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
 	if !e.isLikelyHTTPSpan(span) {
 		return nil, nil
 	}
 
 	httpMetadata := e.extractHTTPMetadata(span)
-	return []meta.StructuredMetadata{httpMetadata}, nil
+	return []metadata.Structured{httpMetadata}, nil
 }
 
 var httpAttributeKeys = map[string]bool{

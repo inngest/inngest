@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -64,8 +63,8 @@ func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 	require.NotNil(t, metadata, "Expected metadata for OpenAI span")
 	require.Len(t, metadata, 1, "Expected exactly one metadata item")
 
-	assert.Equal(t, meta.MetadataKind("inngest.ai"), metadata[0].Kind())
-	assert.Equal(t, meta.MetadataOpMerge, metadata[0].Op())
+	assert.Equal(t, metadata.MetadataKind("inngest.ai"), metadata[0].Kind())
+	assert.Equal(t, metadata.MetadataOpMerge, metadata[0].Op())
 
 	// Verify the extracted data content
 	raw, err := metadata[0].Serialize()

@@ -195,3 +195,4 @@ func TestHTTPMetadataExtractor_PartialHTTPSpan(t *testing.T) {
 	assert.Equal(t, 0.0, data["request_size"], "Should have zero request size")
 	assert.Equal(t, 0.0, data["response_size"], "Should have zero response size")
 }
+
