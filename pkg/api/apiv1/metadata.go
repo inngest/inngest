@@ -115,7 +115,9 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	parentSpanRef := &meta.SpanReference{
-		TraceParent: fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
+		DynamicSpanID:          parentSpan.SpanID,
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 	}
 
 	addTenantIDs := func(attr *meta.SerializableAttrs) {
