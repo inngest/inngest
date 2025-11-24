@@ -654,7 +654,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
 					return enableStepMetadata
 				},
-				SpanExtractor: extractors.Default,
+				SpanExtractor: extractors.DefaultSpanExtractors,
 			},
 		})
 	})
