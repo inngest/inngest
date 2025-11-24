@@ -37,8 +37,8 @@ const NavToggle = ({ collapsed, setCollapsed }: LogoProps) => {
 };
 
 export default function Logo({ collapsed, setCollapsed }: LogoProps) {
-  const { data: info, isLoading } = useInfoQuery();
-  const isDevServer = isLoading ? false : !info?.isSingleNodeService;
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
 
   return (
     <div
@@ -60,11 +60,9 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
             <Link to="/">
               <InngestLogo className="text-basis mr-1.5" width={96} />
             </Link>
-            {isDevServer ? (
-              <span className="text-primary-intense text-[11px] font-medium leading-none">
-                DEV SERVER
-              </span>
-            ) : null}
+            <span className="text-primary-intense text-[11px] font-medium leading-none">
+              {isDevServer ? 'DEV SERVER' : 'SERVER'}
+            </span>
           </div>
         )}
       </div>
