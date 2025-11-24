@@ -44,7 +44,7 @@ func NewHTTPMetadataExtractor() *HTTPMetadataExtractor {
 	return &HTTPMetadataExtractor{}
 }
 
-func (e *HTTPMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
+func (e *HTTPMetadataExtractor) ExtractSpanMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
 	if !e.isLikelyHTTPSpan(span) {
 		return nil, nil
 	}

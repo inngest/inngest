@@ -40,7 +40,7 @@ func NewAIMetadataExtractor() *AIMetadataExtractor {
 	return &AIMetadataExtractor{}
 }
 
-func (e *AIMetadataExtractor) ExtractMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
+func (e *AIMetadataExtractor) ExtractSpanMetadata(ctx context.Context, span *tracev1.Span) ([]metadata.Structured, error) {
 	if !e.isLikelyAISpan(span) {
 		return nil, nil // TODO: should this be an explicit "nah, didn't find any" return?
 	}
