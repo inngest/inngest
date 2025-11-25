@@ -1,7 +1,6 @@
 package extractors
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
