@@ -12,6 +12,8 @@ export default async function createVercelIntegration({
 }: CreateVercelIntegrationParams): Promise<VercelIntegration> {
   const environment = await getProductionEnvironment();
 
+  console.log('this is a test');
+
   const url = new URL('/v1/integrations/vercel/projects', process.env.NEXT_PUBLIC_API_URL);
   url.searchParams.set('workspaceID', environment.id);
   url.searchParams.set('code', vercelAuthorizationCode);
