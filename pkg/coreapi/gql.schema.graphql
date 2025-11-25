@@ -10,6 +10,7 @@ scalar ULID
 scalar UUID
 scalar Bytes
 scalar Unknown
+scalar Int64
 
 "The pagination information in a connection."
 type PageInfo {
@@ -697,6 +698,7 @@ type ConnectV1WorkerConnection {
   gatewayId: ULID!
   instanceId: String!
   workerIp: String!
+  maxWorkerConcurrency: Int64!
 
   appName: String
   appID: UUID
