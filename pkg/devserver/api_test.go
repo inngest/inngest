@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -261,8 +266,10 @@ func newTestDevServer(t *testing.T) *devserver {
 	data := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
 
 	ds := &devserver{
-		Data: data,
-		log:  logger.StdlibLogger(t.Context()),
+		Data:        data,
+		log:         logger.StdlibLogger(t.Context()),
+		handlerLock: &sync.Mutex{},
+		handlers:    []SDKHandler{},
 	}
 
 	return ds
@@ -284,4 +291,57 @@ func getFunctionIDandVersion(t *testing.T, ds *devserver, URL string) map[string
 		functionVersions[fn.Name] = fn.FunctionVersion
 	}
 	return functionVersions
+}
+
+func TestDevEndpoint_ReturnsInfoInDevMode(t *testing.T) {
+	// Create devserver with dev mode (default)
+	ds := newTestDevServer(t)
+	ds.Opts = StartOpts{
+		Config: config.Config{
+			ServerKind: headers.ServerKindDev,
+		},
+	}
+
+	// Create API router with no-op auth middleware for testing
+	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/dev", nil)
+	w := httptest.NewRecorder()
+
+	// Call through the router
+	api.ServeHTTP(w, req)
+
+	// Should return 200 with info
+	require.Equal(t, http.StatusOK, w.Code)
+	
+	// Verify response is valid JSON
+	var info InfoResponse
+	err := json.Unmarshal(w.Body.Bytes(), &info)
+	require.NoError(t, err)
+}
+
+func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
+	// Create devserver with cloud mode (self-hosted)
+	ds := newTestDevServer(t)
+	ds.Opts = StartOpts{
+		Config: config.Config{
+			ServerKind: headers.ServerKindCloud,
+		},
+	}
+
+	// Create API router with no-op auth middleware for testing
+	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/dev", nil)
+	w := httptest.NewRecorder()
+
+	// Call through the router
+	api.ServeHTTP(w, req)
+
+	// Should return 404
+	require.Equal(t, http.StatusNotFound, w.Code)
 }
