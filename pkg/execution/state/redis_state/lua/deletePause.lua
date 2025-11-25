@@ -50,7 +50,7 @@ redis.call("ZREM", keyPauseExpIdx, pauseID)
 
 -- Add an index to block ID to be able to get pauses from block store by ID
 if blockIdxValue ~= "" then
-  redis.call("SET", keyPausesBlockIdx, blockIdxValue)
+  redis.call("SET", keyPausesBlockIdx, blockIdxValue, "KEEPTTL")
 else
   redis.call("DEL", keyPausesBlockIdx)
 end

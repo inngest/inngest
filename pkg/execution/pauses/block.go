@@ -48,6 +48,9 @@ const (
 	// even if some pauses were deleted in the meantime as we can’t rely on
 	// an unordered scan for flushing blocks.
 	DefaultFetchMargin = DefaultPausesPerBlock / 4
+
+	PauseBlockIndexTombstone         = "-"
+	PauseBlockIndexTombstoneDuration = 15 * time.Minute
 )
 
 // Block represents a block of pauses.
@@ -502,10 +505,6 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
-	deleteOpts := state.DeletePauseOpts{}
-	for _, fn := range opts {
-		fn(&deleteOpts)
-	}
 	var blockIDs []ulid.ULID
 	var err error
 
@@ -527,6 +526,13 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 
 	if len(blockIDs) == 0 {
 		return nil
+	}
+
+	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pause.ID)
+	err = b.pc.Client().Do(ctx, b.pc.Client().B().Set().Key(blockIndexKey).Value(PauseBlockIndexTombstone).Ex(PauseBlockIndexTombstoneDuration).Build()).Error()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("error deleting block index while deleting pause: %w", err)
 	}
 
 	// Track deletion in each relevant block.
@@ -625,6 +631,10 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 			return nil, state.ErrPauseNotFound
 		}
 		return nil, fmt.Errorf("error looking up pause block index: %w", err)
+	}
+
+	if blockIDStr == PauseBlockIndexTombstone {
+		return nil, state.ErrPauseNotFound
 	}
 
 	// Parse the block index JSON to extract the block ID
