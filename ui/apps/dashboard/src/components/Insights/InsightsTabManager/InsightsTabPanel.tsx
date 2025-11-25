@@ -49,7 +49,7 @@ export function InsightsTabPanel({
             <Section
               actions={
                 <div className="relative flex gap-2">
-                  <div className="absolute right-full -z-10">
+                  <div className="absolute right-full">
                     <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
                   </div>
                   <InsightsSQLEditorSavedQueryActionsButton tab={tab} />

@@ -74,7 +74,7 @@ export function SQLEditorContextMenu({
         }}
       >
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPrettifySQL}>
-          <span>Prettify SQL</span>
+          <span>Format SQL</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
           </span>
