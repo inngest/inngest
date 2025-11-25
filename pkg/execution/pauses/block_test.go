@@ -120,9 +120,12 @@ func TestBlockFlusher(t *testing.T) {
 		},
 	}
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
 	// Create block store
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -192,9 +195,12 @@ func TestBlockMetadata_SameTimestamps(t *testing.T) {
 		},
 	}
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
 	// Create block store
 	store := &blockstore{
-		rc:        rc,
+		pc:        pauseClient,
 		buf:       mockBufferer,
 		bucket:    bucket,
 		blocksize: 2,
@@ -256,7 +262,7 @@ func (m *mockBufferer) ConsumePause(ctx context.Context, p state.Pause, opts sta
 	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("not implemented")
 }
 
-func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	// For testing purposes, we'll just remove the pause from our mock buffer
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -383,7 +389,7 @@ func (m *mockBuffererSameTimestamp) ConsumePause(ctx context.Context, p state.Pa
 	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("not implemented")
 }
 
-func (m *mockBuffererSameTimestamp) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m *mockBuffererSameTimestamp) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, p := range m.pauses {
@@ -452,8 +458,11 @@ func TestLastBlockMetadata(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -567,8 +576,11 @@ func TestBlockstoreDelete(t *testing.T) {
 		duration: 5 * time.Second,
 	}
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -703,6 +715,9 @@ func TestBoundaryPauseDelete(t *testing.T) {
 	bucket := memblob.OpenBucket(nil)
 	now := time.Now()
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
 	mockBufferer := &mockBufferer{}
 
 	leaser := redisBlockLeaser{
@@ -712,7 +727,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 	}
 
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -864,6 +879,9 @@ func TestLegacyPauseDelete(t *testing.T) {
 	bucket := memblob.OpenBucket(nil)
 	now := time.Now()
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
 	pause1 := &state.Pause{
 		ID:        uuid.New(),
 		CreatedAt: now,
@@ -884,7 +902,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 	}
 
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -984,6 +1002,9 @@ func TestBlockFlushOrderingBug(t *testing.T) {
 	bucket := memblob.OpenBucket(nil)
 	defer bucket.Close()
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
 	// Create Redis state manager with actual Redis backend
 	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 
@@ -1052,7 +1073,7 @@ func TestBlockFlushOrderingBug(t *testing.T) {
 
 	bufferer := StateBufferer(sm)
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         bufferer,
 		Leaser:           leaser,
@@ -1110,6 +1131,9 @@ func TestCompaction(t *testing.T) {
 	bucket := memblob.OpenBucket(nil)
 	defer bucket.Close()
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
 	now := time.Now()
 	pause1 := &state.Pause{
 		ID:        uuid.New(),
@@ -1144,7 +1168,7 @@ func TestCompaction(t *testing.T) {
 
 	// Set compaction limit to 2, so 1 deletion won't trigger compaction
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -1289,6 +1313,9 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	bucket := memblob.OpenBucket(nil)
 	defer bucket.Close()
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+
 	now := time.Now()
 	pause1 := &state.Pause{
 		ID:        uuid.New(),
@@ -1319,7 +1346,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	}
 
 	store, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -1390,4 +1417,133 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	require.Equal(t, int64(3), deleteCount, "delete tracking should show 3 deletions after third delete")
 
 	rc.Close()
+}
+
+func TestPauseByIDAfterFlush(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
+	unshardedClient := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	sm, err := redis_state.New(
+		context.Background(),
+		redis_state.WithUnshardedClient(unshardedClient),
+	)
+	require.NoError(t, err)
+
+	now := time.Now()
+	workspaceID := uuid.New()
+	eventName := "test.event"
+	
+	testPause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.Make(),
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Event:     &eventName,
+		Expires:   state.Time(now.Add(time.Hour)),
+		CreatedAt: now,
+	}
+
+	pause2 := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.Make(),
+			AccountID:  workspaceID,
+			FunctionID: uuid.New(),
+		},
+		Event:     &eventName,
+		Expires:   state.Time(now.Add(time.Hour)),
+		CreatedAt: now.Add(time.Second),
+	}
+
+	_, err = sm.SavePause(context.Background(), testPause)
+	require.NoError(t, err)
+	_, err = sm.SavePause(context.Background(), pause2)
+	require.NoError(t, err)
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	bufferer := StateBufferer(sm)
+	store, err := NewBlockstore(BlockstoreOpts{
+		PauseClient:               pauseClient,
+		Bucket:           bucket,
+		Bufferer:         bufferer,
+		Leaser:           leaser,
+		BlockSize:        2,
+		CompactionLimit:  1,
+		CompactionSample: 0.1,
+		CompactionLeaser: leaser,
+		DeleteAfterFlush: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction: func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: workspaceID,
+		EventName:   eventName,
+	}
+	ctx := context.Background()
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	// Verify block was created
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	// Wait for pauses to be deleted from buffer after flush
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		bufLen, err := bufferer.BufferLen(ctx, index)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), bufLen, "buffer should be empty after flushing")
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// Should find pause after flush
+	foundPause, err := store.PauseByID(ctx, index, testPause.ID)
+	require.NoError(t, err)
+	require.Equal(t, testPause.ID, foundPause.ID)
+	require.Equal(t, testPause.CreatedAt.UnixMilli(), foundPause.CreatedAt.UnixMilli())
+
+	t.Run("with empty event name", func(t *testing.T) {
+		emptyEventIndex := Index{
+			WorkspaceID: workspaceID,
+			EventName:   "",
+		}
+
+		foundPause, err := store.PauseByID(ctx, emptyEventIndex, testPause.ID)
+		require.NoError(t, err)
+		require.Equal(t, testPause.ID, foundPause.ID)
+	})
+
+	// Mark pause as deleted
+	err = store.Delete(ctx, index, testPause)
+	require.NoError(t, err)
+
+	// Should not find pause after delete
+	_, err = store.PauseByID(ctx, index, testPause.ID)
+	require.Error(t, err)
+	require.ErrorIs(t, err, state.ErrPauseNotFound)
+
+	_, err = store.PauseByID(ctx, index, uuid.New())
+	require.Error(t, err)
+	require.ErrorIs(t, err, state.ErrPauseNotFound)
 }

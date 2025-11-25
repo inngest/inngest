@@ -614,6 +614,124 @@ func TestPausesByEventSinceWithCreatedAt(t *testing.T) {
 	r.FlushAll()
 }
 
+func TestDeletePause(t *testing.T) {
+	ctx := context.Background()
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	mgr, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	require.NoError(t, err)
+
+	workspaceID := uuid.New()
+	eventName := "test.event"
+	pauseID := uuid.New()
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.Make(),
+			FunctionID: uuid.New(),
+			AccountID:  uuid.New(),
+		},
+		Event:   &eventName,
+		Expires: state.Time(time.Now().Add(time.Hour)),
+	}
+
+	_, err = mgr.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	foundPause, err := mgr.PauseByID(ctx, pauseID)
+	require.NoError(t, err)
+	require.Equal(t, pauseID, foundPause.ID)
+
+	keysBefore, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
+
+	err = mgr.DeletePause(ctx, pause)
+	require.NoError(t, err)
+
+	_, err = mgr.PauseByID(ctx, pauseID)
+	require.Error(t, err)
+	require.ErrorIs(t, err, state.ErrPauseNotFound)
+
+	keysAfter, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
+	assert.Greater(t, len(keysBefore), len(keysAfter))
+	assert.Equal(t, 0, len(keysAfter))
+}
+
+func TestDeletePauseWithBlockIndex(t *testing.T) {
+	ctx := context.Background()
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	mgr, err := New(ctx, WithUnshardedClient(unshardedClient), WithShardedClient(shardedClient))
+	require.NoError(t, err)
+
+	workspaceID := uuid.New()
+	eventName := "test.event"
+	pauseID := uuid.New()
+	createdAt := time.Now()
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: workspaceID,
+		Identifier: state.PauseIdentifier{
+			RunID:      ulid.Make(),
+			FunctionID: uuid.New(),
+			AccountID:  uuid.New(),
+		},
+		Event:     &eventName,
+		Expires:   state.Time(time.Now().Add(time.Hour)),
+		CreatedAt: createdAt,
+	}
+
+	_, err = mgr.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	blockID := ulid.Make().String()
+	err = mgr.DeletePause(ctx, pause, state.WithWriteBlockIndex(blockID, eventName))
+	require.NoError(t, err)
+
+	keysAfter, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
+	// WithWriteBlockIndex should leave the block index key
+	assert.Equal(t, 1, len(keysAfter))
+
+	blockIndexKey := keysAfter[0]
+	val, err := rc.Do(ctx, rc.B().Get().Key(blockIndexKey).Build()).ToString()
+	require.NoError(t, err)
+
+	// Block index value should be JSON containing the block ID and event name
+	expectedJSON := fmt.Sprintf(`{"blockID":"%s","eventName":"%s"}`, blockID, eventName)
+	assert.Equal(t, expectedJSON, val)
+
+	err = mgr.DeletePause(ctx, pause)
+	require.NoError(t, err)
+
+	finalKeys, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
+	// Second deletion without WriteBlockIndex should clean up all remaining keys
+	assert.Equal(t, 0, len(finalKeys))
+}
+
 func TestDeleteCleansUpAllKeys(t *testing.T) {
 	ctx := context.Background()
 	_, rc := initRedis(t)

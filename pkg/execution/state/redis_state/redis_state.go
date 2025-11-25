@@ -942,6 +942,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	case -1:
 		return status, state.ErrPauseAlreadyExists
 	default:
+		logger.StdlibLogger(ctx).Debug("save pause", "pause", p.ID)
 		return status, nil
 	}
 }
@@ -1075,7 +1076,12 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 	return m.DeletePause(ctx, *pause)
 }
 
-func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {
+	opts := state.DeletePauseOpts{}
+	for _, fn := range options {
+		fn(&opts)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeletePause"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
@@ -1117,6 +1123,15 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
 		pause.kg.GlobalPauseIndex(ctx),
+		pause.kg.PauseBlockIndex(ctx, p.ID),
+	}
+
+	// Marshal WriteBlockIndex to JSON if it has content, otherwise pass empty string
+	blockIndexJSON := ""
+	if opts.WriteBlockIndex.BlockID != "" {
+		if blockIndexBytes, err := json.Marshal(opts.WriteBlockIndex); err == nil {
+			blockIndexJSON = string(blockIndexBytes)
+		}
 	}
 
 	status, err := scripts["deletePause"].Exec(
@@ -1127,6 +1142,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 			p.ID.String(),
 			invokeCorrId,
 			signalCorrId,
+			blockIndexJSON,
 		},
 	).AsInt64()
 	if err != nil {
