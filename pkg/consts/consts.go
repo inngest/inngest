@@ -148,9 +148,8 @@ const (
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
 
-	// ConnectWorkerCapacityForNoConcurrencyLimit is used to indicate that a worker has no capacity limit.
-	// Due to integer overflows of using negative numbers, we use 0 to indicate no limit.``
-	ConnectWorkerCapacityForNoConcurrencyLimit = 0
+	// ConnectWorkerNoConcurrencyLimitForRequests is used to indicate that a worker has no capacity limit.
+	ConnectWorkerNoConcurrencyLimitForRequests = -1
 
 	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
 

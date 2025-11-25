@@ -165,7 +165,6 @@ CREATE TABLE worker_connections (
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
     worker_ip VARCHAR NOT NULL,
-    max_worker_concurrency INT NOT NULL,
 
     connected_at INT NOT NULL,
     last_heartbeat_at INT,
