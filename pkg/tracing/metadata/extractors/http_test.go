@@ -199,8 +199,8 @@ func TestHTTPMetadataExtractor_PartialHTTPSpan(t *testing.T) {
 	assert.Equal(t, 200.0, data["response_status"], "Should extract response status code")
 
 	// Verify missing fields are not set (or are zero values)
-	assert.Empty(t, data["request_content_type"], "Should not have request content type")
-	assert.Empty(t, data["response_content_type"], "Should not have response content type")
-	assert.Equal(t, 0.0, data["request_size"], "Should have zero request size")
-	assert.Equal(t, 0.0, data["response_size"], "Should have zero response size")
+	assert.Nil(t, data["request_content_type"], "Should not have request content type")
+	assert.Nil(t, data["response_content_type"], "Should not have response content type")
+	assert.Nil(t, data["request_size"], "Should have zero request size")
+	assert.Nil(t, data["response_size"], "Should have zero response size")
 }
