@@ -50,30 +50,29 @@ type ConcurrencyLimitConfiguration struct {
 }
 
 type ConnectV1WorkerConnection struct {
-	ID                   ulid.ULID                 `json:"id"`
-	GatewayID            ulid.ULID                 `json:"gatewayId"`
-	InstanceID           string                    `json:"instanceId"`
-	WorkerIP             string                    `json:"workerIp"`
-	MaxWorkerConcurrency int64                     `json:"maxWorkerConcurrency"`
-	AppName              *string                   `json:"appName,omitempty"`
-	AppID                *uuid.UUID                `json:"appID,omitempty"`
-	App                  *cqrs.App                 `json:"app,omitempty"`
-	ConnectedAt          time.Time                 `json:"connectedAt"`
-	LastHeartbeatAt      *time.Time                `json:"lastHeartbeatAt,omitempty"`
-	DisconnectedAt       *time.Time                `json:"disconnectedAt,omitempty"`
-	DisconnectReason     *string                   `json:"disconnectReason,omitempty"`
-	Status               ConnectV1ConnectionStatus `json:"status"`
-	GroupHash            string                    `json:"groupHash"`
-	SdkLang              string                    `json:"sdkLang"`
-	SdkVersion           string                    `json:"sdkVersion"`
-	SdkPlatform          string                    `json:"sdkPlatform"`
-	SyncID               *uuid.UUID                `json:"syncId,omitempty"`
-	BuildID              *string                   `json:"buildId,omitempty"`
-	AppVersion           *string                   `json:"appVersion,omitempty"`
-	FunctionCount        int                       `json:"functionCount"`
-	CPUCores             int                       `json:"cpuCores"`
-	MemBytes             int                       `json:"memBytes"`
-	Os                   string                    `json:"os"`
+	ID               ulid.ULID                 `json:"id"`
+	GatewayID        ulid.ULID                 `json:"gatewayId"`
+	InstanceID       string                    `json:"instanceId"`
+	WorkerIP         string                    `json:"workerIp"`
+	AppName          *string                   `json:"appName,omitempty"`
+	AppID            *uuid.UUID                `json:"appID,omitempty"`
+	App              *cqrs.App                 `json:"app,omitempty"`
+	ConnectedAt      time.Time                 `json:"connectedAt"`
+	LastHeartbeatAt  *time.Time                `json:"lastHeartbeatAt,omitempty"`
+	DisconnectedAt   *time.Time                `json:"disconnectedAt,omitempty"`
+	DisconnectReason *string                   `json:"disconnectReason,omitempty"`
+	Status           ConnectV1ConnectionStatus `json:"status"`
+	GroupHash        string                    `json:"groupHash"`
+	SdkLang          string                    `json:"sdkLang"`
+	SdkVersion       string                    `json:"sdkVersion"`
+	SdkPlatform      string                    `json:"sdkPlatform"`
+	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID          *string                   `json:"buildId,omitempty"`
+	AppVersion       *string                   `json:"appVersion,omitempty"`
+	FunctionCount    int                       `json:"functionCount"`
+	CPUCores         int                       `json:"cpuCores"`
+	MemBytes         int                       `json:"memBytes"`
+	Os               string                    `json:"os"`
 }
 
 type ConnectV1WorkerConnectionEdge struct {

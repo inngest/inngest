@@ -3,14 +3,13 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
+	"time"
 )
 
 const (
@@ -111,12 +110,11 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 		AppName: &conn.AppName,
 		AppID:   conn.AppID,
 
-		ID:                   conn.Id,
-		GatewayID:            conn.GatewayId,
-		InstanceID:           conn.InstanceId,
-		Status:               status,
-		WorkerIP:             conn.WorkerIP,
-		MaxWorkerConcurrency: conn.MaxWorkerConcurrency,
+		ID:         conn.Id,
+		GatewayID:  conn.GatewayId,
+		InstanceID: conn.InstanceId,
+		Status:     status,
+		WorkerIP:   conn.WorkerIP,
 
 		ConnectedAt:     conn.ConnectedAt,
 		LastHeartbeatAt: lastHeartbeatAt,

@@ -36,7 +36,6 @@ const config = {
               EdgeType: 'unknown',
               FilterType: 'string',
               IngestSource: 'string',
-              Int64: 'number',
               IP: 'string',
               JSON: 'null | boolean | number | string | Record<string, unknown> | unknown[]',
               Map: 'Record<string, unknown>',

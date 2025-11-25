@@ -15,6 +15,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/backoff"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -422,10 +423,9 @@ func (w *WorkerCapacity) IsUnlimited() bool {
 }
 
 func (w *WorkerCapacity) IsAvailable() bool {
-	// // allow negative values to indicate unlimited capacity as well though it shouldn't happen
-	return w.Available != 0 || w.IsUnlimited()
+	return w.Available > 0 || w.Available == consts.ConnectWorkerNoConcurrencyLimitForRequests || w.IsUnlimited()
 }
 
 func (w *WorkerCapacity) IsAtCapacity() bool {
-	return !w.IsAvailable() // Total > 0 means there is a limit set
+	return w.Available == 0 && !w.IsUnlimited() // Total > 0 means there is a limit set
 }

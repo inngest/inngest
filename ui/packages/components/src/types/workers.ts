@@ -15,7 +15,6 @@ export type Worker = {
   id: string;
   instanceID: string | null;
   lastHeartbeatAt: string | null;
-  maxWorkerConcurrency: number;
   memBytes: number;
   os: string;
   sdkLang: string;

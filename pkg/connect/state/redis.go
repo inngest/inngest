@@ -918,8 +918,8 @@ func (r *redisConnectionStateManager) GetWorkerCapacities(ctx context.Context, e
 	isWorkerCapacityUnlimited := totalCapacity == 0
 	if isWorkerCapacityUnlimited {
 		return &WorkerCapacity{
-			Total:     consts.ConnectWorkerCapacityForNoConcurrencyLimit,
-			Available: consts.ConnectWorkerCapacityForNoConcurrencyLimit,
+			Total:     totalCapacity,
+			Available: consts.ConnectWorkerNoConcurrencyLimitForRequests,
 		}, nil
 	}
 
