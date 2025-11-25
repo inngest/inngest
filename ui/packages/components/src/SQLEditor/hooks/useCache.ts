@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
 export interface CacheEntry<T> {
   data: T;
@@ -45,46 +45,49 @@ export function useCache<T>(options: CacheOptions): Cache<T> {
   const { ttl } = options;
   const cacheRef = useRef<Map<string, CacheEntry<T>>>(new Map());
 
-  return {
-    get: (key: string): T | null => {
-      const entry = cacheRef.current.get(key);
-      if (!entry) {
-        return null;
-      }
+  return useMemo(
+    () => ({
+      get: (key: string): T | null => {
+        const entry = cacheRef.current.get(key);
+        if (!entry) {
+          return null;
+        }
 
-      const isExpired = Date.now() - entry.timestamp > ttl;
-      if (isExpired) {
-        cacheRef.current.delete(key);
-        return null;
-      }
+        const isExpired = Date.now() - entry.timestamp > ttl;
+        if (isExpired) {
+          cacheRef.current.delete(key);
+          return null;
+        }
 
-      return entry.data;
-    },
+        return entry.data;
+      },
 
-    set: (key: string, data: T): void => {
-      cacheRef.current.set(key, {
-        data,
-        timestamp: Date.now(),
-      });
-    },
+      set: (key: string, data: T): void => {
+        cacheRef.current.set(key, {
+          data,
+          timestamp: Date.now(),
+        });
+      },
 
-    has: (key: string): boolean => {
-      const entry = cacheRef.current.get(key);
-      if (!entry) {
-        return false;
-      }
+      has: (key: string): boolean => {
+        const entry = cacheRef.current.get(key);
+        if (!entry) {
+          return false;
+        }
 
-      const isExpired = Date.now() - entry.timestamp > ttl;
-      if (isExpired) {
-        cacheRef.current.delete(key);
-        return false;
-      }
+        const isExpired = Date.now() - entry.timestamp > ttl;
+        if (isExpired) {
+          cacheRef.current.delete(key);
+          return false;
+        }
 
-      return true;
-    },
+        return true;
+      },
 
-    clear: (): void => {
-      cacheRef.current.clear();
-    },
-  };
+      clear: (): void => {
+        cacheRef.current.clear();
+      },
+    }),
+    [ttl]
+  );
 }
