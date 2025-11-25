@@ -14,6 +14,8 @@ import (
 )
 
 func TestHTTPMetadataExtractor_HTTPSpan(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
 	span := &tracev1.Span{
 		SpanId: []byte("test-span-id"),
 		Name:   "POST /api/users",
@@ -64,7 +66,7 @@ func TestHTTPMetadataExtractor_HTTPSpan(t *testing.T) {
 	}
 
 	extractor := NewHTTPMetadataExtractor()
-	md, err := extractor.ExtractMetadata(context.Background(), span)
+	md, err := extractor.ExtractSpanMetadata(ctx, span)
 
 	require.NoError(t, err)
 
@@ -140,6 +142,9 @@ func TestHTTPMetadataExtractor_NonHTTPSpan(t *testing.T) {
 }
 
 func TestHTTPMetadataExtractor_PartialHTTPSpan(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
 	span := &tracev1.Span{
 		SpanId: []byte("partial-http-span"),
 		Name:   "GET /api/health",
@@ -161,7 +166,7 @@ func TestHTTPMetadataExtractor_PartialHTTPSpan(t *testing.T) {
 	}
 
 	extractor := NewHTTPMetadataExtractor()
-	metadata, err := extractor.ExtractMetadata(context.Background(), span)
+	metadata, err := extractor.ExtractSpanMetadata(ctx, span)
 
 	require.NoError(t, err)
 
@@ -197,4 +202,3 @@ func TestHTTPMetadataExtractor_PartialHTTPSpan(t *testing.T) {
 	assert.Equal(t, 0.0, data["request_size"], "Should have zero request size")
 	assert.Equal(t, 0.0, data["response_size"], "Should have zero response size")
 }
-

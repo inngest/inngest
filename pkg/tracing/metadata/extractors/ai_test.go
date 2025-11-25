@@ -1,7 +1,6 @@
 package extractors
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -14,6 +13,8 @@ import (
 )
 
 func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
 	span := &tracev1.Span{
 		SpanId: []byte("test-span-id"),
 		Name:   "chat gpt-4",
@@ -58,7 +59,7 @@ func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 	}
 
 	extractor := NewAIMetadataExtractor()
-	md, err := extractor.ExtractMetadata(context.Background(), span)
+	md, err := extractor.ExtractSpanMetadata(ctx, span)
 
 	require.NoError(t, err)
 
@@ -98,6 +99,9 @@ func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 }
 
 func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
 	span := &tracev1.Span{
 		SpanId: []byte("http-span-id"),
 		Name:   "GET /api/users",
@@ -124,7 +128,7 @@ func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
 	}
 
 	extractor := NewAIMetadataExtractor()
-	metadata, err := extractor.ExtractMetadata(context.Background(), span)
+	metadata, err := extractor.ExtractSpanMetadata(ctx, span)
 
 	require.NoError(t, err)
 
