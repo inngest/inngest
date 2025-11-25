@@ -108,6 +108,9 @@ func TestHTTPMetadataExtractor_HTTPSpan(t *testing.T) {
 }
 
 func TestHTTPMetadataExtractor_NonHTTPSpan(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
 	span := &tracev1.Span{
 		SpanId: []byte("database-span-id"),
 		Name:   "SELECT FROM users",
@@ -134,7 +137,7 @@ func TestHTTPMetadataExtractor_NonHTTPSpan(t *testing.T) {
 	}
 
 	extractor := NewHTTPMetadataExtractor()
-	metadata, err := extractor.ExtractMetadata(context.Background(), span)
+	metadata, err := extractor.ExtractSpanMetadata(ctx, span)
 
 	require.NoError(t, err)
 
