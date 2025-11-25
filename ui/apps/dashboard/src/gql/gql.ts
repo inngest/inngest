@@ -12,7 +12,6 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  *
  * Therefore it is highly recommended to use the babel or swc plugin for production.
  */
-
 const documents = {
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
