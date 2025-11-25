@@ -72,6 +72,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/jonboulle/clockwork"
@@ -299,6 +300,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Continuations: true,
 	}
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") == "true"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -528,6 +530,10 @@ func start(ctx context.Context, opts StartOpts) error {
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
 		executor.WithTracerProvider(tp),
+
+		executor.WithAllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableStepMetadata
+		}),
 	}
 
 	if capacityManager != nil {
@@ -642,6 +648,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
+			},
+
+			MetadataOpts: apiv1.MetadataOpts{
+				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
+					return enableStepMetadata
+				},
+				SpanExtractor: metadata.SpanExtractors{},
 			},
 		})
 	})
