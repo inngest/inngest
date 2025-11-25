@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1656,11 +1657,9 @@ func TestCompactionCleansUpBlockIndexWhenAllPausesDeleted(t *testing.T) {
 	// Expire TTLs
 	r.FastForward(20 * time.Minute)
 
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		for key := range r.Keys() {
-			assert.NotContains(t, key, "pause-block")
-		}
-	}, 5*time.Second, 100*time.Millisecond)
+	for _, key := range r.Keys() {
+		assert.NotContains(t, key, "pause-block")
+	}
 }
 
 func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
@@ -1772,6 +1771,7 @@ func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
 	err = store.FlushIndexBlock(ctx, index)
 	require.NoError(t, err)
 
+	// Wait for pause deletions after flushing to finish
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		keys, err := rc.Do(ctx, rc.B().Keys().Pattern("*:pause-block:*").Build()).AsStrSlice()
 		assert.NoError(t, err)
@@ -1783,15 +1783,19 @@ func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
 	err = store.Delete(ctx, index, *pause2)
 	require.NoError(t, err)
 
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		keys, err := rc.Do(ctx, rc.B().Keys().Pattern("*:pause-block:*").Build()).AsStrSlice()
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(keys), "Expected 1 pause-block key for remaining pause, but found: %v", keys)
+	// Expire TTLs
+	r.FastForward(20 * time.Minute)
 
-		if len(keys) == 1 {
-			remainingKey := keys[0]
-			expectedKey := pauseClient.KeyGenerator().PauseBlockIndex(ctx, pause3.ID)
-			assert.Equal(t, expectedKey, remainingKey, "Remaining pause-block key should be for pause3")
+	var pauseIdxs []string
+	for _, key := range r.Keys() {
+		if strings.Contains(key, "pause-block") {
+			pauseIdxs = append(pauseIdxs, key)
 		}
-	}, 5*time.Second, 100*time.Millisecond)
+	}
+
+	assert.Len(t, pauseIdxs, 1)
+
+	remainingKey := pauseIdxs[0]
+	expectedKey := pauseClient.KeyGenerator().PauseBlockIndex(ctx, pause3.ID)
+	assert.Equal(t, expectedKey, remainingKey, "Remaining pause-block key should be for pause3")
 }

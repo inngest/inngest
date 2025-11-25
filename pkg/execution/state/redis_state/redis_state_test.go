@@ -721,8 +721,10 @@ func TestDeletePauseWithBlockIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Block index value should be JSON containing the block ID and event name
-	expectedJSON := fmt.Sprintf(`{"blockID":"%s","eventName":"%s"}`, blockID, eventName)
-	assert.Equal(t, expectedJSON, val)
+	expected := state.BlockIndex{BlockID: blockID, EventName: eventName}
+	expectedJSON, err := json.Marshal(expected)
+	require.NoError(t, err)
+	assert.Equal(t, string(expectedJSON), val)
 
 	err = mgr.DeletePause(ctx, pause)
 	require.NoError(t, err)
