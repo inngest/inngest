@@ -100,6 +100,11 @@ type RawUpdate struct {
 	Values Values `json:"values"`
 }
 
+type ScopedUpdate struct {
+	Scope Scope `json:"scope"`
+	Update
+}
+
 type Update struct {
 	RawUpdate
 }

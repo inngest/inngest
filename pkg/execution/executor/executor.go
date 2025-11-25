@@ -4739,15 +4739,28 @@ func emitCheckpointTraces(ctx context.Context) bool {
 	return ok
 }
 
-func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured) (*meta.SpanReference, error) {
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+	var parent *meta.SpanReference
+
+	switch scope {
+	case enums.MetadataScopeRun:
+		parent = tracing.RunSpanRefFromMetadata(runCtx.Metadata())
+	case enums.MetadataScopeStep:
+		parent = runCtx.ParentSpan()
+	case enums.MetadataScopeStepAttempt:
+		parent = runCtx.ExecutionSpan()
+	default:
+		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
+	}
+
 	return tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
-		runCtx.ExecutionSpan(),
+		parent,
 		location,
 		pkgName,
 		runCtx.Metadata(),
 		md,
-		enums.MetadataScopeStepAttempt,
+		scope,
 	)
 }
