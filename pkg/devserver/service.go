@@ -121,11 +121,16 @@ func (d *devserver) Name() string {
 		return "persistence"
 	}
 
+	if d.Opts.Config.ServerKind == "cloud" {
+		return "inngest"
+	}
+
 	return "devserver"
 }
 
 func (d *devserver) PrettyName() string {
-	if d.Name() != "devserver" {
+	// Single node service should return empty string
+	if d.IsSingleNodeService() {
 		return ""
 	}
 

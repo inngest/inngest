@@ -8,6 +8,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +42,13 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 		pauses: []*state.Pause{},
 	}
 
+	// Create pause client
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	
 	// Create block store with a very low block size (2) to trigger flushing quickly
 	const lowBlockSize = 3
 	blockStore, err := NewBlockstore(BlockstoreOpts{
-		RC:               rc,
+		PauseClient:               pauseClient,
 		Bucket:           bucket,
 		Bufferer:         mockBufferer,
 		Leaser:           leaser,
@@ -239,7 +243,7 @@ func (m *mockBlockStore) ReadBlock(ctx context.Context, index Index, blockID uli
 	return nil, nil
 }
 
-func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	m.deleteCalled = true
 	return nil
 }

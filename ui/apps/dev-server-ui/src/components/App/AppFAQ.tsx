@@ -5,10 +5,13 @@ import { Link } from '@inngest/components/Link/NewLink';
 import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
 import { useTracking } from '@/hooks/useTracking';
+import { useInfoQuery } from '@/store/devApi';
 import HelperCard from './HelperCard';
 
 export default function AppFAQ({ openByDefault = false }) {
   const { trackEvent } = useTracking();
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   return (
     <AccordionList
       className="rounded-none border-0"
@@ -107,8 +110,9 @@ export default function AppFAQ({ openByDefault = false }) {
                 </p>
                 <p>
                   As your functions may change, it is necessary to sync your app
-                  whenever it changes. The Inngest Dev Server does this by
-                  polling for changes every 5 seconds by default.
+                  whenever it changes. The Inngest{' '}
+                  {isDevServer ? 'Dev Server' : 'Server'} does this by polling
+                  for changes every 5 seconds by default.
                 </p>
               </AccordionList.Content>
             </AccordionList.Item>
@@ -118,10 +122,10 @@ export default function AppFAQ({ openByDefault = false }) {
               </AccordionList.Trigger>
               <AccordionList.Content>
                 <p className="mb-2">
-                  The Dev Server polls your app's serve endpoint every few
-                  seconds to check for new functions or updates to function
-                  configurations. This enables a "hot reload" like experience
-                  for your Inngest functions.
+                  The {isDevServer ? 'Dev Server' : 'Server'} polls your app's
+                  serve endpoint every few seconds to check for new functions or
+                  updates to function configurations. This enables a "hot
+                  reload" like experience for your Inngest functions.
                 </p>
                 <p className="mb-2">
                   You can adjust the polling interval using{' '}
@@ -137,9 +141,9 @@ export default function AppFAQ({ openByDefault = false }) {
               </AccordionList.Trigger>
               <AccordionList.Content>
                 <p className="mb-2">
-                  The Dev Server will automatically discover and sync apps
-                  running on common ports and paths. This includes ports like
-                  3000, 5000, 8080, and endpoints like{' '}
+                  The {isDevServer ? 'Dev Server' : 'Server'} will automatically
+                  discover and sync apps running on common ports and paths. This
+                  includes ports like 3000, 5000, 8080, and endpoints like{' '}
                   <InlineCode>/api/inngest</InlineCode> and{' '}
                   <InlineCode>/x/inngest</InlineCode>.{' '}
                   <Link
