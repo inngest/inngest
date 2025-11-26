@@ -262,6 +262,7 @@ export type BillingPlan = {
 
 export type BillingSubscription = {
   __typename?: 'BillingSubscription';
+  nextInvoiceAmount: Scalars['Int'];
   nextInvoiceDate: Scalars['Time'];
 };
 

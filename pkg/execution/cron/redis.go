@@ -127,7 +127,8 @@ func (c *redisCronManager) CronHealthCheckJobID(at time.Time) string {
 
 // Sync enqueues a system job of kind "cron-sync" to the system queue.
 func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
-	l := c.log.With("action", "redisCronManager.Sync", "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
+	kind := queue.KindCronSync
+	l := c.log.With("action", "redisCronManager.Sync", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op.String())
 
 	switch ci.Op {
 	case enums.CronOpProcess, enums.CronHealthCheck:
@@ -136,8 +137,7 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 	}
 
 	maxAttempts := consts.MaxRetries + 1
-	kind := queue.KindCronSync
-	at := ulid.Time(ci.ID.Time())
+	at := time.Now()
 	jobID := ci.SyncID()
 
 	err := c.q.Enqueue(ctx, queue.Item{
@@ -157,8 +157,11 @@ func (c *redisCronManager) Sync(ctx context.Context, ci CronItem) error {
 		QueueName:   &kind,
 	}, at, queue.EnqueueOpts{})
 	switch err {
-	case nil, redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Trace("cron-sync enqueued", "jobID", jobID)
+	case nil:
+		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at)
+		return nil
+	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
+		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at)
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing cron sync job")
@@ -185,9 +188,8 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	jobID := fmt.Sprintf("adhoc-%s", c.CronHealthCheckJobID(now))
 
-	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "now", now)
+	l := c.log.With("action", "redisCronManager.EnqueueHealthCheck", "queue", kind, "ci", ci)
 
-	l.Debug("enqueueing adhoc cron health check", "jobID", jobID, "ci", ci)
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -199,10 +201,10 @@ func (c *redisCronManager) EnqueueHealthCheck(ctx context.Context, ci CronItem) 
 
 	switch err {
 	case nil:
-		l.Debug("adhoc cron-health-check enqueued")
+		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID)
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Debug("adhoc cron-health-check already exists")
+		l.Debug("adhoc cron-health-check already exists", "jobID", jobID)
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing adhoc cron-health-check job")
@@ -220,7 +222,7 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 	kind := queue.KindCronHealthCheck
 	jobID := c.CronHealthCheckJobID(nextCheck)
 
-	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "now", now, "nextCheck", nextCheck)
+	l := c.log.With("action", "redisCronManager.EnqueueNextHealthCheck", "queue", kind, "now", now, "nextCheck", nextCheck)
 
 	err := c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -236,10 +238,10 @@ func (c *redisCronManager) EnqueueNextHealthCheck(ctx context.Context) error {
 
 	switch err {
 	case nil:
-		l.Trace("cron-health-check enqueued")
+		l.Debug("cron-health-check enqueued")
 		return nil
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Trace("cron-health-check already exists")
+		l.Debug("cron-health-check already exists")
 		return nil
 	default:
 		l.ReportError(err, "error enqueueing cron health check job")
@@ -271,22 +273,21 @@ func (c *redisCronManager) HealthCheck(ctx context.Context, functionID uuid.UUID
 // ScheduleNext schedules the next "cron" job w.r.t the CronItem provided.
 // While CronItem.ID and CronItem.JobID encode the _actual_ timestamp of the next schedule, the CronItem is scheduled for a few milliseconds (jitterOpts) before the schedule to allow for some processing time to create the function run.
 func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, error) {
-	l := c.log.With("action", "redisCronManager.ScheduleNext", "fnID", ci.FunctionID, "fnVersion", ci.FunctionVersion, "cronExpr", ci.Expression)
+	kind := queue.KindCron
+	l := c.log.With("action", "redisCronManager.ScheduleNext", "queue", kind, "functionID", ci.FunctionID, "functionVersion", ci.FunctionVersion, "cronExpr", ci.Expression, "operation", ci.Op)
 
 	from := ci.ID.Timestamp()
 
 	// Parse the cron expression and get the next execution time
 	next, err := Next(ci.Expression, from)
 	if err != nil {
-		// TODO decide on what to do with this because it likely can't be fixed on retries
-		// This also should never happen as long as this expression is set from an actual function config, which should be validated on function registration.
 		return nil, fmt.Errorf("failed to parse cron expression %q: %w", ci.Expression, err)
 	}
 
 	// We use robfig cron library to find the next time this cron is supposed to run. If there is no time in the next 5 years this cron will run, robfig.cron.Next returns a zero time.
 	// Since we don't allow specifying year as part of the cron expression, these expressions will never run. It is therefore safe to return without scheduling the next run.
 	if next.IsZero() {
-		l.Warn("next schedule is zero, returning")
+		l.Warn("next schedule is zero, returning", "from", from)
 		return nil, nil
 	}
 
@@ -311,7 +312,6 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 	}
 
 	// enqueue new schedule
-	kind := queue.KindCron
 	maxAttempts := consts.MaxRetries + 1
 
 	err = c.q.Enqueue(ctx, queue.Item{
@@ -331,13 +331,13 @@ func (c *redisCronManager) ScheduleNext(ctx context.Context, ci CronItem) (*Cron
 		Payload:     nextItem,
 	}, enqueueAt, queue.EnqueueOpts{PassthroughJobId: true})
 
-	l = l.With("next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
+	l = l.With("from", from, "next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
 
 	switch err {
 	case nil:
-		l.Trace("ScheduleNext success")
+		l.Debug("cron ScheduleNext success")
 	case redis_state.ErrQueueItemExists, redis_state.ErrQueueItemSingletonExists:
-		l.Trace("ScheduleNext already exists")
+		l.Debug("cron ScheduleNext already exists")
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")
 		return nil, fmt.Errorf("error enqueueing cron for next schedule: %w", err)

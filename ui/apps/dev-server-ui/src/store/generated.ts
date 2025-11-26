@@ -14,6 +14,7 @@ export type Scalars = {
   Bytes: any;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
+  Int64: number;
   Map: any;
   Time: any;
   ULID: any;
@@ -108,6 +109,7 @@ export type ConnectV1WorkerConnection = {
   id: Scalars['ULID'];
   instanceId: Scalars['String'];
   lastHeartbeatAt: Maybe<Scalars['Time']>;
+  maxWorkerConcurrency: Scalars['Int64'];
   memBytes: Scalars['Int'];
   os: Scalars['String'];
   sdkLang: Scalars['String'];
@@ -1168,7 +1170,7 @@ export type GetWorkerConnectionsQueryVariables = Exact<{
 }>;
 
 
-export type GetWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', totalCount: number, edges: Array<{ __typename?: 'ConnectV1WorkerConnectionEdge', node: { __typename?: 'ConnectV1WorkerConnection', id: any, gatewayId: any, instanceId: string, workerIp: string, connectedAt: any, lastHeartbeatAt: any | null, disconnectedAt: any | null, disconnectReason: string | null, status: ConnectV1ConnectionStatus, groupHash: string, sdkLang: string, sdkVersion: string, sdkPlatform: string, syncId: any | null, appVersion: string | null, functionCount: number, cpuCores: number, memBytes: number, os: string, app: { __typename?: 'App', id: string } | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
+export type GetWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', totalCount: number, edges: Array<{ __typename?: 'ConnectV1WorkerConnectionEdge', node: { __typename?: 'ConnectV1WorkerConnection', id: any, gatewayId: any, instanceId: string, workerIp: string, maxWorkerConcurrency: number, connectedAt: any, lastHeartbeatAt: any | null, disconnectedAt: any | null, disconnectReason: string | null, status: ConnectV1ConnectionStatus, groupHash: string, sdkLang: string, sdkVersion: string, sdkPlatform: string, syncId: any | null, appVersion: string | null, functionCount: number, cpuCores: number, memBytes: number, os: string, app: { __typename?: 'App', id: string } | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountWorkerConnectionsQueryVariables = Exact<{
   appID: Scalars['UUID'];
@@ -1650,6 +1652,7 @@ export const GetWorkerConnectionsDocument = `
         gatewayId
         instanceId
         workerIp
+        maxWorkerConcurrency
         app {
           id
         }

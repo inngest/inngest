@@ -18,6 +18,9 @@ const config: CodegenConfig = {
 
           object: true,
         },
+        scalars: {
+          Int64: 'number',
+        },
       },
       plugins: [
         'typescript',

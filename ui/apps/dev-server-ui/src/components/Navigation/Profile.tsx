@@ -1,8 +1,11 @@
 import { RiCodeSSlashLine } from '@remixicon/react';
 
+import { useInfoQuery } from '@/store/devApi';
 import { ProfileMenu } from './ProfileMenu';
 
 const Profile = ({ collapsed }: { collapsed: boolean }) => {
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   return (
     <ProfileMenu>
       <div
@@ -23,7 +26,7 @@ const Profile = ({ collapsed }: { collapsed: boolean }) => {
                 Settings
               </div>
               <div className="text-muted max-w-full text-xs leading-4">
-                Dev Server
+                {isDevServer ? 'Dev Server' : 'Server'}
               </div>
             </div>
           )}

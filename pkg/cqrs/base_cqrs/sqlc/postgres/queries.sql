@@ -280,7 +280,7 @@ WHERE snapshot_id NOT IN (
 
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, max_worker_concurrency, connected_at, last_heartbeat_at, disconnected_at,
     recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
 VALUES (
@@ -293,6 +293,7 @@ VALUES (
         sqlc.arg('instance_id'),
         sqlc.arg('status'),
         sqlc.arg('worker_ip'),
+        sqlc.arg('max_worker_concurrency'),
         sqlc.arg('connected_at'),
         sqlc.arg('last_heartbeat_at'),
         sqlc.arg('disconnected_at'),
@@ -322,6 +323,7 @@ DO UPDATE SET
            instance_id = excluded.instance_id,
            status = excluded.status,
            worker_ip = excluded.worker_ip,
+           max_worker_concurrency = excluded.max_worker_concurrency,
 
            connected_at = excluded.connected_at,
            last_heartbeat_at = excluded.last_heartbeat_at,
