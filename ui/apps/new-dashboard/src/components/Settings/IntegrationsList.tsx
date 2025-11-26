@@ -10,7 +10,6 @@ import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiExternalLinkLine } from "@remixicon/react";
 
 import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import { ClientOnly } from "@tanstack/react-router";
 
 type Integration = {
   title: string;

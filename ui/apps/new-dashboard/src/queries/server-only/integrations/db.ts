@@ -1,5 +1,5 @@
 import { graphql } from "@/gql";
-import { type CdcConnection } from "@/gql/graphql";
+import type { CdcConnection } from "@/gql/graphql";
 import graphqlAPI from "@/queries/graphqlAPI";
 import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
 import { createServerFn } from "@tanstack/react-start";
@@ -64,7 +64,7 @@ const testAuthDocument = graphql(`
   }
 `);
 
-export const testAuth = async (input: CdcConnectionInput) => {
+const testAuth = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
   return await graphqlAPI.request<{ cdcTestCredentials: CdcSetupResponse }>(
@@ -85,7 +85,7 @@ const testLogicalReplicationDocument = graphql(`
   }
 `);
 
-export const testLogicalReplication = async (input: CdcConnectionInput) => {
+const testLogicalReplication = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
   return await graphqlAPI.request<{
@@ -105,7 +105,7 @@ const testAutoSetupDocument = graphql(`
   }
 `);
 
-export const testAutoSetup = async (input: CdcConnectionInput) => {
+const testAutoSetup = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
   return await graphqlAPI.request<{ cdcAutoSetup: CdcSetupResponse }>(
@@ -125,17 +125,19 @@ const deleteConnDocument = graphql(`
   }
 `);
 
-export const deleteConn = async (id: string) => {
-  const environment = await getProductionEnvironment();
+export const deleteConn = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data }) => {
+    const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(
-    deleteConnDocument as any,
-    {
-      envID: environment.id,
-      id: id,
-    },
-  );
-};
+    return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(
+      deleteConnDocument as any,
+      {
+        envID: environment.id,
+        id: data.id,
+      },
+    );
+  });
 
 export const verifyCredentials = createServerFn({ method: "POST" })
   .inputValidator((data: { input: CdcConnectionInput }) => data)

@@ -6,7 +6,7 @@ import type { Publication } from "@inngest/components/PostgresIntegrations/newTy
 export default function Manage({ publication }: { publication: Publication }) {
   const handleDelete = async (id: string) => {
     try {
-      await deleteConn(id);
+      await deleteConn({ data: { id } });
       return { success: true, error: null };
     } catch (error) {
       console.error("Error deleting cdc connection:", error);

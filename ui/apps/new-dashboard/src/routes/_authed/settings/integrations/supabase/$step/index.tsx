@@ -1,16 +1,14 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import Auth from "@inngest/components/PostgresIntegrations/Neon/NewAuth";
 import Connect from "@inngest/components/PostgresIntegrations/Neon/NewConnect";
 import {
   IntegrationSteps,
   STEPS_ORDER,
 } from "@inngest/components/PostgresIntegrations/newTypes";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { useSteps } from "@/components/PostgresIntegration/Context";
 import {
-  testAuth,
-  testAutoSetup,
   verifyAutoSetup,
   verifyCredentials,
 } from "@/queries/server-only/integrations/db";
