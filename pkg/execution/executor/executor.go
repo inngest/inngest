@@ -1515,8 +1515,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
 			l := l.With("step_metadata", true)
 			for _, opcode := range resp.Generator {
-				for _, metadata := range opcode.Metadata {
-					if err := metadata.Validate(); err != nil {
+				for _, md := range opcode.Metadata {
+					if err := md.Validate(); err != nil {
 						l.Warn("invalid metadata in driver response", "error", err)
 						continue
 					}
@@ -1527,7 +1527,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 						ctx,
 						&instance,
 						"executor.ExecutePostMetadata",
-						metadata,
+						md,
+						md.Scope,
 					)
 					if err != nil {
 						l.Warn("error creating metadata span", "error", err)
