@@ -293,6 +293,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 				pkgName,
 				nil,
 				m,
+				enums.MetadataScopeExtendedTrace,
 				addTenantIDs,
 			)
 			if err != nil {

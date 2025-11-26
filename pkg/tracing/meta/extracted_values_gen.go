@@ -84,4 +84,5 @@ type ExtractedValues struct {
 	Metadata *metadata.Values
 	MetadataKind *metadata.Kind
 	MetadataOp *metadata.Opcode
+	MetadataScope *metadata.Scope
 }
