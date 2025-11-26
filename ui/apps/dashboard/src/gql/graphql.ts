@@ -19,6 +19,7 @@ export type Scalars = {
   FilterType: string;
   IP: string;
   IngestSource: string;
+  Int64: number;
   JSON: null | boolean | number | string | Record<string, unknown> | unknown[];
   Map: Record<string, unknown>;
   NullString: null | string;
@@ -261,6 +262,7 @@ export type BillingPlan = {
 
 export type BillingSubscription = {
   __typename?: 'BillingSubscription';
+  nextInvoiceAmount: Scalars['Int'];
   nextInvoiceDate: Scalars['Time'];
 };
 
@@ -388,6 +390,7 @@ export type ConnectV1WorkerConnection = {
   id: Scalars['ULID'];
   instanceId: Scalars['String'];
   lastHeartbeatAt: Maybe<Scalars['Time']>;
+  maxWorkerConcurrency: Scalars['Int64'];
   memBytes: Scalars['Int'];
   os: Scalars['String'];
   sdkLang: Scalars['String'];
@@ -433,6 +436,13 @@ export enum ConnectV1WorkerConnectionsOrderByField {
   DisconnectedAt = 'DISCONNECTED_AT',
   LastHeartbeatAt = 'LAST_HEARTBEAT_AT'
 }
+
+export type ConnectV1WorkerMetricsFilter = {
+  from: Scalars['Time'];
+  instanceIDs?: InputMaybe<Array<Scalars['String']>>;
+  name: Scalars['String'];
+  until?: InputMaybe<Scalars['Time']>;
+};
 
 export type CreateCancellationInput = {
   envID: Scalars['UUID'];
@@ -2474,6 +2484,7 @@ export type Workspace = {
   apps: Array<App>;
   archivedEvent: Maybe<ArchivedEvent>;
   cdcConnections: Array<CdcConnection>;
+  connectWorkerMetrics: ScopedMetricsResponse;
   createdAt: Scalars['Time'];
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
@@ -2533,6 +2544,11 @@ export type WorkspaceAppsArgs = {
 
 export type WorkspaceArchivedEventArgs = {
   id: Scalars['ULID'];
+};
+
+
+export type WorkspaceConnectWorkerMetricsArgs = {
+  filter: ConnectV1WorkerMetricsFilter;
 };
 
 
