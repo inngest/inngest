@@ -531,7 +531,6 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pause.ID)
 	err = b.pc.Client().Do(ctx, b.pc.Client().B().Set().Key(blockIndexKey).Value(PauseBlockIndexTombstone).Ex(PauseBlockIndexTombstoneDuration).Build()).Error()
 	if err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("error deleting block index while deleting pause: %w", err)
 	}
 

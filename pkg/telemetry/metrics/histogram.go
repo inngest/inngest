@@ -285,6 +285,7 @@ func HistogramPauseBlockFlushLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_flush_duration",
 		Description: "Distribution of pauses block flush latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -295,6 +296,7 @@ func HistogramPauseBlockFetchLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_fetch_duration",
 		Description: "Distribution of pauses block fetching latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -305,6 +307,7 @@ func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.
 		MetricName:  "pauses_delete_after_flush_duration",
 		Description: "Distribution of pauses deletion duration after flushing a block",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
 	})
 }
@@ -315,6 +318,7 @@ func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts Histogram
 		MetricName:  "span_flush_duration",
 		Description: "Distribution of span flushes from tracing",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  QueueItemLatencyBoundaries,
 	})
 }

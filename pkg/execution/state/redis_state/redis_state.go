@@ -942,7 +942,6 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	case -1:
 		return status, state.ErrPauseAlreadyExists
 	default:
-		logger.StdlibLogger(ctx).Debug("save pause", "pause", p.ID)
 		return status, nil
 	}
 }
