@@ -14,8 +14,9 @@ import { useLocalStorage } from "react-use";
 
 import { OnboardingSteps } from "@/components/Onboarding/types";
 import useOnboardingStep from "@/components/Onboarding/useOnboardingStep";
-import type VercelIntegration from "@/components/Settings/vercel/VercelIntegration";
-import useUpdateVercelIntegration from "@/components/Settings/vercel/useUpdateVercelIntegration";
+import type { VercelIntegration } from "@/queries/server-only/vercel";
+import useUpdateVercelIntegration from "./useUpdateVercelIntegration";
+import { ONBOARDING_VERCEL_NEXT_URL } from "@/components/Onboarding/utils";
 
 const PAGE_SIZE = 4;
 
@@ -32,10 +33,7 @@ type VercelConnectProps = {
   integrations: VercelIntegration;
 };
 
-export const VercelConnect = ({
-  searchParams,
-  integrations,
-}: VercelConnectProps) => {
+export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState(integrations.projects);
   const [saving, setSaving] = useState(false);
@@ -80,16 +78,15 @@ export const VercelConnect = ({
       },
     });
 
-    // TANSTACK TODO: re-enable when the callback route is built
-    // navigate({
-    //   to: "/integrations/vercel/callback/success",
-    //   search: {
-    //     onSuccessRedirectURL: installingVercelFromOnboarding
-    //       ? ONBOARDING_VERCEL_NEXT_URL
-    //       : searchParams.next,
-    //     source: searchParams.source,
-    //   },
-    // });
+    navigate({
+      to: "/integrations/vercel/callback/success",
+      search: {
+        onSuccessRedirectURL: installingVercelFromOnboarding
+          ? ONBOARDING_VERCEL_NEXT_URL
+          : searchParams.next,
+        source: searchParams.source,
+      },
+    });
     setInstallingVercelFromOnboarding(false);
   };
 

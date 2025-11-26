@@ -29,6 +29,7 @@ import { Route as AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport } from "./rout
 import { Route as AuthedEnvEnvSlugOnboardingRouteRouteImport } from "./routes/_authed/env/$envSlug/onboarding/route";
 import { Route as AuthedEnvEnvSlugManageRouteRouteImport } from "./routes/_authed/env/$envSlug/manage/route";
 import { Route as AuthedEnvEnvSlugAppsRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/route";
+import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from "./routes/_authed/integrations/vercel/callback/index";
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from "./routes/_authed/env/$envSlug/unattached-syncs/index";
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from "./routes/_authed/env/$envSlug/runs/index";
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from "./routes/_authed/env/$envSlug/metrics/index";
@@ -44,6 +45,7 @@ import { Route as AuthedEnvEnvSlugFunctionsSlugRouteRouteImport } from "./routes
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteImport } from "./routes/_authed/env/$envSlug/event-types/$eventTypeName/route";
 import { Route as AuthedEnvEnvSlugAppsSyncNewRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/sync-new/route";
 import { Route as AuthedEnvEnvSlugAppsExternalIDRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/$externalID/route";
+import { Route as AuthedIntegrationsVercelCallbackSuccessIndexRouteImport } from "./routes/_authed/integrations/vercel/callback/success/index";
 import { Route as AuthedEnvEnvSlugRunsRunIDIndexRouteImport } from "./routes/_authed/env/$envSlug/runs/$runID/index";
 import { Route as AuthedEnvEnvSlugOnboardingStepIndexRouteImport } from "./routes/_authed/env/$envSlug/onboarding/$step/index";
 import { Route as AuthedEnvEnvSlugManageSigningKeyIndexRouteImport } from "./routes/_authed/env/$envSlug/manage/signing-key/index";
@@ -169,6 +171,12 @@ const AuthedEnvEnvSlugAppsRouteRoute =
     path: "/apps",
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any);
+const AuthedIntegrationsVercelCallbackIndexRoute =
+  AuthedIntegrationsVercelCallbackIndexRouteImport.update({
+    id: "/integrations/vercel/callback/",
+    path: "/integrations/vercel/callback/",
+    getParentRoute: () => AuthedRoute,
+  } as any);
 const AuthedEnvEnvSlugUnattachedSyncsIndexRoute =
   AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport.update({
     id: "/",
@@ -258,6 +266,12 @@ const AuthedEnvEnvSlugAppsExternalIDRouteRoute =
     id: "/$externalID",
     path: "/$externalID",
     getParentRoute: () => AuthedEnvEnvSlugAppsRouteRoute,
+  } as any);
+const AuthedIntegrationsVercelCallbackSuccessIndexRoute =
+  AuthedIntegrationsVercelCallbackSuccessIndexRouteImport.update({
+    id: "/integrations/vercel/callback/success/",
+    path: "/integrations/vercel/callback/success/",
+    getParentRoute: () => AuthedRoute,
   } as any);
 const AuthedEnvEnvSlugRunsRunIDIndexRoute =
   AuthedEnvEnvSlugRunsRunIDIndexRouteImport.update({
@@ -397,6 +411,7 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/metrics": typeof AuthedEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/env/$envSlug/unattached-syncs/": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
+  "/integrations/vercel/callback": typeof AuthedIntegrationsVercelCallbackIndexRoute;
   "/env/$envSlug/apps/$externalID/": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/env/$envSlug/apps/sync-new/": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/env/$envSlug/debugger/$functionSlug": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -407,6 +422,7 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/manage/signing-key": typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute;
   "/env/$envSlug/onboarding/$step/": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/env/$envSlug/runs/$runID": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
+  "/integrations/vercel/callback/success": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
   "/env/$envSlug/apps/$externalID/syncs": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/env/$envSlug/event-types/$eventTypeName/events": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/env/$envSlug/functions/$slug/cancellations": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
@@ -441,6 +457,7 @@ export interface FileRoutesByTo {
   "/env/$envSlug/metrics": typeof AuthedEnvEnvSlugMetricsIndexRoute;
   "/env/$envSlug/runs": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
+  "/integrations/vercel/callback": typeof AuthedIntegrationsVercelCallbackIndexRoute;
   "/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/env/$envSlug/debugger/$functionSlug": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -451,6 +468,7 @@ export interface FileRoutesByTo {
   "/env/$envSlug/manage/signing-key": typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute;
   "/env/$envSlug/onboarding/$step": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/env/$envSlug/runs/$runID": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
+  "/integrations/vercel/callback/success": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
   "/env/$envSlug/apps/$externalID/syncs": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/env/$envSlug/event-types/$eventTypeName/events": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/env/$envSlug/functions/$slug/cancellations": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
@@ -496,6 +514,7 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/metrics/": typeof AuthedEnvEnvSlugMetricsIndexRoute;
   "/_authed/env/$envSlug/runs/": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/_authed/env/$envSlug/unattached-syncs/": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
+  "/_authed/integrations/vercel/callback/": typeof AuthedIntegrationsVercelCallbackIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID/": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/_authed/env/$envSlug/apps/sync-new/": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/_authed/env/$envSlug/debugger/$functionSlug/": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -506,6 +525,7 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/manage/signing-key/": typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute;
   "/_authed/env/$envSlug/onboarding/$step/": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/_authed/env/$envSlug/runs/$runID/": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
+  "/_authed/integrations/vercel/callback/success/": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID/syncs/": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/_authed/env/$envSlug/event-types/$eventTypeName/events/": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/_authed/env/$envSlug/functions/$slug/cancellations/": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
@@ -551,6 +571,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/metrics"
     | "/env/$envSlug/runs"
     | "/env/$envSlug/unattached-syncs/"
+    | "/integrations/vercel/callback"
     | "/env/$envSlug/apps/$externalID/"
     | "/env/$envSlug/apps/sync-new/"
     | "/env/$envSlug/debugger/$functionSlug"
@@ -561,6 +582,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/manage/signing-key"
     | "/env/$envSlug/onboarding/$step/"
     | "/env/$envSlug/runs/$runID"
+    | "/integrations/vercel/callback/success"
     | "/env/$envSlug/apps/$externalID/syncs"
     | "/env/$envSlug/event-types/$eventTypeName/events"
     | "/env/$envSlug/functions/$slug/cancellations"
@@ -595,6 +617,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/metrics"
     | "/env/$envSlug/runs"
     | "/env/$envSlug/unattached-syncs"
+    | "/integrations/vercel/callback"
     | "/env/$envSlug/apps/$externalID"
     | "/env/$envSlug/apps/sync-new"
     | "/env/$envSlug/debugger/$functionSlug"
@@ -605,6 +628,7 @@ export interface FileRouteTypes {
     | "/env/$envSlug/manage/signing-key"
     | "/env/$envSlug/onboarding/$step"
     | "/env/$envSlug/runs/$runID"
+    | "/integrations/vercel/callback/success"
     | "/env/$envSlug/apps/$externalID/syncs"
     | "/env/$envSlug/event-types/$eventTypeName/events"
     | "/env/$envSlug/functions/$slug/cancellations"
@@ -649,6 +673,7 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/metrics/"
     | "/_authed/env/$envSlug/runs/"
     | "/_authed/env/$envSlug/unattached-syncs/"
+    | "/_authed/integrations/vercel/callback/"
     | "/_authed/env/$envSlug/apps/$externalID/"
     | "/_authed/env/$envSlug/apps/sync-new/"
     | "/_authed/env/$envSlug/debugger/$functionSlug/"
@@ -659,6 +684,7 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/manage/signing-key/"
     | "/_authed/env/$envSlug/onboarding/$step/"
     | "/_authed/env/$envSlug/runs/$runID/"
+    | "/_authed/integrations/vercel/callback/success/"
     | "/_authed/env/$envSlug/apps/$externalID/syncs/"
     | "/_authed/env/$envSlug/event-types/$eventTypeName/events/"
     | "/_authed/env/$envSlug/functions/$slug/cancellations/"
@@ -818,6 +844,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsRouteRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute;
     };
+    "/_authed/integrations/vercel/callback/": {
+      id: "/_authed/integrations/vercel/callback/";
+      path: "/integrations/vercel/callback";
+      fullPath: "/integrations/vercel/callback";
+      preLoaderRoute: typeof AuthedIntegrationsVercelCallbackIndexRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
     "/_authed/env/$envSlug/unattached-syncs/": {
       id: "/_authed/env/$envSlug/unattached-syncs/";
       path: "/";
@@ -922,6 +955,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/env/$envSlug/apps/$externalID";
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugAppsRouteRoute;
+    };
+    "/_authed/integrations/vercel/callback/success/": {
+      id: "/_authed/integrations/vercel/callback/success/";
+      path: "/integrations/vercel/callback/success";
+      fullPath: "/integrations/vercel/callback/success";
+      preLoaderRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRouteImport;
+      parentRoute: typeof AuthedRoute;
     };
     "/_authed/env/$envSlug/runs/$runID/": {
       id: "/_authed/env/$envSlug/runs/$runID/";
@@ -1311,6 +1351,8 @@ interface AuthedRouteChildren {
   AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren;
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute;
+  AuthedIntegrationsVercelCallbackIndexRoute: typeof AuthedIntegrationsVercelCallbackIndexRoute;
+  AuthedIntegrationsVercelCallbackSuccessIndexRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -1318,6 +1360,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
+  AuthedIntegrationsVercelCallbackIndexRoute:
+    AuthedIntegrationsVercelCallbackIndexRoute,
+  AuthedIntegrationsVercelCallbackSuccessIndexRoute:
+    AuthedIntegrationsVercelCallbackSuccessIndexRoute,
 };
 
 const AuthedRouteWithChildren =

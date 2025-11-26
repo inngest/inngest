@@ -9,7 +9,7 @@ import useLocalStorage from "react-use/esm/useLocalStorage";
 import { toast } from "sonner";
 import { useMutation } from "urql";
 
-import type { CodedError } from "@/codedError";
+import type { CodedError } from "@/utils/codedError";
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { Secret } from "@/components/Secret";
 import { SyncFailure } from "@/components/SyncFailure";

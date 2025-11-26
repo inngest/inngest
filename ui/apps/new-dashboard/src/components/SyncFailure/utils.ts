@@ -3,7 +3,7 @@ import {
   parseErrorData,
   type CodedError,
   type ErrorCode,
-} from "@/codedError";
+} from "@/utils/codedError";
 
 const messages = {
   account_mismatch: "The app's signing key is for the wrong account.",

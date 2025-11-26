@@ -10,7 +10,7 @@ import { RiLoopLeftLine } from "@remixicon/react";
 import { toast } from "sonner";
 import { useMutation } from "urql";
 
-import type { CodedError } from "@/codedError";
+import type { CodedError } from "@/utils/codedError";
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { SyncFailure } from "@/components/SyncFailure/SyncFailure";
 import { graphql } from "@/gql";
