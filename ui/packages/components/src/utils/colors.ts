@@ -8,6 +8,15 @@ export const rgbToHex = (r: number, g: number, b: number): string =>
     .join('');
 
 export const resolveColor = (
+  colorValue: any,
+  isDark: boolean,
+  defaultColor: string = '#f6f6f6' // carbon 50
+): string =>
+  !colorValue || typeof colorValue !== 'string'
+    ? defaultColor
+    : resolver(colorValue, isDark, defaultColor);
+
+export const resolver = (
   colorValue: string,
   isDark: boolean,
   defaultColor: string = '#f6f6f6' // carbon 50

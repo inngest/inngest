@@ -3,6 +3,7 @@ import { Link } from '@inngest/components/Link/NewLink';
 import { Pill, PillContent } from '@inngest/components/Pill/NewPill';
 import CompactPaginatedTable from '@inngest/components/Table/CompactPaginatedTable';
 import type { Function } from '@inngest/components/types/function';
+import type { FileRouteTypes } from '@tanstack/react-router';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { HorizontalPillList } from '../Pill/HorizontalPillList';
@@ -13,14 +14,15 @@ type Props = {
   envSlug?: string;
   functions: Fn[];
   pathCreator?: {
-    // No need to make this env agnostic, since we only want links in Cloud
-    function: (params: { envSlug: string; functionSlug: string }) => string;
-    eventType: (params: { envSlug: string; eventName: string }) => string;
+    // TANSTACK TODO: we should take cloud tanstack route types here
+    function: (params: { envSlug: string; functionSlug: string }) => unknown;
+    eventType: (params: { envSlug: string; eventName: string }) => unknown;
   };
 };
 
 export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  //@ts-expect-error: TANSTACK TODO: see route type todo above
   const columns = useColumns({ envSlug, pathCreator });
 
   const sortedFunctions = [...functions].sort((a, b) => {
@@ -57,7 +59,12 @@ function useColumns({
               <Link
                 size="medium"
                 className="w-full text-sm"
-                href={pathCreator.function({ envSlug, functionSlug: info.row.original.slug })}
+                to={
+                  pathCreator.function({
+                    envSlug,
+                    functionSlug: info.row.original.slug,
+                  }) as FileRouteTypes['to']
+                }
               >
                 {name}
               </Link>
