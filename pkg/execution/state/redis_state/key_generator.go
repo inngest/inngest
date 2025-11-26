@@ -634,6 +634,10 @@ type PauseKeyGenerator interface {
 	// which is used when caching pauses in-memory to only load the subset of pauses
 	// added after the cache was last updated.
 	PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string
+
+	// PauseBlockIndex is a key that's used to keep the block ID of the flushed pause
+	// so we can still get pauses by ID from blocks.
+	PauseBlockIndex(ctx context.Context, pauseID uuid.UUID) string
 }
 
 type pauseKeyGenerator struct {
@@ -665,6 +669,10 @@ func (u pauseKeyGenerator) PauseIndex(ctx context.Context, kind string, wsID uui
 		return fmt.Sprintf("{%s}:pause-idx:%s:%s:-", u.stateDefaultKey, kind, wsID)
 	}
 	return fmt.Sprintf("{%s}:pause-idx:%s:%s:%s", u.stateDefaultKey, kind, wsID, event)
+}
+
+func (u pauseKeyGenerator) PauseBlockIndex(ctx context.Context, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-block:%s", u.stateDefaultKey, pauseID.String())
 }
 
 type queueItemKeyGenerator struct {

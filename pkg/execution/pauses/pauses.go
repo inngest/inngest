@@ -122,7 +122,7 @@ type Manager interface {
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
 
 	// FlushIndexBlock flushes a new pauses block for the specified index.
 	FlushIndexBlock(ctx context.Context, index Index) error
@@ -171,7 +171,7 @@ type Bufferer interface {
 
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 	// the buffer.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
 
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
@@ -216,7 +216,7 @@ type BlockFlusher interface {
 	BlockSize() int
 
 	// Delete deletes a pause from from block storage.
-	Delete(ctx context.Context, index Index, pause state.Pause) error
+	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
 }
 
 // BlockReader reads blocks for a given index.

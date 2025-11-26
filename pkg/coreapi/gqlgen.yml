@@ -20,6 +20,10 @@ models:
     model: github.com/inngest/inngest/pkg/coreapi.NullString
   Uint:
     model: github.com/99designs/gqlgen/graphql.Uint
+  Int64:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int
   Environment:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   App:

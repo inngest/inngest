@@ -1,6 +1,8 @@
 'use client';
 
 import { Pill } from '@inngest/components/Pill/Pill';
+import { RiFileCopyLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
 import { cn } from '../../utils/classNames';
 import { useRenderAdornment } from '../AdornmentContext';
@@ -27,34 +29,48 @@ export function ValueRow({
   const computed = computeType(node, baseLabel);
   const typeText = typeLabelOverride !== undefined ? typeLabelOverride : computed;
 
+  const handleCopyValue = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(node.name);
+    toast.success('Value copied to clipboard');
+  };
+
   return (
-    <div className="flex items-baseline gap-1.5 px-1 py-0.5">
-      <span
-        className={cn(
-          'text-sm',
-          boldName ? 'text-basis font-semibold' : 'text-subtle',
-          'whitespace-nowrap'
-        )}
-      >
-        {node.name}
-      </span>
-      {Boolean(typeText) && (
-        <span className="text-quaternary-warmerxIntense whitespace-nowrap font-mono text-xs capitalize">
-          {typeText}
-        </span>
-      )}
-      {Boolean(typePillOverride) && (
-        <Pill
-          appearance="outlined"
-          className="border-subtle text-subtle whitespace-nowrap"
-          kind="secondary"
+    <div
+      className="hover:bg-canvasSubtle group flex cursor-pointer items-baseline justify-between gap-2 rounded px-1 py-0.5"
+      onClick={handleCopyValue}
+    >
+      <div className="flex items-center gap-1">
+        <span
+          className={cn(
+            'text-sm',
+            boldName ? 'text-basis font-semibold' : 'text-subtle',
+            'whitespace-nowrap'
+          )}
         >
-          {typePillOverride}
-        </Pill>
-      )}
-      <span className="self-baseline align-baseline text-xs leading-none">
-        {renderAdornment(node, computed)}
-      </span>
+          {node.name}
+        </span>
+        <RiFileCopyLine className="text-subtle h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        {Boolean(typeText) && (
+          <span className="text-quaternary-warmerxIntense whitespace-nowrap font-mono text-xs capitalize">
+            {typeText}
+          </span>
+        )}
+        {Boolean(typePillOverride) && (
+          <Pill
+            appearance="outlined"
+            className="border-subtle text-subtle whitespace-nowrap"
+            kind="secondary"
+          >
+            {typePillOverride}
+          </Pill>
+        )}
+        <span className="self-baseline align-baseline text-xs leading-none">
+          {renderAdornment(node, computed)}
+        </span>
+      </div>
     </div>
   );
 }

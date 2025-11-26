@@ -1,6 +1,5 @@
 'use client';
 
-import { Link } from '@inngest/components/Link/Link';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
 
 import type { Tab } from '@/components/Insights/types';
@@ -17,7 +16,6 @@ import { SQLEditorInstanceProvider } from '../InsightsSQLEditor/SQLEditorInstanc
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '../Section';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
-import { EXTERNAL_FEEDBACK_LINK } from './constants';
 
 type InsightsTabPanelProps = {
   historyWindow?: number;
@@ -51,7 +49,7 @@ export function InsightsTabPanel({
             <Section
               actions={
                 <div className="relative flex gap-2">
-                  <div className="absolute right-full -z-10">
+                  <div className="absolute right-full">
                     <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
                   </div>
                   <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
@@ -70,11 +68,8 @@ export function InsightsTabPanel({
             <Section
               actions={
                 <>
-                  <InsightsSQLEditorDownloadCSVButton temporarilyHide />
+                  <InsightsSQLEditorDownloadCSVButton />
                   {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-                  <Link href={EXTERNAL_FEEDBACK_LINK} rel="noopener noreferrer" target="_blank">
-                    Send us feedback
-                  </Link>
                 </>
               }
               className="border-subtle h-full border-t"

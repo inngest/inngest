@@ -318,7 +318,7 @@ func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID,
 }
 
 // Delete deletes a pause from from block storage or the buffer.
-func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
+func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
 	// Potential future optimization:  cache the last written block for an index
 	// in-memory so we can fast lookup here:
 	//
@@ -342,7 +342,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 		}
 	}
 
-	err := m.buf.Delete(ctx, index, pause)
+	err := m.buf.Delete(ctx, index, pause, opts...)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
 	}
@@ -356,7 +356,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 
 	// Always also delegate to the flusher, just in case a block was written whilst
 	// we issued the delete request.
-	return m.bs.Delete(ctx, index, pause)
+	return m.bs.Delete(ctx, index, pause, opts...)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
