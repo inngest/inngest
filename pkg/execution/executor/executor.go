@@ -657,9 +657,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.useConstraintAPI,
 		req,
 		key,
-		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
+		func(ctx context.Context, performChecks bool) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				return e.schedule(ctx, req, runID, key, performChecks, fallbackIdempotencyKey)
+				return e.schedule(ctx, req, runID, key, performChecks)
 			}, util.WithBoundaries(2*time.Second))
 		})
 }
@@ -678,9 +678,6 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
-	// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
-	// failed (and we don't know if it succeeded on the API)
-	fallbackIdempotencyKey string,
 ) (*sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, fmt.Errorf("app ID is required to schedule a run")
@@ -696,21 +693,23 @@ func (e *executor) schedule(
 	)
 
 	if performChecks {
-		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
-		_ = fallbackIdempotencyKey
-
 		// Attempt to rate-limit the incoming function.
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
 			evtMap := req.Events[0].GetEvent().Map()
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
+				constraintCheckIdempotencyKey := key
+				if e.capacityManager != nil {
+					constraintCheckIdempotencyKey = e.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, req.AccountID, key)
+				}
+
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
-					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
+					ratelimit.WithIdempotency(constraintCheckIdempotencyKey, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
@@ -4041,7 +4040,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	_, err = util.WithRetry(ctx, "pause.handleGeneratorInvokeFunction", func(ctx context.Context) (int, error) {
 		return e.pm.Write(ctx, idx, &pause)
 	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
-
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
 	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing

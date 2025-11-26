@@ -80,9 +80,6 @@ func TestPartitionByID(t *testing.T) {
 				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 					return tc.keyQueues
 				}),
-				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-					return false
-				}),
 				WithClock(clock),
 			)
 

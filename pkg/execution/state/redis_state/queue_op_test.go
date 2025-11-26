@@ -40,9 +40,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		)
 		ctx := context.Background()
 
@@ -156,9 +153,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			defaultShard,
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 		)
 		ctx := context.Background()
@@ -306,9 +300,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			defaultShard,
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 		)
 		ctx := context.Background()
@@ -478,9 +469,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			defaultShard,
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
-			}),
-			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
 			}),
 		)
 		ctx := context.Background()

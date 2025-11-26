@@ -1,12 +1,15 @@
 local cjson = cjson
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 local KEYS = KEYS
 local ARGV = ARGV
 local keyAccountLeases = KEYS[1]
 local keyOperationIdempotency = KEYS[2]
 local requestDetails = cjson.decode(ARGV[1])
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local keyPrefix = ARGV[2]
 local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) 
@@ -16,7 +19,8 @@ local enableDebugLogs = tonumber(ARGV[7]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 local function getConcurrencyCount(key)
@@ -105,6 +109,9 @@ local function throttleCapacity(key, now_ms, period_ms, limit, burst)
 end
 local configVersion = requestDetails.cv
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 local availableCapacity = nil
 local limitingConstraints = {}
 local retryAt = 0

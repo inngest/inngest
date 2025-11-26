@@ -169,8 +169,8 @@ type QueueManager interface {
 	osqueue.QueueDirectAccess
 
 	DequeueByJobID(ctx context.Context, jobID string, opts ...QueueOpOpt) error
-	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
-	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
+	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
+	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
 	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
@@ -212,10 +212,10 @@ type QueueProcessor interface {
 	EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error)
 	Peek(ctx context.Context, partition *QueuePartition, until time.Time, limit int64) ([]*osqueue.QueueItem, error)
 	Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration time.Duration, now time.Time, denies *leaseDenies, options ...leaseOptionFn) (*ulid.ULID, error)
-	ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error)
-	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
+	ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...extendLeaseOptionFn) (*ulid.ULID, error)
+	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, opts ...requeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
+	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, opts ...dequeueOptionFn) error
 
 	PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error)
 	PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...partitionLeaseOpt) (*ulid.ULID, int, error)
@@ -574,24 +574,6 @@ func WithEnqueueSystemPartitionsToBacklog(enqueueToBacklog bool) QueueOpt {
 	}
 }
 
-func WithDisableLeaseChecksForSystemQueues(disableChecks bool) QueueOpt {
-	return func(q *queue) {
-		q.disableLeaseChecksForSystemQueues = disableChecks
-	}
-}
-
-// DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
-// leasing should be disabled or not
-type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
-
-type DisableSystemQueueLeaseChecks func(ctx context.Context) bool
-
-func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
-	return func(q *queue) {
-		q.disableLeaseChecks = lc
-	}
-}
-
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
 // continue to process a shadow partition's backlog.
 // This helps with reducing churn on leases for the shadow partition and allow handling
@@ -718,10 +700,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			return false
 		},
 		enqueueSystemQueuesToBacklog: false,
-		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
-		disableLeaseChecksForSystemQueues: true,
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
@@ -836,9 +814,6 @@ type queue struct {
 	// activeCheckerLeaseLock ensures that there are no data races writing to
 	// or reading from activeCheckerLeaseID in parallel.
 	activeCheckerLeaseLock *sync.RWMutex
-
-	disableLeaseChecks                DisableLeaseChecks
-	disableLeaseChecksForSystemQueues bool
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -2137,22 +2112,8 @@ func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem)
 	return false
 }
 
-func (q *queue) itemDisableLeaseChecks(ctx context.Context, item osqueue.QueueItem) bool {
-	isSystem := item.QueueName != nil || item.Data.QueueName != nil
-	if isSystem {
-		return q.disableLeaseChecksForSystemQueues
-	}
-
-	if item.Data.Identifier.AccountID != uuid.Nil && q.disableLeaseChecks != nil {
-		return q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID)
-	}
-
-	return false
-}
-
 type leaseOptions struct {
 	disableConstraintChecks bool
-	fallbackIdempotencyKey  string
 
 	backlog     QueueBacklog
 	sp          QueueShadowPartition
@@ -2162,12 +2123,6 @@ type leaseOptions struct {
 func LeaseOptionDisableConstraintChecks(disableChecks bool) leaseOptionFn {
 	return func(o *leaseOptions) {
 		o.disableConstraintChecks = disableChecks
-	}
-}
-
-func LeaseOptionFallbackIdempotencyKey(fallbackIdempotencyKey string) leaseOptionFn {
-	return func(o *leaseOptions) {
-		o.fallbackIdempotencyKey = fallbackIdempotencyKey
 	}
 }
 
@@ -2233,10 +2188,10 @@ func (q *queue) Lease(
 
 	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
-	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
-	if o.disableConstraintChecks {
-		checkConstraints = false
-	}
+	// Disable constraint checks and updates under certain circumstances
+	// - For system queues
+	// - When a valid capacity lease is held
+	checkConstraints := !o.disableConstraintChecks
 
 	if checkConstraints {
 		if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
@@ -2324,10 +2279,14 @@ func (q *queue) Lease(
 
 		kg.ThrottleKey(item.Data.Throttle),
 
+		// Constraint API rollout
 		o.sp.acctInProgressLeasesKey(kg, q.capacityManager),
 		o.sp.fnInProgressLeasesKey(kg, q.capacityManager),
 		o.backlog.inProgressLeasesCustomKey(q.capacityManager, kg, o.sp.AccountID, 1),
 		o.backlog.inProgressLeasesCustomKey(q.capacityManager, kg, o.sp.AccountID, 2),
+		q.keyConstraintCheckIdempotency(o.sp.AccountID, item.ID),
+
+		kg.PartitionScavengerIndex(o.sp.PartitionID),
 	}
 
 	partConcurrency := o.constraints.Concurrency.FunctionConcurrency
@@ -2357,11 +2316,9 @@ func (q *queue) Lease(
 		string(marshaledConstraints),
 
 		// Key queues v2
-		checkConstraintsVal,
 		refilledFromBacklogVal,
 
-		// Constraint API rollout
-		o.fallbackIdempotencyKey,
+		checkConstraintsVal,
 	})
 	if err != nil {
 		return nil, err
@@ -2457,6 +2414,18 @@ func (q *queue) Lease(
 	}
 }
 
+type extendLeaseOptions struct {
+	disableConstraintUpdates bool
+}
+
+func ExtendLeaseOptionDisableConstraintUpdates(disableUpdates bool) extendLeaseOptionFn {
+	return func(o *extendLeaseOptions) {
+		o.disableConstraintUpdates = disableUpdates
+	}
+}
+
+type extendLeaseOptionFn func(o *extendLeaseOptions)
+
 // ExtendLease extens the lease for a given queue item, given the queue item is currently
 // leased with the given ID.  This returns a new lease ID if the lease is successfully ended.
 //
@@ -2465,7 +2434,12 @@ func (q *queue) Lease(
 //
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ulid.ULID, duration time.Duration, options ...extendLeaseOptionFn) (*ulid.ULID, error) {
+	o := &extendLeaseOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ExtendLease"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -2490,6 +2464,12 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		backlog.customKeyInProgress(kg, 2),
 		partition.accountInProgressKey(kg),
 		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
+		kg.PartitionScavengerIndex(partition.PartitionID),
+	}
+
+	updateConstraintStateVal := "1"
+	if o.disableConstraintUpdates {
+		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -2497,6 +2477,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		leaseID.String(),
 		newLeaseID.String(),
 		partition.PartitionID,
+		updateConstraintStateVal,
 	})
 	if err != nil {
 		return nil, err
@@ -2614,10 +2595,7 @@ func (q *queue) PartitionLease(
 		return nil, 0, fmt.Errorf("error generating id: %w", err)
 	}
 
-	disableLeaseChecks := p.IsSystem() && q.disableLeaseChecksForSystemQueues
-	if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
-		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
-	}
+	disableLeaseChecks := p.IsSystem()
 	if o.disableLeaseChecks {
 		disableLeaseChecks = o.disableLeaseChecks
 	}
@@ -3480,70 +3458,77 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			continue
 		}
 
-		cmd := client.B().Zrange().
-			Key(queueKey).
-			Min("-inf").
-			Max(now).
-			Byscore().
-			Limit(0, ScavengeConcurrencyQueuePeekSize).
-			Build()
-		itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
-		if err != nil && err != rueidis.Nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
-			continue
-		}
-		if len(itemIDs) == 0 {
-			// Atomically attempt to drop empty pointer to prevent spinning on this item
-			err := q.dropPartitionPointerIfEmpty(
-				ctx,
-				shard,
-				kg.ConcurrencyIndex(),
-				queueKey,
-				partition,
-			)
-			if err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error dropping empty pointer %q for partition %q: %w", partition, queueKey, err))
+		scavengePartition := func(queueKey string) (int, int, error) {
+			cmd := client.B().Zrange().
+				Key(queueKey).
+				Min("-inf").
+				Max(now).
+				Byscore().
+				Limit(0, ScavengeConcurrencyQueuePeekSize).
+				Build()
+			itemIDs, err := client.Do(ctx, cmd).AsStrSlice()
+			if err != nil && err != rueidis.Nil {
+				return 0, 0, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err)
 			}
-			continue
-		}
+			if len(itemIDs) == 0 {
+				return 0, 0, nil
+			}
 
-		// Fetch the queue item, then requeue.
-		cmd = client.B().Hmget().Key(kg.QueueItem()).Field(itemIDs...).Build()
-		jobs, err := client.Do(ctx, cmd).AsStrSlice()
-		if err != nil && err != rueidis.Nil {
-			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
-			continue
-		}
-		for i, item := range jobs {
-			itemID := itemIDs[i]
-			if item == "" {
-				q.log.Error("missing queue item in concurrency queue",
-					"index_partition", partition,
-					"concurrency_queue_key", queueKey,
-					"item_id", itemID,
-				)
+			// Fetch the queue item, then requeue.
+			cmd = client.B().Hmget().Key(kg.QueueItem()).Field(itemIDs...).Build()
+			jobs, err := client.Do(ctx, cmd).AsStrSlice()
+			if err != nil && err != rueidis.Nil {
+				return 0, 0, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err)
+			}
 
-				// Drop item reference to prevent spinning on this item
-				err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
-				if err != nil {
-					resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
+			var counter int
+			for i, item := range jobs {
+				itemID := itemIDs[i]
+				if item == "" {
+					q.log.Error("missing queue item in concurrency queue",
+						"index_partition", partition,
+						"concurrency_queue_key", queueKey,
+						"item_id", itemID,
+					)
+
+					// Drop item reference to prevent spinning on this item
+					err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()
+					if err != nil {
+						resultErr = multierror.Append(resultErr, fmt.Errorf("error removing missing item '%s' from concurrency queue '%s': %w", itemID, partition, err))
+					}
+					continue
 				}
-				continue
+
+				qi := osqueue.QueueItem{}
+				if err := json.Unmarshal([]byte(item), &qi); err != nil {
+					resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
+					continue
+				}
+				if err := q.Requeue(ctx, q.primaryQueueShard, qi, q.clock.Now()); err != nil {
+					resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
+					continue
+				}
+				counter++
 			}
 
-			qi := osqueue.QueueItem{}
-			if err := json.Unmarshal([]byte(item), &qi); err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
-				continue
-			}
-			if err := q.Requeue(ctx, q.primaryQueueShard, qi, q.clock.Now()); err != nil {
-				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
-				continue
-			}
-			counter++
+			return len(itemIDs), counter, nil
 		}
 
-		if len(itemIDs) < ScavengeConcurrencyQueuePeekSize {
+		peekedFromIndex, scavengedFromIndex, err := scavengePartition(kg.PartitionScavengerIndex(partition))
+		if err != nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from scavenger index: %w", err))
+			continue
+		}
+		counter += scavengedFromIndex
+
+		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey)
+		if err != nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from in progress key: %w", err))
+			continue
+		}
+		counter += scavengedFromInProgressKey
+
+		if peekedFromInProgressKey+peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
 			// Atomically attempt to drop empty pointer if we've processed all items
 			err := q.dropPartitionPointerIfEmpty(
 				ctx,

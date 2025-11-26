@@ -10,7 +10,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 ---@type string[]
@@ -34,6 +34,9 @@ local leaseExpiryMS = tonumber(ARGV[5])
 local keyPrefix = ARGV[6]
 ---@type string[]
 local initialLeaseIDs = cjson.decode(ARGV[7])
+if not initialLeaseIDs then
+	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
+end
 local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
@@ -41,10 +44,11 @@ local enableDebugLogs = tonumber(ARGV[11]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -291,6 +295,9 @@ local configVersion = requestDetails.cv
 
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer, b: integer, p: integer }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -400,8 +407,14 @@ local grantedLeases = {}
 
 -- Update constraints
 for i = 1, granted, 1 do
-	local leaseIdempotencyKey = requestDetails.lik[i]
-	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[leaseIdempotencyKey]) or ""
+	if not requestDetails.lik then
+		return redis.error_reply("ERR requestDetails.lik is nil during update")
+	end
+	if not initialLeaseIDs then
+		return redis.error_reply("ERR initialLeaseIDs is nil during update")
+	end
+	local hashedLeaseIdempotencyKey = requestDetails.lik[i]
+	local leaseRunID = (requestDetails.lri ~= nil and requestDetails.lri[hashedLeaseIdempotencyKey]) or ""
 	local initialLeaseID = initialLeaseIDs[i]
 
 	for _, value in ipairs(constraints) do
@@ -422,16 +435,30 @@ for i = 1, granted, 1 do
 
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
 
-	-- Store lease details (lease idempotency key, associated run ID, operation idempotency key for request details)
-	call("HSET", keyLeaseDetails, "lik", leaseIdempotencyKey, "rid", leaseRunID, "oik", hashedOperationIdempotencyKey)
+	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
+	call(
+		"HSET",
+		keyLeaseDetails,
+		"lik",
+		hashedLeaseIdempotencyKey,
+		"rid",
+		leaseRunID,
+		"oik",
+		hashedOperationIdempotencyKey
+	)
 
 	-- Add lease to scavenger set of account leases
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 
+	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
+	local keyLeaseConstraintCheckIdempotency =
+		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
+
 	---@type { lid: string, lik: string }
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID
-	leaseObject["lik"] = leaseIdempotencyKey
+	leaseObject["lik"] = hashedLeaseIdempotencyKey
 
 	table.insert(grantedLeases, leaseObject)
 end
