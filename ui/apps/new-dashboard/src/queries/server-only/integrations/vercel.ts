@@ -9,9 +9,13 @@ import {
   type VercelApp as GraphQLVercelApp,
 } from "@/gql/graphql";
 import { createServerFn } from "@tanstack/react-start";
-import { getProductionEnvironment } from "./getEnvironment";
-import restAPI from "../restAPI";
-import graphqlAPI from "../graphqlAPI";
+import { getProductionEnvironment } from "../getEnvironment";
+import restAPI from "../../restAPI";
+import graphqlAPI from "../../graphqlAPI";
+import { graphql } from "@/gql";
+
+import { ClientError } from "graphql-request";
+import type { VercelIntegration as GraphQLVercelIntegration } from "@/gql/graphql";
 
 export enum VercelDeploymentProtection {
   Disabled = "",
@@ -286,3 +290,40 @@ export const updateVercelIntegration = createServerFn({ method: "POST" })
       ...removeVercelAppPromises,
     ]);
   });
+
+const vercelIntegrationQuery = graphql(`
+  query VercelIntegration {
+    account {
+      vercelIntegration {
+        isMarketplace
+        projects {
+          canChangeEnabled
+          deploymentProtection
+          isEnabled
+          name
+          originOverride
+          projectID
+          protectionBypassSecret
+          servePath
+        }
+      }
+    }
+  }
+`);
+
+export const getVercelIntegration = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<GraphQLVercelIntegration | null> => {
+  try {
+    const res = await graphqlAPI.request(vercelIntegrationQuery);
+    return res.account.vercelIntegration ?? null;
+  } catch (err) {
+    if (err instanceof ClientError) {
+      throw new Error(err.response.errors?.[0]?.message ?? "Unknown error");
+    }
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error("Unknown error");
+  }
+});

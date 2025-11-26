@@ -1,5 +1,5 @@
 import { Connect } from "@/components/Integrations/Vercel/Connect";
-import { createVercelIntegration } from "@/queries/server-only/vercel";
+import { createVercelIntegration } from "@/queries/server-only/integrations/vercel";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { Link } from "@inngest/components/Link/NewLink";
 import { createFileRoute } from "@tanstack/react-router";

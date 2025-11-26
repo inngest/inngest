@@ -10,6 +10,7 @@ import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiExternalLinkLine } from "@remixicon/react";
 
 import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
+import { ClientOnly } from "@tanstack/react-router";
 
 type Integration = {
   title: string;
@@ -69,7 +70,6 @@ const INTEGRATIONS: Integration[] = [
         kind="primary"
         appearance={enabled ? "outlined" : "solid"}
         size="medium"
-        //@ts-expect-error TANSTACK TODO: remove after this route lands
         to={
           enabled
             ? "/settings/integrations/neon"
@@ -91,7 +91,6 @@ const INTEGRATIONS: Integration[] = [
         kind="primary"
         appearance={enabled ? "outlined" : "solid"}
         size="medium"
-        //@ts-expect-error TANSTACK TODO: remove after this route lands
         to={
           enabled
             ? "/settings/integrations/supabase"
@@ -131,7 +130,6 @@ const INTEGRATIONS: Integration[] = [
         appearance="outlined"
         size="medium"
         label="Configure"
-        //@ts-expect-error TANSTACK TODO: remove after this route lands
         to="/settings/integrations/prometheus"
       />
     ),
@@ -148,7 +146,6 @@ const INTEGRATIONS: Integration[] = [
         appearance="solid"
         size="medium"
         label="Connect"
-        //@ts-expect-error TANSTACK TODO: remove after this route lands
         to="/settings/integrations/datadog"
       />
     ),
@@ -190,6 +187,7 @@ export const IntegrationsList = ({ integrations }: Props) => {
                   <div className="bg-contrast flex h-12 w-12 items-center justify-center rounded">
                     {i.Icon}
                   </div>
+
                   {i.actionButton({
                     enabled: isEnabled,
                     hasError: Boolean(integrationData?.error),

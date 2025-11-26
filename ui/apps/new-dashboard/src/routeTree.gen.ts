@@ -29,6 +29,11 @@ import { Route as AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport } from "./rout
 import { Route as AuthedEnvEnvSlugOnboardingRouteRouteImport } from "./routes/_authed/env/$envSlug/onboarding/route";
 import { Route as AuthedEnvEnvSlugManageRouteRouteImport } from "./routes/_authed/env/$envSlug/manage/route";
 import { Route as AuthedEnvEnvSlugAppsRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/route";
+import { Route as AuthedSettingsIntegrationsVercelIndexRouteImport } from "./routes/_authed/settings/integrations/vercel/index";
+import { Route as AuthedSettingsIntegrationsSupabaseIndexRouteImport } from "./routes/_authed/settings/integrations/supabase/index";
+import { Route as AuthedSettingsIntegrationsPrometheusIndexRouteImport } from "./routes/_authed/settings/integrations/prometheus/index";
+import { Route as AuthedSettingsIntegrationsNeonIndexRouteImport } from "./routes/_authed/settings/integrations/neon/index";
+import { Route as AuthedSettingsIntegrationsDatadogIndexRouteImport } from "./routes/_authed/settings/integrations/datadog/index";
 import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from "./routes/_authed/integrations/vercel/callback/index";
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from "./routes/_authed/env/$envSlug/unattached-syncs/index";
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from "./routes/_authed/env/$envSlug/runs/index";
@@ -39,12 +44,22 @@ import { Route as AuthedEnvEnvSlugEventsIndexRouteImport } from "./routes/_authe
 import { Route as AuthedEnvEnvSlugEventTypesIndexRouteImport } from "./routes/_authed/env/$envSlug/event-types/index";
 import { Route as AuthedEnvEnvSlugDebuggerIndexRouteImport } from "./routes/_authed/env/$envSlug/debugger/index";
 import { Route as AuthedEnvEnvSlugAppsIndexRouteImport } from "./routes/_authed/env/$envSlug/apps/index";
+import { Route as AuthedSettingsIntegrationsSupabaseStepRouteRouteImport } from "./routes/_authed/settings/integrations/supabase/$step/route";
+import { Route as AuthedSettingsIntegrationsNeonStepRouteRouteImport } from "./routes/_authed/settings/integrations/neon/$step/route";
 import { Route as AuthedEnvEnvSlugOnboardingStepRouteRouteImport } from "./routes/_authed/env/$envSlug/onboarding/$step/route";
 import { Route as AuthedEnvEnvSlugManageIngestKeysRouteRouteImport } from "./routes/_authed/env/$envSlug/manage/$ingestKeys/route";
 import { Route as AuthedEnvEnvSlugFunctionsSlugRouteRouteImport } from "./routes/_authed/env/$envSlug/functions/$slug/route";
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteImport } from "./routes/_authed/env/$envSlug/event-types/$eventTypeName/route";
 import { Route as AuthedEnvEnvSlugAppsSyncNewRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/sync-new/route";
 import { Route as AuthedEnvEnvSlugAppsExternalIDRouteRouteImport } from "./routes/_authed/env/$envSlug/apps/$externalID/route";
+import { Route as AuthedSettingsIntegrationsVercelConnectIndexRouteImport } from "./routes/_authed/settings/integrations/vercel/connect/index";
+import { Route as AuthedSettingsIntegrationsSupabaseConnectIndexRouteImport } from "./routes/_authed/settings/integrations/supabase/connect/index";
+import { Route as AuthedSettingsIntegrationsSupabaseStepIndexRouteImport } from "./routes/_authed/settings/integrations/supabase/$step/index";
+import { Route as AuthedSettingsIntegrationsNeonConnectIndexRouteImport } from "./routes/_authed/settings/integrations/neon/connect/index";
+import { Route as AuthedSettingsIntegrationsNeonStepIndexRouteImport } from "./routes/_authed/settings/integrations/neon/$step/index";
+import { Route as AuthedSettingsIntegrationsDatadogStartIndexRouteImport } from "./routes/_authed/settings/integrations/datadog/start/index";
+import { Route as AuthedSettingsIntegrationsDatadogFinishIndexRouteImport } from "./routes/_authed/settings/integrations/datadog/finish/index";
+import { Route as AuthedSettingsIntegrationsDatadogConnectEnvIndexRouteImport } from "./routes/_authed/settings/integrations/datadog/connect-env/index";
 import { Route as AuthedIntegrationsVercelCallbackSuccessIndexRouteImport } from "./routes/_authed/integrations/vercel/callback/success/index";
 import { Route as AuthedEnvEnvSlugRunsRunIDIndexRouteImport } from "./routes/_authed/env/$envSlug/runs/$runID/index";
 import { Route as AuthedEnvEnvSlugOnboardingStepIndexRouteImport } from "./routes/_authed/env/$envSlug/onboarding/$step/index";
@@ -56,6 +71,7 @@ import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameIndexRouteImport } from
 import { Route as AuthedEnvEnvSlugDebuggerFunctionSlugIndexRouteImport } from "./routes/_authed/env/$envSlug/debugger/$functionSlug/index";
 import { Route as AuthedEnvEnvSlugAppsSyncNewIndexRouteImport } from "./routes/_authed/env/$envSlug/apps/sync-new/index";
 import { Route as AuthedEnvEnvSlugAppsExternalIDIndexRouteImport } from "./routes/_authed/env/$envSlug/apps/$externalID/index";
+import { Route as AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport } from "./routes/_authed/settings/integrations/vercel/configure/$id/index";
 import { Route as AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from "./routes/_authed/env/$envSlug/manage/$ingestKeys/$keyID/index";
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from "./routes/_authed/env/$envSlug/functions/$slug/runs/index";
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from "./routes/_authed/env/$envSlug/functions/$slug/replays/index";
@@ -171,6 +187,36 @@ const AuthedEnvEnvSlugAppsRouteRoute =
     path: "/apps",
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any);
+const AuthedSettingsIntegrationsVercelIndexRoute =
+  AuthedSettingsIntegrationsVercelIndexRouteImport.update({
+    id: "/integrations/vercel/",
+    path: "/integrations/vercel/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsSupabaseIndexRoute =
+  AuthedSettingsIntegrationsSupabaseIndexRouteImport.update({
+    id: "/integrations/supabase/",
+    path: "/integrations/supabase/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsPrometheusIndexRoute =
+  AuthedSettingsIntegrationsPrometheusIndexRouteImport.update({
+    id: "/integrations/prometheus/",
+    path: "/integrations/prometheus/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsNeonIndexRoute =
+  AuthedSettingsIntegrationsNeonIndexRouteImport.update({
+    id: "/integrations/neon/",
+    path: "/integrations/neon/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsDatadogIndexRoute =
+  AuthedSettingsIntegrationsDatadogIndexRouteImport.update({
+    id: "/integrations/datadog/",
+    path: "/integrations/datadog/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
 const AuthedIntegrationsVercelCallbackIndexRoute =
   AuthedIntegrationsVercelCallbackIndexRouteImport.update({
     id: "/integrations/vercel/callback/",
@@ -231,6 +277,18 @@ const AuthedEnvEnvSlugAppsIndexRoute =
     path: "/",
     getParentRoute: () => AuthedEnvEnvSlugAppsRouteRoute,
   } as any);
+const AuthedSettingsIntegrationsSupabaseStepRouteRoute =
+  AuthedSettingsIntegrationsSupabaseStepRouteRouteImport.update({
+    id: "/integrations/supabase/$step",
+    path: "/integrations/supabase/$step",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsNeonStepRouteRoute =
+  AuthedSettingsIntegrationsNeonStepRouteRouteImport.update({
+    id: "/integrations/neon/$step",
+    path: "/integrations/neon/$step",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
 const AuthedEnvEnvSlugOnboardingStepRouteRoute =
   AuthedEnvEnvSlugOnboardingStepRouteRouteImport.update({
     id: "/$step",
@@ -266,6 +324,54 @@ const AuthedEnvEnvSlugAppsExternalIDRouteRoute =
     id: "/$externalID",
     path: "/$externalID",
     getParentRoute: () => AuthedEnvEnvSlugAppsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsVercelConnectIndexRoute =
+  AuthedSettingsIntegrationsVercelConnectIndexRouteImport.update({
+    id: "/integrations/vercel/connect/",
+    path: "/integrations/vercel/connect/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsSupabaseConnectIndexRoute =
+  AuthedSettingsIntegrationsSupabaseConnectIndexRouteImport.update({
+    id: "/integrations/supabase/connect/",
+    path: "/integrations/supabase/connect/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsSupabaseStepIndexRoute =
+  AuthedSettingsIntegrationsSupabaseStepIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => AuthedSettingsIntegrationsSupabaseStepRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsNeonConnectIndexRoute =
+  AuthedSettingsIntegrationsNeonConnectIndexRouteImport.update({
+    id: "/integrations/neon/connect/",
+    path: "/integrations/neon/connect/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsNeonStepIndexRoute =
+  AuthedSettingsIntegrationsNeonStepIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => AuthedSettingsIntegrationsNeonStepRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsDatadogStartIndexRoute =
+  AuthedSettingsIntegrationsDatadogStartIndexRouteImport.update({
+    id: "/integrations/datadog/start/",
+    path: "/integrations/datadog/start/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsDatadogFinishIndexRoute =
+  AuthedSettingsIntegrationsDatadogFinishIndexRouteImport.update({
+    id: "/integrations/datadog/finish/",
+    path: "/integrations/datadog/finish/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute =
+  AuthedSettingsIntegrationsDatadogConnectEnvIndexRouteImport.update({
+    id: "/integrations/datadog/connect-env/",
+    path: "/integrations/datadog/connect-env/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
   } as any);
 const AuthedIntegrationsVercelCallbackSuccessIndexRoute =
   AuthedIntegrationsVercelCallbackSuccessIndexRouteImport.update({
@@ -332,6 +438,12 @@ const AuthedEnvEnvSlugAppsExternalIDIndexRoute =
     id: "/",
     path: "/",
     getParentRoute: () => AuthedEnvEnvSlugAppsExternalIDRouteRoute,
+  } as any);
+const AuthedSettingsIntegrationsVercelConfigureIdIndexRoute =
+  AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport.update({
+    id: "/integrations/vercel/configure/$id/",
+    path: "/integrations/vercel/configure/$id/",
+    getParentRoute: () => AuthedSettingsRouteRoute,
   } as any);
 const AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute =
   AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport.update({
@@ -402,6 +514,8 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/functions/$slug": typeof AuthedEnvEnvSlugFunctionsSlugRouteRouteWithChildren;
   "/env/$envSlug/manage/$ingestKeys": typeof AuthedEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
   "/env/$envSlug/onboarding/$step": typeof AuthedEnvEnvSlugOnboardingStepRouteRouteWithChildren;
+  "/settings/integrations/neon/$step": typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren;
+  "/settings/integrations/supabase/$step": typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren;
   "/env/$envSlug/apps/": typeof AuthedEnvEnvSlugAppsIndexRoute;
   "/env/$envSlug/debugger": typeof AuthedEnvEnvSlugDebuggerIndexRoute;
   "/env/$envSlug/event-types": typeof AuthedEnvEnvSlugEventTypesIndexRoute;
@@ -412,6 +526,11 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/runs": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/env/$envSlug/unattached-syncs/": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
   "/integrations/vercel/callback": typeof AuthedIntegrationsVercelCallbackIndexRoute;
+  "/settings/integrations/datadog": typeof AuthedSettingsIntegrationsDatadogIndexRoute;
+  "/settings/integrations/neon": typeof AuthedSettingsIntegrationsNeonIndexRoute;
+  "/settings/integrations/prometheus": typeof AuthedSettingsIntegrationsPrometheusIndexRoute;
+  "/settings/integrations/supabase": typeof AuthedSettingsIntegrationsSupabaseIndexRoute;
+  "/settings/integrations/vercel": typeof AuthedSettingsIntegrationsVercelIndexRoute;
   "/env/$envSlug/apps/$externalID/": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/env/$envSlug/apps/sync-new/": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/env/$envSlug/debugger/$functionSlug": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -423,12 +542,21 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/onboarding/$step/": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/env/$envSlug/runs/$runID": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
   "/integrations/vercel/callback/success": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
+  "/settings/integrations/datadog/connect-env": typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute;
+  "/settings/integrations/datadog/finish": typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute;
+  "/settings/integrations/datadog/start": typeof AuthedSettingsIntegrationsDatadogStartIndexRoute;
+  "/settings/integrations/neon/$step/": typeof AuthedSettingsIntegrationsNeonStepIndexRoute;
+  "/settings/integrations/neon/connect": typeof AuthedSettingsIntegrationsNeonConnectIndexRoute;
+  "/settings/integrations/supabase/$step/": typeof AuthedSettingsIntegrationsSupabaseStepIndexRoute;
+  "/settings/integrations/supabase/connect": typeof AuthedSettingsIntegrationsSupabaseConnectIndexRoute;
+  "/settings/integrations/vercel/connect": typeof AuthedSettingsIntegrationsVercelConnectIndexRoute;
   "/env/$envSlug/apps/$externalID/syncs": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/env/$envSlug/event-types/$eventTypeName/events": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/env/$envSlug/functions/$slug/cancellations": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
   "/env/$envSlug/functions/$slug/replays": typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute;
   "/env/$envSlug/functions/$slug/runs": typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
+  "/settings/integrations/vercel/configure/$id": typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute;
   "/env/$envSlug/functions/$slug/replays/$replayID": typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute;
 }
 export interface FileRoutesByTo {
@@ -458,6 +586,11 @@ export interface FileRoutesByTo {
   "/env/$envSlug/runs": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
   "/integrations/vercel/callback": typeof AuthedIntegrationsVercelCallbackIndexRoute;
+  "/settings/integrations/datadog": typeof AuthedSettingsIntegrationsDatadogIndexRoute;
+  "/settings/integrations/neon": typeof AuthedSettingsIntegrationsNeonIndexRoute;
+  "/settings/integrations/prometheus": typeof AuthedSettingsIntegrationsPrometheusIndexRoute;
+  "/settings/integrations/supabase": typeof AuthedSettingsIntegrationsSupabaseIndexRoute;
+  "/settings/integrations/vercel": typeof AuthedSettingsIntegrationsVercelIndexRoute;
   "/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/env/$envSlug/debugger/$functionSlug": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -469,12 +602,21 @@ export interface FileRoutesByTo {
   "/env/$envSlug/onboarding/$step": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/env/$envSlug/runs/$runID": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
   "/integrations/vercel/callback/success": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
+  "/settings/integrations/datadog/connect-env": typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute;
+  "/settings/integrations/datadog/finish": typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute;
+  "/settings/integrations/datadog/start": typeof AuthedSettingsIntegrationsDatadogStartIndexRoute;
+  "/settings/integrations/neon/$step": typeof AuthedSettingsIntegrationsNeonStepIndexRoute;
+  "/settings/integrations/neon/connect": typeof AuthedSettingsIntegrationsNeonConnectIndexRoute;
+  "/settings/integrations/supabase/$step": typeof AuthedSettingsIntegrationsSupabaseStepIndexRoute;
+  "/settings/integrations/supabase/connect": typeof AuthedSettingsIntegrationsSupabaseConnectIndexRoute;
+  "/settings/integrations/vercel/connect": typeof AuthedSettingsIntegrationsVercelConnectIndexRoute;
   "/env/$envSlug/apps/$externalID/syncs": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/env/$envSlug/event-types/$eventTypeName/events": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/env/$envSlug/functions/$slug/cancellations": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
   "/env/$envSlug/functions/$slug/replays": typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute;
   "/env/$envSlug/functions/$slug/runs": typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/env/$envSlug/manage/$ingestKeys/$keyID": typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
+  "/settings/integrations/vercel/configure/$id": typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute;
   "/env/$envSlug/functions/$slug/replays/$replayID": typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute;
 }
 export interface FileRoutesById {
@@ -505,6 +647,8 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/functions/$slug": typeof AuthedEnvEnvSlugFunctionsSlugRouteRouteWithChildren;
   "/_authed/env/$envSlug/manage/$ingestKeys": typeof AuthedEnvEnvSlugManageIngestKeysRouteRouteWithChildren;
   "/_authed/env/$envSlug/onboarding/$step": typeof AuthedEnvEnvSlugOnboardingStepRouteRouteWithChildren;
+  "/_authed/settings/integrations/neon/$step": typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren;
+  "/_authed/settings/integrations/supabase/$step": typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren;
   "/_authed/env/$envSlug/apps/": typeof AuthedEnvEnvSlugAppsIndexRoute;
   "/_authed/env/$envSlug/debugger/": typeof AuthedEnvEnvSlugDebuggerIndexRoute;
   "/_authed/env/$envSlug/event-types/": typeof AuthedEnvEnvSlugEventTypesIndexRoute;
@@ -515,6 +659,11 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/runs/": typeof AuthedEnvEnvSlugRunsIndexRoute;
   "/_authed/env/$envSlug/unattached-syncs/": typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute;
   "/_authed/integrations/vercel/callback/": typeof AuthedIntegrationsVercelCallbackIndexRoute;
+  "/_authed/settings/integrations/datadog/": typeof AuthedSettingsIntegrationsDatadogIndexRoute;
+  "/_authed/settings/integrations/neon/": typeof AuthedSettingsIntegrationsNeonIndexRoute;
+  "/_authed/settings/integrations/prometheus/": typeof AuthedSettingsIntegrationsPrometheusIndexRoute;
+  "/_authed/settings/integrations/supabase/": typeof AuthedSettingsIntegrationsSupabaseIndexRoute;
+  "/_authed/settings/integrations/vercel/": typeof AuthedSettingsIntegrationsVercelIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID/": typeof AuthedEnvEnvSlugAppsExternalIDIndexRoute;
   "/_authed/env/$envSlug/apps/sync-new/": typeof AuthedEnvEnvSlugAppsSyncNewIndexRoute;
   "/_authed/env/$envSlug/debugger/$functionSlug/": typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute;
@@ -526,12 +675,21 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/onboarding/$step/": typeof AuthedEnvEnvSlugOnboardingStepIndexRoute;
   "/_authed/env/$envSlug/runs/$runID/": typeof AuthedEnvEnvSlugRunsRunIDIndexRoute;
   "/_authed/integrations/vercel/callback/success/": typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
+  "/_authed/settings/integrations/datadog/connect-env/": typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute;
+  "/_authed/settings/integrations/datadog/finish/": typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute;
+  "/_authed/settings/integrations/datadog/start/": typeof AuthedSettingsIntegrationsDatadogStartIndexRoute;
+  "/_authed/settings/integrations/neon/$step/": typeof AuthedSettingsIntegrationsNeonStepIndexRoute;
+  "/_authed/settings/integrations/neon/connect/": typeof AuthedSettingsIntegrationsNeonConnectIndexRoute;
+  "/_authed/settings/integrations/supabase/$step/": typeof AuthedSettingsIntegrationsSupabaseStepIndexRoute;
+  "/_authed/settings/integrations/supabase/connect/": typeof AuthedSettingsIntegrationsSupabaseConnectIndexRoute;
+  "/_authed/settings/integrations/vercel/connect/": typeof AuthedSettingsIntegrationsVercelConnectIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID/syncs/": typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute;
   "/_authed/env/$envSlug/event-types/$eventTypeName/events/": typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute;
   "/_authed/env/$envSlug/functions/$slug/cancellations/": typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute;
   "/_authed/env/$envSlug/functions/$slug/replays/": typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute;
   "/_authed/env/$envSlug/functions/$slug/runs/": typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute;
   "/_authed/env/$envSlug/manage/$ingestKeys/$keyID/": typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute;
+  "/_authed/settings/integrations/vercel/configure/$id/": typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute;
   "/_authed/env/$envSlug/functions/$slug/replays/$replayID/": typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute;
 }
 export interface FileRouteTypes {
@@ -562,6 +720,8 @@ export interface FileRouteTypes {
     | "/env/$envSlug/functions/$slug"
     | "/env/$envSlug/manage/$ingestKeys"
     | "/env/$envSlug/onboarding/$step"
+    | "/settings/integrations/neon/$step"
+    | "/settings/integrations/supabase/$step"
     | "/env/$envSlug/apps/"
     | "/env/$envSlug/debugger"
     | "/env/$envSlug/event-types"
@@ -572,6 +732,11 @@ export interface FileRouteTypes {
     | "/env/$envSlug/runs"
     | "/env/$envSlug/unattached-syncs/"
     | "/integrations/vercel/callback"
+    | "/settings/integrations/datadog"
+    | "/settings/integrations/neon"
+    | "/settings/integrations/prometheus"
+    | "/settings/integrations/supabase"
+    | "/settings/integrations/vercel"
     | "/env/$envSlug/apps/$externalID/"
     | "/env/$envSlug/apps/sync-new/"
     | "/env/$envSlug/debugger/$functionSlug"
@@ -583,12 +748,21 @@ export interface FileRouteTypes {
     | "/env/$envSlug/onboarding/$step/"
     | "/env/$envSlug/runs/$runID"
     | "/integrations/vercel/callback/success"
+    | "/settings/integrations/datadog/connect-env"
+    | "/settings/integrations/datadog/finish"
+    | "/settings/integrations/datadog/start"
+    | "/settings/integrations/neon/$step/"
+    | "/settings/integrations/neon/connect"
+    | "/settings/integrations/supabase/$step/"
+    | "/settings/integrations/supabase/connect"
+    | "/settings/integrations/vercel/connect"
     | "/env/$envSlug/apps/$externalID/syncs"
     | "/env/$envSlug/event-types/$eventTypeName/events"
     | "/env/$envSlug/functions/$slug/cancellations"
     | "/env/$envSlug/functions/$slug/replays"
     | "/env/$envSlug/functions/$slug/runs"
     | "/env/$envSlug/manage/$ingestKeys/$keyID"
+    | "/settings/integrations/vercel/configure/$id"
     | "/env/$envSlug/functions/$slug/replays/$replayID";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -618,6 +792,11 @@ export interface FileRouteTypes {
     | "/env/$envSlug/runs"
     | "/env/$envSlug/unattached-syncs"
     | "/integrations/vercel/callback"
+    | "/settings/integrations/datadog"
+    | "/settings/integrations/neon"
+    | "/settings/integrations/prometheus"
+    | "/settings/integrations/supabase"
+    | "/settings/integrations/vercel"
     | "/env/$envSlug/apps/$externalID"
     | "/env/$envSlug/apps/sync-new"
     | "/env/$envSlug/debugger/$functionSlug"
@@ -629,12 +808,21 @@ export interface FileRouteTypes {
     | "/env/$envSlug/onboarding/$step"
     | "/env/$envSlug/runs/$runID"
     | "/integrations/vercel/callback/success"
+    | "/settings/integrations/datadog/connect-env"
+    | "/settings/integrations/datadog/finish"
+    | "/settings/integrations/datadog/start"
+    | "/settings/integrations/neon/$step"
+    | "/settings/integrations/neon/connect"
+    | "/settings/integrations/supabase/$step"
+    | "/settings/integrations/supabase/connect"
+    | "/settings/integrations/vercel/connect"
     | "/env/$envSlug/apps/$externalID/syncs"
     | "/env/$envSlug/event-types/$eventTypeName/events"
     | "/env/$envSlug/functions/$slug/cancellations"
     | "/env/$envSlug/functions/$slug/replays"
     | "/env/$envSlug/functions/$slug/runs"
     | "/env/$envSlug/manage/$ingestKeys/$keyID"
+    | "/settings/integrations/vercel/configure/$id"
     | "/env/$envSlug/functions/$slug/replays/$replayID";
   id:
     | "__root__"
@@ -664,6 +852,8 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/functions/$slug"
     | "/_authed/env/$envSlug/manage/$ingestKeys"
     | "/_authed/env/$envSlug/onboarding/$step"
+    | "/_authed/settings/integrations/neon/$step"
+    | "/_authed/settings/integrations/supabase/$step"
     | "/_authed/env/$envSlug/apps/"
     | "/_authed/env/$envSlug/debugger/"
     | "/_authed/env/$envSlug/event-types/"
@@ -674,6 +864,11 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/runs/"
     | "/_authed/env/$envSlug/unattached-syncs/"
     | "/_authed/integrations/vercel/callback/"
+    | "/_authed/settings/integrations/datadog/"
+    | "/_authed/settings/integrations/neon/"
+    | "/_authed/settings/integrations/prometheus/"
+    | "/_authed/settings/integrations/supabase/"
+    | "/_authed/settings/integrations/vercel/"
     | "/_authed/env/$envSlug/apps/$externalID/"
     | "/_authed/env/$envSlug/apps/sync-new/"
     | "/_authed/env/$envSlug/debugger/$functionSlug/"
@@ -685,12 +880,21 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/onboarding/$step/"
     | "/_authed/env/$envSlug/runs/$runID/"
     | "/_authed/integrations/vercel/callback/success/"
+    | "/_authed/settings/integrations/datadog/connect-env/"
+    | "/_authed/settings/integrations/datadog/finish/"
+    | "/_authed/settings/integrations/datadog/start/"
+    | "/_authed/settings/integrations/neon/$step/"
+    | "/_authed/settings/integrations/neon/connect/"
+    | "/_authed/settings/integrations/supabase/$step/"
+    | "/_authed/settings/integrations/supabase/connect/"
+    | "/_authed/settings/integrations/vercel/connect/"
     | "/_authed/env/$envSlug/apps/$externalID/syncs/"
     | "/_authed/env/$envSlug/event-types/$eventTypeName/events/"
     | "/_authed/env/$envSlug/functions/$slug/cancellations/"
     | "/_authed/env/$envSlug/functions/$slug/replays/"
     | "/_authed/env/$envSlug/functions/$slug/runs/"
     | "/_authed/env/$envSlug/manage/$ingestKeys/$keyID/"
+    | "/_authed/settings/integrations/vercel/configure/$id/"
     | "/_authed/env/$envSlug/functions/$slug/replays/$replayID/";
   fileRoutesById: FileRoutesById;
 }
@@ -844,6 +1048,41 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsRouteRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute;
     };
+    "/_authed/settings/integrations/vercel/": {
+      id: "/_authed/settings/integrations/vercel/";
+      path: "/integrations/vercel";
+      fullPath: "/settings/integrations/vercel";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsVercelIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/supabase/": {
+      id: "/_authed/settings/integrations/supabase/";
+      path: "/integrations/supabase";
+      fullPath: "/settings/integrations/supabase";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsSupabaseIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/prometheus/": {
+      id: "/_authed/settings/integrations/prometheus/";
+      path: "/integrations/prometheus";
+      fullPath: "/settings/integrations/prometheus";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsPrometheusIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/neon/": {
+      id: "/_authed/settings/integrations/neon/";
+      path: "/integrations/neon";
+      fullPath: "/settings/integrations/neon";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsNeonIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/datadog/": {
+      id: "/_authed/settings/integrations/datadog/";
+      path: "/integrations/datadog";
+      fullPath: "/settings/integrations/datadog";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsDatadogIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
     "/_authed/integrations/vercel/callback/": {
       id: "/_authed/integrations/vercel/callback/";
       path: "/integrations/vercel/callback";
@@ -914,6 +1153,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsIndexRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugAppsRouteRoute;
     };
+    "/_authed/settings/integrations/supabase/$step": {
+      id: "/_authed/settings/integrations/supabase/$step";
+      path: "/integrations/supabase/$step";
+      fullPath: "/settings/integrations/supabase/$step";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/neon/$step": {
+      id: "/_authed/settings/integrations/neon/$step";
+      path: "/integrations/neon/$step";
+      fullPath: "/settings/integrations/neon/$step";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
     "/_authed/env/$envSlug/onboarding/$step": {
       id: "/_authed/env/$envSlug/onboarding/$step";
       path: "/$step";
@@ -955,6 +1208,62 @@ declare module "@tanstack/react-router" {
       fullPath: "/env/$envSlug/apps/$externalID";
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugAppsRouteRoute;
+    };
+    "/_authed/settings/integrations/vercel/connect/": {
+      id: "/_authed/settings/integrations/vercel/connect/";
+      path: "/integrations/vercel/connect";
+      fullPath: "/settings/integrations/vercel/connect";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsVercelConnectIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/supabase/connect/": {
+      id: "/_authed/settings/integrations/supabase/connect/";
+      path: "/integrations/supabase/connect";
+      fullPath: "/settings/integrations/supabase/connect";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsSupabaseConnectIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/supabase/$step/": {
+      id: "/_authed/settings/integrations/supabase/$step/";
+      path: "/";
+      fullPath: "/settings/integrations/supabase/$step/";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsSupabaseStepIndexRouteImport;
+      parentRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRoute;
+    };
+    "/_authed/settings/integrations/neon/connect/": {
+      id: "/_authed/settings/integrations/neon/connect/";
+      path: "/integrations/neon/connect";
+      fullPath: "/settings/integrations/neon/connect";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsNeonConnectIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/neon/$step/": {
+      id: "/_authed/settings/integrations/neon/$step/";
+      path: "/";
+      fullPath: "/settings/integrations/neon/$step/";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsNeonStepIndexRouteImport;
+      parentRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRoute;
+    };
+    "/_authed/settings/integrations/datadog/start/": {
+      id: "/_authed/settings/integrations/datadog/start/";
+      path: "/integrations/datadog/start";
+      fullPath: "/settings/integrations/datadog/start";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsDatadogStartIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/datadog/finish/": {
+      id: "/_authed/settings/integrations/datadog/finish/";
+      path: "/integrations/datadog/finish";
+      fullPath: "/settings/integrations/datadog/finish";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsDatadogFinishIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/settings/integrations/datadog/connect-env/": {
+      id: "/_authed/settings/integrations/datadog/connect-env/";
+      path: "/integrations/datadog/connect-env";
+      fullPath: "/settings/integrations/datadog/connect-env";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
     };
     "/_authed/integrations/vercel/callback/success/": {
       id: "/_authed/integrations/vercel/callback/success/";
@@ -1033,6 +1342,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedEnvEnvSlugAppsExternalIDIndexRouteImport;
       parentRoute: typeof AuthedEnvEnvSlugAppsExternalIDRouteRoute;
     };
+    "/_authed/settings/integrations/vercel/configure/$id/": {
+      id: "/_authed/settings/integrations/vercel/configure/$id/";
+      path: "/integrations/vercel/configure/$id";
+      fullPath: "/settings/integrations/vercel/configure/$id";
+      preLoaderRoute: typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
+    };
     "/_authed/env/$envSlug/manage/$ingestKeys/$keyID/": {
       id: "/_authed/env/$envSlug/manage/$ingestKeys/$keyID/";
       path: "/$keyID";
@@ -1102,16 +1418,88 @@ const AuthedBillingRouteRouteChildren: AuthedBillingRouteRouteChildren = {
 const AuthedBillingRouteRouteWithChildren =
   AuthedBillingRouteRoute._addFileChildren(AuthedBillingRouteRouteChildren);
 
+interface AuthedSettingsIntegrationsNeonStepRouteRouteChildren {
+  AuthedSettingsIntegrationsNeonStepIndexRoute: typeof AuthedSettingsIntegrationsNeonStepIndexRoute;
+}
+
+const AuthedSettingsIntegrationsNeonStepRouteRouteChildren: AuthedSettingsIntegrationsNeonStepRouteRouteChildren =
+  {
+    AuthedSettingsIntegrationsNeonStepIndexRoute:
+      AuthedSettingsIntegrationsNeonStepIndexRoute,
+  };
+
+const AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren =
+  AuthedSettingsIntegrationsNeonStepRouteRoute._addFileChildren(
+    AuthedSettingsIntegrationsNeonStepRouteRouteChildren,
+  );
+
+interface AuthedSettingsIntegrationsSupabaseStepRouteRouteChildren {
+  AuthedSettingsIntegrationsSupabaseStepIndexRoute: typeof AuthedSettingsIntegrationsSupabaseStepIndexRoute;
+}
+
+const AuthedSettingsIntegrationsSupabaseStepRouteRouteChildren: AuthedSettingsIntegrationsSupabaseStepRouteRouteChildren =
+  {
+    AuthedSettingsIntegrationsSupabaseStepIndexRoute:
+      AuthedSettingsIntegrationsSupabaseStepIndexRoute,
+  };
+
+const AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren =
+  AuthedSettingsIntegrationsSupabaseStepRouteRoute._addFileChildren(
+    AuthedSettingsIntegrationsSupabaseStepRouteRouteChildren,
+  );
+
 interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute;
   AuthedSettingsOrganizationIndexRoute: typeof AuthedSettingsOrganizationIndexRoute;
   AuthedSettingsUserIndexRoute: typeof AuthedSettingsUserIndexRoute;
+  AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren;
+  AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren;
+  AuthedSettingsIntegrationsDatadogIndexRoute: typeof AuthedSettingsIntegrationsDatadogIndexRoute;
+  AuthedSettingsIntegrationsNeonIndexRoute: typeof AuthedSettingsIntegrationsNeonIndexRoute;
+  AuthedSettingsIntegrationsPrometheusIndexRoute: typeof AuthedSettingsIntegrationsPrometheusIndexRoute;
+  AuthedSettingsIntegrationsSupabaseIndexRoute: typeof AuthedSettingsIntegrationsSupabaseIndexRoute;
+  AuthedSettingsIntegrationsVercelIndexRoute: typeof AuthedSettingsIntegrationsVercelIndexRoute;
+  AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute: typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute;
+  AuthedSettingsIntegrationsDatadogFinishIndexRoute: typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute;
+  AuthedSettingsIntegrationsDatadogStartIndexRoute: typeof AuthedSettingsIntegrationsDatadogStartIndexRoute;
+  AuthedSettingsIntegrationsNeonConnectIndexRoute: typeof AuthedSettingsIntegrationsNeonConnectIndexRoute;
+  AuthedSettingsIntegrationsSupabaseConnectIndexRoute: typeof AuthedSettingsIntegrationsSupabaseConnectIndexRoute;
+  AuthedSettingsIntegrationsVercelConnectIndexRoute: typeof AuthedSettingsIntegrationsVercelConnectIndexRoute;
+  AuthedSettingsIntegrationsVercelConfigureIdIndexRoute: typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute;
 }
 
 const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
   AuthedSettingsOrganizationIndexRoute: AuthedSettingsOrganizationIndexRoute,
   AuthedSettingsUserIndexRoute: AuthedSettingsUserIndexRoute,
+  AuthedSettingsIntegrationsNeonStepRouteRoute:
+    AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
+  AuthedSettingsIntegrationsSupabaseStepRouteRoute:
+    AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren,
+  AuthedSettingsIntegrationsDatadogIndexRoute:
+    AuthedSettingsIntegrationsDatadogIndexRoute,
+  AuthedSettingsIntegrationsNeonIndexRoute:
+    AuthedSettingsIntegrationsNeonIndexRoute,
+  AuthedSettingsIntegrationsPrometheusIndexRoute:
+    AuthedSettingsIntegrationsPrometheusIndexRoute,
+  AuthedSettingsIntegrationsSupabaseIndexRoute:
+    AuthedSettingsIntegrationsSupabaseIndexRoute,
+  AuthedSettingsIntegrationsVercelIndexRoute:
+    AuthedSettingsIntegrationsVercelIndexRoute,
+  AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute:
+    AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute,
+  AuthedSettingsIntegrationsDatadogFinishIndexRoute:
+    AuthedSettingsIntegrationsDatadogFinishIndexRoute,
+  AuthedSettingsIntegrationsDatadogStartIndexRoute:
+    AuthedSettingsIntegrationsDatadogStartIndexRoute,
+  AuthedSettingsIntegrationsNeonConnectIndexRoute:
+    AuthedSettingsIntegrationsNeonConnectIndexRoute,
+  AuthedSettingsIntegrationsSupabaseConnectIndexRoute:
+    AuthedSettingsIntegrationsSupabaseConnectIndexRoute,
+  AuthedSettingsIntegrationsVercelConnectIndexRoute:
+    AuthedSettingsIntegrationsVercelConnectIndexRoute,
+  AuthedSettingsIntegrationsVercelConfigureIdIndexRoute:
+    AuthedSettingsIntegrationsVercelConfigureIdIndexRoute,
 };
 
 const AuthedSettingsRouteRouteWithChildren =
