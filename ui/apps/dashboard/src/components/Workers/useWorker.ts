@@ -35,6 +35,7 @@ const query = graphql(`
             gatewayId
             instanceID: instanceId
             workerIp
+            maxWorkerConcurrency
             app {
               id
             }
