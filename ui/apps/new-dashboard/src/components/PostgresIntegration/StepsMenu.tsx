@@ -5,11 +5,12 @@ import {
   isValidStep,
 } from "@inngest/components/PostgresIntegrations/types";
 import StepsMenu from "@inngest/components/Steps/NewStepsMenu";
-import Menu from "@inngest/components/PostgresIntegrations/StepsMenu";
 import { RiExternalLinkLine } from "@remixicon/react";
 
 import { pathCreator } from "@/utils/urls";
 import { useSteps } from "./Context";
+
+import Menu from "@inngest/components/PostgresIntegrations/NewStepsMenu";
 import { useNavigate } from "@tanstack/react-router";
 
 export default function NeonStepsMenu({

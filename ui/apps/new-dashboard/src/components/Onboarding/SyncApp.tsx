@@ -23,11 +23,14 @@ import CommonVercelErrors from "./CommonVercelErrors";
 import {
   type VercelSyncsResponse,
   type VercelApp,
-} from "@/queries/server-only/vercel";
+} from "@/queries/server-only/integrations/vercel";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
 import { getNextStepName } from "./utils";
-import { getVercelSyncs, syncAppManually } from "@/queries/server-only/vercel";
+import {
+  getVercelSyncs,
+  syncAppManually,
+} from "@/queries/server-only/integrations/vercel";
 
 export default function SyncApp() {
   const currentStepName = OnboardingSteps.SyncApp;

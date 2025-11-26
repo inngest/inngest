@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react";
-import { IntegrationSteps } from "@inngest/components/PostgresIntegrations/types";
+import { IntegrationSteps } from "@inngest/components/PostgresIntegrations/newTypes";
 
 interface StepsContextType {
   stepsCompleted: IntegrationSteps[];

@@ -44,7 +44,7 @@ type LinkWrapperProps = {
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
   ({ children, href, to, target, prefetch = false, scroll = true, ...props }, ref) =>
-    href ? (
+    href || to ? (
       <Link
         href={href}
         to={to}
@@ -89,6 +89,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       iconSide,
       loading = false,
       href,
+      to,
       type = 'button',
       keys,
       className,
@@ -155,7 +156,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <TooltipWrapper tooltip={tooltip}>
-        <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
+        <LinkWrapper href={href} to={to} target={target} prefetch={prefetch} scroll={scroll}>
           {buttonElement}
         </LinkWrapper>
       </TooltipWrapper>

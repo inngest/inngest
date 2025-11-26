@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { neonMenuStepContent } from "@inngest/components/PostgresIntegrations/Neon/neonContent";
 import {
   IntegrationSteps,
@@ -5,9 +6,7 @@ import {
   isValidStep,
 } from "@inngest/components/PostgresIntegrations/types";
 import StepsPageHeader from "@inngest/components/Steps/StepsPageHeader";
-
 import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
 
 export default function PageHeader({
   step,
@@ -21,7 +20,10 @@ export default function PageHeader({
   const navigate = useNavigate();
 
   if (!isValidStep(step)) {
-    navigate({ to: pathCreator.pgIntegrationStep({ integration }) });
+    navigate({
+      to: pathCreator.pgIntegrationStep({ integration }),
+      params: { step: STEPS_ORDER[0]! },
+    });
     return;
   }
   const currentStep = steps.indexOf(step);
