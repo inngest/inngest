@@ -28,10 +28,8 @@ const (
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default.
 	DefaultPausesPerBlock = 10_000
 
-	// DefaultCompactionLimit is the number of pauses that have to be deleted from
-	// a block to compact it.  This prevents us from rewriting pauses on every
-	// deletion - a waste of ops.
-	DefaultCompactionLimit = (DefaultPausesPerBlock / 5)
+	// DefaultCompactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	DefaultCompactionGarbageRatio = 0.2
 
 	// DefaultCompactionSample gives us a 10% chance of running compactions after
 	// a delete.
@@ -81,9 +79,8 @@ type BlockstoreOpts struct {
 	// FlushLeaseRenewInterval is the interval for flush lease renewals.
 	FlushLeaseRenewInterval time.Duration
 
-	// CompactionLimit is the total number of pauses that should trigger a compaction.
-	// Note that this doesnt always trigger a compaction;
-	CompactionLimit int
+	// CompactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	CompactionGarbageRatio float64
 	// CompactionSample is the chance of compaction, from 0-1.0
 	CompactionSample float64
 	// CompactionLeaser manages compaction leases for a given index.
@@ -126,8 +123,8 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
 	}
-	if opts.CompactionLimit == 0 {
-		opts.CompactionLimit = DefaultCompactionLimit
+	if opts.CompactionGarbageRatio == 0 {
+		opts.CompactionGarbageRatio = DefaultCompactionGarbageRatio
 	}
 	if opts.CompactionSample == 0 {
 		opts.CompactionSample = DefaultCompactionSample
@@ -149,7 +146,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		blocksize:                    opts.BlockSize,
 		fetchMargin:                  opts.FetchMargin,
 		flushLeaseRenewInterval:      opts.FlushLeaseRenewInterval,
-		compactionLimit:              opts.CompactionLimit,
+		compactionGarbageRatio:       opts.CompactionGarbageRatio,
 		compactionSample:             opts.CompactionSample,
 		compactionLeaser:             opts.CompactionLeaser,
 		compactionLeaseRenewInterval: opts.CompactionLeaseRenewInterval,
@@ -171,10 +168,8 @@ type blockstore struct {
 	// flushLeaseRenewInterval is the interval for flush lease renewals.
 	flushLeaseRenewInterval time.Duration
 
-	// compactionLimit is the number of pauses that have to be deleted from
-	// a block to compact it.  This prevents us from rewriting pauses on every
-	// deletion - a waste of ops.
-	compactionLimit int
+	// compactionGarbageRatio is the ratio of deletions to block size that triggers compaction.
+	compactionGarbageRatio float64
 	// CompactionSample is the chance of compaction, from 0-100
 	compactionSample float64
 	// compactionLeaser manages compaction leases for a given index.
@@ -566,13 +561,11 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 				maxDeletes = max(maxDeletes, size)
 			}
 
-			if maxDeletes < int64(b.compactionLimit) {
-				return
-			}
-
 			// Trigger a new compaction.
-			logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
-			b.Compact(ctx, index)
+			if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
+				logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
+				b.Compact(ctx, index)
+			}
 		}()
 	}
 
@@ -740,11 +733,18 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 		deleteKey := blockDeleteKey(index, blockID)
 		deleteCount, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(deleteKey).Build()).AsInt64()
 		if err != nil {
-			l.Warn("error getting delete count for block", "block_id", blockIDStr, "error", err)
+			l.Error("error getting delete count for block", "block_id", blockIDStr, "error", err)
 			continue
 		}
 
-		if deleteCount >= int64(b.compactionLimit) {
+		blockMD := blockMetadataList[blockIDStr]
+		if blockMD == nil {
+			l.Error("no metadata found for block", "block_id", blockIDStr)
+			continue
+		}
+
+		ratioThreshold := int64(float64(blockMD.Len) * b.compactionGarbageRatio)
+		if deleteCount >= ratioThreshold {
 			blocksToCompact = append(blocksToCompact, blockID)
 		}
 	}
