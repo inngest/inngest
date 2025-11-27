@@ -292,6 +292,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			l.Warn("skipping pause before block boundary",
 				"pause_created_at", item.CreatedAt,
 				"block_boundary", since)
+			continue
 		}
 
 		if item.CreatedAt.IsZero() {
