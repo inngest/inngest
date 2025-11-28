@@ -942,7 +942,6 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	case -1:
 		return status, state.ErrPauseAlreadyExists
 	default:
-		logger.StdlibLogger(ctx).Debug("save pause", "pause", p.ID)
 		return status, nil
 	}
 }
@@ -1152,6 +1151,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ..
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}

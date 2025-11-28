@@ -4,6 +4,7 @@ Deletes a pause.
 
 Output:
   0: Successfully deleted
+  1: Pause not in buffer (race condition - caller should mark deleted in block)
 
 ]]
 
@@ -23,7 +24,7 @@ local signalCorrelationId = ARGV[3]
 local blockIdxValue = ARGV[4]
 
 redis.call("HDEL", pauseEventKey, pauseID)
-redis.call("DEL", pauseKey)
+local deleted = redis.call("DEL", pauseKey)
 -- SREM to remove the pause for this run
 redis.call("SREM", keyRunPauses, pauseID)
 
@@ -48,12 +49,16 @@ redis.call("ZREM", keyPauseAddIdx, pauseID)
 redis.call("ZREM", keyPauseExpIdx, pauseID)
 
 
--- Add an index to block ID to be able to get pauses from block store by ID
 if blockIdxValue ~= "" then
-  redis.call("SET", keyPausesBlockIdx, blockIdxValue, "KEEPTTL")
+  if deleted > 0 then
+    redis.call("SET", keyPausesBlockIdx, blockIdxValue, "KEEPTTL")
+  else
+    -- deleted == 0: pause wasn't in buffer (race condition)
+    -- Return sentinel error so caller can mark it deleted in the block
+    return 1
+  end
 else
   redis.call("DEL", keyPausesBlockIdx)
 end
-
 
 return 0
