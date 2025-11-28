@@ -1151,6 +1151,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ..
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}

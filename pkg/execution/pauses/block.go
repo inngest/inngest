@@ -405,10 +405,18 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 			var deleted int64
 
 			for _, p := range block.Pauses {
-				if err := b.buf.Delete(ctx, index, *p, state.WithWriteBlockIndex(block.ID.String(), index.EventName)); err != nil {
-					logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
-				} else {
+				err := b.buf.Delete(ctx, index, *p, state.WithWriteBlockIndex(block.ID.String(), index.EventName))
+				switch {
+				case err == nil:
 					deleted = deleted + 1
+				case errors.Is(err, state.ErrPauseNotInBuffer):
+					if err := b.Delete(ctx, index, *p); err != nil {
+						logger.StdlibLogger(ctx).Error("error marking pause deleted in block", "error", err, "pause_id", p.ID)
+					} else {
+						deleted = deleted + 1
+					}
+				default:
+					logger.StdlibLogger(ctx).Error("error deleting pause from buffer after flushing block", "error", err)
 				}
 				time.Sleep(5 * time.Millisecond)
 			}
