@@ -71,9 +71,6 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   -- remaining capacity in time units
   local time_capacity_remain = now_ms + total_capacity_time - tat
 
-  -- convert time capacity to token capacity
-  local capacity = math.floor(time_capacity_remain / emission)
-
   -- Convert the remaining time budget back into a number of tokens.
   local capacity = math.floor(time_capacity_remain / emission)
 
