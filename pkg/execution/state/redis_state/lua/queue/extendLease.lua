@@ -24,6 +24,7 @@ local newLeaseKey     = ARGV[3]
 
 local partitionID 		      = ARGV[4]
 local updateConstraintState = tonumber(ARGV[5])
+local enablePartitionScavengeIndex = tonumber(ARGV[6])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -50,7 +51,10 @@ redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 
 -- Update scavenger index
-redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
+-- TODO: Remove rollout flag once all executors are aware of the new index
+if enablePartitionScavengeIndex == 1 then
+  redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
+end
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
