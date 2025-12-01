@@ -303,6 +303,7 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	for _, t := range m.Topics() {
 		tid := t.String()
 		found, ok := b.topics[tid]
+
 		if !ok {
 			continue
 		}

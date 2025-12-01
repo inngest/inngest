@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -46,13 +47,21 @@ func TestRedisBroadcaster(t *testing.T) {
 	// in a separate slice.
 	b1, b2 := NewRedisBroadcaster(pubc, subc1), NewRedisBroadcaster(pubc, subc2)
 	m1, m2 := []Message{}, []Message{} // holds all messages
-	s1 := NewInmemorySubscription(uuid.New(), func(m Message) error {
+	s1 := NewInmemorySubscription(uuid.New(), func(b []byte) error {
+		var m Message
+		if err := json.Unmarshal(b, &m); err != nil {
+			return err
+		}
 		l.Lock()
 		m1 = append(m1, m)
 		l.Unlock()
 		return nil
 	})
-	s2 := NewInmemorySubscription(uuid.New(), func(m Message) error {
+	s2 := NewInmemorySubscription(uuid.New(), func(b []byte) error {
+		var m Message
+		if err := json.Unmarshal(b, &m); err != nil {
+			return err
+		}
 		l.Lock()
 		m2 = append(m2, m)
 		l.Unlock()

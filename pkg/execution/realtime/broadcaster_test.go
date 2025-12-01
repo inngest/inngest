@@ -25,7 +25,11 @@ func TestBroadcaster(t *testing.T) {
 		messages = []Message{}
 		l        sync.Mutex
 	)
-	appender := func(m Message) error {
+	appender := func(b []byte) error {
+		var m Message
+		if err := json.Unmarshal(b, &m); err != nil {
+			return err
+		}
 		l.Lock()
 		messages = append(messages, m)
 		l.Unlock()
@@ -118,10 +122,10 @@ func TestBroadcaster(t *testing.T) {
 			messages = []Message{}
 
 			failed := false
-			sub := NewInmemorySubscription(id, func(m Message) error {
+			sub := NewInmemorySubscription(id, func(b []byte) error {
 				if failed {
 					failed = false
-					err := appender(m)
+					err := appender(b)
 					require.NoError(t, err)
 					return nil
 				}
@@ -246,7 +250,6 @@ func TestBroadcasterConds(t *testing.T) {
 		}, time.Second, time.Millisecond, "unsubscribe should be called")
 		wg.Wait()
 	})
-
 }
 
 func TestBroadcasterStream(t *testing.T) {
@@ -259,27 +262,44 @@ func TestBroadcasterStream(t *testing.T) {
 		streams  = []Chunk{}
 		l        sync.Mutex
 	)
-	appender := func(m Message) error {
-		l.Lock()
-		messages = append(messages, m)
-		l.Unlock()
+	appender := func(b []byte) error {
+		// First, check the "kind" field to determine the type
+		var kindCheck struct {
+			Kind string `json:"kind"`
+		}
+		if err := json.Unmarshal(b, &kindCheck); err != nil {
+			return err
+		}
+
+		switch kindCheck.Kind {
+		case "chunk":
+			var c Chunk
+			if err := json.Unmarshal(b, &c); err != nil {
+				return err
+			}
+			l.Lock()
+			streams = append(streams, c)
+			l.Unlock()
+		default:
+			var m Message
+			if err := json.Unmarshal(b, &m); err != nil {
+				return err
+			}
+			l.Lock()
+			messages = append(messages, m)
+			l.Unlock()
+		}
 		return nil
 	}
 
-	sub := NewInmemorySubscription(id, appender).(subMemory)
-	sub.chunkWriter = func(c Chunk) error {
-		l.Lock()
-		streams = append(streams, c)
-		l.Unlock()
-		return nil
-	}
+	sub := NewInmemorySubscription(id, appender)
 
-	// Subscribe to our topics
+	// This is the message we'll publish.
 	msg := Message{
 		Kind:    streamingtypes.MessageKindDataStreamStart,
 		Channel: "user:123",
 		Topic:   "openai",
-		Data:    json.RawMessage(`streamid123`),
+		Data:    json.RawMessage(`"streamid123"`),
 	}
 
 	err := b.Subscribe(ctx, sub, msg.Topics())
@@ -298,7 +318,7 @@ func TestBroadcasterStream(t *testing.T) {
 		require.EqualValues(t, 1, len(streams), streams)
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: "streamid123",
+			StreamID: `"streamid123"`,
 			Data:     "a",
 		}, streams[0])
 
@@ -307,7 +327,7 @@ func TestBroadcasterStream(t *testing.T) {
 		require.EqualValues(t, 2, len(streams), streams)
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: "streamid123",
+			StreamID: `"streamid123"`,
 			Data:     "b",
 		}, streams[1])
 	})

@@ -30,8 +30,8 @@ const (
 	MessageKindRun = MessageKind("run")
 	// MessageKindData represents misc data published on a custom run channel
 	MessageKindData = MessageKind("data")
-	// MessageKindDataStreamStart represents misc data published on a custom run channel,
-	// streamed to subscribers via multiple messages with an arbitrary prefix.
+	// MessageKindDataStreamStart represents the start of a streaming chunk block,
+	// streamed to subscribers via multiple messages with the same datastream ID.
 	MessageKindDataStreamStart = MessageKind("datastream-start")
 	// MessageKindDataStreamEnd acknowledges the end of a datastream.
 	MessageKindDataStreamEnd   = MessageKind("datastream-end")

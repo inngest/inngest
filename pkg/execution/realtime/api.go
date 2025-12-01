@@ -63,6 +63,7 @@ func (a *api) setup() {
 		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
 		r.Get("/realtime/connect", a.GetWebsocketUpgrade)
+		r.Get("/realtime/stream", a.GetSSE)
 		r.Post("/realtime/token", a.PostCreateJWT)
 	})
 
@@ -115,6 +116,9 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"jwt": jwt,
 	})
+}
+
+func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {

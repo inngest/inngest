@@ -1,12 +1,13 @@
 package realtime
 
 import (
+	"encoding/json"
 	"sync/atomic"
 
 	"github.com/google/uuid"
 )
 
-func NewInmemorySubscription(id uuid.UUID, writer func(m Message) error) Subscription {
+func NewInmemorySubscription(id uuid.UUID, writer func(b []byte) error) Subscription {
 	return subMemory{
 		id:     id,
 		writer: writer,
@@ -19,8 +20,7 @@ type subMemory struct {
 	streamCalls int32
 	id          uuid.UUID
 
-	writer      func(m Message) error
-	chunkWriter func(c Chunk) error
+	writer func(b []byte) error
 }
 
 func (s subMemory) ID() uuid.UUID {
@@ -31,20 +31,29 @@ func (s subMemory) Protocol() string {
 	return "memory"
 }
 
-func (s subMemory) WriteMessage(m Message) error {
+func (s subMemory) Tee(b []byte) error {
 	atomic.AddInt32(&s.writeCalls, 1)
 	if s.writer != nil {
-		return s.writer(m)
+		return s.writer(b)
 	}
 	return nil
 }
 
+func (s subMemory) WriteMessage(m Message) error {
+	byt, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return s.Tee(byt)
+}
+
 func (s subMemory) WriteChunk(c Chunk) error {
 	atomic.AddInt32(&s.streamCalls, 1)
-	if s.chunkWriter != nil {
-		return s.chunkWriter(c)
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return err
 	}
-	return nil
+	return s.Tee(byt)
 }
 
 func (s subMemory) SendKeepalive(m Message) error {

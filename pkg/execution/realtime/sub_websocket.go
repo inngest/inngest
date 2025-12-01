@@ -75,6 +75,10 @@ func (s SubscriptionWS) Protocol() string {
 	return "ws"
 }
 
+func (s SubscriptionWS) Tee(b []byte) error {
+	return s.ws.Write(context.Background(), websocket.MessageText, b)
+}
+
 func (s SubscriptionWS) WriteMessage(m Message) error {
 	// Ensure that the data is valid JSON.  NOte that sometimes
 	// m.Data is set as a raw string - eg. the channel ID.

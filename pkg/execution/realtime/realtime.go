@@ -8,9 +8,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 )
 
-type Message = streamingtypes.Message
-type Topic = streamingtypes.Topic
-type Chunk = streamingtypes.Chunk
+type (
+	Message = streamingtypes.Message
+	Topic   = streamingtypes.Topic
+	Chunk   = streamingtypes.Chunk
+)
 
 // Publisher accepts messages from other services (eg. the executor, or the event API) and
 // publishes messages to any subscribers.
@@ -94,6 +96,13 @@ type Subscription interface {
 
 	// WriteChunk publishes a chunk in a stream - data for a given stream ID to the subscription.
 	WriteChunk(c Chunk) error
+
+	// Tee forwards bytes directly to the subscription.  It is different to WriteMessage in
+	// that no encapsulation is written;  the bytes are written directly as-is.
+	//
+	// This is useful when forwarding raw bytes from eg. durable endpoints to its redirected
+	// endpoint.
+	Tee(b []byte) error
 
 	// Closer closes the current subscription immediately, terminating any active connections.
 	io.Closer
