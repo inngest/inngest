@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -340,7 +341,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		logger.StdlibLogger(ctx).Warn(
 			"error copying request body to subscribers",
 			"error", err,
-			"channel", channel,
+			"channel", strings.ReplaceAll(strings.ReplaceAll(channel, "\n", ""), "\r", ""),
 		)
 		http.Error(w, "Error forwarding data", 500)
 		return
