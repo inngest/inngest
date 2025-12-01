@@ -1107,7 +1107,17 @@ func (q *queue) process(
 	continuationCtr := i.PCtr
 	capacityLeaseID := i.capacityLeaseID
 
+	// Disable constraint updates in case
+	// - we are processing an item for a system queue
+	// - we are holding an active capacity lease
+	//
+	// For system queues, we skip constraint checks + updates entirely,
+	// for regular functions we manage constraint checks + updates in the Constraint API,
+	// if enabled for the current account.
+	//
+	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
 	constraintsManagedByAPI := capacityLeaseID != nil && !capacityLeaseID.IsZero()
+	disableConstraintUpdates := constraintsManagedByAPI || i.P.IsSystem()
 
 	var err error
 	leaseID := qi.LeaseID
@@ -1152,7 +1162,7 @@ func (q *queue) process(
 					*leaseID,
 					QueueLeaseDuration,
 					// When holding a capacity lease, do not update constraint state
-					ExtendLeaseOptionDisableConstraintUpdates(constraintsManagedByAPI),
+					ExtendLeaseOptionDisableConstraintUpdates(disableConstraintUpdates),
 				)
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
@@ -1408,7 +1418,7 @@ func (q *queue) process(
 			}
 
 			qi.AtMS = at.UnixMilli()
-			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at, RequeueOptionDisableConstraintUpdates(constraintsManagedByAPI)); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at, RequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil
@@ -1426,7 +1436,7 @@ func (q *queue) process(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(constraintsManagedByAPI)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -1441,7 +1451,7 @@ func (q *queue) process(
 		}
 
 	case <-doneCh:
-		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(constraintsManagedByAPI)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, DequeueOptionDisableConstraintUpdates(disableConstraintUpdates)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
