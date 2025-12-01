@@ -34,6 +34,8 @@ func TestQueueScavenge(t *testing.T) {
 	kg := shard.RedisClient.KeyGenerator()
 
 	t.Run("in-progress items must be added to scavenger index", func(t *testing.T) {
+		r.FlushAll()
+
 		q := NewQueue(
 			shard,
 			WithClock(clock),
@@ -98,6 +100,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
 		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
 
+		// Dequeue item and check scavenger index was cleaned up
 		err = q.Dequeue(ctx, shard, item, DequeueOptionDisableConstraintUpdates(false))
 		require.NoError(t, err)
 
@@ -107,7 +110,65 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
-	t.Run("existing items in in-progress sets must be covered by scavenger", func(t *testing.T) {})
+	t.Run("enqueueing multiple items should lead to earliest lease to expire to be pointer score", func(t *testing.T) {
+		r.FlushAll()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		fnID := uuid.New()
+
+		qi := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					AccountID:  accountID,
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		start := time.Now().Truncate(time.Second)
+
+		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		leaseExpiry := clock.Now().Add(5 * time.Second)
+		leaseExpiry2 := clock.Now().Add(3 * time.Second)
+		require.NotEqual(t, leaseExpiry, leaseExpiry2)
+
+		// Lease item in legacy/fallback mode (do not disable lease checks)
+		leaseID1, err := q.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+		require.NotNil(t, leaseID1)
+
+		leaseID2, err := q.Lease(ctx, item2, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+		require.NotNil(t, leaseID2)
+
+		// Ensure both items are in scavenger index
+		require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item1.ID)))
+		require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item2.ID)))
+
+		// The earliest expiring lease should become the pointer score
+		require.True(t, r.Exists(kg.ConcurrencyIndex()))
+		require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+	})
+
+	t.Run("existing items in in-progress sets must be covered by scavenger", func(t *testing.T) {
+	})
 
 	t.Run("scavenger must clean up expired leases", func(t *testing.T) {})
 
