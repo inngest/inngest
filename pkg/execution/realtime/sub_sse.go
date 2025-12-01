@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -14,11 +15,11 @@ import (
 func NewSSESubscription(
 	ctx context.Context,
 	w http.ResponseWriter,
-) subSSE {
+) *subSSE {
 	// Ensure SSE headers are sent.
 	sseHeaders(w)
 
-	return subSSE{
+	return &subSSE{
 		id: uuid.New(),
 		w:  w,
 	}
@@ -35,19 +36,20 @@ func sseHeaders(w http.ResponseWriter) {
 type subSSE struct {
 	id uuid.UUID
 	w  http.ResponseWriter
+	mu sync.Mutex // Protects concurrent writes to http.ResponseWriter
 }
 
 // ID returns a unique ID for the given subscription
-func (s subSSE) ID() uuid.UUID {
+func (s *subSSE) ID() uuid.UUID {
 	return s.id
 }
 
 // Protocol is the name of the protocol/implementation
-func (s subSSE) Protocol() string {
+func (s *subSSE) Protocol() string {
 	return "sse"
 }
 
-func (s subSSE) Write(b []byte) error {
+func (s *subSSE) Write(b []byte) error {
 	return s.write(b)
 }
 
@@ -56,7 +58,7 @@ func (s subSSE) Write(b []byte) error {
 // 30 seconds - this is not implementation specific.
 //
 // If SendKeepalive fails consecutively, the subscription will be closed.
-func (s subSSE) SendKeepalive(m Message) error {
+func (s *subSSE) SendKeepalive(m Message) error {
 	// Send the minimum empty message to ensure the conn is active.
 	return s.write([]byte(":\n\n"))
 }
@@ -67,7 +69,7 @@ func (s subSSE) SendKeepalive(m Message) error {
 //
 // Note that each subscription implementation may write different formats of a Message,
 // so this cannot fulfil io.Writer.
-func (s subSSE) WriteMessage(m Message) error {
+func (s *subSSE) WriteMessage(m Message) error {
 	// Ensure that m.Data - a RawMessage - is valid JSON.
 	if !json.Valid(m.Data) {
 		enc, err := json.Marshal(string(m.Data))
@@ -85,7 +87,7 @@ func (s subSSE) WriteMessage(m Message) error {
 }
 
 // WriteChunk publishes a chunk in a stream - data for a given stream ID to the subscription.
-func (s subSSE) WriteChunk(c Chunk) error {
+func (s *subSSE) WriteChunk(c Chunk) error {
 	byt, err := json.Marshal(c)
 	if err != nil {
 		return err
@@ -94,7 +96,7 @@ func (s subSSE) WriteChunk(c Chunk) error {
 }
 
 // Closer closes the current subscription immediately, terminating any active connections.
-func (s subSSE) Close() error {
+func (s *subSSE) Close() error {
 	// Writer is a reguler http.ResponseWriter.  This is usually handled and closed
 	// by the http server.  However, when Close is called we can attempt to hijack this
 	// conn and call Close directly.
@@ -113,13 +115,16 @@ func (s subSSE) Close() error {
 }
 
 // writeSSE formats the data as a proper SSE event and writes it
-func (s subSSE) writeSSE(data []byte) error {
+func (s *subSSE) writeSSE(data []byte) error {
 	// Format as SSE event: "data: {json}\n\n"
 	sseData := fmt.Sprintf("data: %s\n\n", data)
 	return s.write([]byte(sseData))
 }
 
-func (s subSSE) write(b []byte) error {
+func (s *subSSE) write(b []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	
 	if _, err := s.w.Write(b); err != nil {
 		return err
 	}
