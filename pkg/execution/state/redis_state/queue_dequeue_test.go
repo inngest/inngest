@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -968,9 +970,8 @@ func TestQueueDequeue(t *testing.T) {
 	})
 }
 
-func TestQueueRequeue(t *testing.T) {
+func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	r := miniredis.RunT(t)
-
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
 		DisableCache: true,
@@ -978,199 +979,52 @@ func TestQueueRequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	clock := clockwork.NewFakeClock()
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := shard.RedisClient.KeyGenerator()
+
+	q := NewQueue(
+		shard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	)
 	ctx := context.Background()
 
-	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
-		now := time.Now()
+	accountID := uuid.New()
+	fnID := uuid.New()
 
-		fnID := uuid.New()
-		runID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-			FunctionID: fnID,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					RunID:      runID,
-					WorkflowID: fnID,
-				},
+	qi := osqueue.QueueItem{
+		FunctionID: fnID,
+		Data: osqueue.Item{
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:  accountID,
+				WorkflowID: fnID,
 			},
-		}, now, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
+		},
+	}
 
-		_, err = q.Lease(ctx, item, time.Second, time.Now(), nil)
-		require.NoError(t, err)
+	start := time.Now().Truncate(time.Second)
 
-		// Assert partition index is original
-		pi := QueuePartition{FunctionID: &item.FunctionID}
-		requirePartitionScoreEquals(t, r, pi.FunctionID, now.Truncate(time.Second))
+	item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
 
-		requirePartitionInProgress(t, q, item.FunctionID, 1)
+	// Lease item in new mode (skip checks)
+	leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true))
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
 
-		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, q.primaryQueueShard, item, next)
-		require.NoError(t, err)
+	require.Equal(t, clock.Now().Add(5*time.Second).UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
+	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
-			requireItemScoreEquals(t, r, item, next)
-		})
+	err = q.Dequeue(ctx, shard, item, DequeueOptionDisableConstraintUpdates(true))
+	require.NoError(t, err)
 
-		t.Run("It should always remove the lease from the re-enqueued item", func(t *testing.T) {
-			fetched := getQueueItem(t, r, item.ID)
-			require.Nil(t, fetched.LeaseID)
-		})
-
-		t.Run("It should decrease the in-progress count", func(t *testing.T) {
-			requirePartitionInProgress(t, q, item.FunctionID, 0)
-		})
-
-		t.Run("It should update the partition's earliest time, if earliest", func(t *testing.T) {
-			// Assert partition index is updated, as there's only one item here.
-			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
-		})
-
-		t.Run("run indexes are updated on requeue to partition", func(t *testing.T) {
-			kg := q.primaryQueueShard.RedisClient.kg
-
-			require.False(t, r.Exists(kg.ActiveRunsSet("p", item.FunctionID.String())))
-			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
-		})
-
-		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-				FunctionID: fnID,
-				Data: osqueue.Item{
-					Identifier: state.Identifier{
-						RunID:      runID,
-						WorkflowID: fnID,
-					},
-				},
-			}, now, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
-
-			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, q.primaryQueueShard, item, next)
-			require.NoError(t, err)
-
-			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
-		})
-
-		t.Run("Updates default indexes", func(t *testing.T) {
-			at := time.Now().Truncate(time.Second)
-			rid := ulid.MustNew(ulid.Now(), rand.Reader)
-			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-				FunctionID: uuid.New(),
-				Data: osqueue.Item{
-					Kind: osqueue.KindEdge,
-					Identifier: state.Identifier{
-						RunID: rid,
-					},
-				},
-			}, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			key := fmt.Sprintf("{queue}:idx:run:%s", rid)
-
-			keys, err := r.ZMembers(key)
-			require.NoError(t, err)
-			require.Equal(t, 1, len(keys))
-
-			// Score for entry should be the first enqueue time.
-			scores, err := r.ZMScore(key, keys[0])
-			require.NoError(t, err)
-			require.EqualValues(t, at.UnixMilli(), scores[0])
-
-			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, q.primaryQueueShard, item, next)
-			require.NoError(t, err)
-
-			// Score should be the requeue time.
-			scores, err = r.ZMScore(key, keys[0])
-			require.NoError(t, err)
-			require.EqualValues(t, next.UnixMilli(), scores[0])
-
-			// Still only one member.
-			keys, err = r.ZMembers(key)
-			require.NoError(t, err)
-			require.Equal(t, 1, len(keys))
-		})
-	})
-
-	t.Run("For a queue item with concurrency keys it requeues all partitions", func(t *testing.T) {
-		r.FlushAll()
-
-		fnID, acctID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("fn")),
-			uuid.NewSHA1(uuid.NameSpaceDNS, []byte("acct"))
-
-		now := time.Now()
-		item := osqueue.QueueItem{
-			FunctionID: fnID,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					AccountID: acctID,
-				},
-				CustomConcurrencyKeys: []state.CustomConcurrency{
-					{
-						Key: util.ConcurrencyKey(
-							enums.ConcurrencyScopeAccount,
-							acctID,
-							"test-plz",
-						),
-						Limit: 5,
-					},
-					{
-						Key: util.ConcurrencyKey(
-							enums.ConcurrencyScopeFn,
-							fnID,
-							"another-id",
-						),
-						Limit: 2,
-					},
-				},
-			},
-		}
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, now, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		fnPart, custom1, custom2 := q.ItemPartitions(ctx, q.primaryQueueShard, item)
-
-		// Get all scores
-		require.False(t, r.Exists(custom1.zsetKey(q.primaryQueueShard.RedisClient.kg)))
-		require.False(t, r.Exists(custom2.zsetKey(q.primaryQueueShard.RedisClient.kg)))
-		itemScoreDefault, _ := r.ZMScore(fnPart.zsetKey(q.primaryQueueShard.RedisClient.kg), item.ID)
-		partScoreDefault, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), fnPart.ID)
-		accountPartScore, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(acctID), fnPart.ID)
-		accountScore, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), acctID.String())
-
-		require.NotEmpty(t, itemScoreDefault, "Couldn't find item in '%s':\n%s", custom1.zsetKey(q.primaryQueueShard.RedisClient.kg), r.Dump())
-		require.NotEmpty(t, partScoreDefault)
-		require.Equal(t, partScoreDefault, accountPartScore, "expected account partitions to match global partitions")
-		require.Equal(t, accountPartScore[0], accountScore[0], "expected account score to match earliest account partition")
-
-		_, err = q.Lease(ctx, item, time.Second, q.clock.Now(), nil)
-		require.NoError(t, err)
-
-		// Requeue
-		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, q.primaryQueueShard, item, next)
-		require.NoError(t, err)
-
-		t.Run("It requeues all partitions", func(t *testing.T) {
-			newItemScore, _ := r.ZMScore(fnPart.zsetKey(q.primaryQueueShard.RedisClient.kg), item.ID)
-			newPartScore, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(), fnPart.ID)
-			newAccountPartScore, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(acctID), fnPart.ID)
-			newAccountScore, _ := r.ZMScore(q.primaryQueueShard.RedisClient.kg.GlobalAccountIndex(), acctID.String())
-
-			require.NotEqual(t, itemScoreDefault, newItemScore)
-			require.NotEqual(t, partScoreDefault, newPartScore)
-			require.Equal(t, newPartScore, newAccountPartScore)
-			require.Equal(t, newPartScore, newAccountPartScore)
-			require.Equal(t, next.Truncate(time.Second).Unix(), int64(newPartScore[0]))
-			require.Equal(t, newAccountPartScore[0], newAccountScore[0], "expected account score to match earliest account partition", r.Dump())
-			require.EqualValues(t, next.UnixMilli(), int(newItemScore[0]))
-			require.EqualValues(t, next.Unix(), int(newPartScore[0]))
-		})
-	})
+	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
+	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
