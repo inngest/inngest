@@ -37,6 +37,9 @@ func TestQueueScavenge(t *testing.T) {
 		q := NewQueue(
 			shard,
 			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
 		)
 		ctx := context.Background()
 

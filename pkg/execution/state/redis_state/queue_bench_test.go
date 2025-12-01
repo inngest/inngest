@@ -39,7 +39,6 @@ func BenchmarkKeyQueues(b *testing.B) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithEnqueueSystemPartitionsToBacklog(false),
 		WithKindToQueueMapping(map[string]string{
 			osqueue.KindPause:           osqueue.KindPause,
 			osqueue.KindDebounce:        osqueue.KindDebounce,
