@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
 )
 
@@ -48,6 +49,13 @@ type redisBroadcaster struct {
 // Publish publishes a message to Redis' pub-sub.  This is then caught by any subscribers
 // to the same Redis pub-sub channels, which push the message to any connected Subscriptions.
 func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"broadcaster": "redis",
+		},
+	})
+
 	// Push the message to Redis' pub/sub so that all other replicas of the
 	// broadcaster receive the same content.  This ensures that every subscription
 	// publishes message data.
@@ -91,9 +99,23 @@ func (b *redisBroadcaster) Write(ctx context.Context, channel string, data []byt
 }
 
 func (b *redisBroadcaster) publish(ctx context.Context, channel, message string) {
+	metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"op": "publish",
+		},
+	})
+
 	cmd := b.pubc.B().Publish().Channel(channel).Message(message).Build()
 	for i := 0; i < redisPublishAttempts; i++ {
 		if i > 0 {
+			metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"op":     "publish",
+					"status": "retry",
+				},
+			})
 			<-time.After(redisRetryInterval)
 		}
 		if ctx.Err() != nil {
@@ -120,6 +142,12 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 		"failed to publish via realtime redis pubsub",
 		"channel", channel,
 	)
+	metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"op": "publish",
+		},
+	})
 }
 
 // Subscribe is called with an active Websocket or SSE connection to subscribe the conn to multiple topics.
@@ -136,6 +164,12 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 			// pub/sub call, as the pub/sub Receive will stop when this context is closed
 			// after the subscription finishes.
 			if err := b.redisPubsub(ctx, s, t); err != nil {
+				metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
+					PkgName: "realtime",
+					Tags: map[string]any{
+						"op": "subscribe",
+					},
+				})
 				logger.StdlibLogger(ctx).Error(
 					"error subscribing to realtime redis pubsub",
 					"error", err,
@@ -166,8 +200,21 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t Topic) error {
 	cmd := b.subc.B().Subscribe().Channel(t.String()).Build()
 	err := b.subc.Receive(ctx, cmd, func(msg rueidis.PubSubMessage) {
+		metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"op": "receive",
+			},
+		})
+
 		// Check if this is raw data (prefixed with redisRawDataPrefix)
 		if len(msg.Message) > len(redisRawDataPrefix) && msg.Message[:len(redisRawDataPrefix)] == redisRawDataPrefix {
+			metrics.IncrRealtimeRedisMessageTypesTotal(ctx, metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"type": "raw",
+				},
+			})
 			// This is raw data - extract and forward directly using Write()
 			rawData := []byte(msg.Message[len(redisRawDataPrefix):]) // Remove prefix
 			if err := s.Write(rawData); err != nil {
@@ -181,10 +228,22 @@ func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t To
 			return
 		}
 
+		metrics.IncrRealtimeRedisMessageTypesTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"type": "structured",
+			},
+		})
 		// This is a structured message - unmarshal and process normally
 		m := Message{}
 		err := json.Unmarshal([]byte(msg.Message), &m)
 		if err != nil {
+			metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"op": "unmarshal",
+				},
+			})
 			logger.StdlibLogger(ctx).Error(
 				"error unmarshalling for realtime redis pubsub",
 				"error", err,

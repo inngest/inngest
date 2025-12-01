@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -146,6 +147,8 @@ func (b *broadcaster) subscribe(
 		// keepalives after an interval to ensure that the connection
 		// remains open during periods of inactivity.
 		go b.keepalive(ctx, s.ID())
+
+		b.recordConnectionMetrics(ctx)
 	}
 
 	return nil
@@ -259,7 +262,38 @@ func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid
 
 	// Then remove the subscription from our subscription map
 	delete(b.subs, subscriptionID)
+
+	b.recordConnectionMetrics(ctx)
 	return nil
+}
+
+func (b *broadcaster) recordConnectionMetrics(ctx context.Context) {
+	// This function assumes b.l is already locked by the caller.
+	websocketCount := 0
+	sseCount := 0
+
+	for _, as := range b.subs {
+		sub := as.Subscription
+		if sub.Protocol() == "websocket" {
+			websocketCount++
+		} else if sub.Protocol() == "sse" {
+			sseCount++
+		}
+	}
+
+	metrics.GaugeRealtimeConnectionsActive(ctx, int64(websocketCount), metrics.GaugeOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"protocol": "websocket",
+		},
+	})
+
+	metrics.GaugeRealtimeConnectionsActive(ctx, int64(sseCount), metrics.GaugeOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"protocol": "sse",
+		},
+	})
 }
 
 func (b *broadcaster) Close(ctx context.Context) error {
@@ -325,6 +359,11 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
+
 	wg := sync.WaitGroup{}
 	for _, t := range m.Topics() {
 		tid := t.String()
@@ -344,7 +383,7 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 
 			defer wg.Done()
 			t.eachSubscription(func(s Subscription) {
-				b.publishTo(ctx, s, m)
+				b.publishTo(ctx, s, msg)
 			})
 		}(m, found)
 	}
@@ -410,6 +449,13 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 				return
 			}
 		}
+		metrics.IncrRealtimeMessageDeliveryFailuresTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": s.Protocol(),
+				"reason":   "write_failed",
+			},
+		})
 		logger.StdlibLogger(ctx).Warn(
 			"error publishing to subscription",
 			"error", err,
@@ -445,6 +491,12 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 		}
 		if err != nil {
 			errCount += 1
+			metrics.IncrRealtimeKeepaliveFailuresTotal(ctx, metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"protocol": sub.Protocol(),
+				},
+			})
 		}
 		if errCount == MaxKeepaliveErrors {
 			// Close this subscription and quit.
