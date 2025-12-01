@@ -97,12 +97,14 @@ func (a *api) metricsMiddleware(next http.Handler) http.Handler {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(ww, r)
 
+		route := chi.RouteContext(r.Context()).RoutePattern()
+
 		metrics.IncrRealtimeHTTPRequestsTotal(r.Context(), metrics.CounterOpt{
 			PkgName: "realtime",
 			Tags: map[string]any{
 				"method": r.Method,
 				"status": strconv.Itoa(ww.Status()),
-				"route":  r.URL.Path,
+				"route":  route,
 			},
 		})
 		metrics.HistogramRealtimeHTTPRequestDuration(r.Context(), time.Since(start).Milliseconds(), metrics.HistogramOpt{
@@ -115,7 +117,7 @@ func (a *api) metricsMiddleware(next http.Handler) http.Handler {
 			metrics.IncrRealtimeAuthFailuresTotal(r.Context(), metrics.CounterOpt{
 				PkgName: "realtime",
 				Tags: map[string]any{
-					"route": r.URL.Path,
+					"route": route,
 				},
 			})
 		}
