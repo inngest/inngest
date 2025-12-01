@@ -6,6 +6,7 @@ import useDebounce from '@inngest/components/hooks/useDebounce';
 import { toast } from 'sonner';
 
 import { useCreateAppMutation } from '@/store/generated';
+import { useInfoQuery } from '@/store/devApi';
 import isValidUrl from '@/utils/urlValidation';
 
 type AddAppModalProps = {
@@ -14,6 +15,8 @@ type AddAppModalProps = {
 };
 
 export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
+  const { data: info, isLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   const [inputUrl, setInputUrl] = useState('');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isDisabled, setDisabled] = useState(true);
@@ -67,7 +70,11 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="min-w-[500px]">
-      <Modal.Header description="Sync your Inngest application to the Dev Server">
+      <Modal.Header
+        description={`Sync your Inngest application to the ${
+          isDevServer ? 'Dev Server' : 'Server'
+        }`}
+      >
         Sync App
       </Modal.Header>
       <Modal.Body>

@@ -3,7 +3,9 @@
 import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { SQLEditorContextMenu } from './SQLEditorContextMenu';
 import { useSQLEditorInstance } from './SQLEditorInstanceContext';
 import { useSaveTabActions } from './SaveTabContext';
@@ -17,6 +19,9 @@ export function InsightsSQLEditor() {
   const { editorRef } = useSQLEditorInstance();
   const { activeTab } = useActiveTab();
   const { saveTab } = useSaveTabActions();
+  const { queries } = useStoredQueries();
+
+  const hasChanges = activeTab ? hasUnsavedChanges(queries.data, activeTab) : false;
 
   const hasSelection = () => {
     const editor = editorRef.current;
@@ -117,6 +122,7 @@ export function InsightsSQLEditor() {
         onRunQuery={handleRunQuery}
         onSaveQuery={handleSaveQuery}
         hasSelection={hasSelection}
+        hasUnsavedChanges={hasChanges}
       />
     </div>
   );

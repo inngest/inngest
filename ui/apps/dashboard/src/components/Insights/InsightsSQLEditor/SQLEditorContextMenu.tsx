@@ -17,6 +17,7 @@ type SQLEditorContextMenuProps = {
   onRunQuery: () => void;
   onSaveQuery: () => void;
   hasSelection: () => boolean;
+  hasUnsavedChanges: boolean;
 };
 
 export function SQLEditorContextMenu({
@@ -27,6 +28,7 @@ export function SQLEditorContextMenu({
   onRunQuery,
   onSaveQuery,
   hasSelection,
+  hasUnsavedChanges,
 }: SQLEditorContextMenuProps) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -72,7 +74,7 @@ export function SQLEditorContextMenu({
         }}
       >
         <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onPrettifySQL}>
-          <span>Prettify SQL</span>
+          <span>Format SQL</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
           </span>
@@ -111,7 +113,11 @@ export function SQLEditorContextMenu({
             <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'enter']} />
           </span>
         </DropdownMenuItem>
-        <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={onSaveQuery}>
+        <DropdownMenuItem
+          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+          disabled={!hasUnsavedChanges}
+          onSelect={onSaveQuery}
+        >
           <span>Save query</span>
           <span className="ml-auto">
             <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'alt', 'S']} />

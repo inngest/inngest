@@ -21,8 +21,6 @@ export function InsightsSQLEditorSavedQueryActionsButton({
     return queries.data?.find((q) => q.id === tab.savedQueryId);
   }, [queries.data, tab.savedQueryId]);
 
-  if (savedQuery === undefined) return null;
-
   return (
     <QueryActionsMenu
       onSelectDelete={(q) => deleteQuery(q.id)}

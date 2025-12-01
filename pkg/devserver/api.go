@@ -136,6 +136,12 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
+	// Return 404 in self-hosted mode
+	if a.devserver.Opts.Config.ServerKind == "cloud" {
+		http.NotFound(w, r)
+		return
+	}
+
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 

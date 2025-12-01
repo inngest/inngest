@@ -352,6 +352,7 @@ func DeterministicSpanID(seed []byte) trace.SpanID {
 	return trace.SpanID(r.Bytes(8))
 }
 
+// DeterministicSpanConfig creates a new span config based off of a deterministic seed.
 func DeterministicSpanConfig(seed []byte) DeterministicIDs {
 	sum := sha256.Sum256(seed)
 	// XXX: can we not allocate here?

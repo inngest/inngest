@@ -57,7 +57,7 @@ export function QueryActionsMenu({
         {editorRef && (
           <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={handleFormatSQL}>
             <RiAlignLeft className="size-4" />
-            <span>Prettify SQL</span>
+            <span>Format SQL</span>
           </DropdownMenuItem>
         )}
         {isActualQueryAndUnshared(query) && (
@@ -72,16 +72,17 @@ export function QueryActionsMenu({
             <span>Share with your org</span>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem
-          className="text-error px-4 outline-none"
-          onSelect={() => {
-            if (query === undefined) return;
-            onSelectDelete(query);
-          }}
-        >
-          <RiDeleteBinLine className="size-4" />
-          <span>Delete query</span>
-        </DropdownMenuItem>
+        {query !== undefined && (
+          <DropdownMenuItem
+            className="text-error px-4 outline-none"
+            onSelect={() => {
+              onSelectDelete(query);
+            }}
+          >
+            <RiDeleteBinLine className="size-4" />
+            <span>Delete query</span>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

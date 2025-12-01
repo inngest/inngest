@@ -23,7 +23,7 @@ import {
 import { KeyboardShortcutTooltip } from '@/components/Insights/KeyboardShortcutTooltip';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import type { Tab } from '@/components/Insights/types';
-import { hasDiffWithSavedQuery } from './InsightsTabManager';
+import { hasUnsavedChanges } from './InsightsTabManager';
 import { useTabManagerActions } from './TabManagerContext';
 import { HOME_TAB, TEMPLATES_TAB } from './constants';
 
@@ -55,7 +55,7 @@ export function InsightsTabsList({
             const tab = tabs.find((t) => t.id === tabId);
             if (tab === undefined) return;
 
-            if (hasDiffWithSavedQuery(queries.data, tab)) {
+            if (hasUnsavedChanges(queries.data, tab)) {
               setPendingCloseTabId(tabId);
               return;
             }
@@ -137,7 +137,7 @@ function IndicatorTabIcon({ tab }: { tab: Tab }) {
 
   if (tab.id === TEMPLATES_TAB.id) {
     return <RiBookReadLine size={16} />;
-  } else if (hasDiffWithSavedQuery(queries.data, tab)) {
+  } else if (hasUnsavedChanges(queries.data, tab)) {
     return <RiCircleFill className="fill-amber-500" size={16} />;
   } else {
     return <RiCodeSSlashLine size={16} />;

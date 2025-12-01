@@ -2935,6 +2935,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 			ctx,
 			meta.SpanNameStep,
 			&tracing.CreateSpanOptions{
+				Seed:      []byte(gen.ID + gen.Timing.String()),
 				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
 				StartTime: gen.Timing.Start(),
 				EndTime:   gen.Timing.End(),

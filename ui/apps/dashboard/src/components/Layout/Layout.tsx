@@ -4,8 +4,8 @@ import { Suspense, type ReactNode } from 'react';
 
 import IncidentBanner from '@/app/(organization-active)/IncidentBanner';
 import { getNavCollapsed } from '@/app/actions';
-import { BillingBanner } from '@/components/BillingBanner';
-import { ExecutionOverageBanner } from '@/components/ExecutionOverage';
+// import { BillingBanner } from '@/components/BillingBanner';
+// import { ExecutionOverageBanner } from '@/components/ExecutionOverage';
 import { getProfileDisplay } from '@/queries/server-only/profile';
 import type { Environment } from '@/utils/environments';
 import SideBar from './SideBar';
@@ -29,13 +29,9 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         <IncidentBanner />
 
-        <Suspense>
-          <BillingBanner />
-        </Suspense>
+        <Suspense>{/* <BillingBanner /> */}</Suspense>
 
-        <Suspense>
-          <ExecutionOverageBanner />
-        </Suspense>
+        <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
 
         {children}
       </div>

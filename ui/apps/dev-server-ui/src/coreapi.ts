@@ -222,8 +222,16 @@ export const CANCEL_RUN = gql`
 `;
 
 export const RERUN = gql`
-  mutation Rerun($runID: ULID!, $debugRunID: ULID = null, $debugSessionID: ULID = null) {
-    rerun(runID: $runID, debugRunID: $debugRunID, debugSessionID: $debugSessionID)
+  mutation Rerun(
+    $runID: ULID!
+    $debugRunID: ULID = null
+    $debugSessionID: ULID = null
+  ) {
+    rerun(
+      runID: $runID
+      debugRunID: $debugRunID
+      debugSessionID: $debugSessionID
+    )
   }
 `;
 
@@ -464,7 +472,12 @@ export const GET_WORKER_CONNECTIONS = gql`
   ) {
     workerConnections(
       first: $first
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: $timeField
+      }
       orderBy: $orderBy
       after: $cursor
     ) {
@@ -474,6 +487,7 @@ export const GET_WORKER_CONNECTIONS = gql`
           gatewayId
           instanceId
           workerIp
+          maxWorkerConcurrency
           app {
             id
           }
@@ -512,7 +526,12 @@ export const COUNT_WORKER_CONNECTIONS = gql`
     $status: [ConnectV1ConnectionStatus!]
   ) {
     workerConnections(
-      filter: { appIDs: [$appID], from: $startTime, status: $status, timeField: CONNECTED_AT }
+      filter: {
+        appIDs: [$appID]
+        from: $startTime
+        status: $status
+        timeField: CONNECTED_AT
+      }
       orderBy: [{ field: CONNECTED_AT, direction: DESC }]
     ) {
       totalCount

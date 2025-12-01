@@ -8,6 +8,7 @@ import { RiExternalLinkLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { useUpdateAppMutation, type GetAppsQuery } from '@/store/generated';
+import { useInfoQuery } from '@/store/devApi';
 import isValidUrl from '@/utils/urlValidation';
 
 export default function UpdateApp({
@@ -15,6 +16,8 @@ export default function UpdateApp({
 }: {
   app: GetAppsQuery['apps'][number];
 }) {
+  const { data: info, isLoading: infoLoading, error } = useInfoQuery();
+  const isDevServer = error ? false : !info?.isSingleNodeService;
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,7 +75,7 @@ export default function UpdateApp({
         href="https://www.inngest.com/docs/sdk/serve?ref=dev-app"
         iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
       >
-        Syncing to the Dev Server
+        Syncing to the {isDevServer ? 'Dev Server' : 'Server'}
       </Link>
     </form>
   );

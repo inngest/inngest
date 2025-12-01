@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { availableClickhouseFunctions } from '@inngest/components/SQLEditor/hooks/availableClickhouseFunctions';
+import { useCache } from '@inngest/components/SQLEditor/hooks/useCache';
 import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/types';
-import { useQuery } from '@tanstack/react-query';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
-import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useEventTypes } from '@/components/EventTypes/useEventTypes';
 import { useEventTypeSchemas } from '../../InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/useEventTypeSchemas';
 
 const KEYWORDS = [
@@ -44,75 +42,107 @@ const CLICKHOUSE_FUNCTIONS = availableClickhouseFunctions.map((name) => ({
   signature: `${name}($1)`,
 }));
 
-// Matches occurrences of name = '<event_name>' (single quotes only)
-const POSSIBLE_EVENT_NAME_REGEX = /name\s*=\s*'([^']+)'/gi;
-
 export function useSQLCompletionConfig(): SQLCompletionConfig {
-  const env = useEnvironment();
-  const { query } = useInsightsStateMachineContext();
-  const getAllEventTypes = useAllEventTypes();
+  const getEventTypes = useEventTypes();
   const getEventTypeSchemas = useEventTypeSchemas();
 
-  // Fetch all event names for autocomplete
-  const { data: allEventTypes } = useQuery({
-    queryKey: ['all-event-types', env.id],
-    queryFn: getAllEventTypes,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+  // Cache for fetched event names with 5 minute TTL
+  const eventNamesCache = useCache<string[]>({ ttl: 5 * 60 * 1000, name: 'eventNames' });
+
+  // Cache for fetched schemas with 5 minute TTL
+  const schemasCache = useCache<Array<{ name: string; type: string }>>({
+    ttl: 5 * 60 * 1000,
+    name: 'eventSchemas',
   });
 
-  // Extract event names from current query
-  const eventNamesInQuery = useMemo(() => {
-    const names = new Set<string>();
-    const matches = query.matchAll(POSSIBLE_EVENT_NAME_REGEX);
-    for (const match of matches) {
-      const name = match[1]?.trim();
-      if (name) names.add(name);
-    }
-    return Array.from(names).slice(0, 5); // Limit to 5
-  }, [query]);
+  // Create a function to fetch event names dynamically with nameSearch
+  // Supports pagination up to a maximum number of pages with caching
+  // NOTE: This function is called from fetchWithCache in useSQLCompletions
+  // The cache is checked BEFORE calling this function
+  const fetchEventNames = useCallback(
+    async (search: string): Promise<string[]> => {
+      const cacheKey = search || '__empty__';
 
-  // Fetch schemas for event names in query
-  const [dataProperties, setDataProperties] = useState<Array<{ name: string; type: string }>>([]);
+      const MAX_PAGES = 5; // Fetch up to 5 pages (40 per page = 200 total)
+      const allEvents: string[] = [];
+      let cursor: string | null = null;
+      let pageCount = 0;
 
-  useEffect(() => {
-    if (eventNamesInQuery.length === 0) {
-      setDataProperties([]);
-      return;
-    }
+      while (pageCount < MAX_PAGES) {
+        const result = await getEventTypes({
+          cursor,
+          archived: false,
+          nameSearch: search || null,
+        });
 
-    // Fetch schemas for all event names in query
-    Promise.all(
-      eventNamesInQuery.map((name) =>
-        getEventTypeSchemas({ cursor: null, nameSearch: name }).catch(() => ({ events: [] }))
-      )
-    ).then((results) => {
-      const propsMap = new Map<string, string>();
+        allEvents.push(...result.events.map((e) => e.name));
+        pageCount++;
 
-      results.forEach((result) => {
+        // Check if there are more pages
+        if (result.pageInfo.hasNextPage && result.pageInfo.endCursor) {
+          cursor = result.pageInfo.endCursor;
+        } else {
+          // No more pages
+          break;
+        }
+      }
+
+      // Update cache
+      eventNamesCache.set(cacheKey, allEvents);
+
+      return allEvents;
+    },
+    [getEventTypes, eventNamesCache]
+  );
+
+  // Create a function to fetch schema for a specific event name
+  const fetchEventSchema = useCallback(
+    async (eventName: string): Promise<Array<{ name: string; type: string }>> => {
+      try {
+        const result = await getEventTypeSchemas({ cursor: null, nameSearch: eventName });
+        const propsMap = new Map<string, string>();
+
         result.events.forEach((event) => {
+          // Only process if the event name matches exactly
+          if (event.name !== eventName) {
+            return;
+          }
+
           try {
-            const schema = JSON.parse(event.schema || '{}');
+            if (!event.schema) {
+              return;
+            }
+
+            const schema = JSON.parse(event.schema);
             const dataProps = schema?.properties?.data?.properties;
 
-            if (dataProps && typeof dataProps === 'object') {
-              Object.entries(dataProps).forEach(([key, value]: [string, any]) => {
-                const type = value?.type || 'unknown';
-                // Union of all properties from all schemas
-                if (!propsMap.has(key)) {
-                  propsMap.set(key, type);
-                }
-              });
+            if (!dataProps || typeof dataProps !== 'object') {
+              return;
             }
+
+            Object.entries(dataProps).forEach(([key, value]: [string, any]) => {
+              const type = value?.type || 'unknown';
+              if (!propsMap.has(key)) {
+                propsMap.set(key, type);
+              }
+            });
           } catch {
             // Ignore parse errors
           }
         });
-      });
 
-      const props = Array.from(propsMap.entries()).map(([name, type]) => ({ name, type }));
-      setDataProperties(props);
-    });
-  }, [eventNamesInQuery, getEventTypeSchemas]);
+        const props = Array.from(propsMap.entries()).map(([name, type]) => ({ name, type }));
+
+        // Update cache
+        schemasCache.set(eventName, props);
+
+        return props;
+      } catch (error) {
+        return [];
+      }
+    },
+    [getEventTypeSchemas, schemasCache]
+  );
 
   return useMemo<SQLCompletionConfig>(
     () => ({
@@ -120,9 +150,13 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
       keywords: KEYWORDS,
       functions: CLICKHOUSE_FUNCTIONS,
       tables: TABLES,
-      eventNames: allEventTypes?.map((et) => et.name) || [],
-      dataProperties,
+      eventNames: [],
+      dataProperties: [], // Will be populated dynamically based on selected event
+      fetchEventNames,
+      fetchEventSchema,
+      eventNamesCache,
+      schemasCache,
     }),
-    [allEventTypes, dataProperties]
+    [fetchEventNames, fetchEventSchema, eventNamesCache, schemasCache]
   );
 }
