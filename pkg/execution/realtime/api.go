@@ -21,6 +21,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	// SSEConnectionTimeout is the maximum duration an SSE connection can remain open
+	SSEConnectionTimeout = 15 * time.Minute
+)
+
 type APIOpts struct {
 	JWTSecret []byte
 	// Broadcaster allows connections to subscribe to topics, picking up events from
@@ -63,7 +68,7 @@ func (a *api) setup() {
 		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
 		r.Get("/realtime/connect", a.GetWebsocketUpgrade)
-		r.Get("/realtime/stream", a.GetSSE)
+		r.Get("/realtime/sse", a.GetSSE)
 		r.Post("/realtime/token", a.PostCreateJWT)
 	})
 
@@ -119,6 +124,45 @@ func (a *api) PostCreateJWT(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	auth, err := realtimeAuth(ctx)
+	if err != nil {
+		w.Header().Set("content-type", "application/json")
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		return
+	}
+
+	sub := NewSSESubscription(ctx, w)
+
+	err = a.opts.Broadcaster.Subscribe(ctx, sub, auth.Topics)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error subscribing to topics", "error", err)
+		http.Error(w, "error subscribing to topics", http.StatusInternalServerError)
+		return
+	}
+
+	logger.StdlibLogger(ctx).Info(
+		"new SSE connection",
+		"acct_id", auth.AccountID(),
+		"env_id", auth.Env,
+		"topics", auth.Topics,
+	)
+
+	// Wait for client disconnect or timeout
+	timeout := time.NewTimer(SSEConnectionTimeout)
+	defer timeout.Stop()
+
+	select {
+	case <-ctx.Done():
+		// Client disconnected
+	case <-timeout.C:
+		// Connection timeout
+		logger.StdlibLogger(ctx).Info("SSE connection timeout", "acct_id", auth.AccountID(), "sse_id", sub.id)
+	}
+
+	// Cleanup subscription
+	a.opts.Broadcaster.CloseSubscription(ctx, sub.ID())
 }
 
 func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {

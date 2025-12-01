@@ -28,7 +28,9 @@ var (
 
 // NewInProcessBroadcaster is a single broadcaster which manages active subscriptions
 // in-memory and broadcasts to connected subscribers.
-func NewInProcessBroadcaster() Broadcaster {
+//
+// This fulfils the Broadcaster interface.
+func NewInProcessBroadcaster() *broadcaster {
 	return newBroadcaster()
 }
 

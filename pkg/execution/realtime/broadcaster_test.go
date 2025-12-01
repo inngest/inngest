@@ -158,7 +158,7 @@ func TestBroadcasterConds(t *testing.T) {
 	t.Run("single subscriber", func(t *testing.T) {
 		var (
 			ctx = context.Background()
-			b   = NewInProcessBroadcaster().(*broadcaster)
+			b   = NewInProcessBroadcaster()
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
 				Kind:    streamingtypes.MessageKindData,
@@ -204,7 +204,7 @@ func TestBroadcasterConds(t *testing.T) {
 	t.Run("single subscriber with same topic subscriptions", func(t *testing.T) {
 		var (
 			ctx = context.Background()
-			b   = NewInProcessBroadcaster().(*broadcaster)
+			b   = NewInProcessBroadcaster()
 			sub = NewInmemorySubscription(uuid.New(), nil)
 			msg = Message{
 				Kind:    streamingtypes.MessageKindData,
