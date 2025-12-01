@@ -466,7 +466,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND account_id = sqlc.arg(account_id) AND (parent_span_id IS NULL OR parent_span_id = '0000000000000000')
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
 
@@ -491,12 +491,12 @@ WHERE span_id IN (
     parent_span_id
   FROM spans execSpans
   WHERE execSpans.run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND execSpans.account_id = sqlc.arg(account_id)
-  GROUP BY dynamic_span_id
-  HAVING SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
-  ORDER BY start_time
+  GROUP BY dynamic_span_id, parent_span_id
+  HAVING SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = sqlc.arg(step_id)::text)::int) > 0
+  ORDER BY MIN(start_time)
   LIMIT 1
 )
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
 
@@ -517,11 +517,11 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND account_id = sqlc.arg(account_id)
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
-  SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = sqlc.arg(step_id)::text)::int) > 0
 AND
-  SUM(attributes->>'$."_inngest.step.attempt"' = sqlc.arg(step_attempt)::bigint) > 0
+  SUM(((((attributes#>>'{}')::json->>'_inngest.step.attempt')::bigint) = sqlc.arg(step_attempt)::bigint)::int) > 0
 ORDER BY start_time ASC
 LIMIT 1;
 
@@ -542,9 +542,9 @@ SELECT
   )) AS span_fragments
 FROM spans b
 WHERE b.run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND b.account_id = sqlc.arg(account_id)
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
-  SUM(attributes->>'$."_inngest.step.id"' = sqlc.arg(step_id)::text) > 0
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = sqlc.arg(step_id)::text)::int) > 0
 ORDER BY start_time DESC
 LIMIT 1;
 
@@ -565,6 +565,6 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND span_id = sqlc.arg(span_id) AND account_id = sqlc.arg(account_id)
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
