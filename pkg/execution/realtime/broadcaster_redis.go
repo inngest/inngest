@@ -64,6 +64,8 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 		PkgName: "realtime",
 		Tags: map[string]any{
 			"broadcaster": "redis",
+			"stage":       "ingest",
+			"payload":     "structured",
 		},
 	})
 
@@ -109,6 +111,15 @@ func (b *redisBroadcaster) PublishStream(ctx context.Context, m Message, data st
 // Write publishes raw bytes to Redis pub/sub for the specified channel, ensuring
 // all Redis broadcaster instances receive the data, and also forwards to local subscriptions.
 func (b *redisBroadcaster) Write(ctx context.Context, envID uuid.UUID, channel string, data []byte) {
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"broadcaster": "redis",
+			"stage":       "ingest",
+			"payload":     "raw",
+		},
+	})
+
 	// First, publish to Redis so other instances receive the data
 	// We need a way to distinguish raw data from structured messages
 	// Use a special prefix to indicate this is raw data

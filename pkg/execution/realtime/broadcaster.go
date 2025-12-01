@@ -347,6 +347,14 @@ func (b *broadcaster) Close(ctx context.Context) error {
 }
 
 func (b *broadcaster) Write(ctx context.Context, envID uuid.UUID, channel string, data []byte) {
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "raw",
+		},
+	})
+
 	b.l.RLock()
 	defer b.l.RUnlock()
 
@@ -376,7 +384,10 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 
 	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
 		PkgName: "realtime",
-		Tags:    map[string]any{},
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "structured",
+		},
 	})
 
 	wg := conc.WaitGroup{}
@@ -412,7 +423,10 @@ func (b *broadcaster) publishToTopic(ctx context.Context, t Topic, m Message) {
 
 	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
 		PkgName: "realtime",
-		Tags:    map[string]any{},
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "structured",
+		},
 	})
 
 	tid := t.String()
@@ -432,6 +446,14 @@ func (b *broadcaster) publishToTopic(ctx context.Context, t Topic, m Message) {
 func (b *broadcaster) writeToTopic(ctx context.Context, t Topic, data []byte) {
 	b.l.RLock()
 	defer b.l.RUnlock()
+
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "raw",
+		},
+	})
 
 	tid := t.String()
 	found, ok := b.topics[tid]
