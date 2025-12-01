@@ -185,6 +185,14 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 	})
 }
 
+// startTopic is called as soon as a new Topic is subscribed to for the first time.
+//
+// It sets up bookkeeping and defers to `runTopic` if the topic is currently not
+// subscribed to.
+//
+// It's called by the underlying *broadcaster and sets up the pubsub topic so that
+// we can publish to all active subscribers that are in-memory from this Redis
+// pubsub client.
 func (b *redisBroadcaster) startTopic(ctx context.Context, t Topic) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -216,10 +224,18 @@ func (b *redisBroadcaster) stopTopic(ctx context.Context, t Topic) error {
 	return nil
 }
 
+// runTopic is called as soon as a new Topic is subscribed to for the first time,
+// and sets up the Redis subscriber.
 func (b *redisBroadcaster) runTopic(ctx context.Context, t Topic) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.StdlibLogger(ctx).Error("panic in redis topic subscriber", "panic", r, "topic", t)
+		}
+		// Explicitly unsubscribe from the topic to ensure that we don't keep receiving messages
+		// on the connection.
+		cmd := b.subc.B().Unsubscribe().Channel(t.String()).Build()
+		if err := b.subc.Do(context.WithoutCancel(ctx), cmd).Error(); err != nil {
+			logger.StdlibLogger(ctx).Warn("failed to unsubscribe from redis topic", "topic", t, "error", err)
 		}
 	}()
 
