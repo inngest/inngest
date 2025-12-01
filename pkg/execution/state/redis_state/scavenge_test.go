@@ -110,6 +110,59 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
+	t.Run("in-progress items must be added to scavenger index - requeue", func(t *testing.T) {
+		r.FlushAll()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		fnID := uuid.New()
+
+		qi := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					AccountID:  accountID,
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		start := time.Now().Truncate(time.Second)
+
+		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Lease item in legacy/fallback mode (do not disable lease checks)
+		leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+		require.True(t, r.Exists(kg.ConcurrencyIndex()))
+
+		// Requeue item and check scavenger index was cleaned up
+		err = q.Requeue(ctx, shard, item, clock.Now().Add(5*time.Second), RequeueOptionDisableConstraintUpdates(false))
+		require.NoError(t, err)
+
+		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+		require.False(t, r.Exists(kg.ConcurrencyIndex()))
+		// Legacy: Since we did not disable lease checks,
+		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+	})
+
 	t.Run("enqueueing multiple items should lead to earliest lease to expire to be pointer score", func(t *testing.T) {
 		r.FlushAll()
 
@@ -167,6 +220,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
 	})
 
+	// NOTE: This test covers backward compatibility with in-progress items tracked by the queue
 	t.Run("existing items in in-progress sets must be covered by scavenger", func(t *testing.T) {
 		r.FlushAll()
 
@@ -290,10 +344,6 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.ConcurrencyIndex()))
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
-	})
-
-	// NOTE: This test covers backward compatibility with in-progress items tracked by the queue
-	t.Run("scavenger must clean up expired leases from in-progress sets", func(t *testing.T) {
 	})
 
 	t.Run("scavenging removes leftover traces of key queues", func(t *testing.T) {

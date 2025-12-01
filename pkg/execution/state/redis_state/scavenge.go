@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/redis/rueidis"
 )
@@ -157,6 +158,12 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			continue
 		}
 		counter += scavengedFromIndex
+		metrics.IncrQueueScavengerRequeuedItemsCounter(ctx, int64(peekedFromIndex), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": "partition_index",
+			},
+		})
 
 		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey)
 		if err != nil {
@@ -164,6 +171,12 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			continue
 		}
 		counter += scavengedFromInProgressKey
+		metrics.IncrQueueScavengerRequeuedItemsCounter(ctx, int64(peekedFromInProgressKey), metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": "in_progress_key",
+			},
+		})
 
 		if peekedFromInProgressKey+peekedFromIndex < ScavengeConcurrencyQueuePeekSize {
 			// Atomically attempt to drop empty pointer if we've processed all items
