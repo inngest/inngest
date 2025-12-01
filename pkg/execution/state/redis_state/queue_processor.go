@@ -1835,7 +1835,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 	constraintRes, err := p.queue.itemLeaseConstraintCheck(
 		ctx,
-		*p.partition,
 		&partition,
 		&backlog,
 		constraints,

@@ -175,16 +175,39 @@ func (q *queue) backlogRefillConstraintCheck(
 }
 
 type itemLeaseConstraintCheckResult struct {
-	leaseID              *ulid.ULID
-	limitingConstraint   enums.QueueConstraint
+	// leaseID optionally returns a capacity lease ID which
+	// must be passed to the processing function to be extended
+	// while processing the item.
+	leaseID *ulid.ULID
+
+	// limitingConstraint returns the most limiting constraint in case
+	// no capacity was available.
+	limitingConstraint enums.QueueConstraint
+
+	// skipConstraintChecks determines whether subsequent operations
+	// should check and enforce constraints, and whether constraint state
+	// should be updated while processing a queue item.
+	//
+	// When enrolled to the Constraint API and holding a valid capacity lease,
+	// constraint checks _and_ updates may be skipped, as state is maintained within
+	// the Constraint API.
 	skipConstraintChecks bool
 
 	retryAfter time.Time
 }
 
+// itemLeaseConstraintCheck determines whether the given queue item
+// can start processing with or without checking and updating constraint state.
+//
+// If enrolled to the Constraint API, constraint checks will be moved to the new API.
+// In case of failing API requests and enabled fallback, we will attempt to check
+// constraints in the queue during regular Lease operations (while handling idempotency
+// in case the Constraint API call succeeded internally).
+//
+// In the case of using the Constraint API, the item may also receive a capacity lease to be
+// extended for the duration of processing.
 func (q *queue) itemLeaseConstraintCheck(
 	ctx context.Context,
-	partition QueuePartition,
 	shadowPart *QueueShadowPartition,
 	backlog *QueueBacklog,
 	constraints PartitionConstraintConfig,
@@ -223,7 +246,9 @@ func (q *queue) itemLeaseConstraintCheck(
 	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(now.Add(5*time.Second))
 	if hasValidCapacityLease {
 		return itemLeaseConstraintCheckResult{
-			leaseID:              item.CapacityLeaseID,
+			leaseID: item.CapacityLeaseID,
+			// Skip any constraint checks and subsequent updates,
+			// as constraint state is maintained in the Constraint API.
 			skipConstraintChecks: true,
 		}, nil
 	}
@@ -284,7 +309,9 @@ func (q *queue) itemLeaseConstraintCheck(
 	capacityLeaseID := res.Leases[0].LeaseID
 
 	return itemLeaseConstraintCheckResult{
-		leaseID:              &capacityLeaseID,
+		leaseID: &capacityLeaseID,
+		// Skip any constraint checks and subsequent updates,
+		// as constraint state is maintained in the Constraint API.
 		skipConstraintChecks: true,
 	}, nil
 }
