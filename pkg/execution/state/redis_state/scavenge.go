@@ -6,6 +6,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
@@ -96,7 +97,18 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			continue
 		}
 
-		scavengePartition := func(queueKey string) (int, int, error) {
+		scavengePartition := func(queueKey string, kind string) (int, int, error) {
+			start := q.clock.Now()
+			defer func() {
+				dur := q.clock.Now().Sub(start)
+				metrics.HistogramQueueScavengerPartitionScavengeDuration(ctx, time.Duration(dur.Milliseconds()), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": kind,
+					},
+				})
+			}()
+
 			cmd := client.B().Zrange().
 				Key(queueKey).
 				Min("-inf").
@@ -152,7 +164,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			return len(itemIDs), counter, nil
 		}
 
-		peekedFromIndex, scavengedFromIndex, err := scavengePartition(kg.PartitionScavengerIndex(partition))
+		peekedFromIndex, scavengedFromIndex, err := scavengePartition(kg.PartitionScavengerIndex(partition), "partition_index")
 		if err != nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from scavenger index: %w", err))
 			continue
@@ -165,7 +177,7 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 			},
 		})
 
-		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey)
+		peekedFromInProgressKey, scavengedFromInProgressKey, err := scavengePartition(queueKey, "in_progress_key")
 		if err != nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("could not scavenge from in progress key: %w", err))
 			continue

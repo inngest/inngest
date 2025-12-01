@@ -371,3 +371,14 @@ func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ
 		Boundaries:  DefaultBoundaries,
 	})
 }
+
+func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partition_scavenge_duration",
+		Description: "Distribution of queue scavenger duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
