@@ -48,7 +48,11 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </div>
             </Listbox.Option>
           </Link>
-          <Link to="/settings/organization" resetScroll={false}>
+          <Link
+            //@ts-expect-error - Tanstack TODO: figure out why tanstack doesn't like this with our splat route
+            to="/settings/organization"
+            resetScroll={false}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
