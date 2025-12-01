@@ -93,7 +93,12 @@ if scavengerIndexScores ~= false or concurrencyScores ~= false then
 	-- TODO: Remove this check once all items are tracked in scavenger index
 	if
 		earliestLease == nil
-		or (concurrencyScores ~= false and concurrencyScores ~= nil and tonumber(concurrencyScores[2]) < earliestLease)
+		or (
+    concurrencyScores ~= false and
+    concurrencyScores ~= nil and
+    #concurrencyScores > 0 and
+    tonumber(concurrencyScores[2]
+  ) < earliestLease)
 	then
 		earliestLease = tonumber(concurrencyScores[2])
 	end

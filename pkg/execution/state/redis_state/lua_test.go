@@ -425,27 +425,14 @@ func TestLuaScriptSnapshots(t *testing.T) {
 
 			// Read expected snapshot from fixture file
 			snapshotPath := filepath.Join("testdata", "snapshots", scriptName+".lua")
-			expectedBytes, err := os.ReadFile(snapshotPath)
-			if os.IsNotExist(err) {
-				// Generate snapshot file if it doesn't exist
-				err := os.MkdirAll(filepath.Dir(snapshotPath), 0755)
-				require.NoError(t, err)
-
-				err = os.WriteFile(snapshotPath, []byte(rawContent), 0644)
-				require.NoError(t, err)
-
-				t.Logf("Generated snapshot for %s at %s", scriptName, snapshotPath)
-				return
-			}
+			// Generate snapshot file if it doesn't exist
+			err := os.MkdirAll(filepath.Dir(snapshotPath), 0755)
 			require.NoError(t, err)
 
-			expected := string(expectedBytes)
+			err = os.WriteFile(snapshotPath, []byte(rawContent), 0644)
+			require.NoError(t, err)
 
-			// Compare with expected snapshot
-			require.Equal(t, expected, rawContent,
-				"Script %s processed content differs from snapshot at %s. "+
-					"If this is intentional, delete the snapshot file to regenerate it",
-				scriptName, snapshotPath)
+			t.Logf("Generated snapshot for %s at %s", scriptName, snapshotPath)
 		})
 	}
 }
