@@ -1106,18 +1106,7 @@ func (q *queue) process(
 	p := i.P
 	continuationCtr := i.PCtr
 	capacityLeaseID := i.capacityLeaseID
-
-	// Disable constraint updates in case
-	// - we are processing an item for a system queue
-	// - we are holding an active capacity lease
-	//
-	// For system queues, we skip constraint checks + updates entirely,
-	// for regular functions we manage constraint checks + updates in the Constraint API,
-	// if enabled for the current account.
-	//
-	// If the Constraint API is disabled or the lease expired, we will manage constraint state internally.
-	constraintsManagedByAPI := capacityLeaseID != nil && !capacityLeaseID.IsZero()
-	disableConstraintUpdates := constraintsManagedByAPI || i.P.IsSystem()
+	disableConstraintUpdates := i.disableConstraintUpdates
 
 	var err error
 	leaseID := qi.LeaseID
@@ -1181,7 +1170,11 @@ func (q *queue) process(
 					return
 				}
 
-				// If no capacity lease is used, no-op
+				// If no initial capacity lease was provided for this queue item, no-op
+				// This specifically happens when
+				// - the item is enqueued to a system queue
+				// - the Constraint API is disabled or the current account is not enrolled
+				// - the Constraint API provided a lease which expired at the time of leasing the queue item
 				if i.capacityLeaseID == nil {
 					continue
 				}
@@ -2142,6 +2135,10 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		PCtr: p.partitionContinueCtr,
 
 		capacityLeaseID: constraintRes.leaseID,
+		// Disable constraint updates in case we skipped constraint checks.
+		// This should always be linked, as we want consistent behavior while
+		// processing a queue item.
+		disableConstraintUpdates: constraintRes.skipConstraintChecks,
 	}
 
 	return nil
