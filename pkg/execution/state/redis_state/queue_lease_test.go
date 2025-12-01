@@ -3,16 +3,20 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -1630,4 +1634,131 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.False(t, r.Exists(fnPart.concurrencyKey(kg)))
 		})
 	})
+}
+
+type testRolloutManager struct{}
+
+// Acquire implements constraintapi.RolloutManager.
+func (t *testRolloutManager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquireRequest) (*constraintapi.CapacityAcquireResponse, errs.InternalError) {
+	panic("unimplemented")
+}
+
+// Check implements constraintapi.RolloutManager.
+func (t *testRolloutManager) Check(ctx context.Context, req *constraintapi.CapacityCheckRequest) (*constraintapi.CapacityCheckResponse, errs.UserError, errs.InternalError) {
+	panic("unimplemented")
+}
+
+// ExtendLease implements constraintapi.RolloutManager.
+func (t *testRolloutManager) ExtendLease(ctx context.Context, req *constraintapi.CapacityExtendLeaseRequest) (*constraintapi.CapacityExtendLeaseResponse, errs.InternalError) {
+	panic("unimplemented")
+}
+
+// Release implements constraintapi.RolloutManager.
+func (t *testRolloutManager) Release(ctx context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+	panic("unimplemented")
+}
+
+func TestQueueLeaseConstraintIdempotency(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	var cm constraintapi.CapacityManager = &testRolloutManager{}
+	rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
+
+	q := NewQueue(
+		shard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: &PartitionThrottle{
+					Limit:                     1,
+					Period:                    5,
+					ThrottleKeyExpressionHash: "throttle-expr-key",
+				},
+			}
+		}),
+
+		WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}),
+		WithCapacityManager(rolloutManager),
+	)
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+
+	qi := osqueue.QueueItem{
+		FunctionID: fnID,
+		Data: osqueue.Item{
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:  accountID,
+				WorkflowID: fnID,
+			},
+			Throttle: &osqueue.Throttle{
+				Period:            5,
+				Limit:             1,
+				Key:               "throttle-key",
+				KeyExpressionHash: "throttle-expr-key",
+			},
+		},
+	}
+
+	start := time.Now().Truncate(time.Second)
+
+	item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	// First call should succeed - Use up all capacity
+	leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
+
+	clock.Advance(time.Second)
+	r.FastForward(time.Second)
+	r.SetTime(clock.Now())
+
+	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	// Second call should fail - Capacity all used up
+	leaseID, err = q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrQueueItemThrottled)
+	require.Nil(t, leaseID)
+
+	// Set idempotency key
+	keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
+		QueueShard: shard.Name,
+	}, accountID, item2.ID)
+
+	err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
+	require.NoError(t, err)
+
+	// Do not skip lease checks but handle idempotency
+	leaseID, err = q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
+
+	// Skip all checks
+	item3, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	leaseID, err = q.Lease(ctx, item3, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true))
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
 }
