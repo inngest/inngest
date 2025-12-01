@@ -60,6 +60,8 @@ type CreateSpanOptions struct {
 	Seed []byte
 
 	// DynamicSeed is optional and used for CreateOrUpdate operations
+	// This differs from Seed in that seed creates a deterministic trace and span ID while
+	// dynamic seed only creates a deterministic dynamic span ID while leaving the concrete span ID random.
 	DynamicSeed []byte
 }
 
