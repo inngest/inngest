@@ -117,7 +117,7 @@ func TestAPI_GetSSE(t *testing.T) {
 		defer resp.Body.Close()
 
 		// Read the response body (this will block until timeout or data)
-		body, err := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		output := string(body)
 
 		// If we got data, verify it's in SSE format

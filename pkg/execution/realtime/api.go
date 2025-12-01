@@ -165,7 +165,9 @@ func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cleanup subscription
-	a.opts.Broadcaster.CloseSubscription(ctx, sub.ID())
+	if err := a.opts.Broadcaster.CloseSubscription(ctx, sub.ID()); err != nil {
+		logger.StdlibLogger(ctx).Warn("error closing SSE subscription", "error", err, "sub_id", sub.ID())
+	}
 }
 
 func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
@@ -315,7 +317,7 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	// Authenticate the request
 	auth, err := realtimeAuth(ctx)
 	if err != nil || auth == nil || !auth.Publish {
-		http.Error(w, "Not authenticated for publishing", 401)
+		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
 		return
 	}
 
