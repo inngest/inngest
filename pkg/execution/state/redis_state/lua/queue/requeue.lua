@@ -85,9 +85,6 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- Remove item from ready queue
 redis.call("ZREM", keyReadyQueue, item.id)
 
--- Remove item from scavenger index
-redis.call("ZREM", keyPartitionScavengerIndex, item.id)
-
 if updateConstraintState == 1 then
   -- This removes the queue item from the concurrency/in-progress queue and ensures that the concurrency
   -- index/scavenger queue is updated to the next earliest item.
@@ -122,6 +119,9 @@ if updateConstraintState == 1 then
   removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
   removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 end
+
+-- Remove item from scavenger index
+redis.call("ZREM", keyPartitionScavengerIndex, item.id)
 
 -- Get the earliest item in the new scavenger index and old partition concurrency set.  We may be dequeueing
 -- the only in-progress job and should remove this from the partition concurrency

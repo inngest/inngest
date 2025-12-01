@@ -764,12 +764,6 @@ func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
 	}
 }
 
-func EnablePartitionScavengeIndex(enable bool) QueueOpt {
-	return func(q *queue) {
-		q.enablePartitionScavengeIndex = enable
-	}
-}
-
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -893,15 +887,6 @@ type queue struct {
 	// scavengerLeaseLock ensures that there are no data races writing to
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
-
-	// enablePartitionScavengeIndex determines whether Lease, Extend, Requeue, Dequeue will
-	// write to new partition scavenger index. This must be initially disabled while old
-	// executors are still running as those are not aware of the new index and will incorrectly
-	// remove the concurrency index pointer.
-	//
-	// TODO: Remove this flag before disabling checks during lease as part of the Constraint API rollout!
-	// We must always track in progress items for Scavenging "lost" items.
-	enablePartitionScavengeIndex bool
 
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
@@ -2298,11 +2283,6 @@ func (q *queue) Lease(
 		return nil, fmt.Errorf("could not marshal constraints: %w", err)
 	}
 
-	enablePartitionScavengeIndexVal := "0"
-	if q.enablePartitionScavengeIndex {
-		enablePartitionScavengeIndexVal = "1"
-	}
-
 	args, err := StrSlice([]any{
 		item.ID,
 		o.sp.PartitionID,
@@ -2323,7 +2303,6 @@ func (q *queue) Lease(
 		refilledFromBacklogVal,
 
 		checkConstraintsVal,
-		enablePartitionScavengeIndexVal,
 	})
 	if err != nil {
 		return nil, err

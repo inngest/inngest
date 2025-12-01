@@ -283,6 +283,130 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
+	// NOTE: This test validates scavenging logic continues to work when we progressively switch to the Constraint API.
+	// The idea here is that initially we will always update constraint state and add items to the in progress set,
+	// when rolling out the new scavenger code we will always add to the scavenger partition index,
+	// and when using valid capacity leases we will stop updating constraint state while still updating the new scavenger partition index
+	// to ensure in-progress items are requeued in case a worker dies.
+	t.Run("when mixing items with and without constraint checks, the scavenger index remains consistent", func(t *testing.T) {
+		t.Run("old executors must not break new items", func(t *testing.T) {
+			// Scenario:
+			// - New executors will start populating scavenger index while still updating the in progress (concurrency) sets
+			// - Old executors will finish processing the existing runs while only considering the concurrency sets
+			//
+			// Not actually true:
+			// - If we roll out without another flag, the old executor may remove pointers to the scavenger index because they do not read from the new index
+			// - We should only start populating the new index once all executors have rolled out to consume from both old + new
+			//
+			// What happens:
+			// - Since we keep writing to the in progress/concurrency set consumed by the existing operations on old executor pods,
+			// we will not drop pointers to partitions from the global concurrency index
+			// - The only thing we _cannot_ do until all old executor pods have terminated is to stop constraint checks/updates,
+			// as that would mean we _only_ write to the new index which is not read by _all_ executor pods.
+
+			r.FlushAll()
+
+			q := NewQueue(
+				shard,
+				WithClock(clock),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+			)
+			ctx := context.Background()
+
+			accountID := uuid.New()
+			fnID := uuid.New()
+
+			qi := osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Payload: json.RawMessage("{\"test\":\"payload\"}"),
+					Identifier: state.Identifier{
+						AccountID:  accountID,
+						WorkflowID: fnID,
+					},
+				},
+			}
+
+			start := time.Now().Truncate(time.Second)
+
+			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			// Perform initial lease without writing to the new index
+			leaseID, err := q.Lease(ctx, item, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			leaseExpiry := clock.Now().Add(5 * time.Second)
+			require.True(t, r.Exists(kg.ConcurrencyIndex()))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+
+			// It's critical that we write to the existing concurrency set which is checked by old Lease, Extend, Requeue, Dequeue scripts
+			require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
+
+			// This will not be read by the old executors!
+			require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
+
+			clock.Advance(time.Second)
+			r.FastForward(time.Second)
+			r.SetTime(clock.Now())
+
+			leaseID, err = q.ExtendLease(ctx, item, *leaseID, 5*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+			leaseExpiry = clock.Now().Add(5 * time.Second)
+
+			require.True(t, r.Exists(kg.ConcurrencyIndex()))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+
+			// It's critical that we extend the item in the existing concurrency set which is checked by old Lease, Extend, Requeue, Dequeue scripts
+			require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item.ID)))
+
+			require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item.ID)))
+
+			err = q.Requeue(ctx, shard, item, clock.Now(), RequeueOptionDisableConstraintUpdates(false))
+			require.NoError(t, err)
+
+			require.False(t, r.Exists(kg.ConcurrencyIndex()))
+			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+			require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+		})
+
+		t.Run("lease checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+			t.Run("no earlier old lease", func(t *testing.T) {})
+
+			t.Run("no earlier item in scavenger index", func(t *testing.T) {})
+		})
+
+		t.Run("extend checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+			t.Run("no earlier old lease", func(t *testing.T) {})
+
+			t.Run("no earlier item in scavenger index", func(t *testing.T) {})
+		})
+
+		t.Run("requeue checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+			t.Run("no more leases in either should drop pointer to function", func(t *testing.T) {})
+
+			t.Run("earlier old lease", func(t *testing.T) {})
+
+			t.Run("earlier item in scavenger index", func(t *testing.T) {})
+		})
+
+		t.Run("dequeue checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
+			t.Run("no more leases in either should drop pointer to function", func(t *testing.T) {})
+
+			t.Run("earlier old lease", func(t *testing.T) {})
+
+			t.Run("earlier item in scavenger index", func(t *testing.T) {})
+		})
+	})
+
 	t.Run("scavenger must clean up expired leases", func(t *testing.T) {
 		r.FlushAll()
 
