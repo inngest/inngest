@@ -74,12 +74,15 @@ func (a *api) setup() {
 
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
-
 		// Note that we use use realtime auth middleware and check for publishing claims manually.
 		// This also allows us to use the original auth middleware and use signing keys for publishing.
 		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
+		// PostPublish always publishes well formed messages that we've defined within Inngest.
 		r.Post("/realtime/publish", a.PostPublish)
+		// PostPublishTee publishes raw bytes to the subscription, teeing from the HTTP request
+		// to all subscribers.
+		r.Post("/realtime/publish/tee", a.PostPublishTee)
 	})
 }
 
@@ -304,6 +307,44 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	a.opts.Broadcaster.Publish(r.Context(), msg)
 }
 
+// PostPublishTee reads from the request and forwards raw bytes to all subscribers.  This allows
+// users to publish eg. SSE streams directly from a request to subscribers with minimal latency.
+func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Authenticate the request
+	auth, err := realtimeAuth(ctx)
+	if err != nil || auth == nil || !auth.Publish {
+		http.Error(w, "Not authenticated for publishing", 401)
+		return
+	}
+
+	// Get channel from query parameters
+	channel := r.URL.Query().Get("channel")
+	if channel == "" {
+		http.Error(w, "channel query parameter required", 400)
+		return
+	}
+
+	defer r.Body.Close()
+
+	// Use io.Copy with broadcaster's Write method for optimal performance
+	_, err = io.Copy(&channelWriter{
+		broadcaster: a.opts.Broadcaster,
+		ctx:         ctx,
+		channel:     channel,
+	}, r.Body)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn(
+			"error copying request body to subscribers",
+			"error", err,
+			"channel", channel,
+		)
+		http.Error(w, "Error forwarding data", 500)
+		return
+	}
+}
+
 // publishStream handles publishing a stream of data sent to Inngest over seconds
 // to minutes.
 func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
@@ -390,4 +431,16 @@ func (a *api) getStreamMessage(r *http.Request) (Message, error) {
 	}
 
 	return msg, nil
+}
+
+// channelWriter implements io.Writer to forward data to broadcaster
+type channelWriter struct {
+	broadcaster Broadcaster
+	ctx         context.Context
+	channel     string
+}
+
+func (w *channelWriter) Write(p []byte) (n int, err error) {
+	w.broadcaster.Write(w.ctx, w.channel, p)
+	return len(p), nil
 }
