@@ -195,6 +195,7 @@ func (q *queue) itemLeaseConstraintCheck(
 	l := logger.StdlibLogger(ctx)
 
 	// Disable lease checks for system queues
+	// NOTE: This also disables constraint updates during processing, for consistency.
 	if shadowPart.SystemQueueName != nil {
 		return itemLeaseConstraintCheckResult{
 			skipConstraintChecks: true,
