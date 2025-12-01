@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -407,14 +406,12 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Authenticate the request
 	auth, err := realtimeAuth(ctx)
 	if err != nil || auth == nil || !auth.Publish {
 		http.Error(w, "Not authenticated for publishing", http.StatusUnauthorized)
 		return
 	}
 
-	// Get channel from query parameters
 	channel := r.URL.Query().Get("channel")
 	if channel == "" {
 		http.Error(w, "channel query parameter required", 400)
@@ -423,14 +420,12 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	// Use io.Copy with broadcaster's Write method for optimal performance
-
+	// straight up copy using a lil util from the r.Body to our publishers.
 	n, err := io.Copy(&channelWriter{
 		broadcaster: a.opts.Broadcaster,
 		ctx:         ctx,
 		channel:     channel,
-		// Pass the authenticated environment ID
-		envID: auth.Env,
+		envID:       auth.Env, // req'd for auth
 	}, r.Body)
 
 	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{
@@ -440,10 +435,9 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		logger.StdlibLogger(ctx).Warn(
-
 			"error copying request body to subscribers",
 			"error", err,
-			"channel", strings.ReplaceAll(strings.ReplaceAll(channel, "\n", ""), "\r", ""),
+			"channel", util.LogReplace(channel),
 		)
 		http.Error(w, "Error forwarding data", 500)
 		return
