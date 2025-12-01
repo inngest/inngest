@@ -77,7 +77,7 @@ func (s SubscriptionWS) Protocol() string {
 	return "ws"
 }
 
-func (s SubscriptionWS) Tee(b []byte) error {
+func (s SubscriptionWS) Write(b []byte) error {
 	return s.ws.Write(context.Background(), websocket.MessageText, b)
 }
 

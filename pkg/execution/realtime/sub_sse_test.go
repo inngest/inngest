@@ -48,12 +48,12 @@ func TestSSESubscription_Protocol(t *testing.T) {
 	require.Equal(t, "sse", sub.Protocol())
 }
 
-func TestSSESubscription_Tee(t *testing.T) {
+func TestSSESubscription_Write(t *testing.T) {
 	w := httptest.NewRecorder()
 	sub := NewSSESubscription(context.Background(), w)
 
 	testData := []byte("test data")
-	err := sub.Tee(testData)
+	err := sub.Write(testData)
 
 	require.NoError(t, err)
 	require.Equal(t, testData, w.Body.Bytes())

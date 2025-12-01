@@ -31,7 +31,7 @@ func (s subMemory) Protocol() string {
 	return "memory"
 }
 
-func (s subMemory) Tee(b []byte) error {
+func (s subMemory) Write(b []byte) error {
 	atomic.AddInt32(&s.writeCalls, 1)
 	if s.writer != nil {
 		return s.writer(b)
@@ -44,7 +44,7 @@ func (s subMemory) WriteMessage(m Message) error {
 	if err != nil {
 		return err
 	}
-	return s.Tee(byt)
+	return s.Write(byt)
 }
 
 func (s subMemory) WriteChunk(c Chunk) error {
@@ -53,7 +53,7 @@ func (s subMemory) WriteChunk(c Chunk) error {
 	if err != nil {
 		return err
 	}
-	return s.Tee(byt)
+	return s.Write(byt)
 }
 
 func (s subMemory) SendKeepalive(m Message) error {

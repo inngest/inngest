@@ -47,7 +47,7 @@ func (s subSSE) Protocol() string {
 	return "sse"
 }
 
-func (s subSSE) Tee(b []byte) error {
+func (s subSSE) Write(b []byte) error {
 	return s.write(b)
 }
 
