@@ -12,6 +12,9 @@ import (
 const (
 	redisPublishAttempts = 3
 	redisRetryInterval   = 2 * time.Second
+	// redisRawDataPrefix is used to distinguish raw byte data from structured JSON messages
+	// in Redis pub/sub. Raw data published via Write() is prefixed with this string.
+	redisRawDataPrefix = "RAW:"
 )
 
 // NewRedisBroadcaster implements a decentralized broadcaster that allows publishing and fanout of
@@ -74,6 +77,19 @@ func (b *redisBroadcaster) PublishStream(ctx context.Context, m Message, data st
 	}
 }
 
+// Write publishes raw bytes to Redis pub/sub for the specified channel, ensuring
+// all Redis broadcaster instances receive the data, and also forwards to local subscriptions.
+func (b *redisBroadcaster) Write(ctx context.Context, channel string, data []byte) {
+	// First, publish to Redis so other instances receive the data
+	// We need a way to distinguish raw data from structured messages
+	// Use a special prefix to indicate this is raw data
+	rawMessage := redisRawDataPrefix + string(data)
+	b.publish(ctx, channel, rawMessage)
+
+	// Also forward to local subscriptions immediately
+	b.broadcaster.Write(ctx, channel, data)
+}
+
 func (b *redisBroadcaster) publish(ctx context.Context, channel, message string) {
 	cmd := b.pubc.B().Publish().Channel(channel).Message(message).Build()
 	for i := 0; i < redisPublishAttempts; i++ {
@@ -106,7 +122,7 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 	)
 }
 
-// Subscribe is called with an active Websocket connection to subscribe the conn to multiple topics.
+// Subscribe is called with an active Websocket or SSE connection to subscribe the conn to multiple topics.
 func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics []Topic) error {
 	err := b.broadcaster.subscribe(
 		ctx,
@@ -150,8 +166,22 @@ func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics
 func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t Topic) error {
 	cmd := b.subc.B().Subscribe().Channel(t.String()).Build()
 	err := b.subc.Receive(ctx, cmd, func(msg rueidis.PubSubMessage) {
-		// Unmarshal the message's contents into the Message struct, then send on
-		// the backing websocket connection.
+		// Check if this is raw data (prefixed with redisRawDataPrefix)
+		if len(msg.Message) > len(redisRawDataPrefix) && msg.Message[:len(redisRawDataPrefix)] == redisRawDataPrefix {
+			// This is raw data - extract and forward directly using Write()
+			rawData := []byte(msg.Message[len(redisRawDataPrefix):]) // Remove prefix
+			if err := s.Write(rawData); err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error writing raw redis data to subscription",
+					"error", err,
+					"channel", t.String(),
+					"sub_id", s.ID(),
+				)
+			}
+			return
+		}
+
+		// This is a structured message - unmarshal and process normally
 		m := Message{}
 		err := json.Unmarshal([]byte(msg.Message), &m)
 		if err != nil {

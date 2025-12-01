@@ -17,6 +17,14 @@ type (
 // Publisher accepts messages from other services (eg. the executor, or the event API) and
 // publishes messages to any subscribers.
 type Publisher interface {
+	// Write publishes arbitrary data to a channel.  Note that this does
+	// not have any Message wrapping, and is raw data to be read by an
+	// end user.
+	//
+	// Because of this, there is no topic, as theres no way to indicate
+	// which topic we're writing to without the Message wrapper.
+	Write(ctx context.Context, channel string, data []byte)
+
 	// Publish publishes a message to any realtime subscribers.
 	//
 	// Note that this returns no error;  we expect that the publisher retries

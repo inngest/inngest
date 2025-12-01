@@ -159,7 +159,7 @@ type Message struct {
 	Channel string `json:"channel,omitempty,omitzero"`
 	// EnvID is the environment ID that the message belongs to.
 	EnvID uuid.UUID `json:"env_id,omitempty,omitzero"`
-	// TOpic represents the custom topic that this message should be broadcast
+	// Topic represents the custom topic that this message should be broadcast
 	// on.  For steps, this must include the unhashed step ID.  For custom broadcasts,
 	// this is the chosen topic name in the SDK.
 	Topic string `json:"topic"`

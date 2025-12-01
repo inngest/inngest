@@ -297,6 +297,30 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	return nil
 }
 
+func (b *broadcaster) Write(ctx context.Context, channel string, data []byte) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	// Find all subscriptions for this channel across all topics
+	// Since we don't have a specific topic, we'll write to any subscription
+	// that has a matching channel in any of its topics
+	for _, topicSub := range b.topics {
+		if topicSub.Channel == channel {
+			topicSub.eachSubscription(func(s Subscription) {
+				// Use Write() to forward raw bytes directly
+				if err := s.Write(data); err != nil {
+					logger.StdlibLogger(ctx).Warn(
+						"error writing raw data to subscription",
+						"error", err,
+						"channel", channel,
+						"sub_id", s.ID(),
+					)
+				}
+			})
+		}
+	}
+}
+
 func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	b.l.RLock()
 	defer b.l.RUnlock()
