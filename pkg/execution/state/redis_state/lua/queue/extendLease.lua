@@ -24,7 +24,6 @@ local newLeaseKey     = ARGV[3]
 
 local partitionID 		      = ARGV[4]
 local updateConstraintState = tonumber(ARGV[5])
-local enablePartitionScavengeIndex = tonumber(ARGV[6])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -50,11 +49,29 @@ item.leaseID = newLeaseKey
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 
--- Update scavenger index
--- TODO: Remove rollout flag once all executors are aware of the new index
-if enablePartitionScavengeIndex == 1 then
-  redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
+if updateConstraintState == 1 then
+  -- This extends the item in the zset and also ensures that scavenger queues are
+  -- updated.
+  local function handleExtendLease(keyConcurrency)
+    redis.call("ZADD", keyConcurrency, nextTime, item.id)
+  end
+
+  -- Items always belong to an account
+  redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+
+  handleExtendLease(keyConcurrencyFn)
+
+  if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
+    handleExtendLease(keyCustomConcurrencyKey1)
+  end
+
+  if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
+    handleExtendLease(keyCustomConcurrencyKey2)
+  end
 end
+
+-- Update scavenger index
+redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -85,27 +102,6 @@ if scavengerIndexScores ~= false or concurrencyScores ~= false then
 		-- Ensure that we update the score with the earliest lease
 		redis.call("ZADD", keyConcurrencyPointer, earliestLease, partitionID)
 	end
-end
-
-if updateConstraintState == 1 then
-  -- This extends the item in the zset and also ensures that scavenger queues are
-  -- updated.
-  local function handleExtendLease(keyConcurrency)
-    redis.call("ZADD", keyConcurrency, nextTime, item.id)
-  end
-
-  -- Items always belong to an account
-  redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
-
-  handleExtendLease(keyConcurrencyFn)
-
-  if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-    handleExtendLease(keyCustomConcurrencyKey1)
-  end
-
-  if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-    handleExtendLease(keyCustomConcurrencyKey2)
-  end
 end
 
 return 0
