@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/sourcegraph/conc"
 )
 
 var (
@@ -71,6 +72,8 @@ type broadcaster struct {
 	// conds is a map of subscriptionID-topic hashes to a sync.Cond, allowing
 	// us to
 	conds map[string]*sync.Cond
+
+	wg conc.WaitGroup
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
@@ -146,7 +149,14 @@ func (b *broadcaster) subscribe(
 		// This is the first time we've seen a subscription.  Send
 		// keepalives after an interval to ensure that the connection
 		// remains open during periods of inactivity.
-		go b.keepalive(ctx, s.ID())
+		b.wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error("panic in keepalive", "panic", r, "sub_id", s.ID())
+				}
+			}()
+			b.keepalive(ctx, s.ID())
+		})
 
 		b.recordConnectionMetrics(ctx)
 	}
@@ -173,7 +183,13 @@ func (b *broadcaster) setupCond(
 
 	rctx, cancel := context.WithCancel(ctx)
 
-	go func(t Topic) {
+	b.wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic in setupCond waiter", "panic", r, "topic", t)
+			}
+		}()
+
 		cond.L.Lock()
 		cond.Wait()
 		cond.L.Unlock()
@@ -184,12 +200,26 @@ func (b *broadcaster) setupCond(
 		if onUnsubscribe != nil {
 			// NOTE: this uses the parent context that isn't cancelled via unsubscribe.
 			// The context may be cancelled via a parent call, eg. SIGINT.
-			go onUnsubscribe(ctx, t)
+			b.wg.Go(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.StdlibLogger(ctx).Error("panic in onUnsubscribe", "panic", r, "topic", t)
+					}
+				}()
+				onUnsubscribe(ctx, t)
+			})
 		}
-	}(t)
+	})
 
 	if onSubscribe != nil {
-		go onSubscribe(rctx, t)
+		b.wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error("panic in onSubscribe", "panic", r, "topic", t)
+				}
+			}()
+			onSubscribe(rctx, t)
+		})
 	}
 }
 
@@ -316,6 +346,14 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	}
 
 	go func() {
+		defer func() {
+			// Ensure we wait for all background routines to finish.
+			// Since we recover inside them, Wait() shouldn't panic, but let's be safe.
+			if r := b.wg.WaitAndRecover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic waiting for broadcaster shutdown", "panic", r)
+			}
+		}()
+
 		// After 5 minutes, close all connections.
 		<-time.After(ShutdownGracePeriod)
 
@@ -364,7 +402,7 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 		Tags:    map[string]any{},
 	})
 
-	wg := sync.WaitGroup{}
+	wg := conc.WaitGroup{}
 	for _, t := range m.Topics() {
 		tid := t.String()
 		found, ok := b.topics[tid]
@@ -373,19 +411,19 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 			continue
 		}
 
-		wg.Add(1)
-		go func(msg Message, t topicsub) {
+		wg.Go(func() {
+			t := found
 			// Ensure we set the correct topic name for the given topic.
 			// Messages always have a custom topic name (eg. the step name),
 			// but are broadcast to internal topics such as "$step";  we need
 			// to update that for each topic here.
+			msg := m
 			msg.Topic = t.Name
 
-			defer wg.Done()
 			t.eachSubscription(func(s Subscription) {
 				b.publishTo(ctx, s, msg)
 			})
-		}(m, found)
+		})
 	}
 
 	wg.Wait()
@@ -396,7 +434,7 @@ func (b *broadcaster) PublishChunk(ctx context.Context, m Message, c Chunk) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
-	wg := sync.WaitGroup{}
+	wg := conc.WaitGroup{}
 	for _, t := range m.Topics() {
 		tid := t.String()
 		found, ok := b.topics[tid]
@@ -404,13 +442,12 @@ func (b *broadcaster) PublishChunk(ctx context.Context, m Message, c Chunk) {
 			continue
 		}
 
-		wg.Add(1)
-		go func(t topicsub) {
-			defer wg.Done()
+		wg.Go(func() {
+			t := found
 			t.eachSubscription(func(s Subscription) {
 				b.publishStreamTo(ctx, s, c)
 			})
-		}(found)
+		})
 	}
 
 	wg.Wait()
@@ -441,7 +478,13 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 
 	// If this failed to write, attempt to resend the message until
 	// max attempts pass.
-	go func() {
+	b.wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic in doPublish retry", "panic", r, "sub_id", s.ID())
+			}
+		}()
+
 		var err error
 		for att := 1; att < MaxWriteAttempts; att++ {
 			<-time.After(WriteRetryInterval)
@@ -464,7 +507,7 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 		)
 		// TODO: mark the subscription as failing.  If the subscription
 		// continues to fail, ensure we close the subscription.
-	}()
+	})
 }
 
 // keepalive sends keepalives to the subscription within a specific interval, ensuring

@@ -71,17 +71,27 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 	pubCtx := context.WithoutCancel(ctx)
 
 	for _, t := range m.Topics() {
-		go func(t Topic) {
+		b.wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error("panic in redis publish", "panic", r)
+				}
+			}()
 			b.publish(pubCtx, t.String(), string(content))
-		}(t)
+		})
 	}
 }
 
 func (b *redisBroadcaster) PublishStream(ctx context.Context, m Message, data string) {
 	for _, t := range m.Topics() {
-		go func(t Topic) {
+		b.wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error("panic in redis publish stream", "panic", r)
+				}
+			}()
 			b.publish(ctx, t.String(), string(m.Data)+":"+data)
-		}(t)
+		})
 	}
 }
 
