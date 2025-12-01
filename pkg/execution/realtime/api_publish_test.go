@@ -54,7 +54,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 
 		// Create JWT with publish permissions
 		accountID := uuid.New()
-		envID := uuid.New()
+		envID := topic.EnvID
 		publishJWT, err := NewPublishJWT(context.Background(), []byte("test-secret"), accountID, envID)
 		require.NoError(t, err)
 
@@ -122,7 +122,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 
 		// Create JWT with publish permissions
 		accountID := uuid.New()
-		envID := uuid.New()
+		envID := topic.EnvID
 		jwt, err := NewPublishJWT(context.Background(), []byte("test-secret"), accountID, envID)
 		require.NoError(t, err)
 
@@ -206,7 +206,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 
 		// Create JWT
 		accountID := uuid.New()
-		envID := uuid.New()
+		envID := topic.EnvID
 		jwt, err := NewPublishJWT(context.Background(), []byte("test-secret"), accountID, envID)
 		require.NoError(t, err)
 
@@ -341,7 +341,7 @@ func TestAPI_PostPublishTee(t *testing.T) {
 
 		// Create JWT
 		accountID := uuid.New()
-		envID := uuid.New()
+		envID := topic.EnvID
 		jwt, err := NewPublishJWT(context.Background(), []byte("test-secret"), accountID, envID)
 		require.NoError(t, err)
 
