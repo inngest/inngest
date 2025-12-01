@@ -168,9 +168,129 @@ func TestQueueScavenge(t *testing.T) {
 	})
 
 	t.Run("existing items in in-progress sets must be covered by scavenger", func(t *testing.T) {
+		r.FlushAll()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		fnID := uuid.New()
+
+		qi := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					AccountID:  accountID,
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		start := time.Now().Truncate(time.Second)
+
+		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate existing lease valid for another second
+		leaseExpiry := clock.Now().Add(time.Second)
+		_, err = r.ZAdd(kg.Concurrency("p", fnID.String()), float64(leaseExpiry.UnixMilli()), item1.ID)
+		require.NoError(t, err)
+
+		_, err = r.ZAdd(kg.ConcurrencyIndex(), float64(leaseExpiry.UnixMilli()), fnID.String())
+		require.NoError(t, err)
+
+		// First run should not find any items since lease is still valid
+
+		scavenged, err := q.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 0, scavenged)
+
+		require.True(t, r.Exists(kg.ConcurrencyIndex()))
+		require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		require.True(t, clock.Now().After(leaseExpiry))
+
+		scavenged, err = q.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, scavenged)
+
+		require.False(t, r.Exists(kg.ConcurrencyIndex()))
+		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	})
 
-	t.Run("scavenger must clean up expired leases", func(t *testing.T) {})
+	t.Run("scavenger must clean up expired leases", func(t *testing.T) {
+		r.FlushAll()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountID := uuid.New()
+		fnID := uuid.New()
+
+		qi := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					AccountID:  accountID,
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		start := time.Now().Truncate(time.Second)
+
+		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate existing lease valid for another second
+		leaseExpiry := clock.Now().Add(5 * time.Second)
+		leaseID, err := q.Lease(ctx, item1, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		// First run should not find any items since lease is still valid
+
+		scavenged, err := q.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 0, scavenged)
+
+		require.True(t, r.Exists(kg.ConcurrencyIndex()))
+		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+		require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item1.ID)))
+		require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+
+		clock.Advance(6 * time.Second)
+		r.FastForward(6 * time.Second)
+		r.SetTime(clock.Now())
+
+		require.True(t, clock.Now().After(leaseExpiry))
+
+		scavenged, err = q.Scavenge(ctx, 100)
+		require.NoError(t, err)
+		require.Equal(t, 1, scavenged)
+
+		require.False(t, r.Exists(kg.ConcurrencyIndex()))
+		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
+	})
 
 	// NOTE: This test covers backward compatibility with in-progress items tracked by the queue
 	t.Run("scavenger must clean up expired leases from in-progress sets", func(t *testing.T) {
