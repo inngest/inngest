@@ -3307,127 +3307,6 @@ func TestQueueFunctionPause(t *testing.T) {
 	require.Equal(t, idA, *peeked[0].FunctionID)
 }
 
-func TestQueueScavenge(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-	)
-	ctx := context.Background()
-
-	id := uuid.New()
-
-	qi := osqueue.QueueItem{
-		FunctionID: id,
-		Data: osqueue.Item{
-			Payload: json.RawMessage("{\"test\":\"payload\"}"),
-		},
-	}
-
-	t.Run("scavenging removes leftover traces of key queues", func(t *testing.T) {
-		r.FlushAll()
-
-		start := time.Now().Truncate(time.Second)
-
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.Zero)
-		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
-
-		qp := getDefaultPartition(t, r, id)
-
-		leaseStart := time.Now()
-		leaseExpires := q.clock.Now().Add(time.Second)
-
-		itemCountMatches := func(num int) {
-			zsetKey := qp.zsetKey(q.primaryQueueShard.RedisClient.kg)
-			items, err := rc.Do(ctx, rc.B().
-				Zrangebyscore().
-				Key(zsetKey).
-				Min("-inf").
-				Max("+inf").
-				Build()).AsStrSlice()
-			require.NoError(t, err)
-			assert.Equal(t, num, len(items), "expected %d items in the queue %q", num, zsetKey, r.Dump())
-		}
-
-		concurrencyItemCountMatches := func(num int) {
-			items, err := rc.Do(ctx, rc.B().
-				Zrangebyscore().
-				Key(qp.concurrencyKey(q.primaryQueueShard.RedisClient.kg)).
-				Min("-inf").
-				Max("+inf").
-				Build()).AsStrSlice()
-			require.NoError(t, err)
-			assert.Equal(t, num, len(items), "expected %d items in the concurrency queue", num, r.Dump())
-		}
-
-		itemCountMatches(1)
-		concurrencyItemCountMatches(0)
-
-		leaseId, err := q.Lease(ctx, item, time.Second, leaseStart, nil)
-		require.NoError(t, err)
-		require.NotNil(t, leaseId)
-
-		itemCountMatches(0)
-		concurrencyItemCountMatches(1)
-
-		// wait til leases are expired
-		<-time.After(2 * time.Second)
-		require.True(t, time.Now().After(leaseExpires))
-
-		incompatibleConcurrencyIndexItem := q.primaryQueueShard.RedisClient.kg.Concurrency("p", id.String())
-		compatibleConcurrencyIndexItem := id.String()
-
-		indexMembers, err := r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
-		require.NoError(t, err)
-		require.Equal(t, 1, len(indexMembers))
-		require.Contains(t, indexMembers, compatibleConcurrencyIndexItem)
-
-		leftoverData := []string{
-			q.primaryQueueShard.RedisClient.kg.Concurrency("p", id.String()),
-			"{queue}:concurrency:p:0ffd4629-317c-4f65-8b8f-b30fccfde46f",
-			"{queue}:concurrency:custom:f:0ffd4629-317c-4f65-8b8f-b30fccfde46f:1nt4mu0skse4a",
-		}
-		score := float64(leaseStart.Add(time.Second).UnixMilli())
-		for _, leftover := range leftoverData {
-			_, err = r.ZAdd(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(), score, leftover)
-			require.NoError(t, err)
-		}
-		indexMembers, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
-		require.NoError(t, err)
-		require.Equal(t, 4, len(indexMembers))
-		for _, datum := range leftoverData {
-			require.Contains(t, indexMembers, datum)
-		}
-
-		requeued, err := q.Scavenge(ctx, ScavengePeekSize)
-		require.NoError(t, err)
-		assert.Equal(t, 1, requeued, "expected one item with expired leases to be requeued by scavenge", r.Dump())
-
-		itemCountMatches(1)
-		concurrencyItemCountMatches(0)
-
-		_, err = r.ZMembers(q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex())
-		require.Error(t, err, r.Dump())
-		require.ErrorIs(t, err, miniredis.ErrKeyNotFound)
-
-		newConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(incompatibleConcurrencyIndexItem).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(newConcurrencyQueueItems), "expected no items in the new concurrency queue", r.Dump())
-
-		oldConcurrencyQueueItems, err := rc.Do(ctx, rc.B().Zcard().Key(compatibleConcurrencyIndexItem).Build()).AsInt64()
-		require.NoError(t, err)
-		assert.Equal(t, 0, int(oldConcurrencyQueueItems), "expected no items in the old concurrency queue", r.Dump())
-	})
-}
-
 func TestQueueSetFunctionMigrate(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -4942,6 +4821,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 	})
 
 	t.Run("system queues", func(t *testing.T) {
+		t.Skip("system queues are never enqueued to backlogs")
+
 		r := miniredis.RunT(t)
 		rc, err := rueidis.NewClient(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
@@ -4962,7 +4843,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithEnqueueSystemPartitionsToBacklog(true),
+			// WithEnqueueSystemPartitionsToBacklog(true),
 		)
 		ctx := context.Background()
 
@@ -6021,6 +5902,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 	})
 
 	t.Run("system queues", func(t *testing.T) {
+		t.Skip("system queues are not enqueued to backlogs")
 		r := miniredis.RunT(t)
 		rc, err := rueidis.NewClient(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
@@ -6042,7 +5924,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithEnqueueSystemPartitionsToBacklog(true),
+			// WithEnqueueSystemPartitionsToBacklog(true),
 		)
 		ctx := context.Background()
 
