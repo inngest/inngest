@@ -67,6 +67,7 @@ local marshaledConstraints = ARGV[11]
 local refilledFromBacklog = tonumber(ARGV[12])
 
 local checkConstraints = tonumber(ARGV[13])
+local enablePartitionScavengeIndex = tonumber(ARGV[14])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -177,7 +178,10 @@ redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 redis.call("ZREM", keyReadyQueue, item.id)
 
 -- Always add to partition scavenging index
-redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
+-- TODO: Remove rollout flag once all executors are aware of the new index
+if enablePartitionScavengeIndex == 1 then
+  redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
+end
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
