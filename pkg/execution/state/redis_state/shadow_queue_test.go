@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -2347,4 +2349,113 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
+}
+
+func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	constraints := PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Throttle: &PartitionThrottle{
+			ThrottleKeyExpressionHash: "throttle-key-hash",
+			Limit:                     1,
+			Burst:                     0,
+			Period:                    5,
+		},
+		Concurrency: PartitionConcurrency{
+			AccountConcurrency:  10,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	var cm constraintapi.CapacityManager = &testRolloutManager{}
+	rolloutManager := constraintapi.NewRolloutManager(cm, QueueDefaultKey, "rl")
+
+	q := NewQueue(
+		shard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+			return true, true
+		}),
+		WithCapacityManager(rolloutManager),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return constraints
+		}),
+	)
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+
+	qi := osqueue.QueueItem{
+		FunctionID: fnID,
+		Data: osqueue.Item{
+			Kind:    osqueue.KindStart,
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:  accountID,
+				WorkflowID: fnID,
+			},
+			Throttle: &osqueue.Throttle{
+				KeyExpressionHash: "throttle-key-hash",
+				Limit:             1,
+				Burst:             0,
+				Period:            5,
+				Key:               "throttle-key",
+			},
+		},
+	}
+
+	start := time.Now().Truncate(time.Second)
+
+	item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	backlog := q.ItemBacklog(ctx, item1)
+	require.NotNil(t, backlog.Throttle)
+
+	shadowPart := q.ItemShadowPartition(ctx, item1)
+
+	res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID, item2.ID}, constraints)
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Refill)
+	require.Equal(t, 1, res.Capacity)
+	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, enums.QueueConstraintThrottle, res.Constraint)
+
+	// Set idempotency key
+	keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
+		QueueShard: shard.Name,
+	}, accountID, "random string for backlog operation")
+
+	err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
+	require.NoError(t, err)
+
+	res, err = q.BacklogRefill(
+		ctx,
+		&backlog,
+		&shadowPart,
+		clock.Now().Add(time.Minute),
+		[]string{qi.ID},
+		constraints,
+		WithBacklogRefillDisableConstraintChecks(true),
+		WithBacklogRefillConstraintCheckIdempotencyKey(keyConstraintCheckIdempotency),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 1, res.Refilled)
 }
