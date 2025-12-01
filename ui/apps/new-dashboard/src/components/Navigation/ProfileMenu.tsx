@@ -4,7 +4,6 @@ import {
   RiBillLine,
   RiEqualizerLine,
   RiGroupLine,
-  RiLogoutCircleLine,
   RiUserLine,
   RiUserSharedLine,
 } from "@remixicon/react";
@@ -13,7 +12,7 @@ import ModeSwitch from "@inngest/components/ThemeMode/ModeSwitch";
 
 import { pathCreator } from "@/utils/urls";
 import { Link } from "@tanstack/react-router";
-import { useClerk } from "@clerk/tanstack-react-start";
+import { SignOutButton } from "../Auth/SignOutButton";
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -121,43 +120,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
           >
-            <SignOut isMarketplace={isMarketplace} />
+            <SignOutButton isMarketplace={isMarketplace} />
           </Listbox.Option>
         </Listbox.Options>
       </div>
     </Listbox>
   );
 };
-
-function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
-  const { signOut, session } = useClerk();
-
-  const content = (
-    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-      <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-      <div>Sign Out </div>
-    </div>
-  );
-
-  if (!isMarketplace) {
-    // Sign out via Clerk.
-    return (
-      <button
-        onClick={async () => {
-          await signOut({
-            sessionId: session?.id,
-            redirectUrl: "/sign-in/choose",
-          });
-        }}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  // Sign out via our backend.
-  return (
-    // @ts-expect-error - TANSTACK TODO: fix when routes land
-    <Link to={`${import.meta.env.VITE_API_URL}/v1/logout`}>{content}</Link>
-  );
-}

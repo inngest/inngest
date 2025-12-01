@@ -1,18 +1,32 @@
 import SplitView from "@/components/SignIn/SplitView";
 import { SignUp } from "@clerk/tanstack-react-start";
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getCookie } from "@tanstack/react-start/server";
 
-//
-// TANSTACK TODO: Add anonymous ID to the sign up form
+const getAnonymousId = createServerFn({ method: "GET" }).handler(async () => {
+  const anonymousId = getCookie("inngest_anonymous_id");
+  return anonymousId || null;
+});
+
 export const Route = createFileRoute("/(auth)/sign-up/$")({
   component: RouteComponent,
+  loader: async () => {
+    const anonymousId = await getAnonymousId();
+    return { anonymousId };
+  },
 });
 
 function RouteComponent() {
+  const { anonymousId } = Route.useLoaderData();
+
   return (
     <SplitView>
       <div className="mx-auto my-8 mt-auto text-center">
         <SignUp
+          unsafeMetadata={{
+            ...(anonymousId && { anonymousID: anonymousId }),
+          }}
           appearance={{
             elements: {
               footer: "bg-none",

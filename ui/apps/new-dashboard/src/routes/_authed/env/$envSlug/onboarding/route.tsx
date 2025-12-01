@@ -10,6 +10,7 @@ export const Route = createFileRoute("/_authed/env/$envSlug/onboarding")({
       redirect({
         to: "/env/$envSlug/onboarding/$step",
         params: { envSlug: params.envSlug, step: "create-app" },
+        throw: true,
       });
     }
   },

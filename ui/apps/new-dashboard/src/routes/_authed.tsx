@@ -1,4 +1,4 @@
-import { fetchClerkAuth } from "@/data/clerk";
+import { fetchClerkAuth, jwtAuth } from "@/data/auth";
 import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
 import Layout from "@/components/Layout/Layout";
@@ -18,8 +18,18 @@ export const Route = createFileRoute("/_authed")({
       },
     ],
   }),
-  beforeLoad: async () => {
-    const { userId, token } = await fetchClerkAuth();
+  beforeLoad: async ({ location }) => {
+    const isJWTAuth = await jwtAuth();
+
+    //
+    // for jwt auth (marketplace) abort clerk check below.
+    if (isJWTAuth) {
+      return;
+    }
+
+    const { userId, token } = await fetchClerkAuth({
+      data: { redirectUrl: location.href },
+    });
 
     return {
       userId,

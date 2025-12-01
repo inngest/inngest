@@ -11,20 +11,23 @@
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as authUserSetupRouteImport } from "./routes/(auth)/user-setup";
 import { Route as authSignOutRouteImport } from "./routes/(auth)/sign-out";
+import { Route as authOrganizationSetupRouteImport } from "./routes/(auth)/organization-setup";
 import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settings/route";
 import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
 import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
 import { Route as authSignUpSplatRouteImport } from "./routes/(auth)/sign-up.$";
 import { Route as authSignInSplatRouteImport } from "./routes/(auth)/sign-in.$";
+import { Route as authOrganizationListSplatRouteImport } from "./routes/(auth)/organization-list.$";
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from "./routes/_authed/env/$envSlug/route";
 import { Route as AuthedSettingsUserIndexRouteImport } from "./routes/_authed/settings/user/index";
-import { Route as AuthedSettingsOrganizationIndexRouteImport } from "./routes/_authed/settings/organization/index";
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from "./routes/_authed/settings/integrations/index";
 import { Route as AuthedBillingUsageIndexRouteImport } from "./routes/_authed/billing/usage/index";
 import { Route as AuthedBillingPlansIndexRouteImport } from "./routes/_authed/billing/plans/index";
 import { Route as AuthedBillingPaymentsIndexRouteImport } from "./routes/_authed/billing/payments/index";
+import { Route as AuthedSettingsOrganizationSplatRouteImport } from "./routes/_authed/settings/organization/$";
 import { Route as AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport } from "./routes/_authed/env/$envSlug/unattached-syncs/route";
 import { Route as AuthedEnvEnvSlugOnboardingRouteRouteImport } from "./routes/_authed/env/$envSlug/onboarding/route";
 import { Route as AuthedEnvEnvSlugManageRouteRouteImport } from "./routes/_authed/env/$envSlug/manage/route";
@@ -89,9 +92,19 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
+const authUserSetupRoute = authUserSetupRouteImport.update({
+  id: "/(auth)/user-setup",
+  path: "/user-setup",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const authSignOutRoute = authSignOutRouteImport.update({
   id: "/(auth)/sign-out",
   path: "/sign-out",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const authOrganizationSetupRoute = authOrganizationSetupRouteImport.update({
+  id: "/(auth)/organization-setup",
+  path: "/organization-setup",
   getParentRoute: () => rootRouteImport,
 } as any);
 const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
@@ -125,6 +138,12 @@ const authSignInSplatRoute = authSignInSplatRouteImport.update({
   path: "/sign-in/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const authOrganizationListSplatRoute =
+  authOrganizationListSplatRouteImport.update({
+    id: "/(auth)/organization-list/$",
+    path: "/organization-list/$",
+    getParentRoute: () => rootRouteImport,
+  } as any);
 const AuthedEnvEnvSlugRouteRoute = AuthedEnvEnvSlugRouteRouteImport.update({
   id: "/env/$envSlug",
   path: "/env/$envSlug",
@@ -135,12 +154,6 @@ const AuthedSettingsUserIndexRoute = AuthedSettingsUserIndexRouteImport.update({
   path: "/user/",
   getParentRoute: () => AuthedSettingsRouteRoute,
 } as any);
-const AuthedSettingsOrganizationIndexRoute =
-  AuthedSettingsOrganizationIndexRouteImport.update({
-    id: "/organization/",
-    path: "/organization/",
-    getParentRoute: () => AuthedSettingsRouteRoute,
-  } as any);
 const AuthedSettingsIntegrationsIndexRoute =
   AuthedSettingsIntegrationsIndexRouteImport.update({
     id: "/integrations/",
@@ -162,6 +175,12 @@ const AuthedBillingPaymentsIndexRoute =
     id: "/payments/",
     path: "/payments/",
     getParentRoute: () => AuthedBillingRouteRoute,
+  } as any);
+const AuthedSettingsOrganizationSplatRoute =
+  AuthedSettingsOrganizationSplatRouteImport.update({
+    id: "/organization/$",
+    path: "/organization/$",
+    getParentRoute: () => AuthedSettingsRouteRoute,
   } as any);
 const AuthedEnvEnvSlugUnattachedSyncsRouteRoute =
   AuthedEnvEnvSlugUnattachedSyncsRouteRouteImport.update({
@@ -492,8 +511,11 @@ export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/billing": typeof AuthedBillingRouteRouteWithChildren;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
+  "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
+  "/user-setup": typeof authUserSetupRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing/": typeof AuthedBillingIndexRoute;
@@ -502,11 +524,11 @@ export interface FileRoutesByFullPath {
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   "/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
+  "/settings/organization/$": typeof AuthedSettingsOrganizationSplatRoute;
   "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
   "/billing/plans": typeof AuthedBillingPlansIndexRoute;
   "/billing/usage": typeof AuthedBillingUsageIndexRoute;
   "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
-  "/settings/organization": typeof AuthedSettingsOrganizationIndexRoute;
   "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   "/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
@@ -562,19 +584,22 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
+  "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
+  "/user-setup": typeof authUserSetupRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
+  "/settings/organization/$": typeof AuthedSettingsOrganizationSplatRoute;
   "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
   "/billing/plans": typeof AuthedBillingPlansIndexRoute;
   "/billing/usage": typeof AuthedBillingUsageIndexRoute;
   "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
-  "/settings/organization": typeof AuthedSettingsOrganizationIndexRoute;
   "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsIndexRoute;
   "/env/$envSlug/debugger": typeof AuthedEnvEnvSlugDebuggerIndexRoute;
@@ -625,8 +650,11 @@ export interface FileRoutesById {
   "/_authed": typeof AuthedRouteWithChildren;
   "/_authed/billing": typeof AuthedBillingRouteRouteWithChildren;
   "/_authed/settings": typeof AuthedSettingsRouteRouteWithChildren;
+  "/(auth)/organization-setup": typeof authOrganizationSetupRoute;
   "/(auth)/sign-out": typeof authSignOutRoute;
+  "/(auth)/user-setup": typeof authUserSetupRoute;
   "/_authed/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/(auth)/organization-list/$": typeof authOrganizationListSplatRoute;
   "/(auth)/sign-in/$": typeof authSignInSplatRoute;
   "/(auth)/sign-up/$": typeof authSignUpSplatRoute;
   "/_authed/billing/": typeof AuthedBillingIndexRoute;
@@ -635,11 +663,11 @@ export interface FileRoutesById {
   "/_authed/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/_authed/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   "/_authed/env/$envSlug/unattached-syncs": typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren;
+  "/_authed/settings/organization/$": typeof AuthedSettingsOrganizationSplatRoute;
   "/_authed/billing/payments/": typeof AuthedBillingPaymentsIndexRoute;
   "/_authed/billing/plans/": typeof AuthedBillingPlansIndexRoute;
   "/_authed/billing/usage/": typeof AuthedBillingUsageIndexRoute;
   "/_authed/settings/integrations/": typeof AuthedSettingsIntegrationsIndexRoute;
-  "/_authed/settings/organization/": typeof AuthedSettingsOrganizationIndexRoute;
   "/_authed/settings/user/": typeof AuthedSettingsUserIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
   "/_authed/env/$envSlug/apps/sync-new": typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren;
@@ -698,8 +726,11 @@ export interface FileRouteTypes {
     | "/"
     | "/billing"
     | "/settings"
+    | "/organization-setup"
     | "/sign-out"
+    | "/user-setup"
     | "/env/$envSlug"
+    | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/billing/"
@@ -708,11 +739,11 @@ export interface FileRouteTypes {
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
     | "/env/$envSlug/unattached-syncs"
+    | "/settings/organization/$"
     | "/billing/payments"
     | "/billing/plans"
     | "/billing/usage"
     | "/settings/integrations"
-    | "/settings/organization"
     | "/settings/user"
     | "/env/$envSlug/apps/$externalID"
     | "/env/$envSlug/apps/sync-new"
@@ -768,19 +799,22 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/settings"
+    | "/organization-setup"
     | "/sign-out"
+    | "/user-setup"
     | "/env/$envSlug"
+    | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/billing"
     | "/create-environment"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
+    | "/settings/organization/$"
     | "/billing/payments"
     | "/billing/plans"
     | "/billing/usage"
     | "/settings/integrations"
-    | "/settings/organization"
     | "/settings/user"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/debugger"
@@ -830,8 +864,11 @@ export interface FileRouteTypes {
     | "/_authed"
     | "/_authed/billing"
     | "/_authed/settings"
+    | "/(auth)/organization-setup"
     | "/(auth)/sign-out"
+    | "/(auth)/user-setup"
     | "/_authed/env/$envSlug"
+    | "/(auth)/organization-list/$"
     | "/(auth)/sign-in/$"
     | "/(auth)/sign-up/$"
     | "/_authed/billing/"
@@ -840,11 +877,11 @@ export interface FileRouteTypes {
     | "/_authed/env/$envSlug/manage"
     | "/_authed/env/$envSlug/onboarding"
     | "/_authed/env/$envSlug/unattached-syncs"
+    | "/_authed/settings/organization/$"
     | "/_authed/billing/payments/"
     | "/_authed/billing/plans/"
     | "/_authed/billing/usage/"
     | "/_authed/settings/integrations/"
-    | "/_authed/settings/organization/"
     | "/_authed/settings/user/"
     | "/_authed/env/$envSlug/apps/$externalID"
     | "/_authed/env/$envSlug/apps/sync-new"
@@ -901,7 +938,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   AuthedRoute: typeof AuthedRouteWithChildren;
+  authOrganizationSetupRoute: typeof authOrganizationSetupRoute;
   authSignOutRoute: typeof authSignOutRoute;
+  authUserSetupRoute: typeof authUserSetupRoute;
+  authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute;
   authSignInSplatRoute: typeof authSignInSplatRoute;
   authSignUpSplatRoute: typeof authSignUpSplatRoute;
 }
@@ -922,11 +962,25 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/(auth)/user-setup": {
+      id: "/(auth)/user-setup";
+      path: "/user-setup";
+      fullPath: "/user-setup";
+      preLoaderRoute: typeof authUserSetupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/(auth)/sign-out": {
       id: "/(auth)/sign-out";
       path: "/sign-out";
       fullPath: "/sign-out";
       preLoaderRoute: typeof authSignOutRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/(auth)/organization-setup": {
+      id: "/(auth)/organization-setup";
+      path: "/organization-setup";
+      fullPath: "/organization-setup";
+      preLoaderRoute: typeof authOrganizationSetupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/_authed/settings": {
@@ -971,6 +1025,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof authSignInSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/(auth)/organization-list/$": {
+      id: "/(auth)/organization-list/$";
+      path: "/organization-list/$";
+      fullPath: "/organization-list/$";
+      preLoaderRoute: typeof authOrganizationListSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/_authed/env/$envSlug": {
       id: "/_authed/env/$envSlug";
       path: "/env/$envSlug";
@@ -983,13 +1044,6 @@ declare module "@tanstack/react-router" {
       path: "/user";
       fullPath: "/settings/user";
       preLoaderRoute: typeof AuthedSettingsUserIndexRouteImport;
-      parentRoute: typeof AuthedSettingsRouteRoute;
-    };
-    "/_authed/settings/organization/": {
-      id: "/_authed/settings/organization/";
-      path: "/organization";
-      fullPath: "/settings/organization";
-      preLoaderRoute: typeof AuthedSettingsOrganizationIndexRouteImport;
       parentRoute: typeof AuthedSettingsRouteRoute;
     };
     "/_authed/settings/integrations/": {
@@ -1019,6 +1073,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/billing/payments";
       preLoaderRoute: typeof AuthedBillingPaymentsIndexRouteImport;
       parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    "/_authed/settings/organization/$": {
+      id: "/_authed/settings/organization/$";
+      path: "/organization/$";
+      fullPath: "/settings/organization/$";
+      preLoaderRoute: typeof AuthedSettingsOrganizationSplatRouteImport;
+      parentRoute: typeof AuthedSettingsRouteRoute;
     };
     "/_authed/env/$envSlug/unattached-syncs": {
       id: "/_authed/env/$envSlug/unattached-syncs";
@@ -1449,8 +1510,8 @@ const AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren =
   );
 
 interface AuthedSettingsRouteRouteChildren {
+  AuthedSettingsOrganizationSplatRoute: typeof AuthedSettingsOrganizationSplatRoute;
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute;
-  AuthedSettingsOrganizationIndexRoute: typeof AuthedSettingsOrganizationIndexRoute;
   AuthedSettingsUserIndexRoute: typeof AuthedSettingsUserIndexRoute;
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren;
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren;
@@ -1469,8 +1530,8 @@ interface AuthedSettingsRouteRouteChildren {
 }
 
 const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
+  AuthedSettingsOrganizationSplatRoute: AuthedSettingsOrganizationSplatRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
-  AuthedSettingsOrganizationIndexRoute: AuthedSettingsOrganizationIndexRoute,
   AuthedSettingsUserIndexRoute: AuthedSettingsUserIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
@@ -1760,7 +1821,10 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,
+  authUserSetupRoute: authUserSetupRoute,
+  authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
   authSignUpSplatRoute: authSignUpSplatRoute,
 };
