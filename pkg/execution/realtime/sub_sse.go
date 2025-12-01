@@ -97,6 +97,10 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 
 // Closer closes the current subscription immediately, terminating any active connections.
 func (s *subSSE) Close() error {
+	// Close must also acquire the lock
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Writer is a reguler http.ResponseWriter.  This is usually handled and closed
 	// by the http server.  However, when Close is called we can attempt to hijack this
 	// conn and call Close directly.
@@ -124,7 +128,7 @@ func (s *subSSE) writeSSE(data []byte) error {
 func (s *subSSE) write(b []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if _, err := s.w.Write(b); err != nil {
 		return err
 	}
