@@ -504,9 +504,137 @@ func TestQueueScavenge(t *testing.T) {
 		})
 
 		t.Run("extend checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
-			t.Run("no earlier old lease", func(t *testing.T) {})
+			t.Run("earlier in progress item exists", func(t *testing.T) {
+				r.FlushAll()
 
-			t.Run("no earlier item in scavenger index", func(t *testing.T) {})
+				q := NewQueue(
+					shard,
+					WithClock(clock),
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+						return true
+					}),
+				)
+				ctx := context.Background()
+
+				accountID := uuid.New()
+				fnID := uuid.New()
+
+				qi := osqueue.QueueItem{
+					FunctionID: fnID,
+					Data: osqueue.Item{
+						Payload: json.RawMessage("{\"test\":\"payload\"}"),
+						Identifier: state.Identifier{
+							AccountID:  accountID,
+							WorkflowID: fnID,
+						},
+					},
+				}
+
+				start := time.Now().Truncate(time.Second)
+
+				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				// Simulate existing lease valid for another second
+				leaseExpiry1 := clock.Now().Add(time.Second)
+				_, err = r.ZAdd(kg.Concurrency("p", fnID.String()), float64(leaseExpiry1.UnixMilli()), item1.ID)
+				require.NoError(t, err)
+
+				_, err = r.ZAdd(kg.ConcurrencyIndex(), float64(leaseExpiry1.UnixMilli()), fnID.String())
+				require.NoError(t, err)
+
+				// Lease item first
+				leaseID, err := q.Lease(ctx, item2, 5*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+
+				// Then push back lease with expiry which is still later than earliest leased item
+				leaseExpiry2 := clock.Now().Add(3 * time.Second)
+				leaseID, err = q.ExtendLease(ctx, item2, *leaseID, 3*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+
+				// New item must exist in partition scavenger index
+				require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item2.ID)))
+
+				// Global index must have earlier timestamp
+				require.True(t, r.Exists(kg.ConcurrencyIndex()))
+				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+
+				// Concurrency index must have both items
+				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item1.ID)))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+			})
+
+			t.Run("earlier item in scavenger index", func(t *testing.T) {
+				r.FlushAll()
+
+				q := NewQueue(
+					shard,
+					WithClock(clock),
+					WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+						return true
+					}),
+				)
+				ctx := context.Background()
+
+				accountID := uuid.New()
+				fnID := uuid.New()
+
+				qi := osqueue.QueueItem{
+					FunctionID: fnID,
+					Data: osqueue.Item{
+						Payload: json.RawMessage("{\"test\":\"payload\"}"),
+						Identifier: state.Identifier{
+							AccountID:  accountID,
+							WorkflowID: fnID,
+						},
+					},
+				}
+
+				start := time.Now().Truncate(time.Second)
+
+				item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				// Perform initial lease only to the new index
+				leaseID, err := q.Lease(ctx, item1, 3*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(true)) // NOTE: Do not update concurrency index!
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+
+				leaseID2, err := q.Lease(ctx, item2, 2*time.Second, clock.Now(), nil, LeaseOptionDisableConstraintChecks(false))
+				require.NoError(t, err)
+				require.NotNil(t, leaseID2)
+
+				leaseID2, err = q.ExtendLease(ctx, item2, *leaseID2, 5*time.Second, ExtendLeaseOptionDisableConstraintUpdates(false))
+				require.NoError(t, err)
+				require.NotNil(t, leaseID2)
+
+				leaseExpiry1 := clock.Now().Add(3 * time.Second)
+				leaseExpiry2 := clock.Now().Add(5 * time.Second)
+
+				// Both items must exist in scavenger index
+				require.True(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
+				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item1.ID)))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.PartitionScavengerIndex(fnID.String()), item2.ID)))
+
+				// Global index must have earlier timestamp
+				require.True(t, r.Exists(kg.ConcurrencyIndex()))
+				require.Equal(t, leaseExpiry1.UnixMilli(), int64(score(t, r, kg.ConcurrencyIndex(), fnID.String())))
+
+				// Concurrency index must only have second item
+				require.True(t, r.Exists(kg.Concurrency("p", fnID.String())))
+				require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), item1.ID))
+				require.Equal(t, leaseExpiry2.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), item2.ID)))
+			})
 		})
 
 		t.Run("requeue checks for existing leases and only updates if theres no earlier lease", func(t *testing.T) {
