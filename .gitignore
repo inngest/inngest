@@ -33,3 +33,5 @@ docs/openapi/v3/
 # Go workspace file
 go.work
 go.work.sum
+
+pkg/execution/state/redis_state/testdata
