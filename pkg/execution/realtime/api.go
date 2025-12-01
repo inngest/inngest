@@ -214,11 +214,13 @@ func (a *api) GetWebsocketUpgrade(w http.ResponseWriter, r *http.Request) {
 	pollCtx := context.Background()
 	if err := sub.Poll(pollCtx); err != nil {
 		logger.StdlibLogger(ctx).Warn(
-			"error reading from rt ws conn",
+			"websocket poll returned error",
 			"error", err,
+			"sub_id", sub.ID(),
 		)
 	}
 
+	logger.StdlibLogger(ctx).Debug("closing websocket conn", "sub_id", sub.ID())
 	_ = ws.CloseNow()
 }
 

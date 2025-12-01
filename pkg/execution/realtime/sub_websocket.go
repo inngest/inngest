@@ -25,6 +25,8 @@ import (
 //     topics.
 //   - The websocket subscriber listens for incoming messages which can subscribe and unsubscribe from
 //     new topics at will (given a valid JWT in the websocket message, for subscription requests)
+//
+// This implements ReadWriteSubscription
 func NewWebsocketSubscription(
 	ctx context.Context,
 	b Broadcaster,
@@ -32,7 +34,7 @@ func NewWebsocketSubscription(
 	jwtSigningKey []byte,
 	conn *websocket.Conn,
 	topics []Topic,
-) (ReadWriteSubscription, error) {
+) (*SubscriptionWS, error) {
 	sub := &SubscriptionWS{
 		b:             b,
 		acctID:        acctID,
@@ -119,15 +121,14 @@ func (s SubscriptionWS) Close() error {
 }
 
 func (s SubscriptionWS) Poll(ctx context.Context) error {
-	// Ping the websocket conn to begin with.
-	err := s.ws.Ping(ctx)
-	if err != nil {
-		return fmt.Errorf("error pinging websocket conn before polling: %w", err)
-	}
-
 	for {
 		mt, byt, err := s.ws.Read(ctx)
 		if err != nil {
+			status := websocket.CloseStatus(err)
+			if status >= websocket.StatusNormalClosure && status <= websocket.StatusNoStatusRcvd {
+				// safe to ignore tehse.
+				return nil
+			}
 			return err
 		}
 
@@ -139,10 +140,8 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 		// Unmarshal byt, handle subscribe and unsubscribe requests.
 		msg := &Message{}
 		if err := json.Unmarshal(byt, msg); err != nil {
-			// Unknown message, ignore.
-			logger.StdlibLogger(ctx).Warn(
-				"unknown realtime ws message",
-			)
+			// unknown message, ignore...
+			logger.StdlibLogger(ctx).Warn("unknown realtime ws message")
 			continue
 		}
 
@@ -161,16 +160,16 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 
 			topics, err := TopicsFromJWT(ctx, s.jwtSigningKey, jwt)
 			if err != nil {
-				// TODO: Reply with unsuccessful subscribe msg
+				// XXX: Reply with unsuccessful subscribe msg
 				continue
 			}
 
 			if err := s.b.Subscribe(ctx, s, topics); err != nil {
-				// TODO: Reply with unsuccessful subscribe msg
+				// XXX: Reply with unsuccessful subscribe msg
 				continue
 			}
 
-			// TODO: Reply with successful subscribe msg
+			// XXX: Reply with successful subscribe msg
 			continue
 		case streamingtypes.MessageKindUnsubscribe:
 			// Unsub from the given topics.  Assume that the unsubscribe data
@@ -185,7 +184,7 @@ func (s SubscriptionWS) Poll(ctx context.Context) error {
 			}
 
 			if err := s.b.Unsubscribe(ctx, s.id, topics); err != nil {
-				// TODO: reply with error.
+				// XXX: reply with error.
 				continue
 			}
 		}
