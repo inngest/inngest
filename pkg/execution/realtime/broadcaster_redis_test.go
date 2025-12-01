@@ -71,6 +71,7 @@ func TestRedisBroadcaster(t *testing.T) {
 	// Create two messages with two separate topics.
 	msg1 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
 	msg1.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
+
 	msg2 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
 	msg2.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
 
@@ -104,8 +105,13 @@ func TestRedisBroadcaster(t *testing.T) {
 
 		require.Equal(t, 1, len(m1))
 		require.Equal(t, 1, len(m2))
-		require.Equal(t, msg1, m1[0])
-		require.Equal(t, msg1, m2[0])
+
+		// The broadcaster sets the topic name on the outgoing message
+		expectedMsg1 := msg1
+		expectedMsg1.Topic = "$run"
+
+		require.Equal(t, expectedMsg1, m1[0])
+		require.Equal(t, expectedMsg1, m2[0])
 		l.Unlock()
 
 		// Publish message 2
@@ -118,8 +124,11 @@ func TestRedisBroadcaster(t *testing.T) {
 			return len(m1) == 2 && len(m2) == 2
 		}, time.Second, 5*time.Millisecond)
 
-		require.Equal(t, msg2, m1[1])
-		require.Equal(t, msg2, m2[1])
+		expectedMsg2 := msg2
+		expectedMsg2.Topic = "$run"
+
+		require.Equal(t, expectedMsg2, m1[1])
+		require.Equal(t, expectedMsg2, m2[1])
 	})
 }
 
@@ -204,11 +213,11 @@ func TestRedisBroadcasterWrite(t *testing.T) {
 
 		// Write data to channel1 - only s1 should receive it
 		testData1 := []byte("Hello from channel 1")
-		b1.Write(ctx, channel1, testData1)
+		b1.Write(ctx, topic1.EnvID, channel1, testData1)
 
 		// Write data to channel2 - only s2 should receive it
 		testData2 := []byte("Hello from channel 2")
-		b2.Write(ctx, channel2, testData2)
+		b2.Write(ctx, topic2.EnvID, channel2, testData2)
 
 		// Wait for data propagation via Redis
 		assert.Eventually(t, func() bool {
@@ -229,7 +238,7 @@ func TestRedisBroadcasterWrite(t *testing.T) {
 
 		// Write more data to verify continued isolation
 		testData3 := []byte("Second message to channel 1")
-		b1.Write(ctx, channel1, testData3)
+		b1.Write(ctx, topic1.EnvID, channel1, testData3)
 
 		// Wait for additional data
 		assert.Eventually(t, func() bool {
@@ -243,6 +252,50 @@ func TestRedisBroadcasterWrite(t *testing.T) {
 		require.Len(t, channel1Data, 2, "s1 should have received 2 messages")
 		require.Len(t, channel2Data, 1, "s2 should still have only 1 message")
 		assert.Equal(t, testData3, channel1Data[1], "s1 should receive second message")
+		l.Unlock()
+	})
+
+	t.Run("Write method delivers raw data to correct topic (EnvID isolation)", func(t *testing.T) {
+		// This test ensures that raw data sent via Redis (which uses Topic.String() as key)
+		// is correctly delivered to the subscriber, even when Topic.String() != Topic.Channel.
+		// This verifies we are using writeToTopic instead of broadcaster.Write (which matches on Channel only).
+
+		envID := uuid.New()
+		channelName := "raw-channel"
+		// Topic string will be something like "envID:channelName" or similar depending on implementation
+		topic := Topic{
+			EnvID:   envID,
+			Channel: channelName,
+			Name:    "raw-topic",
+		}
+
+		receivedData := [][]byte{}
+		sub := NewInmemorySubscription(uuid.New(), func(data []byte) error {
+			l.Lock()
+			receivedData = append(receivedData, append([]byte(nil), data...))
+			l.Unlock()
+			return nil
+		})
+
+		err := b1.Subscribe(ctx, sub, []Topic{topic})
+		require.NoError(t, err)
+
+		// Wait for subscription
+		time.Sleep(100 * time.Millisecond)
+
+		data := []byte("secret-data")
+		// We must write using the EnvID+channel combination that matches the topic key.
+		b1.Write(ctx, topic.EnvID, topic.Channel, data)
+
+		require.Eventually(t, func() bool {
+			l.Lock()
+			defer l.Unlock()
+			return len(receivedData) > 0
+		}, 2*time.Second, 10*time.Millisecond)
+
+		l.Lock()
+		require.Len(t, receivedData, 1)
+		require.Equal(t, data, receivedData[0])
 		l.Unlock()
 	})
 }

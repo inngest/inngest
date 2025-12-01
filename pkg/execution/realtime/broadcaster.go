@@ -42,7 +42,6 @@ func newBroadcaster() *broadcaster {
 		subs:    map[uuid.UUID]*activesub{},
 		topics:  map[string]topicsub{},
 		l:       &sync.RWMutex{},
-		conds:   map[string]*sync.Cond{},
 	}
 }
 
@@ -69,30 +68,27 @@ type broadcaster struct {
 	topics map[string]topicsub
 
 	l *sync.RWMutex
-	// conds is a map of subscriptionID-topic hashes to a sync.Cond, allowing
-	// us to
-	conds map[string]*sync.Cond
 
 	wg conc.WaitGroup
+
+	// TopicStart is called when the first subscriber connects to a topic.
+	TopicStart func(ctx context.Context, t Topic) error
+	// TopicStop is called when the last subscriber disconnects from a topic.
+	TopicStop func(ctx context.Context, t Topic) error
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
 	if len(topics) == 0 {
 		return nil
 	}
-	return b.subscribe(ctx, s, topics, nil, nil)
+	return b.subscribe(ctx, s, topics)
 }
 
 // subscribe ensures that a given Subscription is subscribed to the provided topics.
-// The onSubscribe callback is called when the subscription starts for eahc topic, and the
-// onUnsubscribe callback is called when the subscription ends, eg. when Close or Unsubscribe
-// is called on another thread.
 func (b *broadcaster) subscribe(
 	ctx context.Context,
 	s Subscription,
 	topics []Topic,
-	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(ctx context.Context, t Topic),
 ) error {
 	if len(topics) == 0 {
 		return nil
@@ -130,14 +126,28 @@ func (b *broadcaster) subscribe(
 		// meaning we only send a single message per eg. websocket connection.
 		if !seen {
 			topicsubs.subscriptions.Insert(skiplistSub{s})
+			topicsubs.RefCount++
 			b.topics[topicHash] = topicsubs
-		}
 
-		// For each topic, create a new context which is cancelled when Unsubscribe or Close is called.
-		//
-		// We manage closing of channels via sync.Cond calls, which broadcast to many blocked
-		// goroutines allowing them to continue.
-		b.setupCond(ctx, s, t, onSubscribe, onUnsubscribe)
+			if topicsubs.RefCount == 1 && b.TopicStart != nil {
+				// We must release the lock while calling TopicStart to avoid deadlocks
+				// if TopicStart calls back into broadcaster (though it shouldn't).
+				// However, releasing the lock here is dangerous as state might change.
+				// For now, we assume TopicStart is non-blocking and doesn't call back.
+				// redisBroadcaster.TopicStart spawns a goroutine, so it is fast.
+				if err := b.TopicStart(ctx, t); err != nil {
+					// Rollback
+					topicsubs.subscriptions.Delete(skiplistSub{s})
+					topicsubs.RefCount--
+					if topicsubs.RefCount == 0 {
+						delete(b.topics, topicHash)
+					} else {
+						b.topics[topicHash] = topicsubs
+					}
+					return fmt.Errorf("error starting topic %s: %w", t.String(), err)
+				}
+			}
+		}
 	}
 
 	if as, ok := b.subs[s.ID()]; ok {
@@ -161,68 +171,15 @@ func (b *broadcaster) subscribe(
 		b.recordConnectionMetrics(ctx)
 	}
 
+	metrics.HistogramRealtimeSubscriptionTopicsCount(ctx, int64(len(topics)), metrics.HistogramOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
+
 	return nil
 }
 
-// setupCond sets up a new sync.Cond, ensuring that any goroutines waiting for
-// the topic to be unsubscribe are unblocked at the same time.
-//
-// NOTE: this must be called with the broadcast lock held.
-func (b *broadcaster) setupCond(
-	ctx context.Context,
-	s Subscription,
-	t Topic,
-	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(ctx context.Context, t Topic),
-) {
-	cond, ok := b.conds[s.ID().String()+t.String()]
-	if !ok {
-		cond = sync.NewCond(&sync.Mutex{})
-		b.conds[s.ID().String()+t.String()] = cond
-	}
-
-	rctx, cancel := context.WithCancel(ctx)
-
-	b.wg.Go(func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.StdlibLogger(ctx).Error("panic in setupCond waiter", "panic", r, "topic", t)
-			}
-		}()
-
-		cond.L.Lock()
-		cond.Wait()
-		cond.L.Unlock()
-
-		// We've received a notification that this topic has been unsubscribed, so cancel
-		// the context.
-		cancel()
-		if onUnsubscribe != nil {
-			// NOTE: this uses the parent context that isn't cancelled via unsubscribe.
-			// The context may be cancelled via a parent call, eg. SIGINT.
-			b.wg.Go(func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.StdlibLogger(ctx).Error("panic in onUnsubscribe", "panic", r, "topic", t)
-					}
-				}()
-				onUnsubscribe(ctx, t)
-			})
-		}
-	})
-
-	if onSubscribe != nil {
-		b.wg.Go(func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.StdlibLogger(ctx).Error("panic in onSubscribe", "panic", r, "topic", t)
-				}
-			}()
-			onSubscribe(rctx, t)
-		})
-	}
-}
-
+// Unsubscribe removes a subscription from specific topics.
 func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics []Topic) error {
 	if atomic.LoadInt32(&b.closing) == 1 {
 		// Already happening, so ignore.
@@ -256,9 +213,17 @@ func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics [
 		subs.subscriptions.Delete(skiplistSub{as.Subscription})
 		delete(as.Topics, str)
 
-		// Signal to all conds that the topic has been unsubscribed.
-		if cond, ok := b.conds[subID.String()+t.String()]; ok {
-			cond.Broadcast()
+		subs.RefCount--
+		if subs.RefCount == 0 {
+			if b.TopicStop != nil {
+				if err := b.TopicStop(ctx, t); err != nil {
+					logger.StdlibLogger(ctx).Warn("error stopping topic", "error", err, "topic", t)
+				}
+			}
+			delete(b.topics, str)
+		} else {
+			// Update the map with new RefCount
+			b.topics[str] = subs
 		}
 	}
 
@@ -288,6 +253,18 @@ func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid
 			continue
 		}
 		subs.subscriptions.Delete(skiplistSub{as.Subscription})
+
+		subs.RefCount--
+		if subs.RefCount == 0 {
+			if b.TopicStop != nil {
+				if err := b.TopicStop(ctx, t); err != nil {
+					logger.StdlibLogger(ctx).Warn("error stopping topic", "error", err, "topic", t)
+				}
+			}
+			delete(b.topics, str)
+		} else {
+			b.topics[str] = subs
+		}
 	}
 
 	// Then remove the subscription from our subscription map
@@ -369,7 +346,7 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	return nil
 }
 
-func (b *broadcaster) Write(ctx context.Context, channel string, data []byte) {
+func (b *broadcaster) Write(ctx context.Context, envID uuid.UUID, channel string, data []byte) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
@@ -377,7 +354,7 @@ func (b *broadcaster) Write(ctx context.Context, channel string, data []byte) {
 	// Since we don't have a specific topic, we'll write to any subscription
 	// that has a matching channel in any of its topics
 	for _, topicSub := range b.topics {
-		if topicSub.Channel == channel {
+		if topicSub.EnvID == envID && topicSub.Channel == channel {
 			topicSub.eachSubscription(func(s Subscription) {
 				// Use Write() to forward raw bytes directly
 				if err := s.Write(data); err != nil {
@@ -427,6 +404,52 @@ func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	}
 
 	wg.Wait()
+}
+
+func (b *broadcaster) publishToTopic(ctx context.Context, t Topic, m Message) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
+
+	tid := t.String()
+	found, ok := b.topics[tid]
+	if !ok {
+		return
+	}
+
+	msg := m
+	msg.Topic = t.Name
+
+	found.eachSubscription(func(s Subscription) {
+		b.publishTo(ctx, s, msg)
+	})
+}
+
+func (b *broadcaster) writeToTopic(ctx context.Context, t Topic, data []byte) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	tid := t.String()
+	found, ok := b.topics[tid]
+	if !ok {
+		return
+	}
+
+	found.eachSubscription(func(s Subscription) {
+		// Use Write() to forward raw bytes directly
+		if err := s.Write(data); err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"error writing raw data to subscription",
+				"error", err,
+				"topic", t.String(),
+				"sub_id", s.ID(),
+			)
+		}
+	})
 }
 
 // PublishStream publishes streams of data to any subscribers for a given datastream.
@@ -582,6 +605,7 @@ type topicsub struct {
 	Topic
 
 	subscriptions *skiplist.SkipList
+	RefCount      int
 }
 
 func (t topicsub) eachSubscription(f func(s Subscription)) {

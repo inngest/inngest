@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
@@ -428,6 +429,8 @@ func (a *api) PostPublishTee(w http.ResponseWriter, r *http.Request) {
 		broadcaster: a.opts.Broadcaster,
 		ctx:         ctx,
 		channel:     channel,
+		// Pass the authenticated environment ID
+		envID: auth.Env,
 	}, r.Body)
 
 	metrics.HistogramRealtimeRawDataSizeBytes(ctx, n, metrics.HistogramOpt{
@@ -547,9 +550,10 @@ type channelWriter struct {
 	broadcaster Broadcaster
 	ctx         context.Context
 	channel     string
+	envID       uuid.UUID
 }
 
 func (w *channelWriter) Write(p []byte) (n int, err error) {
-	w.broadcaster.Write(w.ctx, w.channel, p)
+	w.broadcaster.Write(w.ctx, w.envID, w.channel, p)
 	return len(p), nil
 }

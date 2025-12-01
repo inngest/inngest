@@ -154,3 +154,13 @@ func IncrRealtimeJWTTokensCreatedTotal(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func HistogramRealtimeSubscriptionTopicsCount(ctx context.Context, val int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, val, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "realtime_subscription_topics_count",
+		Description: "Number of topics per subscription",
+		Tags:        opts.Tags,
+		Boundaries:  peekSizeBoundaries,
+	})
+}

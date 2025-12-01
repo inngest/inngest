@@ -152,103 +152,50 @@ func TestBroadcaster(t *testing.T) {
 	})
 }
 
-// TestBroadcasterConds ensures that the sync.Cond mechanisms work for subscribing and
-// unsubscribing
-func TestBroadcasterConds(t *testing.T) {
-	t.Run("single subscriber", func(t *testing.T) {
-		var (
-			ctx = context.Background()
-			b   = NewInProcessBroadcaster()
-			sub = NewInmemorySubscription(uuid.New(), nil)
-			msg = Message{
-				Kind:    streamingtypes.MessageKindData,
-				Data:    json.RawMessage(`"output"`),
-				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
-			}
-			unsubCalled int32
-			wg          sync.WaitGroup
-		)
+// TestBroadcasterHooks ensures that the TopicStart and TopicStop hooks work correctly
+func TestBroadcasterHooks(t *testing.T) {
+	t.Run("Lifecycle hooks", func(t *testing.T) {
+		b := NewInProcessBroadcaster()
 
-		wg.Add(1)
-		err := b.subscribe(
-			ctx,
-			sub,
-			msg.Topics(),
-			func(ctx context.Context, topic Topic) {
-				require.Nil(t, ctx.Err())
-				require.Equal(t, msg.Topics()[0], topic)
+		var startCalled, stopCalled int32
 
-				// We should have a closed ctx
-				<-time.After(20 * time.Millisecond)
-
-				require.NotNil(t, ctx.Err(), "expected ctx to be cancelled")
-				wg.Done()
-			},
-			func(ctx context.Context, t Topic) {
-				atomic.AddInt32(&unsubCalled, 1)
-			},
-		)
-
-		<-time.After(10 * time.Millisecond)
-
-		require.NoError(t, err)
-		err = b.Unsubscribe(ctx, sub.ID(), msg.Topics())
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&unsubCalled) >= int32(1)
-		}, time.Second, time.Millisecond, "unsubscribe should be called")
-		wg.Wait()
-	})
-
-	t.Run("single subscriber with same topic subscriptions", func(t *testing.T) {
-		var (
-			ctx = context.Background()
-			b   = NewInProcessBroadcaster()
-			sub = NewInmemorySubscription(uuid.New(), nil)
-			msg = Message{
-				Kind:    streamingtypes.MessageKindData,
-				Data:    json.RawMessage(`"output"`),
-				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
-			}
-			unsubCalled int32
-			wg          sync.WaitGroup
-		)
-
-		// This asserts that the subscribe and unsubscribe callbacks work, even if
-		// the actual underlying subscription<>topic pair has been deduplicated.
-		for i := 0; i < 10; i++ {
-			wg.Add(1)
-			err := b.subscribe(
-				ctx,
-				sub,
-				msg.Topics(),
-				func(ctx context.Context, topic Topic) {
-					require.Nil(t, ctx.Err())
-					require.Equal(t, msg.Topics()[0], topic)
-
-					// We should have a closed ctx
-					<-time.After(20 * time.Millisecond)
-
-					require.NotNil(t, ctx.Err(), "expected ctx to be cancelled")
-					wg.Done()
-				},
-				func(ctx context.Context, t Topic) {
-					atomic.AddInt32(&unsubCalled, 1)
-				},
-			)
-			require.NoError(t, err)
+		b.TopicStart = func(ctx context.Context, t Topic) error {
+			atomic.AddInt32(&startCalled, 1)
+			return nil
+		}
+		b.TopicStop = func(ctx context.Context, t Topic) error {
+			atomic.AddInt32(&stopCalled, 1)
+			return nil
 		}
 
-		<-time.After(10 * time.Millisecond)
+		sub1 := NewInmemorySubscription(uuid.New(), nil)
+		sub2 := NewInmemorySubscription(uuid.New(), nil)
+		msg := Message{
+			Kind:    streamingtypes.MessageKindData,
+			Channel: "test",
+			Topic:   "topic1",
+		}
 
-		err := b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+		// 1. First subscribe -> Start called
+		err := b.Subscribe(context.Background(), sub1, msg.Topics())
 		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
+		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
 
-		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&unsubCalled) == int32(10)
-		}, time.Second, time.Millisecond, "unsubscribe should be called")
-		wg.Wait()
+		// 2. Second subscribe -> Start NOT called
+		err = b.Subscribe(context.Background(), sub2, msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
+
+		// 3. First unsubscribe -> Stop NOT called
+		err = b.Unsubscribe(context.Background(), sub1.ID(), msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
+
+		// 4. Second unsubscribe -> Stop called
+		err = b.Unsubscribe(context.Background(), sub2.ID(), msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&stopCalled))
 	})
 }
 

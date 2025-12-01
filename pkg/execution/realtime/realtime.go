@@ -23,7 +23,7 @@ type Publisher interface {
 	//
 	// Because of this, there is no topic, as theres no way to indicate
 	// which topic we're writing to without the Message wrapper.
-	Write(ctx context.Context, channel string, data []byte)
+	Write(ctx context.Context, envID uuid.UUID, channel string, data []byte)
 
 	// Publish publishes a message to any realtime subscribers.
 	//

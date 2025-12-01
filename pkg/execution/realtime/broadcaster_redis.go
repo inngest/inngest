@@ -3,8 +3,10 @@ package realtime
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/redis/rueidis"
@@ -28,11 +30,17 @@ const (
 // The messages pass from executors (calling .Publish) to gateways (susbcribed to redis pub/sub via
 // .Subscribe calls), being sent to all interested subscribers.
 func NewRedisBroadcaster(pubc, subc rueidis.Client) Broadcaster {
-	return &redisBroadcaster{
-		broadcaster: newBroadcaster(),
-		pubc:        pubc,
-		subc:        subc,
+	b := &redisBroadcaster{
+		broadcaster:      newBroadcaster(),
+		pubc:             pubc,
+		subc:             subc,
+		topicCancelFuncs: map[string]context.CancelFunc{},
 	}
+
+	b.broadcaster.TopicStart = b.startTopic
+	b.broadcaster.TopicStop = b.stopTopic
+
+	return b
 }
 
 type redisBroadcaster struct {
@@ -44,6 +52,9 @@ type redisBroadcaster struct {
 	pubc rueidis.Client
 	// subc is the raw client connected to Redis, allowing us to subscribe to pub-sub streams.
 	subc rueidis.Client
+
+	mu               sync.Mutex
+	topicCancelFuncs map[string]context.CancelFunc
 }
 
 // Publish publishes a message to Redis' pub-sub.  This is then caught by any subscribers
@@ -97,15 +108,18 @@ func (b *redisBroadcaster) PublishStream(ctx context.Context, m Message, data st
 
 // Write publishes raw bytes to Redis pub/sub for the specified channel, ensuring
 // all Redis broadcaster instances receive the data, and also forwards to local subscriptions.
-func (b *redisBroadcaster) Write(ctx context.Context, channel string, data []byte) {
+func (b *redisBroadcaster) Write(ctx context.Context, envID uuid.UUID, channel string, data []byte) {
 	// First, publish to Redis so other instances receive the data
 	// We need a way to distinguish raw data from structured messages
 	// Use a special prefix to indicate this is raw data
 	rawMessage := redisRawDataPrefix + string(data)
-	b.publish(ctx, channel, rawMessage)
 
-	// Also forward to local subscriptions immediately
-	b.broadcaster.Write(ctx, channel, data)
+	// Construct the Redis channel name using the EnvID for isolation
+	topicKey := Topic{EnvID: envID, Channel: channel}.String()
+	b.publish(ctx, topicKey, rawMessage)
+
+	// Also forward to local subscriptions immediately (now correctly scoped)
+	b.broadcaster.Write(ctx, envID, channel, data)
 }
 
 func (b *redisBroadcaster) publish(ctx context.Context, channel, message string) {
@@ -160,54 +174,44 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 	})
 }
 
-// Subscribe is called with an active Websocket or SSE connection to subscribe the conn to multiple topics.
-func (b *redisBroadcaster) Subscribe(ctx context.Context, s Subscription, topics []Topic) error {
-	err := b.broadcaster.subscribe(
-		ctx,
-		s,
-		topics,
-		func(ctx context.Context, t Topic) {
-			// We are subscribing to a specific topic.  This context will be closed
-			// when Unsubscribe is called on the broadcaster.
-			//
-			// This means that we are safe to use this function's context within a redis
-			// pub/sub call, as the pub/sub Receive will stop when this context is closed
-			// after the subscription finishes.
-			if err := b.redisPubsub(ctx, s, t); err != nil {
-				metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
-					PkgName: "realtime",
-					Tags: map[string]any{
-						"op": "subscribe",
-					},
-				})
-				logger.StdlibLogger(ctx).Error(
-					"error subscribing to realtime redis pubsub",
-					"error", err,
-					"topic", t,
-					"subscription_id", s.ID(),
-				)
-				_ = b.Unsubscribe(ctx, s.ID(), []Topic{t})
-				return
-			}
+func (b *redisBroadcaster) startTopic(ctx context.Context, t Topic) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-			logger.StdlibLogger(ctx).Debug(
-				"subscribing to realtime redis pubsub",
-				"topic", t,
-				"subscription_id", s.ID(),
-			)
-		},
-		func(ctx context.Context, t Topic) {
-			logger.StdlibLogger(ctx).Debug(
-				"unsubscribed from realtime redis pubsub",
-				"topic", t,
-				"subscription_id", s.ID(),
-			)
-		},
-	)
-	return err
+	key := t.String()
+	if _, ok := b.topicCancelFuncs[key]; ok {
+		return nil
+	}
+
+	// Create a detached context for the background routine
+	bgCtx, cancel := context.WithCancel(context.Background())
+	b.topicCancelFuncs[key] = cancel
+
+	b.wg.Go(func() {
+		b.runTopic(bgCtx, t)
+	})
+	return nil
 }
 
-func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t Topic) error {
+func (b *redisBroadcaster) stopTopic(ctx context.Context, t Topic) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	key := t.String()
+	if cancel, ok := b.topicCancelFuncs[key]; ok {
+		cancel()
+		delete(b.topicCancelFuncs, key)
+	}
+	return nil
+}
+
+func (b *redisBroadcaster) runTopic(ctx context.Context, t Topic) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.StdlibLogger(ctx).Error("panic in redis topic subscriber", "panic", r, "topic", t)
+		}
+	}()
+
 	cmd := b.subc.B().Subscribe().Channel(t.String()).Build()
 	err := b.subc.Receive(ctx, cmd, func(msg rueidis.PubSubMessage) {
 		metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
@@ -227,14 +231,8 @@ func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t To
 			})
 			// This is raw data - extract and forward directly using Write()
 			rawData := []byte(msg.Message[len(redisRawDataPrefix):]) // Remove prefix
-			if err := s.Write(rawData); err != nil {
-				logger.StdlibLogger(ctx).Warn(
-					"error writing raw redis data to subscription",
-					"error", err,
-					"channel", t.String(),
-					"sub_id", s.ID(),
-				)
-			}
+			// Broadcast to all local subscribers
+			b.broadcaster.writeToTopic(ctx, t, rawData)
 			return
 		}
 
@@ -260,9 +258,15 @@ func (b *redisBroadcaster) redisPubsub(ctx context.Context, s Subscription, t To
 			)
 			return
 		}
-		// Publish the message to the given subscription.  The underlying broadcaster
-		// handles retries here.
-		b.publishTo(ctx, s, m)
+		// Publish the message to all local subscribers
+		b.broadcaster.publishToTopic(ctx, t, m)
 	})
-	return err
+
+	if err != nil && ctx.Err() == nil {
+		logger.StdlibLogger(ctx).Error(
+			"redis topic subscription error",
+			"error", err,
+			"topic", t,
+		)
+	}
 }
