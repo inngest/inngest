@@ -406,7 +406,7 @@ func (q *queue) processShadowPartitionBacklog(
 	refillUntil time.Time,
 	constraints PartitionConstraintConfig,
 ) (*BacklogRefillResult, bool, error) {
-	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
+	var enableKeyQueues bool
 	if shadowPart.AccountID != nil {
 		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
 	}

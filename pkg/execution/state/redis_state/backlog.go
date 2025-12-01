@@ -164,7 +164,7 @@ func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 
 func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
 	if sp.SystemQueueName != nil {
-		return q.enqueueSystemQueuesToBacklog
+		return false
 	}
 
 	if sp.AccountID == nil || q.allowKeyQueues == nil {

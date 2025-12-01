@@ -383,7 +383,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithEnqueueSystemPartitionsToBacklog(false),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -533,7 +532,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithEnqueueSystemPartitionsToBacklog(false),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -1990,7 +1988,6 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithEnqueueSystemPartitionsToBacklog(false),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
@@ -2132,7 +2129,6 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithEnqueueSystemPartitionsToBacklog(false),
 			WithRunMode(QueueRunMode{
 				Sequential:                        true,
 				Scavenger:                         true,
