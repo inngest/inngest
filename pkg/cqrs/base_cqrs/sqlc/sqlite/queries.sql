@@ -12,7 +12,8 @@ ON CONFLICT(id) DO UPDATE SET
     checksum = excluded.checksum,
     archived_at = NULL,
     "method" = excluded.method,
-    app_version = excluded.app_version
+    app_version = excluded.app_version,
+    url = excluded.url
 RETURNING *;
 
 -- name: GetApp :one

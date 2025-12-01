@@ -266,15 +266,25 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 	}
 
+	app, err := a.devserver.Data.GetAppByURL(ctx, consts.DevServerEnvID, r.URL)
+	if err == nil && app.Name == "" {
+		// Since there's an app with the same URL but no name, we can assume it
+		// was a failed sync. We should delete it since we're in the process of
+		// syncing a replacement app.
+		//
+		// This situation happens when a user enters an unreachable URL in the
+		// UI. It'll still create an app, but in a placeholder state
+
+		err = a.devserver.Data.DeleteApp(ctx, app.ID)
+		if err != nil {
+			l.Error("error deleting app", "error", err)
+		}
+	}
+
 	// setup a list of crons to be upserted into the queue for scheduling
 	var crons []cron.CronItem
 
-	// Attempt to get the existing app by URL, and delete it if possible.
-	// We're going to recreate it below.
-	//
-	// We need to do this as we always create an app when entering the URL
-	// via the UI.  This is a dev-server specific quirk.
-	appID := inngest.DeterministicAppUUID(r.URL)
+	appID := inngest.DeterministicAppUUID(r.AppName)
 
 	tx, err := a.devserver.Data.WithTx(ctx)
 	if err != nil {
