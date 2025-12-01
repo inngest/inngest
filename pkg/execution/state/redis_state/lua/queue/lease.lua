@@ -182,16 +182,27 @@ redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
 -- scavenger index such that we get a previously lost job if possible.
-local inProgressScores =
-	redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-if inProgressScores ~= false then
-	local earliestLease = tonumber(inProgressScores[2])
-	-- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
-	-- lost jobs easily.
-	-- Note: Previously, we stored the queue name in the zset, so we have to add an extra
-	-- check to the scavenger logic to handle partition uuids for old queue items
+-- TODO: Remove check on keyInProgressPartition once all new executors have rolled out and no more old items are in progress
+local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if scavengerIndexScores ~= false or concurrencyScores ~= false then
+  -- Either scavenger index or partition in progress set includes more items
 
-	redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  local earliestLease = nil
+  if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
+    earliestLease = tonumber(scavengerIndexScores[2])
+  end
+
+  -- Fall back to in progress set
+  -- TODO: Remove this check once all items are tracked in scavenger index
+  if earliestLease == nil or (concurrencyScores ~= false and concurrencyScores ~= nil and tonumber(concurrencyScores[2]) < earliestLease) then
+    earliestLease = tonumber(concurrencyScores[2])
+  end
+
+  if earliestLease ~= nil then
+    -- Ensure that we update the score with the earliest lease
+    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  end
 end
 
 -- Update in progress items sets / concurrency constraint state if we checked them
