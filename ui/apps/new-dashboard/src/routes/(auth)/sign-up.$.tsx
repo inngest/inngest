@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 //
 // TANSTACK TODO: Add anonymous ID to the sign up form
-export const Route = createFileRoute("/sign-up/$")({
+export const Route = createFileRoute("/(auth)/sign-up/$")({
   component: RouteComponent,
 });
 

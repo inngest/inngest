@@ -9,15 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root";
-import { Route as SignOutRouteImport } from "./routes/sign-out";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
-import { Route as SignUpSplatRouteImport } from "./routes/sign-up.$";
-import { Route as SignInSplatRouteImport } from "./routes/sign-in.$";
+import { Route as authSignOutRouteImport } from "./routes/(auth)/sign-out";
 import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settings/route";
 import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
 import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
+import { Route as authSignUpSplatRouteImport } from "./routes/(auth)/sign-up.$";
+import { Route as authSignInSplatRouteImport } from "./routes/(auth)/sign-in.$";
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from "./routes/_authed/env/$envSlug/route";
 import { Route as AuthedSettingsUserIndexRouteImport } from "./routes/_authed/settings/user/index";
 import { Route as AuthedSettingsOrganizationIndexRouteImport } from "./routes/_authed/settings/organization/index";
@@ -80,11 +80,6 @@ import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport 
 import { Route as AuthedEnvEnvSlugAppsExternalIDSyncsIndexRouteImport } from "./routes/_authed/env/$envSlug/apps/$externalID/syncs/index";
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRouteImport } from "./routes/_authed/env/$envSlug/functions/$slug/replays/$replayID/index";
 
-const SignOutRoute = SignOutRouteImport.update({
-  id: "/sign-out",
-  path: "/sign-out",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const AuthedRoute = AuthedRouteImport.update({
   id: "/_authed",
   getParentRoute: () => rootRouteImport,
@@ -94,14 +89,9 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
-const SignUpSplatRoute = SignUpSplatRouteImport.update({
-  id: "/sign-up/$",
-  path: "/sign-up/$",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const SignInSplatRoute = SignInSplatRouteImport.update({
-  id: "/sign-in/$",
-  path: "/sign-in/$",
+const authSignOutRoute = authSignOutRouteImport.update({
+  id: "/(auth)/sign-out",
+  path: "/sign-out",
   getParentRoute: () => rootRouteImport,
 } as any);
 const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
@@ -124,6 +114,16 @@ const AuthedBillingIndexRoute = AuthedBillingIndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => AuthedBillingRouteRoute,
+} as any);
+const authSignUpSplatRoute = authSignUpSplatRouteImport.update({
+  id: "/(auth)/sign-up/$",
+  path: "/sign-up/$",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const authSignInSplatRoute = authSignInSplatRouteImport.update({
+  id: "/(auth)/sign-in/$",
+  path: "/sign-in/$",
+  getParentRoute: () => rootRouteImport,
 } as any);
 const AuthedEnvEnvSlugRouteRoute = AuthedEnvEnvSlugRouteRouteImport.update({
   id: "/env/$envSlug",
@@ -490,12 +490,12 @@ const AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
-  "/sign-out": typeof SignOutRoute;
   "/billing": typeof AuthedBillingRouteRouteWithChildren;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/sign-up/$": typeof SignUpSplatRoute;
+  "/sign-out": typeof authSignOutRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/sign-in/$": typeof authSignInSplatRoute;
+  "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing/": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
@@ -561,11 +561,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
-  "/sign-out": typeof SignOutRoute;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/sign-up/$": typeof SignUpSplatRoute;
+  "/sign-out": typeof authSignOutRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/sign-in/$": typeof authSignInSplatRoute;
+  "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
@@ -623,12 +623,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
   "/_authed": typeof AuthedRouteWithChildren;
-  "/sign-out": typeof SignOutRoute;
   "/_authed/billing": typeof AuthedBillingRouteRouteWithChildren;
   "/_authed/settings": typeof AuthedSettingsRouteRouteWithChildren;
-  "/sign-in/$": typeof SignInSplatRoute;
-  "/sign-up/$": typeof SignUpSplatRoute;
+  "/(auth)/sign-out": typeof authSignOutRoute;
   "/_authed/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
+  "/(auth)/sign-in/$": typeof authSignInSplatRoute;
+  "/(auth)/sign-up/$": typeof authSignUpSplatRoute;
   "/_authed/billing/": typeof AuthedBillingIndexRoute;
   "/_authed/create-environment/": typeof AuthedCreateEnvironmentIndexRoute;
   "/_authed/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
@@ -696,12 +696,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
-    | "/sign-out"
     | "/billing"
     | "/settings"
+    | "/sign-out"
+    | "/env/$envSlug"
     | "/sign-in/$"
     | "/sign-up/$"
-    | "/env/$envSlug"
     | "/billing/"
     | "/create-environment"
     | "/env/$envSlug/apps"
@@ -767,11 +767,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
-    | "/sign-out"
     | "/settings"
+    | "/sign-out"
+    | "/env/$envSlug"
     | "/sign-in/$"
     | "/sign-up/$"
-    | "/env/$envSlug"
     | "/billing"
     | "/create-environment"
     | "/env/$envSlug/manage"
@@ -828,12 +828,12 @@ export interface FileRouteTypes {
     | "__root__"
     | "/"
     | "/_authed"
-    | "/sign-out"
     | "/_authed/billing"
     | "/_authed/settings"
-    | "/sign-in/$"
-    | "/sign-up/$"
+    | "/(auth)/sign-out"
     | "/_authed/env/$envSlug"
+    | "/(auth)/sign-in/$"
+    | "/(auth)/sign-up/$"
     | "/_authed/billing/"
     | "/_authed/create-environment/"
     | "/_authed/env/$envSlug/apps"
@@ -901,20 +901,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   AuthedRoute: typeof AuthedRouteWithChildren;
-  SignOutRoute: typeof SignOutRoute;
-  SignInSplatRoute: typeof SignInSplatRoute;
-  SignUpSplatRoute: typeof SignUpSplatRoute;
+  authSignOutRoute: typeof authSignOutRoute;
+  authSignInSplatRoute: typeof authSignInSplatRoute;
+  authSignUpSplatRoute: typeof authSignUpSplatRoute;
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    "/sign-out": {
-      id: "/sign-out";
-      path: "/sign-out";
-      fullPath: "/sign-out";
-      preLoaderRoute: typeof SignOutRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/_authed": {
       id: "/_authed";
       path: "";
@@ -929,18 +922,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/sign-up/$": {
-      id: "/sign-up/$";
-      path: "/sign-up/$";
-      fullPath: "/sign-up/$";
-      preLoaderRoute: typeof SignUpSplatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/sign-in/$": {
-      id: "/sign-in/$";
-      path: "/sign-in/$";
-      fullPath: "/sign-in/$";
-      preLoaderRoute: typeof SignInSplatRouteImport;
+    "/(auth)/sign-out": {
+      id: "/(auth)/sign-out";
+      path: "/sign-out";
+      fullPath: "/sign-out";
+      preLoaderRoute: typeof authSignOutRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/_authed/settings": {
@@ -970,6 +956,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/billing/";
       preLoaderRoute: typeof AuthedBillingIndexRouteImport;
       parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    "/(auth)/sign-up/$": {
+      id: "/(auth)/sign-up/$";
+      path: "/sign-up/$";
+      fullPath: "/sign-up/$";
+      preLoaderRoute: typeof authSignUpSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/(auth)/sign-in/$": {
+      id: "/(auth)/sign-in/$";
+      path: "/sign-in/$";
+      fullPath: "/sign-in/$";
+      preLoaderRoute: typeof authSignInSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     "/_authed/env/$envSlug": {
       id: "/_authed/env/$envSlug";
@@ -1760,9 +1760,9 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
-  SignOutRoute: SignOutRoute,
-  SignInSplatRoute: SignInSplatRoute,
-  SignUpSplatRoute: SignUpSplatRoute,
+  authSignOutRoute: authSignOutRoute,
+  authSignInSplatRoute: authSignInSplatRoute,
+  authSignUpSplatRoute: authSignUpSplatRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

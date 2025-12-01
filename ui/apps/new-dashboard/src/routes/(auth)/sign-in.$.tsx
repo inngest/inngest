@@ -11,7 +11,7 @@ type SignInSearchParams = {
   error?: string;
 };
 
-export const Route = createFileRoute("/sign-in/$")({
+export const Route = createFileRoute("/(auth)/sign-in/$")({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): SignInSearchParams => {
     return {
