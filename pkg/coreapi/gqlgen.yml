@@ -131,6 +131,8 @@ models:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunctionResult
   SpanMetadataKind:
     model: github.com/inngest/inngest/pkg/tracing/metadata.Kind
+  SpanMetadataScope:
+    model: github.com/inngest/inngest/pkg/enums.MetadataScope
   SpanMetadataValues:
     model: github.com/inngest/inngest/pkg/tracing/metadata.Values
   StreamItem:
