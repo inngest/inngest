@@ -12,6 +12,7 @@ scalar Bytes
 scalar Unknown
 scalar Int64
 scalar SpanMetadataKind
+scalar SpanMetadataScope
 scalar SpanMetadataValues
 
 "The pagination information in a connection."
@@ -603,6 +604,7 @@ type RunTraceSpan {
 }
 
 type SpanMetadata {
+  scope: SpanMetadataScope!
   kind: SpanMetadataKind!
   values: SpanMetadataValues!
 }
