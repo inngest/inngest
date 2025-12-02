@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -790,7 +791,7 @@ func TestExtractTypedValues(t *testing.T) {
 		values := metadata.Values{
 			"key": []byte(`"value"`),
 		}
-		kind := metadata.KindInngestAI
+		kind := extractors.KindInngestAI
 		op := enums.MetadataOpcodeSet
 		attrs := map[string]any{
 			"_inngest.metadata.values": "{\"key\":\"value\"}",

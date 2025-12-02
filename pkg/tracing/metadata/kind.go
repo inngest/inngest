@@ -16,10 +16,6 @@ const (
 
 	KindPrefixInngest  = "inngest."
 	KindPrefixUserland = "userland."
-
-	KindInngestAI       Kind = "inngest.ai"
-	KindInngestHTTP     Kind = "inngest.http"
-	KindInngestWarnings Kind = "inngest.warnings"
 )
 
 func (k Kind) String() string {

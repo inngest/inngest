@@ -8,6 +8,10 @@ import (
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+const (
+	KindInngestAI metadata.Kind = "inngest.ai"
+)
+
 type AIMetadata struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`
@@ -17,7 +21,7 @@ type AIMetadata struct {
 }
 
 func (ms AIMetadata) Kind() metadata.Kind {
-	return "inngest.ai"
+	return KindInngestAI
 }
 
 func (ms AIMetadata) Op() metadata.Opcode {

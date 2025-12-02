@@ -9,6 +9,10 @@ import (
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+const (
+	KindInngestHTTP metadata.Kind = "inngest.http"
+)
+
 type HTTPMetadata struct {
 	ResponseContentType *string `json:"response_content_type,omitempty"`
 	RequestContentType  *string `json:"request_content_type,omitempty"`
@@ -21,7 +25,7 @@ type HTTPMetadata struct {
 }
 
 func (m HTTPMetadata) Kind() metadata.Kind {
-	return "inngest.http"
+	return KindInngestHTTP
 }
 
 func (m HTTPMetadata) Op() metadata.Opcode {
