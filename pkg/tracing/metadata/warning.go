@@ -7,6 +7,10 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
+const (
+	KindInngestWarnings Kind = "inngest.warnings"
+)
+
 type WarningError struct {
 	Key string
 	Err error
