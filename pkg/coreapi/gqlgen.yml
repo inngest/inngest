@@ -129,6 +129,10 @@ models:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunction
   RunHistoryInvokeFunctionResult:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunctionResult
+  SpanMetadataKind:
+    model: github.com/inngest/inngest/pkg/tracing/metadata.Kind
+  SpanMetadataValues:
+    model: github.com/inngest/inngest/pkg/tracing/metadata.Values
   StreamItem:
     fields:
       inBatch:
