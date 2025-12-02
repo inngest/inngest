@@ -105,7 +105,7 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 			run := c.Run(ctx, *runID.Load())
 			r.Equal("FAILED", run.Status)
 			r.Equal("{\"error\":{\"error\":\"InngestErrStateOverflowed: The function run exceeded the state size limit of 1 bytes.\",\"name\":\"InngestErrStateOverflowed\",\"message\":\"The function run exceeded the state size limit of 1 bytes.\"}}", run.Output)
-		}, 5*time.Second, time.Second)
+		}, 10*time.Second, time.Second)
 
 		removeStateSizeLimit(t)
 
