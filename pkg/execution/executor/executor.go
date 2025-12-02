@@ -2837,19 +2837,109 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 		return e.handleGeneratorSyncFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepFailed:
 		return e.handleStepFailed(ctx, runCtx, gen, edge)
+	case enums.OpcodeDiscoveryRequest:
+		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
 }
 
-// handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
-// has finished
-func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, groupID string, hasPendingSteps bool) error {
+	if !shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
+		return nil
+	}
+
+	// Enqueue the next discovery step to continue execution.
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
+	now := time.Now()
+	nextItem := queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
+		GroupID:               groupID,
+		Kind:                  queue.KindEdge,
+		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Attempt:               0,
+		MaxAttempts:           runCtx.MaxAttempts(),
+		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
+	}
+
+	lifecycleItem := runCtx.LifecycleItem()
+	metadata := runCtx.Metadata()
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{nextItem.Metadata},
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:       &tracing.SpanDebugData{Location: "executor.maybeEnqueueDiscoveryStep"},
+			Metadata:    metadata,
+			Parent:      tracing.RunSpanRefFromMetadata(metadata),
+			QueueItem:   &nextItem,
+		},
+	)
+	if err != nil {
+		// return fmt.Errorf("error creating span for next step after
+		// Step: %w", err)
+		e.log.Debug("error creating span for next step after Step", "error", err)
+	}
+
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+	if err != nil {
+		span.Drop()
+
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
+
+		logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+
+		return err
+	}
+
+	_ = span.Send()
+
+	for _, l := range e.lifecycles {
+		// We can't specify step name here since that will result in the
+		// "followup discovery step" having the same name as its predecessor.
+		var stepName *string = nil
+		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
+	}
+
+	return nil
+}
+
+// handleGeneratorDiscoveryRequest handles OpcodeDiscoveryRequest, which
+// indicates that the SDK is requesting new work to be scheduled, typically
+// after checkpointing or in an effort to recover from non-determinism.
+func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	// Currently we always enqueue based off of this request, but in the future
+	// we should fetch `hasPendingSteps` without saving state and use that to
+	// decide whether to enqueue, as that takes in to account execution
+	// versions and parallel steps.
+	groupID := uuid.New().String()
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		true,
+	)
+}
+
+// handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
+// has finished
+func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// Save the response to the state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -2915,69 +3005,16 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// Update the group ID in context;  we've already saved this step's success and we're now
 	// running the step again, needing a new history group
 	groupID := uuid.New().String()
-	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	now := time.Now()
-	nextItem := queue.Item{
-		JobID:                 &jobID,
-		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
-		GroupID:               groupID,
-		Kind:                  queue.KindEdge,
-		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()), // Convert from v2 metadata
-		PriorityFactor:        runCtx.PriorityFactor(),
-		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
-		Attempt:               0,
-		MaxAttempts:           runCtx.MaxAttempts(),
-		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              make(map[string]any),
-		ParallelMode:          gen.ParallelMode(),
-	}
-
-	if shouldEnqueueDiscovery(hasPendingSteps, runCtx.ParallelMode()) {
-		lifecycleItem := runCtx.LifecycleItem()
-		metadata := runCtx.Metadata()
-		span, err := e.tracerProvider.CreateDroppableSpan(
-			ctx,
-			meta.SpanNameStepDiscovery,
-			&tracing.CreateSpanOptions{
-				Carriers:    []map[string]any{nextItem.Metadata},
-				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStep"},
-				Metadata:    metadata,
-				Parent:      tracing.RunSpanRefFromMetadata(metadata),
-				QueueItem:   &nextItem,
-			},
-		)
-		if err != nil {
-			// return fmt.Errorf("error creating span for next step after
-			// Step: %w", err)
-			e.log.Debug("error creating span for next step after Step", "error", err)
-		}
-
-		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err != nil {
-			span.Drop()
-
-			if err == redis_state.ErrQueueItemExists {
-				return nil
-			}
-
-			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
-
-			return err
-		}
-
-		_ = span.Send()
-	}
-
-	for _, l := range e.lifecycles {
-		// We can't specify step name here since that will result in the
-		// "followup discovery step" having the same name as its predecessor.
-		var stepName *string = nil
-		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
-	}
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
+	)
 
 	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
 	//
@@ -2994,8 +3031,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// 		RunID:      i.md.ID.RunID,
 	// 	})
 	// }
-
-	return nil
 }
 
 func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
