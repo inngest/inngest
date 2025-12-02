@@ -86,7 +86,8 @@ func TestAppURLChange(t *testing.T) {
 
 		// Sync via proxy 1. Execution requests go via proxy 1
 		sync(t, proxy1URL.String())
-		ic.Send(ctx, inngestgo.Event{Name: eventName})
+		_, err = ic.Send(ctx, inngestgo.Event{Name: eventName})
+		r.NoError(err)
 		r.EventuallyWithT(func(t *assert.CollectT) {
 			require.Equal(t,
 				[]string{proxy1URL.Host},
@@ -97,7 +98,8 @@ func TestAppURLChange(t *testing.T) {
 		// Sync via proxy 2. Execution requests go via proxy 2. This proves that
 		// resyncing with a new URL changes the app URL
 		sync(t, proxy2URL.String())
-		ic.Send(ctx, inngestgo.Event{Name: eventName})
+		_, err = ic.Send(ctx, inngestgo.Event{Name: eventName})
+		r.NoError(err)
 		r.EventuallyWithT(func(t *assert.CollectT) {
 			require.Equal(t,
 				[]string{proxy1URL.Host, proxy2URL.Host},
