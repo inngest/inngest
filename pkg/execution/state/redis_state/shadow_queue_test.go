@@ -2425,37 +2425,70 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	require.NoError(t, err)
 	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
+	item3, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
 
 	backlog := q.ItemBacklog(ctx, item1)
 	require.NotNil(t, backlog.Throttle)
 
 	shadowPart := q.ItemShadowPartition(ctx, item1)
 
-	res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID, item2.ID}, constraints)
+	// Refill once, should work
+	res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item1.ID}, constraints)
 	require.NoError(t, err)
-	require.Equal(t, 2, res.Refill)
+	require.Equal(t, 1, res.Refill) // refill gets adjusted to constraint
 	require.Equal(t, 1, res.Capacity)
 	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+	// Refill again, should fail due throttle
+	res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, clock.Now().Add(time.Minute), []string{item2.ID}, constraints)
+	require.NoError(t, err)
+	require.Equal(t, 0, res.Refill) // refill gets adjusted to constraint
+
+	require.Equal(t, 0, res.Capacity)
+	require.Equal(t, 0, res.Refilled)
 	require.Equal(t, enums.QueueConstraintThrottle, res.Constraint)
 
 	// Set idempotency key
+	idempotencyKey := "random string for backlog operation"
 	keyConstraintCheckIdempotency := rolloutManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
 		QueueShard: shard.Name,
-	}, accountID, "random string for backlog operation")
+	}, accountID, idempotencyKey)
 
 	err = r.Set(keyConstraintCheckIdempotency, strconv.Itoa(int(clock.Now().UnixMilli())))
 	require.NoError(t, err)
 
+	// Refill with idempotency should work
 	res, err = q.BacklogRefill(
 		ctx,
 		&backlog,
 		&shadowPart,
 		clock.Now().Add(time.Minute),
-		[]string{qi.ID},
+		[]string{item2.ID},
 		constraints,
-		WithBacklogRefillDisableConstraintChecks(true),
-		WithBacklogRefillConstraintCheckIdempotencyKey(keyConstraintCheckIdempotency),
+		WithBacklogRefillDisableConstraintChecks(false),
+		WithBacklogRefillConstraintCheckIdempotencyKey(idempotencyKey),
 	)
 	require.NoError(t, err)
+	require.Equal(t, 1, res.Refill)
+	require.Equal(t, 4, res.Capacity) // function concurrency is limiting constraint
 	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, []string{item2.ID}, res.RefilledItems)
+
+	// Refill with ignoring checks should work
+	res, err = q.BacklogRefill(
+		ctx,
+		&backlog,
+		&shadowPart,
+		clock.Now().Add(time.Minute),
+		[]string{item3.ID},
+		constraints,
+		WithBacklogRefillDisableConstraintChecks(true),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 1, res.Refill)
+	require.Equal(t, 1, res.Capacity)
+	require.Equal(t, 1, res.Refilled)
+	require.Equal(t, []string{item3.ID}, res.RefilledItems)
 }
