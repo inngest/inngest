@@ -12,11 +12,13 @@ import (
 
 type MetadataSpanAttrOpts func(attr *meta.SerializableAttrs)
 
-func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, spanMetadata metadata.Structured, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, spanMetadata metadata.Structured, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
 	attrs, err := MetadataAttrs(spanMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
 	}
+
+	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
 	for _, opt := range opts {
 		opt(attrs)
