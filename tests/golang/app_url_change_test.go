@@ -68,14 +68,12 @@ func TestAppURLChange(t *testing.T) {
 		// This is how we'll assert that the app URL changes
 		var postRequestHosts []string
 		proxy1URL, cleanup := createProxy(t, appURL, func(req *http.Request) {
-			fmt.Println("req", req.Method, req.Host)
 			if req.Method == http.MethodPost {
 				postRequestHosts = append(postRequestHosts, req.Host)
 			}
 		})
 		defer cleanup()
 		proxy2URL, cleanup := createProxy(t, appURL, func(req *http.Request) {
-			fmt.Println("req", req.Method, req.Host)
 			if req.Method == http.MethodPost {
 				postRequestHosts = append(postRequestHosts, req.Host)
 			}
