@@ -27,6 +27,9 @@ type Opts struct {
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
 	CachingMiddleware CachingMiddleware[[]byte]
+	// RateLimitingMiddleware runs after caching middleware, allowing cached responses
+	// to be resolved without rate limit impacts.
+	RateLimitingMiddleware func(http.Handler) http.Handler
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
@@ -121,6 +124,10 @@ func (a *router) setup() {
 
 			if a.opts.CachingMiddleware != nil {
 				r.Use(a.opts.CachingMiddleware.Middleware)
+			}
+
+			if a.opts.RateLimitingMiddleware != nil {
+				r.Use(a.opts.RateLimitingMiddleware)
 			}
 
 			if a.opts.MetricsMiddleware != nil {
