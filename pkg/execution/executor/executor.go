@@ -2845,18 +2845,15 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 }
 
 func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, groupID string, hasPendingSteps bool) error {
-	if !shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
-		return nil
-	}
-
 	// Enqueue the next discovery step to continue execution.
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
-	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 	now := time.Now()
+	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
+
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
@@ -2872,40 +2869,43 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		ParallelMode:          gen.ParallelMode(),
 	}
 
-	lifecycleItem := runCtx.LifecycleItem()
-	metadata := runCtx.Metadata()
-	span, err := e.tracerProvider.CreateDroppableSpan(
-		ctx,
-		meta.SpanNameStepDiscovery,
-		&tracing.CreateSpanOptions{
-			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.maybeEnqueueDiscoveryStep"},
-			Metadata:    metadata,
-			Parent:      tracing.RunSpanRefFromMetadata(metadata),
-			QueueItem:   &nextItem,
-		},
-	)
-	if err != nil {
-		// return fmt.Errorf("error creating span for next step after
-		// Step: %w", err)
-		e.log.Debug("error creating span for next step after Step", "error", err)
-	}
+	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
 
-	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-	if err != nil {
-		span.Drop()
-
-		if err == redis_state.ErrQueueItemExists {
-			return nil
+		lifecycleItem := runCtx.LifecycleItem()
+		metadata := runCtx.Metadata()
+		span, err := e.tracerProvider.CreateDroppableSpan(
+			ctx,
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				Carriers:    []map[string]any{nextItem.Metadata},
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+				Debug:       &tracing.SpanDebugData{Location: "executor.maybeEnqueueDiscoveryStep"},
+				Metadata:    metadata,
+				Parent:      tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:   &nextItem,
+			},
+		)
+		if err != nil {
+			// return fmt.Errorf("error creating span for next step after
+			// Step: %w", err)
+			e.log.Debug("error creating span for next step after Step", "error", err)
 		}
 
-		logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		if err != nil {
+			span.Drop()
 
-		return err
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+
+			return err
+		}
+
+		_ = span.Send()
 	}
-
-	_ = span.Send()
 
 	for _, l := range e.lifecycles {
 		// We can't specify step name here since that will result in the
