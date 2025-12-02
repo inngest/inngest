@@ -126,12 +126,12 @@ func (a *router) setup() {
 				r.Use(a.opts.CachingMiddleware.Middleware)
 			}
 
-			if a.opts.RateLimitingMiddleware != nil {
-				r.Use(a.opts.RateLimitingMiddleware)
-			}
-
 			if a.opts.MetricsMiddleware != nil {
 				r.Use(a.opts.MetricsMiddleware.Middleware)
+			}
+
+			if a.opts.RateLimitingMiddleware != nil {
+				r.Use(a.opts.RateLimitingMiddleware)
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
