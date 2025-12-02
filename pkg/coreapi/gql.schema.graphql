@@ -11,6 +11,8 @@ scalar UUID
 scalar Bytes
 scalar Unknown
 scalar Int64
+scalar SpanMetadataKind
+scalar SpanMetadataValues
 
 "The pagination information in a connection."
 type PageInfo {
@@ -597,6 +599,12 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+  metadata: [SpanMetadata!]!
+}
+
+type SpanMetadata {
+  kind: SpanMetadataKind!
+  values: SpanMetadataValues!
 }
 
 type UserlandSpan {

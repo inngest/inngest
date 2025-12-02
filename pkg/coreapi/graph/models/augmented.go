@@ -53,6 +53,7 @@ type RunTraceSpan struct {
 	DebugRunID     *ulid.ULID         `json:"debugRunID,omitempty"`
 	DebugSessionID *ulid.ULID         `json:"debugSessionID,omitempty"`
 	DebugPaused    bool               `json:"debugPaused"`
+	Metadata       []*SpanMetadata    `json:"metadata,omitempty"`
 
 	// Internal fields not exposed over GraphQL.
 	SpanTypeName string

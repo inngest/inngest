@@ -34,6 +34,7 @@ message RunSpan {
   optional string step_id = 21;
   bool is_userland = 22;
   optional UserlandSpan userland_span = 23;
+  repeated SpanMetadata metadata = 24;
 }
 
 message UserlandSpan {
@@ -44,6 +45,11 @@ message UserlandSpan {
   optional string scope_version = 5;
   optional bytes span_attrs = 6;
   optional bytes resource_attrs = 7;
+}
+
+message SpanMetadata {
+  string kind = 1;
+  map<string, string> values = 2;
 }
 
 enum SpanStatus {
