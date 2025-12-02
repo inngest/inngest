@@ -163,7 +163,7 @@ local function check_active_capacity(now_ms, keyActiveSet, limit)
 end
 
 -- Check throttle capacity if configured
-local checkThrottle = checkConstraints and throttlePeriod > 0 and throttleLimit > 0
+local checkThrottle = checkConstraints == 1 and throttlePeriod > 0 and throttleLimit > 0
 -- Skip throttle GCRA checks if constraint check idempotency is set by Constraint API
 if checkConstraints and exists_without_ending(keyConstraintCheckIdempotency, ":-") and redis.call("EXISTS", keyConstraintCheckIdempotency) == 1 then
   checkThrottle = false
