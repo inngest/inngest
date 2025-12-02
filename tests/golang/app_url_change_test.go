@@ -17,8 +17,6 @@ import (
 )
 
 func TestAppURLChange(t *testing.T) {
-	t.Setenv("INNGEST_DEV", "1")
-
 	sync := func(t *testing.T, u string) {
 		r := require.New(t)
 

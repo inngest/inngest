@@ -26,10 +26,7 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "fnrun")
 	defer server.Close()
 
-	var (
-		ok        int32
-		lastRunId string
-	)
+	var runID atomic.Pointer[string]
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -37,21 +34,13 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 		},
 		inngestgo.EventTrigger("test/state-size.limit", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
-			_, _ = step.Run(ctx, "step1", func(ctx context.Context) (any, error) {
-				if atomic.LoadInt32(&ok) == 0 {
-					lastRunId = input.InputCtx.RunID
-				}
-				atomic.AddInt32(&ok, 1)
+			runID.Store(&input.InputCtx.RunID)
 
+			_, _ = step.Run(ctx, "step1", func(ctx context.Context) (any, error) {
 				return nil, nil
 			})
 
 			_, _ = step.Run(ctx, "step2", func(ctx context.Context) (any, error) {
-				if atomic.LoadInt32(&ok) == 0 {
-					lastRunId = input.InputCtx.RunID
-				}
-				atomic.AddInt32(&ok, 1)
-
 				return nil, nil
 			})
 
@@ -106,16 +95,19 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 	}
 
 	t.Run("should fail due to state size limit reached", func(t *testing.T) {
+		r := require.New(t)
 		setStateSizeLimit(t, 1)
 
 		_, _ = inngestClient.Send(ctx, inngestgo.Event{Name: "test/state-size.limit", Data: map[string]any{"success": true}})
-
-		<-time.After(3 * time.Second)
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			r := require.New(t)
+			r.NotEmpty(runID.Load())
+			run := c.Run(ctx, *runID.Load())
+			r.Equal("FAILED", run.Status)
+			r.Equal("{\"error\":{\"error\":\"InngestErrStateOverflowed: The function run exceeded the state size limit of 1 bytes.\",\"name\":\"InngestErrStateOverflowed\",\"message\":\"The function run exceeded the state size limit of 1 bytes.\"}}", run.Output)
+		}, 5*time.Second, time.Second)
 
 		removeStateSizeLimit(t)
 
-		run := c.Run(ctx, lastRunId)
-		assert.Equal(t, "FAILED", run.Status)
-		assert.Equal(t, "{\"error\":{\"error\":\"InngestErrStateOverflowed: The function run exceeded the state size limit of 1 bytes.\",\"name\":\"InngestErrStateOverflowed\",\"message\":\"The function run exceeded the state size limit of 1 bytes.\"}}", run.Output)
 	})
 }
