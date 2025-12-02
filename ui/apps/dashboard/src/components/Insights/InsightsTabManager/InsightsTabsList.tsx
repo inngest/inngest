@@ -28,6 +28,19 @@ import { useTabManagerActions } from './TabManagerContext';
 import { UnsavedChangesModal } from './UnsavedChangesModal';
 import { HOME_TAB, TEMPLATES_TAB } from './constants';
 
+/**
+ * Filters a list of tab IDs to return only tabs with unsaved changes
+ */
+function getTabsWithUnsavedChanges(
+  tabIds: string[],
+  allTabs: Tab[],
+  queriesData: ReturnType<typeof useStoredQueries>['queries']['data']
+): Tab[] {
+  return tabIds
+    .map((id) => allTabs.find((t) => t.id === id))
+    .filter((tab): tab is Tab => tab !== undefined && hasUnsavedChanges(queriesData, tab));
+}
+
 interface InsightsTabsListProps {
   activeTabId: string;
   isQueryHelperPanelVisible: boolean;
@@ -47,17 +60,12 @@ export function InsightsTabsList({
   const [pendingCloseTabIds, setPendingCloseTabIds] = useState<string[]>([]);
 
   const ActionTabIcon = isQueryHelperPanelVisible ? RiContractLeftLine : RiExpandRightLine;
-
   // Get all tabs with unsaved changes that are pending close
-  const unsavedTabsPendingClose = pendingCloseTabIds
-    .map((id) => tabs.find((t) => t.id === id))
-    .filter((tab): tab is Tab => tab !== undefined && hasUnsavedChanges(queries.data, tab));
+  const unsavedTabsPendingClose = getTabsWithUnsavedChanges(pendingCloseTabIds, tabs, queries.data);
 
   const processPendingCloseTabs = (tabIdsToClose: string[]) => {
     // Find all tabs with unsaved changes
-    const tabsWithUnsavedChanges = tabIdsToClose
-      .map((id) => tabs.find((t) => t.id === id))
-      .filter((tab): tab is Tab => tab !== undefined && hasUnsavedChanges(queries.data, tab));
+    const tabsWithUnsavedChanges = getTabsWithUnsavedChanges(tabIdsToClose, tabs, queries.data);
 
     if (tabsWithUnsavedChanges.length > 0) {
       // Show bulk confirmation modal for all unsaved tabs
