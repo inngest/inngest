@@ -511,6 +511,7 @@ type ComplexityRoot struct {
 
 	SpanMetadata struct {
 		Kind   func(childComplexity int) int
+		Scope  func(childComplexity int) int
 		Values func(childComplexity int) int
 	}
 
@@ -2956,6 +2957,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SpanMetadata.Kind(childComplexity), true
 
+	case "SpanMetadata.scope":
+		if e.complexity.SpanMetadata.Scope == nil {
+			break
+		}
+
+		return e.complexity.SpanMetadata.Scope(childComplexity), true
+
 	case "SpanMetadata.values":
 		if e.complexity.SpanMetadata.Values == nil {
 			break
@@ -3525,6 +3533,7 @@ scalar Bytes
 scalar Unknown
 scalar Int64
 scalar SpanMetadataKind
+scalar SpanMetadataScope
 scalar SpanMetadataValues
 
 "The pagination information in a connection."
@@ -4116,6 +4125,7 @@ type RunTraceSpan {
 }
 
 type SpanMetadata {
+  scope: SpanMetadataScope!
   kind: SpanMetadataKind!
   values: SpanMetadataValues!
 }
@@ -19055,6 +19065,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "scope":
+				return ec.fieldContext_SpanMetadata_scope(ctx, field)
 			case "kind":
 				return ec.fieldContext_SpanMetadata_kind(ctx, field)
 			case "values":
@@ -19781,6 +19793,50 @@ func (ec *executionContext) fieldContext_SleepStepInfo_sleepUntil(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanMetadata_scope(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(enums.MetadataScope)
+	fc.Result = res
+	return ec.marshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanMetadata_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SpanMetadataScope does not have child fields")
 		},
 	}
 	return fc, nil
@@ -27880,6 +27936,13 @@ func (ec *executionContext) _SpanMetadata(ctx context.Context, sel ast.Selection
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("SpanMetadata")
+		case "scope":
+
+			out.Values[i] = ec._SpanMetadata_scope(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "kind":
 
 			out.Values[i] = ec._SpanMetadata_kind(ctx, field, obj)
@@ -29831,6 +29894,16 @@ func (ec *executionContext) marshalNSpanMetadataKind2githubᚗcomᚋinngestᚋin
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx context.Context, v interface{}) (enums.MetadataScope, error) {
+	var res enums.MetadataScope
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSpanMetadataScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐMetadataScope(ctx context.Context, sel ast.SelectionSet, v enums.MetadataScope) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNSpanMetadataValues2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetadataᚐValues(ctx context.Context, v interface{}) (metadata.Values, error) {
