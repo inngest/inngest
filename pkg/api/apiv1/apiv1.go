@@ -64,6 +64,9 @@ type Opts struct {
 
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
+
+	// MetadataOpts represents the required opts for the metadadata API
+	MetadataOpts MetadataOpts
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -145,6 +148,7 @@ func (a *router) setup() {
 			r.Get("/runs/{runID}", a.GetFunctionRun)
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
 
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 

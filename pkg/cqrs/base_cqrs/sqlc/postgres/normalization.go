@@ -366,6 +366,66 @@ func (r *GetSpansByDebugSessionIDRow) ToSQLite() (*sqlc.GetSpansByDebugSessionID
 	}, nil
 }
 
+func (r *GetRunSpanByRunIDRow) ToSQLite() (*sqlc.GetRunSpanByRunIDRow, error) {
+	return &sqlc.GetRunSpanByRunIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetStepSpanByStepIDRow) ToSQLite() (*sqlc.GetStepSpanByStepIDRow, error) {
+	return &sqlc.GetStepSpanByStepIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetExecutionSpanByStepIDAndAttemptRow) ToSQLite() (*sqlc.GetExecutionSpanByStepIDAndAttemptRow, error) {
+	return &sqlc.GetExecutionSpanByStepIDAndAttemptRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetLatestExecutionSpanByStepIDRow) ToSQLite() (*sqlc.GetLatestExecutionSpanByStepIDRow, error) {
+	return &sqlc.GetLatestExecutionSpanByStepIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
+func (r *GetSpanBySpanIDRow) ToSQLite() (*sqlc.GetSpanBySpanIDRow, error) {
+	return &sqlc.GetSpanBySpanIDRow{
+		RunID:         r.RunID,
+		TraceID:       r.TraceID,
+		DynamicSpanID: r.DynamicSpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
 func (r *GetSpanOutputRow) ToSQLite() (*sqlc.GetSpanOutputRow, error) {
 	var input, output interface{}
 
