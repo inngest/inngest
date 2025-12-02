@@ -2492,3 +2492,108 @@ func TestBacklogRefillWithDisabledConstraintChecks(t *testing.T) {
 	require.Equal(t, 1, res.Refilled)
 	require.Equal(t, []string{item3.ID}, res.RefilledItems)
 }
+
+func TestBacklogRefillSetCapacityLease(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	constraints := PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: PartitionConcurrency{
+			AccountConcurrency:  10,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	q := NewQueue(
+		shard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return constraints
+		}),
+	)
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+
+	qi := osqueue.QueueItem{
+		FunctionID: fnID,
+		Data: osqueue.Item{
+			Kind:    osqueue.KindStart,
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:  accountID,
+				WorkflowID: fnID,
+			},
+		},
+	}
+
+	start := clock.Now()
+
+	item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	item3, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	backlog := q.ItemBacklog(ctx, item1)
+
+	shadowPart := q.ItemShadowPartition(ctx, item1)
+
+	capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+	capacityLeaseID2 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+	capacityLeaseID3 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+
+	refillItemIDs := []string{item1.ID, item3.ID, item2.ID} // intentionally out of order
+	capacityLeaseIDs := []ulid.ULID{capacityLeaseID, capacityLeaseID3, capacityLeaseID2}
+
+	// Refill once, should work
+	res, err := q.BacklogRefill(
+		ctx,
+		&backlog,
+		&shadowPart,
+		clock.Now().Add(time.Minute),
+		refillItemIDs,
+		constraints,
+		WithBacklogRefillItemCapacityLeaseIDs(capacityLeaseIDs),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 3, res.Refill) // refill gets adjusted to constraint
+	require.Equal(t, 5, res.Capacity)
+	require.Equal(t, 3, res.Refilled)
+	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+	loaded, err := q.ItemByID(ctx, item1.ID, WithQueueOpShard(shard))
+	require.NoError(t, err)
+	require.Equal(t, loaded.ID, item1.ID)
+	require.NotNil(t, loaded.CapacityLeaseID)
+	require.Equal(t, capacityLeaseID, *loaded.CapacityLeaseID)
+
+	loaded, err = q.ItemByID(ctx, item2.ID, WithQueueOpShard(shard))
+	require.NoError(t, err)
+	require.Equal(t, loaded.ID, item2.ID)
+	require.NotNil(t, loaded.CapacityLeaseID)
+	require.Equal(t, capacityLeaseID2, *loaded.CapacityLeaseID)
+
+	loaded, err = q.ItemByID(ctx, item3.ID, WithQueueOpShard(shard))
+	require.NoError(t, err)
+	require.Equal(t, loaded.ID, item3.ID)
+	require.NotNil(t, loaded.CapacityLeaseID)
+	require.Equal(t, capacityLeaseID3, *loaded.CapacityLeaseID)
+}

@@ -794,7 +794,7 @@ func (q *queue) BacklogRefill(
 
 	returnTuple, ok := res.([]any)
 	if !ok || len(returnTuple) != 8 {
-		return nil, fmt.Errorf("expected return tuple to include 7 items")
+		return nil, fmt.Errorf("expected return tuple to include 8 items")
 	}
 
 	status, ok := returnTuple[0].(int64)
