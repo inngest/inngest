@@ -70,7 +70,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the function was created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -89,7 +89,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the function was created with version 0
-		fnVersions1 := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions1 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions1, 1)
 		for _, fnVersion := range fnVersions1 {
 			require.Equal(t, 0, fnVersion)
@@ -100,7 +100,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the updated version
-		fnVersions2 := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions2 := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions2, 1)
 
 		// fn versions don't change
@@ -129,7 +129,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 			require.NoError(t, err, "registration %d failed", i)
 
 			// Verify the version is incremented
-			fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+			fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 			require.Len(t, fnVersions, 1)
 			for _, fnVersion := range fnVersions {
 				require.Equal(t, expectedVersion, fnVersion, "function version should be %d after %d registration(s)", expectedVersion, i+1)
@@ -147,7 +147,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err := api.register(ctx, req)
 		require.NoError(t, err)
 
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -160,7 +160,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		_, err = api.register(ctx, req)
 		require.NoError(t, err)
 
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
 		require.Equal(t, fnVersions[sdkFunction1.Name], 1)
@@ -173,7 +173,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Function1 should bumped up to version 2, function2 should be removed.
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction1.Name)
 		require.Equal(t, fnVersions[sdkFunction1.Name], 2)
@@ -193,7 +193,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 0, fnVersion)
@@ -210,7 +210,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify both functions had versions incremented even though function2 had no change in config.
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 1, fnVersion)
@@ -230,7 +230,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 0
-		fnVersions := getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 2)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, fnVersion, 0)
@@ -246,7 +246,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify function1 is gone and function2 is now on version=1
-		fnVersions = getFunctionIDandVersion(t, ds, req.URL)
+		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
 		require.Len(t, fnVersions, 1)
 		require.Contains(t, fnVersions, sdkFunction2.Name)
 		require.Equal(t, fnVersions[sdkFunction2.Name], 1)
@@ -275,12 +275,12 @@ func newTestDevServer(t *testing.T) *devserver {
 	return ds
 }
 
-func getFunctionIDandVersion(t *testing.T, ds *devserver, URL string) map[string]int {
+func getFunctionIDandVersion(t *testing.T, ds *devserver, appName string) map[string]int {
 	t.Helper()
 
 	functionVersions := make(map[string]int)
 
-	appID := inngest.DeterministicAppUUID(URL)
+	appID := inngest.DeterministicAppUUID(appName)
 	funcs, err := ds.Data.GetFunctionsByAppInternalID(t.Context(), appID)
 	require.NoError(t, err)
 
@@ -315,7 +315,7 @@ func TestDevEndpoint_ReturnsInfoInDevMode(t *testing.T) {
 
 	// Should return 200 with info
 	require.Equal(t, http.StatusOK, w.Code)
-	
+
 	// Verify response is valid JSON
 	var info InfoResponse
 	err := json.Unmarshal(w.Body.Bytes(), &info)
