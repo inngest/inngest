@@ -11,11 +11,13 @@
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as SupportIndexRouteImport } from "./routes/support/index";
 import { Route as authUserSetupRouteImport } from "./routes/(auth)/user-setup";
 import { Route as authSignOutRouteImport } from "./routes/(auth)/sign-out";
 import { Route as authOrganizationSetupRouteImport } from "./routes/(auth)/organization-setup";
 import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settings/route";
 import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
+import { Route as SupportImpersonationIndexRouteImport } from "./routes/support/impersonation/index";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
 import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
 import { Route as authSignUpSplatRouteImport } from "./routes/(auth)/sign-up.$";
@@ -92,6 +94,11 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
+const SupportIndexRoute = SupportIndexRouteImport.update({
+  id: "/support/",
+  path: "/support/",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const authUserSetupRoute = authUserSetupRouteImport.update({
   id: "/(auth)/user-setup",
   path: "/user-setup",
@@ -117,6 +124,12 @@ const AuthedBillingRouteRoute = AuthedBillingRouteRouteImport.update({
   path: "/billing",
   getParentRoute: () => AuthedRoute,
 } as any);
+const SupportImpersonationIndexRoute =
+  SupportImpersonationIndexRouteImport.update({
+    id: "/support/impersonation/",
+    path: "/support/impersonation/",
+    getParentRoute: () => rootRouteImport,
+  } as any);
 const AuthedCreateEnvironmentIndexRoute =
   AuthedCreateEnvironmentIndexRouteImport.update({
     id: "/create-environment/",
@@ -514,12 +527,14 @@ export interface FileRoutesByFullPath {
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
   "/user-setup": typeof authUserSetupRoute;
+  "/support": typeof SupportIndexRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing/": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
+  "/support/impersonation": typeof SupportImpersonationIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
@@ -587,12 +602,14 @@ export interface FileRoutesByTo {
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
   "/user-setup": typeof authUserSetupRoute;
+  "/support": typeof SupportIndexRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
   "/billing": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
+  "/support/impersonation": typeof SupportImpersonationIndexRoute;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
   "/settings/organization/$": typeof AuthedSettingsOrganizationSplatRoute;
@@ -653,12 +670,14 @@ export interface FileRoutesById {
   "/(auth)/organization-setup": typeof authOrganizationSetupRoute;
   "/(auth)/sign-out": typeof authSignOutRoute;
   "/(auth)/user-setup": typeof authUserSetupRoute;
+  "/support/": typeof SupportIndexRoute;
   "/_authed/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/(auth)/organization-list/$": typeof authOrganizationListSplatRoute;
   "/(auth)/sign-in/$": typeof authSignInSplatRoute;
   "/(auth)/sign-up/$": typeof authSignUpSplatRoute;
   "/_authed/billing/": typeof AuthedBillingIndexRoute;
   "/_authed/create-environment/": typeof AuthedCreateEnvironmentIndexRoute;
+  "/support/impersonation/": typeof SupportImpersonationIndexRoute;
   "/_authed/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/_authed/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/_authed/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
@@ -729,12 +748,14 @@ export interface FileRouteTypes {
     | "/organization-setup"
     | "/sign-out"
     | "/user-setup"
+    | "/support"
     | "/env/$envSlug"
     | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/billing/"
     | "/create-environment"
+    | "/support/impersonation"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
@@ -802,12 +823,14 @@ export interface FileRouteTypes {
     | "/organization-setup"
     | "/sign-out"
     | "/user-setup"
+    | "/support"
     | "/env/$envSlug"
     | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
     | "/billing"
     | "/create-environment"
+    | "/support/impersonation"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
     | "/settings/organization/$"
@@ -867,12 +890,14 @@ export interface FileRouteTypes {
     | "/(auth)/organization-setup"
     | "/(auth)/sign-out"
     | "/(auth)/user-setup"
+    | "/support/"
     | "/_authed/env/$envSlug"
     | "/(auth)/organization-list/$"
     | "/(auth)/sign-in/$"
     | "/(auth)/sign-up/$"
     | "/_authed/billing/"
     | "/_authed/create-environment/"
+    | "/support/impersonation/"
     | "/_authed/env/$envSlug/apps"
     | "/_authed/env/$envSlug/manage"
     | "/_authed/env/$envSlug/onboarding"
@@ -941,9 +966,11 @@ export interface RootRouteChildren {
   authOrganizationSetupRoute: typeof authOrganizationSetupRoute;
   authSignOutRoute: typeof authSignOutRoute;
   authUserSetupRoute: typeof authUserSetupRoute;
+  SupportIndexRoute: typeof SupportIndexRoute;
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute;
   authSignInSplatRoute: typeof authSignInSplatRoute;
   authSignUpSplatRoute: typeof authSignUpSplatRoute;
+  SupportImpersonationIndexRoute: typeof SupportImpersonationIndexRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -960,6 +987,13 @@ declare module "@tanstack/react-router" {
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/support/": {
+      id: "/support/";
+      path: "/support";
+      fullPath: "/support";
+      preLoaderRoute: typeof SupportIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/(auth)/user-setup": {
@@ -996,6 +1030,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/billing";
       preLoaderRoute: typeof AuthedBillingRouteRouteImport;
       parentRoute: typeof AuthedRoute;
+    };
+    "/support/impersonation/": {
+      id: "/support/impersonation/";
+      path: "/support/impersonation";
+      fullPath: "/support/impersonation";
+      preLoaderRoute: typeof SupportImpersonationIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     "/_authed/create-environment/": {
       id: "/_authed/create-environment/";
@@ -1824,9 +1865,11 @@ const rootRouteChildren: RootRouteChildren = {
   authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,
   authUserSetupRoute: authUserSetupRoute,
+  SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
   authSignUpSplatRoute: authSignUpSplatRoute,
+  SupportImpersonationIndexRoute: SupportImpersonationIndexRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -502,6 +502,9 @@ importers:
       '@launchdarkly/node-server-sdk':
         specifier: ^9.0.3
         version: 9.0.3
+      '@radix-ui/react-select':
+        specifier: ^1.2.2
+        version: 1.2.2(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@radix-ui/react-toggle-group':
         specifier: ^1.1.11
         version: 1.1.11(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -544,6 +547,9 @@ importers:
       '@tanstack/react-table':
         specifier: 8.21.3
         version: 8.21.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@team-plain/typescript-sdk':
+        specifier: ^3.0.1
+        version: 3.0.1
       '@unpic/react':
         specifier: ^1.0.1
         version: 1.0.1(next@14.2.32(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -5828,7 +5834,7 @@ packages:
     resolution: {integrity: sha512-USm05zrsFxYLPdWWq+K3STlWiT/3ELn3RcV5hJMghpeAIhxfsUIg6mt12CBJBInWMV4VneoV7SfGv8xIwo2qNQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
-      rollup: '>=3.29.5'
+      rollup: '>=4.22.4'
     peerDependenciesMeta:
       rollup:
         optional: true
