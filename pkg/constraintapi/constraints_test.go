@@ -760,6 +760,201 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 		},
 
+		{
+			name: "ratelimit allowed",
+			mi: MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				t.Log(resp.Debug())
+				require.Equal(t, 0, resp.Usage[0].Used)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				t.Log(resp.Debug())
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				require.Equal(t, 1, resp.Usage[0].Used)
+			},
+		},
+
+		{
+			name: "throttle rejected",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     1,
+						Period:                    3600,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 1,
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				require.Equal(t, 0, resp.Usage[0].Used)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				t.Log(resp.Debug())
+
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.False(t, resp.RetryAfter.IsZero())
+				// Next unit will be available in 1h
+				require.WithinDuration(t, deps.clock.Now().Add(time.Hour), resp.RetryAfter, time.Second)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				require.Equal(t, 1, resp.Usage[0].Used)
+			},
+		},
+
+		{
+			name: "throttle allowed with legacy state",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     5,
+						Period:                    60,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state
+				tat := deps.clock.Now().Add(24 * time.Second).UnixMilli()
+				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				require.Equal(t, 2, resp.Usage[0].Used)
+
+				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				require.NoError(t, err)
+				parsed, err := strconv.Atoi(raw)
+				require.NoError(t, err)
+				tat := time.UnixMilli(int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				require.Equal(t, time.UnixMilli(0), resp.RetryAfter)
+
+				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				require.NoError(t, err)
+				parsed, err := strconv.Atoi(raw)
+				require.NoError(t, err)
+				tat := time.UnixMilli(int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(36*time.Second), tat, time.Second)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				require.Equal(t, 3, resp.Usage[0].Used)
+			},
+		},
+
+		{
+			name: "throttle partially rejected with legacy state",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     5,
+						Period:                    60,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// Set existing legacy state
+				tat := deps.clock.Now().Add(48 * time.Second).UnixMilli()
+				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				require.NoError(t, err)
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// The initial state accounts for 4 requests
+				require.Equal(t, 4, resp.Usage[0].Used)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				// This should be the actual value, accounting for 5 requests
+				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				require.NoError(t, err)
+				parsed, err := strconv.Atoi(raw)
+				require.NoError(t, err)
+				tat := time.UnixMilli(int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(60*time.Second), tat, time.Second)
+
+				t.Log("now", deps.clock.Now())
+				t.Log("retry", resp.RetryAfter)
+
+				// Wait one "window", 12s, until the next request can happen
+				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), resp.RetryAfter, time.Second)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				// We are now accounting for 5 requests
+				require.Equal(t, 5, resp.Usage[0].Used)
+			},
+		},
+
 		// TODO: Test rate limit allowed/rejected/legacy rejected/legacy allowed
 	}
 

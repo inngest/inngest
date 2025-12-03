@@ -123,6 +123,7 @@ end
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	-- Handle zero limit case - immediately rate limit
 	if limit == 0 then
+		debug("limit 0")
 		return { 0, now_ns + period_ns }
 	end
 
@@ -152,19 +153,24 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local allow_at = new_tat - delay_variation_tolerance
 	local diff = now_ns - allow_at
 
+	debug("checked", "diff", tostring(diff))
+
 	if diff < 0 then
 		-- We are rate limited - calculate retry time
 		-- RetryAfter = -diff (when diff is negative)
 		return { 0, allow_at }
 	else
 		-- Not rate limited - calculate remaining capacity
-		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		-- Use current TAT instead of new_tat since we haven't consumed the token yet
+		-- next = delayVariationTolerance - ttl, where ttl = currentTat.Sub(now)
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
+
+		debug("remaining", tostring(remaining))
 
 		-- Calculate when the next unit will be available after consuming all remaining capacity
 		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
