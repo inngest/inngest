@@ -27,6 +27,21 @@ type RateLimitConstraint struct {
 	EvaluatedKeyHash string
 }
 
+// StateKey returns the fully-qualified Redis key pointing to the rate limit GCRA state
+func (r *RateLimitConstraint) StateKey(keyPrefix string, accountID uuid.UUID, envID uuid.UUID) string {
+	switch r.Scope {
+	case enums.RateLimitScopeAccount:
+		return fmt.Sprintf("{%s}:rl:a:%s:%s", keyPrefix, accountID, r.EvaluatedKeyHash)
+	case enums.RateLimitScopeEnv:
+		return fmt.Sprintf("{%s}:rl:e:%s:%s", keyPrefix, envID, r.EvaluatedKeyHash)
+	// Function rate limit key is compatible with the queue implementation
+	default:
+		// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
+		// See ratelimit/ratelimit_lua.go for the rate limit implementation.
+		return fmt.Sprintf("{%s}:%s", keyPrefix, r.EvaluatedKeyHash)
+	}
+}
+
 type ConcurrencyConstraint struct {
 	// Mode specifies whether concurrency is applied to step (default) or function run level
 	Mode enums.ConcurrencyMode
@@ -77,6 +92,19 @@ type ThrottleConstraint struct {
 
 	KeyExpressionHash string
 	EvaluatedKeyHash  string
+}
+
+// StateKey returns the fully-qualified Redis key pointing to the throttle GCRA state
+func (t *ThrottleConstraint) StateKey(keyPrefix string, accountID uuid.UUID, envID uuid.UUID) string {
+	switch t.Scope {
+	case enums.ThrottleScopeAccount:
+		return fmt.Sprintf("{%s}:throttle:a:%s:%s", keyPrefix, accountID, t.EvaluatedKeyHash)
+	case enums.ThrottleScopeEnv:
+		return fmt.Sprintf("{%s}:throttle:e:%s:%s", keyPrefix, envID, t.EvaluatedKeyHash)
+	// Function throttle state key is compatible with the queue implementation
+	default:
+		return fmt.Sprintf("{%s}:throttle:%s", keyPrefix, t.EvaluatedKeyHash)
+	}
 }
 
 type ConstraintItem struct {
