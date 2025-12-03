@@ -1,15 +1,17 @@
 import { useLocation } from "@tanstack/react-router";
 import { ProfileMenu } from "./ProfileMenu";
-import { ProfileDisplayType } from "@/queries/server-only/profile";
+import { ProfileDisplayType } from "@/data/profile";
 import { Image } from "@unpic/react";
+import { useAuth } from "@clerk/tanstack-react-start";
 
 export const Profile = ({
   collapsed,
   profile,
 }: {
   collapsed: boolean;
-  profile: ProfileDisplayType;
+  profile?: ProfileDisplayType;
 }) => {
+  const { isSignedIn } = useAuth();
   const location = useLocation();
   const pathname = location.pathname;
   const active =
@@ -17,8 +19,19 @@ export const Profile = ({
     pathname.startsWith("/billing") ||
     pathname.startsWith("/settings/user");
 
+  // If user is not authenticated, show the sign-in button
+  if (!isSignedIn || !profile) {
+    return (
+      <div className="border-subtle mt-2 flex h-16 w-full flex-row items-center justify-center border-t px-2.5">
+        <ProfileMenu isAuthenticated={false}>
+          <div></div>
+        </ProfileMenu>
+      </div>
+    );
+  }
+
   return (
-    <ProfileMenu isMarketplace={profile.isMarketplace}>
+    <ProfileMenu isAuthenticated={true}>
       <div
         className={`border-subtle mt-2 flex h-16 w-full flex-row items-center justify-start border-t px-2.5 `}
       >
