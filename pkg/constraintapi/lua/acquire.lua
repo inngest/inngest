@@ -165,7 +165,12 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-		return { remaining, 0 }
+
+		-- Calculate when the next unit will be available after consuming all remaining capacity
+		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
+		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+
+		return { remaining, toInteger(next_available_at_ns) }
 	end
 end
 
