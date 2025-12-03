@@ -2,16 +2,7 @@ import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/ag
 import { z } from 'zod';
 
 import type { InsightsAgentState } from '../types';
-
-const systemPromptTemplate = `You are an event selection specialist.
-
-Your job is to analyze the user's request and the list of available event names, then choose the 1-5 most relevant events.
-
-## Instructions:
-- Review the list of available events provided below.
-- Based on the user's query, decide which 1-5 events are the best match.
-- Call the \`select_events\` tool and pass your final choice in the \`events\` parameter.
-- Do not guess event names; only use names from the provided list.`;
+import systemPrompt from './system.md';
 
 const SelectEventsParams = z.object({
   events: z
@@ -76,10 +67,10 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
       ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
       : 'No event list is available. Ask the user to clarify which events they are interested in.';
 
-    return `${systemPromptTemplate}\n\n${eventsList}`;
+    return `${systemPrompt}\n\n${eventsList}`;
   },
   model: anthropic({
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-haiku-4-5',
     defaultParameters: {
       max_tokens: 4096,
     },

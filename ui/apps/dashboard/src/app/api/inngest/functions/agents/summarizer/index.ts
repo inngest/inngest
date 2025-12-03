@@ -1,5 +1,6 @@
 import { anthropic, createAgent } from '@inngest/agent-kit';
 
+import systemPrompt from './system.md';
 import type { InsightsAgentState as InsightsState } from './types';
 
 export const summarizerAgent = createAgent<InsightsState>({
@@ -9,11 +10,7 @@ export const summarizerAgent = createAgent<InsightsState>({
     const events = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
     const sql = network?.state.data.sql;
     return [
-      'You are a helpful assistant summarizing the result of a SQL generation process.',
-      'Write a one sentence short summary that explains:',
-      '- What events were just analyzed (if known).',
-      '- What the query returns and how it helps the user.',
-      'Avoid restating the full SQL. Be clear and non-technical when possible.',
+      systemPrompt,
       events.length ? `Selected events: ${events.join(', ')}` : '',
       sql ? 'A SQL statement has been prepared; summarize its intent, not its exact text.' : '',
     ]
@@ -21,7 +18,7 @@ export const summarizerAgent = createAgent<InsightsState>({
       .join('\n');
   },
   model: anthropic({
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-haiku-4-5',
     defaultParameters: {
       max_tokens: 4096,
     },
