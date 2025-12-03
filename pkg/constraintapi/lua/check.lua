@@ -144,9 +144,10 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		return { 0, allow_at }
 	else
 		-- Not rate limited - calculate remaining capacity
-		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		-- Use current TAT instead of new_tat since we haven't consumed the token yet
+		-- next = delayVariationTolerance - ttl, where ttl = currentTat.Sub(now)
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)

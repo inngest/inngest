@@ -107,6 +107,11 @@ type CapacityCheckResponse struct {
 	internalDebugState checkScriptResponse
 }
 
+// Debug returns INTERNAL debug information
+func (ac *CapacityCheckResponse) Debug() []string {
+	return ac.internalDebugState.Debug
+}
+
 type CapacityAcquireRequest struct {
 	// IdempotencyKey prevents performing the same lease request multiple times.
 	IdempotencyKey string
