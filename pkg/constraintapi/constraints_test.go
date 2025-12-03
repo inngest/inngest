@@ -41,7 +41,9 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		beforeAcquire func(t *testing.T, deps *deps)
 
-		afterAcquire func(t *testing.T, deps *deps, resp *CapacityAcquireResponse)
+		afterPreAcquireCheck  func(t *testing.T, deps *deps, resp *CapacityCheckResponse)
+		afterAcquire          func(t *testing.T, deps *deps, resp *CapacityAcquireResponse)
+		afterPostAcquireCheck func(t *testing.T, deps *deps, resp *CapacityCheckResponse)
 
 		expectedLeaseAmount int
 
@@ -563,6 +565,140 @@ func TestConstraintEnforcement(t *testing.T) {
 				}, keys)
 			},
 		},
+
+		{
+			name: "throttle allowed",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     1,
+						Period:                    60,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+			},
+		},
+
+		{
+			name: "throttle rejected",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     1,
+						Period:                    3600,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              2,
+			expectedLeaseAmount: 1,
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				t.Log(resp.Debug())
+
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.False(t, resp.RetryAfter.IsZero())
+				require.WithinDuration(t, deps.clock.Now().Add(time.Hour), resp.RetryAfter, time.Second)
+			},
+		},
+
+		{
+			name: "throttle allowed with legacy state",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     1,
+						Period:                    60,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// TODO Set existing legacy state
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+			},
+		},
+
+		{
+			name: "throttle rejected with legacy state",
+			mi: MigrationIdentifier{
+				QueueShard: "test",
+			},
+			config: ConstraintConfig{
+				FunctionVersion: 1,
+				Throttle: []ThrottleConfig{
+					{
+						Limit:                     1,
+						Period:                    60,
+						ThrottleKeyExpressionHash: "expr-hash",
+					},
+				},
+			},
+			constraints: []ConstraintItem{
+				{
+					Kind: ConstraintKindThrottle,
+					Throttle: &ThrottleConstraint{
+						KeyExpressionHash: "expr-hash",
+						EvaluatedKeyHash:  "key-hash",
+					},
+				},
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				// TODO Set existing legacy state
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+			},
+		},
+
+		// TODO: Test rate limit allowed/rejected/legacy rejected/legacy allowed
 	}
 
 	for _, test := range testCases {
@@ -590,6 +726,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				WithNumScavengerShards(1),
 				WithQueueStateKeyPrefix("q:v1"),
 				WithRateLimitKeyPrefix("rl"),
+				WithEnableDebugLogs(true),
 			)
 			require.NoError(t, err)
 			require.NotNil(t, cm)
@@ -605,6 +742,20 @@ func TestConstraintEnforcement(t *testing.T) {
 
 			if test.beforeAcquire != nil {
 				test.beforeAcquire(t, deps)
+			}
+
+			checkResp, _, err := cm.Check(ctx, &CapacityCheckRequest{
+				Migration:     test.mi,
+				AccountID:     accountID,
+				Configuration: test.config,
+				Constraints:   test.constraints,
+				EnvID:         envID,
+				FunctionID:    fnID,
+			})
+			require.NoError(t, err)
+
+			if test.afterPreAcquireCheck != nil {
+				test.afterPreAcquireCheck(t, deps, checkResp)
 			}
 
 			leaseIdempotencyKeys := make([]string, test.amount)
@@ -642,6 +793,20 @@ func TestConstraintEnforcement(t *testing.T) {
 
 			if test.expectedLeaseAmount == 0 {
 				return
+			}
+
+			checkResp, _, err = cm.Check(ctx, &CapacityCheckRequest{
+				Migration:     test.mi,
+				AccountID:     accountID,
+				Configuration: test.config,
+				Constraints:   test.constraints,
+				EnvID:         envID,
+				FunctionID:    fnID,
+			})
+			require.NoError(t, err)
+
+			if test.afterPostAcquireCheck != nil {
+				test.afterPostAcquireCheck(t, deps, checkResp)
 			}
 
 			clock.Advance(2 * time.Second)

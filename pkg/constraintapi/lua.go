@@ -156,7 +156,7 @@ type SerializedThrottleConstraint struct {
 	// b = Burst (embedded from config)
 	Burst int `json:"b"`
 
-	// p = Period (embedded from config)
+	// p = Period in ms (embedded from config)
 	Period int `json:"p"`
 
 	// k = Key (fully-qualified Redis key)
@@ -177,7 +177,7 @@ type SerializedRateLimitConstraint struct {
 	// l = Limit (embedded from config)
 	Limit int `json:"l"`
 
-	// p = Period (embedded from config)
+	// p = Period in ns (embedded from config)
 	Period int `json:"p"`
 
 	// b = Burst (embedded from config)
@@ -282,7 +282,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				if tConfig.Scope == ci.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
 					throttleConstraint.Limit = tConfig.Limit
 					throttleConstraint.Burst = tConfig.Burst
-					throttleConstraint.Period = tConfig.Period
+					throttleConstraint.Period = tConfig.Period * 1000 // Convert seconds to milliseconds
 					break
 				}
 			}
