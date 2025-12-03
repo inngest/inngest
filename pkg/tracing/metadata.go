@@ -10,7 +10,11 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 )
 
-type MetadataSpanAttrOpts func(attr *meta.SerializableAttrs)
+type MetadataSpanAttrOpts func(cfg *MetadataSpanConfig)
+
+type MetadataSpanConfig struct {
+	Attrs *meta.SerializableAttrs
+}
 
 func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, spanMetadata metadata.Structured, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
 	attrs, err := MetadataAttrs(spanMetadata)
@@ -20,8 +24,11 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
+	cfg := MetadataSpanConfig{
+		Attrs: attrs,
+	}
 	for _, opt := range opts {
-		opt(attrs)
+		opt(&cfg)
 	}
 
 	kindTag := spanMetadata.Kind().String()
@@ -42,7 +49,7 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 			Debug:      &SpanDebugData{Location: location},
 			Parent:     parent,
 			Metadata:   stateMetadata,
-			Attributes: attrs,
+			Attributes: cfg.Attrs,
 
 			DynamicSeed: MetadataSpanIDSeed(parent.DynamicSpanID, spanMetadata.Kind()),
 		},
