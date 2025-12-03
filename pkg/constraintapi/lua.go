@@ -208,9 +208,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Scope:             int(ci.RateLimit.Scope),
 				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
-				// NOTE: Rate limit state is prefixed with the rate limit key prefix. This is important for compatibility.
-				// See ratelimit/ratelimit_lua.go for the rate limit implementation.
-				Key: fmt.Sprintf("{%s}:%s", keyPrefix, ci.RateLimit.EvaluatedKeyHash),
+				Key:               ci.RateLimit.StateKey(keyPrefix, accountID, envID),
 			}
 
 			// Find matching rate limit config
@@ -272,12 +270,11 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 	case ConstraintKindThrottle:
 		serialized.Kind = 3
 		if ci.Throttle != nil {
-			// NOTE: Throttle keys do NOT use a prefix like ratelimit
 			throttleConstraint := &SerializedThrottleConstraint{
 				Scope:             int(ci.Throttle.Scope),
 				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
 				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
-				Key:               fmt.Sprintf("{%s}:throttle:%s", keyPrefix, ci.Throttle.EvaluatedKeyHash),
+				Key:               ci.Throttle.StateKey(keyPrefix, accountID, envID),
 			}
 
 			// Find matching throttle config
