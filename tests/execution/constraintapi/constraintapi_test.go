@@ -2,6 +2,7 @@ package constraintapi_test
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
@@ -10,9 +11,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -20,7 +29,7 @@ import (
 )
 
 func TestConstraintEnforcement(t *testing.T) {
-	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	accountID, envID, fnID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
 	type deps struct {
 		cm    constraintapi.RolloutManager
@@ -30,6 +39,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		q     redis_state.QueueProcessor
 		shard redis_state.QueueShard
+
+		exec execution.Executor
 
 		config      constraintapi.ConstraintConfig
 		constraints []constraintapi.ConstraintItem
@@ -46,12 +57,18 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		beforeAcquire func(t *testing.T, deps *deps)
 
+		afterPreAcquireCheck func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse)
+
 		afterAcquire func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse)
+
+		afterPostAcquireCheck func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse)
 
 		expectedLeaseAmount int
 
 		afterExtend  func(t *testing.T, deps *deps, resp *constraintapi.CapacityExtendLeaseResponse)
 		afterRelease func(t *testing.T, deps *deps, resp *constraintapi.CapacityReleaseResponse)
+
+		executorUseConstraintAPI constraintapi.UseConstraintAPIFn
 	}
 
 	kg := redis_state.NewQueueClient(nil, "q:v1").KeyGenerator()
@@ -181,7 +198,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			// This test checks ensures that Throttl constraint state set in the queue is respected by the Constraint API
+			// This test checks ensures that Throttle constraint state set in the queue is respected by the Constraint API
 			name: "existing throttle should be respected",
 			config: constraintapi.ConstraintConfig{
 				FunctionVersion: 1,
@@ -273,6 +290,197 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Equal(t, "throttle-key", resp.LimitingConstraints[0].Throttle.EvaluatedKeyHash)
 			},
 		},
+
+		// Rate limit set by Schedule() is respected
+		{
+			name: "rate limited by gcra state set in schedule",
+			config: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: util.XXHash("event.data.customerID"),
+					},
+				},
+			},
+			queueConstraints: redis_state.PartitionConstraintConfig{
+				FunctionVersion: 1,
+			},
+			constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindRateLimit,
+					RateLimit: &constraintapi.RateLimitConstraint{
+						KeyExpressionHash: util.XXHash("event.data.customerID"),
+						EvaluatedKeyHash:  fmt.Sprintf("%s-%s", fnID, util.XXHash("user1")),
+					},
+				},
+			},
+			mi: constraintapi.MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			amount:              1,
+			expectedLeaseAmount: 0,
+			executorUseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				// Disable Constraint API for this test
+				return false, false
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				ctx := context.Background()
+
+				idempotencyKey := "outside-idempotency-key"
+				eventID := ulid.MustNew(ulid.Timestamp(deps.clock.Now()), rand.Reader)
+
+				rateLimitExpr := "event.data.customerID"
+				fnConfig := inngest.Function{
+					ID:              fnID,
+					FunctionVersion: 1,
+					RateLimit: &inngest.RateLimit{
+						Limit:  5,
+						Period: "60s",
+						Key:    &rateLimitExpr,
+					},
+					Name: "test function",
+					Slug: "test-function",
+					Triggers: inngest.MultipleTriggers{
+						inngest.Trigger{
+							EventTrigger: &inngest.EventTrigger{
+								Event: "test/event",
+							},
+							CronTrigger: nil,
+						},
+					},
+				}
+
+				md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
+					Function:       fnConfig,
+					AccountID:      accountID,
+					WorkspaceID:    envID,
+					AppID:          appID,
+					IdempotencyKey: &idempotencyKey,
+					Events: []event.TrackedEvent{
+						event.NewOSSTrackedEventWithID(event.Event{
+							Name: "test/event",
+							Data: map[string]any{
+								"customerID": "user1",
+							},
+						}, eventID),
+					},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, md)
+				require.NotNil(t, md.ID.RunID)
+
+				rateLimitKeyHash := util.XXHash("user1")
+				keyRateLimitState := fmt.Sprintf("{rl}%s-%s", fnID, rateLimitKeyHash)
+				require.True(t, deps.r.Exists(keyRateLimitState))
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse) {
+				require.Len(t, resp.LimitingConstraints, 1)
+				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
+			},
+		},
+
+		// Rate limit set by Schedule() is respected
+		{
+			name: "rate limit gcra state set in schedule checked but allowed by Acquire call",
+			config: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						Limit:             10,
+						Period:            60,
+						KeyExpressionHash: util.XXHash("event.data.customerID"),
+					},
+				},
+			},
+			queueConstraints: redis_state.PartitionConstraintConfig{
+				FunctionVersion: 1,
+			},
+			constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindRateLimit,
+					RateLimit: &constraintapi.RateLimitConstraint{
+						KeyExpressionHash: util.XXHash("event.data.customerID"),
+						EvaluatedKeyHash:  fmt.Sprintf("%s-%s", fnID, util.XXHash("user1")),
+					},
+				},
+			},
+			mi: constraintapi.MigrationIdentifier{
+				IsRateLimit: true,
+			},
+			amount:              1,
+			expectedLeaseAmount: 1,
+			executorUseConstraintAPI: func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				// Disable Constraint API for this test
+				return false, false
+			},
+			beforeAcquire: func(t *testing.T, deps *deps) {
+				ctx := context.Background()
+
+				idempotencyKey := "outside-idempotency-key"
+				eventID := ulid.MustNew(ulid.Timestamp(deps.clock.Now()), rand.Reader)
+
+				rateLimitExpr := "event.data.customerID"
+				fnConfig := inngest.Function{
+					ID:              fnID,
+					FunctionVersion: 1,
+					RateLimit: &inngest.RateLimit{
+						Limit:  5,
+						Period: "60s",
+						Key:    &rateLimitExpr,
+					},
+					Name: "test function",
+					Slug: "test-function",
+					Triggers: inngest.MultipleTriggers{
+						inngest.Trigger{
+							EventTrigger: &inngest.EventTrigger{
+								Event: "test/event",
+							},
+							CronTrigger: nil,
+						},
+					},
+				}
+
+				md, err := deps.exec.Schedule(ctx, execution.ScheduleRequest{
+					Function:       fnConfig,
+					AccountID:      accountID,
+					WorkspaceID:    envID,
+					AppID:          appID,
+					IdempotencyKey: &idempotencyKey,
+					Events: []event.TrackedEvent{
+						event.NewOSSTrackedEventWithID(event.Event{
+							Name: "test/event",
+							Data: map[string]any{
+								"customerID": "user1",
+							},
+						}, eventID),
+					},
+				})
+				require.NoError(t, err)
+				require.NotNil(t, md)
+				require.NotNil(t, md.ID.RunID)
+
+				rateLimitKeyHash := util.XXHash("user1")
+				keyRateLimitState := fmt.Sprintf("{rl}%s-%s", fnID, rateLimitKeyHash)
+				require.True(t, deps.r.Exists(keyRateLimitState))
+			},
+			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) { // Usage should already be visible in check
+				require.Len(t, resp.Usage, 1)
+				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
+				require.Equal(t, 9, resp.Usage[0].Used)
+				require.Equal(t, 10, resp.Usage[0].Limit)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse) {
+				require.Len(t, resp.LimitingConstraints, 0)
+			},
+			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) {
+				require.Len(t, resp.Usage, 1)
+				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
+				require.Equal(t, 10, resp.Usage[0].Used)
+				require.Equal(t, 10, resp.Usage[0].Limit)
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -327,6 +535,41 @@ func TestConstraintEnforcement(t *testing.T) {
 				}),
 			)
 
+			rl := ratelimit.New(ctx, rc, "{rl}")
+
+			unsharded := redis_state.NewUnshardedClient(rc, "estate", "q:v1")
+			sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+				UnshardedClient:        unsharded,
+				FunctionRunStateClient: rc,
+				BatchClient:            rc,
+				StateDefaultKey:        "estate",
+				QueueDefaultKey:        "q:v1",
+				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+			})
+
+			sm, err := redis_state.New(ctx,
+				redis_state.WithShardedClient(sharded),
+				redis_state.WithUnshardedClient(unsharded),
+			)
+			require.NoError(t, err)
+			exec, err := executor.NewExecutor(
+				executor.WithRateLimiter(rl),
+				executor.WithAssignedQueueShard(defaultShard),
+				executor.WithQueue(q),
+				executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
+				executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+				executor.WithCapacityManager(cm),
+				executor.WithLogger(logger.StdlibLogger(ctx)),
+				executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+					if test.executorUseConstraintAPI != nil {
+						return test.executorUseConstraintAPI(ctx, accountID)
+					}
+
+					return true, true
+				}),
+			)
+			require.NoError(t, err)
+
 			deps := &deps{
 				config:      test.config,
 				constraints: test.constraints,
@@ -336,6 +579,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				rc:          rc,
 				q:           q,
 				shard:       defaultShard,
+				exec:        exec,
 			}
 
 			if test.beforeAcquire != nil {
@@ -345,6 +589,20 @@ func TestConstraintEnforcement(t *testing.T) {
 			leaseIdempotencyKeys := make([]string, test.amount)
 			for i := range test.amount {
 				leaseIdempotencyKeys[i] = fmt.Sprintf("item%d", i)
+			}
+
+			checkResp, _, err := cm.Check(ctx, &constraintapi.CapacityCheckRequest{
+				Migration:     test.mi,
+				AccountID:     accountID,
+				Configuration: test.config,
+				Constraints:   test.constraints,
+				EnvID:         envID,
+				FunctionID:    fnID,
+			})
+			require.NoError(t, err)
+
+			if test.afterPreAcquireCheck != nil {
+				test.afterPreAcquireCheck(t, deps, checkResp)
 			}
 
 			acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
@@ -381,6 +639,20 @@ func TestConstraintEnforcement(t *testing.T) {
 				return
 			}
 
+			checkResp, _, err = cm.Check(ctx, &constraintapi.CapacityCheckRequest{
+				Migration:     test.mi,
+				AccountID:     accountID,
+				Configuration: test.config,
+				Constraints:   test.constraints,
+				EnvID:         envID,
+				FunctionID:    fnID,
+			})
+			require.NoError(t, err)
+
+			if test.afterPostAcquireCheck != nil {
+				test.afterPostAcquireCheck(t, deps, checkResp)
+			}
+
 			clock.Advance(2 * time.Second)
 			r.FastForward(2 * time.Second)
 			r.SetTime(clock.Now())
@@ -415,6 +687,7 @@ func TestConstraintEnforcement(t *testing.T) {
 	}
 }
 
+// TestQueueConstraintAPICompatibility ensures the current queue implementation is compatible with the Constraint API
 func TestQueueConstraintAPICompatibility(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
@@ -561,4 +834,18 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 	t.Run("queue should check in progress leases during PartitionLease", func(t *testing.T) {})
 	t.Run("queue should ignore GCRA during Lease if idempotency key set", func(t *testing.T) {})
 	t.Run("queue should ignore GCRA during BacklogRefill if idempotency key set", func(t *testing.T) {})
+}
+
+// TestScheduleConstraintCompatibility ensures Schedule() is compatible with the Constraint API
+func TestScheduleConstraintAPICompatibility(t *testing.T) {
+	t.Run("rate limit should ignore GCRA if idempotency key set", func(t *testing.T) {
+		// enforce gcra during acquire which sets constraint check idempotency key
+		// run rate limit with same constraint check idempotency key and verify it's ignored
+	})
+
+	t.Run("rate limit should gracefully use state set by Constraint API", func(t *testing.T) {
+		// enforce gcra during acquire which sets constraint check idempotency key
+		// run rate limit on different idempotency key and check it still uses the same state
+		// this verifies we correctly and consistently enforce rate limits while we are rolling out or rolling back the Constraint API and it's partially used
+	})
 }
