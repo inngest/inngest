@@ -524,6 +524,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.EndedAt = nil
 	}
 
+	for _, md := range span.Metadata {
+		gqlSpan.Metadata = append(gqlSpan.Metadata, (*models.SpanMetadata)(md))
+	}
+
 	return gqlSpan, nil
 }
 

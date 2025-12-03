@@ -285,6 +285,7 @@ func HistogramPauseBlockFlushLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_flush_duration",
 		Description: "Distribution of pauses block flush latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -295,6 +296,7 @@ func HistogramPauseBlockFetchLatency(ctx context.Context, delay time.Duration, o
 		MetricName:  "pauses_block_fetch_duration",
 		Description: "Distribution of pauses block fetching latency",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
 	})
 }
@@ -305,6 +307,7 @@ func HistogramPauseDeleteLatencyAfterBlockFlush(ctx context.Context, delay time.
 		MetricName:  "pauses_delete_after_flush_duration",
 		Description: "Distribution of pauses deletion duration after flushing a block",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
 	})
 }
@@ -315,6 +318,7 @@ func HistogramSpanFlush(ctx context.Context, delay time.Duration, opts Histogram
 		MetricName:  "span_flush_duration",
 		Description: "Distribution of span flushes from tracing",
 		Tags:        opts.Tags,
+		Unit:        "ms",
 		Boundaries:  QueueItemLatencyBoundaries,
 	})
 }
@@ -327,5 +331,27 @@ func HistogramPauseBlockCompactionDuration(ctx context.Context, delay time.Durat
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  PausesBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerShardProcessDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_process_duration",
+		Description: "Distribution of scavenger shard processing time duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "constraintapi_scavenger_shard_lease_age",
+		Description: "Distribution of scavenger expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
 	})
 }

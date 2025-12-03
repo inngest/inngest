@@ -1075,7 +1075,12 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 	return m.DeletePause(ctx, *pause)
 }
 
-func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {
+	opts := state.DeletePauseOpts{}
+	for _, fn := range options {
+		fn(&opts)
+	}
+
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeletePause"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
@@ -1117,6 +1122,15 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
 		pause.kg.GlobalPauseIndex(ctx),
+		pause.kg.PauseBlockIndex(ctx, p.ID),
+	}
+
+	// Marshal WriteBlockIndex to JSON if it has content, otherwise pass empty string
+	blockIndexJSON := ""
+	if opts.WriteBlockIndex.BlockID != "" {
+		if blockIndexBytes, err := json.Marshal(opts.WriteBlockIndex); err == nil {
+			blockIndexJSON = string(blockIndexBytes)
+		}
 	}
 
 	status, err := scripts["deletePause"].Exec(
@@ -1127,6 +1141,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 			p.ID.String(),
 			invokeCorrId,
 			signalCorrId,
+			blockIndexJSON,
 		},
 	).AsInt64()
 	if err != nil {
@@ -1136,6 +1151,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	switch status {
 	case 0:
 		return nil
+	case 1:
+		return state.ErrPauseNotInBuffer
 	default:
 		return fmt.Errorf("unknown response deleting pause: %d", status)
 	}
@@ -1291,48 +1308,6 @@ func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signa
 	}
 
 	return p, nil
-}
-
-func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PausesByID"), redis_telemetry.ScopePauses)
-
-	pause := m.u.Pauses()
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	keys := make([]string, len(ids))
-	for n, id := range ids {
-		keys[n] = pause.kg.Pause(ctx, id)
-	}
-
-	cmd := pause.Client().B().Mget().Key(keys...).Build()
-	strings, err := pause.Client().Do(ctx, cmd).AsStrSlice()
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var merr error
-
-	pauses := []*state.Pause{}
-	for _, item := range strings {
-		if len(item) == 0 {
-			continue
-		}
-
-		pause := &state.Pause{}
-		err = json.Unmarshal([]byte(item), pause)
-		if err != nil {
-			merr = errors.Join(merr, err)
-			continue
-		}
-		pauses = append(pauses, pause)
-	}
-
-	return pauses, merr
 }
 
 func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {

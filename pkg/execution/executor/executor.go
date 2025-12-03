@@ -47,6 +47,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
@@ -283,7 +284,7 @@ func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	}
 }
 
-func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
+func WithCapacityManager(cm constraintapi.RolloutManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).capacityManager = cm
 		return nil
@@ -396,9 +397,20 @@ type ExecutorRealtimeConfig struct {
 	PublishURL string
 }
 
-func WithUseLuaRateLimitImplementation(fn func(ctx context.Context, accountID uuid.UUID) bool) ExecutorOpt {
+// AllowStepMetadata determines if step metadata should be enabled for the account
+type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
+
+func (am AllowStepMetadata) Enabled(ctx context.Context, acctID uuid.UUID) bool {
+	if am == nil {
+		return false
+	}
+
+	return am(ctx, acctID)
+}
+
+func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).useLuaRateLimitImplementation = fn
+		e.(*executor).allowStepMetadata = md
 		return nil
 	}
 }
@@ -420,7 +432,7 @@ type executor struct {
 	batcher      batch.BatchManager
 	singletonMgr singleton.Singleton
 
-	capacityManager  constraintapi.CapacityManager
+	capacityManager  constraintapi.RolloutManager
 	useConstraintAPI constraintapi.UseConstraintAPIFn
 
 	fl                  state.FunctionLoader
@@ -456,7 +468,7 @@ type executor struct {
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
 
-	useLuaRateLimitImplementation func(ctx context.Context, accountID uuid.UUID) bool
+	allowStepMetadata AllowStepMetadata
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -646,15 +658,29 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 }
 
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*sv2.Metadata, error) {
+	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
+	// When running a cancellation, functions are cancelled at scheduling time based off of
+	// this run ID.
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
+
+	key := idempotencyKey(req, runID)
+
 	// Check constraints and acquire lease
 	return WithConstraints(
 		ctx,
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
+		key,
 		func(ctx context.Context, performChecks bool, fallbackIdempotencyKey string) (*sv2.Metadata, error) {
 			return util.CritT(ctx, "schedule", func(ctx context.Context) (*sv2.Metadata, error) {
-				return e.schedule(ctx, req, performChecks, fallbackIdempotencyKey)
+				return e.schedule(ctx, req, runID, key, performChecks, fallbackIdempotencyKey)
 			}, util.WithBoundaries(2*time.Second))
 		})
 }
@@ -667,6 +693,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func (e *executor) schedule(
 	ctx context.Context,
 	req execution.ScheduleRequest,
+	runID ulid.ULID,
+	// key is the idempotency key
+	key string,
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
@@ -687,19 +716,6 @@ func (e *executor) schedule(
 		"evt_id", req.Events[0].GetInternalID(),
 	)
 
-	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
-	// When running a cancellation, functions are cancelled at scheduling time based off of
-	// this run ID.
-	var runID ulid.ULID
-
-	if req.RunID == nil {
-		runID = ulid.MustNew(ulid.Now(), rand.Reader)
-	} else {
-		runID = *req.RunID
-	}
-
-	key := idempotencyKey(req, runID)
-
 	if performChecks {
 		// TODO: Enforce rate limit with fallbackIdempotencyKey if performChecks: true
 		_ = fallbackIdempotencyKey
@@ -710,26 +726,18 @@ func (e *executor) schedule(
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 			switch err {
 			case nil:
-				// Enable new pure Lua implementation on a per-account basis
-				useLuaRL := e.useLuaRateLimitImplementation != nil && e.useLuaRateLimitImplementation(ctx, req.AccountID)
-				impl := "throttled"
-				if useLuaRL {
-					impl = "lua"
-				}
-
 				res, err := e.rateLimiter.RateLimit(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
 					ratelimit.WithNow(time.Now()),
-					ratelimit.WithUseLuaImplementation(useLuaRL),
 					ratelimit.WithIdempotency(key, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"impl":   impl,
+							"impl":   "lua",
 							"status": "error",
 						},
 					})
@@ -741,7 +749,7 @@ func (e *executor) schedule(
 					metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"impl":   impl,
+							"impl":   "lua",
 							"status": "limited",
 						},
 					})
@@ -756,7 +764,7 @@ func (e *executor) schedule(
 				metrics.IncrRateLimitUsage(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"impl":   impl,
+						"impl":   "lua",
 						"status": status,
 					},
 				})
@@ -1476,7 +1484,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		// For most executions, we now set the status of the execution span.
+		//For most executions, we now set the status of the execution span.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
@@ -1502,6 +1510,31 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
 			return nil, err
+		}
+
+		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
+			l := l.With("step_metadata", true)
+			for _, opcode := range resp.Generator {
+				for _, md := range opcode.Metadata {
+					if err := md.Validate(); err != nil {
+						l.Warn("invalid metadata in driver response", "error", err)
+						continue
+					}
+
+					// TODO: validate that specific kinds are allowed to be set by the user and check account-level metadata
+					// limits.
+					_, err := e.createMetadataSpan(
+						ctx,
+						&instance,
+						"executor.ExecutePostMetadata",
+						md,
+						md.Scope,
+					)
+					if err != nil {
+						l.Warn("error creating metadata span", "error", err)
+					}
+				}
+			}
 		}
 
 		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
@@ -2775,7 +2808,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		copied := *op
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
-			// parellel step individually.
+			// parallel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {
@@ -2903,6 +2936,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 			ctx,
 			meta.SpanNameStep,
 			&tracing.CreateSpanOptions{
+				Seed:      []byte(gen.ID + gen.Timing.String()),
 				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
 				StartTime: gen.Timing.Start(),
 				EndTime:   gen.Timing.End(),
@@ -4047,7 +4081,13 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	idx := pauses.Index{WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID, EventName: eventName}
-	_, err = e.pm.Write(ctx, idx, &pause)
+
+	// We really don't want this to fail, the invoke can be retried fine in an idempotent way but
+	// workflows with 0 retries setup will just hang forever if pause creation fails.
+	_, err = util.WithRetry(ctx, "pause.handleGeneratorInvokeFunction", func(ctx context.Context) (int, error) {
+		return e.pm.Write(ctx, idx, &pause)
+	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
+
 	// A pause may already exist if the write succeeded but we timed out before
 	// returning (MDB i/o timeouts). In that case, we ignore the
 	// ErrPauseAlreadyExists error and continue. We rely on the pause enqueuing
@@ -4699,4 +4739,30 @@ func setEmitCheckpointTraces(ctx context.Context) context.Context {
 func emitCheckpointTraces(ctx context.Context) bool {
 	ok, _ := ctx.Value(traceStepsVal).(bool)
 	return ok
+}
+
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+	var parent *meta.SpanReference
+
+	switch scope {
+	case enums.MetadataScopeRun:
+		parent = tracing.RunSpanRefFromMetadata(runCtx.Metadata())
+	case enums.MetadataScopeStep:
+		parent = runCtx.ParentSpan()
+	case enums.MetadataScopeStepAttempt:
+		parent = runCtx.ExecutionSpan()
+	default:
+		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
+	}
+
+	return tracing.CreateMetadataSpan(
+		ctx,
+		e.tracerProvider,
+		parent,
+		location,
+		pkgName,
+		runCtx.Metadata(),
+		md,
+		scope,
+	)
 }

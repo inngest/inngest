@@ -10,6 +10,10 @@ scalar ULID
 scalar UUID
 scalar Bytes
 scalar Unknown
+scalar Int64
+scalar SpanMetadataKind
+scalar SpanMetadataScope
+scalar SpanMetadataValues
 
 "The pagination information in a connection."
 type PageInfo {
@@ -596,6 +600,13 @@ type RunTraceSpan {
   debugRunID: ULID
   debugSessionID: ULID
   debugPaused: Boolean!
+  metadata: [SpanMetadata!]!
+}
+
+type SpanMetadata {
+  scope: SpanMetadataScope!
+  kind: SpanMetadataKind!
+  values: SpanMetadataValues!
 }
 
 type UserlandSpan {
@@ -697,6 +708,7 @@ type ConnectV1WorkerConnection {
   gatewayId: ULID!
   instanceId: String!
   workerIp: String!
+  maxWorkerConcurrency: Int64!
 
   appName: String
   appID: UUID

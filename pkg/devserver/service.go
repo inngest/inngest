@@ -121,11 +121,16 @@ func (d *devserver) Name() string {
 		return "persistence"
 	}
 
+	if d.Opts.Config.ServerKind == "cloud" {
+		return "inngest"
+	}
+
 	return "devserver"
 }
 
 func (d *devserver) PrettyName() string {
-	if d.Name() != "devserver" {
+	// Single node service should return empty string
+	if d.IsSingleNodeService() {
 		return ""
 	}
 
@@ -735,8 +740,7 @@ func upsertErroredApp(
 		}
 	}
 
-	appID := inngest.DeterministicAppUUID(appURL)
-	_, err = tx.GetAppByID(ctx, appID)
+	app, err := tx.GetAppByURL(ctx, consts.DevServerEnvID, appURL)
 	if err == sql.ErrNoRows {
 		// App doesn't exist so create it.
 		_, err = tx.UpsertApp(ctx, cqrs.UpsertAppParams{
@@ -744,7 +748,7 @@ func upsertErroredApp(
 				String: pingError.Error(),
 				Valid:  true,
 			},
-			ID:  appID,
+			ID:  app.ID,
 			Url: appURL,
 		})
 		if err != nil {
@@ -768,7 +772,7 @@ func upsertErroredApp(
 		return
 	}
 	_, err = tx.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-		ID: appID,
+		ID: app.ID,
 		Error: sql.NullString{
 			String: pingError.Error(),
 			Valid:  true,

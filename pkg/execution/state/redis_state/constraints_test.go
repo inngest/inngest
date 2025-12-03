@@ -1,8 +1,10 @@
 package redis_state
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/assert"
@@ -184,27 +186,38 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 }
 
 func TestConstraintItemsFromBacklog(t *testing.T) {
+	accountID, fnID := uuid.New(), uuid.New()
 	tests := []struct {
 		name     string
 		backlog  *QueueBacklog
+		sp       *QueueShadowPartition
 		expected []constraintapi.ConstraintItem
 	}{
 		{
-			name:    "minimal backlog",
-			backlog: &QueueBacklog{},
+			name: "minimal backlog",
+			backlog: &QueueBacklog{
+				ShadowPartitionID: fnID.String(),
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
 					},
 				},
 			},
@@ -217,19 +230,26 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 					ThrottleKey:               "throttle-key-value",
 				},
 			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
 					},
 				},
 				{
@@ -246,32 +266,43 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 			backlog: &QueueBacklog{
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
 						HashedKeyExpression: "custom-key-1-hash",
 						HashedValue:         "custom-key-1-value",
 					},
 					{
+						CanonicalKeyID:      fmt.Sprintf("f:%s:%s", fnID, "custom-key-2-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeFn,
+						EntityID:            fnID,
 						HashedKeyExpression: "custom-key-2-hash",
 						HashedValue:         "custom-key-2-value",
 					},
 				},
 			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
 					},
 				},
 				{
@@ -281,6 +312,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeAccount,
 						KeyExpressionHash: "custom-key-1-hash",
 						EvaluatedKeyHash:  "custom-key-1-value",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:a:%s:%s", accountID, "custom-key-1-value"),
 					},
 				},
 				{
@@ -290,6 +322,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeFn,
 						KeyExpressionHash: "custom-key-2-hash",
 						EvaluatedKeyHash:  "custom-key-2-value",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:f:%s:%s", fnID, "custom-key-2-value"),
 					},
 				},
 			},
@@ -303,26 +336,35 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				},
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("e:%s:%s", fnID, "complete-key-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeEnv,
+						EntityID:            fnID,
 						HashedKeyExpression: "complete-key-hash",
 						HashedValue:         "complete-key-value",
 					},
 				},
 			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			expected: []constraintapi.ConstraintItem{
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeAccount,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
 					},
 				},
 				{
 					Kind: constraintapi.ConstraintKindConcurrency,
 					Concurrency: &constraintapi.ConcurrencyConstraint{
-						Mode:  enums.ConcurrencyModeStep,
-						Scope: enums.ConcurrencyScopeFn,
+						Mode:              enums.ConcurrencyModeStep,
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", fnID),
 					},
 				},
 				{
@@ -339,6 +381,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 						Scope:             enums.ConcurrencyScopeEnv,
 						KeyExpressionHash: "complete-key-hash",
 						EvaluatedKeyHash:  "complete-key-value",
+						InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:custom:e:%s:%s", fnID, "complete-key-value"),
 					},
 				},
 			},
@@ -347,7 +390,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintItemsFromBacklog(tt.backlog)
+			result := constraintItemsFromBacklog(tt.sp, tt.backlog, queueKeyGenerator{queueDefaultKey: "q:v1"})
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -522,9 +565,11 @@ func TestConvertLimitingConstraint(t *testing.T) {
 }
 
 func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
+	accountID, fnID := uuid.New(), uuid.New()
 	tests := []struct {
 		name                    string
 		backlog                 *QueueBacklog
+		sp                      *QueueShadowPartition
 		constraints             PartitionConstraintConfig
 		expectedQueueConstraint enums.QueueConstraint
 		description             string
@@ -532,6 +577,11 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		{
 			name:    "account concurrency constraint round trip",
 			backlog: &QueueBacklog{},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					AccountConcurrency: 10,
@@ -543,6 +593,11 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 		{
 			name:    "function concurrency constraint round trip",
 			backlog: &QueueBacklog{},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
+			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
 					FunctionConcurrency: 5,
@@ -558,6 +613,11 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 					ThrottleKeyExpressionHash: "throttle-hash",
 					ThrottleKey:               "throttle-value",
 				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
 				Throttle: &PartitionThrottle{
@@ -575,12 +635,19 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 			backlog: &QueueBacklog{
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
 						HashedKeyExpression: "custom-key-1-hash",
 						HashedValue:         "custom-key-1-value",
 					},
 				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -602,18 +669,27 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 			backlog: &QueueBacklog{
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "key-1-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
 						HashedKeyExpression: "key-1-hash",
 						HashedValue:         "key-1-value",
 					},
 					{
+						CanonicalKeyID:      fmt.Sprintf("f:%s:%s", fnID, "custom-key-2-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeFn,
+						EntityID:            fnID,
 						HashedKeyExpression: "custom-key-2-hash",
 						HashedValue:         "custom-key-2-value",
 					},
 				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -645,12 +721,19 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 				},
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "custom-key-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
 						HashedKeyExpression: "custom-key-hash",
 						HashedValue:         "custom-key-value",
 					},
 				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -679,12 +762,19 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 			backlog: &QueueBacklog{
 				ConcurrencyKeys: []BacklogConcurrencyKey{
 					{
+						CanonicalKeyID:      fmt.Sprintf("a:%s:%s", accountID, "different-value"),
 						ConcurrencyMode:     enums.ConcurrencyModeStep,
 						Scope:               enums.ConcurrencyScopeAccount,
+						EntityID:            accountID,
 						HashedKeyExpression: "different-hash",
 						HashedValue:         "different-value",
 					},
 				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				FunctionID:  &fnID,
 			},
 			constraints: PartitionConstraintConfig{
 				Concurrency: PartitionConcurrency{
@@ -706,7 +796,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Step 1: Generate constraint items from the backlog
-			constraintItems := constraintItemsFromBacklog(tt.backlog)
+			constraintItems := constraintItemsFromBacklog(tt.sp, tt.backlog, queueKeyGenerator{queueDefaultKey: "q:v1"})
 
 			// Step 2: Filter the constraint items to find the ones that would be limiting
 			// We simulate what the constraint API would return as limiting constraints

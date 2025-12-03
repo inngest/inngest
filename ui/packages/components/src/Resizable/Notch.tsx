@@ -80,7 +80,7 @@ function buildCrossAxisSizeClass(orientation: Orientation): string {
 }
 
 function buildDividerClasses(orientation: Orientation): string {
-  return orientation === 'vertical' ? 'left-0 right-0 h-0.5' : 'top-0 bottom-0 w-0.5';
+  return orientation === 'vertical' ? 'left-0 right-0 h-px' : 'top-0 bottom-0 w-px';
 }
 
 function buildHandleSizeClasses(orientation: Orientation): string {

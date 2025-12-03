@@ -48,31 +48,32 @@ func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sql
 
 func (q NormalizedQueries) InsertWorkerConnection(ctx context.Context, arg sqlc_sqlite.InsertWorkerConnectionParams) error {
 	err := q.db.InsertWorkerConnection(ctx, InsertWorkerConnectionParams{
-		AccountID:        arg.AccountID,
-		WorkspaceID:      arg.WorkspaceID,
-		AppName:          arg.AppName,
-		AppID:            arg.AppID,
-		ID:               arg.ID,
-		GatewayID:        arg.GatewayID,
-		InstanceID:       arg.InstanceID,
-		Status:           int16(arg.Status),
-		WorkerIp:         arg.WorkerIp,
-		ConnectedAt:      arg.ConnectedAt,
-		LastHeartbeatAt:  arg.LastHeartbeatAt,
-		DisconnectedAt:   arg.DisconnectedAt,
-		RecordedAt:       arg.RecordedAt,
-		InsertedAt:       arg.InsertedAt,
-		DisconnectReason: arg.DisconnectReason,
-		GroupHash:        arg.GroupHash,
-		SdkLang:          arg.SdkLang,
-		SdkVersion:       arg.SdkVersion,
-		SdkPlatform:      arg.SdkPlatform,
-		SyncID:           arg.SyncID,
-		AppVersion:       arg.AppVersion,
-		FunctionCount:    int32(arg.FunctionCount),
-		CpuCores:         int32(arg.CpuCores),
-		MemBytes:         arg.MemBytes,
-		Os:               arg.Os,
+		AccountID:            arg.AccountID,
+		WorkspaceID:          arg.WorkspaceID,
+		AppName:              arg.AppName,
+		AppID:                arg.AppID,
+		ID:                   arg.ID,
+		GatewayID:            arg.GatewayID,
+		InstanceID:           arg.InstanceID,
+		Status:               int16(arg.Status),
+		WorkerIp:             arg.WorkerIp,
+		MaxWorkerConcurrency: arg.MaxWorkerConcurrency,
+		ConnectedAt:          arg.ConnectedAt,
+		LastHeartbeatAt:      arg.LastHeartbeatAt,
+		DisconnectedAt:       arg.DisconnectedAt,
+		RecordedAt:           arg.RecordedAt,
+		InsertedAt:           arg.InsertedAt,
+		DisconnectReason:     arg.DisconnectReason,
+		GroupHash:            arg.GroupHash,
+		SdkLang:              arg.SdkLang,
+		SdkVersion:           arg.SdkVersion,
+		SdkPlatform:          arg.SdkPlatform,
+		SyncID:               arg.SyncID,
+		AppVersion:           arg.AppVersion,
+		FunctionCount:        int32(arg.FunctionCount),
+		CpuCores:             int32(arg.CpuCores),
+		MemBytes:             arg.MemBytes,
+		Os:                   arg.Os,
 	})
 	if err != nil {
 		return err
@@ -788,6 +789,51 @@ func (q NormalizedQueries) GetSpansByDebugSessionID(ctx context.Context, debugSe
 	}
 
 	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetRunSpanByRunID(ctx context.Context, args sqlc_sqlite.GetRunSpanByRunIDParams) (*sqlc_sqlite.GetRunSpanByRunIDRow, error) {
+	row, err := q.db.GetRunSpanByRunID(ctx, GetRunSpanByRunIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetStepSpanByStepID(ctx context.Context, args sqlc_sqlite.GetStepSpanByStepIDParams) (*sqlc_sqlite.GetStepSpanByStepIDRow, error) {
+	row, err := q.db.GetStepSpanByStepID(ctx, GetStepSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetExecutionSpanByStepIDAndAttempt(ctx context.Context, args sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptParams) (*sqlc_sqlite.GetExecutionSpanByStepIDAndAttemptRow, error) {
+	row, err := q.db.GetExecutionSpanByStepIDAndAttempt(ctx, GetExecutionSpanByStepIDAndAttemptParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetLatestExecutionSpanByStepID(ctx context.Context, args sqlc_sqlite.GetLatestExecutionSpanByStepIDParams) (*sqlc_sqlite.GetLatestExecutionSpanByStepIDRow, error) {
+	row, err := q.db.GetLatestExecutionSpanByStepID(ctx, GetLatestExecutionSpanByStepIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
+}
+
+func (q NormalizedQueries) GetSpanBySpanID(ctx context.Context, args sqlc_sqlite.GetSpanBySpanIDParams) (*sqlc_sqlite.GetSpanBySpanIDRow, error) {
+	row, err := q.db.GetSpanBySpanID(ctx, GetSpanBySpanIDParams(args))
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToSQLite()
 }
 
 func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanIds []string) ([]*sqlc_sqlite.GetSpanOutputRow, error) {

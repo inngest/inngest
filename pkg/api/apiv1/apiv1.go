@@ -27,6 +27,9 @@ type Opts struct {
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
 	CachingMiddleware CachingMiddleware[[]byte]
+	// RateLimitingMiddleware runs after caching middleware, allowing cached responses
+	// to be resolved without rate limit impacts.
+	RateLimitingMiddleware func(http.Handler) http.Handler
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
@@ -64,6 +67,9 @@ type Opts struct {
 
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
+
+	// MetadataOpts represents the required opts for the metadadata API
+	MetadataOpts MetadataOpts
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -124,6 +130,10 @@ func (a *router) setup() {
 				r.Use(a.opts.MetricsMiddleware.Middleware)
 			}
 
+			if a.opts.RateLimitingMiddleware != nil {
+				r.Use(a.opts.RateLimitingMiddleware)
+			}
+
 			r.Use(headers.ContentTypeJsonResponse())
 
 			// Add the HTTP-based checkpointing API.  Note that for backcompat,
@@ -145,6 +155,7 @@ func (a *router) setup() {
 			r.Get("/runs/{runID}", a.GetFunctionRun)
 			r.Delete("/runs/{runID}", a.cancelFunctionRun)
 			r.Get("/runs/{runID}/jobs", a.GetFunctionRunJobs)
+			r.Post("/runs/{runID}/metadata", a.addRunMetadata)
 
 			r.Get("/apps/{appName}/functions", a.GetAppFunctions) // Returns an app and all of its functions.
 

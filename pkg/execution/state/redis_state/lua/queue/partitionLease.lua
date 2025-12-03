@@ -16,6 +16,9 @@ local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted 
 local keyAcctConcurrency      = KEYS[5] -- in progress queue for account
 local keyFnConcurrency        = KEYS[6] -- in progress queue for partition
 
+local keyInProgressLeasesAcct = KEYS[7]
+local keyInProgressLeasesFn   = KEYS[8]
+
 local partitionID             = ARGV[1]
 local leaseID                 = ARGV[2]
 local currentTime             = tonumber(ARGV[3]) -- in ms, to check lease validation
@@ -54,6 +57,9 @@ if disableLeaseChecks ~= 1 then
       -- Check that there's capacity for this partition, based off of partition-level
       -- concurrency keys.
       local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
+      if exists_without_ending(keyInProgressLeasesAcct, ":-") then
+        acctCap = acctCap - count_concurrency(keyInProgressLeasesAcct, currentTime)
+      end
       if acctCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
           update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, noCapacityScore)
@@ -68,6 +74,9 @@ if disableLeaseChecks ~= 1 then
       -- Check that there's capacity for this partition, based off of partition-level
       -- concurrency keys.
       local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
+      if exists_without_ending(keyInProgressLeasesFn, ":-") then
+        fnCap = fnCap - count_concurrency(keyInProgressLeasesFn, currentTime)
+      end
       if fnCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
           update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, noCapacityScore)
