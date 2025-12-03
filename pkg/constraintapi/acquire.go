@@ -274,6 +274,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
+			RetryAfter:          retryAfter,
 			internalDebugState:  parsedResponse,
 		}, nil
 
