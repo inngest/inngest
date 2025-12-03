@@ -1,13 +1,14 @@
 import { anthropic, createAgent } from '@inngest/agent-kit';
 
+import type { InsightsAgentState as InsightsState } from '../types';
 import systemPrompt from './system.md';
-import type { InsightsAgentState as InsightsState } from './types';
 
 export const summarizerAgent = createAgent<InsightsState>({
   name: 'Insights Summarizer',
   description: 'Writes a concise summary describing what the generated SQL does and why.',
   system: async ({ network }) => {
-    const events = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
+    const events =
+      network?.state.data.selectedEvents?.map((e: { event_name: string }) => e.event_name) ?? [];
     const sql = network?.state.data.sql;
     return [
       systemPrompt,

@@ -1,8 +1,8 @@
 import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
+import type { InsightsAgentState } from '../types';
 import systemPrompt from './system.md';
-import type { InsightsAgentState } from './types';
 
 const GenerateSqlParams = z.object({
   sql: z
@@ -34,7 +34,8 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
   name: 'Insights Query Writer',
   description: 'Generates a safe, read-only SQL SELECT statement for ClickHouse.',
   system: async ({ network }) => {
-    const selected = network?.state.data.selectedEvents?.map((e) => e.event_name) ?? [];
+    const selected =
+      network?.state.data.selectedEvents?.map((e: { event_name: string }) => e.event_name) ?? [];
     return [
       systemPrompt,
       '',
