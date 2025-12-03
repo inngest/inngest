@@ -64,9 +64,11 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           refetchSavedQueries();
           toast.success('Successfully updated query');
         } else {
-          toast.error(
-            `Failed to update query${result.error === 'unique' ? ': name must be unique' : ''}`
-          );
+          const errorMessage = `Failed to update query${
+            result.error === 'unique' ? ': name must be unique' : ''
+          }`;
+          toast.error(errorMessage);
+          throw new Error(errorMessage);
         }
       } else {
         const result = await beSaveQuery({ name: tab.name, query: tab.query });
@@ -78,9 +80,11 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           refetchSavedQueries();
           toast.success('Successfully saved query');
         } else {
-          toast.error(
-            `Failed to save query${result.error === 'unique' ? ': name must be unique' : ''}`
-          );
+          const errorMessage = `Failed to save query${
+            result.error === 'unique' ? ': name must be unique' : ''
+          }`;
+          toast.error(errorMessage);
+          throw new Error(errorMessage);
         }
       }
     },

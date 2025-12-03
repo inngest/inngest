@@ -13,9 +13,7 @@ import (
 	"github.com/lmittmann/tint"
 )
 
-var (
-	stdlibCtxKey = stdlibKey{}
-)
+var stdlibCtxKey = stdlibKey{}
 
 type stdlibKey struct{}
 
@@ -195,15 +193,18 @@ func newLogger(opts ...LoggerOpt) Logger {
 	}
 }
 
-// StdlibLoggger returns the stdlib logger in context, or a new logger
+// From returns the stdlib logger in context, or a new logger
 // if none stored.
-func StdlibLogger(ctx context.Context, opts ...LoggerOpt) Logger {
+func From(ctx context.Context, opts ...LoggerOpt) Logger {
 	l := ctx.Value(stdlibCtxKey)
 	if l == nil {
 		return newLogger(opts...)
 	}
 	return l.(Logger)
 }
+
+// StdlibLogger is an alternative name for From for backcompat.
+var StdlibLogger = From
 
 func VoidLogger() Logger {
 	return newLogger(WithLoggerWriter(io.Discard))
