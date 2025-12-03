@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as AuthedRouteImport } from "./routes/_authed";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as SupportIndexRouteImport } from "./routes/support/index";
+import { Route as ApiSupportTicketsRouteImport } from "./routes/api/support-tickets";
+import { Route as ApiInngestRouteImport } from "./routes/api/inngest";
+import { Route as ApiChatRouteImport } from "./routes/api/chat";
 import { Route as authUserSetupRouteImport } from "./routes/(auth)/user-setup";
 import { Route as authSignOutRouteImport } from "./routes/(auth)/sign-out";
 import { Route as authOrganizationSetupRouteImport } from "./routes/(auth)/organization-setup";
@@ -20,6 +23,7 @@ import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing
 import { Route as SupportImpersonationIndexRouteImport } from "./routes/support/impersonation/index";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
 import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
+import { Route as ApiRealtimeTokenRouteImport } from "./routes/api/realtime/token";
 import { Route as authSignUpSplatRouteImport } from "./routes/(auth)/sign-up.$";
 import { Route as authSignInSplatRouteImport } from "./routes/(auth)/sign-in.$";
 import { Route as authOrganizationListSplatRouteImport } from "./routes/(auth)/organization-list.$";
@@ -99,6 +103,21 @@ const SupportIndexRoute = SupportIndexRouteImport.update({
   path: "/support/",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
+  id: "/api/support-tickets",
+  path: "/api/support-tickets",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiInngestRoute = ApiInngestRouteImport.update({
+  id: "/api/inngest",
+  path: "/api/inngest",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: "/api/chat",
+  path: "/api/chat",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const authUserSetupRoute = authUserSetupRouteImport.update({
   id: "/(auth)/user-setup",
   path: "/user-setup",
@@ -140,6 +159,11 @@ const AuthedBillingIndexRoute = AuthedBillingIndexRouteImport.update({
   id: "/",
   path: "/",
   getParentRoute: () => AuthedBillingRouteRoute,
+} as any);
+const ApiRealtimeTokenRoute = ApiRealtimeTokenRouteImport.update({
+  id: "/api/realtime/token",
+  path: "/api/realtime/token",
+  getParentRoute: () => rootRouteImport,
 } as any);
 const authSignUpSplatRoute = authSignUpSplatRouteImport.update({
   id: "/(auth)/sign-up/$",
@@ -527,11 +551,15 @@ export interface FileRoutesByFullPath {
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
   "/user-setup": typeof authUserSetupRoute;
+  "/api/chat": typeof ApiChatRoute;
+  "/api/inngest": typeof ApiInngestRoute;
+  "/api/support-tickets": typeof ApiSupportTicketsRoute;
   "/support": typeof SupportIndexRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
+  "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/billing/": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/support/impersonation": typeof SupportImpersonationIndexRoute;
@@ -602,11 +630,15 @@ export interface FileRoutesByTo {
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
   "/user-setup": typeof authUserSetupRoute;
+  "/api/chat": typeof ApiChatRoute;
+  "/api/inngest": typeof ApiInngestRoute;
+  "/api/support-tickets": typeof ApiSupportTicketsRoute;
   "/support": typeof SupportIndexRoute;
   "/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/organization-list/$": typeof authOrganizationListSplatRoute;
   "/sign-in/$": typeof authSignInSplatRoute;
   "/sign-up/$": typeof authSignUpSplatRoute;
+  "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/billing": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
   "/support/impersonation": typeof SupportImpersonationIndexRoute;
@@ -670,11 +702,15 @@ export interface FileRoutesById {
   "/(auth)/organization-setup": typeof authOrganizationSetupRoute;
   "/(auth)/sign-out": typeof authSignOutRoute;
   "/(auth)/user-setup": typeof authUserSetupRoute;
+  "/api/chat": typeof ApiChatRoute;
+  "/api/inngest": typeof ApiInngestRoute;
+  "/api/support-tickets": typeof ApiSupportTicketsRoute;
   "/support/": typeof SupportIndexRoute;
   "/_authed/env/$envSlug": typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   "/(auth)/organization-list/$": typeof authOrganizationListSplatRoute;
   "/(auth)/sign-in/$": typeof authSignInSplatRoute;
   "/(auth)/sign-up/$": typeof authSignUpSplatRoute;
+  "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/_authed/billing/": typeof AuthedBillingIndexRoute;
   "/_authed/create-environment/": typeof AuthedCreateEnvironmentIndexRoute;
   "/support/impersonation/": typeof SupportImpersonationIndexRoute;
@@ -748,11 +784,15 @@ export interface FileRouteTypes {
     | "/organization-setup"
     | "/sign-out"
     | "/user-setup"
+    | "/api/chat"
+    | "/api/inngest"
+    | "/api/support-tickets"
     | "/support"
     | "/env/$envSlug"
     | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
+    | "/api/realtime/token"
     | "/billing/"
     | "/create-environment"
     | "/support/impersonation"
@@ -823,11 +863,15 @@ export interface FileRouteTypes {
     | "/organization-setup"
     | "/sign-out"
     | "/user-setup"
+    | "/api/chat"
+    | "/api/inngest"
+    | "/api/support-tickets"
     | "/support"
     | "/env/$envSlug"
     | "/organization-list/$"
     | "/sign-in/$"
     | "/sign-up/$"
+    | "/api/realtime/token"
     | "/billing"
     | "/create-environment"
     | "/support/impersonation"
@@ -890,11 +934,15 @@ export interface FileRouteTypes {
     | "/(auth)/organization-setup"
     | "/(auth)/sign-out"
     | "/(auth)/user-setup"
+    | "/api/chat"
+    | "/api/inngest"
+    | "/api/support-tickets"
     | "/support/"
     | "/_authed/env/$envSlug"
     | "/(auth)/organization-list/$"
     | "/(auth)/sign-in/$"
     | "/(auth)/sign-up/$"
+    | "/api/realtime/token"
     | "/_authed/billing/"
     | "/_authed/create-environment/"
     | "/support/impersonation/"
@@ -966,10 +1014,14 @@ export interface RootRouteChildren {
   authOrganizationSetupRoute: typeof authOrganizationSetupRoute;
   authSignOutRoute: typeof authSignOutRoute;
   authUserSetupRoute: typeof authUserSetupRoute;
+  ApiChatRoute: typeof ApiChatRoute;
+  ApiInngestRoute: typeof ApiInngestRoute;
+  ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute;
   SupportIndexRoute: typeof SupportIndexRoute;
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute;
   authSignInSplatRoute: typeof authSignInSplatRoute;
   authSignUpSplatRoute: typeof authSignUpSplatRoute;
+  ApiRealtimeTokenRoute: typeof ApiRealtimeTokenRoute;
   SupportImpersonationIndexRoute: typeof SupportImpersonationIndexRoute;
 }
 
@@ -994,6 +1046,27 @@ declare module "@tanstack/react-router" {
       path: "/support";
       fullPath: "/support";
       preLoaderRoute: typeof SupportIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/support-tickets": {
+      id: "/api/support-tickets";
+      path: "/api/support-tickets";
+      fullPath: "/api/support-tickets";
+      preLoaderRoute: typeof ApiSupportTicketsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/inngest": {
+      id: "/api/inngest";
+      path: "/api/inngest";
+      fullPath: "/api/inngest";
+      preLoaderRoute: typeof ApiInngestRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/chat": {
+      id: "/api/chat";
+      path: "/api/chat";
+      fullPath: "/api/chat";
+      preLoaderRoute: typeof ApiChatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/(auth)/user-setup": {
@@ -1051,6 +1124,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/billing/";
       preLoaderRoute: typeof AuthedBillingIndexRouteImport;
       parentRoute: typeof AuthedBillingRouteRoute;
+    };
+    "/api/realtime/token": {
+      id: "/api/realtime/token";
+      path: "/api/realtime/token";
+      fullPath: "/api/realtime/token";
+      preLoaderRoute: typeof ApiRealtimeTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     "/(auth)/sign-up/$": {
       id: "/(auth)/sign-up/$";
@@ -1865,10 +1945,14 @@ const rootRouteChildren: RootRouteChildren = {
   authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,
   authUserSetupRoute: authUserSetupRoute,
+  ApiChatRoute: ApiChatRoute,
+  ApiInngestRoute: ApiInngestRoute,
+  ApiSupportTicketsRoute: ApiSupportTicketsRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
   authSignUpSplatRoute: authSignUpSplatRoute,
+  ApiRealtimeTokenRoute: ApiRealtimeTokenRoute,
   SupportImpersonationIndexRoute: SupportImpersonationIndexRoute,
 };
 export const routeTree = rootRouteImport

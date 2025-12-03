@@ -15,20 +15,7 @@ import {
   type TicketType,
 } from "./ticketOptions";
 import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-
-export type RequestBody = {
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-    accountId: string;
-  };
-  ticket: {
-    type: Exclude<TicketType, null>;
-    body: string;
-    severity?: BugSeverity;
-  };
-};
+import type { RequestBody } from "@/routes/api/support-tickets";
 
 const instructions: { [K in Exclude<TicketType, null>]: string } = {
   bug: "Please include any relevant run IDs, function names, event IDs in your message",

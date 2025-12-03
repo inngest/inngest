@@ -1,5 +1,6 @@
 import { useClerk } from "@clerk/tanstack-react-start";
 import { RiLogoutCircleLine } from "@remixicon/react";
+import { Link } from "@tanstack/react-router";
 
 export const SignOutButton = ({
   isMarketplace = false,
@@ -32,8 +33,5 @@ export const SignOutButton = ({
   }
 
   // Sign out via our backend.
-  return (
-    // @ts-expect-error - TANSTACK TODO: fix when routes land
-    <Link to={`${import.meta.env.VITE_API_URL}/v1/logout`}>{content}</Link>
-  );
+  return <a href={`${import.meta.env.VITE_API_URL}/v1/logout`}>{content}</a>;
 };
