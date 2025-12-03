@@ -9,6 +9,9 @@ export const EVENT_SCHEMA_JSON: JSONSchema = {
     id: { type: 'string' },
     name: { type: 'string' },
     ts: { type: 'number' },
+    ts_dt: { type: 'string' },
+    received_at: { type: 'number' },
+    received_at_dt: { type: 'string' },
     v: { type: 'string' },
   },
 };

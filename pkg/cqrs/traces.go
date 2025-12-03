@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -56,6 +57,8 @@ type OtelSpan struct {
 	DebugSessionID ulid.ULID `json:"debug_session_id,omitempty,omitzero"`
 
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
+
+	Metadata []*SpanMetadata `json:"metadata,omitempty,omitzero"`
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {
@@ -183,6 +186,8 @@ type Span struct {
 	Events             []SpanEvent       `json:"events"`
 	Links              []SpanLink        `json:"links"`
 	RunID              *ulid.ULID        `json:"run_id"`
+
+	Metadata []SpanMetadata `json:"metadata"`
 
 	// Children is a virtual field used for reconstructing the trace tree.
 	// This field is not expected to be stored in the DB
@@ -335,6 +340,12 @@ type SpanLink struct {
 	Attributes map[string]string `json:"attr"`
 }
 
+type SpanMetadata struct {
+	Scope  metadata.Scope  `json:"scope"`
+	Kind   metadata.Kind   `json:"kind"`
+	Values metadata.Values `json:"values"`
+}
+
 // TraceRun represents a function run backed by a trace
 type TraceRun struct {
 	AccountID    uuid.UUID       `json:"account_id"`
@@ -410,6 +421,11 @@ type TraceReader interface {
 	// GetSpansByDebugSessionID retrieves all spans related to the specified debug session
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, runID ulid.ULID, stepID string, attempt int, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetLatestExecutionSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
+	GetSpanBySpanID(ctx context.Context, runID ulid.ULID, spanID string, accountID, workspaceID uuid.UUID) (*OtelSpan, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)

@@ -31,6 +31,7 @@ type Querier interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
 	GetEventsIDbound(ctx context.Context, arg GetEventsIDboundParams) ([]*Event, error)
+	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*GetExecutionSpanByStepIDAndAttemptRow, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunctionRunRow, error)
@@ -41,15 +42,19 @@ type Querier interface {
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
+	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error)
 	GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error)
 	//
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
+	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
+	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*GetSpansByDebugRunIDRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*GetSpansByDebugSessionIDRow, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
+	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*GetStepSpanByStepIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
