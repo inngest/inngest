@@ -799,24 +799,24 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			name: "throttle rejected",
+			name: "rate limit rejected",
 			mi: MigrationIdentifier{
-				QueueShard: "test",
+				IsRateLimit: true,
 			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
-				Throttle: []ThrottleConfig{
+				RateLimit: []RateLimitConfig{
 					{
-						Limit:                     1,
-						Period:                    3600,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindThrottle,
-					Throttle: &ThrottleConstraint{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
 					},
@@ -831,10 +831,10 @@ func TestConstraintEnforcement(t *testing.T) {
 				t.Log(resp.Debug())
 
 				require.Len(t, resp.LimitingConstraints, 1)
-				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
+				require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
-				// Next unit will be available in 1h
-				require.WithinDuration(t, deps.clock.Now().Add(time.Hour), resp.RetryAfter, time.Second)
+				// Next unit will be available in 1m
+				require.WithinDuration(t, deps.clock.Now().Add(time.Minute), resp.RetryAfter, time.Second)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				require.Equal(t, 1, resp.Usage[0].Used)
@@ -842,24 +842,24 @@ func TestConstraintEnforcement(t *testing.T) {
 		},
 
 		{
-			name: "throttle allowed with legacy state",
+			name: "rate limit allowed with legacy state",
 			mi: MigrationIdentifier{
-				QueueShard: "test",
+				IsRateLimit: true,
 			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
-				Throttle: []ThrottleConfig{
+				RateLimit: []RateLimitConfig{
 					{
-						Limit:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             5,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindThrottle,
-					Throttle: &ThrottleConstraint{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
 					},
@@ -869,28 +869,30 @@ func TestConstraintEnforcement(t *testing.T) {
 			expectedLeaseAmount: 1,
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Set existing legacy state
-				tat := deps.clock.Now().Add(24 * time.Second).UnixMilli()
-				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				tat := deps.clock.Now().Add(24 * time.Second).UnixNano()
+				err := deps.r.Set("{rl}key-hash", strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
+				t.Log(resp.Debug())
+
 				require.Equal(t, 2, resp.Usage[0].Used)
 
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				raw, err := deps.r.Get("{rl}key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
+				tat := time.Unix(0, int64(parsed))
 				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				require.Equal(t, time.UnixMilli(0), resp.RetryAfter)
 
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				raw, err := deps.r.Get("{rl}key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
+				tat := time.Unix(0, int64(parsed))
 				require.WithinDuration(t, deps.clock.Now().Add(36*time.Second), tat, time.Second)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
