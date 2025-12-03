@@ -1,4 +1,4 @@
-import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
+import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
 import type { InsightsAgentState } from './types';
@@ -49,7 +49,7 @@ Currently, you can **only query events**. Support for querying function runs wil
 
 ## Getting Started
 
-Access Insights through the Inngest dashboard by clicking on the "Insights" tab in the left navigation. 
+Access Insights through the Inngest dashboard by clicking on the "Insights" tab in the left navigation.
 
 ![Getting Started Dashboard View](/assets/docs/platform/monitor/insights/insights_dashboard_view.png)
 
@@ -171,7 +171,7 @@ AND ts > toUnixTimestamp(addHours(now(), -1)) * 1000;
 
 #### Extracting JSON Data and Aggregating
 
-SELECT simpleJSONExtractString(data, 'user_id') as user_id, count(*) 
+SELECT simpleJSONExtractString(data, 'user_id') as user_id, count(*)
 FROM events
 WHERE name = 'order.created'
 GROUP BY user_id
@@ -235,7 +235,12 @@ export const queryWriterAgent = createAgent<InsightsAgentState>({
       '- Do NOT under any circumstances prefix table names or column names with "events_"',
     ].join('\n');
   },
-  model: openai({ model: 'gpt-4.1-2025-04-14' }),
+  model: anthropic({
+    model: 'claude-sonnet-4-5-20250929',
+    defaultParameters: {
+      max_tokens: 4096,
+    },
+  }),
   tools: [generateSqlTool],
   tool_choice: 'generate_sql',
 });

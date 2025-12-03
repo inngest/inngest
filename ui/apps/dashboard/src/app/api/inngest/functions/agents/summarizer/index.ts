@@ -1,4 +1,4 @@
-import { createAgent, openai } from '@inngest/agent-kit';
+import { anthropic, createAgent } from '@inngest/agent-kit';
 
 import type { InsightsAgentState as InsightsState } from './types';
 
@@ -20,5 +20,10 @@ export const summarizerAgent = createAgent<InsightsState>({
       .filter(Boolean)
       .join('\n');
   },
-  model: openai({ model: 'gpt-4.1-2025-04-14' }),
+  model: anthropic({
+    model: 'claude-sonnet-4-5-20250929',
+    defaultParameters: {
+      max_tokens: 4096,
+    },
+  }),
 });
