@@ -285,7 +285,12 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	end
 
 	-- calculate next theoretical arrival time
-	local new_tat = tat + (math.max(capacity, 1) * emission)
+	local new_tat
+	if now_ms > tat then
+		new_tat = now_ms + (math.max(capacity, 1) * emission)
+	else
+		new_tat = tat + (math.max(capacity, 1) * emission)
+	end
 
 	if capacity > 0 then
 		local expiry = string.format("%d", period_ms / 1000)
