@@ -1,11 +1,11 @@
 import { Button } from "@inngest/components/Button/NewButton";
 import { Error } from "@inngest/components/Error/Error";
-import { Header } from "@inngest/components/Header/NewHeader";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { rootRouteId, useMatch, useRouter } from "@tanstack/react-router";
-import Layout from "../Layout/Layout";
 
-export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
+import * as Sentry from "@sentry/tanstackstart-react";
+
+function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();
   const isRoot = useMatch({
     strict: false,
@@ -45,3 +45,8 @@ export function DefaultCatchBoundary({ error }: ErrorComponentProps) {
     </div>
   );
 }
+
+export const SentryWrappedCatchBoundary = Sentry.withErrorBoundary(
+  DefaultCatchBoundary,
+  {},
+);

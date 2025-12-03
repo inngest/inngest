@@ -18,6 +18,8 @@ import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
 import { QueryClient } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
+import SentryUserIdentification from "@/components/Analytics/SentryUserIdentification";
+import PageViewTracker from "@/components/Analytics/PageViewTracker";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -73,12 +75,13 @@ function RootComponent() {
       <ThemeProvider attribute="class" defaultTheme="system">
         <InngestClerkProvider>
           <URQLProviderWrapper>
-            {/* TANSTACK TODO: add sentry user identification provider here */}
+            <SentryUserIdentification />
             <ClientFeatureFlagProvider>
               <TooltipProvider delayDuration={0}>
                 <Outlet />
               </TooltipProvider>
-              {/* TANSTACK TODO: add page view tracker here */}
+
+              <PageViewTracker />
             </ClientFeatureFlagProvider>
           </URQLProviderWrapper>
         </InngestClerkProvider>

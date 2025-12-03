@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
+import * as Sentry from "@sentry/tanstackstart-react";
 
 import { getLaunchDarklyClient } from "./ServerLaunchDarkly";
 
@@ -76,8 +77,7 @@ export async function getBooleanFlag(
     const variation = await client.variation(flag, context, defaultValue);
     return variation;
   } catch (err) {
-    // TANSTACK TODO: Uncomment this when Sentry is migrated
-    // Sentry.captureException(err);
+    Sentry.captureException(err);
     console.error("Failed to get LaunchDarkly variation", err);
     return false;
   }

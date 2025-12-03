@@ -13,6 +13,7 @@ import {
 import SignInRedirectErrors from "../SignIn/Errors";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
+import * as Sentry from "@sentry/tanstackstart-react";
 
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
@@ -57,8 +58,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
             // Handle unauthenticated errors after (1) trying to refresh the token and (2) retrying the operation.
             if (isUnauthenticatedError(error)) {
               // Log to Sentry if it still fails after trying to refresh the token and retrying the operation.
-              // TANSTACK TODO: add Sentry capture here
-              // Sentry.captureException(error);
+              Sentry.captureException(error);
               signOut(() => {
                 navigate({
                   to: `${
