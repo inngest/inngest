@@ -2933,7 +2933,7 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 		gen,
 		edge,
 		groupID,
-		true,
+		false,
 	)
 }
 
