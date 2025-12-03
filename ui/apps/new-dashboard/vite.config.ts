@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import viteReact from "@vitejs/plugin-react";
 import path from "path";
+import svgrPlugin from "vite-plugin-svgr";
 
 export default defineConfig({
   resolve: {
@@ -41,5 +42,6 @@ export default defineConfig({
       projects: ["./tsconfig.json"],
     }),
     viteReact(),
+    svgrPlugin(),
   ],
 });

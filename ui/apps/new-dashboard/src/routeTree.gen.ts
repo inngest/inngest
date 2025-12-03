@@ -19,6 +19,7 @@ import { Route as authUserSetupRouteImport } from "./routes/(auth)/user-setup";
 import { Route as authSignOutRouteImport } from "./routes/(auth)/sign-out";
 import { Route as authOrganizationSetupRouteImport } from "./routes/(auth)/organization-setup";
 import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settings/route";
+import { Route as AuthedIntentRouteRouteImport } from "./routes/_authed/intent/route";
 import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
 import { Route as SupportImpersonationIndexRouteImport } from "./routes/support/impersonation/index";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
@@ -30,6 +31,8 @@ import { Route as authOrganizationListSplatRouteImport } from "./routes/(auth)/o
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from "./routes/_authed/env/$envSlug/route";
 import { Route as AuthedSettingsUserIndexRouteImport } from "./routes/_authed/settings/user/index";
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from "./routes/_authed/settings/integrations/index";
+import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from "./routes/_authed/intent/setup-aws-marketplace/index";
+import { Route as AuthedIntentCreateWebhookIndexRouteImport } from "./routes/_authed/intent/create-webhook/index";
 import { Route as AuthedBillingUsageIndexRouteImport } from "./routes/_authed/billing/usage/index";
 import { Route as AuthedBillingPlansIndexRouteImport } from "./routes/_authed/billing/plans/index";
 import { Route as AuthedBillingPaymentsIndexRouteImport } from "./routes/_authed/billing/payments/index";
@@ -138,6 +141,11 @@ const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
   path: "/settings",
   getParentRoute: () => AuthedRoute,
 } as any);
+const AuthedIntentRouteRoute = AuthedIntentRouteRouteImport.update({
+  id: "/intent",
+  path: "/intent",
+  getParentRoute: () => AuthedRoute,
+} as any);
 const AuthedBillingRouteRoute = AuthedBillingRouteRouteImport.update({
   id: "/billing",
   path: "/billing",
@@ -196,6 +204,18 @@ const AuthedSettingsIntegrationsIndexRoute =
     id: "/integrations/",
     path: "/integrations/",
     getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any);
+const AuthedIntentSetupAwsMarketplaceIndexRoute =
+  AuthedIntentSetupAwsMarketplaceIndexRouteImport.update({
+    id: "/setup-aws-marketplace/",
+    path: "/setup-aws-marketplace/",
+    getParentRoute: () => AuthedIntentRouteRoute,
+  } as any);
+const AuthedIntentCreateWebhookIndexRoute =
+  AuthedIntentCreateWebhookIndexRouteImport.update({
+    id: "/create-webhook/",
+    path: "/create-webhook/",
+    getParentRoute: () => AuthedIntentRouteRoute,
   } as any);
 const AuthedBillingUsageIndexRoute = AuthedBillingUsageIndexRouteImport.update({
   id: "/usage/",
@@ -547,6 +567,7 @@ const AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute =
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/billing": typeof AuthedBillingRouteRouteWithChildren;
+  "/intent": typeof AuthedIntentRouteRouteWithChildren;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
@@ -571,6 +592,8 @@ export interface FileRoutesByFullPath {
   "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
   "/billing/plans": typeof AuthedBillingPlansIndexRoute;
   "/billing/usage": typeof AuthedBillingUsageIndexRoute;
+  "/intent/create-webhook": typeof AuthedIntentCreateWebhookIndexRoute;
+  "/intent/setup-aws-marketplace": typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
   "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
@@ -626,6 +649,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/intent": typeof AuthedIntentRouteRouteWithChildren;
   "/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/organization-setup": typeof authOrganizationSetupRoute;
   "/sign-out": typeof authSignOutRoute;
@@ -648,6 +672,8 @@ export interface FileRoutesByTo {
   "/billing/payments": typeof AuthedBillingPaymentsIndexRoute;
   "/billing/plans": typeof AuthedBillingPlansIndexRoute;
   "/billing/usage": typeof AuthedBillingUsageIndexRoute;
+  "/intent/create-webhook": typeof AuthedIntentCreateWebhookIndexRoute;
+  "/intent/setup-aws-marketplace": typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   "/settings/integrations": typeof AuthedSettingsIntegrationsIndexRoute;
   "/settings/user": typeof AuthedSettingsUserIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsIndexRoute;
@@ -698,6 +724,7 @@ export interface FileRoutesById {
   "/": typeof IndexRoute;
   "/_authed": typeof AuthedRouteWithChildren;
   "/_authed/billing": typeof AuthedBillingRouteRouteWithChildren;
+  "/_authed/intent": typeof AuthedIntentRouteRouteWithChildren;
   "/_authed/settings": typeof AuthedSettingsRouteRouteWithChildren;
   "/(auth)/organization-setup": typeof authOrganizationSetupRoute;
   "/(auth)/sign-out": typeof authSignOutRoute;
@@ -722,6 +749,8 @@ export interface FileRoutesById {
   "/_authed/billing/payments/": typeof AuthedBillingPaymentsIndexRoute;
   "/_authed/billing/plans/": typeof AuthedBillingPlansIndexRoute;
   "/_authed/billing/usage/": typeof AuthedBillingUsageIndexRoute;
+  "/_authed/intent/create-webhook/": typeof AuthedIntentCreateWebhookIndexRoute;
+  "/_authed/intent/setup-aws-marketplace/": typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
   "/_authed/settings/integrations/": typeof AuthedSettingsIntegrationsIndexRoute;
   "/_authed/settings/user/": typeof AuthedSettingsUserIndexRoute;
   "/_authed/env/$envSlug/apps/$externalID": typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren;
@@ -780,6 +809,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/billing"
+    | "/intent"
     | "/settings"
     | "/organization-setup"
     | "/sign-out"
@@ -804,6 +834,8 @@ export interface FileRouteTypes {
     | "/billing/payments"
     | "/billing/plans"
     | "/billing/usage"
+    | "/intent/create-webhook"
+    | "/intent/setup-aws-marketplace"
     | "/settings/integrations"
     | "/settings/user"
     | "/env/$envSlug/apps/$externalID"
@@ -859,6 +891,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/intent"
     | "/settings"
     | "/organization-setup"
     | "/sign-out"
@@ -881,6 +914,8 @@ export interface FileRouteTypes {
     | "/billing/payments"
     | "/billing/plans"
     | "/billing/usage"
+    | "/intent/create-webhook"
+    | "/intent/setup-aws-marketplace"
     | "/settings/integrations"
     | "/settings/user"
     | "/env/$envSlug/apps"
@@ -930,6 +965,7 @@ export interface FileRouteTypes {
     | "/"
     | "/_authed"
     | "/_authed/billing"
+    | "/_authed/intent"
     | "/_authed/settings"
     | "/(auth)/organization-setup"
     | "/(auth)/sign-out"
@@ -954,6 +990,8 @@ export interface FileRouteTypes {
     | "/_authed/billing/payments/"
     | "/_authed/billing/plans/"
     | "/_authed/billing/usage/"
+    | "/_authed/intent/create-webhook/"
+    | "/_authed/intent/setup-aws-marketplace/"
     | "/_authed/settings/integrations/"
     | "/_authed/settings/user/"
     | "/_authed/env/$envSlug/apps/$externalID"
@@ -1097,6 +1135,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthedSettingsRouteRouteImport;
       parentRoute: typeof AuthedRoute;
     };
+    "/_authed/intent": {
+      id: "/_authed/intent";
+      path: "/intent";
+      fullPath: "/intent";
+      preLoaderRoute: typeof AuthedIntentRouteRouteImport;
+      parentRoute: typeof AuthedRoute;
+    };
     "/_authed/billing": {
       id: "/_authed/billing";
       path: "/billing";
@@ -1173,6 +1218,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/settings/integrations";
       preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport;
       parentRoute: typeof AuthedSettingsRouteRoute;
+    };
+    "/_authed/intent/setup-aws-marketplace/": {
+      id: "/_authed/intent/setup-aws-marketplace/";
+      path: "/setup-aws-marketplace";
+      fullPath: "/intent/setup-aws-marketplace";
+      preLoaderRoute: typeof AuthedIntentSetupAwsMarketplaceIndexRouteImport;
+      parentRoute: typeof AuthedIntentRouteRoute;
+    };
+    "/_authed/intent/create-webhook/": {
+      id: "/_authed/intent/create-webhook/";
+      path: "/create-webhook";
+      fullPath: "/intent/create-webhook";
+      preLoaderRoute: typeof AuthedIntentCreateWebhookIndexRouteImport;
+      parentRoute: typeof AuthedIntentRouteRoute;
     };
     "/_authed/billing/usage/": {
       id: "/_authed/billing/usage/";
@@ -1600,6 +1659,20 @@ const AuthedBillingRouteRouteChildren: AuthedBillingRouteRouteChildren = {
 const AuthedBillingRouteRouteWithChildren =
   AuthedBillingRouteRoute._addFileChildren(AuthedBillingRouteRouteChildren);
 
+interface AuthedIntentRouteRouteChildren {
+  AuthedIntentCreateWebhookIndexRoute: typeof AuthedIntentCreateWebhookIndexRoute;
+  AuthedIntentSetupAwsMarketplaceIndexRoute: typeof AuthedIntentSetupAwsMarketplaceIndexRoute;
+}
+
+const AuthedIntentRouteRouteChildren: AuthedIntentRouteRouteChildren = {
+  AuthedIntentCreateWebhookIndexRoute: AuthedIntentCreateWebhookIndexRoute,
+  AuthedIntentSetupAwsMarketplaceIndexRoute:
+    AuthedIntentSetupAwsMarketplaceIndexRoute,
+};
+
+const AuthedIntentRouteRouteWithChildren =
+  AuthedIntentRouteRoute._addFileChildren(AuthedIntentRouteRouteChildren);
+
 interface AuthedSettingsIntegrationsNeonStepRouteRouteChildren {
   AuthedSettingsIntegrationsNeonStepIndexRoute: typeof AuthedSettingsIntegrationsNeonStepIndexRoute;
 }
@@ -1918,6 +1991,7 @@ const AuthedEnvEnvSlugRouteRouteWithChildren =
 
 interface AuthedRouteChildren {
   AuthedBillingRouteRoute: typeof AuthedBillingRouteRouteWithChildren;
+  AuthedIntentRouteRoute: typeof AuthedIntentRouteRouteWithChildren;
   AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren;
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute;
@@ -1927,6 +2001,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedBillingRouteRoute: AuthedBillingRouteRouteWithChildren,
+  AuthedIntentRouteRoute: AuthedIntentRouteRouteWithChildren,
   AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
