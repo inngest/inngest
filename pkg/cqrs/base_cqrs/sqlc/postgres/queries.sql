@@ -503,7 +503,7 @@ WHERE span_id IN (
 )
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING SUM((name = 'executor.step.discovery')::int) > 0
-UNION
+UNION ALL
 SELECT
   run_id,
   trace_id,
@@ -520,7 +520,7 @@ SELECT
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND account_id = sqlc.arg(account_id)
-GROUP BY dynamic_span_id
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = sqlc.arg(step_id)::text)::int) > 0
   AND
