@@ -48,6 +48,10 @@ type redisCapacityManager struct {
 	enableDebugLogs bool
 
 	lifecycles []ConstraintAPILifecycleHooks
+
+	operationIdempotencyTTL       time.Duration
+	constraintCheckIdempotencyTTL time.Duration
+	checkIdempotencyTTL           time.Duration
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -100,11 +104,32 @@ func WithLifecycles(lifecycles ...ConstraintAPILifecycleHooks) RedisCapacityMana
 	}
 }
 
+func WithOperationIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.operationIdempotencyTTL = ttl
+	}
+}
+
+func WithConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.constraintCheckIdempotencyTTL = ttl
+	}
+}
+
+func WithCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.checkIdempotencyTTL = ttl
+	}
+}
+
 func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
 	manager := &redisCapacityManager{
-		keyGenerator: keyGenerator{},
+		keyGenerator:                  keyGenerator{},
+		operationIdempotencyTTL:       OperationIdempotencyTTL,
+		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
+		checkIdempotencyTTL:           CheckIdempotencyTTL,
 	}
 
 	for _, rcmo := range options {

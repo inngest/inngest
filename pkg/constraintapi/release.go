@@ -57,7 +57,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		keyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
-		int(OperationIdempotencyTTL.Seconds()),
+		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 	})
 	if err != nil {

@@ -68,7 +68,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		newLeaseID.String(),
 		now.UnixMilli(), // current time in milliseconds for throttle
 		leaseExpiry.UnixMilli(),
-		int(OperationIdempotencyTTL.Seconds()),
+		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 	})
 	if err != nil {

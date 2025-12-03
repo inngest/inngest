@@ -134,7 +134,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		req.AccountID,
 		now.UnixMilli(),
 		now.UnixNano(),
-		CheckIdempotencyTTL.Seconds(),
+		r.checkIdempotencyTTL.Seconds(),
 		enableDebugLogsVal,
 	})
 	if err != nil {
