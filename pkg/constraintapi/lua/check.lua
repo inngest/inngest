@@ -315,6 +315,8 @@ res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 
 -- Set operation idempotency TTL
-call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+if operationIdempotencyTTL > 0 then
+	call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+end
 
 return encoded

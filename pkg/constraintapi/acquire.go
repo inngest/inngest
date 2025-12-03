@@ -193,8 +193,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs,
 
 		util.XXHash(req.IdempotencyKey), // hashed operation idempotency key
-		int(OperationIdempotencyTTL.Seconds()),
-		int(ConstraintCheckIdempotencyTTL.Seconds()),
+		int(r.operationIdempotencyTTL.Seconds()),
+		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
 	})
