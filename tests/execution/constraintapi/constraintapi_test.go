@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -372,10 +373,12 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.NotNil(t, md.ID.RunID)
 
 				rateLimitKeyHash := util.XXHash("user1")
-				keyRateLimitState := fmt.Sprintf("{rl}%s-%s", fnID, rateLimitKeyHash)
+				keyRateLimitState := fmt.Sprintf("{rl}:%s-%s", fnID, rateLimitKeyHash)
 				require.True(t, deps.r.Exists(keyRateLimitState))
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse) {
+				t.Log(resp.Debug())
+
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
 			},
@@ -426,7 +429,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					ID:              fnID,
 					FunctionVersion: 1,
 					RateLimit: &inngest.RateLimit{
-						Limit:  5,
+						Limit:  10,
 						Period: "60s",
 						Key:    &rateLimitExpr,
 					},
@@ -462,22 +465,31 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.NotNil(t, md.ID.RunID)
 
 				rateLimitKeyHash := util.XXHash("user1")
-				keyRateLimitState := fmt.Sprintf("{rl}%s-%s", fnID, rateLimitKeyHash)
+				keyRateLimitState := fmt.Sprintf("{rl}:%s-%s", fnID, rateLimitKeyHash)
 				require.True(t, deps.r.Exists(keyRateLimitState))
+
+				raw, err := deps.r.Get(keyRateLimitState)
+				require.NoError(t, err)
+				parsed, err := strconv.Atoi(raw)
+				require.NoError(t, err)
+				tat := time.Unix(0, int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) { // Usage should already be visible in check
 				require.Len(t, resp.Usage, 1)
 				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
-				require.Equal(t, 9, resp.Usage[0].Used)
+				require.Equal(t, 1, resp.Usage[0].Used)
 				require.Equal(t, 10, resp.Usage[0].Limit)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *constraintapi.CapacityAcquireResponse) {
+				t.Log(resp.Debug())
+
 				require.Len(t, resp.LimitingConstraints, 0)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *constraintapi.CapacityCheckResponse) {
 				require.Len(t, resp.Usage, 1)
 				require.Equal(t, constraintapi.ConstraintKindRateLimit, resp.Usage[0].Constraint.Kind)
-				require.Equal(t, 10, resp.Usage[0].Used)
+				require.Equal(t, 2, resp.Usage[0].Used)
 				require.Equal(t, 10, resp.Usage[0].Limit)
 			},
 		},
@@ -535,7 +547,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				}),
 			)
 
-			rl := ratelimit.New(ctx, rc, "{rl}")
+			rl := ratelimit.New(ctx, rc, "{rl}:")
 
 			unsharded := redis_state.NewUnshardedClient(rc, "estate", "q:v1")
 			sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
@@ -567,6 +579,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 					return true, true
 				}),
+				executor.WithClock(clock),
 			)
 			require.NoError(t, err)
 

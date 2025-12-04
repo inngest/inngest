@@ -51,6 +51,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -392,6 +393,13 @@ func WithRealtimeConfig(config ExecutorRealtimeConfig) ExecutorOpt {
 	}
 }
 
+func WithClock(clock clockwork.Clock) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).clock = clock
+		return nil
+	}
+}
+
 type ExecutorRealtimeConfig struct {
 	Secret     []byte
 	PublishURL string
@@ -469,6 +477,7 @@ type executor struct {
 	tracerProvider tracing.TracerProvider
 
 	allowStepMetadata AllowStepMetadata
+	clock             clockwork.Clock
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -535,13 +544,13 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 
 func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger, idempontenceKey string, evtMap map[string]any, id sv2.ID, req execution.ScheduleRequest) error {
 	for _, c := range req.Function.Cancel {
-		expires := time.Now().Add(consts.CancelTimeout)
+		expires := e.now().Add(consts.CancelTimeout)
 		if c.Timeout != nil {
 			dur, err := str2duration.ParseDuration(*c.Timeout)
 			if err != nil {
 				return fmt.Errorf("error parsing cancel duration: %w", err)
 			}
-			expires = time.Now().Add(dur)
+			expires = e.now().Add(dur)
 		}
 
 		// The triggering event ID should be the first ID in the batch.
@@ -685,6 +694,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		})
 }
 
+func (e *executor) now() time.Time {
+	if e.clock != nil {
+		return e.clock.Now()
+	}
+	return time.Now()
+}
+
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 //
@@ -729,7 +745,7 @@ func (e *executor) schedule(
 					logger.WithStdlib(ctx, l),
 					rateLimitKey,
 					*req.Function.RateLimit,
-					ratelimit.WithNow(time.Now()),
+					ratelimit.WithNow(e.now()),
 					ratelimit.WithIdempotency(constraintCheckIdempotencyKey, RateLimitIdempotencyTTL),
 				)
 				if err != nil {
@@ -1114,7 +1130,7 @@ func (e *executor) schedule(
 		}
 	}
 
-	at := time.Now()
+	at := e.now()
 	if req.BatchID == nil {
 		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
 		if evtTs.After(at) {
@@ -1263,7 +1279,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
 	if isSleepResume {
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			EndTime:    time.Now(),
+			EndTime:    e.now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResume"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
@@ -1347,7 +1363,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// ensures ui timeline alignment
 	start, ok := redis_state.GetItemStart(ctx)
 	if !ok {
-		start = time.Now()
+		start = e.now()
 	}
 
 	if md.Config.StartedAt.IsZero() {
@@ -1462,7 +1478,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Metadata:   &md,
 			QueueItem:  &item,
 			Attributes: tracing.FunctionAttrs(&instance.f),
-			StartTime:  time.Now(),
+			StartTime:  e.now(),
 		},
 	)
 	if err != nil {
@@ -1483,11 +1499,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Attributes: tracing.DriverResponseAttrs(resp, nil),
 		}
 
-		//For most executions, we now set the status of the execution span.
+		// For most executions, we now set the status of the execution span.
 		// For some responses, however, the execution as the user sees it is
 		// still ongoing. Account for that here.
 		if !resp.IsGatewayRequest() {
-			updateOpts.EndTime = time.Now()
+			updateOpts.EndTime = e.now()
 
 			status := enums.StepStatusCompleted
 			if err != nil || resp.Err != nil || resp.UserError != nil {
@@ -2152,10 +2168,10 @@ func (e *executor) handlePause(
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
-		if pause.Expires.Time().Before(time.Now()) {
+		if pause.Expires.Time().Before(e.now()) {
 			l.Debug("encountered expired pause")
 
-			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(e.now())
 			if shouldDelete {
 				// Consume this pause to remove it entirely
 				l.Debug("deleting expired pause")
@@ -2273,10 +2289,10 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		eventName = *pause.Event
 	}
 
-	if pause.Expires.Time().Before(time.Now()) {
+	if pause.Expires.Time().Before(e.now()) {
 		l.Debug("encountered expired pause")
 
-		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(e.now())
 		if shouldDelete {
 			// Consume this pause to remove it entirely
 			l.Debug("deleting expired pause")
@@ -2418,7 +2434,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 
 	pauseSpan := tracing.SpanRefFromPause(&pause)
 	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    time.Now(),
+		EndTime:    e.now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
 		Status:     enums.StepStatusTimedOut,
 		TargetSpan: pauseSpan,
@@ -2466,7 +2482,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			e.log.Error("error creating span for next step after resume timeout", "error", err)
 		}
 
-		err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
+		err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 		if err != nil {
 			if errors.Is(err, redis_state.ErrQueueItemExists) {
 				nextStepSpan.Drop()
@@ -2583,7 +2599,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 		pauseSpan := tracing.SpanRefFromPause(&pause)
 		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			EndTime:    time.Now(),
+			EndTime:    e.now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
 			TargetSpan: pauseSpan,
@@ -2634,7 +2650,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
-			err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
+			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 			if err != nil {
 				if err == redis_state.ErrQueueItemExists {
 					nextStepSpan.Drop()
@@ -2896,7 +2912,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
-	now := time.Now()
+	now := e.Now()
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 
 	nextItem := queue.Item{
@@ -3072,7 +3088,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// 		FnID:       i.md.ID.FunctionID,
 	// 		FnSlug:     i.f.GetSlug(),
 	// 		Channel:    i.md.ID.RunID.String(),
-	// 		CreatedAt:  time.Now(),
+	// 		CreatedAt:  e.now(),
 	// 		RunID:      i.md.ID.RunID,
 	// 	})
 	// }
@@ -3154,7 +3170,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 
 	// This is the discovery step to find what happens after we error
 	jobID := fmt.Sprintf("%s-%s-failure", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	now := time.Now()
+	now := e.now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
@@ -3272,7 +3288,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID+"-plan")
-	now := time.Now()
+	now := e.now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
@@ -3337,7 +3353,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
-	until := time.Now().Add(dur)
+	until := e.now().Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
@@ -3546,7 +3562,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	now := time.Now()
+	now := e.now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
@@ -3767,7 +3783,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
-	now := time.Now()
+	now := e.now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           runCtx.Metadata().ID.Tenant.EnvID,
@@ -3846,7 +3862,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
-	now := time.Now()
+	now := e.now()
 
 	sid := run.NewSpanID(ctx)
 	carrier := itrace.NewTraceCarrier(
@@ -3949,7 +3965,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			}
 
 			if updateSpanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-				EndTime:    time.Now(),
+				EndTime:    e.now(),
 				Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
 				Status:     enums.StepStatusFailed,
 				TargetSpan: span.Ref,
@@ -4023,7 +4039,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
-	now := time.Now()
+	now := e.now()
 
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
@@ -4245,7 +4261,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 
 	opcode := gen.Op.String()
-	now := time.Now()
+	now := e.now()
 
 	sid := run.NewSpanID(ctx)
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
@@ -4380,7 +4396,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		if err != nil {
 			return err
 		}
-		at := time.Now().Add(dur)
+		at := e.now().Add(dur)
 
 		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
 			ScheduleBatchPayload: batch.ScheduleBatchPayload{
@@ -4608,10 +4624,10 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 		return res, err
 	}
 
-	if pause.Expires.Time().Before(time.Now()) {
+	if pause.Expires.Time().Before(e.now()) {
 		l.Debug("encountered expired signal")
 
-		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(e.now())
 		if shouldDelete {
 			l.Debug("deleting expired pause")
 			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
@@ -4747,7 +4763,7 @@ func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Me
 			// Always from the root span.
 			Parent:    tracing.RunSpanRefFromMetadata(&md),
 			QueueItem: &item,
-			StartTime: time.Now(),
+			StartTime: e.now(),
 		},
 	)
 	if err != nil {

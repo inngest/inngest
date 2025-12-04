@@ -689,7 +689,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				require.Equal(t, time.UnixMilli(0), resp.RetryAfter)
+				require.True(t, resp.RetryAfter.IsZero())
 
 				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
 				require.NoError(t, err)
