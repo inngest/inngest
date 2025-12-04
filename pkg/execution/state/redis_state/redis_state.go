@@ -188,6 +188,9 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		u: m.unsafeUnshardedClientDoNotUse,
 	}
 
+	// Default to deleting pauses from buffer only
+	m.pauseDeleter = m.unshardedMgr
+
 	return m, nil
 }
 
@@ -205,12 +208,18 @@ func WithUnshardedClient(u *UnshardedClient) Opt {
 	}
 }
 
+func (m *mgr) SetPauseDeleter(pm state.PauseDeleter) {
+	m.pauseDeleter = pm
+}
+
 type mgr struct {
 	// unsafe: Operate on sharded manager instead.
 	unsafeShardedClientDoNotUse *ShardedClient
 
 	// unsafe: Operate on unsharded manager instead.
 	unsafeUnshardedClientDoNotUse *UnshardedClient
+
+	pauseDeleter state.PauseDeleter
 
 	shardedMgr
 	unshardedMgr
@@ -993,7 +1002,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
 		return err
 	}
 
-	err = m.deletePausesForRun(ctx, ctx, i)
+	err = m.unshardedMgr.deletePausesForRun(ctx, ctx, m.pauseDeleter, i)
 	if err != nil {
 		return err
 	}
@@ -1041,27 +1050,34 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	return nil
 }
 
-func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Context, pauseDeleter state.PauseDeleter, i state.Identifier) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "deletePausesForRun"), redis_telemetry.ScopePauses)
 
 	pause := m.u.Pauses()
 
-	// Fetch all pauses for the run
-	if pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice(); err == nil {
-		for _, id := range pauseIDs {
-			pauseID, _ := uuid.Parse(id)
-			err = m.DeletePauseByID(ctx, pauseID)
-			if err != nil {
-				// bubble the error up we can safely retry the whole process
-				return err
-			}
+	pauseIDs, err := pause.Client().Do(callCtx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).AsStrSlice()
+	if err != nil {
+		return err
+	}
+
+	for _, id := range pauseIDs {
+		pauseID, err := uuid.Parse(id)
+		if err != nil {
+			// This should never happen
+			logger.StdlibLogger(ctx).Error("invalid pause ID in run pause set", "error", err, "pauseID", id, "runID", i.RunID)
+			continue
+		}
+		// This call will either go to the pause manager to handle deleting from blocks
+		// or use the current implementation in this file by default.
+		if err := pauseDeleter.DeletePauseByID(ctx, pauseID, i.WorkspaceID); err != nil {
+			return err
 		}
 	}
 
-	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
+	return nil
 }
 
-func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error {
+func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
 	pause, err := m.PauseByID(ctx, pauseID)
 	if err != nil {
@@ -1256,6 +1272,16 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 	pause := &state.Pause{}
 	err = json.Unmarshal([]byte(str), pause)
 	return pause, err
+}
+
+func (m unshardedMgr) GetRunPauseIDs(ctx context.Context, runID ulid.ULID) ([]string, error) {
+	pause := m.u.Pauses()
+	return pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, runID)).Build()).AsStrSlice()
+}
+
+func (m unshardedMgr) DeleteRunPauseSet(ctx context.Context, runID ulid.ULID) error {
+	pause := m.u.Pauses()
+	return pause.Client().Do(ctx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, runID)).Build()).Error()
 }
 
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {

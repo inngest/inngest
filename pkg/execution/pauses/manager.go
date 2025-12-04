@@ -18,31 +18,25 @@ var BlockFlushQueueName = "block-flush"
 
 var defaultFlushDelay = 10 * time.Second
 
-type ManagerOpt func(m Manager)
+type ManagerOpt func(m *manager)
 
 type FeatureCallback func(ctx context.Context, workspaceID uuid.UUID) bool
 
 func WithFlushDelay(delay time.Duration) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.flushDelay = delay
-		}
+	return func(mgr *manager) {
+		mgr.flushDelay = delay
 	}
 }
 
 func WithBlockFlushEnabled(cb FeatureCallback) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.blockFlushEnabled = cb
-		}
+	return func(mgr *manager) {
+		mgr.blockFlushEnabled = cb
 	}
 }
 
 func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
-	return func(m Manager) {
-		if mgr, ok := m.(*manager); ok {
-			mgr.blockStoreEnabled = cb
-		}
+	return func(mgr *manager) {
+		mgr.blockStoreEnabled = cb
 	}
 }
 
@@ -447,4 +441,9 @@ func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ul
 		return nil, 0, fmt.Errorf("block store not available")
 	}
 	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
+}
+
+func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+
+	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
 }

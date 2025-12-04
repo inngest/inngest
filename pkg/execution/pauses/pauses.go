@@ -138,12 +138,16 @@ type Manager interface {
 	// GetBlockDeletedIDs returns all deleted pause IDs for a specific block.
 	// Used for debugging block deletion tracking. Returns IDs, total count, and error.
 	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
+
+	// DeletePauseByID deletes a pause by its ID, handling both buffer and block storage
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
 // The buffer writes them to a datastore before being periodically flushed
 // to blocks on disk.
 type Bufferer interface {
+	state.PauseDeleter
 	// Write writes one or more pauses to the backing store.  Note that the index
 	// for each pause must be the same.
 	//
@@ -215,8 +219,11 @@ type BlockFlusher interface {
 	// BlockSize returns the number of pauses saved in each block.
 	BlockSize() int
 
-	// Delete deletes a pause from from block storage.
+	// Delete deletes a pause from block storage.
 	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
+
+	// DeleteByID deletes a pause from a block by its ID.
+	// DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // BlockReader reads blocks for a given index.

@@ -307,6 +307,18 @@ func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return len(m.pauses) > 0, nil
 }
 
+func (m *mockBufferer) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, p := range m.pauses {
+		if p.ID == pauseID && p.WorkspaceID == workspaceID {
+			m.pauses = append(m.pauses[:i], m.pauses[i+1:]...)
+			return nil
+		}
+	}
+	return state.ErrPauseNotFound
+}
+
 // Helper methods for thread-safe access in tests
 func (m *mockBufferer) pauseCount() int {
 	m.mu.RLock()
@@ -431,6 +443,18 @@ func (m *mockBuffererSameTimestamp) IndexExists(ctx context.Context, i Index) (b
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.pauses) > 0, nil
+}
+
+func (m *mockBuffererSameTimestamp) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, p := range m.pauses {
+		if p.ID == pauseID && p.WorkspaceID == workspaceID {
+			m.pauses = append(m.pauses[:i], m.pauses[i+1:]...)
+			return nil
+		}
+	}
+	return state.ErrPauseNotFound
 }
 
 func TestLastBlockMetadata(t *testing.T) {
