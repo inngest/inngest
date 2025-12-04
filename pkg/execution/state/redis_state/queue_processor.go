@@ -1105,7 +1105,9 @@ func (q *queue) process(
 	qi := i.I
 	p := i.P
 	continuationCtr := i.PCtr
-	capacityLeaseID := i.capacityLeaseID
+
+	capacityLeaseID := newCapacityLease(i.capacityLeaseID)
+
 	disableConstraintUpdates := i.disableConstraintUpdates
 
 	var err error
@@ -1119,7 +1121,7 @@ func (q *queue) process(
 	extendLeaseTick := q.clock.NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
-	extendCapacityLeaseTick := q.clock.NewTicker(QueueLeaseDuration / 2)
+	extendCapacityLeaseTick := q.clock.NewTicker(q.capacityLeaseExtendInterval)
 	defer extendCapacityLeaseTick.Stop()
 
 	errCh := make(chan error)
@@ -1176,10 +1178,12 @@ func (q *queue) process(
 				// - the Constraint API is disabled or the current account is not enrolled
 				// - the Constraint API provided a lease which expired at the time of leasing the queue item
 				if i.capacityLeaseID == nil {
+					q.log.Trace("item has no capacity lease, skipping lease extension")
 					continue
 				}
 
-				if capacityLeaseID == nil {
+				currentCapacityLease := capacityLeaseID.get()
+				if currentCapacityLease == nil {
 					q.log.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
@@ -1187,12 +1191,12 @@ func (q *queue) process(
 				}
 
 				// This idempotency key will change with every refreshed lease, which makes sense.
-				operationIdempotencyKey := capacityLeaseID.String()
+				operationIdempotencyKey := currentCapacityLease.String()
 
 				res, err := q.capacityManager.ExtendLease(context.Background(), &constraintapi.CapacityExtendLeaseRequest{
 					AccountID:      p.AccountID,
 					IdempotencyKey: operationIdempotencyKey,
-					LeaseID:        *capacityLeaseID,
+					LeaseID:        *currentCapacityLease,
 					Migration: constraintapi.MigrationIdentifier{
 						IsRateLimit: false,
 						QueueShard:  q.primaryQueueShard.Name,
@@ -1211,7 +1215,7 @@ func (q *queue) process(
 								"partitionID": p.ID,
 								"accountID":   p.AccountID.String(),
 								"item":        qi.ID,
-								"leaseID":     capacityLeaseID.String(),
+								"leaseID":     currentCapacityLease.String(),
 							}),
 						)
 					}
@@ -1227,7 +1231,7 @@ func (q *queue) process(
 					return
 				}
 
-				capacityLeaseID = res.LeaseID
+				capacityLeaseID.set(res.LeaseID)
 			}
 		}
 	}()
@@ -1364,18 +1368,17 @@ func (q *queue) process(
 	// When capacity is leased, release it after requeueing/dequeueing the item.
 	// This is optional and best-effort to free up concurrency capacity as quickly as possible
 	// for the next worker to lease a queue item.
-	if capacityLeaseID != nil {
+	if capacityLeaseID.has() {
 		defer service.Go(func() {
+			currentLeaseID := capacityLeaseID.get()
 			if capacityLeaseID == nil {
 				return
 			}
 
-			currentLeaseID := *capacityLeaseID
-
 			res, err := q.capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 				AccountID:      p.AccountID,
 				IdempotencyKey: qi.ID,
-				LeaseID:        currentLeaseID,
+				LeaseID:        *currentLeaseID,
 				Migration: constraintapi.MigrationIdentifier{
 					IsRateLimit: false,
 					QueueShard:  q.primaryQueueShard.Name,
