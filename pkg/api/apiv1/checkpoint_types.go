@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -198,6 +200,21 @@ type checkpointAsyncSteps struct {
 	// executing the SDK.
 	QueueItemRef string                  `json:"qi_id"`
 	Steps        []state.GeneratorOpcode `json:"steps"`
+	// Timestamp is the unix-millisecond epoch when the request was created.
+	Timestamp int `json:"ts"`
+}
+
+// TrackLatency tracks how long it took for us to receive the async checkpoint
+// request via metrics.
+func (c checkpointAsyncSteps) TrackLatency(ctx context.Context) {
+	if c.Timestamp == 0 {
+		return
+	}
+
+	d := time.Since(time.UnixMilli(int64(c.Timestamp)))
+	metrics.HistogramCheckpointStartLatency(ctx, d, "async", metrics.HistogramOpt{
+		PkgName: "checkpoint",
+	})
 }
 
 type checkpointSyncSteps struct {
