@@ -160,8 +160,6 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local allow_at = new_tat - delay_variation_tolerance
 	local diff = now_ns - allow_at
 
-	debug("checked", "diff", tostring(diff))
-
 	if diff < 0 then
 		-- We are rate limited - calculate retry time
 		-- RetryAfter = -diff (when diff is negative)
@@ -176,8 +174,6 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-
-		debug("remaining", tostring(remaining))
 
 		-- Calculate when the next unit will be available after consuming all remaining capacity
 		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval

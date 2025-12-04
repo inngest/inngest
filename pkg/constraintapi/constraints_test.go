@@ -850,7 +850,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				RateLimit: []RateLimitConfig{
 					{
-						Limit:             5,
+						Limit:             10,
 						Period:            60,
 						KeyExpressionHash: "expr-hash",
 					},
@@ -869,56 +869,58 @@ func TestConstraintEnforcement(t *testing.T) {
 			expectedLeaseAmount: 1,
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Set existing legacy state
-				tat := deps.clock.Now().Add(24 * time.Second).UnixNano()
+				tat := deps.clock.Now().Add(6 * time.Second).UnixNano()
 				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				t.Log(resp.Debug())
 
-				require.Equal(t, 2, resp.Usage[0].Used)
+				require.Equal(t, 1, resp.Usage[0].Used)
 
 				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
 				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				require.Equal(t, deps.clock.Now().Add(24*time.Second), resp.RetryAfter)
+				t.Log(resp.Debug())
+
+				require.True(t, resp.RetryAfter.Before(deps.clock.Now()))
 
 				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
 				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
+				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), tat, time.Second)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				require.Equal(t, 3, resp.Usage[0].Used)
+				require.Equal(t, 2, resp.Usage[0].Used)
 			},
 		},
 
 		{
-			name: "throttle partially rejected with legacy state",
+			name: "rate limit partially rejected with legacy state",
 			mi: MigrationIdentifier{
-				QueueShard: "test",
+				IsRateLimit: true,
 			},
 			config: ConstraintConfig{
 				FunctionVersion: 1,
-				Throttle: []ThrottleConfig{
+				RateLimit: []RateLimitConfig{
 					{
-						Limit:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             10,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
 			constraints: []ConstraintItem{
 				{
-					Kind: ConstraintKindThrottle,
-					Throttle: &ThrottleConstraint{
+					Kind: ConstraintKindRateLimit,
+					RateLimit: &RateLimitConstraint{
 						KeyExpressionHash: "expr-hash",
 						EvaluatedKeyHash:  "key-hash",
 					},
@@ -928,36 +930,39 @@ func TestConstraintEnforcement(t *testing.T) {
 			expectedLeaseAmount: 1,
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Set existing legacy state
-				tat := deps.clock.Now().Add(48 * time.Second).UnixMilli()
-				err := deps.r.Set("{q:v1}:throttle:key-hash", strconv.Itoa(int(tat)))
+				tat := deps.clock.Now().Add(6 * time.Second).UnixNano()
+				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				// The initial state accounts for 4 requests
-				require.Equal(t, 4, resp.Usage[0].Used)
-			},
-			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				// This should be the actual value, accounting for 5 requests
-				raw, err := deps.r.Get("{q:v1}:throttle:key-hash")
+				t.Log(resp.Debug())
+
+				require.Equal(t, 1, resp.Usage[0].Used)
+
+				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
-				tat := time.UnixMilli(int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(60*time.Second), tat, time.Second)
+				tat := time.Unix(0, int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), tat, time.Second)
+			},
+			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
+				t.Log(resp.Debug())
 
-				t.Log("now", deps.clock.Now())
-				t.Log("retry", resp.RetryAfter)
+				require.WithinDuration(t, deps.clock.Now().Add(6*time.Second), resp.RetryAfter, time.Second)
 
-				// Wait one "window", 12s, until the next request can happen
-				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), resp.RetryAfter, time.Second)
+				raw, err := deps.r.Get("{rl}:key-hash")
+				require.NoError(t, err)
+				parsed, err := strconv.Atoi(raw)
+				require.NoError(t, err)
+				tat := time.Unix(0, int64(parsed))
+				require.WithinDuration(t, deps.clock.Now().Add(12*time.Second), tat, time.Second)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
-				// We are now accounting for 5 requests
-				require.Equal(t, 5, resp.Usage[0].Used)
+				// We are now accounting for 2 requests
+				require.Equal(t, 2, resp.Usage[0].Used)
 			},
 		},
-
-		// TODO: Test rate limit allowed/rejected/legacy rejected/legacy allowed
 	}
 
 	for _, test := range testCases {
