@@ -212,11 +212,8 @@ func (c checkpointAsyncSteps) TrackLatency(ctx context.Context) {
 	}
 
 	d := time.Since(time.UnixMilli(int64(c.Timestamp)))
-	metrics.HistogramCheckpointStartLatency(ctx, d, metrics.HistogramOpt{
+	metrics.HistogramCheckpointStartLatency(ctx, d, "async", metrics.HistogramOpt{
 		PkgName: "checkpoint",
-		Tags: map[string]any{
-			"type": "async",
-		},
 	})
 }
 
