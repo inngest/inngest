@@ -356,7 +356,7 @@ func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Durat
 	})
 }
 
-func HistogramAsyncCheckpointStartLatency(ctx context.Context, age time.Duration, opts HistogramOpt) {
+func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "checkpoint_start_latency",
