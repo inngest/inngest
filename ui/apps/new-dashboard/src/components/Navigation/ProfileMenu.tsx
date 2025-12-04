@@ -13,6 +13,7 @@ import ModeSwitch from "@inngest/components/ThemeMode/ModeSwitch";
 import { pathCreator } from "@/utils/urls";
 import { Link } from "@tanstack/react-router";
 import { SignOutButton } from "../Auth/SignOutButton";
+import type { FileRouteTypes } from "@/routeTree.gen";
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -49,8 +50,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </Link>
           <Link
-            //@ts-expect-error - Tanstack TODO: figure out why tanstack doesn't like this with our splat route
-            to="/settings/organization"
+            to={"/settings/organization" as FileRouteTypes["to"]}
             resetScroll={false}
           >
             <Listbox.Option
@@ -65,8 +65,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           </Link>
 
           <Link
-            //@ts-expect-error - TANSTACK TODO: fix when routes land
-            to="/settings/organization/organization-members"
+            to={
+              "/settings/organization/organization-members" as FileRouteTypes["to"]
+            }
             resetScroll={false}
           >
             <Listbox.Option
@@ -92,8 +93,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </Link>
 
-          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
-          <Link to="/organization-list">
+          <Link to={"/organization-list" as FileRouteTypes["to"]}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -107,8 +107,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          {/* @ts-expect-error - TANSTACK TODO: fix when routes land */}
-          <Link to="/sign-in/choose">
+          <Link to={"/sign-in/choose" as FileRouteTypes["to"]}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchAccount"

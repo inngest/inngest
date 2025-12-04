@@ -8,6 +8,21 @@ import {
 import graphqlAPI from "@/queries/graphqlAPI";
 import { createServerFn } from "@tanstack/react-start";
 
+//
+// Transform billingPeriod from unknown to string to satisfy createServerFn serialization
+// billingPeriod is actually a string (e.g., "month", "year") but GraphQL types it as unknown
+type TransformBillingPeriod<T> = T extends { plan: infer P | null }
+  ? Omit<T, "plan"> & {
+      plan: P extends { billingPeriod: unknown }
+        ? Omit<P, "billingPeriod"> & { billingPeriod: string }
+        : P;
+    }
+  : T;
+
+type TransformPlanBillingPeriod<T> = T extends { billingPeriod: unknown }
+  ? Omit<T, "billingPeriod"> & { billingPeriod: string }
+  : T;
+
 export const entitlementUsageDocument = graphql(`
   query EntitlementUsage {
     account {
@@ -216,13 +231,22 @@ export const currentPlanDocument = graphql(`
 
 export const currentPlan = createServerFn({
   method: "GET",
-  //@ts-expect-error TANSTACK TODO: sort out type error at merge time
-}).handler(async () => {
-  const res = await graphqlAPI.request<GetCurrentPlanQuery>(
-    currentPlanDocument,
-  );
-  return res.account;
-});
+}).handler(
+  async (): Promise<TransformBillingPeriod<GetCurrentPlanQuery["account"]>> => {
+    const res = await graphqlAPI.request<GetCurrentPlanQuery>(
+      currentPlanDocument,
+    );
+    return {
+      ...res.account,
+      plan: res.account.plan
+        ? {
+            ...res.account.plan,
+            billingPeriod: res.account.plan.billingPeriod as string,
+          }
+        : null,
+    } as TransformBillingPeriod<GetCurrentPlanQuery["account"]>;
+  },
+);
 
 export const billingDetailsDocument = graphql(`
   query GetBillingDetails {
@@ -282,13 +306,29 @@ export const plansDocument = graphql(`
 
 export const plans = createServerFn({
   method: "GET",
-  //@ts-expect-error TANSTACK TODO: sort out type error at merge time
-}).handler(async () => {
-  try {
-    const res = await graphqlAPI.request<GetPlansQuery>(plansDocument);
-    return res.plans;
-  } catch (error) {
-    console.error("Error fetching plans:", error);
-    throw new Error("Failed to fetch plans");
-  }
-});
+}).handler(
+  async (): Promise<
+    Array<
+      TransformPlanBillingPeriod<NonNullable<GetPlansQuery["plans"][0]> | null>
+    >
+  > => {
+    try {
+      const res = await graphqlAPI.request<GetPlansQuery>(plansDocument);
+      return res.plans.map((plan) =>
+        plan
+          ? {
+              ...plan,
+              billingPeriod: plan.billingPeriod as string,
+            }
+          : null,
+      ) as Array<
+        TransformPlanBillingPeriod<NonNullable<
+          GetPlansQuery["plans"][0]
+        > | null>
+      >;
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      throw new Error("Failed to fetch plans");
+    }
+  },
+);

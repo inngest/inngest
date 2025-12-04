@@ -14,15 +14,14 @@ type Props = {
   envSlug?: string;
   functions: Fn[];
   pathCreator?: {
-    // TANSTACK TODO: we should take cloud tanstack route types here
-    function: (params: { envSlug: string; functionSlug: string }) => unknown;
-    eventType: (params: { envSlug: string; eventName: string }) => unknown;
+    function: (params: { envSlug: string; functionSlug: string }) => FileRouteTypes['to'];
+    eventType: (params: { envSlug: string; eventName: string }) => FileRouteTypes['to'];
   };
 };
 
 export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  //@ts-expect-error: TANSTACK TODO: see route type todo above
+
   const columns = useColumns({ envSlug, pathCreator });
 
   const sortedFunctions = [...functions].sort((a, b) => {
@@ -42,8 +41,8 @@ function useColumns({
 }: {
   envSlug?: string;
   pathCreator?: {
-    function: (params: { envSlug: string; functionSlug: string }) => string;
-    eventType: (params: { envSlug: string; eventName: string }) => string;
+    function: (params: { envSlug: string; functionSlug: string }) => FileRouteTypes['to'];
+    eventType: (params: { envSlug: string; eventName: string }) => FileRouteTypes['to'];
   };
 }) {
   const columnHelper = createColumnHelper<Fn>();

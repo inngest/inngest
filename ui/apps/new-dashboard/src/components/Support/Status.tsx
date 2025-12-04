@@ -1,5 +1,4 @@
 import {
-  impactSchema,
   type Indicator,
   type InngestStatus as Status,
 } from "@inngest/components/SharedContext/useInngestStatus";
@@ -24,8 +23,11 @@ const statusEventSchema = z.object({
 
 const incidentSchema = statusEventSchema.extend({
   status: z.enum(["identified", "investigating", "monitoring"]),
-  // @ts-expect-error: TANSTACK TODO: figure out how to type this
-  current_worst_impact: impactSchema,
+  current_worst_impact: z.enum([
+    "partial_outage",
+    "degraded_performance",
+    "full_outage",
+  ]),
 });
 
 const maintenanceInProgressEventSchema = statusEventSchema.extend({

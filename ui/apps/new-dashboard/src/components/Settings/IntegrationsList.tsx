@@ -10,6 +10,7 @@ import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiExternalLinkLine } from "@remixicon/react";
 
 import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
+import type { FileRouteTypes } from "@tanstack/react-router";
 
 type Integration = {
   title: string;
@@ -49,8 +50,7 @@ const INTEGRATIONS: Integration[] = [
           kind="primary"
           appearance={enabled ? "outlined" : "solid"}
           size="medium"
-          //@ts-expect-error TANSTACK TODO: remove after this route lands
-          to={url}
+          to={url as FileRouteTypes["to"]}
           label={label}
           target={target}
         />

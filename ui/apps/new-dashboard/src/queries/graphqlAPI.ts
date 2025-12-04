@@ -23,7 +23,6 @@ const requestMiddleware: RequestMiddleware = async (request) => {
   } else {
     //
     // Need to forward the `Cookie` header for non-Clerk users.
-    // TANSTACK TODO: what is this? do we still need it
     const allCookies = getCookies();
     const cookieString = Object.entries(allCookies)
       .map(([name, value]) => `${name}=${value}`)

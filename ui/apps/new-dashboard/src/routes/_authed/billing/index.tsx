@@ -29,16 +29,10 @@ export const Route = createFileRoute("/_authed/billing/")({
       throw new Error("Failed to fetch current plan");
     }
 
-    //
-    //TANSTACK TODO: sort out type error at merge time
     return {
       addons,
       entitlements,
-
-      currentPlan: {
-        ...currentPlan,
-        billingPeriod: currentPlan.billingPeriod as {},
-      },
+      currentPlan,
       currentSubscription,
       billing,
     };

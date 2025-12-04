@@ -4,6 +4,7 @@ import { RiKey2Line } from "@remixicon/react";
 
 import type { Environment as EnvType } from "@/utils/environments";
 import { Link } from "@tanstack/react-router";
+import { pathCreator } from "@/utils/urls";
 
 export default function KeysMenu({
   activeEnv,
@@ -25,8 +26,7 @@ export default function KeysMenu({
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute left-0 z-50 ml-1 w-[137px] gap-y-0.5 rounded border">
-          {/* @ts-expect-error TANSTACK TODO: Route `/env/$env/manage/keys` not yet implemented - unsuppress after route is added */}
-          <Link to={`/env/${activeEnv.slug}/manage/keys`}>
+          <Link to={pathCreator.keys({ envSlug: activeEnv.slug })}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="eventKeys"
@@ -34,8 +34,8 @@ export default function KeysMenu({
               Event keys
             </Listbox.Option>
           </Link>
-          {/* @ts-expect-error TANSTACK TODO: Route `/env/$env/manage/signing-key` not yet implemented - unsuppress after route is added */}
-          <Link to={`/env/${activeEnv.slug}/manage/signing-key`}>
+
+          <Link to={pathCreator.signingKeys({ envSlug: activeEnv.slug })}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signingKeys"
