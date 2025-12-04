@@ -11,15 +11,11 @@ import {
   useStripe,
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import resolveConfig from "tailwindcss/resolveConfig";
+
 import { useMutation } from "urql";
 
 import { graphql } from "@/gql";
-import tailwindConfig from "../../../../tailwind.config";
-
-const {
-  theme: { textColor, placeholderColor },
-} = resolveConfig(tailwindConfig);
+import { placeholderColor, textColor } from "@/utils/tailwind";
 
 type CheckoutModalProps = {
   onCancel: () => void;

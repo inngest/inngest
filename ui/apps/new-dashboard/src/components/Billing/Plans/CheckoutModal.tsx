@@ -11,16 +11,16 @@ import {
   useStripe,
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import resolveConfig from "tailwindcss/resolveConfig";
 import { useMutation } from "urql";
 
 import { graphql } from "@/gql";
 import { type StripeSubscriptionItemsInput } from "@/gql/graphql";
-import tailwindConfig from "../../../../tailwind.config";
-
-const {
-  theme: { colors, textColor, backgroundColor, placeholderColor },
-} = resolveConfig(tailwindConfig);
+import {
+  backgroundColor,
+  colors,
+  textColor,
+  placeholderColor,
+} from "@/utils/tailwind";
 
 export type CheckoutItem = {
   /* Inngest plan slug */
@@ -69,7 +69,6 @@ export default function CheckoutModal({
             appearance: {
               variables: {
                 colorText: resolveColor(textColor.basis, isDark()),
-                // @ts-expect-error - TANSTACK TOD: fix this
                 colorPrimary: resolveColor(colors.primary.moderate, isDark()),
                 colorBackground: resolveColor(
                   backgroundColor.canvasBase,

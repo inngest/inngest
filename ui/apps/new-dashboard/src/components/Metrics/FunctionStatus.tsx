@@ -3,26 +3,12 @@ import { Info } from "@inngest/components/Info/Info";
 import { Link } from "@inngest/components/Link/NewLink";
 import { resolveColor } from "@inngest/components/utils/colors";
 import { isDark } from "@inngest/components/utils/theme";
-import resolveConfig from "tailwindcss/resolveConfig";
 
 import type {
   FunctionStatusMetricsQuery,
   ScopedMetricsResponse,
 } from "@/gql/graphql";
-import tailwindConfig from "../../../tailwind.config";
-
-const resolvedConfig = resolveConfig(tailwindConfig);
-const {
-  theme: { backgroundColor, colors, textColor },
-} = resolvedConfig;
-
-// Type assertion for extended colors that aren't in DefaultColors
-const extendedColors = colors as typeof colors & {
-  primary: { moderate: string };
-  secondary: { subtle: string };
-  tertiary: { subtle: string };
-  quaternary: { coolModerate: string };
-};
+import { backgroundColor, colors, textColor } from "@/utils/tailwind";
 
 export type MetricsData = {
   workspace: {
@@ -47,7 +33,7 @@ const mapMetrics = (totals: FunctionTotals) => {
       value: totals.completed || 0,
       name: "Completed",
       itemStyle: {
-        color: resolveColor(extendedColors.primary.moderate, dark, "#2c9b63"),
+        color: resolveColor(colors.primary.moderate, dark, "#2c9b63"),
       },
     },
     {
@@ -61,25 +47,21 @@ const mapMetrics = (totals: FunctionTotals) => {
       value: totals.failed || 0,
       name: "Failed",
       itemStyle: {
-        color: resolveColor(extendedColors.tertiary.subtle, dark, "#fa8d86"),
+        color: resolveColor(colors.tertiary.subtle, dark, "#fa8d86"),
       },
     },
     {
       value: totals.running,
       name: "Running",
       itemStyle: {
-        color: resolveColor(extendedColors.secondary.subtle, dark, "#52b2fd"),
+        color: resolveColor(colors.secondary.subtle, dark, "#52b2fd"),
       },
     },
     {
       value: totals.queued,
       name: "Queued",
       itemStyle: {
-        color: resolveColor(
-          extendedColors.quaternary.coolModerate,
-          dark,
-          "#8b74f9",
-        ),
+        color: resolveColor(colors.quaternary.coolModerate, dark, "#8b74f9"),
       },
     },
   ];

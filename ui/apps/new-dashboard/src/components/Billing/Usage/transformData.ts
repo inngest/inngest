@@ -1,14 +1,14 @@
 import { type ChartProps } from "@inngest/components/Chart/Chart";
 import { resolveColor } from "@inngest/components/utils/colors";
 import { isDark } from "@inngest/components/utils/theme";
-import resolveConfig from "tailwindcss/resolveConfig";
 
 import { type TimeSeries } from "@/gql/graphql";
-import tailwindConfig from "../../../../tailwind.config";
-
-const {
-  theme: { textColor, colors, borderColor, backgroundColor },
-} = resolveConfig(tailwindConfig);
+import {
+  textColor,
+  colors,
+  borderColor,
+  backgroundColor,
+} from "@/utils/tailwind";
 
 type ChartPoint = {
   time: Date;
@@ -179,7 +179,6 @@ export function createChartOptions(
         stack: "usage",
 
         itemStyle: {
-          // @ts-expect-error - TANSTACK TODO: fix this type
           color: resolveColor(colors.secondary.moderate, dark, "#2389F1"),
         },
         barWidth: "98%",
@@ -191,7 +190,6 @@ export function createChartOptions(
         type: "bar",
         stack: "usage",
         itemStyle: {
-          // @ts-expect-error - TANSTACK TODO: fix this type
           color: resolveColor(colors.accent.subtle, dark, "#EC9923"),
         },
         barWidth: "98%",

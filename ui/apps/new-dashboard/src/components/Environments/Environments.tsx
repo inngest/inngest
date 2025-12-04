@@ -149,7 +149,7 @@ export default function Environments() {
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
                 className="text-sm"
-                href="create-environment"
+                href="/create-environment"
                 kind="primary"
                 label="Create custom environment"
               />

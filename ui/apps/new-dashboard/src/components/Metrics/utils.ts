@@ -10,16 +10,15 @@ import {
   toDate,
 } from "@inngest/components/utils/date";
 import { isDark } from "@inngest/components/utils/theme";
-import resolveConfig from "tailwindcss/resolveConfig";
 
 import type { MetricsData, MetricsResponse, ScopedMetric } from "@/gql/graphql";
-import tailwindConfig from "../../../tailwind.config";
+import {
+  backgroundColor,
+  colors,
+  textColor,
+  borderColor,
+} from "@/utils/tailwind";
 import type { EntityLookup, EntityType } from "./Dashboard";
-
-const resolvedConfig = resolveConfig(tailwindConfig);
-const {
-  theme: { colors, backgroundColor, textColor, borderColor },
-} = resolvedConfig;
 
 // Type assertion for extended colors that aren't in DefaultColors
 const extendedColors = colors as typeof colors & {

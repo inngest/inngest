@@ -4,12 +4,11 @@ import { Info } from "@inngest/components/Info/Info";
 import { Link } from "@inngest/components/Link/NewLink";
 import { resolveColor } from "@inngest/components/utils/colors";
 import { isDark } from "@inngest/components/utils/theme";
-import resolveConfig from "tailwindcss/resolveConfig";
-
 import type { VolumeMetricsQuery } from "@/gql/graphql";
 import { pathCreator } from "@/utils/urls";
-import tailwindConfig from "../../../tailwind.config";
+import { borderColor } from "@/utils/tailwind";
 import type { EntityLookup } from "./Dashboard";
+
 import {
   getLineChartOptions,
   getXAxis,
@@ -18,9 +17,6 @@ import {
 } from "./utils";
 
 const zeroID = "00000000-0000-0000-0000-000000000000";
-const {
-  theme: { borderColor },
-} = resolveConfig(tailwindConfig);
 
 export const mapConcurrency = (
   { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery["workspace"],

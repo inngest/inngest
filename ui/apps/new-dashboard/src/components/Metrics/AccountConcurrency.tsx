@@ -4,11 +4,10 @@ import { Info } from "@inngest/components/Info/Info";
 import { Link } from "@inngest/components/Link/NewLink";
 import { resolveColor } from "@inngest/components/utils/colors";
 import { isDark } from "@inngest/components/utils/theme";
-import resolveConfig from "tailwindcss/resolveConfig";
 
 import type { MetricsResponse } from "@/gql/graphql";
 import { pathCreator } from "@/utils/urls";
-import tailwindConfig from "../../../tailwind.config";
+import { borderColor } from "@/utils/tailwind";
 import {
   getLineChartOptions,
   getXAxis,
@@ -71,9 +70,6 @@ export function AccountConcurrency({
     </div>
   );
 }
-const {
-  theme: { borderColor },
-} = resolveConfig(tailwindConfig);
 
 function createChartOption({
   limit,
