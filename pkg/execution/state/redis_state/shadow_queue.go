@@ -500,44 +500,41 @@ func (q *queue) processShadowPartitionBacklog(
 		return nil, false, fmt.Errorf("could not check constraints for backlogRefill: %w", err)
 	}
 
-	// If no items can be refilled, exit early
-	if len(constraintCheckRes.itemsToRefill) == 0 {
-		return &BacklogRefillResult{
-			Constraint:        constraintCheckRes.limitingConstraint,
-			Refilled:          0,
-			Refill:            len(items),
-			BacklogCountUntil: total,
-			TotalBacklogCount: 0, // Not fetched
-			Capacity:          0,
-			RefilledItems:     nil,
-			RetryAt:           constraintCheckRes.retryAfter,
-		}, false, nil
+	// In case the Constraint API determines no work can happen right now, we will report the limit
+	// and respect the retryAfter value
+	res := &BacklogRefillResult{
+		Constraint:        constraintCheckRes.limitingConstraint,
+		RetryAt:           constraintCheckRes.retryAfter,
+		BacklogCountUntil: total,
 	}
 
-	res, err := durationWithTags(
-		ctx,
-		q.primaryQueueShard.Name,
-		"backlog_process_duration",
-		q.clock.Now(),
-		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(
-				ctx,
-				backlog,
-				shadowPart,
-				refillUntil,
-				constraintCheckRes.itemsToRefill,
-				constraints,
-				WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
-				WithBacklogRefillDisableConstraintChecks(constraintCheckRes.skipConstraintChecks),
-				WithBacklogRefillItemCapacityLeaseIDs(constraintCheckRes.itemCapacityLeases),
-			)
-		},
-		map[string]any{
-			//	"partition_id": shadowPart.PartitionID,
-		},
-	)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+	// If no items can be refilled, exit early
+	if len(constraintCheckRes.itemsToRefill) > 0 {
+		res, err = durationWithTags(
+			ctx,
+			q.primaryQueueShard.Name,
+			"backlog_process_duration",
+			q.clock.Now(),
+			func(ctx context.Context) (*BacklogRefillResult, error) {
+				return q.BacklogRefill(
+					ctx,
+					backlog,
+					shadowPart,
+					refillUntil,
+					constraintCheckRes.itemsToRefill,
+					constraints,
+					WithBacklogRefillConstraintCheckIdempotencyKey(operationIdempotencyKey),
+					WithBacklogRefillDisableConstraintChecks(constraintCheckRes.skipConstraintChecks),
+					WithBacklogRefillItemCapacityLeaseIDs(constraintCheckRes.itemCapacityLeases),
+				)
+			},
+			map[string]any{
+				//	"partition_id": shadowPart.PartitionID,
+			},
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+		}
 	}
 
 	// Report limiting constraint
