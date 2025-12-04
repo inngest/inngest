@@ -53,7 +53,6 @@ function SupabaseStep() {
           setStepsCompleted(IntegrationSteps.ConnectDb);
         }}
         integration="supabase"
-        // @ts-expect-error - TANSTACK TODO: sort out type issue
         verifyAutoSetup={(input) => verifyAutoSetup({ data: { input } })}
         savedCredentials={credentials}
         handleLostCredentials={handleLostCredentials}

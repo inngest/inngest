@@ -1,14 +1,10 @@
 import { ArchivedEnvBanner } from "@/components/Environments/ArchivedEnvBanner";
 import { EnvironmentProvider } from "@/components/Environments/environment-context";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { SharedContextProvider } from "@/components/SharedContext/SharedContextProvider";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
-import { Route as OrgActiveRoute } from "@/routes/_authed";
-
-export const Route = createFileRoute("/_authed/env/$envSlug")({
-  component: EnvLayout,
-});
+import { getEnvironment } from "@/queries/server/getEnvironment";
 
 const NotFound = () => (
   <div className="mt-16 flex place-content-center">
@@ -16,10 +12,28 @@ const NotFound = () => (
   </div>
 );
 
-function EnvLayout() {
-  const { env } = OrgActiveRoute.useLoaderData();
+export const Route = createFileRoute("/_authed/env/$envSlug")({
+  component: EnvLayout,
+  notFoundComponent: NotFound,
+  loader: async ({ params }) => {
+    const env = await getEnvironment({
+      data: { environmentSlug: params.envSlug },
+    });
 
-  return env ? (
+    if (params.envSlug && !env) {
+      throw notFound({ data: { error: "Environment not found" } });
+    }
+
+    return {
+      env,
+    };
+  },
+});
+
+function EnvLayout() {
+  const { env } = Route.useLoaderData();
+
+  return (
     <>
       <ArchivedEnvBanner env={env} />
       <EnvironmentProvider env={env}>
@@ -28,7 +42,5 @@ function EnvLayout() {
         </SharedContextProvider>
       </EnvironmentProvider>
     </>
-  ) : (
-    <NotFound />
   );
 }

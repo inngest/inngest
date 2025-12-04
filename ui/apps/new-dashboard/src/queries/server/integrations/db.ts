@@ -171,23 +171,59 @@ export const verifyLogicalReplication = createServerFn({ method: "POST" })
     }
   });
 
+type AutoSetupSteps = {
+  logical_replication_enabled: { complete: boolean };
+  publication_created: { complete: boolean };
+  replication_slot_created: { complete: boolean };
+  roles_granted: { complete: boolean };
+  user_created: { complete: boolean };
+};
+
+const defaultSteps: AutoSetupSteps = {
+  logical_replication_enabled: { complete: false },
+  publication_created: { complete: false },
+  replication_slot_created: { complete: false },
+  roles_granted: { complete: false },
+  user_created: { complete: false },
+};
+
 export const verifyAutoSetup = createServerFn({ method: "POST" })
   .inputValidator((data: { input: CdcConnectionInput }) => data)
-  // @ts-expect-error - TANSTACK TODO: sort out type issue
-  .handler(async ({ data }) => {
-    try {
-      const response = await testAutoSetup(data.input);
-      const error = response.cdcAutoSetup.error;
-      if (error) {
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      | { success: false; error: string; steps: AutoSetupSteps }
+      | { success: true; error: null; steps: AutoSetupSteps }
+      | { success: false; error: null; steps: AutoSetupSteps }
+    > => {
+      try {
+        //
+        // Note some shenanigans below to work around our "unknown" types
+        // which create serialization issues with server functions
+        const response = await testAutoSetup(data.input);
+        const error = response.cdcAutoSetup.error;
+        const steps = (response.cdcAutoSetup.steps ||
+          defaultSteps) as unknown as AutoSetupSteps;
+        if (error) {
+          return {
+            success: false,
+            error: error,
+            steps,
+          };
+        }
+        return {
+          success: true,
+          error: null,
+          steps,
+        };
+      } catch (error) {
+        console.error("Error connecting:", error);
         return {
           success: false,
-          error: error,
-          steps: response.cdcAutoSetup.steps,
+          error: null,
+          steps: defaultSteps,
         };
       }
-      return { success: true, error: null, steps: response.cdcAutoSetup.steps };
-    } catch (error) {
-      console.error("Error connecting:", error);
-      return { success: false, error: null };
-    }
-  });
+    },
+  );

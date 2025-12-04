@@ -68,7 +68,6 @@ function NeonStep() {
           setStepsCompleted(IntegrationSteps.ConnectDb);
         }}
         integration="neon"
-        // @ts-expect-error - TANSTACK TODO: sort out type issue
         verifyAutoSetup={(input) => verifyAutoSetup({ data: { input } })}
         savedCredentials={credentials}
         handleLostCredentials={handleLostCredentials}

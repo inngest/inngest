@@ -2,7 +2,7 @@ import { Connect } from "@/components/Integrations/Vercel/Connect";
 import { createVercelIntegration } from "@/queries/server/integrations/vercel";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { Link } from "@inngest/components/Link/NewLink";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, type FileRouteTypes } from "@tanstack/react-router";
 
 export type VercelCallbackProps = {
   // OAuth 2.0 authorization code issued by Vercel’s authorization server. This code is valid for
@@ -60,9 +60,11 @@ async function VercelCallbackComponent() {
       <div className="text-muted mb-7 text-base">
         Select the Vercel projects that have Inngest functions. You can
         optionally specify server route other than the default{" "}
-        <span className="font-semibold">(`/api/inngest`)</span>. //
-        {/* @ts-expect-error - TANSTACK TODO: remove once this route lands */}
-        <Link size="medium" to={"/create-organization/set-up"}>
+        <span className="font-semibold">(`/api/inngest`)</span>.
+        <Link
+          size="medium"
+          to={"/create-organization/set-up" as FileRouteTypes["to"]}
+        >
           Learn more
         </Link>
       </div>

@@ -1,4 +1,4 @@
-import { Children, isValidElement, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Children, isValidElement, useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
