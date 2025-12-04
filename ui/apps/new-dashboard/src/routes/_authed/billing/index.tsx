@@ -8,6 +8,7 @@ import EntitlementListItem from "@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from "@/components/Billing/BillingDetails/BillingInformation";
 import PaymentMethod from "@/components/Billing/BillingDetails/PaymentMethod";
 import { isHobbyFreePlan } from "@/components/Billing/Plans/utils";
+import { ClientFeatureFlag } from "@/components/FeatureFlags/ClientFeatureFlag";
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -159,21 +160,22 @@ function BillingComponent() {
             addon={addons.userCount}
             onChange={refetch}
           />
-          {/*TANSTACK TODO: sort out launch darkly server feature flags*/}
-          <EntitlementListItem
-            increaseInHigherPlan={true}
-            planName={currentPlan.name}
-            title="Log retention"
-            description="View and search function run traces and metrics"
-            entitlement={{
-              currentValue: addons.advancedObservability.purchased,
-              displayValue: `${entitlements.history.limit} day${
-                entitlements.history.limit === 1 ? "" : "s"
-              }`,
-            }}
-            addon={advancedObservabilityAddon}
-            onChange={refetch}
-          />
+          <ClientFeatureFlag flag="advanced-observability" defaultValue={false}>
+            <EntitlementListItem
+              increaseInHigherPlan={true}
+              planName={currentPlan.name}
+              title="Log retention"
+              description="View and search function run traces and metrics"
+              entitlement={{
+                currentValue: addons.advancedObservability.purchased,
+                displayValue: `${entitlements.history.limit} day${
+                  entitlements.history.limit === 1 ? "" : "s"
+                }`,
+              }}
+              addon={advancedObservabilityAddon}
+              onChange={refetch}
+            />
+          </ClientFeatureFlag>
           <EntitlementListItem
             increaseInHigherPlan={true}
             planName={currentPlan.name}
@@ -208,35 +210,42 @@ function BillingComponent() {
             addon={advancedObservabilityAddon}
             onChange={refetch}
           />
-          <EntitlementListItem
-            increaseInHigherPlan={false}
-            planName={currentPlan.name}
-            title="Dedicated Slack Channel"
-            description="Dedicated Slack channel for support"
-            entitlement={{
-              currentValue: entitlements.slackChannel.enabled,
-              displayValue: entitlements.slackChannel.enabled
-                ? "Enabled"
-                : "Not enabled",
-            }}
-            addon={{
-              ...addons.slackChannel,
-              baseValue: 0,
-              purchased: addons.slackChannel.purchaseCount > 0,
-            }}
-            onChange={refetch}
-          />
-          <EntitlementListItem
-            planName={currentPlan.name}
-            title="Connect Workers"
-            description="Maximum number of connect workers"
-            entitlement={{
-              currentValue: entitlements.connectWorkerConnections.limit,
-              displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
-            }}
-            addon={addons.connectWorkers}
-            onChange={refetch}
-          />
+          <ClientFeatureFlag
+            flag="dedicated-slack-channel"
+            defaultValue={false}
+          >
+            <EntitlementListItem
+              increaseInHigherPlan={false}
+              planName={currentPlan.name}
+              title="Dedicated Slack Channel"
+              description="Dedicated Slack channel for support"
+              entitlement={{
+                currentValue: entitlements.slackChannel.enabled,
+                displayValue: entitlements.slackChannel.enabled
+                  ? "Enabled"
+                  : "Not enabled",
+              }}
+              addon={{
+                ...addons.slackChannel,
+                baseValue: 0,
+                purchased: addons.slackChannel.purchaseCount > 0,
+              }}
+              onChange={refetch}
+            />
+          </ClientFeatureFlag>
+          <ClientFeatureFlag flag="connect-workers" defaultValue={false}>
+            <EntitlementListItem
+              planName={currentPlan.name}
+              title="Connect Workers"
+              description="Maximum number of connect workers"
+              entitlement={{
+                currentValue: entitlements.connectWorkerConnections.limit,
+                displayValue: `${entitlements.connectWorkerConnections.limit} connections`,
+              }}
+              addon={addons.connectWorkers}
+              onChange={refetch}
+            />
+          </ClientFeatureFlag>
           <EntitlementListItem
             increaseInHigherPlan={false}
             planName={currentPlan.name}

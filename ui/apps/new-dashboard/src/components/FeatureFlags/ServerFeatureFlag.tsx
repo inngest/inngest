@@ -1,27 +1,7 @@
-import type { PropsWithChildren } from "react";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import * as Sentry from "@sentry/tanstackstart-react";
 
 import { getLaunchDarklyClient } from "./ServerLaunchDarkly";
-
-type Props = PropsWithChildren<{
-  defaultValue?: boolean;
-  flag: string;
-}>;
-
-// Conditionally renders children based on a feature flag.
-export async function ServerFeatureFlag({
-  children,
-  defaultValue = false,
-  flag,
-}: Props) {
-  const isEnabled = await getBooleanFlag(flag, { defaultValue });
-  if (isEnabled) {
-    return <>{children}</>;
-  }
-
-  return null;
-}
 
 export async function getBooleanFlag(
   flag: string,
@@ -33,8 +13,8 @@ export async function getBooleanFlag(
     throw new Error("ServerLaunchdarkly init failed: user is not logged in");
   }
 
-  const clerk = clerkClient();
-  const user = await clerkClient().users.getUser(userId);
+  const clerk = await clerkClient();
+  const user = await clerk.users.getUser(userId);
 
   if (!user) {
     throw new Error("ServerLaunchdarkly init failed: user is not logged in");

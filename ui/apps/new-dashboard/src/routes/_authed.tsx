@@ -8,16 +8,6 @@ import { getProfileDisplay } from "@/queries/server/profile";
 
 export const Route = createFileRoute("/_authed")({
   component: Authed,
-  head: () => ({
-    //
-    // TANSTACK TODO: third party scripts to initial
-    scripts: [
-      {
-        src: "",
-        type: "text/javascript",
-      },
-    ],
-  }),
   beforeLoad: async ({ location }) => {
     const isJWTAuth = await jwtAuth();
 
