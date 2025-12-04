@@ -15,7 +15,7 @@ import (
 
 // GetEventRuns returns function runs given an event ID.
 func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
-	if a.opts.RateLimited(r.Context(), w, "/v1/runs/{runID}") {
+	if a.opts.RateLimited(r, w, "/v1/runs/{runID}") {
 		return
 	}
 
