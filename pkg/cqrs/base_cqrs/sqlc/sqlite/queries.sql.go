@@ -575,8 +575,10 @@ WHERE run_id = ? AND account_id = ?
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
-AND
+  AND
   SUM(attributes->>'$."_inngest.step.attempt"' = CAST(?4 AS INTEGER)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
@@ -1048,6 +1050,8 @@ WHERE b.run_id = ?1 AND b.account_id = ?2
 GROUP BY dynamic_span_id
 HAVING
   SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+  AND
+  SUM(name IN ('executor.step', 'executor.execution')) > 0
 ORDER BY start_time DESC
 LIMIT 1
 `
@@ -1175,6 +1179,7 @@ SELECT
 FROM spans
 WHERE run_id = ? AND account_id = ? AND (parent_span_id IS NULL OR parent_span_id == '0000000000000000')
 GROUP BY dynamic_span_id
+HAVING SUM(name = 'executor.run') > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
@@ -1521,13 +1526,39 @@ WHERE span_id IN (
   SELECT
     parent_span_id
   FROM spans execSpans
-  WHERE execSpans.run_id = ? AND execSpans.account_id = ?
+  WHERE execSpans.run_id = ?1 AND execSpans.account_id = ?2
   GROUP BY dynamic_span_id
-  HAVING SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+  HAVING
+    SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+    AND
+    SUM(name = 'executor.execution') > 0
   ORDER BY start_time
   LIMIT 1
 )
 GROUP BY dynamic_span_id
+HAVING SUM(name = 'executor.step.discovery') > 0
+UNION ALL
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?1 AND account_id = ?2
+GROUP BY dynamic_span_id
+HAVING
+  SUM(attributes->>'$."_inngest.step.id"' = CAST(?3 AS TEXT)) > 0
+  AND
+  SUM(name = 'executor.step') > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
@@ -2460,7 +2491,8 @@ ON CONFLICT(id) DO UPDATE SET
     checksum = excluded.checksum,
     archived_at = NULL,
     "method" = excluded.method,
-    app_version = excluded.app_version
+    app_version = excluded.app_version,
+    url = excluded.url
 RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version
 `
 

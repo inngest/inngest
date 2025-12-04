@@ -272,6 +272,15 @@ func (c checkpointer) CheckpointAsyncSteps(ctx context.Context, input AsyncCheck
 		"env_id", input.EnvID,
 	)
 
+	t := time.Now()
+	err := c.checkpointAsyncSteps(ctx, input, l)
+	if d := time.Since(t); d > time.Second {
+		l.Warn("slow async checkpoint", "duration_ms", d.Milliseconds())
+	}
+	return err
+}
+
+func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheckpoint, l logger.Logger) error {
 	md, err := c.State.LoadMetadata(ctx, input.ID())
 	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, state.ErrMetadataNotFound) {
 		// Handle run not found with 404

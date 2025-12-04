@@ -270,8 +270,8 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		return fmt.Errorf("failed to create span: %w", err)
 	}
 
-	addTenantIDs := func(attrs *meta.SerializableAttrs) {
-		attrs.Merge(tenantAttrs)
+	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
+		cfg.Attrs = cfg.Attrs.Merge(tenantAttrs)
 	}
 
 	if a.opts.MetadataOpts.Flag.Enabled(ctx, auth.AccountID()) && a.opts.MetadataOpts.SpanExtractor != nil {

@@ -305,6 +305,8 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	input.TrackLatency(ctx)
+
 	err = a.checkpointer.CheckpointAsyncSteps(ctx, checkpoint.AsyncCheckpoint{
 		RunID:        input.RunID,
 		FnID:         input.FnID,

@@ -121,13 +121,12 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 	}
 
-	addTenantIDs := func(attr *meta.SerializableAttrs) {
-		meta.AddAttr(attr, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
-		meta.AddAttr(attr, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
-		meta.AddAttr(attr, meta.Attrs.FunctionID, &parentSpan.FunctionID)
-		meta.AddAttr(attr, meta.Attrs.RunID, &parentSpan.RunID)
-		meta.AddAttr(attr, meta.Attrs.AppID, &parentSpan.AppID)
-
+	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
+		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &parentSpan.FunctionID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &parentSpan.RunID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)
 	}
 
 	for _, md := range req.Metadata {

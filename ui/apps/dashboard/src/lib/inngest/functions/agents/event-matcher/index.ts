@@ -1,7 +1,8 @@
-import { createAgent, createTool, openai, type AnyZodType } from '@inngest/agent-kit';
+import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/agent-kit';
 import { z } from 'zod';
 
-import type { InsightsAgentState } from './types';
+import type { InsightsAgentState } from '../types';
+import systemPrompt from './system.md';
 
 const SelectEventsParams = z.object({
   events: z
@@ -61,22 +62,19 @@ export const eventMatcherAgent = createAgent<InsightsAgentState>({
   system: async ({ network }): Promise<string> => {
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
-    return [
-      'You are an event selection specialist.',
-      "Your job is to analyze the user's request and the list of available event names, then choose the 1-5 most relevant events.",
-      '',
-      'Instructions:',
-      '- Review the list of available events provided below.',
-      "- Based on the user's query, decide which 1-5 events are the best match.",
-      '- Call the `select_events` tool and pass your final choice in the `events` parameter.',
-      '- Do not guess event names; only use names from the provided list.',
-      '',
-      sample.length
-        ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
-        : 'No event list is available. Ask the user to clarify which events they are interested in.',
-    ].join('\n');
+
+    const eventsList = sample.length
+      ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
+      : 'No event list is available. Ask the user to clarify which events they are interested in.';
+
+    return `${systemPrompt}\n\n${eventsList}`;
   },
-  model: openai({ model: 'gpt-4.1-2025-04-14' }),
+  model: anthropic({
+    model: 'claude-haiku-4-5',
+    defaultParameters: {
+      max_tokens: 4096,
+    },
+  }),
   tools: [selectEventsTool],
   tool_choice: 'select_events',
 });
