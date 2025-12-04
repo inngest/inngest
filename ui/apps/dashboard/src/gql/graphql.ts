@@ -29,6 +29,9 @@ export type Scalars = {
   Runtime: unknown;
   SchemaSource: unknown;
   SearchObject: unknown;
+  SpanMetadataKind: string;
+  SpanMetadataScope: string;
+  SpanMetadataValues: Record<string, any>;
   Time: string;
   Timerange: unknown;
   ULID: string;
@@ -1944,6 +1947,7 @@ export type RunTraceSpan = {
   isPreview: Maybe<Scalars['Boolean']>;
   isRoot: Scalars['Boolean'];
   isUserland: Scalars['Boolean'];
+  metadata: Array<SpanMetadata>;
   name: Scalars['String'];
   outputID: Maybe<Scalars['String']>;
   parentSpan: Maybe<RunTraceSpan>;
@@ -2165,6 +2169,13 @@ export type SkippedFunctionRun = {
 export type SleepStepInfo = {
   __typename?: 'SleepStepInfo';
   sleepUntil: Scalars['Time'];
+};
+
+export type SpanMetadata = {
+  __typename?: 'SpanMetadata';
+  kind: Scalars['SpanMetadataKind'];
+  scope: Scalars['SpanMetadataScope'];
+  values: Scalars['SpanMetadataValues'];
 };
 
 export type StartWorkflowInput = {
