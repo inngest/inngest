@@ -870,7 +870,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			beforeAcquire: func(t *testing.T, deps *deps) {
 				// Set existing legacy state
 				tat := deps.clock.Now().Add(24 * time.Second).UnixNano()
-				err := deps.r.Set("{rl}key-hash", strconv.Itoa(int(tat)))
+				err := deps.r.Set("{rl}:key-hash", strconv.Itoa(int(tat)))
 				require.NoError(t, err)
 			},
 			afterPreAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
@@ -878,7 +878,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 				require.Equal(t, 2, resp.Usage[0].Used)
 
-				raw, err := deps.r.Get("{rl}key-hash")
+				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
@@ -886,14 +886,14 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
 			},
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
-				require.Equal(t, time.UnixMilli(0), resp.RetryAfter)
+				require.Equal(t, deps.clock.Now().Add(24*time.Second), resp.RetryAfter)
 
-				raw, err := deps.r.Get("{rl}key-hash")
+				raw, err := deps.r.Get("{rl}:key-hash")
 				require.NoError(t, err)
 				parsed, err := strconv.Atoi(raw)
 				require.NoError(t, err)
 				tat := time.Unix(0, int64(parsed))
-				require.WithinDuration(t, deps.clock.Now().Add(36*time.Second), tat, time.Second)
+				require.WithinDuration(t, deps.clock.Now().Add(24*time.Second), tat, time.Second)
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				require.Equal(t, 3, resp.Usage[0].Used)
