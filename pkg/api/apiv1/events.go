@@ -44,7 +44,7 @@ func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*
 }
 
 func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
-	if a.opts.RateLimited(w, "/v1/events") {
+	if a.opts.RateLimited(r.Context(), w, "/v1/events") {
 		return
 	}
 
@@ -120,7 +120,7 @@ func (a API) GetEvent(ctx context.Context, eventID ulid.ULID) (*cqrs.Event, erro
 
 // GetEvent is the HTTP implementation for retrieving events.
 func (a router) getEvent(w http.ResponseWriter, r *http.Request) {
-	if a.opts.RateLimited(w, "/v1/events/{eventID}") {
+	if a.opts.RateLimited(r.Context(), w, "/v1/events/{eventID}") {
 		return
 	}
 
@@ -154,7 +154,7 @@ func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.Funct
 }
 
 func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
-	if a.opts.RateLimited(w, "/v1/events/{eventID}/runs") {
+	if a.opts.RateLimited(r.Context(), w, "/v1/events/{eventID}/runs") {
 		return
 	}
 
