@@ -1,14 +1,423 @@
 package redis_state
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/jonboulle/clockwork"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestItemLeaseConstraintCheck(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	shard := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, "q:v1"),
+		Name:        consts.DefaultQueueShardName,
+	}
+	kg := shard.RedisClient.kg
+
+	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	ctx = logger.WithStdlib(ctx, l)
+
+	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+		constraintapi.WithLifecycles(cmLifecycles),
+		constraintapi.WithNumScavengerShards(1),
+		constraintapi.WithQueueShards(map[string]rueidis.Client{
+			consts.DefaultQueueShardName: rc,
+		}),
+		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithRateLimitClient(rc),
+		constraintapi.WithRateLimitKeyPrefix("rl"),
+	)
+	require.NoError(t, err)
+
+	reset := func() {
+		r.FlushAll()
+		r.SetTime(clock.Now())
+		cmLifecycles.reset()
+	}
+
+	accountID := uuid.New()
+	envID := uuid.New()
+	fnID := uuid.New()
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			Payload: json.RawMessage("{\"test\":\"payload\"}"),
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+			},
+		},
+	}
+
+	constraints := PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: PartitionConcurrency{
+			AccountConcurrency:  10,
+			FunctionConcurrency: 5,
+		},
+	}
+
+	start := clock.Now()
+
+	t.Run("waive checks for system queues", func(t *testing.T) {
+		reset()
+
+		qn := "example-system-queue"
+		item := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Payload:    json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{},
+				QueueName:  &qn,
+			},
+			QueueName: &qn,
+		}
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.leaseID)
+		require.True(t, res.skipConstraintChecks)
+
+		// Do not expect a call for the system queue
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when missing identifier", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.leaseID)
+		require.False(t, res.skipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing identifiers
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when capacity manager not configured", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.leaseID)
+		require.False(t, res.skipConstraintChecks)
+
+		// Do not expect a ConstraintAPI call for missing capacity manager
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("skip constraintapi but require checks when feature flag disabled", func(t *testing.T) {
+		reset()
+
+		item := osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Payload: json.RawMessage("{\"test\":\"payload\"}"),
+				Identifier: state.Identifier{
+					WorkflowID: fnID,
+				},
+			},
+		}
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return false, false // disable flag
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		// No lease acquired
+		require.Nil(t, res.leaseID)
+		require.False(t, res.skipConstraintChecks) // Require checks
+
+		// Do not expect a ConstraintAPI call for disabled feature flag
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("should not acquire lease with valid existing item lease", func(t *testing.T) {
+		reset()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate valid lease
+		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(10*time.Second)), rand.Reader)
+
+		qi.CapacityLeaseID = &capacityLeaseID
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		require.NotNil(t, res.leaseID)
+		require.True(t, res.skipConstraintChecks)
+
+		// This time, we do not expect a call to the Constraint API, simply use the valid lease
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("should acquire lease with expired existing item lease", func(t *testing.T) {
+		reset()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Simulate expired lease
+		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(-10*time.Second)), rand.Reader)
+
+		qi.CapacityLeaseID = &capacityLeaseID
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		require.NotNil(t, res.leaseID)
+		require.True(t, res.skipConstraintChecks)
+
+		// Expect call because lease expired
+		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+
+	t.Run("acquire lease from constraint api", func(t *testing.T) {
+		reset()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		require.NotNil(t, res.leaseID)
+		require.True(t, res.skipConstraintChecks)
+
+		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+	})
+}
 
 func TestConstraintConfigFromConstraints(t *testing.T) {
 	tests := []struct {
