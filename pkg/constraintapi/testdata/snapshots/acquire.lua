@@ -68,12 +68,17 @@ local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_t
 end
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	if limit == 0 then
-		return { 0, now_ns + period_ns }
+		return { 0, now_ns + period_ns, 0 }
 	end
 	local emission_interval = period_ns / limit
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
 	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+	local used_tokens = 0
+	if tat > now_ns then
+		local consumed_time = tat - now_ns
+		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
+	end
 	local increment = 1 * emission_interval
 	local new_tat
 	if now_ns > tat then
@@ -84,15 +89,17 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local allow_at = new_tat - delay_variation_tolerance
 	local diff = now_ns - allow_at
 	if diff < 0 then
-		return { 0, allow_at }
+		return { 0, allow_at, used_tokens }
 	else
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-		return { remaining, 0 }
+		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
+		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
 local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
@@ -129,12 +136,9 @@ local function throttleCapacity(key, now_ms, period_ms, limit, burst)
 	local time_capacity_remain = now_ms + total_capacity_time - tat
 	local capacity = math.floor(time_capacity_remain / emission)
 	local final_capacity = math.min(capacity, limit + burst)
-	if final_capacity < 1 then
-		local next_available_at_ms = tat - total_capacity_time + emission
-		return { final_capacity, math.ceil(next_available_at_ms) }
-	else
-		return { final_capacity, 0 }
-	end
+	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
+	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
+	return { final_capacity, next_available_at_ms }
 end
 local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	local emission = period_ms / math.max(limit, 1)
@@ -144,7 +148,12 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	else
 		tat = tonumber(tat)
 	end
-	local new_tat = tat + (math.max(capacity, 1) * emission)
+	local new_tat
+	if now_ms > tat then
+		new_tat = now_ms + (math.max(capacity, 1) * emission)
+	else
+		new_tat = tat + (math.max(capacity, 1) * emission)
+	end
 	if capacity > 0 then
 		local expiry = string.format("%d", period_ms / 1000)
 		if expiry == "0" then
@@ -203,7 +212,9 @@ for index, value in ipairs(constraints) do
 			"cc",
 			tostring(constraintCapacity),
 			"ac",
-			tostring(availableCapacity)
+			tostring(availableCapacity),
+			"ra",
+			tostring(constraintRetryAfter)
 		)
 		availableCapacity = constraintCapacity
 		table.insert(limitingConstraints, index)
@@ -280,6 +291,7 @@ result["r"] = requested
 result["g"] = granted
 result["l"] = grantedLeases
 result["lc"] = limitingConstraints
+result["ra"] = retryAt 
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
 local encoded = cjson.encode(result)

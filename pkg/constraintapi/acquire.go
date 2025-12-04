@@ -238,6 +238,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	}
 
 	retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
+	if retryAfter.Before(now) {
+		retryAfter = time.Time{}
+	}
 
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {

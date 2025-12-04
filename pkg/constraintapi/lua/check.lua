@@ -245,7 +245,7 @@ for index, value in ipairs(constraints) do
 		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
 		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
-		constraintRetryAfter = rlRes[2] / 1000000 -- convert from ns to ms
+		constraintRetryAfter = toInteger(rlRes[2] / 1000000) -- convert from ns to ms
 
 		local usage = {}
 		usage["l"] = value.r.l
@@ -280,7 +280,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = throttleRes[2] -- already in ms
+		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
 
 		local usage = {}
 		usage["l"] = value.t.l
