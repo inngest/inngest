@@ -407,9 +407,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		err = iter.process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, len(cmLifecycles.acquireCalls), 0)
-		require.Equal(t, len(cmLifecycles.extendCalls), 0)
-		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
 	})
 
 	t.Run("with constraint api and no active lease", func(t *testing.T) {
@@ -428,6 +428,15 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			// make lease extensions more frequent
 			WithCapacityLeaseExtendInterval(time.Second),
 			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  10,
+						FunctionConcurrency: 5,
+					},
+				}
+			}),
 		)
 
 		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
@@ -448,9 +457,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		err = iter.process(ctx, &qi)
 		require.NoError(t, err)
 
-		require.Equal(t, len(cmLifecycles.acquireCalls), 1)
-		require.Equal(t, len(cmLifecycles.extendCalls), 0)
-		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
 	})
 
 	t.Run("with constraint api and active capacity lease", func(t *testing.T) {
@@ -543,9 +552,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		require.NoError(t, err)
 
 		// No further Constraint API calls should be made
-		require.Equal(t, len(cmLifecycles.acquireCalls), 0)
-		require.Equal(t, len(cmLifecycles.extendCalls), 0)
-		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+		require.Equal(t, 0, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
 
 		// Expect item to be sent to worker with capacity lease + request to disable constraint updates
 		item := <-q.workers
