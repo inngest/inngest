@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -27,13 +28,10 @@ type Opts struct {
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
 	CachingMiddleware CachingMiddleware[[]byte]
-	// RateLimitingMiddleware runs after caching middleware, allowing cached responses
-	// to be resolved without rate limit impacts.
-	RateLimitingMiddleware func(http.Handler) http.Handler
 	// RateLimiter is called within an API endpoint with a route to determine whether
 	// the route is rate limited.  If so, this should write a rate limit response
 	// via publicerr.
-	RateLimited func(w http.ResponseWriter, route string) bool
+	RateLimited func(ctx context.Context, w http.ResponseWriter, route string) bool
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 
@@ -77,7 +75,7 @@ type Opts struct {
 	MetadataOpts MetadataOpts
 }
 
-func noopRateChecker(w http.ResponseWriter, route string) bool {
+func noopRateChecker(ctx context.Context, w http.ResponseWriter, route string) bool {
 	return false
 }
 
@@ -141,10 +139,6 @@ func (a *router) setup() {
 
 			if a.opts.MetricsMiddleware != nil {
 				r.Use(a.opts.MetricsMiddleware.Middleware)
-			}
-
-			if a.opts.RateLimitingMiddleware != nil {
-				r.Use(a.opts.RateLimitingMiddleware)
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
