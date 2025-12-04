@@ -105,11 +105,11 @@ end
 ---@param period_ns integer
 ---@param limit integer
 ---@param burst integer
----@return integer[] returns a 2-tuple of remaining capacity and retry at
+---@return integer[] returns a 3-tuple of remaining capacity, retry at, and current usage
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	-- Handle zero limit case - immediately rate limit
 	if limit == 0 then
-		return { 0, now_ns + period_ns }
+		return { 0, now_ns + period_ns, 0 }
 	end
 
 	-- Match throttled library calculations exactly
@@ -123,6 +123,13 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 
 	-- retrieve and normalize theoretical arrival time
 	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+
+	-- Calculate current usage (consumed tokens) independently of burst capacity
+	local used_tokens = 0
+	if tat > now_ns then
+		local consumed_time = tat - now_ns
+		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
+	end
 
 	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
 	local increment = 1 * emission_interval
@@ -141,7 +148,7 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	if diff < 0 then
 		-- We are rate limited - calculate retry time
 		-- RetryAfter = -diff (when diff is negative)
-		return { 0, allow_at }
+		return { 0, allow_at, used_tokens }
 	else
 		-- Not rate limited - calculate remaining capacity
 		-- Use current TAT instead of new_tat since we haven't consumed the token yet
@@ -157,7 +164,7 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
 		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
 
-		return { remaining, toInteger(next_available_at_ns) }
+		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
 
@@ -242,7 +249,7 @@ for index, value in ipairs(constraints) do
 
 		local usage = {}
 		usage["l"] = value.r.l
-		usage["u"] = math.max(math.min(value.r.l - constraintCapacity, value.r.l), 0)
+		usage["u"] = rlRes[3] -- use the calculated usage from rateLimitCapacity
 		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		-- concurrency
