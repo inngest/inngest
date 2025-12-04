@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 
-import { inngest } from '../inngest/client';
+import { inngest } from '@/lib/inngest/client';
 
 // Zod schema for UserMessage
 const userMessageSchema = z.object({
