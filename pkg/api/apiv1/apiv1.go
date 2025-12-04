@@ -77,8 +77,16 @@ type Opts struct {
 	MetadataOpts MetadataOpts
 }
 
+func noopRateChecker(w http.ResponseWriter, route string) bool {
+	return false
+}
+
 // AddRoutes adds a new API handler to the given router.
 func AddRoutes(r chi.Router, o Opts) http.Handler {
+	if o.RateLimited == nil {
+		o.RateLimited = noopRateChecker
+	}
+
 	if o.AuthFinder == nil {
 		o.AuthFinder = apiv1auth.NilAuthFinder
 	}
