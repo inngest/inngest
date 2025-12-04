@@ -681,11 +681,12 @@ func (q *queue) BacklogRefill(
 	nowMS := q.clock.Now().UnixMilli()
 
 	var (
-		throttleKey                                  string
+		keyThrottleState                             string
 		throttleLimit, throttleBurst, throttlePeriod int
 	)
 	if latestConstraints.Throttle != nil && b.Throttle != nil {
-		throttleKey = b.Throttle.ThrottleKey
+		// NOTE: The Throttle state key must be generated to match the Redis key used in the Lease and Constraint API implementation
+		keyThrottleState = kg.ThrottleKey(&osqueue.Throttle{Key: b.Throttle.ThrottleKey})
 		throttleLimit = latestConstraints.Throttle.Limit
 		throttleBurst = latestConstraints.Throttle.Burst
 		throttlePeriod = latestConstraints.Throttle.Period
@@ -767,7 +768,7 @@ func (q *queue) BacklogRefill(
 		latestConstraints.CustomConcurrencyLimit(1),
 		latestConstraints.CustomConcurrencyLimit(2),
 
-		throttleKey,
+		keyThrottleState,
 		throttleLimit,
 		throttleBurst,
 		throttlePeriod,
