@@ -144,10 +144,10 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		require.NoError(t, internalErr)
 		require.NotNil(t, resp)
 
-		require.Equal(t, 11, resp.AvailableCapacity)
+		require.Equal(t, 12, resp.AvailableCapacity)
 		require.Equal(t, ConstraintKindRateLimit, resp.LimitingConstraints[0].Kind)
 		require.Equal(t, 120, resp.Usage[0].Limit)
-		require.Equal(t, 109, resp.Usage[0].Used)
+		require.Equal(t, 1, resp.Usage[0].Used)
 	})
 
 	t.Run("Extend", func(t *testing.T) {

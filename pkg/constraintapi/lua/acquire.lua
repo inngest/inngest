@@ -123,7 +123,6 @@ end
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	-- Handle zero limit case - immediately rate limit
 	if limit == 0 then
-		debug("limit 0")
 		return { 0, now_ns + period_ns, 0 }
 	end
 

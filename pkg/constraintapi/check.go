@@ -182,10 +182,15 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	case 1:
 		l.Trace("successful check request")
 
+		retryAfter := time.UnixMilli(int64(parsedResponse.RetryAt))
+		if retryAfter.Before(now) {
+			retryAfter = time.Time{}
+		}
+
 		return &CapacityCheckResponse{
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
-			RetryAfter:          time.UnixMilli(int64(parsedResponse.RetryAt)),
+			RetryAfter:          retryAfter,
 			AvailableCapacity:   parsedResponse.AvailableCapacity,
 			Usage:               constraintUsage,
 			internalDebugState:  parsedResponse,
