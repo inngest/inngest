@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,7 +30,7 @@ type Opts struct {
 	// RateLimiter is called within an API endpoint with a route to determine whether
 	// the route is rate limited.  If so, this should write a rate limit response
 	// via publicerr.
-	RateLimited func(ctx context.Context, w http.ResponseWriter, route string) bool
+	RateLimited func(r *http.Request, w http.ResponseWriter, route string) bool
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 
@@ -75,7 +74,7 @@ type Opts struct {
 	MetadataOpts MetadataOpts
 }
 
-func noopRateChecker(ctx context.Context, w http.ResponseWriter, route string) bool {
+func noopRateChecker(r *http.Request, w http.ResponseWriter, route string) bool {
 	return false
 }
 
