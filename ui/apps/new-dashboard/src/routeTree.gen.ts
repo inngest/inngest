@@ -22,6 +22,7 @@ import { Route as AuthedSettingsRouteRouteImport } from "./routes/_authed/settin
 import { Route as AuthedIntentRouteRouteImport } from "./routes/_authed/intent/route";
 import { Route as AuthedBillingRouteRouteImport } from "./routes/_authed/billing/route";
 import { Route as SupportImpersonationIndexRouteImport } from "./routes/support/impersonation/index";
+import { Route as AuthedEnvIndexRouteImport } from "./routes/_authed/env/index";
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from "./routes/_authed/create-environment/index";
 import { Route as AuthedBillingIndexRouteImport } from "./routes/_authed/billing/index";
 import { Route as ApiRealtimeTokenRouteImport } from "./routes/api/realtime/token";
@@ -157,6 +158,11 @@ const SupportImpersonationIndexRoute =
     path: "/support/impersonation/",
     getParentRoute: () => rootRouteImport,
   } as any);
+const AuthedEnvIndexRoute = AuthedEnvIndexRouteImport.update({
+  id: "/env/",
+  path: "/env/",
+  getParentRoute: () => AuthedRoute,
+} as any);
 const AuthedCreateEnvironmentIndexRoute =
   AuthedCreateEnvironmentIndexRouteImport.update({
     id: "/create-environment/",
@@ -583,6 +589,7 @@ export interface FileRoutesByFullPath {
   "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/billing/": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
+  "/env": typeof AuthedEnvIndexRoute;
   "/support/impersonation": typeof SupportImpersonationIndexRoute;
   "/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
@@ -665,6 +672,7 @@ export interface FileRoutesByTo {
   "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/billing": typeof AuthedBillingIndexRoute;
   "/create-environment": typeof AuthedCreateEnvironmentIndexRoute;
+  "/env": typeof AuthedEnvIndexRoute;
   "/support/impersonation": typeof SupportImpersonationIndexRoute;
   "/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
   "/env/$envSlug/onboarding": typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren;
@@ -740,6 +748,7 @@ export interface FileRoutesById {
   "/api/realtime/token": typeof ApiRealtimeTokenRoute;
   "/_authed/billing/": typeof AuthedBillingIndexRoute;
   "/_authed/create-environment/": typeof AuthedCreateEnvironmentIndexRoute;
+  "/_authed/env/": typeof AuthedEnvIndexRoute;
   "/support/impersonation/": typeof SupportImpersonationIndexRoute;
   "/_authed/env/$envSlug/apps": typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren;
   "/_authed/env/$envSlug/manage": typeof AuthedEnvEnvSlugManageRouteRouteWithChildren;
@@ -825,6 +834,7 @@ export interface FileRouteTypes {
     | "/api/realtime/token"
     | "/billing/"
     | "/create-environment"
+    | "/env"
     | "/support/impersonation"
     | "/env/$envSlug/apps"
     | "/env/$envSlug/manage"
@@ -907,6 +917,7 @@ export interface FileRouteTypes {
     | "/api/realtime/token"
     | "/billing"
     | "/create-environment"
+    | "/env"
     | "/support/impersonation"
     | "/env/$envSlug/manage"
     | "/env/$envSlug/onboarding"
@@ -981,6 +992,7 @@ export interface FileRouteTypes {
     | "/api/realtime/token"
     | "/_authed/billing/"
     | "/_authed/create-environment/"
+    | "/_authed/env/"
     | "/support/impersonation/"
     | "/_authed/env/$envSlug/apps"
     | "/_authed/env/$envSlug/manage"
@@ -1155,6 +1167,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/support/impersonation";
       preLoaderRoute: typeof SupportImpersonationIndexRouteImport;
       parentRoute: typeof rootRouteImport;
+    };
+    "/_authed/env/": {
+      id: "/_authed/env/";
+      path: "/env";
+      fullPath: "/env";
+      preLoaderRoute: typeof AuthedEnvIndexRouteImport;
+      parentRoute: typeof AuthedRoute;
     };
     "/_authed/create-environment/": {
       id: "/_authed/create-environment/";
@@ -1995,6 +2014,7 @@ interface AuthedRouteChildren {
   AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren;
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren;
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute;
+  AuthedEnvIndexRoute: typeof AuthedEnvIndexRoute;
   AuthedIntegrationsVercelCallbackIndexRoute: typeof AuthedIntegrationsVercelCallbackIndexRoute;
   AuthedIntegrationsVercelCallbackSuccessIndexRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute;
 }
@@ -2005,6 +2025,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
+  AuthedEnvIndexRoute: AuthedEnvIndexRoute,
   AuthedIntegrationsVercelCallbackIndexRoute:
     AuthedIntegrationsVercelCallbackIndexRoute,
   AuthedIntegrationsVercelCallbackSuccessIndexRoute:

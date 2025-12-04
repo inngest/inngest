@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { Listbox } from "@headlessui/react";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import {
@@ -220,24 +220,22 @@ export default function EnvironmentSelectMenu({
                   />
                 ))
               ) : (
-                <div
-                  onClick={() => navigate({ to: "/env" as any })}
-                  className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
-                >
-                  <RiLoopLeftLine className="h-3 w-3" />
-                  Sync a branch
-                </div>
+                <Link to="/env">
+                  <div className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal">
+                    <RiLoopLeftLine className="h-3 w-3" />
+                    Sync a branch
+                  </div>
+                </Link>
               )}
             </div>
 
             <div>
-              <div
-                onClick={() => navigate({ to: "/env" as any })}
-                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
-              >
-                <RiCloudFill className="h-3 w-3" />
-                View All Environments
-              </div>
+              <Link to="/env">
+                <div className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal">
+                  <RiCloudFill className="h-3 w-3" />
+                  View All Environments
+                </div>
+              </Link>
             </div>
           </Listbox.Options>
         </div>

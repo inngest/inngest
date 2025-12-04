@@ -40,7 +40,6 @@ export const CreateEnvironment = () => {
       return;
     }
     toast.success(`Created new environment`);
-    // @ts-expect-error - TANSTACK TODO: remove this when this route lands
     navigate({ to: "/env" });
   };
 

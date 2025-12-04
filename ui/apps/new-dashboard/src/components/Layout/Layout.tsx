@@ -1,8 +1,9 @@
-import { type ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { type ProfileDisplayType } from "@/queries/server/profile";
 import type { Environment } from "@/utils/environments";
 import SideBar from "./SideBar";
+import IncidentBanner from "../Incident/IncidentBanner";
 
 type LayoutProps = {
   collapsed: boolean | undefined;
@@ -25,7 +26,12 @@ export default function Layout({
       <SideBar activeEnv={activeEnv} collapsed={collapsed} profile={profile} />
 
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
-        {/* TANSTACK TODO: add incident banner, billing banner, and execution overage banner here */}
+        <IncidentBanner />
+
+        {/* disabled by Dan 11/22/2025 for performance reasons */}
+        <Suspense>{/* <BillingBanner /> */}</Suspense>
+        <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
+
         {children}
       </div>
     </div>
