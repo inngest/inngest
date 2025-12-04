@@ -1,6 +1,9 @@
 import { CancelFunctionModal } from "@/components/Functions/CancelFunction/CancelFunctionModal";
 import { PauseFunctionModal } from "@/components/Functions/PauseFunction/PauseModal";
-import { InvokeFunctionDocument, FunctionTriggerTypes } from "@/gql/graphql";
+import {
+  InvokeFunctionOnboardingDocument,
+  FunctionTriggerTypes,
+} from "@/gql/graphql";
 import { useEnvironment } from "@/components/Environments/environment-context";
 import { useFunction } from "@/queries/functions";
 import { Header } from "@inngest/components/Header/NewHeader";
@@ -29,7 +32,7 @@ function FunctionComponent() {
 
   const functionSlug = decodeURIComponent(slug);
   const [{ data, error, fetching }] = useFunction({ functionSlug });
-  const [, invokeFunction] = useMutation(InvokeFunctionDocument);
+  const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag("bulk-cancellation-ui");

@@ -1,8 +1,8 @@
 import { graphql } from "@/gql";
 import {
   type GetVercelAppsQuery,
-  type InvokeFunctionMutation,
-  type InvokeFunctionMutationVariables,
+  type InvokeFunctionOnboardingMutation,
+  type InvokeFunctionOnboardingMutationVariables,
   type SyncResponse,
 } from "@/gql/graphql";
 import { graphqlAPI } from "@/queries/graphqlAPI";
@@ -46,18 +46,20 @@ export const invokeFn = async ({
   functionSlug,
   user,
   data,
-}: Pick<InvokeFunctionMutationVariables, "data" | "functionSlug" | "user">) => {
+}: Pick<
+  InvokeFunctionOnboardingMutationVariables,
+  "data" | "functionSlug" | "user"
+>) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ invokeFunction: InvokeFunctionMutation }>(
-    InvokeFunctionOnboardingDocument,
-    {
-      envID: environment.id,
-      functionSlug: functionSlug,
-      user: user,
-      data: data,
-    },
-  );
+  return await graphqlAPI.request<{
+    invokeFunction: InvokeFunctionOnboardingMutation;
+  }>(InvokeFunctionOnboardingDocument, {
+    envID: environment.id,
+    functionSlug: functionSlug,
+    user: user,
+    data: data,
+  });
 };
 
 export const InvokeFunctionLookupDocument = graphql(`

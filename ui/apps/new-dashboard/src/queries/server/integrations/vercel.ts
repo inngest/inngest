@@ -1,6 +1,5 @@
 import { getVercelApps, syncNewApp } from "@/components/Onboarding/data";
 import {
-  GetSavedVercelProjectsDocument,
   CreateVercelAppDocument,
   UpdateVercelAppDocument,
   RemoveVercelAppDocument,
@@ -16,6 +15,25 @@ import { graphql } from "@/gql";
 
 import { ClientError } from "graphql-request";
 import type { VercelIntegration as GraphQLVercelIntegration } from "@/gql/graphql";
+
+export const GetSavedVercelProjectsDocument = graphql(`
+  query GetSavedVercelProjects($environmentID: ID!) {
+    account {
+      marketplace
+    }
+
+    environment: workspace(id: $environmentID) {
+      savedVercelProjects: vercelApps {
+        id
+        originOverride
+        projectID
+        protectionBypassSecret
+        path
+        workspaceID
+      }
+    }
+  }
+`);
 
 export enum VercelDeploymentProtection {
   Disabled = "",
