@@ -718,6 +718,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
 		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
+		capacityLeaseExtendInterval:   QueueLeaseDuration / 2,
 	}
 
 	// default to using primary queue client for shard selection
@@ -761,6 +762,12 @@ func WithCapacityManager(capacityManager constraintapi.RolloutManager) QueueOpt 
 func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) QueueOpt {
 	return func(q *queue) {
 		q.useConstraintAPI = uca
+	}
+}
+
+func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.capacityLeaseExtendInterval = interval
 	}
 }
 
@@ -919,8 +926,9 @@ type queue struct {
 
 	enableJobPromotion bool
 
-	capacityManager  constraintapi.RolloutManager
-	useConstraintAPI constraintapi.UseConstraintAPIFn
+	capacityManager             constraintapi.RolloutManager
+	useConstraintAPI            constraintapi.UseConstraintAPIFn
+	capacityLeaseExtendInterval time.Duration
 }
 
 type QueueRunMode struct {
@@ -1009,6 +1017,36 @@ type processItem struct {
 	//
 	// NOTE: This value is set in itemLeaseConstraintCheck.
 	disableConstraintUpdates bool
+}
+
+type capacityLease struct {
+	currentCapacityLeaseID *ulid.ULID
+	capacityLeaseLock      sync.Mutex
+}
+
+func newCapacityLease(initialLeaseID *ulid.ULID) *capacityLease {
+	return &capacityLease{
+		currentCapacityLeaseID: initialLeaseID,
+		capacityLeaseLock:      sync.Mutex{},
+	}
+}
+
+func (p *capacityLease) set(leaseID *ulid.ULID) {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	p.currentCapacityLeaseID = leaseID
+}
+
+func (p *capacityLease) get() *ulid.ULID {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	return p.currentCapacityLeaseID
+}
+
+func (p *capacityLease) has() bool {
+	p.capacityLeaseLock.Lock()
+	defer p.capacityLeaseLock.Unlock()
+	return p.currentCapacityLeaseID != nil
 }
 
 // FnMetadata is stored within the queue for retrieving
