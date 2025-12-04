@@ -204,10 +204,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	l.Trace(
 		"prepared acquire call",
-		"req", req,
-		"state", requestState,
-		"keys", keys,
-		"args", args,
 	)
 
 	rawRes, err := scripts["acquire"].Exec(ctx, client, keys, args).AsBytes()
@@ -282,7 +278,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}, nil
 
 	case 2:
-		l.Trace("acquire call lacking capacity", "status", parsedResponse.Status)
+		l.Trace("acquire call lacking capacity", "status", parsedResponse.Status, "limiting", limitingConstraints)
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
