@@ -752,3 +752,12 @@ func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrExtendedTraceSpansTotal(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "extended_trace_spans_total",
+		Description: "Total number of extended trace spans",
+		Tags:        opts.Tags,
+	})
+}
