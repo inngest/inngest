@@ -2913,7 +2913,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
 	}
 
-	now := e.Now()
+	now := e.now()
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
 
 	nextItem := queue.Item{
