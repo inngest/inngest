@@ -7,6 +7,15 @@ import { createChannel } from '../realtime';
 import { createInsightsNetwork } from './agents/network';
 import type { InsightsAgentState } from './agents/types';
 
+type PublishOpts = {
+  topics: string[];
+  channel: string;
+  runId: string;
+};
+const publishApi = async ({ topics, channel, runId }: PublishOpts, data: any) => {
+  return await inngest['inngestApi'].publish({ topics, channel, runId }, data);
+};
+
 export const runAgentNetwork = inngest.createFunction(
   {
     id: 'run-insights-agent',
@@ -17,6 +26,7 @@ export const runAgentNetwork = inngest.createFunction(
     event,
     publish,
     step,
+    runId,
   }: GetFunctionInput<typeof inngest, 'insights-agent/chat.requested'>) => {
     const { threadId: providedThreadId, userMessage, userId, channelKey, history } = event.data;
 
@@ -26,14 +36,15 @@ export const runAgentNetwork = inngest.createFunction(
     }
 
     // Generate a threadId
-    const threadId = await step.run('generate-thread-id', async () => {
-      return providedThreadId || uuidv4();
-    });
+    let threadId = providedThreadId;
+    if (!threadId) {
+      threadId = await step.run('generate-thread-id', async () => {
+        return uuidv4();
+      });
+    }
 
     // Determine the target channel for publishing (channelKey takes priority)
-    const targetChannel = await step.run('generate-target-channel', async () => {
-      return channelKey || userId;
-    });
+    const targetChannel = channelKey || userId;
 
     try {
       const clientState = userMessage.state || {};
@@ -55,7 +66,12 @@ export const runAgentNetwork = inngest.createFunction(
       await network.run(userMessage, {
         streaming: {
           publish: async (chunk: AgentMessageChunk) => {
-            await publish(createChannel(targetChannel).agent_stream(chunk));
+            await publishApi(
+              { topics: ['agent_stream'], channel: `user:${targetChannel}`, runId },
+              chunk
+            );
+            // Bring this back when we expose publish right on the Inngest client to use these types
+            // await publish(createChannel(targetChannel).agent_stream(chunk));
           },
         },
       });
@@ -83,7 +99,12 @@ export const runAgentNetwork = inngest.createFunction(
       };
       try {
         // Use the same target channel as the main flow
-        await publish(createChannel(targetChannel).agent_stream(errorChunk));
+        await publishApi(
+          { topics: ['agent_stream'], channel: `user:${targetChannel}`, runId },
+          errorChunk
+        );
+        // Bring this back when we expose publish right on the Inngest client to use these types
+        // await publish(createChannel(targetChannel).agent_stream(errorChunk));
       } catch {}
 
       throw error;
