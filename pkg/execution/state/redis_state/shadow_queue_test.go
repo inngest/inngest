@@ -1861,7 +1861,7 @@ func TestRefillConstraints(t *testing.T) {
 				runGCRAScript(
 					t,
 					rc,
-					testThrottle.Key,
+					kg.ThrottleKey(&osqueue.Throttle{Key: testThrottle.Key}),
 					at,
 					time.Duration(testThrottle.Period)*time.Second,
 					testThrottle.Limit,
