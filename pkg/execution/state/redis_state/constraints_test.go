@@ -417,6 +417,58 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.Equal(t, 0, len(cmLifecycles.extendCalls))
 		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
 	})
+
+	t.Run("lacking constraint capacity", func(t *testing.T) {
+		reset()
+
+		for i := range 10 {
+			_, err := r.ZAdd(
+				kg.Concurrency("account", accountID.String()),
+				float64(clock.Now().Add(5*time.Second).UnixMilli()),
+				fmt.Sprintf("i%d", i),
+			)
+			require.NoError(t, err)
+		}
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return constraints
+			}),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		sp := q.ItemShadowPartition(ctx, qi)
+		backlog := q.ItemBacklog(ctx, qi)
+
+		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
+		require.NoError(t, err)
+
+		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.limitingConstraint)
+		require.Nil(t, res.leaseID)
+		require.False(t, res.skipConstraintChecks)
+
+		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
+		require.Equal(t, 0, len(cmLifecycles.extendCalls))
+		require.Equal(t, 0, len(cmLifecycles.releaseCalls))
+
+		require.Len(t, cmLifecycles.acquireCalls[0].GrantedLeases, 0)
+		require.Len(t, cmLifecycles.acquireCalls[0].LimitingConstraints, 1)
+		require.Equal(t, constraintapi.ConstraintKindConcurrency, cmLifecycles.acquireCalls[0].LimitingConstraints[0].Kind)
+	})
 }
 
 func TestConstraintConfigFromConstraints(t *testing.T) {
