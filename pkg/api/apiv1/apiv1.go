@@ -30,8 +30,13 @@ type Opts struct {
 	// RateLimitingMiddleware runs after caching middleware, allowing cached responses
 	// to be resolved without rate limit impacts.
 	RateLimitingMiddleware func(http.Handler) http.Handler
+	// RateLimiter is called within an API endpoint with a route to determine whether
+	// the route is rate limited.  If so, this should write a rate limit response
+	// via publicerr.
+	RateLimited func(w http.ResponseWriter, route string) bool
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
+
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
 	// Queue allows the checkppinting API to continue by enqueueing new queue items.
