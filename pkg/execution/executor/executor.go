@@ -683,6 +683,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Check constraints and acquire lease
 	return WithConstraints(
 		ctx,
+		e.now(),
 		e.capacityManager,
 		e.useConstraintAPI,
 		req,
