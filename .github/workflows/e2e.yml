@@ -81,7 +81,7 @@ jobs:
           go tool covdata percent -i=$GOCOVERDIR | tee coverage.txt
 
       - name: Upload devserver logs
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api-${{ matrix.enableConstraintAPI }}
