@@ -562,8 +562,10 @@ WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
-AND
+  AND
   SUM(((((attributes#>>'{}')::json->>'_inngest.step.attempt')::bigint) = $4::bigint)::int) > 0
+  AND
+  SUM((name IN ('executor.step', 'executor.execution'))::int) > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
@@ -1028,6 +1030,8 @@ WHERE b.run_id = CAST($1 AS CHAR(26)) AND b.account_id = $2
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 HAVING
   SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  AND
+  SUM((name IN ('executor.step', 'executor.execution'))::int) > 0
 ORDER BY start_time DESC
 LIMIT 1
 `
@@ -1156,6 +1160,7 @@ SELECT
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2 AND (parent_span_id IS NULL OR parent_span_id = '0000000000000000')
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM((name = 'executor.run')::int) > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
@@ -1497,11 +1502,37 @@ WHERE span_id IN (
   FROM spans execSpans
   WHERE execSpans.run_id = CAST($1 AS CHAR(26)) AND execSpans.account_id = $2
   GROUP BY dynamic_span_id, parent_span_id
-  HAVING SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  HAVING
+    SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+    AND
+    SUM((name = 'executor.execution')::int) > 0
   ORDER BY MIN(start_time)
   LIMIT 1
 )
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING SUM((name = 'executor.step.discovery')::int) > 0
+UNION ALL
+SELECT
+  run_id,
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END,
+    'input_span_id', CASE WHEN input IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26)) AND account_id = $2
+GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
+HAVING
+  SUM(((attributes#>>'{}')::json->>'_inngest.step.id' = $3::text)::int) > 0
+  AND
+  SUM((name = 'executor.step')::int) > 0
 ORDER BY start_time ASC
 LIMIT 1
 `
