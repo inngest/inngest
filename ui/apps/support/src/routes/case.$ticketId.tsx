@@ -5,7 +5,9 @@ import { RiArrowLeftLine } from "@remixicon/react";
 export const Route = createFileRoute("/case/$ticketId")({
   component: TicketDetail,
   loader: async ({ params }) => {
-    const ticket = await getTicketById({ data: { ticketId: params.ticketId } });
+    const ticket = await getTicketById({
+      data: { ticketId: params.ticketId as string },
+    });
 
     if (!ticket) {
       throw new Error("Ticket not found");

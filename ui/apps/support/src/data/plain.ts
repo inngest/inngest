@@ -37,10 +37,11 @@ export type TicketDetail = {
   timelineEntries: TimelineEntry[];
 };
 
-export const getTicketsByEmail = createServerFn({ method: "GET" }).handler(
-  async (ctx: any): Promise<TicketSummary[]> => {
+export const getTicketsByEmail = createServerFn({ method: "GET" })
+  .inputValidator((data: { email: string }) => data)
+  .handler(async ({ data }): Promise<TicketSummary[]> => {
     try {
-      const { email } = ctx.data as { email: string };
+      const { email } = data;
 
       // First, get or create the customer by email
       const customer = await plainClient.getCustomerByEmail({
@@ -82,13 +83,13 @@ export const getTicketsByEmail = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching tickets:", error);
       return [];
     }
-  },
-);
+  });
 
-export const getTicketById = createServerFn({ method: "GET" }).handler(
-  async (ctx: any): Promise<TicketDetail | null> => {
+export const getTicketById = createServerFn({ method: "GET" })
+  .inputValidator((data: { ticketId: string }) => data)
+  .handler(async ({ data }): Promise<TicketDetail | null> => {
     try {
-      const { ticketId } = ctx.data as { ticketId: string };
+      const { ticketId } = data;
 
       const result = await plainClient.getThread({
         threadId: ticketId,
@@ -120,5 +121,4 @@ export const getTicketById = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching ticket details:", error);
       return null;
     }
-  },
-);
+  });
