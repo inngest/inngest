@@ -10,6 +10,7 @@ type Events = {
 
 export const inngest = new Inngest({
   id: 'insights-agent-client',
+  // @ts-expect-error - realtimeMiddleware is not typed correctly
   middleware: [realtimeMiddleware()],
   eventKey: process.env.INNGEST_AI_EVENT_KEY,
   schemas: new EventSchemas().fromRecord<Events>(),
