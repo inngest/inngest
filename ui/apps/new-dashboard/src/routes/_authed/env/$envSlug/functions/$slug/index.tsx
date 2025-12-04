@@ -6,7 +6,7 @@ import LatestFailedFunctionRuns from "@/components/Functions/LatestFailedFunctio
 import SDKRequestThroughputChart from "@/components/Functions/SDKRequestThroughput";
 import StepBacklogChart from "@/components/Functions/StepBacklogChart";
 import StepsRunningChart from "@/components/Functions/StepsRunningChart";
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 import { useFunction, useFunctionUsage } from "@/queries";
 import { pathCreator } from "@/utils/urls";
 import { useAccountFeatures } from "@/utils/useAccountFeatures";

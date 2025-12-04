@@ -12,7 +12,7 @@ import {
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
 import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
 import URQLProviderWrapper from "@/components/URQL/URQLProvider";
-import { navCollapsed } from "@/data/nav";
+import { navCollapsed } from "@/lib/nav";
 import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
 import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";

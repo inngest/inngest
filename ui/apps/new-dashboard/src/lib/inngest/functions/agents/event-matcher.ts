@@ -6,7 +6,7 @@ import {
 } from "@inngest/agent-kit";
 import { z } from "zod";
 
-import type { InsightsAgentState } from "@/lib/inngest/functions/agents/types";
+import type { InsightsAgentState } from "./types";
 
 const SelectEventsParams = z.object({
   events: z

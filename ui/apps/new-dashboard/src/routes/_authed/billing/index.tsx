@@ -12,7 +12,7 @@ import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
-} from "@/queries/server-only/billing";
+} from "@/queries/server/billing";
 import { pathCreator } from "@/utils/urls";
 
 export const Route = createFileRoute("/_authed/billing/")({

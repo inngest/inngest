@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ProfileDisplayType } from "@/queries/server-only/profile";
+import type { ProfileDisplayType } from "@/queries/server/profile";
 import type { Environment } from "@/utils/environments";
 import Logo from "../Navigation/Logo";
 import Navigation from "../Navigation/Navigation";

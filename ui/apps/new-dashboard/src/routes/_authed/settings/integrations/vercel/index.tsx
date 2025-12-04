@@ -4,7 +4,7 @@ import { Link } from "@inngest/components/Link/NewLink";
 import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 import { RiExternalLinkLine } from "@remixicon/react";
 
-import { getVercelIntegration } from "@/queries/server-only/integrations/vercel";
+import { getVercelIntegration } from "@/queries/server/integrations/vercel";
 import { VercelProjects } from "@/components/Settings/Vercel/VercelProjects";
 
 export const Route = createFileRoute("/_authed/settings/integrations/vercel/")({

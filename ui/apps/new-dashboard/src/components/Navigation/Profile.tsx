@@ -1,6 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 import { ProfileMenu } from "./ProfileMenu";
-import { type ProfileDisplayType } from "@/queries/server-only/profile";
+import { type ProfileDisplayType } from "@/queries/server/profile";
 import { Image } from "@unpic/react";
 
 export const Profile = ({

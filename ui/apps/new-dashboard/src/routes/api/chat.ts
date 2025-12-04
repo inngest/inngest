@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { z } from "zod";
-import { inngest } from "@/data/inngest/client";
+import { inngest } from "@/lib/inngest/client";
 
 //
 // Zod schema for UserMessage

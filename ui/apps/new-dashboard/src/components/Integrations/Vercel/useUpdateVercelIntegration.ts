@@ -2,7 +2,7 @@ import { useMutation } from "urql";
 
 import { graphql } from "@/gql";
 import { useDefaultEnvironment } from "@/queries";
-import type { VercelIntegration } from "@/queries/server-only/integrations/vercel";
+import type { VercelIntegration } from "@/queries/server/integrations/vercel";
 
 const CreateVercelAppDocument = graphql(`
   mutation CreateVercelApp($input: CreateVercelAppInput!) {

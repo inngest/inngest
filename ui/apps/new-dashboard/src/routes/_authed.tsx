@@ -1,10 +1,10 @@
-import { fetchClerkAuth, jwtAuth } from "@/data/auth";
+import { fetchClerkAuth, jwtAuth } from "@/lib/auth";
 import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
 import Layout from "@/components/Layout/Layout";
-import { navCollapsed } from "@/data/nav";
-import { getEnvironment } from "@/queries/server-only/getEnvironment";
-import { getProfileDisplay } from "@/queries/server-only/profile";
+import { navCollapsed } from "@/lib/nav";
+import { getEnvironment } from "@/queries/server/getEnvironment";
+import { getProfileDisplay } from "@/queries/server/profile";
 
 export const Route = createFileRoute("/_authed")({
   component: Authed,

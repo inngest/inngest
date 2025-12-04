@@ -3,7 +3,7 @@ import { SupportForm } from "@/components/Support/SupportForm";
 import { useSystemStatus } from "@/components/Support/SystemStatus";
 import type { TicketType } from "@/components/Support/ticketOptions";
 import { graphql } from "@/gql";
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 
 import {
   ThreadStatus,

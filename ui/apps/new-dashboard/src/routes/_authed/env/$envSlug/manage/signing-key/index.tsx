@@ -8,7 +8,7 @@ import { EnvironmentType } from "@/gql/graphql";
 import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Card } from "@inngest/components/Card";
 import { InlineCode } from "@inngest/components/Code";
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 
 export const Route = createFileRoute(
   "/_authed/env/$envSlug/manage/signing-key/",

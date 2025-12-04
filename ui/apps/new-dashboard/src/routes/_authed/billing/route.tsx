@@ -3,7 +3,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import PageTitle from "@/components/Billing/PageTitle";
 import { MarketplaceAccessControl } from "@/components/Billing/MarketplaceAccessControl";
-import { getProfileDisplay } from "@/queries/server-only/profile";
+import { getProfileDisplay } from "@/queries/server/profile";
 import { pathCreator } from "@/utils/urls";
 import Toaster from "@/components/Toast/Toaster";
 

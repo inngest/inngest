@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
 import { Input } from "@inngest/components/Forms/Input";
 import { RiArrowRightLine } from "@remixicon/react";
 import slugify from "@sindresorhus/slugify";
+import { createFileRoute } from "@tanstack/react-router";
 import { capitalCase } from "change-case";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "urql";
-import { createFileRoute, useSearch } from "@tanstack/react-router";
 
-import { graphql } from "@/gql";
-import WebhookIcon from "@/icons/webhookIcon.svg?react";
-import { useDefaultEnvironment } from "@/queries/environments";
-import { createTransform } from "@/components/Manage/transformHelpers";
+import WebhookIcon from "@/components/Icons/webhookIcon.svg?react";
 import ApprovalDialog from "@/components/Intent/ApprovalDialog";
+import { createTransform } from "@/components/Manage/transformHelpers";
+import { graphql } from "@/gql";
+import { useDefaultEnvironment } from "@/queries/environments";
 import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
 
 export const Route = createFileRoute("/_authed/intent/create-webhook/")({

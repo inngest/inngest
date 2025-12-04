@@ -5,7 +5,7 @@ import { StatusDot } from "@inngest/components/Status/StatusDot";
 import useDebounce from "@inngest/components/hooks/useDebounce";
 
 import Toaster from "@/components/Toast/Toaster";
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 import { useEnvironments } from "@/queries";
 import { EnvironmentType, type Environment } from "@/utils/environments";
 import { BranchEnvironmentActions } from "./BranchEnvironmentActions";

@@ -1,4 +1,4 @@
-import { getEnvironment } from "@/queries/server-only/getEnvironment";
+import { getEnvironment } from "@/queries/server/getEnvironment";
 import { type Environment } from "@/utils/environments";
 
 export const getEnv = async (

@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { getSubscriptionToken } from "@inngest/realtime";
-import { inngest } from "@/data/inngest/client";
-import { createChannel } from "@/data/inngest/realtime";
+import { inngest } from "@/lib/inngest/client";
+import { createChannel } from "@/lib/inngest/realtime";
 
 export type RequestBody = {
   userId?: string;

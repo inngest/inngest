@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import SetupPage from "@/components/PrometheusIntegration/SetupPage";
-import { MetricsEntitlements } from "@/queries/server-only/entitlements";
+import { MetricsEntitlements } from "@/queries/server/entitlements";
 
 export const Route = createFileRoute(
   "/_authed/settings/integrations/prometheus/",

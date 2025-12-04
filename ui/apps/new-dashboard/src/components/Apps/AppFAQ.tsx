@@ -4,8 +4,8 @@ import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Link } from "@inngest/components/Link/NewLink";
 
-import appActiveListDark from "@/images/app-active-list-dark.png";
-import appActiveListLight from "@/images/app-active-list-light.jpg";
+import appActiveListDark from "@/components/Images/app-active-list-dark.png";
+import appActiveListLight from "@/components/Images/app-active-list-light.jpg";
 import { ValidateModal } from "./ValidateButton/ValidateModal";
 import { Image } from "@unpic/react";
 

@@ -5,7 +5,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { graphql } from "@/gql";
 import { type AwsMarketplaceSetupInput } from "@/gql/graphql";
-import AWSLogo from "@/icons/aws-logo.svg?react";
+import AWSLogo from "@/components/Icons/aws-logo.svg?react";
 
 import { pathCreator } from "@/utils/urls";
 import ApprovalDialog from "@/components/Intent/ApprovalDialog";

@@ -12,10 +12,7 @@ import { toast } from "sonner";
 import { FunctionTriggerTypes } from "@/gql/graphql";
 import { pathCreator } from "@/utils/urls";
 import { OnboardingSteps } from "../Onboarding/types";
-import {
-  invokeFunction,
-  prefetchFunctions,
-} from "@/queries/server-only/functions";
+import { invokeFunction, prefetchFunctions } from "@/queries/server/functions";
 import useOnboardingStep from "./useOnboardingStep";
 import { useOnboardingTracking } from "./useOnboardingTracking";
 import { useNavigate, ClientOnly } from "@tanstack/react-router";

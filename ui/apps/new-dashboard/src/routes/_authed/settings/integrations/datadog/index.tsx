@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import DatadogSetupPage from "@/components/Settings/DatadogSetupPage";
 import SetupPage from "@/components/DatadogIntegration/SetupPage";
-import { MetricsEntitlements } from "@/queries/server-only/entitlements";
+import { MetricsEntitlements } from "@/queries/server/entitlements";
 
 export const Route = createFileRoute("/_authed/settings/integrations/datadog/")(
   {

@@ -1,4 +1,4 @@
-import { getProdApps } from "@/queries/server-only/apps";
+import { getProdApps } from "@/queries/server/apps";
 import { useEffect, useState } from "react";
 
 const useOnboardingWidget = () => {

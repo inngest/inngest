@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { PostgresIntegrations } from "@/queries/server-only/integrations/db";
+import { PostgresIntegrations } from "@/queries/server/integrations/db";
 import Manage from "@/components/PostgresIntegration/Manage";
 
 export const Route = createFileRoute("/_authed/settings/integrations/neon/")({

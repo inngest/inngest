@@ -2,10 +2,10 @@ import { createState, type AgentMessageChunk } from "@inngest/agent-kit";
 import type { GetFunctionInput } from "inngest";
 import { v4 as uuidv4 } from "uuid";
 
-import { inngest } from "@/lib/inngest/client";
-import { createChannel } from "@/lib/inngest/realtime";
-import { createInsightsNetwork } from "@/lib/inngest/functions/agents/network";
-import type { InsightsAgentState } from "@/lib/inngest/functions/agents/types";
+import { inngest } from "../client";
+import { createChannel } from "../realtime";
+import { createInsightsNetwork } from "./agents/network";
+import type { InsightsAgentState } from "./agents/types";
 
 export const runAgentNetwork = inngest.createFunction(
   {

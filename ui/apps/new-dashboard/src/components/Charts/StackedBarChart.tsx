@@ -19,7 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 
 type BarChartProps = {
   className?: string;

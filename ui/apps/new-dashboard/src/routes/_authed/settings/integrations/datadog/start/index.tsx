@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import DatadogSetupPage from "@/components/Settings/DatadogSetupPage";
 import StartPage from "@/components/DatadogIntegration/StartPage";
-import { MetricsEntitlements } from "@/queries/server-only/entitlements";
+import { MetricsEntitlements } from "@/queries/server/entitlements";
 
 type DatadogStartSearch = {
   site?: string;

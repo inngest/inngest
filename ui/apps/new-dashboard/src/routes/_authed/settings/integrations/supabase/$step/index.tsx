@@ -11,7 +11,7 @@ import { useSteps } from "@/components/PostgresIntegration/Context";
 import {
   verifyAutoSetup,
   verifyCredentials,
-} from "@/queries/server-only/integrations/db";
+} from "@/queries/server/integrations/db";
 
 export const Route = createFileRoute(
   "/_authed/settings/integrations/supabase/$step/",

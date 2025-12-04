@@ -27,7 +27,7 @@ import {
   VercelDeploymentProtection,
   type VercelProject,
 } from "@/gql/graphql";
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 import { useDefaultEnvironment } from "@/queries";
 import { useVercelIntegration } from "@/queries/useVercelIntegration";
 

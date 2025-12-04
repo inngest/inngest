@@ -8,7 +8,7 @@ import AppFAQ from "@/components/Apps/AppFAQ";
 import { Apps } from "@/components/Apps/Apps";
 import { StatusMenu } from "@/components/Apps/StatusMenu";
 
-import { getProdApps } from "@/queries/server-only/apps";
+import { getProdApps } from "@/queries/server/apps";
 import { pathCreator } from "@/utils/urls";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Header } from "@inngest/components/Header/NewHeader";

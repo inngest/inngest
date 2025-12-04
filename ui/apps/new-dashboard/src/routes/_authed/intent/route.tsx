@@ -1,7 +1,7 @@
 import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import { getProfileDisplay } from "@/queries/server-only/profile";
+import { getProfileDisplay } from "@/queries/server/profile";
 
 export const Route = createFileRoute("/_authed/intent")({
   component: IntenComponent,

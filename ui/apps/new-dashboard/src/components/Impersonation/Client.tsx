@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useClerk, useSignIn } from "@clerk/tanstack-react-start";
 
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 import { useNavigate } from "@tanstack/react-router";
 
 export default function ImpersonationClient({

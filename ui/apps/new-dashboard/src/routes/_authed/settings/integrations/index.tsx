@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { IntegrationsList } from "@/components/Settings/IntegrationsList";
-import { PostgresIntegrations } from "@/queries/server-only/integrations/db";
-import { getVercelIntegration } from "@/queries/server-only/integrations/vercel";
+import { PostgresIntegrations } from "@/queries/server/integrations/db";
+import { getVercelIntegration } from "@/queries/server/integrations/vercel";
 
 export const Route = createFileRoute("/_authed/settings/integrations/")({
   component: IntegrationsPage,

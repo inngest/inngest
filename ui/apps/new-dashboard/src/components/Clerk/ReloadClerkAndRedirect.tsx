@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useUser } from "@clerk/tanstack-react-start";
 
-import LoadingIcon from "@/icons/LoadingIcon";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
 
 type ReloadClerkAndRedirectProps = {
   redirectURL: string;

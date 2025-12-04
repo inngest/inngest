@@ -1,5 +1,5 @@
 import { type InvokeFunctionMutationVariables } from "@/gql/graphql";
-import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
+import { getProductionEnvironment } from "@/queries/server/getEnvironment";
 import {
   getInvokeFunctionLookups,
   invokeFn,

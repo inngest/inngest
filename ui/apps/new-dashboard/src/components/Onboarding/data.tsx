@@ -6,7 +6,7 @@ import {
   type SyncResponse,
 } from "@/gql/graphql";
 import { graphqlAPI } from "@/queries/graphqlAPI";
-import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
+import { getProductionEnvironment } from "@/queries/server/getEnvironment";
 
 export const SyncOnboardingAppDocument = graphql(`
   mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {

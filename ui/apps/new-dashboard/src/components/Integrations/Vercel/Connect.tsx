@@ -14,7 +14,7 @@ import { useLocalStorage } from "react-use";
 
 import { OnboardingSteps } from "@/components/Onboarding/types";
 import useOnboardingStep from "@/components/Onboarding/useOnboardingStep";
-import type { VercelIntegration } from "@/queries/server-only/integrations/vercel";
+import type { VercelIntegration } from "@/queries/server/integrations/vercel";
 import useUpdateVercelIntegration from "./useUpdateVercelIntegration";
 import { ONBOARDING_VERCEL_NEXT_URL } from "@/components/Onboarding/utils";
 

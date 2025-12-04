@@ -9,7 +9,7 @@ import {
   type VercelApp as GraphQLVercelApp,
 } from "@/gql/graphql";
 import { createServerFn } from "@tanstack/react-start";
-import { getProductionEnvironment } from "../getEnvironment";
+import { getProductionEnvironment } from "@/queries/server/getEnvironment";
 import restAPI from "../../restAPI";
 import graphqlAPI from "../../graphqlAPI";
 import { graphql } from "@/gql";

@@ -2,8 +2,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import IntegrationsPage from "@inngest/components/PostgresIntegrations/NewIntegrationPage";
 import { integrationPageContent } from "@inngest/components/PostgresIntegrations/Supabase/newSupabaseContent";
 
-import { PostgresIntegrations } from "@/queries/server-only/integrations/db";
-import { deleteConn } from "@/queries/server-only/integrations/db";
+import { PostgresIntegrations } from "@/queries/server/integrations/db";
+import { deleteConn } from "@/queries/server/integrations/db";
 
 export const Route = createFileRoute(
   "/_authed/settings/integrations/supabase/",

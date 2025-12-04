@@ -6,7 +6,7 @@ import {
   VerticalPlanCard,
 } from "@/components/Billing/Plans/PlanCard";
 import { type Plan } from "@/components/Billing/Plans/utils";
-import { currentPlan as getCurrentPlan } from "@/queries/server-only/billing";
+import { currentPlan as getCurrentPlan } from "@/queries/server/billing";
 import { pathCreator } from "@/utils/urls";
 
 export const Route = createFileRoute("/_authed/billing/plans/")({
