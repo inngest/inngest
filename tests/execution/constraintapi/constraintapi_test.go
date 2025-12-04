@@ -1452,11 +1452,410 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 	t.Run("rate limit should ignore GCRA if idempotency key set", func(t *testing.T) {
 		// enforce gcra during acquire which sets constraint check idempotency key
 		// run rate limit with same constraint check idempotency key and verify it's ignored
+
+		queueConstraints := redis_state.PartitionConstraintConfig{
+			FunctionVersion: 1,
+		}
+
+		r := miniredis.RunT(t)
+		ctx := context.Background()
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		clock := clockwork.NewFakeClock()
+
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithRateLimitClient(rc),
+			constraintapi.WithQueueShards(map[string]rueidis.Client{
+				"test": rc,
+			}),
+			constraintapi.WithClock(clock),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueStateKeyPrefix("q:v1"),
+			constraintapi.WithRateLimitKeyPrefix("rl"),
+			constraintapi.WithEnableDebugLogs(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cm)
+
+		defaultShard := redis_state.QueueShard{
+			Kind:        string(enums.QueueShardKindRedis),
+			Name:        "test",
+			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
+		}
+		q := redis_state.NewQueue(defaultShard,
+			redis_state.WithClock(clock),
+			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+				"test": defaultShard,
+			}),
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+				return defaultShard, nil
+			}),
+			redis_state.WithCapacityManager(cm),
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+				return true, true
+			}),
+			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+				return queueConstraints
+			}),
+		)
+
+		rl := ratelimit.New(ctx, rc, "{rl}:")
+
+		unsharded := redis_state.NewUnshardedClient(rc, "estate", "q:v1")
+		sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+			UnshardedClient:        unsharded,
+			FunctionRunStateClient: rc,
+			BatchClient:            rc,
+			StateDefaultKey:        "estate",
+			QueueDefaultKey:        "q:v1",
+			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		})
+
+		sm, err := redis_state.New(ctx,
+			redis_state.WithShardedClient(sharded),
+			redis_state.WithUnshardedClient(unsharded),
+		)
+		require.NoError(t, err)
+		exec, err := executor.NewExecutor(
+			executor.WithRateLimiter(rl),
+			executor.WithAssignedQueueShard(defaultShard),
+			executor.WithQueue(q),
+			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
+			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+			executor.WithCapacityManager(cm),
+			executor.WithLogger(logger.StdlibLogger(ctx)),
+			executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return false, false
+			}),
+			executor.WithClock(clock),
+		)
+		require.NoError(t, err)
+
+		eventID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+		accountID, envID, fnID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+		scheduleIdempotencyKey := eventID.String()
+
+		expr := "event.data.customerID"
+		val := "user1"
+
+		rlKey := fmt.Sprintf("%s-%s", fnID, util.XXHash(val))
+
+		// Simulate idempotency key generated during Schedule
+		leaseIdempotencyKey := fmt.Sprintf("%s-%s", util.XXHash(fnID.String()), util.XXHash(eventID.String()))
+
+		res, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			IdempotencyKey: "acquire",
+			AccountID:      accountID,
+			EnvID:          envID,
+			FunctionID:     fnID,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						KeyExpressionHash: util.XXHash(expr),
+						Limit:             5,
+						Period:            60,
+					},
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindRateLimit,
+					RateLimit: &constraintapi.RateLimitConstraint{
+						KeyExpressionHash: util.XXHash(expr),
+						EvaluatedKeyHash:  rlKey,
+					},
+				},
+			},
+			Amount:               3,
+			LeaseIdempotencyKeys: []string{leaseIdempotencyKey, "item2", "item3"},
+			CurrentTime:          clock.Now(),
+			Duration:             5 * time.Second,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceAPI,
+				Location:          constraintapi.LeaseLocationScheduleRun,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			MaximumLifetime: time.Minute,
+			Migration: constraintapi.MigrationIdentifier{
+				IsRateLimit: true,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, res.Leases, 1)
+
+		// Idempotency key should be set
+		keyConstraintCheckIdempotency := cm.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, accountID, leaseIdempotencyKey)
+		require.True(t, r.Exists(keyConstraintCheckIdempotency))
+
+		// Rate limit should be allowed with idempotency
+		rlRes, err := rl.RateLimit(ctx, rlKey, inngest.RateLimit{
+			Limit:  5,
+			Period: "60s",
+			Key:    &expr,
+		},
+			ratelimit.WithIdempotency(keyConstraintCheckIdempotency, 5*time.Second),
+		)
+		require.NoError(t, err)
+		require.True(t, rlRes.IdempotencyHit)
+		require.False(t, rlRes.Limited)
+
+		// Try as part of schedule
+		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+			AccountID:      accountID,
+			WorkspaceID:    envID,
+			AppID:          appID,
+			IdempotencyKey: &scheduleIdempotencyKey,
+			Function: inngest.Function{
+				FunctionVersion: 1,
+				ID:              fnID,
+				RateLimit: &inngest.RateLimit{
+					Key:    &expr,
+					Limit:  5,
+					Period: "60s",
+				},
+				Name: "test function",
+				Slug: "test-fn",
+				Triggers: inngest.MultipleTriggers{
+					inngest.Trigger{
+						EventTrigger: &inngest.EventTrigger{
+							Event: "test/event",
+						},
+						CronTrigger: nil,
+					},
+				},
+			},
+			Events: []event.TrackedEvent{
+				event.NewOSSTrackedEventWithID(event.Event{
+					Name: "test/event",
+					Data: map[string]any{
+						"customerID": val,
+					},
+				}, eventID),
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, md)
 	})
 
 	t.Run("rate limit should gracefully use state set by Constraint API", func(t *testing.T) {
 		// enforce gcra during acquire which sets constraint check idempotency key
 		// run rate limit on different idempotency key and check it still uses the same state
 		// this verifies we correctly and consistently enforce rate limits while we are rolling out or rolling back the Constraint API and it's partially used
+
+		queueConstraints := redis_state.PartitionConstraintConfig{
+			FunctionVersion: 1,
+		}
+
+		r := miniredis.RunT(t)
+		ctx := context.Background()
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		clock := clockwork.NewFakeClock()
+
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithRateLimitClient(rc),
+			constraintapi.WithQueueShards(map[string]rueidis.Client{
+				"test": rc,
+			}),
+			constraintapi.WithClock(clock),
+			constraintapi.WithNumScavengerShards(1),
+			constraintapi.WithQueueStateKeyPrefix("q:v1"),
+			constraintapi.WithRateLimitKeyPrefix("rl"),
+			constraintapi.WithEnableDebugLogs(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cm)
+
+		defaultShard := redis_state.QueueShard{
+			Kind:        string(enums.QueueShardKindRedis),
+			Name:        "test",
+			RedisClient: redis_state.NewQueueClient(rc, "q:v1"),
+		}
+		q := redis_state.NewQueue(defaultShard,
+			redis_state.WithClock(clock),
+			redis_state.WithQueueShardClients(map[string]redis_state.QueueShard{
+				"test": defaultShard,
+			}),
+			redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+				return defaultShard, nil
+			}),
+			redis_state.WithCapacityManager(cm),
+			redis_state.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (bool, bool) {
+				return true, true
+			}),
+			redis_state.WithPartitionConstraintConfigGetter(func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+				return queueConstraints
+			}),
+		)
+
+		rl := ratelimit.New(ctx, rc, "{rl}:")
+
+		unsharded := redis_state.NewUnshardedClient(rc, "estate", "q:v1")
+		sharded := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+			UnshardedClient:        unsharded,
+			FunctionRunStateClient: rc,
+			BatchClient:            rc,
+			StateDefaultKey:        "estate",
+			QueueDefaultKey:        "q:v1",
+			FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+		})
+
+		sm, err := redis_state.New(ctx,
+			redis_state.WithShardedClient(sharded),
+			redis_state.WithUnshardedClient(unsharded),
+		)
+		require.NoError(t, err)
+		exec, err := executor.NewExecutor(
+			executor.WithRateLimiter(rl),
+			executor.WithAssignedQueueShard(defaultShard),
+			executor.WithQueue(q),
+			executor.WithStateManager(redis_state.MustRunServiceV2(sm)),
+			executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
+			executor.WithCapacityManager(cm),
+			executor.WithLogger(logger.StdlibLogger(ctx)),
+			executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return false, false
+			}),
+			executor.WithClock(clock),
+		)
+		require.NoError(t, err)
+
+		eventID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+		accountID, envID, fnID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+		expr := "event.data.customerID"
+		val := "user1"
+
+		rlKey := fmt.Sprintf("%s-%s", fnID, util.XXHash(val))
+
+		// Simulate idempotency key generated during Schedule
+		leaseIdempotencyKey := fmt.Sprintf("%s-%s", util.XXHash(fnID.String()), util.XXHash(eventID.String()))
+
+		res, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			IdempotencyKey: "acquire",
+			AccountID:      accountID,
+			EnvID:          envID,
+			FunctionID:     fnID,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				RateLimit: []constraintapi.RateLimitConfig{
+					{
+						KeyExpressionHash: util.XXHash(expr),
+						Limit:             10,
+						Period:            60,
+					},
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindRateLimit,
+					RateLimit: &constraintapi.RateLimitConstraint{
+						KeyExpressionHash: util.XXHash(expr),
+						EvaluatedKeyHash:  rlKey,
+					},
+				},
+			},
+			Amount:               1,
+			LeaseIdempotencyKeys: []string{leaseIdempotencyKey},
+			CurrentTime:          clock.Now(),
+			Duration:             5 * time.Second,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceAPI,
+				Location:          constraintapi.LeaseLocationScheduleRun,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			MaximumLifetime: time.Minute,
+			Migration: constraintapi.MigrationIdentifier{
+				IsRateLimit: true,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, res.Leases, 1)
+
+		// Idempotency key should be set
+		keyConstraintCheckIdempotency := cm.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{IsRateLimit: true}, accountID, leaseIdempotencyKey)
+		require.True(t, r.Exists(keyConstraintCheckIdempotency))
+
+		// Rate limit should be allowed with idempotency
+		rlRes, err := rl.RateLimit(ctx, rlKey, inngest.RateLimit{
+			Limit:  10,
+			Period: "60s",
+			Key:    &expr,
+		},
+			ratelimit.WithIdempotency(keyConstraintCheckIdempotency, 5*time.Second),
+		)
+		require.NoError(t, err)
+		require.True(t, rlRes.IdempotencyHit)
+		require.False(t, rlRes.Limited)
+
+		// Check rate limit state was set
+		keyRateLimitState := fmt.Sprintf("{rl}:%s", fmt.Sprintf("%s-%s", fnID.String(), util.XXHash(val)))
+
+		raw, err := r.Get(keyRateLimitState)
+		require.NoError(t, err)
+		parsed, err := strconv.Atoi(raw)
+		require.NoError(t, err)
+		tat := time.Unix(0, int64(parsed))
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), tat, time.Second)
+
+		// Schedule should be allowed for second event with same key
+		eventID2 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+		scheduleIdempotencyKey := eventID2.String()
+		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+			AccountID:      accountID,
+			WorkspaceID:    envID,
+			AppID:          appID,
+			IdempotencyKey: &scheduleIdempotencyKey,
+			Function: inngest.Function{
+				FunctionVersion: 1,
+				ID:              fnID,
+				RateLimit: &inngest.RateLimit{
+					Key:    &expr,
+					Limit:  10,
+					Period: "60s",
+				},
+				Name: "test function",
+				Slug: "test-fn",
+				Triggers: inngest.MultipleTriggers{
+					inngest.Trigger{
+						EventTrigger: &inngest.EventTrigger{
+							Event: "test/event",
+						},
+						CronTrigger: nil,
+					},
+				},
+			},
+			Events: []event.TrackedEvent{
+				event.NewOSSTrackedEventWithID(event.Event{
+					Name: "test/event",
+					Data: map[string]any{
+						"customerID": val,
+					},
+				}, eventID2),
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, md)
+
+		// Ensure same state was updated
+		raw, err = r.Get(keyRateLimitState)
+		require.NoError(t, err)
+		parsed, err = strconv.Atoi(raw)
+		require.NoError(t, err)
+		tat = time.Unix(0, int64(parsed))
+		require.WithinDuration(t, clock.Now().Add(12*time.Second), tat, time.Second)
 	})
 }
