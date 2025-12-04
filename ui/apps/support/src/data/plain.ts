@@ -1,4 +1,4 @@
-import { PlainClient } from "@team-plain/typescript-sdk";
+import { PlainClient } from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
 
 // Initialize Plain client
