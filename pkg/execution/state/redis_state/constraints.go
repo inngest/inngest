@@ -243,7 +243,7 @@ func (q *queue) itemLeaseConstraintCheck(
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
-	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(now.Add(5*time.Second))
+	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().After(now.Add(2*time.Second))
 	if hasValidCapacityLease {
 		return itemLeaseConstraintCheckResult{
 			leaseID: item.CapacityLeaseID,

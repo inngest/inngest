@@ -320,48 +320,237 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	shard := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, "q:v1"),
+		Name:        consts.DefaultQueueShardName,
+	}
+	kg := shard.RedisClient.kg
 
-	q := NewQueue(
-		shard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-	)
 	ctx := context.Background()
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+	ctx = logger.WithStdlib(ctx, l)
+
+	cmLifecycles := newConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClock(clock),
+		constraintapi.WithEnableDebugLogs(true),
+		constraintapi.WithLifecycles(cmLifecycles),
+		constraintapi.WithNumScavengerShards(1),
+		constraintapi.WithQueueShards(map[string]rueidis.Client{
+			consts.DefaultQueueShardName: rc,
+		}),
+		constraintapi.WithQueueStateKeyPrefix("q:v1"),
+		constraintapi.WithRateLimitClient(rc),
+		constraintapi.WithRateLimitKeyPrefix("rl"),
+	)
+	require.NoError(t, err)
+
+	reset := func() {
+		r.FlushAll()
+		r.SetTime(clock.Now())
+		cmLifecycles.reset()
+	}
 
 	accountID := uuid.New()
+	envID := uuid.New()
 	fnID := uuid.New()
 
 	item := osqueue.QueueItem{
-		FunctionID: fnID,
+		FunctionID:  fnID,
+		WorkspaceID: envID,
 		Data: osqueue.Item{
 			Payload: json.RawMessage("{\"test\":\"payload\"}"),
 			Identifier: state.Identifier{
-				AccountID:  accountID,
-				WorkflowID: fnID,
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
 			},
 		},
 	}
 
 	start := clock.Now()
 
-	qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
+	t.Run("without constraint api", func(t *testing.T) {
+		reset()
 
-	p := q.ItemPartition(ctx, shard, qi)
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return false, false
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+		)
 
-	iter := processor{
-		partition:            &p,
-		items:                []*osqueue.QueueItem{&qi},
-		partitionContinueCtr: 0,
-		queue:                q,
-		denies:               newLeaseDenyList(),
-		staticTime:           q.clock.Now(),
-		parallel:             false,
-	}
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
 
-	err = iter.process(ctx, &qi)
-	require.NoError(t, err)
+		p := q.ItemPartition(ctx, shard, qi)
+
+		iter := processor{
+			partition:            &p,
+			items:                []*osqueue.QueueItem{&qi},
+			partitionContinueCtr: 0,
+			queue:                q,
+			denies:               newLeaseDenyList(),
+			staticTime:           q.clock.Now(),
+			parallel:             false,
+		}
+
+		err = iter.process(ctx, &qi)
+		require.NoError(t, err)
+
+		require.Equal(t, len(cmLifecycles.acquireCalls), 0)
+		require.Equal(t, len(cmLifecycles.extendCalls), 0)
+		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+	})
+
+	t.Run("with constraint api and no active lease", func(t *testing.T) {
+		reset()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := q.ItemPartition(ctx, shard, qi)
+
+		iter := processor{
+			partition:            &p,
+			items:                []*osqueue.QueueItem{&qi},
+			partitionContinueCtr: 0,
+			queue:                q,
+			denies:               newLeaseDenyList(),
+			staticTime:           q.clock.Now(),
+			parallel:             false,
+		}
+
+		err = iter.process(ctx, &qi)
+		require.NoError(t, err)
+
+		require.Equal(t, len(cmLifecycles.acquireCalls), 1)
+		require.Equal(t, len(cmLifecycles.extendCalls), 0)
+		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+	})
+
+	t.Run("with constraint api and active capacity lease", func(t *testing.T) {
+		reset()
+
+		q := NewQueue(
+			shard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool, fallback bool) {
+				return true, true
+			}),
+			WithCapacityManager(cm),
+			// make lease extensions more frequent
+			WithCapacityLeaseExtendInterval(time.Second),
+			WithLogger(l),
+		)
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		// Acquire a lease
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeAccount,
+						InProgressItemKey: kg.Concurrency("account", accountID.String()),
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope:             enums.ConcurrencyScopeFn,
+						InProgressItemKey: kg.Concurrency("p", fnID.String()),
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        10 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.LeaseLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			Migration: constraintapi.MigrationIdentifier{
+				QueueShard: shard.Name,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		require.Len(t, cmLifecycles.acquireCalls, 1)
+
+		cmLifecycles.reset()
+
+		// Set capacity lease ID
+		qi.CapacityLeaseID = &resp.Leases[0].LeaseID
+
+		p := q.ItemPartition(ctx, shard, qi)
+
+		iter := processor{
+			partition:            &p,
+			items:                []*osqueue.QueueItem{&qi},
+			partitionContinueCtr: 0,
+			queue:                q,
+			denies:               newLeaseDenyList(),
+			staticTime:           q.clock.Now(),
+			parallel:             false,
+		}
+
+		err = iter.process(ctx, &qi)
+		require.NoError(t, err)
+
+		// No further Constraint API calls should be made
+		require.Equal(t, len(cmLifecycles.acquireCalls), 0)
+		require.Equal(t, len(cmLifecycles.extendCalls), 0)
+		require.Equal(t, len(cmLifecycles.releaseCalls), 0)
+
+		// Expect item to be sent to worker with capacity lease + request to disable constraint updates
+		item := <-q.workers
+		require.Equal(t, qi, item.I)
+		require.Equal(t, qi.CapacityLeaseID, item.capacityLeaseID)
+		require.True(t, item.disableConstraintUpdates)
+	})
 }
