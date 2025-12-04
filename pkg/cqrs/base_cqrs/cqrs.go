@@ -341,6 +341,7 @@ fragmentLoop:
 			case strings.HasPrefix(name, "executor."):
 				newSpan.Name = name
 			case name == meta.SpanNameMetadata:
+				newSpan.Name = name
 				isMetadata = true
 				break fragmentLoop
 			}
@@ -461,6 +462,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			return nil, err
 		}
 
+		if newSpan.Name == meta.SpanNameMetadata {
+			continue
+		}
+
 		spanMap.Set(newSpan.SpanID, newSpan)
 	}
 
@@ -487,6 +492,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			}
 		}
 
+		if metadata, ok := metadataByParent[span.SpanID]; ok {
+			span.Metadata = metadata
+		}
+
 		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
@@ -508,10 +517,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 				"spanID", span.SpanID,
 				"parentSpanID", span.ParentSpanID,
 			)
-		}
-
-		if metadata, ok := metadataByParent[span.SpanID]; ok {
-			span.Metadata = metadata
 		}
 	}
 
@@ -540,7 +545,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			Scope  *metadata.Scope  `json:"_inngest.metadata.scope"`
 			Kind   *metadata.Kind   `json:"_inngest.metadata.kind"`
 			Op     *metadata.Opcode `json:"_inngest.metadata.op"`
-			Values *string          `json:"_inngest.metadata"`
+			Values *string          `json:"_inngest.metadata.values"`
 		}
 		if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
 			logger.StdlibLogger(ctx).Error("error unmarshalling metadata span attributes", "error", err)
