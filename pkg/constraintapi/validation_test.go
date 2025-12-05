@@ -48,7 +48,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -80,7 +80,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -110,7 +110,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -140,7 +140,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -170,7 +170,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -200,7 +200,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -230,7 +230,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -260,7 +260,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -290,7 +290,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 0,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -320,7 +320,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceUnknown,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -350,7 +350,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationUnknown,
+					Location: CallerLocationUnknown,
 				},
 			},
 			wantErr: true,
@@ -373,7 +373,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -404,7 +404,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{}, // Empty slice
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -427,7 +427,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 0,
 				Source: LeaseSource{
 					Service:  ServiceUnknown,
-					Location: LeaseLocationUnknown,
+					Location: CallerLocationUnknown,
 				},
 			},
 			wantErr: true,
@@ -472,7 +472,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -536,7 +536,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -569,7 +569,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -601,7 +601,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -634,7 +634,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				MaximumLifetime: -1 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -668,7 +668,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -701,7 +701,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceNewRuns,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -734,7 +734,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationScheduleRun,
+					Location: CallerLocationSchedule,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -767,7 +767,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationPartitionLease,
+					Location: CallerLocationBacklogRefill,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -800,7 +800,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceAPI,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -864,7 +864,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -897,7 +897,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -930,7 +930,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -963,7 +963,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -996,7 +996,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1029,7 +1029,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1093,7 +1093,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1126,7 +1126,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1159,7 +1159,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1229,7 +1229,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash",
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -1279,7 +1279,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash",
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -1334,10 +1334,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash-1",
+						KeyExpressionHash: "expr-hash-1",
 					},
 					{
-						ThrottleKeyExpressionHash: "expr-hash-2",
+						KeyExpressionHash: "expr-hash-2",
 					},
 				},
 			},
@@ -1501,7 +1501,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: tt.mi,
 			}
@@ -1866,11 +1866,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -1997,11 +1997,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2372,11 +2372,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key-1",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key-1",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2414,11 +2414,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2532,11 +2532,11 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2624,11 +2624,11 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2717,11 +2717,11 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 					FunctionVersion: 0,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeAccount,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeAccount,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2956,7 +2956,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2990,7 +2990,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3024,7 +3024,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2"}, // Only 2 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3058,7 +3058,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // 3 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3092,7 +3092,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // Exactly 3 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3125,7 +3125,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{}, // Empty
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3159,7 +3159,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -3199,7 +3199,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",

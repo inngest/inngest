@@ -874,10 +874,10 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     10,
-						Burst:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "throttle-hash",
+						Limit:             10,
+						Burst:             5,
+						Period:            60,
+						KeyExpressionHash: "throttle-hash",
 					},
 				},
 			},
@@ -925,10 +925,10 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Limit:                     20,
-						Burst:                     10,
-						Period:                    30,
-						ThrottleKeyExpressionHash: "complete-throttle-hash",
+						Limit:             20,
+						Burst:             10,
+						Period:            30,
+						KeyExpressionHash: "complete-throttle-hash",
 					},
 				},
 			},

@@ -259,7 +259,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			MaximumLifetime: time.Minute,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			Migration: constraintapi.MigrationIdentifier{
@@ -519,7 +519,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			MaximumLifetime: time.Minute,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			Migration: constraintapi.MigrationIdentifier{

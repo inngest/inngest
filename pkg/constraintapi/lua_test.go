@@ -52,11 +52,11 @@ func TestSerializedConstraintItem(t *testing.T) {
 		},
 		Throttle: []ThrottleConfig{
 			{
-				Scope:                     enums.ThrottleScopeFn,
-				Limit:                     200,
-				Burst:                     300,
-				Period:                    60,
-				ThrottleKeyExpressionHash: "throttle-expr",
+				Scope:             enums.ThrottleScopeFn,
+				Limit:             200,
+				Burst:             300,
+				Period:            60,
+				KeyExpressionHash: "throttle-expr",
 			},
 		},
 	}

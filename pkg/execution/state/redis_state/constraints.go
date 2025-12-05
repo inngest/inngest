@@ -124,7 +124,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
-			Location:          constraintapi.LeaseLocationItemLease,
+			Location:          constraintapi.CallerLocationBacklogRefill,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
 		Migration: constraintapi.MigrationIdentifier{
@@ -274,7 +274,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
-			Location:          constraintapi.LeaseLocationItemLease,
+			Location:          constraintapi.CallerLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
 		Migration: constraintapi.MigrationIdentifier{
@@ -343,10 +343,10 @@ func constraintConfigFromConstraints(
 
 	if constraints.Throttle != nil {
 		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
-			Limit:                     constraints.Throttle.Limit,
-			Burst:                     constraints.Throttle.Burst,
-			Period:                    constraints.Throttle.Period,
-			ThrottleKeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
+			Limit:             constraints.Throttle.Limit,
+			Burst:             constraints.Throttle.Burst,
+			Period:            constraints.Throttle.Period,
+			KeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
 		})
 	}
 

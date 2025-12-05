@@ -429,11 +429,11 @@ func (tb *TestDataBuilder) CreateBasicConstraintConfig(concurrencyLimit, rateLim
 		},
 		Throttle: []ThrottleConfig{
 			{
-				Scope:                     2, // ThrottleScopeFn
-				Limit:                     rateLimitAmount,
-				Burst:                     rateLimitAmount / 2,
-				Period:                    rateLimitPeriod,
-				ThrottleKeyExpressionHash: "throttle-hash",
+				Scope:             2, // ThrottleScopeFn
+				Limit:             rateLimitAmount,
+				Burst:             rateLimitAmount / 2,
+				Period:            rateLimitPeriod,
+				KeyExpressionHash: "throttle-hash",
 			},
 		},
 	}

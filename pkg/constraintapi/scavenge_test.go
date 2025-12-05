@@ -277,7 +277,7 @@ func TestScavengeProcess_Basic(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -362,7 +362,7 @@ func TestScavengeProcess_Basic(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -391,7 +391,7 @@ func TestScavengeProcess_Basic(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -472,7 +472,7 @@ func TestScavengeProcess_Basic(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
@@ -502,11 +502,11 @@ func TestScavengeProcess_Basic(t *testing.T) {
 			FunctionVersion: 1,
 			Throttle: []ThrottleConfig{
 				{
-					Scope:                     enums.ThrottleScopeFn,
-					Limit:                     10,
-					Burst:                     5,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "scavenge-throttle",
+					Scope:             enums.ThrottleScopeFn,
+					Limit:             10,
+					Burst:             5,
+					Period:            60,
+					KeyExpressionHash: "scavenge-throttle",
 				},
 			},
 		}
@@ -538,7 +538,7 @@ func TestScavengeProcess_Basic(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -605,7 +605,7 @@ func TestScavengeProcess_Sharding(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -668,7 +668,7 @@ func TestScavengeProcess_Sharding(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -732,7 +732,7 @@ func TestScavengeProcess_Sharding(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -809,7 +809,7 @@ func TestScavengeProcess_ErrorScenarios(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -837,7 +837,7 @@ func TestScavengeProcess_ErrorScenarios(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -925,7 +925,7 @@ func TestScavengeProcess_Performance(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})

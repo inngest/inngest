@@ -195,6 +195,8 @@ type CapacityLease struct {
 
 	// IdempotencyKey represents the resource associated with the lease, e.g. a queue item or event.
 	IdempotencyKey string
+
+	// TODO: We can store additional lease details in here (e.g. selected worked in the case of worker concurrency)
 }
 
 type CapacityAcquireResponse struct {
@@ -265,25 +267,25 @@ type RunProcessingMode int
 const (
 	// RunProcessingModeBackground is used for regular (async) run scheduling and execution.
 	RunProcessingModeBackground RunProcessingMode = iota
-	// RunProcessingModeSync is used for requests sent by the Checkpointing API/Project Zero.
-	RunProcessingModeSync
+	// RunProcessingModeDurableEndpoint is used for requests sent by Durable Endpoints / Checkpointing
+	RunProcessingModeDurableEndpoint
 )
 
-type LeaseLocation int
+type CallerLocation int
 
 const (
-	LeaseLocationUnknown LeaseLocation = iota
+	CallerLocationUnknown CallerLocation = iota
 
-	// LeaseLocationScheduleRun is hit before scheduling a run
-	LeaseLocationScheduleRun
+	// CallerLocationSchedule is hit before scheduling a run
+	CallerLocationSchedule
 
-	// LeaseLocationPartitionLease is hit before leasing a partition
-	LeaseLocationPartitionLease
+	// CallerLocationBacklogRefill is hit before refilling items from a backlog to a ready queue
+	CallerLocationBacklogRefill
 
-	// LeaseLocationItemLease is hit before leasing a queue item
-	LeaseLocationItemLease
+	// CallerLocationItemLease is hit before leasing a queue item
+	CallerLocationItemLease
 
-	LeaseLocationCheckpoint
+	CallerLocationCheckpoint
 )
 
 type LeaseService int
@@ -300,7 +302,7 @@ type LeaseSource struct {
 	Service LeaseService
 
 	// Location refers to the lifecycle step requiring constraint checks
-	Location LeaseLocation
+	Location CallerLocation
 
 	RunProcessingMode RunProcessingMode
 }

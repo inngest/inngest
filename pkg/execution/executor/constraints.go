@@ -264,12 +264,12 @@ func CheckConstraints(
 	source := constraintapi.LeaseSource{
 		Service:           constraintapi.ServiceExecutor,
 		RunProcessingMode: constraintapi.RunProcessingModeBackground,
-		Location:          constraintapi.LeaseLocationScheduleRun,
+		Location:          constraintapi.CallerLocationSchedule,
 	}
 	if req.RunMode == enums.RunModeSync {
 		source.Service = constraintapi.ServiceAPI
-		source.RunProcessingMode = constraintapi.RunProcessingModeSync
-		source.Location = constraintapi.LeaseLocationCheckpoint
+		source.RunProcessingMode = constraintapi.RunProcessingModeDurableEndpoint
+		source.Location = constraintapi.CallerLocationCheckpoint
 	}
 
 	// TODO: Fetch account concurrency
