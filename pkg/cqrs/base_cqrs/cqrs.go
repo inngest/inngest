@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -663,6 +665,12 @@ func sorter(span *cqrs.OtelSpan) {
 
 		// sort based on SpanID if two spans have equal timestamps
 		return span.Children[i].SpanID < span.Children[j].SpanID
+	})
+
+	slices.SortFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
+		return cmp.Or(
+			cmp.Compare(a.Scope, b.Scope),
+			cmp.Compare(a.Kind, b.Kind))
 	})
 
 	for _, child := range span.Children {
