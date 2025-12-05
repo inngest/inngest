@@ -73,7 +73,7 @@ local function clampTat(tat, now_ns, period_ns, delay_variation_tolerance)
 	end
 end
 local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-	local tat = redis.call("GET", key)
+	local tat = call("GET", key)
 	if not tat then
 		return now_ns
 	end
@@ -83,7 +83,7 @@ local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_t
 	end
 	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
 	if raw_tat ~= clamped_tat then
-		redis.call("SET", key, clamped_tat, "KEEPTTL")
+		call("SET", key, clamped_tat, "KEEPTTL")
 	end
 	return clamped_tat
 end
@@ -142,7 +142,7 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 		local clamped_tat = clampTat(new_tat, now_ns, period_ns, delay_variation_tolerance)
 		local ttl_ns = clamped_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) 
-		redis.call("SET", key, clamped_tat, "EX", ttl_seconds)
+		call("SET", key, clamped_tat, "EX", ttl_seconds)
 	end
 end
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
