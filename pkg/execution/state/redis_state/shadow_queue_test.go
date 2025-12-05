@@ -1641,6 +1641,7 @@ func TestRefillConstraints(t *testing.T) {
 					Refill:            10,
 					Refilled:          10,
 				},
+				retryAt: 6 * time.Minute,
 			},
 		},
 		// Throttle deny
