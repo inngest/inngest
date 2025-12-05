@@ -6,14 +6,15 @@ import { formatDayString } from '@inngest/components/utils/date';
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
-// import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { isHobbyFreePlan /*isHobbyPlan*/ } from '@/components/Billing/Plans/utils';
+import { LimitBar, type Data } from '@/components/Billing/LimitBar';
+import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
-import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { ServerFeatureFlag, getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import type { EntitlementUsageWithMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 function kbyteDisplayValue(kibibytes: number): string {
@@ -40,49 +41,72 @@ export default async function Page() {
     await getEntitlementUsage();
     await getBillingDetails();
   };
-  /*
-  const isCurrentHobbyPlan = isHobbyPlan(currentPlan);
 
-  const legacyNoRunsPlan = entitlements.runCount.limit === null;
-  const runs: Data = {
-    title: 'Runs',
-    description: `${
-      entitlements.runCount.overageAllowed ? 'Additional usage incurred at additional charge.' : ''
-    }`,
-    current: entitlements.runCount.usage || 0,
-    limit: entitlements.runCount.limit || null,
-    overageAllowed: entitlements.runCount.overageAllowed,
-    tooltipContent: 'A single durable function execution.',
-  };
+  // Check feature flag to determine if we should prepare usage data
+  const usageMetricsCacheEnabled = await getBooleanFlag('usage-metrics-db-cache', {
+    defaultValue: false,
+  });
 
-  const isExecutionBasedPlan =
-    currentPlan.slug === 'pro-2025-08-08' || currentPlan.slug === 'pro-2025-06-04';
-  const steps: Data = {
-    title: isExecutionBasedPlan ? 'Executions' : 'Steps',
-    description: `${
-      entitlements.runCount.overageAllowed && !legacyNoRunsPlan
-        ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
-        : entitlements.runCount.overageAllowed
-        ? 'Additional usage incurred at additional charge.'
-        : ''
-    }`,
-    current: entitlements.stepCount.usage || 0,
-    limit: entitlements.stepCount.limit || null,
-    overageAllowed: entitlements.stepCount.overageAllowed,
-    tooltipContent: isExecutionBasedPlan
-      ? 'Combined total of runs and steps executed.'
-      : 'An individual step in durable functions.',
-  };
-  const executions: Data = {
-    title: 'Executions',
-    description: isCurrentHobbyPlan
-      ? 'The maximum number of executions per month'
-      : 'Additional usage billed at the start of the next billing cycle.',
-    current: entitlements.executions.usage || 0,
-    limit: entitlements.executions.limit || null,
-    overageAllowed: entitlements.executions.overageAllowed,
-    tooltipContent: 'Combined total of runs and steps executed.',
-  };*/
+  // Only prepare usage data if feature flag is enabled (and thus usage fields are available)
+  let runs: Data | null = null;
+  let steps: Data | null = null;
+  let executions: Data | null = null;
+  let isCurrentHobbyPlan = false;
+  let legacyNoRunsPlan = false;
+
+  if (usageMetricsCacheEnabled) {
+    isCurrentHobbyPlan = isHobbyPlan(currentPlan);
+    legacyNoRunsPlan = entitlements.runCount.limit === null;
+
+    runs = {
+      title: 'Runs',
+      description: `${
+        entitlements.runCount.overageAllowed
+          ? 'Additional usage incurred at additional charge.'
+          : ''
+      }`,
+      current: (entitlements.runCount as any).usage || 0,
+      limit: entitlements.runCount.limit || null,
+      overageAllowed: entitlements.runCount.overageAllowed,
+      tooltipContent: 'A single durable function execution.',
+    };
+
+    const isExecutionBasedPlan =
+      currentPlan.slug === 'pro-2025-08-08' || currentPlan.slug === 'pro-2025-06-04';
+    steps = {
+      title: isExecutionBasedPlan ? 'Executions' : 'Steps',
+      description: `${
+        entitlements.runCount.overageAllowed && !legacyNoRunsPlan
+          ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
+          : entitlements.runCount.overageAllowed
+          ? 'Additional usage incurred at additional charge.'
+          : ''
+      }`,
+      current: (entitlements.stepCount as any).usage || 0,
+      limit: entitlements.stepCount.limit || null,
+      overageAllowed: entitlements.stepCount.overageAllowed,
+      tooltipContent: isExecutionBasedPlan
+        ? 'Combined total of runs and steps executed.'
+        : 'An individual step in durable functions.',
+    };
+
+    executions = {
+      title: 'Executions',
+      description: isCurrentHobbyPlan
+        ? 'The maximum number of executions per month'
+        : 'Additional usage billed at the start of the next billing cycle.',
+      current:
+        (entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']).executions
+          .usage || 0,
+      limit:
+        (entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']).executions
+          .limit || null,
+      overageAllowed:
+        (entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']).executions
+          .overageAllowed || false,
+      tooltipContent: 'Combined total of runs and steps executed.',
+    };
+  }
 
   const nextInvoiceDate = currentSubscription?.nextInvoiceDate
     ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
@@ -153,9 +177,13 @@ export default async function Page() {
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {/* {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
-          {!isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
-          {isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />} */}
+          <ServerFeatureFlag flag="usage-metrics-db-cache" defaultValue={false}>
+            {runs && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
+              <LimitBar data={runs} className="my-4" />
+            )}
+            {steps && !isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
+            {executions && isCurrentHobbyPlan && <LimitBar data={executions} className="mb-6" />}
+          </ServerFeatureFlag>
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}
