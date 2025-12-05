@@ -4,6 +4,7 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { getTicketsByEmail, type TicketSummary } from "@/data/plain";
+import { StatusBadge, PriorityBadge } from "@/components/Support/TicketBadges";
 
 const getAuthStatusAndTickets = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -52,35 +53,6 @@ function Home() {
       sessionId: session?.id,
       redirectUrl: "/sign-in/$",
     });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "todo":
-        return "bg-yellow-100 text-yellow-800";
-      case "done":
-        return "bg-green-100 text-green-800";
-      case "snoozed":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    const priorityStr = priority ? String(priority).toLowerCase() : "";
-    switch (priorityStr) {
-      case "urgent":
-        return "text-red-600";
-      case "high":
-        return "text-orange-600";
-      case "normal":
-        return "text-blue-600";
-      case "low":
-        return "text-gray-600";
-      default:
-        return "text-gray-600";
-    }
   };
 
   return (
@@ -135,20 +107,12 @@ function Home() {
                     <div className="flex-1">
                       <h3 className="text-basis font-medium">{ticket.title}</h3>
                       <div className="mt-2 flex items-center gap-3">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
-                            ticket.status,
-                          )}`}
-                        >
-                          {ticket.status}
-                        </span>
-                        <span
-                          className={`text-xs font-medium ${getPriorityColor(
-                            ticket.priority,
-                          )}`}
-                        >
-                          {ticket.priority} priority
-                        </span>
+                        <StatusBadge status={ticket.status} size="sm" />
+                        <PriorityBadge
+                          priority={ticket.priority}
+                          size="sm"
+                          showLabel={false}
+                        />
                       </div>
                       <div className="text-muted mt-2 text-xs">
                         Updated:{" "}
