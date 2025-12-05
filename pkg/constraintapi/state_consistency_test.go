@@ -325,7 +325,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			*extendResp.LeaseID,
 			util.XXHash("extend-lease-1"),
 			"",
-			util.XXHash("extend-acquire"),
+			acquireResp.RequestID,
 		)
 
 		enableDebugLogs = true
