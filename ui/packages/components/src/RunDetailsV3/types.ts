@@ -17,6 +17,69 @@ export type Trace = {
   isUserland: boolean;
   debugRunID?: string | null;
   debugSessionID?: string | null;
+  metadata?: SpanMetadata[];
+};
+
+export type SpanMetadataKind =
+  | `inngest.http`
+  | `inngest.ai`
+  | `inngest.warnings`
+  | SpanMetadataKindUserland;
+
+export type SpanMetadataKindUserland = `userland.${string}`;
+
+export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trace';
+
+export type SpanMetadata =
+  | SpanMetadataInngestAI
+  | SpanMetadataInngestHTTP
+  | SpanMetadataInngestWarnings
+  | SpanMetadataUserland
+  | SpanMetadataUnknown;
+
+export type SpanMetadataInngestAI = {
+  scope: 'step_attempt' | 'extended_trace';
+  kind: 'inngest.ai';
+  values: {
+    input_tokens?: number;
+    output_tokens?: number;
+    model: string;
+    system: string;
+    operation_name: string;
+  };
+};
+
+export type SpanMetadataInngestHTTP = {
+  scope: 'extended_trace';
+  kind: 'inngest.http';
+  values: {
+    method: string;
+    domain: string;
+    path: string;
+    request_size?: number;
+    request_content_type?: string;
+    response_size?: number;
+    response_status?: number;
+    response_content_type?: string;
+  };
+};
+
+export type SpanMetadataInngestWarnings = {
+  scope: SpanMetadataScope;
+  kind: 'inngest.warnings';
+  values: Record<string, string>;
+};
+
+export type SpanMetadataUserland = {
+  scope: SpanMetadataScope;
+  kind: SpanMetadataKindUserland;
+  values: Record<string, unknown>;
+};
+
+export type SpanMetadataUnknown = {
+  scope: SpanMetadataScope;
+  kind: SpanMetadataKind;
+  values: Record<string, unknown>;
 };
 
 export type UserlandSpanType = {
