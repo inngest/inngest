@@ -223,7 +223,7 @@ type BlockFlusher interface {
 	Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error
 
 	// DeleteByID deletes a pause from a block by its ID.
-	// DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+	DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
 
 // BlockReader reads blocks for a given index.

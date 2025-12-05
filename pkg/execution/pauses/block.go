@@ -580,6 +580,41 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 	return nil
 }
 
+// DeleteByID deletes a pause from a block by marking it as deleted in the block's delete tracking set.
+// This method must be called before the pause is deleted from the buffer, otherwise the block index
+// lookup will fail and we won't know which block contains the pause.
+// Note: This method does not trigger compaction as it can be called by any service that only has 
+// access to the buffer and not necessarily the block store.
+func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
+
+	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Getdel().Key(blockIndexKey).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil
+		}
+		return fmt.Errorf("error reading block index for pause %s: %w", pauseID, err)
+	}
+
+	if blockIDStr == PauseBlockIndexTombstone {
+		return nil
+	}
+
+	var blockIndex state.BlockIndex
+	if err := json.Unmarshal([]byte(blockIDStr), &blockIndex); err != nil {
+		return fmt.Errorf("error parsing block index JSON '%s': %w", blockIDStr, err)
+	}
+
+	blockID, err := ulid.Parse(blockIndex.BlockID)
+	if err != nil {
+		return fmt.Errorf("error parsing block ID '%s': %w", blockIndex.BlockID, err)
+	}
+
+	index := Index{WorkspaceID: workspaceID, EventName: blockIndex.EventName}
+
+	return b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error()
+}
+
 func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
 	md, err := b.LastBlockMetadata(ctx, i)
 	if err != nil {
