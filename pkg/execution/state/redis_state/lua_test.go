@@ -163,12 +163,14 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
+					retryAt:         time.Minute * (60 / 10),
 				},
 				{
 					delay:           0,
 					capacityBefore:  10,
 					consumeCapacity: 5,
 					capacityAfter:   5,
+					retryAt:         time.Minute * (60 / 10),
 				},
 				{
 					delay:           0,
@@ -182,6 +184,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
+					retryAt:         time.Minute * (60 / 10),
 				},
 			},
 		},
@@ -197,12 +200,14 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  100,
 					consumeCapacity: 0,
 					capacityAfter:   100,
+					retryAt:         time.Minute * (600 / 100),
 				},
 				{
 					delay:           0,
 					capacityBefore:  100,
 					consumeCapacity: 20,
 					capacityAfter:   80,
+					retryAt:         time.Minute * (600 / 100),
 				},
 				{
 					delay:           1 * time.Hour,
@@ -216,6 +221,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10, // assume 10 items got refilled again
 					consumeCapacity: 0,
 					capacityAfter:   10,
+					retryAt:         6 * time.Minute,
 				},
 			},
 		},
@@ -231,24 +237,28 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  12,
 					consumeCapacity: 0,
 					capacityAfter:   12,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           0,
 					capacityBefore:  12,
 					consumeCapacity: 5,
 					capacityAfter:   7,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           10 * time.Minute,
 					capacityBefore:  8, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   8,
+					retryAt:         2 * time.Minute,
 				},
 				{
 					delay:           5 * time.Minute,
 					capacityBefore:  9, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   9,
+					retryAt:         3 * time.Minute,
 				},
 				{
 					delay:           0,
@@ -264,6 +274,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
+					retryAt:         3 * time.Minute,
 				},
 			},
 		},
@@ -277,6 +288,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
+					retryAt:         5 * time.Second,
 				},
 				{
 					delay:           time.Second,
@@ -290,6 +302,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
+					retryAt:         5 * time.Second,
 				},
 			},
 		},
