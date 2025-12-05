@@ -65,6 +65,7 @@ type CapacityCheckRequest struct {
 	EnvID uuid.UUID
 
 	// FunctionID is used for identifying the function.
+	// This is optional, in case no function-level constraints are checked.
 	FunctionID uuid.UUID
 
 	// Configuration represents the latest known constraint configuration (a subset of the function config).

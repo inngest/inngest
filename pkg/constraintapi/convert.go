@@ -590,9 +590,12 @@ func CapacityCheckRequestFromProto(pbReq *pb.CapacityCheckRequest) (*CapacityChe
 		return nil, fmt.Errorf("invalid env ID: %w", err)
 	}
 
-	functionID, err := uuid.Parse(pbReq.FunctionId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid function ID: %w", err)
+	var functionID uuid.UUID
+	if pbReq.FunctionId != "" {
+		functionID, err = uuid.Parse(pbReq.FunctionId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid function ID: %w", err)
+		}
 	}
 
 	constraints := make([]ConstraintItem, len(pbReq.Constraints))
