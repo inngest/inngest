@@ -5,7 +5,7 @@ import { Button } from "@inngest/components/Button/NewButton";
 import { Link } from "@inngest/components/Link/NewLink";
 import { toast } from "sonner";
 
-import { CodeBlock } from "@inngest/components/CodeBlock/CodeBlock";
+import { CodeBlock } from "@inngest/components/CodeBlock/NewCodeBlock";
 import { getManageKey } from "@/utils/urls";
 import makeVM from "@/utils/vm";
 import { Context } from "./Context";

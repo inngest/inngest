@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { RiContractRightFill, RiExpandLeftFill } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
-import useLocalStorage from 'react-use/lib/useLocalStorage';
+import { useLocalStorage } from 'react-use';
 
 import { Card } from '../Card';
 import { CodeBlock } from '../CodeBlock';
