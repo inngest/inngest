@@ -158,6 +158,11 @@ type acquireScriptResponse struct {
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
 
+	requestID, err := ulid.New(ulid.Timestamp(r.clock.Now()), rand.Reader)
+	if err != nil {
+		return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
+	}
+
 	// Validate request
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
@@ -167,6 +172,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"account_id", req.AccountID,
 		"env_id", req.EnvID,
 		"fn_id", req.FunctionID,
+		"req_id", requestID,
 	)
 
 	now := r.clock.Now()
@@ -222,9 +228,16 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	operationIdempotencyPeriod := min(r.operationIdempotencyTTL, req.Duration)
 
 	keys := []string{
-		r.keyRequestState(keyPrefix, req.AccountID, req.IdempotencyKey),
+		// The request state is persisted for consistent cleanup during Scavenge/Release operations
+		r.keyRequestState(keyPrefix, req.AccountID, requestID),
+
+		// Operation idempotency is used for retries while the generated leases are still valid
 		r.keyOperationIdempotency(keyPrefix, req.AccountID, "acq", operationIdempotencyKey),
+
+		// Enable idempotency for the entire Acquire call. This is used by batch operations like BacklogRefill which
+		// may need to skip GCRA checks without knowing individual leases/items
 		r.keyConstraintCheckIdempotency(keyPrefix, req.AccountID, req.IdempotencyKey),
+
 		r.keyScavengerShard(keyPrefix, scavengerShard),
 		r.keyAccountLeases(keyPrefix, req.AccountID),
 	}
@@ -237,6 +250,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	args, err := strSlice([]any{
 		// This will be marshaled
 		rueidis.BinaryString(requestState),
+		requestID.String(),
+
 		req.AccountID,
 		now.UnixMilli(), // current time in milliseconds for throttle
 		now.UnixNano(),  // current time in nanoseconds for rate limiting
@@ -245,7 +260,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		keyPrefix,
 		initialLeaseIDs,
 
-		util.XXHash(req.IdempotencyKey), // hashed operation idempotency key
 		int(operationIdempotencyPeriod.Seconds()),
 		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
@@ -358,6 +372,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			FairnessReduction:   parsedResponse.FairnessReduction,
 			internalDebugState:  parsedResponse,
 		}, nil
+
+	case 4:
+		l.Trace("acquire while previous request state still exists")
+		return nil, errs.Wrap(0, false, "request state for this idempotency key already exists")
 
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)

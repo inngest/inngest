@@ -10,16 +10,16 @@ local keyConstraintCheckIdempotency = KEYS[3]
 local keyScavengerShard = KEYS[4]
 local keyAccountLeases = KEYS[5]
 local requestDetails = cjson.decode(ARGV[1])
-local accountID = ARGV[2]
-local nowMS = tonumber(ARGV[3]) 
-local nowNS = tonumber(ARGV[4]) 
-local leaseExpiryMS = tonumber(ARGV[5])
-local keyPrefix = ARGV[6]
-local initialLeaseIDs = cjson.decode(ARGV[7])
+local requestID = ARGV[2]
+local accountID = ARGV[3]
+local nowMS = tonumber(ARGV[4]) 
+local nowNS = tonumber(ARGV[5]) 
+local leaseExpiryMS = tonumber(ARGV[6])
+local keyPrefix = ARGV[7]
+local initialLeaseIDs = cjson.decode(ARGV[8])
 if not initialLeaseIDs then
 	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
 end
-local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
 local enableDebugLogs = tonumber(ARGV[11]) == 1
@@ -194,6 +194,16 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 	return opIdempotency
 end
+local existingRequestState = call("GET", keyRequestState)
+if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
+	local res = {}
+	res["s"] = 4
+	res["d"] = debugLogs
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
+	return cjson.encode(res)
+end
 local availableCapacity = requested
 local limitingConstraints = {}
 local retryAt = 0
@@ -282,16 +292,7 @@ for i = 1, granted, 1 do
 		end
 	end
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
-	call(
-		"HSET",
-		keyLeaseDetails,
-		"lik",
-		hashedLeaseIdempotencyKey,
-		"rid",
-		leaseRunID,
-		"oik",
-		hashedOperationIdempotencyKey
-	)
+	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 	local keyLeaseConstraintCheckIdempotency =
 		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)

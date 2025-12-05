@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"testing"
@@ -585,16 +586,19 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 	te.CapacityManager.clock = clock
 
 	t.Run("Invalid JSON in Request State", func(t *testing.T) {
+		reqID := ulid.MustNew(ulid.Timestamp(te.CapacityManager.clock.Now()), rand.Reader)
 		// Pre-populate invalid request state
-		requestStateKey := te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, "invalid-json")
+		requestStateKey := te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, reqID)
 		err := te.Redis.Set(requestStateKey, "invalid-json-data")
 		require.NoError(t, err)
+		leaseID := ulid.Make()
+		te.Redis.HSet(te.CapacityManager.keyLeaseDetails(te.KeyPrefix, te.AccountID, leaseID), "req", reqID.String())
 
 		// Try to extend lease which will try to read the corrupted state
 		resp, err := te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
 			IdempotencyKey: "extend-invalid",
 			AccountID:      te.AccountID,
-			LeaseID:        ulid.Make(),
+			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
 			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})

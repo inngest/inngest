@@ -165,8 +165,8 @@ func (r *redisCapacityManager) keyAccountLeases(prefix string, accountID uuid.UU
 }
 
 // keyRequestState returns the key storing per-operation request details
-func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, operationIdempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, util.XXHash(operationIdempotencyKey))
+func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, requestID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, requestID)
 }
 
 // keyOperationIdempotency returns the operation idempotency key for operation retries

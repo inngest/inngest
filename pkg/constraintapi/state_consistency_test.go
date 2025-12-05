@@ -117,7 +117,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		finalState := te.CaptureRedisState()
 		te.CompareRedisState(afterAcquireState, finalState, "After Release")
 
-		_, err = te.Redis.Get(te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, "consistency-acquire-1"))
+		_, err = te.Redis.Get(te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, acquireResp.RequestID))
 		require.Error(t, err)
 
 		// Verify all capacity is restored - only idempotency keys should remain
