@@ -7,7 +7,7 @@ local function gcra(key, now_ms, period_ms, limit, burst)
 
 	local emission  = period_ms / math.max(limit, 1)   -- how frequently we can admit new requests
 	local increment = emission * cost         -- this request's time delta
-	local variance  = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
+	local variance  = emission * (math.max(burst, 1)) -- variance takes into account bursts
 
 	-- fetch the theoretical arrival time for equally spaced requests
 	-- at exactly the rate limit
@@ -70,9 +70,6 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
 
   -- remaining capacity in time units
   local time_capacity_remain = now_ms + total_capacity_time - tat
-
-  -- convert time capacity to token capacity
-  local capacity = math.floor(time_capacity_remain / emission)
 
   -- Convert the remaining time budget back into a number of tokens.
   local capacity = math.floor(time_capacity_remain / emission)

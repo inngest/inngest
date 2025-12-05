@@ -466,6 +466,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			// Step spans should not show attempts if they only have one and
 			// have resolved
 			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
+				gqlSpan.Metadata = append(gqlSpan.Metadata, gqlSpan.ChildrenSpans[0].Metadata...)
 				// However, we preserve any userland spans from the
 				// successful execution if we have any.
 				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans

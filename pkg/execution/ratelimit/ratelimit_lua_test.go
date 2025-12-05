@@ -16,7 +16,7 @@ import (
 
 const prefix = "{rl}:"
 
-// initRedis creates both miniredis/rueidis for Lua, throttled store, and fake clock
+// initRedis creates miniredis/rueidis for Lua and fake clock
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, clockwork.FakeClock) {
 	r := miniredis.RunT(t)
 

@@ -44,8 +44,11 @@ func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*
 }
 
 func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	if a.opts.RateLimited(r, w, "/v1/events") {
+		return
+	}
 
+	ctx := r.Context()
 	opts := cqrs.WorkspaceEventsOpts{}
 
 	limit, _ := strconv.Atoi(r.FormValue("limit"))
@@ -117,6 +120,10 @@ func (a API) GetEvent(ctx context.Context, eventID ulid.ULID) (*cqrs.Event, erro
 
 // GetEvent is the HTTP implementation for retrieving events.
 func (a router) getEvent(w http.ResponseWriter, r *http.Request) {
+	if a.opts.RateLimited(r, w, "/v1/events/{eventID}") {
+		return
+	}
+
 	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
 	parsed, err := ulid.Parse(eventID)
@@ -147,6 +154,10 @@ func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.Funct
 }
 
 func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
+	if a.opts.RateLimited(r, w, "/v1/events/{eventID}/runs") {
+		return
+	}
+
 	ctx := r.Context()
 	eventID := chi.URLParam(r, "eventID")
 

@@ -22,7 +22,7 @@ export function createInsightsNetwork(
     name: 'Insights SQL Generation Network',
     description: 'Selects relevant events, proposes a SQL query, and summarizes the result.',
     agents: [eventMatcherAgent, queryWriterAgent, summarizerAgent],
-    defaultModel: openai({ model: 'gpt-5-nano-2025-08-07' }),
+    defaultModel: openai({ model: 'claude-haiku-4-5' }),
     maxIter: 6,
     defaultState: initialState,
     router: sequenceRouter,
