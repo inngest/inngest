@@ -102,6 +102,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 
 		// One lease should have been granted
 		require.Len(t, resp.Leases, 1)
+		require.Equal(t, leaseIdempotencyKey, resp.Leases[0].IdempotencyKey)
 
 		// Don't expect limiting constraint
 		require.Nil(t, resp.LimitingConstraints)
