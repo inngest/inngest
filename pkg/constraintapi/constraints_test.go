@@ -250,7 +250,7 @@ func TestConstraintEnforcement(t *testing.T) {
 
 					Source: LeaseSource{
 						Service:           ServiceAPI,
-						Location:          LeaseLocationPartitionLease,
+						Location:          CallerLocationBacklogRefill,
 						RunProcessingMode: RunProcessingModeBackground,
 					},
 
@@ -576,9 +576,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						Limit:                     1,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             1,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -612,9 +612,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						Limit:                     1,
-						Period:                    3600,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             1,
+						Period:            3600,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -655,9 +655,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						Limit:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             5,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -712,9 +712,9 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						Limit:                     5,
-						Period:                    60,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Limit:             5,
+						Period:            60,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -1045,7 +1045,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				MaximumLifetime:      time.Hour,
 				Source: LeaseSource{
 					Service:           ServiceExecutor,
-					Location:          LeaseLocationItemLease,
+					Location:          CallerLocationItemLease,
 					RunProcessingMode: RunProcessingModeBackground,
 				},
 			})
@@ -1364,9 +1364,9 @@ func TestConcurrencyConstraint_InProgressLeasesKey_KeyFormat(t *testing.T) {
 
 func TestConstraintItem_IsFunctionLevelConstraint(t *testing.T) {
 	tests := []struct {
-		name       string
-		constraint ConstraintItem
-		expected   bool
+		name        string
+		constraint  ConstraintItem
+		expected    bool
 		description string
 	}{
 		// Rate Limit Constraints
@@ -1932,12 +1932,12 @@ func TestConstraintKind_IsQueueConstraint(t *testing.T) {
 func TestConstraintKind_IsQueueConstraint_ConstraintMixing(t *testing.T) {
 	// Verify that queue constraints cannot be mixed with rate limit constraints
 	// This aligns with validation logic that prevents mixing these constraint types
-	
+
 	queueConstraints := []ConstraintKind{
 		ConstraintKindConcurrency,
 		ConstraintKindThrottle,
 	}
-	
+
 	nonQueueConstraints := []ConstraintKind{
 		ConstraintKindRateLimit,
 	}
@@ -2004,8 +2004,8 @@ func TestConcurrencyConstraint_IsCustomKey(t *testing.T) {
 			description: "constraints with whitespace KeyExpressionHash should still be considered custom keys",
 		},
 		{
-			name: "zero value constraint is not custom key",
-			constraint: ConcurrencyConstraint{},
+			name:        "zero value constraint is not custom key",
+			constraint:  ConcurrencyConstraint{},
 			expected:    false,
 			description: "zero-value constraints should not be custom keys",
 		},
@@ -2089,11 +2089,11 @@ func TestConcurrencyConstraint_IsCustomKey_KeyGeneration(t *testing.T) {
 	customKey := customConstraint.InProgressLeasesKey(prefix, accountID, envID, functionID)
 
 	assert.NotEqual(t, standardKey, customKey, "Standard and custom constraints should generate different keys")
-	
+
 	// Custom key should include the custom key information
 	assert.Contains(t, customKey, "custom_expr", "Custom key should include key expression hash")
 	assert.Contains(t, customKey, "custom_eval", "Custom key should include evaluated key hash")
-	
+
 	// Standard key should not contain custom key patterns
 	assert.NotContains(t, standardKey, "<", "Standard key should not contain custom key markers")
 	assert.NotContains(t, standardKey, ">", "Standard key should not contain custom key markers")

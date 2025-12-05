@@ -279,7 +279,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 
 			// Find matching throttle config
 			for _, tConfig := range config.Throttle {
-				if tConfig.Scope == ci.Throttle.Scope && tConfig.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
+				if tConfig.Scope == ci.Throttle.Scope && tConfig.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
 					throttleConstraint.Limit = tConfig.Limit
 					throttleConstraint.Burst = tConfig.Burst
 					throttleConstraint.Period = tConfig.Period * 1000 // Convert seconds to milliseconds

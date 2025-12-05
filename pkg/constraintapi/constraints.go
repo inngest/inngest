@@ -175,7 +175,7 @@ func (t *ThrottleConstraint) PrettyString() string {
 
 func (t *ThrottleConstraint) PrettyStringConfig(config ConstraintConfig) string {
 	for _, tc := range config.Throttle {
-		if tc.Scope != t.Scope || tc.ThrottleKeyExpressionHash != t.KeyExpressionHash {
+		if tc.Scope != t.Scope || tc.KeyExpressionHash != t.KeyExpressionHash {
 			continue
 		}
 

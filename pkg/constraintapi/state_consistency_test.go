@@ -30,9 +30,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 			Throttle: []ThrottleConfig{
 				{
-					Limit:                     10,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "consistency-test",
+					Limit:             10,
+					Period:            60,
+					KeyExpressionHash: "consistency-test",
 				},
 			},
 		}
@@ -71,7 +71,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -178,7 +178,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -252,7 +252,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -375,7 +375,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -430,9 +430,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 			Throttle: []ThrottleConfig{
 				{
-					Limit:                     5,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "throttle-expr",
+					Limit:             5,
+					Period:            60,
+					KeyExpressionHash: "throttle-expr",
 				},
 			},
 		}
@@ -470,7 +470,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})

@@ -171,7 +171,7 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing source service"))
 	}
 
-	if r.Source.Location == LeaseLocationUnknown {
+	if r.Source.Location == CallerLocationUnknown {
 		errs = multierror.Append(errs, fmt.Errorf("missing source location"))
 	}
 
@@ -321,7 +321,7 @@ func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 		if ci.Throttle != nil {
 			var found bool
 			for _, t := range cc.Throttle {
-				if t.Scope == ci.Throttle.Scope && t.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
+				if t.Scope == ci.Throttle.Scope && t.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
 					found = true
 					break
 				}

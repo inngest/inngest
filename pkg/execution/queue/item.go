@@ -718,11 +718,11 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 		}
 
 		throttles = append(throttles, constraintapi.ThrottleConfig{
-			Limit:                     int(fn.Throttle.Limit),
-			Burst:                     int(fn.Throttle.Burst),
-			Period:                    int(fn.Throttle.Period.Seconds()),
-			Scope:                     enums.ThrottleScopeFn,
-			ThrottleKeyExpressionHash: util.XXHash(throttleKey),
+			Limit:             int(fn.Throttle.Limit),
+			Burst:             int(fn.Throttle.Burst),
+			Period:            int(fn.Throttle.Period.Seconds()),
+			Scope:             enums.ThrottleScopeFn,
+			KeyExpressionHash: util.XXHash(throttleKey),
 		})
 	}
 

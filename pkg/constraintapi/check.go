@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
+	"github.com/redis/rueidis"
 )
 
 type checkRequestData struct {
@@ -27,7 +28,7 @@ type checkRequestData struct {
 }
 
 func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
-	*checkRequestData,
+	[]byte,
 	[]ConstraintItem,
 	string,
 	error,
@@ -55,16 +56,16 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 
 	state.SortedConstraints = serialized
 
+	dataBytes, err := json.Marshal(state)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
+	}
+
 	// NOTE: We fingerprint the query to apply basic response caching.
 	// As Check can be expensive, we don't want to run unnecessary queries
 	// that may impact lease and constraint enforcement operations.
 	var hash string
 	{
-		dataBytes, err := json.Marshal(state)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf("could not marshal request: %w", err)
-		}
-
 		fingerprint := sha256.New()
 		_, err = fingerprint.Write(dataBytes)
 		if err != nil {
@@ -73,7 +74,7 @@ func buildCheckRequestData(req *CapacityCheckRequest, keyPrefix string) (
 		hash = hex.EncodeToString(fingerprint.Sum(nil))
 	}
 
-	return state, constraints, hash, nil
+	return dataBytes, constraints, hash, nil
 }
 
 type checkScriptResponse struct {
@@ -129,7 +130,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	now := r.clock.Now()
 
 	args, err := strSlice([]any{
-		data,
+		rueidis.BinaryString(data),
 		keyPrefix,
 		req.AccountID,
 		now.UnixMilli(),

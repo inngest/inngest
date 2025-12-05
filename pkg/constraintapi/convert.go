@@ -143,8 +143,8 @@ func RunProcessingModeToProto(mode RunProcessingMode) pb.ConstraintApiRunProcess
 	switch mode {
 	case RunProcessingModeBackground:
 		return pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND
-	case RunProcessingModeSync:
-		return pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC
+	case RunProcessingModeDurableEndpoint:
+		return pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT
 	default:
 		return pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_UNSPECIFIED
 	}
@@ -154,44 +154,44 @@ func RunProcessingModeFromProto(mode pb.ConstraintApiRunProcessingMode) RunProce
 	switch mode {
 	case pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND:
 		return RunProcessingModeBackground
-	case pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_SYNC:
-		return RunProcessingModeSync
+	case pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_DURABLE_ENDPOINT:
+		return RunProcessingModeDurableEndpoint
 	default:
 		return RunProcessingModeBackground
 	}
 }
 
-func LeaseLocationToProto(location LeaseLocation) pb.ConstraintApiLeaseLocation {
+func CallerLocationToProto(location CallerLocation) pb.ConstraintApiCallerLocation {
 	switch location {
-	case LeaseLocationUnknown:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED
-	case LeaseLocationScheduleRun:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN
-	case LeaseLocationPartitionLease:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE
-	case LeaseLocationItemLease:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE
-	case LeaseLocationCheckpoint:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT
+	case CallerLocationUnknown:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED
+	case CallerLocationSchedule:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_SCHEDULE
+	case CallerLocationBacklogRefill:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL
+	case CallerLocationItemLease:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE
+	case CallerLocationCheckpoint:
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT
 	default:
-		return pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED
+		return pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED
 	}
 }
 
-func LeaseLocationFromProto(location pb.ConstraintApiLeaseLocation) LeaseLocation {
+func LeaseLocationFromProto(location pb.ConstraintApiCallerLocation) CallerLocation {
 	switch location {
-	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_UNSPECIFIED:
-		return LeaseLocationUnknown
-	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_SCHEDULE_RUN:
-		return LeaseLocationScheduleRun
-	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_PARTITION_LEASE:
-		return LeaseLocationPartitionLease
-	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_ITEM_LEASE:
-		return LeaseLocationItemLease
-	case pb.ConstraintApiLeaseLocation_CONSTRAINT_API_LEASE_LOCATION_CHECKPOINT:
-		return LeaseLocationCheckpoint
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED:
+		return CallerLocationUnknown
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_SCHEDULE:
+		return CallerLocationSchedule
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_BACKLOG_REFILL:
+		return CallerLocationBacklogRefill
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_ITEM_LEASE:
+		return CallerLocationItemLease
+	case pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_CHECKPOINT:
+		return CallerLocationCheckpoint
 	default:
-		return LeaseLocationUnknown
+		return CallerLocationUnknown
 	}
 }
 
@@ -303,11 +303,11 @@ func ConcurrencyConfigFromProto(pbConfig *pb.ConcurrencyConfig) ConcurrencyConfi
 
 func ThrottleConfigToProto(config ThrottleConfig) *pb.ThrottleConfig {
 	return &pb.ThrottleConfig{
-		Scope:                     ThrottleScopeToProto(config.Scope),
-		ThrottleKeyExpressionHash: config.ThrottleKeyExpressionHash,
-		Limit:                     int32(config.Limit),
-		Burst:                     int32(config.Burst),
-		Period:                    int32(config.Period),
+		Scope:             ThrottleScopeToProto(config.Scope),
+		KeyExpressionHash: config.KeyExpressionHash,
+		Limit:             int32(config.Limit),
+		Burst:             int32(config.Burst),
+		Period:            int32(config.Period),
 	}
 }
 
@@ -316,11 +316,11 @@ func ThrottleConfigFromProto(pbConfig *pb.ThrottleConfig) ThrottleConfig {
 		return ThrottleConfig{}
 	}
 	return ThrottleConfig{
-		Scope:                     ThrottleScopeFromProto(pbConfig.Scope),
-		ThrottleKeyExpressionHash: pbConfig.ThrottleKeyExpressionHash,
-		Limit:                     int(pbConfig.Limit),
-		Burst:                     int(pbConfig.Burst),
-		Period:                    int(pbConfig.Period),
+		Scope:             ThrottleScopeFromProto(pbConfig.Scope),
+		KeyExpressionHash: pbConfig.KeyExpressionHash,
+		Limit:             int(pbConfig.Limit),
+		Burst:             int(pbConfig.Burst),
+		Period:            int(pbConfig.Period),
 	}
 }
 
@@ -522,7 +522,7 @@ func CapacityLeaseFromProto(pbLease *pb.CapacityLease) (CapacityLease, error) {
 func LeaseSourceToProto(source LeaseSource) *pb.LeaseSource {
 	return &pb.LeaseSource{
 		Service:           LeaseServiceToProto(source.Service),
-		Location:          LeaseLocationToProto(source.Location),
+		Location:          CallerLocationToProto(source.Location),
 		RunProcessingMode: RunProcessingModeToProto(source.RunProcessingMode),
 	}
 }

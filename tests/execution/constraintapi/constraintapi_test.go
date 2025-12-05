@@ -205,11 +205,11 @@ func TestConstraintEnforcement(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []constraintapi.ThrottleConfig{
 					{
-						Scope:                     enums.ThrottleScopeFn,
-						Period:                    60,
-						Limit:                     1,
-						Burst:                     0,
-						ThrottleKeyExpressionHash: "expr-hash",
+						Scope:             enums.ThrottleScopeFn,
+						Period:            60,
+						Limit:             1,
+						Burst:             0,
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -634,7 +634,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				MaximumLifetime:      time.Hour,
 				Source: constraintapi.LeaseSource{
 					Service:           constraintapi.ServiceExecutor,
-					Location:          constraintapi.LeaseLocationItemLease,
+					Location:          constraintapi.CallerLocationItemLease,
 					RunProcessingMode: constraintapi.RunProcessingModeBackground,
 				},
 			})
@@ -805,7 +805,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			MaximumLifetime:      time.Hour,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 		})
@@ -945,7 +945,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			MaximumLifetime:      time.Hour,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 		})
@@ -1016,9 +1016,9 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			},
 			Throttle: []constraintapi.ThrottleConfig{
 				{
-					ThrottleKeyExpressionHash: "expr-hash",
-					Limit:                     5,
-					Period:                    60,
+					KeyExpressionHash: "expr-hash",
+					Limit:             5,
+					Period:            60,
 				},
 			},
 		}
@@ -1112,7 +1112,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			MaximumLifetime:      time.Hour,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 		})
@@ -1229,9 +1229,9 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			},
 			Throttle: []constraintapi.ThrottleConfig{
 				{
-					ThrottleKeyExpressionHash: "expr-hash",
-					Limit:                     5,
-					Period:                    60,
+					KeyExpressionHash: "expr-hash",
+					Limit:             5,
+					Period:            60,
 				},
 			},
 		}
@@ -1329,7 +1329,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			MaximumLifetime:      time.Hour,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.LeaseLocationItemLease,
+				Location:          constraintapi.CallerLocationItemLease,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 		})
@@ -1579,7 +1579,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			Duration:             5 * time.Second,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceAPI,
-				Location:          constraintapi.LeaseLocationScheduleRun,
+				Location:          constraintapi.CallerLocationSchedule,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			MaximumLifetime: time.Minute,
@@ -1774,7 +1774,7 @@ func TestScheduleConstraintAPICompatibility(t *testing.T) {
 			Duration:             5 * time.Second,
 			Source: constraintapi.LeaseSource{
 				Service:           constraintapi.ServiceAPI,
-				Location:          constraintapi.LeaseLocationScheduleRun,
+				Location:          constraintapi.CallerLocationSchedule,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
 			MaximumLifetime: time.Minute,

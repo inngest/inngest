@@ -490,8 +490,8 @@ func TestLuaCompatibility(t *testing.T) {
 					MaximumLifetime:      time.Hour,
 					Source: constraintapi.LeaseSource{
 						Service:           constraintapi.ServiceAPI,
-						Location:          constraintapi.LeaseLocationItemLease,
-						RunProcessingMode: constraintapi.RunProcessingModeSync,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
 					},
 				})
 
