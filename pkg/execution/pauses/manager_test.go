@@ -248,6 +248,10 @@ func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pa
 	return nil
 }
 
+func (m *mockBlockStore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	return nil
+}
+
 func (m *mockBlockStore) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
 	return nil, nil
 }
