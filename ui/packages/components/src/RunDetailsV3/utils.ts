@@ -51,6 +51,15 @@ export function traceHasChildren(depth: number, trace: Trace) {
   return (trace.childrenSpans?.length ?? 0) > 0;
 }
 
+export function traceWalk(trace: Trace, fn: (trace: Trace) => void) {
+  let walkChildren = (trace: Trace) => {
+    fn(trace);
+    trace.childrenSpans?.forEach(walkChildren);
+  };
+
+  return walkChildren(trace);
+}
+
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
   let beforeWidth = queued - min;
   let queuedWidth = (started ?? max) - queued;
