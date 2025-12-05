@@ -3,6 +3,8 @@ package debug.v1;
 
 import "debug/v1/queue.proto";
 import "debug/v1/pause.proto";
+import "debug/v1/constraintapi.proto";
+import "constraintapi/v1/service.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 
@@ -22,4 +24,7 @@ service Debug {
   rpc BlockPeek(BlockPeekRequest) returns (BlockPeekResponse) {}
   // BlockDeleted retrieves deleted pause IDs from a specific block.
   rpc BlockDeleted(BlockDeletedRequest) returns (BlockDeletedResponse) {}
+  // CheckConstraints invokes Check() on the configured capacity manager
+  rpc CheckConstraints(constraintapi.v1.CapacityCheckRequest) returns (CheckConstraintsResponse);
 }
+

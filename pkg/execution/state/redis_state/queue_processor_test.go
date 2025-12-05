@@ -294,7 +294,6 @@ func TestQueueRunExtended(t *testing.T) {
 			}
 
 			go func() {
-
 				defer func() {
 					if err := recover(); err != nil {
 						fmt.Println(err)
@@ -333,7 +332,6 @@ func TestQueueRunExtended(t *testing.T) {
 
 			<-time.After(5 * time.Second)
 		}
-
 	}()
 
 	mrand.Seed(time.Now().UnixMicro())

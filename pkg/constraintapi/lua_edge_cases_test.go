@@ -2,12 +2,14 @@ package constraintapi
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -60,7 +62,7 @@ func TestLuaScriptEdgeCases_RateLimitGCRA(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
@@ -124,7 +126,7 @@ func TestLuaScriptEdgeCases_RateLimitGCRA(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
@@ -179,7 +181,7 @@ func TestLuaScriptEdgeCases_RateLimitGCRA(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
@@ -203,7 +205,7 @@ func TestLuaScriptEdgeCases_RateLimitGCRA(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{IsRateLimit: true},
 		})
@@ -261,7 +263,7 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -327,7 +329,7 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -372,7 +374,7 @@ func TestLuaScriptEdgeCases_Concurrency(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -395,11 +397,11 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			FunctionVersion: 1,
 			Throttle: []ThrottleConfig{
 				{
-					Scope:                     enums.ThrottleScopeFn,
-					Limit:                     1000000, // Very high limit
-					Burst:                     100000,  // High burst
-					Period:                    1,       // 1 second period
-					ThrottleKeyExpressionHash: "small-interval",
+					Scope:             enums.ThrottleScopeFn,
+					Limit:             1000000, // Very high limit
+					Burst:             100000,  // High burst
+					Period:            1,       // 1 second period
+					KeyExpressionHash: "small-interval",
 				},
 			},
 		}
@@ -435,7 +437,7 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		}
@@ -456,11 +458,11 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			FunctionVersion: 1,
 			Throttle: []ThrottleConfig{
 				{
-					Scope:                     enums.ThrottleScopeFn,
-					Limit:                     1,
-					Burst:                     0,
-					Period:                    86400, // 24 hours
-					ThrottleKeyExpressionHash: "large-period",
+					Scope:             enums.ThrottleScopeFn,
+					Limit:             1,
+					Burst:             0,
+					Period:            86400, // 24 hours
+					KeyExpressionHash: "large-period",
 				},
 			},
 		}
@@ -493,7 +495,7 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -517,7 +519,7 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -532,11 +534,11 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			FunctionVersion: 1,
 			Throttle: []ThrottleConfig{
 				{
-					Scope:                     enums.ThrottleScopeFn,
-					Limit:                     0, // No throughput allowed
-					Burst:                     0,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "zero-throttle",
+					Scope:             enums.ThrottleScopeFn,
+					Limit:             0, // No throughput allowed
+					Burst:             0,
+					Period:            60,
+					KeyExpressionHash: "zero-throttle",
 				},
 			},
 		}
@@ -566,7 +568,7 @@ func TestLuaScriptEdgeCases_Throttle(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -585,23 +587,29 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 	te.CapacityManager.clock = clock
 
 	t.Run("Invalid JSON in Request State", func(t *testing.T) {
+		reqID := ulid.MustNew(ulid.Timestamp(te.CapacityManager.clock.Now()), rand.Reader)
 		// Pre-populate invalid request state
-		requestStateKey := te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, "invalid-json")
+		requestStateKey := te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, reqID)
 		err := te.Redis.Set(requestStateKey, "invalid-json-data")
 		require.NoError(t, err)
+		leaseID := ulid.Make()
+		te.Redis.HSet(
+			te.CapacityManager.keyLeaseDetails(te.KeyPrefix, te.AccountID, leaseID),
+			"req", reqID.String(),
+			"lik", util.XXHash("acquire-key"),
+			"rid", "",
+		)
 
 		// Try to extend lease which will try to read the corrupted state
-		resp, err := te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
+		_, err = te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
 			IdempotencyKey: "extend-invalid",
 			AccountID:      te.AccountID,
-			LeaseID:        ulid.Make(),
+			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
 			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
-
-		// Should handle gracefully (specific error handling depends on implementation)
-		require.NoError(t, err)
-		require.Equal(t, 3, resp.internalDebugState.Status)
+		require.ErrorContains(t, err, "requestDetails is nil after JSON decode")
+		require.Error(t, err)
 	})
 
 	t.Run("Missing Lease Details", func(t *testing.T) {
@@ -664,8 +672,7 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 
 		enableDebugLogs = true
 
-		// First request
-		resp1, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		req := &CapacityAcquireRequest{
 			IdempotencyKey:       "idempotency-test",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -679,40 +686,31 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		_, _, _, fingerprint, err := buildRequestState(req, "q:v1")
+		require.NoError(t, err)
+
+		acquireIdempotencyKey := fmt.Sprintf("idempotency-test-%s", fingerprint)
+
+		// First request
+		resp1, err := te.CapacityManager.Acquire(context.Background(), req)
 
 		require.NoError(t, err)
 		t.Log(resp1.internalDebugState.Debug)
 		require.Len(t, resp1.Leases, 1)
 
 		// Duplicate request with same idempotency key should return cached result
-		resp2, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
-			IdempotencyKey:       "idempotency-test", // Same idempotency key
-			AccountID:            te.AccountID,
-			EnvID:                te.EnvID,
-			FunctionID:           te.FunctionID,
-			Amount:               2,                                        // Different amount - should be ignored
-			LeaseIdempotencyKeys: []string{"lease-idem-2", "lease-idem-3"}, // Different keys
-			CurrentTime:          clock.Now(),
-			Duration:             5 * time.Second,
-			MaximumLifetime:      time.Minute,
-			Configuration:        config,
-			Constraints:          constraints,
-			Source: LeaseSource{
-				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
-			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		resp2, err := te.CapacityManager.Acquire(context.Background(), req)
 
 		require.NoError(t, err)
 		require.Equal(t, resp1.Leases, resp2.Leases, "Idempotent request should return same result")
 
 		// Verify idempotency key management
 		iv := te.NewIdempotencyVerifier()
-		iv.VerifyOperationIdempotency("acq", "idempotency-test", int(OperationIdempotencyTTL.Seconds()), true)
+		iv.VerifyOperationIdempotency("acq", acquireIdempotencyKey, int(OperationIdempotencyTTL.Seconds()), true)
 	})
 }

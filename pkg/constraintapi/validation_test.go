@@ -48,7 +48,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -80,7 +80,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -110,7 +110,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -140,7 +140,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -170,7 +170,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -200,7 +200,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -230,7 +230,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -260,7 +260,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -290,7 +290,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 0,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -320,7 +320,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceUnknown,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -350,7 +350,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationUnknown,
+					Location: CallerLocationUnknown,
 				},
 			},
 			wantErr: true,
@@ -373,7 +373,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -404,7 +404,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{}, // Empty slice
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 			},
 			wantErr: true,
@@ -427,7 +427,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				MaximumLifetime: 0,
 				Source: LeaseSource{
 					Service:  ServiceUnknown,
-					Location: LeaseLocationUnknown,
+					Location: CallerLocationUnknown,
 				},
 			},
 			wantErr: true,
@@ -472,7 +472,7 @@ func TestCapacityAcquireRequestValid(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -536,7 +536,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -569,7 +569,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -601,7 +601,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				MaximumLifetime: 30 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -634,7 +634,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				MaximumLifetime: -1 * time.Minute,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -668,7 +668,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -701,7 +701,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceNewRuns,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -734,7 +734,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationScheduleRun,
+					Location: CallerLocationSchedule,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -767,7 +767,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationPartitionLease,
+					Location: CallerLocationBacklogRefill,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -800,7 +800,7 @@ func TestCapacityAcquireRequestValidEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceAPI,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -864,7 +864,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -897,7 +897,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -930,7 +930,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -963,7 +963,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -996,7 +996,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1029,7 +1029,7 @@ func TestCapacityAcquireRequestValidBoundaryConditions(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1093,7 +1093,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1126,7 +1126,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1159,7 +1159,7 @@ func TestCapacityAcquireRequestValidSpecialCharacters(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -1229,7 +1229,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash",
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -1279,7 +1279,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash",
+						KeyExpressionHash: "expr-hash",
 					},
 				},
 			},
@@ -1334,10 +1334,10 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				FunctionVersion: 1,
 				Throttle: []ThrottleConfig{
 					{
-						ThrottleKeyExpressionHash: "expr-hash-1",
+						KeyExpressionHash: "expr-hash-1",
 					},
 					{
-						ThrottleKeyExpressionHash: "expr-hash-2",
+						KeyExpressionHash: "expr-hash-2",
 					},
 				},
 			},
@@ -1501,7 +1501,7 @@ func TestRolloutNoMixedConstraints(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: tt.mi,
 			}
@@ -1866,11 +1866,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -1939,7 +1939,31 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 			errMsgs: []string{"missing envID"},
 		},
 		{
-			name: "missing function ID",
+			name: "valid request with account-level constraint and no function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0, // No longer required
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount, // Account-level constraint
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid - missing function ID with function-level concurrency constraint",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -1951,6 +1975,7 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn, // Function-level constraint
 							InProgressItemKey: "test-key",
 						},
 					},
@@ -1960,21 +1985,154 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsgs: []string{"missing functionID"},
+			errMsgs: []string{"function ID is required for function-level constraints"},
 		},
 		{
-			name: "missing constraint config function version",
+			name: "invalid - missing function ID with function-level throttle constraint",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
-				FunctionID: functionID,
+				FunctionID: uuid.Nil,
 				Configuration: ConstraintConfig{
-					FunctionVersion: 0,
+					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							Scope:             enums.ThrottleScopeFn, // Function-level constraint
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "invalid - missing function ID with function-level rate limit constraint",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+					RateLimit: []RateLimitConfig{
+						{
+							Scope:             enums.RateLimitScopeFn,
+							Limit:             100,
+							Period:            60,
+							KeyExpressionHash: "rate-key",
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							Scope:             enums.RateLimitScopeFn, // Function-level constraint
+							KeyExpressionHash: "rate-key",
+							EvaluatedKeyHash:  "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "invalid - mixed constraints with function-level constraint but missing function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
 				},
 				Constraints: []ConstraintItem{
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount, // Account-level (OK)
+							InProgressItemKey: "test-key",
+						},
+					},
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn, // Function-level (requires FunctionID)
+							InProgressItemKey: "test-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "valid - multiple account-level constraints without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0, // No longer required
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							InProgressItemKey: "test-key-1",
+						},
+					},
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							InProgressItemKey: "test-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invvalid request with zero function version",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0, // No longer required to be non-zero
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: kindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
 							InProgressItemKey: "test-key",
 						},
 					},
@@ -1984,7 +2142,9 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsgs: []string{"missing constraint config workflow version"},
+			errMsgs: []string{
+				"function version is required for function-level constraints",
+			},
 		},
 		{
 			name: "missing constraints",
@@ -2170,8 +2330,6 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 			errMsgs: []string{
 				"missing accountID",
 				"missing envID",
-				"missing functionID",
-				"missing constraint config workflow version",
 				"must provide constraints",
 			},
 		},
@@ -2214,11 +2372,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key-1",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key-1",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2256,11 +2414,11 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					FunctionVersion: 1,
 					Throttle: []ThrottleConfig{
 						{
-							Scope:                     enums.ThrottleScopeFn,
-							ThrottleKeyExpressionHash: "throttle-key",
-							Limit:                     10,
-							Burst:                     20,
-							Period:                    60,
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
 						},
 					},
 				},
@@ -2329,6 +2487,437 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 	}
 }
 
+func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+
+	tests := []struct {
+		name    string
+		request CapacityCheckRequest
+		wantErr bool
+		errMsgs []string
+	}{
+		{
+			name: "valid - function-level concurrency constraint with function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - function-level throttle constraint with function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - function-level rate limit constraint with function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+					RateLimit: []RateLimitConfig{
+						{
+							Scope:             enums.RateLimitScopeFn,
+							Limit:             100,
+							Period:            60,
+							KeyExpressionHash: "rate-key",
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							Scope:             enums.RateLimitScopeFn,
+							KeyExpressionHash: "rate-key",
+							EvaluatedKeyHash:  "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid - function-level concurrency constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "invalid - function-level throttle constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							Scope:             enums.ThrottleScopeFn,
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "invalid - function-level rate limit constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+					RateLimit: []RateLimitConfig{
+						{
+							Scope:             enums.RateLimitScopeFn,
+							Limit:             100,
+							Period:            60,
+							KeyExpressionHash: "rate-key",
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							Scope:             enums.RateLimitScopeFn,
+							KeyExpressionHash: "rate-key",
+							EvaluatedKeyHash:  "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "valid - account-level concurrency constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							InProgressItemKey: "test-key",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - account-level throttle constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+					Throttle: []ThrottleConfig{
+						{
+							Scope:             enums.ThrottleScopeAccount,
+							KeyExpressionHash: "throttle-key",
+							Limit:             10,
+							Burst:             20,
+							Period:            60,
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindThrottle,
+						Throttle: &ThrottleConstraint{
+							Scope:             enums.ThrottleScopeAccount,
+							KeyExpressionHash: "throttle-key",
+							EvaluatedKeyHash:  "throttle-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - account-level rate limit constraint without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+					RateLimit: []RateLimitConfig{
+						{
+							Scope:             enums.RateLimitScopeAccount,
+							Limit:             100,
+							Period:            60,
+							KeyExpressionHash: "rate-key",
+						},
+					},
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindRateLimit,
+						RateLimit: &RateLimitConstraint{
+							Scope:             enums.RateLimitScopeAccount,
+							KeyExpressionHash: "rate-key",
+							EvaluatedKeyHash:  "rate-key-hash",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid - mixed function and account level constraints without function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount, // Account level - OK
+							InProgressItemKey: "test-key-1",
+						},
+					},
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn, // Function level - requires FunctionID
+							InProgressItemKey: "test-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: true,
+			errMsgs: []string{"function ID is required for function-level constraints"},
+		},
+		{
+			name: "valid - mixed function and account level constraints with function ID",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID, // Function ID provided
+				Configuration: ConstraintConfig{
+					FunctionVersion: 1,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							InProgressItemKey: "test-key-1",
+						},
+					},
+					{
+						Kind: ConstraintKindConcurrency,
+						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							InProgressItemKey: "test-key-2",
+						},
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - constraint with nil concurrency object (bypass function level check)",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind:        ConstraintKindConcurrency,
+						Concurrency: nil, // Nil constraint - should not trigger function level check
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - constraint with nil throttle object (bypass function level check)",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind:     ConstraintKindThrottle,
+						Throttle: nil, // Nil constraint - should not trigger function level check
+					},
+				},
+				Migration: MigrationIdentifier{
+					QueueShard: "test",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid - constraint with nil rate limit object (bypass function level check)",
+			request: CapacityCheckRequest{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: uuid.Nil,
+				Configuration: ConstraintConfig{
+					FunctionVersion: 0,
+				},
+				Constraints: []ConstraintItem{
+					{
+						Kind:      ConstraintKindRateLimit,
+						RateLimit: nil, // Nil constraint - should not trigger function level check
+					},
+				},
+				Migration: MigrationIdentifier{
+					IsRateLimit: true,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.request.Valid()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				for _, expectedMsg := range tt.errMsgs {
+					assert.Contains(t, err.Error(), expectedMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 	baseTime := time.Date(2023, 10, 15, 12, 30, 45, 0, time.UTC)
 	accountID := uuid.New()
@@ -2367,7 +2956,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2401,7 +2990,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2435,7 +3024,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2"}, // Only 2 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2469,7 +3058,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // 3 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2503,7 +3092,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1", "lease-key-2", "lease-key-3"}, // Exactly 3 keys
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2536,7 +3125,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{}, // Empty
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2570,7 +3159,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				LeaseIdempotencyKeys: []string{"lease-key-1"},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",
@@ -2610,7 +3199,7 @@ func TestCapacityAcquireRequestValidAmountEdgeCases(t *testing.T) {
 				},
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{
 					QueueShard: "test",

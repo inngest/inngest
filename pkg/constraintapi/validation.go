@@ -36,13 +36,16 @@ func (r *CapacityCheckRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing envID"))
 	}
 
-	if r.FunctionID == uuid.Nil {
-		errs = multierror.Append(errs, fmt.Errorf("missing functionID"))
-	}
-
-	if r.Configuration.FunctionVersion == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("missing constraint config workflow version"))
-	}
+	// We want to allow check requests without specific functions to check account concurrency, etc.
+	// For function-level constraints, we do require the function ID and version, see the constraint checks below
+	//
+	// if r.FunctionID == uuid.Nil {
+	// 	errs = multierror.Append(errs, fmt.Errorf("missing functionID"))
+	// }
+	//
+	// if r.Configuration.FunctionVersion == 0 {
+	// 	errs = multierror.Append(errs, fmt.Errorf("missing constraint config workflow version"))
+	// }
 
 	// Validate configuration
 	if err := r.Configuration.Valid(); err != nil {
@@ -65,6 +68,16 @@ func (r *CapacityCheckRequest) Valid() error {
 
 		if err := r.Configuration.ValidConstraintUsage(ci); err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("invalid constraint usage %d: %w", i, err))
+		}
+
+		isFunctionLevelConstraint := ci.IsFunctionLevelConstraint()
+
+		if isFunctionLevelConstraint && r.FunctionID == uuid.Nil {
+			errs = multierror.Append(errs, fmt.Errorf("function ID is required for function-level constraints"))
+		}
+
+		if isFunctionLevelConstraint && r.Configuration.FunctionVersion == 0 {
+			errs = multierror.Append(errs, fmt.Errorf("function version is required for function-level constraints"))
 		}
 	}
 
@@ -158,7 +171,7 @@ func (r *CapacityAcquireRequest) Valid() error {
 		errs = multierror.Append(errs, fmt.Errorf("missing source service"))
 	}
 
-	if r.Source.Location == LeaseLocationUnknown {
+	if r.Source.Location == CallerLocationUnknown {
 		errs = multierror.Append(errs, fmt.Errorf("missing source location"))
 	}
 
@@ -268,9 +281,10 @@ func (ci ConstraintItem) Valid() error {
 func (cc ConstraintConfig) Valid() error {
 	var errs error
 
-	if cc.FunctionVersion == 0 {
-		errs = multierror.Append(errs, fmt.Errorf("missing function version"))
-	}
+	// We want to allow check requests without specific functions to check account concurrency, etc.
+	// if cc.FunctionVersion == 0 {
+	// 	errs = multierror.Append(errs, fmt.Errorf("missing function version"))
+	// }
 
 	if len(cc.Concurrency.CustomConcurrencyKeys) > MaxCustomConcurrencyKeys {
 		errs = multierror.Append(errs, fmt.Errorf("exceeded maximum of %d custom concurrency keys", MaxCustomConcurrencyKeys))
@@ -290,7 +304,7 @@ func (cc ConstraintConfig) Valid() error {
 func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 	switch ci.Kind {
 	case ConstraintKindConcurrency:
-		if ci.Concurrency.EvaluatedKeyHash != "" {
+		if ci.Concurrency != nil && ci.Concurrency.EvaluatedKeyHash != "" {
 			var found bool
 			for _, ckey := range cc.Concurrency.CustomConcurrencyKeys {
 				if ckey.Scope == ci.Concurrency.Scope && ckey.Mode == ci.Concurrency.Mode && ckey.KeyExpressionHash == ci.Concurrency.KeyExpressionHash {
@@ -304,27 +318,31 @@ func (cc ConstraintConfig) ValidConstraintUsage(ci ConstraintItem) error {
 		}
 
 	case ConstraintKindThrottle:
-		var found bool
-		for _, t := range cc.Throttle {
-			if t.Scope == ci.Throttle.Scope && t.ThrottleKeyExpressionHash == ci.Throttle.KeyExpressionHash {
-				found = true
-				break
+		if ci.Throttle != nil {
+			var found bool
+			for _, t := range cc.Throttle {
+				if t.Scope == ci.Throttle.Scope && t.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			return fmt.Errorf("unknown throttle constraint")
+			if !found {
+				return fmt.Errorf("unknown throttle constraint")
+			}
 		}
 
 	case ConstraintKindRateLimit:
-		var found bool
-		for _, r := range cc.RateLimit {
-			if r.Scope == ci.RateLimit.Scope && r.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
-				found = true
-				break
+		if ci.RateLimit != nil {
+			var found bool
+			for _, r := range cc.RateLimit {
+				if r.Scope == ci.RateLimit.Scope && r.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			return fmt.Errorf("unknown rate limit constraint")
+			if !found {
+				return fmt.Errorf("unknown rate limit constraint")
+			}
 		}
 	}
 	return nil

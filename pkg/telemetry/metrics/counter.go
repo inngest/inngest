@@ -752,3 +752,12 @@ func IncrConstraintAPIScavengerReclaimedLeasesCounter(ctx context.Context, count
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueScavengerRequeuedItemsCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_scavenger_requeued_total",
+		Description: "Total number of requeud items reclaimed by queue scavenger",
+		Tags:        opts.Tags,
+	})
+}
