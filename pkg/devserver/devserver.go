@@ -744,14 +744,15 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:           l,
-			DB:            ds.Data,
-			Queue:         rq,
-			State:         ds.State,
-			Cron:          croner,
-			ShardSelector: shardSelector,
-			Port:          ds.Opts.DebugAPIPort,
-			PauseManager:  pauseMgr,
+			Log:             l,
+			DB:              ds.Data,
+			Queue:           rq,
+			State:           ds.State,
+			Cron:            croner,
+			ShardSelector:   shardSelector,
+			Port:            ds.Opts.DebugAPIPort,
+			PauseManager:    pauseMgr,
+			CapacityManager: capacityManager,
 		}))
 	}
 

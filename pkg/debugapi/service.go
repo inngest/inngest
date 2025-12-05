@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/pauses"
@@ -34,16 +35,18 @@ func NewDebugAPI(o Opts) service.Service {
 		croner:    o.Cron,
 		findShard: o.ShardSelector,
 		pm:        o.PauseManager,
+		cm:        o.CapacityManager,
 	}
 }
 
 type Opts struct {
-	Log          logger.Logger
-	DB           cqrs.Manager
-	Queue        redis_state.QueueManager
-	State        state.Manager
-	Cron         cron.CronManager
-	PauseManager pauses.Manager
+	Log             logger.Logger
+	DB              cqrs.Manager
+	Queue           redis_state.QueueManager
+	State           state.Manager
+	Cron            cron.CronManager
+	PauseManager    pauses.Manager
+	CapacityManager constraintapi.CapacityManager
 
 	ShardSelector redis_state.ShardSelector
 
@@ -63,6 +66,7 @@ type debugAPI struct {
 	state  state.Manager
 	croner cron.CronManager
 	pm     pauses.Manager
+	cm     constraintapi.CapacityManager
 }
 
 func (d *debugAPI) Name() string {
