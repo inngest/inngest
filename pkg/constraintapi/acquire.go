@@ -351,6 +351,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		// success or idempotency
 		return &CapacityAcquireResponse{
+			RequestID:           requestID,
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			FairnessReduction:   parsedResponse.FairnessReduction,
@@ -366,6 +367,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
+			RequestID:           requestID,
 			Leases:              leases,
 			LimitingConstraints: limitingConstraints,
 			RetryAfter:          retryAfter,
