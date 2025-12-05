@@ -1,8 +1,5 @@
-'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button/NewButton';
-import CodeSearch from '@inngest/components/CodeSearch/CodeSearch';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
@@ -21,6 +18,7 @@ import { durationToString, parseDuration } from '@inngest/components/utils/date'
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import CodeSearch from '../CodeSearch/NewCodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import { useShared } from '../SharedContext/SharedContext';
 import { usePathCreator } from '../SharedContext/usePathCreator';
@@ -32,7 +30,7 @@ import {
 } from '../hooks/useNewSearchParams';
 import type { Features } from '../types/features';
 import { parseCelSearchError } from '../utils/searchErrorParser';
-import { EventDetails } from './EventDetails';
+import { EventDetails } from './NewEventDetails';
 import TotalCount from './TotalCount';
 import { useColumns } from './columns';
 

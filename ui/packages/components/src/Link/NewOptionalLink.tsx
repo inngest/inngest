@@ -9,7 +9,7 @@ export const OptionalLink = ({
   href?: string;
   children: ReactNode;
 }) =>
-  href ? (
+  href || props.to ? (
     <Link href={href} {...props}>
       {children}
     </Link>
