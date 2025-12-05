@@ -121,7 +121,7 @@ end
 ---@param delay_variation_tolerance number
 ---@return integer
 local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
-	local tat = redis.call("GET", key)
+	local tat = call("GET", key)
 	if not tat then
 		return now_ns
 	end
@@ -134,7 +134,7 @@ local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_t
 	local clamped_tat = clampTat(raw_tat, now_ns, period_ns, delay_variation_tolerance)
 	-- If value was clamped, commit the normalization immediately
 	if raw_tat ~= clamped_tat then
-		redis.call("SET", key, clamped_tat, "KEEPTTL")
+		call("SET", key, clamped_tat, "KEEPTTL")
 	end
 
 	return clamped_tat
@@ -250,7 +250,7 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 		-- Calculate TTL like throttled library: ttl = newTat.Sub(now)
 		local ttl_ns = clamped_tat - now_ns
 		local ttl_seconds = math.ceil(ttl_ns / 1000000000) -- Convert nanoseconds to seconds
-		redis.call("SET", key, clamped_tat, "EX", ttl_seconds)
+		call("SET", key, clamped_tat, "EX", ttl_seconds)
 	end
 end
 
