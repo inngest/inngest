@@ -109,10 +109,12 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints flexibleIntArray    `json:"lc"`
-	FairnessReduction   int                 `json:"fr"`
-	RetryAt             int                 `json:"ra"`
-	Debug               flexibleStringArray `json:"d"`
+	LimitingConstraints  flexibleIntArray    `json:"lc"`
+	FairnessReduction    int                 `json:"fr"`
+	RetryAt              int                 `json:"ra"`
+	Debug                flexibleStringArray `json:"d"`
+	ActiveAccountLeases  int                 `json:"aal"`
+	ExpiredAccountLeases int                 `json:"eal"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -266,6 +268,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 			"successful acquire call",
 			"status", parsedResponse.Status,
 			"leases", leases,
+			"active", parsedResponse.ActiveAccountLeases,
+			"expired", parsedResponse.ExpiredAccountLeases,
 		)
 
 		// success or idempotency
@@ -278,7 +282,13 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}, nil
 
 	case 2:
-		l.Trace("acquire call lacking capacity", "status", parsedResponse.Status, "limiting", limitingConstraints)
+		l.Trace(
+			"acquire call lacking capacity",
+			"status", parsedResponse.Status,
+			"limiting", limitingConstraints,
+			"active", parsedResponse.ActiveAccountLeases,
+			"expired", parsedResponse.ExpiredAccountLeases,
+		)
 
 		// lacking capacity
 		return &CapacityAcquireResponse{

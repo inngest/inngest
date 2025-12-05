@@ -460,13 +460,18 @@ func (s *scavengerService) Run(ctx context.Context) error {
 			Tags:    map[string]any{},
 		})
 
-		l.Trace("scavenger tick completed",
+		l := l.With(
 			"total_accounts", res.TotalAccountsCount,
 			"expired_accounts", res.TotalExpiredAccountsCount,
 			"scanned_accounts", res.ScannedAccounts,
 			"expired_leases", res.TotalExpiredLeasesCount,
 			"reclaimed_leases", res.ReclaimedLeases,
 		)
+		if res.ReclaimedLeases > 0 {
+			l.Debug("scavenger tick completed")
+		} else {
+			l.Trace("scavenger tick completed")
+		}
 	}
 }
 

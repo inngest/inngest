@@ -83,8 +83,6 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
-debug("debugging release")
-
 for _, c in ipairs(constraints) do
 	-- for concurrency constraints
 	if c.k == 2 then

@@ -61,6 +61,24 @@ local function getConcurrencyCount(key)
 	return count
 end
 
+---@return integer
+local function getActiveAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+---@return integer
+local function getExpiredAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, "-inf", tostring(nowMS))
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
 ---@param value number
 ---@return integer
@@ -414,6 +432,8 @@ if availableCapacity <= 0 then
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
 
 	return cjson.encode(res)
 end
@@ -512,6 +532,8 @@ result["lc"] = limitingConstraints
 result["ra"] = retryAt -- include retryAt to hint when next capacity is available
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
+result["aal"] = getActiveAccountLeasesCount()
+result["eal"] = getExpiredAccountLeasesCount()
 
 local encoded = cjson.encode(result)
 
