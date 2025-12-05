@@ -2120,7 +2120,7 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid request with zero function version (no longer required)",
+			name: "invvalid request with zero function version",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -2132,6 +2132,7 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					{
 						Kind: kindConcurrency,
 						Concurrency: &ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
 							InProgressItemKey: "test-key",
 						},
 					},
@@ -2140,7 +2141,10 @@ func TestCapacityCheckRequestValid(t *testing.T) {
 					QueueShard: "test",
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{
+				"function version is required for function-level constraints",
+			},
 		},
 		{
 			name: "missing constraints",
