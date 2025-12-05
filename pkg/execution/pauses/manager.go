@@ -353,6 +353,20 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opt
 	return m.bs.Delete(ctx, index, pause, opts...)
 }
 
+// DeletePauseByID deletes a pause by ID from block storage and the buffer.
+func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	// We check the block flushing feature flag because block store delete will only
+	// just mark pauses as deleted in Redis. It's done before the buffer delete because
+	// we need the pause block index to be there to mark the block deletion
+	if m.bs != nil && m.blockFlushEnabled(ctx, workspaceID) {
+		if err := m.bs.DeleteByID(ctx, pauseID, workspaceID); err != nil {
+			return err
+		}
+	}
+
+	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
+}
+
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	if m.bs == nil {
 		return nil
@@ -441,9 +455,4 @@ func (m manager) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ul
 		return nil, 0, fmt.Errorf("block store not available")
 	}
 	return m.bs.GetBlockDeletedIDs(ctx, index, blockID)
-}
-
-func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
-
-	return m.buf.DeletePauseByID(ctx, pauseID, workspaceID)
 }

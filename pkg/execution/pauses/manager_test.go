@@ -177,7 +177,79 @@ func TestConsumePause(t *testing.T) {
 	require.NoError(t, cleanup())
 	assert.Equal(t, true, result.DidConsume)
 	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
-	assert.True(t, mockBlockStore.deleteCalled, "Delete should be called on the blockstore")
+	assert.Equal(t, 1, mockBlockStore.deleteCalled, "Delete should be called once on the blockstore")
+}
+
+func TestDeletePauseByID(t *testing.T) {
+	t.Run("with block store enabled", func(t *testing.T) {
+		mockBufferer := &mockBufferer{}
+		mockBlockStore := &mockBlockStore{}
+		mockFlusher := &mockSimpleFlusher{}
+		
+		manager := NewManager(mockBufferer, mockBlockStore, mockFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
+
+		ctx := context.Background()
+		pauseID := uuid.New()
+		workspaceID := uuid.New()
+
+		testPause := &state.Pause{
+			ID:          pauseID,
+			WorkspaceID: workspaceID,
+		}
+		mockBufferer.pauses = append(mockBufferer.pauses, testPause)
+
+		err := manager.DeletePauseByID(ctx, pauseID, workspaceID)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, mockBlockStore.deleteByIDCalled, "BlockStore DeleteByID should be called once")
+		assert.Equal(t, 1, mockBufferer.deletePauseByIDCalled, "Buffer DeletePauseByID should be called once")
+	})
+
+	t.Run("with block store disabled", func(t *testing.T) {
+		mockBufferer := &mockBufferer{}
+		mockBlockStore := &mockBlockStore{}
+		mockFlusher := &mockSimpleFlusher{}
+
+		manager := NewManager(mockBufferer, mockBlockStore, mockFlusher)
+
+		ctx := context.Background()
+		pauseID := uuid.New()
+		workspaceID := uuid.New()
+
+		testPause := &state.Pause{
+			ID:          pauseID,
+			WorkspaceID: workspaceID,
+		}
+		mockBufferer.pauses = append(mockBufferer.pauses, testPause)
+
+		err := manager.DeletePauseByID(ctx, pauseID, workspaceID)
+		require.NoError(t, err)
+
+		assert.Equal(t, 0, mockBlockStore.deleteByIDCalled, "BlockStore DeleteByID should NOT be called when disabled")
+		assert.Equal(t, 1, mockBufferer.deletePauseByIDCalled, "Buffer DeletePauseByID should be called once")
+	})
+
+	t.Run("without block store", func(t *testing.T) {
+		mockBufferer := &mockBufferer{}
+		mockFlusher := &mockSimpleFlusher{}
+
+		manager := NewManager(mockBufferer, nil, mockFlusher, WithBlockFlushEnabled(alwaysEnabled))
+
+		ctx := context.Background()
+		pauseID := uuid.New()
+		workspaceID := uuid.New()
+
+		testPause := &state.Pause{
+			ID:          pauseID,
+			WorkspaceID: workspaceID,
+		}
+		mockBufferer.pauses = append(mockBufferer.pauses, testPause)
+
+		err := manager.DeletePauseByID(ctx, pauseID, workspaceID)
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, mockBufferer.deletePauseByIDCalled, "Buffer DeletePauseByID should be called once")
+	})
 }
 
 // Helper functions
@@ -219,12 +291,9 @@ func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.
 	return state.ConsumePauseResult{DidConsume: true}, func() error { return nil }, nil
 }
 
-func (m *mockBuffererWithConsume) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
-	return m.mockBufferer.PauseByID(ctx, index, pauseID)
-}
-
 type mockBlockStore struct {
-	deleteCalled bool
+	deleteCalled      int
+	deleteByIDCalled  int
 }
 
 func (m *mockBlockStore) BlockSize() int {
@@ -244,11 +313,12 @@ func (m *mockBlockStore) ReadBlock(ctx context.Context, index Index, blockID uli
 }
 
 func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pause, opts ...state.DeletePauseOpt) error {
-	m.deleteCalled = true
+	m.deleteCalled++
 	return nil
 }
 
 func (m *mockBlockStore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	m.deleteByIDCalled++
 	return nil
 }
 
