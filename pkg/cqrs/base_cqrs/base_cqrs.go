@@ -30,9 +30,9 @@ var (
 )
 
 type BaseCQRSOptions struct {
-	// InMemory indicates that the sqlite should run in memory only and not persist data to disk.
-	// This is expected to be used for the Dev server and testing.
-	InMemory bool
+	// Persist indicates that the sqlite db should persist data to disk.
+	// This can be used for the Dev server, testing, and single-node services.
+	Persist bool
 	// ForTest indicates that the database handler is created for testing purposes.
 	// By default database handlers are all singletons, but when this flag is enabled, they will create temporary handlers.
 	//
@@ -60,18 +60,7 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 		o.Do(func() {
 			db, err = sql.Open("pgx", opts.PostgresURI)
 		})
-	} else if opts.InMemory {
-		if opts.ForTest {
-			// initializes a temporary database every time for test purposes
-			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
-			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
-		} else {
-			// initialize the db once
-			o.Do(func() {
-				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
-			})
-		}
-	} else {
+	} else if opts.Persist {
 		o.Do(func() {
 			// make the dir if it doesn't exist
 			dir := consts.DefaultInngestConfigDir
@@ -98,6 +87,18 @@ func New(opts BaseCQRSOptions) (*sql.DB, error) {
 
 			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
 		})
+	} else {
+		// In-memory
+		if opts.ForTest {
+			// initializes a temporary database every time for test purposes
+			dbName := fmt.Sprintf("sqlite_%s", strings.ToLower(ulid.MustNew(ulid.Now(), rand.Reader).String()))
+			db, err = sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName))
+		} else {
+			// initialize the db once
+			o.Do(func() {
+				db, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+			})
+		}
 	}
 
 	if err != nil {
@@ -170,7 +171,7 @@ func up(db *sql.DB, opts BaseCQRSOptions) error {
 		}
 
 		dbName = "file:inngest?mode=memory&cache=shared"
-		if !opts.InMemory {
+		if opts.Persist {
 			dbName = fmt.Sprintf("file:%s?cache=shared", fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.SQLiteDbFileName))
 		}
 	}
