@@ -32,6 +32,7 @@ func TestConstraintEnforcement(t *testing.T) {
 		config      ConstraintConfig
 		constraints []ConstraintItem
 
+		acquireRequestID      ulid.ULID
 		acquireIdempotencyKey string
 	}
 
@@ -92,7 +93,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
@@ -125,7 +126,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
 					fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
@@ -393,7 +394,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 				}, keys, r.Dump())
@@ -426,7 +427,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
 				}, keys)
@@ -507,7 +508,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, resp.Leases[0].LeaseID),
 					keyInProgressLeases,
 				}, keys)
@@ -540,7 +541,7 @@ func TestConstraintEnforcement(t *testing.T) {
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
-					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
+					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, deps.acquireRequestID),
 					cm.keyLeaseDetails(cm.queueStateKeyPrefix, accountID, *resp.LeaseID),
 					keyInProgressLeases,
 				}, keys)
@@ -1069,6 +1070,10 @@ func TestConstraintEnforcement(t *testing.T) {
 
 			acquireResp, err := cm.Acquire(ctx, acquireReq)
 			require.NoError(t, err)
+
+			if acquireResp != nil {
+				deps.acquireRequestID = acquireResp.RequestID
+			}
 
 			if test.afterAcquire != nil {
 				test.afterAcquire(t, deps, acquireResp)

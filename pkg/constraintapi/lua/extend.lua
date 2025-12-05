@@ -108,7 +108,7 @@ if decode_ulid_time(currentLeaseID) < nowMS then
 end
 
 -- Check if lease details still exist
-local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "oik", "rid")
+local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "req", "rid")
 if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or leaseDetails[2] == nil then
 	local res = {}
 	res["s"] = 2
@@ -117,11 +117,11 @@ if leaseDetails == false or leaseDetails == nil or leaseDetails[1] == nil or lea
 end
 
 local hashedLeaseIdempotencyKey = leaseDetails[1]
-local hashedOperationIdempotencyKey = leaseDetails[2]
+local requestID = leaseDetails[2]
 local leaseRunID = leaseDetails[3]
 
 -- Request state must still exist
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	debug(keyRequestState)
@@ -158,16 +158,7 @@ for _, value in ipairs(constraints) do
 end
 
 -- update lease details
-call(
-	"HSET",
-	keyNewLeaseDetails,
-	"lik",
-	hashedLeaseIdempotencyKey,
-	"rid",
-	leaseRunID,
-	"oik",
-	hashedOperationIdempotencyKey
-)
+call("HSET", keyNewLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 call("DEL", keyOldLeaseDetails)
 
 -- update account leases for scavenger (do not clean up active lease)

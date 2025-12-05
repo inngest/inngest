@@ -218,6 +218,8 @@ type CapacityAcquireResponse struct {
 	RetryAfter time.Time
 
 	internalDebugState acquireScriptResponse
+
+	RequestID ulid.ULID
 }
 
 // Debug returns INTERNAL debug information

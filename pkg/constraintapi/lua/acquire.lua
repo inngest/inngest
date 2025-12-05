@@ -27,17 +27,17 @@ local keyAccountLeases = KEYS[5]
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>? }
 local requestDetails = cjson.decode(ARGV[1])
-local accountID = ARGV[2]
-local nowMS = tonumber(ARGV[3]) --[[@as integer]]
-local nowNS = tonumber(ARGV[4]) --[[@as integer]]
-local leaseExpiryMS = tonumber(ARGV[5])
-local keyPrefix = ARGV[6]
+local requestID = ARGV[2]
+local accountID = ARGV[3]
+local nowMS = tonumber(ARGV[4]) --[[@as integer]]
+local nowNS = tonumber(ARGV[5]) --[[@as integer]]
+local leaseExpiryMS = tonumber(ARGV[6])
+local keyPrefix = ARGV[7]
 ---@type string[]
-local initialLeaseIDs = cjson.decode(ARGV[7])
+local initialLeaseIDs = cjson.decode(ARGV[8])
 if not initialLeaseIDs then
 	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
 end
-local hashedOperationIdempotencyKey = ARGV[8]
 local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
@@ -351,6 +351,20 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	return opIdempotency
 end
 
+-- If the same request state is still in progress (active leases), we cannot acquire more leases for the same request
+-- This should never happen, as we generate a new ID for each request
+local existingRequestState = call("GET", keyRequestState)
+if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
+	local res = {}
+	res["s"] = 4
+	res["d"] = debugLogs
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
+
+	return cjson.encode(res)
+end
+
 -- TODO: Is the operation related to a single idempotency key that is still valid? Return that
 -- TODO: This is basically the key queues case: What if the existing lease is still valid? And if it expired, can the
 -- lease idempotency key be safely reused (should be fine)
@@ -484,16 +498,7 @@ for i = 1, granted, 1 do
 	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
 
 	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
-	call(
-		"HSET",
-		keyLeaseDetails,
-		"lik",
-		hashedLeaseIdempotencyKey,
-		"rid",
-		leaseRunID,
-		"oik",
-		hashedOperationIdempotencyKey
-	)
+	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 
 	-- Add lease to scavenger set of account leases
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)

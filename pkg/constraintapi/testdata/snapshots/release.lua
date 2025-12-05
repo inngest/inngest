@@ -25,18 +25,14 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 	return opIdempotency
 end
-local hashedOperationIdempotencyKey = call("HGET", keyLeaseDetails, "oik")
-if
-	hashedOperationIdempotencyKey == false
-	or hashedOperationIdempotencyKey == nil
-	or hashedOperationIdempotencyKey == ""
-then
+local requestID = call("HGET", keyLeaseDetails, "req")
+if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	local res = {}
