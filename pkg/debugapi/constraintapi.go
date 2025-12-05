@@ -126,7 +126,7 @@ func (d *debugAPI) CheckConstraints(ctx context.Context, req *cpb.CapacityCheckR
 	}
 
 	if userErr != nil {
-		return nil, fmt.Errorf("user err: %w", err)
+		return nil, fmt.Errorf("user err: %w", userErr)
 	}
 
 	serializedResp := constraintapi.CapacityCheckResponseToProto(resp)
