@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -85,9 +86,11 @@ func (q *queue) backlogRefillConstraintCheck(
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
+	hashedItemIDs := make(map[string]string)
 	for i, item := range items {
 		itemIDs[i] = item.ID
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
+		hashedItemIDs[util.XXHash(item.ID)] = item.ID
 	}
 
 	if q.capacityManager == nil || q.useConstraintAPI == nil {
@@ -159,8 +162,8 @@ func (q *queue) backlogRefillConstraintCheck(
 	itemsToRefill := make([]string, len(res.Leases))
 	itemCapacityLeases := make([]ulid.ULID, len(res.Leases))
 	for i, l := range res.Leases {
-		// NOTE: This works because idempotency key == queue item ID
-		itemsToRefill[i] = l.IdempotencyKey
+		// NOTE: This works because idempotency key == hash(queue item ID) and we keep track of the hashed values
+		itemsToRefill[i] = hashedItemIDs[l.IdempotencyKey]
 		itemCapacityLeases[i] = l.LeaseID
 	}
 

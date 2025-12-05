@@ -109,12 +109,14 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints  flexibleIntArray    `json:"lc"`
-	FairnessReduction    int                 `json:"fr"`
-	RetryAt              int                 `json:"ra"`
-	Debug                flexibleStringArray `json:"d"`
-	ActiveAccountLeases  int                 `json:"aal"`
-	ExpiredAccountLeases int                 `json:"eal"`
+	LimitingConstraints flexibleIntArray    `json:"lc"`
+	FairnessReduction   int                 `json:"fr"`
+	RetryAt             int                 `json:"ra"`
+	Debug               flexibleStringArray `json:"d"`
+
+	ActiveAccountLeases  int `json:"aal"`
+	ExpiredAccountLeases int `json:"eal"`
+	EarliestLeaseExpiry  int `json:"ele"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -262,14 +264,18 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
+	l = l.With(
+		"status", parsedResponse.Status,
+		"active", parsedResponse.ActiveAccountLeases,
+		"expired", parsedResponse.ExpiredAccountLeases,
+		"earliest_expiry", time.UnixMilli(int64(parsedResponse.EarliestLeaseExpiry)),
+	)
+
 	switch parsedResponse.Status {
 	case 1, 3:
 		l.Trace(
 			"successful acquire call",
-			"status", parsedResponse.Status,
 			"leases", leases,
-			"active", parsedResponse.ActiveAccountLeases,
-			"expired", parsedResponse.ExpiredAccountLeases,
 		)
 
 		// success or idempotency
@@ -284,10 +290,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	case 2:
 		l.Trace(
 			"acquire call lacking capacity",
-			"status", parsedResponse.Status,
 			"limiting", limitingConstraints,
-			"active", parsedResponse.ActiveAccountLeases,
-			"expired", parsedResponse.ExpiredAccountLeases,
 		)
 
 		// lacking capacity

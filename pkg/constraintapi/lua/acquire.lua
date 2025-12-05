@@ -79,6 +79,15 @@ local function getExpiredAccountLeasesCount()
 	return count
 end
 
+---@return integer
+local function getEarliestLeaseExpiry()
+	local count = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if count == nil or count == false or #count == 0 then
+		return 0
+	end
+	return tonumber(count[2])
+end
+
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
 ---@param value number
 ---@return integer
@@ -434,6 +443,7 @@ if availableCapacity <= 0 then
 	res["fr"] = fairnessReduction
 	res["aal"] = getActiveAccountLeasesCount()
 	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
 
 	return cjson.encode(res)
 end
@@ -534,6 +544,7 @@ result["d"] = debugLogs
 result["fr"] = fairnessReduction
 result["aal"] = getActiveAccountLeasesCount()
 result["eal"] = getExpiredAccountLeasesCount()
+result["ele"] = getEarliestLeaseExpiry()
 
 local encoded = cjson.encode(result)
 
