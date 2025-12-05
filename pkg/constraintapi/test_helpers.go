@@ -234,7 +234,7 @@ func (cv *ConstraintVerifier) VerifyInProgressCounts(constraints []ConstraintIte
 }
 
 // VerifyLeaseDetails checks that lease details are properly stored and consistent
-func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdempotencyKey, expectedRunID, expectedOpKey string) {
+func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdempotencyKey, expectedRunID string, expectedRequestID ulid.ULID) {
 	leaseDetailsKey := cv.te.CapacityManager.keyLeaseDetails(cv.te.KeyPrefix, cv.te.AccountID, leaseID)
 
 	require.True(cv.te.t, cv.te.Redis.Exists(leaseDetailsKey), "Lease details key should exist: %s", leaseDetailsKey)
@@ -251,10 +251,10 @@ func (cv *ConstraintVerifier) VerifyLeaseDetails(leaseID ulid.ULID, expectedIdem
 		require.Equal(cv.te.t, expectedRunID, rid, "Run ID mismatch")
 	}
 
-	if expectedOpKey != "" {
-		oik := cv.te.Redis.HGet(leaseDetailsKey, "oik")
-		require.NotEmpty(cv.te.t, oik, "Operation idempotency key should be stored")
-		require.Equal(cv.te.t, expectedOpKey, oik, "Operation idempotency key mismatch")
+	if !expectedRequestID.IsZero() {
+		reqID := cv.te.Redis.HGet(leaseDetailsKey, "req")
+		require.NotEmpty(cv.te.t, reqID, "Operation idempotency key should be stored")
+		require.Equal(cv.te.t, expectedRequestID.String(), reqID, "Operation idempotency key mismatch")
 	}
 }
 

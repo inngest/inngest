@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -592,20 +593,23 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 		err := te.Redis.Set(requestStateKey, "invalid-json-data")
 		require.NoError(t, err)
 		leaseID := ulid.Make()
-		te.Redis.HSet(te.CapacityManager.keyLeaseDetails(te.KeyPrefix, te.AccountID, leaseID), "req", reqID.String())
+		te.Redis.HSet(
+			te.CapacityManager.keyLeaseDetails(te.KeyPrefix, te.AccountID, leaseID),
+			"req", reqID.String(),
+			"lik", util.XXHash("acquire-key"),
+			"rid", "",
+		)
 
 		// Try to extend lease which will try to read the corrupted state
-		resp, err := te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
+		_, err = te.CapacityManager.ExtendLease(context.Background(), &CapacityExtendLeaseRequest{
 			IdempotencyKey: "extend-invalid",
 			AccountID:      te.AccountID,
 			LeaseID:        leaseID,
 			Duration:       5 * time.Second,
 			Migration:      MigrationIdentifier{QueueShard: "test"},
 		})
-
-		// Should handle gracefully (specific error handling depends on implementation)
-		require.NoError(t, err)
-		require.Equal(t, 3, resp.internalDebugState.Status)
+		require.ErrorContains(t, err, "requestDetails is nil after JSON decode")
+		require.Error(t, err)
 	})
 
 	t.Run("Missing Lease Details", func(t *testing.T) {
