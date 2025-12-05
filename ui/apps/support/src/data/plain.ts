@@ -154,12 +154,15 @@ type TimeLineEntryEdge = {
           __typename: "MachineUserActor";
           machineUser: { fullName: string };
         };
-    entry: EmailEntry; // CustomEntry | ChatEntry | SlackMessageEntry;
+    entry: EmailEntry | CustomEntry; // CustomEntry | ChatEntry | SlackMessageEntry;
   };
 };
 
 type TimelineEntriesResponse = {
   thread: {
+    customer: {
+      fullName: string;
+    };
     timelineEntries: { edges: TimeLineEntryEdge[] };
   };
 };
@@ -186,6 +189,18 @@ type CustomerActor = {
   };
 };
 type Actor = UserActor | CustomerActor;
+
+type Component = {
+  __typename: "ComponentText" | "ComponentPlainText";
+  // We normalize this field in the query
+  text: string;
+};
+
+type CustomEntry = {
+  __typename: "CustomEntry";
+  title: string;
+  components: Component[];
+};
 
 type EmailEntry = {
   __typename: "EmailEntry";
@@ -232,6 +247,9 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
           query GetTimelineEntries($threadId: ID!, $first: Int, $after: String, $last: Int, $before: String) {
             thread(threadId: $threadId) {
               id
+              customer {
+                fullName
+              }
               timelineEntries(first: $first, after: $after, last: $last, before: $before) {
                 edges {
                   cursor
@@ -261,6 +279,18 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
                     }
                     entry {
                       __typename
+                      ... on CustomEntry {
+                        title
+                        components {
+                          __typename
+                          ... on ComponentText {
+                            text
+                          }
+                          ... on ComponentPlainText {
+                            text: plainText
+                          }
+                        }
+                      }
                       ... on EmailEntry {
                         emailId
                         subject
@@ -303,7 +333,7 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
         `,
         variables: {
           threadId: ticketId,
-          first: 10,
+          first: 20,
           after: null,
           last: null,
           before: null,
@@ -315,13 +345,41 @@ export const getTimelineEntriesForTicket = createServerFn({ method: "GET" })
         return [];
       }
 
+      const customerName = res.data.thread.customer.fullName;
+
       const entries = res.data.thread.timelineEntries.edges;
       // Filter out entries that are not EmailEntry or SlackMessageEntry
-      return entries.filter(
-        (entry) =>
-          entry.node.entry.__typename === "EmailEntry" ||
-          entry.node.entry.__typename === "SlackMessageEntry",
-      );
+      console.log(JSON.stringify(entries, null, 2));
+      return entries
+        .filter(
+          (entry) =>
+            // Custom entries are created via the API
+            entry.node.entry.__typename === "CustomEntry" ||
+            entry.node.entry.__typename === "EmailEntry", //||
+          // entry.node.entry.__typename === "SlackMessageEntry",
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.node.timestamp.iso8601).getTime() -
+            new Date(b.node.timestamp.iso8601).getTime(),
+        )
+        .map((entry, idx) => {
+          // Map the first custom entry to the customer's name
+          // We create a ticket via the API so it's a "machine user"
+          if (idx === 0 && entry.node.entry.__typename === "CustomEntry") {
+            return {
+              ...entry,
+              node: {
+                ...entry.node,
+                actor: {
+                  __typename: "CustomerActor",
+                  customer: { fullName: customerName },
+                },
+              },
+            };
+          }
+          return entry;
+        });
     } catch (error) {
       console.error("Error fetching timeline entries:", error);
       return [];
