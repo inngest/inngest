@@ -706,6 +706,8 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 
 		// Acquired lease and request to skip checks
 		require.Len(t, res.itemCapacityLeases, 1)
+		require.Len(t, res.itemsToRefill, 1)
+		require.Equal(t, qi.ID, res.itemsToRefill[0])
 		require.True(t, res.skipConstraintChecks)
 
 		// Expect exactly one acquire request
