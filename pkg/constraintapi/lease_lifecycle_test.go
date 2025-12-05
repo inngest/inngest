@@ -438,8 +438,7 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 			},
 		}
 
-		// Step 1: First acquire with idempotency key
-		resp1, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		acquireReq := &CapacityAcquireRequest{
 			IdempotencyKey:       "idempotent-key",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -456,7 +455,10 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		// Step 1: First acquire with idempotency key
+		resp1, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, resp1.Leases, 2)
@@ -466,24 +468,7 @@ func TestLeaseLifecycle_CompleteWorkflows(t *testing.T) {
 		}
 
 		// Step 2: Repeat same acquire with same idempotency key
-		resp2, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
-			IdempotencyKey:       "idempotent-key", // Same key
-			AccountID:            te.AccountID,
-			EnvID:                te.EnvID,
-			FunctionID:           te.FunctionID,
-			Amount:               3,                                                        // Different amount - should be ignored
-			LeaseIdempotencyKeys: []string{"idempotent-3", "idempotent-4", "idempotent-5"}, // Different lease keys
-			CurrentTime:          clock.Now(),
-			Duration:             60 * time.Second, // Different duration
-			MaximumLifetime:      2 * time.Minute,  // Different lifetime
-			Configuration:        config,
-			Constraints:          constraints,
-			Source: LeaseSource{
-				Service:  ServiceExecutor,
-				Location: CallerLocationItemLease,
-			},
-			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		resp2, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, resp2.Leases, 2, "Should return same number of leases from cached result")

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -30,6 +31,8 @@ func TestConstraintEnforcement(t *testing.T) {
 
 		config      ConstraintConfig
 		constraints []ConstraintItem
+
+		acquireIdempotencyKey string
 	}
 
 	type testCase struct {
@@ -86,7 +89,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -118,7 +121,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
@@ -148,7 +151,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -379,11 +382,15 @@ func TestConstraintEnforcement(t *testing.T) {
 				// All keys should exist
 				keys := r.Keys()
 				keyInProgressLeases := constraints[0].Concurrency.InProgressLeasesKey(cm.queueStateKeyPrefix, accountID, envID, fnID)
+
+				t.Log(deps.acquireIdempotencyKey)
+				t.Log(util.XXHash(deps.acquireIdempotencyKey))
+
 				require.Len(t, keys, 8)
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -415,7 +422,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
@@ -444,7 +451,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -497,7 +504,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
 					cm.keyRequestState(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -529,7 +536,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				require.Subset(t, []string{
 					cm.keyScavengerShard(cm.queueStateKeyPrefix, 0),
 					cm.keyAccountLeases(cm.queueStateKeyPrefix, accountID),
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "item0"),
@@ -558,7 +565,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				keys := r.Keys()
 				require.Len(t, keys, 5)
 				require.Subset(t, []string{
-					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", "acquire"),
+					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "acq", deps.acquireIdempotencyKey),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "ext", "extend"),
 					cm.keyOperationIdempotency(cm.queueStateKeyPrefix, accountID, "rel", "release"),
 					cm.keyConstraintCheckIdempotency(cm.queueStateKeyPrefix, accountID, "acquire"),
@@ -980,6 +987,8 @@ func TestConstraintEnforcement(t *testing.T) {
 			defer rc.Close()
 
 			clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+			l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(logger.LevelTrace))
+			ctx = logger.WithStdlib(ctx, l)
 
 			cm, err := NewRedisCapacityManager(
 				WithRateLimitClient(rc),
@@ -1029,7 +1038,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				leaseIdempotencyKeys[i] = fmt.Sprintf("item%d", i)
 			}
 
-			acquireResp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
+			acquireReq := &CapacityAcquireRequest{
 				Migration:            test.mi,
 				AccountID:            accountID,
 				IdempotencyKey:       "acquire",
@@ -1048,7 +1057,17 @@ func TestConstraintEnforcement(t *testing.T) {
 					Location:          CallerLocationItemLease,
 					RunProcessingMode: RunProcessingModeBackground,
 				},
-			})
+			}
+
+			keyPrefix, _, err := cm.clientAndPrefix(test.mi)
+			require.NoError(t, err)
+
+			_, _, _, fingerprint, err := buildRequestState(acquireReq, keyPrefix)
+			require.NoError(t, err)
+
+			deps.acquireIdempotencyKey = fmt.Sprintf("acquire-%s", fingerprint)
+
+			acquireResp, err := cm.Acquire(ctx, acquireReq)
 			require.NoError(t, err)
 
 			if test.afterAcquire != nil {

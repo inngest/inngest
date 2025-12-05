@@ -143,7 +143,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	}
 
 	l.Trace(
-		"prepared acquire call",
+		"prepared check call",
 		"req", req,
 		"keys", keys,
 		"args", args,
