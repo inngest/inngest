@@ -37,6 +37,27 @@ local function getConcurrencyCount(key)
 	end
 	return count
 end
+local function getActiveAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+local function getExpiredAccountLeasesCount()
+	local count = call("ZCOUNT", keyAccountLeases, "-inf", tostring(nowMS))
+	if count == nil then
+		return 0
+	end
+	return count
+end
+local function getEarliestLeaseExpiry()
+	local count = call("ZRANGE", keyAccountLeases, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if count == nil or count == false or #count == 0 then
+		return 0
+	end
+	return tonumber(count[2])
+end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
@@ -232,6 +253,9 @@ if availableCapacity <= 0 then
 	res["ra"] = retryAt
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
+	res["aal"] = getActiveAccountLeasesCount()
+	res["eal"] = getExpiredAccountLeasesCount()
+	res["ele"] = getEarliestLeaseExpiry()
 	return cjson.encode(res)
 end
 local granted = availableCapacity
@@ -294,6 +318,9 @@ result["lc"] = limitingConstraints
 result["ra"] = retryAt 
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
+result["aal"] = getActiveAccountLeasesCount()
+result["eal"] = getExpiredAccountLeasesCount()
+result["ele"] = getEarliestLeaseExpiry()
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded

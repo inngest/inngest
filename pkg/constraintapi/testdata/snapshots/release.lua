@@ -52,7 +52,6 @@ local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
-debug("debugging release")
 for _, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
