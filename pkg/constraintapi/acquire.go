@@ -51,7 +51,7 @@ type redisRequestState struct {
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 }
 
-func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisRequestState, []ConstraintItem) {
+func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisRequestState, []ConstraintItem, map[string]string) {
 	state := &redisRequestState{
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
@@ -65,10 +65,16 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 		ActiveAmount:  0,
 	}
 
-	// Hash lease idempotency keys
+	// We hash all idempotency keys provided by users internally.
+	// This is a security precaution and helps reduce memory usage.
+	// Users still expect the unhashed idempotency keys to be returned,
+	// hence we need to track the mapping between idempotency key -> hash(idempotency key)
+	hashedLeaseIdempotencyKeysMap := make(map[string]string)
 	hashedLeaseIdempotencyKeys := make([]string, len(req.LeaseIdempotencyKeys))
 	for i, leaseIdempotencyKey := range req.LeaseIdempotencyKeys {
-		hashedLeaseIdempotencyKeys[i] = util.XXHash(leaseIdempotencyKey)
+		hashed := util.XXHash(leaseIdempotencyKey)
+		hashedLeaseIdempotencyKeys[i] = hashed
+		hashedLeaseIdempotencyKeysMap[hashed] = leaseIdempotencyKey
 	}
 
 	state.HashedLeaseIdempotencyKeys = hashedLeaseIdempotencyKeys
@@ -98,7 +104,7 @@ func buildRequestState(req *CapacityAcquireRequest, keyPrefix string) (*redisReq
 
 	state.SortedConstraints = serialized
 
-	return state, constraints
+	return state, constraints, hashedLeaseIdempotencyKeysMap
 }
 
 type acquireScriptResponse struct {
@@ -165,7 +171,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState, sortedConstraints := buildRequestState(req, keyPrefix)
+	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap := buildRequestState(req, keyPrefix)
 
 	// Deterministically compute this based on numScavengerShards and accountID
 	scavengerShard := r.scavengerShard(ctx, req.AccountID)
@@ -223,9 +229,17 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	leases := make([]CapacityLease, len(parsedResponse.GrantedLeases))
 	for i, v := range parsedResponse.GrantedLeases {
+		// To return the original lease idempotency key back to the user,
+		// we have to perform a reverse lookup in the map of hash(idempotency key) -> idempotency key
+		// we created when serializing the request state.
+		leaseIdempotencyKey, ok := hashedLeaseIdempotencyKeysMap[v.LeaseIdempotencyKey]
+		if !ok {
+			return nil, errs.Wrap(0, false, "invalid hashed lease idempotency key returned")
+		}
+
 		leases[i] = CapacityLease{
 			LeaseID:        v.LeaseID,
-			IdempotencyKey: v.LeaseIdempotencyKey,
+			IdempotencyKey: leaseIdempotencyKey,
 		}
 	}
 
