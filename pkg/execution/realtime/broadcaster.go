@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/sourcegraph/conc"
 )
 
 var (
@@ -28,7 +30,9 @@ var (
 
 // NewInProcessBroadcaster is a single broadcaster which manages active subscriptions
 // in-memory and broadcasts to connected subscribers.
-func NewInProcessBroadcaster() Broadcaster {
+//
+// This fulfils the Broadcaster interface.
+func NewInProcessBroadcaster() *broadcaster {
 	return newBroadcaster()
 }
 
@@ -38,7 +42,6 @@ func newBroadcaster() *broadcaster {
 		subs:    map[uuid.UUID]*activesub{},
 		topics:  map[string]topicsub{},
 		l:       &sync.RWMutex{},
-		conds:   map[string]*sync.Cond{},
 	}
 }
 
@@ -65,28 +68,27 @@ type broadcaster struct {
 	topics map[string]topicsub
 
 	l *sync.RWMutex
-	// conds is a map of subscriptionID-topic hashes to a sync.Cond, allowing
-	// us to
-	conds map[string]*sync.Cond
+
+	wg conc.WaitGroup
+
+	// TopicStart is called when the first subscriber connects to a topic.
+	TopicStart func(ctx context.Context, t Topic) error
+	// TopicStop is called when the last subscriber disconnects from a topic.
+	TopicStop func(ctx context.Context, t Topic) error
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
 	if len(topics) == 0 {
 		return nil
 	}
-	return b.subscribe(ctx, s, topics, nil, nil)
+	return b.subscribe(ctx, s, topics)
 }
 
 // subscribe ensures that a given Subscription is subscribed to the provided topics.
-// The onSubscribe callback is called when the subscription starts for eahc topic, and the
-// onUnsubscribe callback is called when the subscription ends, eg. when Close or Unsubscribe
-// is called on another thread.
 func (b *broadcaster) subscribe(
 	ctx context.Context,
 	s Subscription,
 	topics []Topic,
-	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(ctx context.Context, t Topic),
 ) error {
 	if len(topics) == 0 {
 		return nil
@@ -124,14 +126,28 @@ func (b *broadcaster) subscribe(
 		// meaning we only send a single message per eg. websocket connection.
 		if !seen {
 			topicsubs.subscriptions.Insert(skiplistSub{s})
+			topicsubs.RefCount++
 			b.topics[topicHash] = topicsubs
-		}
 
-		// For each topic, create a new context which is cancelled when Unsubscribe or Close is called.
-		//
-		// We manage closing of channels via sync.Cond calls, which broadcast to many blocked
-		// goroutines allowing them to continue.
-		b.setupCond(ctx, s, t, onSubscribe, onUnsubscribe)
+			if topicsubs.RefCount == 1 && b.TopicStart != nil {
+				// We must release the lock while calling TopicStart to avoid deadlocks
+				// if TopicStart calls back into broadcaster (though it shouldn't).
+				// However, releasing the lock here is dangerous as state might change.
+				// For now, we assume TopicStart is non-blocking and doesn't call back.
+				// redisBroadcaster.TopicStart spawns a goroutine, so it is fast.
+				if err := b.TopicStart(ctx, t); err != nil {
+					// Rollback
+					topicsubs.subscriptions.Delete(skiplistSub{s})
+					topicsubs.RefCount--
+					if topicsubs.RefCount == 0 {
+						delete(b.topics, topicHash)
+					} else {
+						b.topics[topicHash] = topicsubs
+					}
+					return fmt.Errorf("error starting topic %s: %w", t.String(), err)
+				}
+			}
+		}
 	}
 
 	if as, ok := b.subs[s.ID()]; ok {
@@ -143,51 +159,27 @@ func (b *broadcaster) subscribe(
 		// This is the first time we've seen a subscription.  Send
 		// keepalives after an interval to ensure that the connection
 		// remains open during periods of inactivity.
-		go b.keepalive(ctx, s.ID())
+		b.wg.Go(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error("panic in keepalive", "panic", r, "sub_id", s.ID())
+				}
+			}()
+			b.keepalive(ctx, s.ID())
+		})
+
+		b.recordConnectionMetrics(ctx)
 	}
+
+	metrics.HistogramRealtimeSubscriptionTopicsCount(ctx, int64(len(topics)), metrics.HistogramOpt{
+		PkgName: "realtime",
+		Tags:    map[string]any{},
+	})
 
 	return nil
 }
 
-// setupCond sets up a new sync.Cond, ensuring that any goroutines waiting for
-// the topic to be unsubscribe are unblocked at the same time.
-//
-// NOTE: this must be called with the broadcast lock held.
-func (b *broadcaster) setupCond(
-	ctx context.Context,
-	s Subscription,
-	t Topic,
-	onSubscribe func(ctx context.Context, t Topic),
-	onUnsubscribe func(ctx context.Context, t Topic),
-) {
-	cond, ok := b.conds[s.ID().String()+t.String()]
-	if !ok {
-		cond = sync.NewCond(&sync.Mutex{})
-		b.conds[s.ID().String()+t.String()] = cond
-	}
-
-	rctx, cancel := context.WithCancel(ctx)
-
-	go func(t Topic) {
-		cond.L.Lock()
-		cond.Wait()
-		cond.L.Unlock()
-
-		// We've received a notification that this topic has been unsubscribed, so cancel
-		// the context.
-		cancel()
-		if onUnsubscribe != nil {
-			// NOTE: this uses the parent context that isn't cancelled via unsubscribe.
-			// The context may be cancelled via a parent call, eg. SIGINT.
-			go onUnsubscribe(ctx, t)
-		}
-	}(t)
-
-	if onSubscribe != nil {
-		go onSubscribe(rctx, t)
-	}
-}
-
+// Unsubscribe removes a subscription from specific topics.
 func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics []Topic) error {
 	if atomic.LoadInt32(&b.closing) == 1 {
 		// Already happening, so ignore.
@@ -221,9 +213,17 @@ func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics [
 		subs.subscriptions.Delete(skiplistSub{as.Subscription})
 		delete(as.Topics, str)
 
-		// Signal to all conds that the topic has been unsubscribed.
-		if cond, ok := b.conds[subID.String()+t.String()]; ok {
-			cond.Broadcast()
+		subs.RefCount--
+		if subs.RefCount == 0 {
+			if b.TopicStop != nil {
+				if err := b.TopicStop(ctx, t); err != nil {
+					logger.StdlibLogger(ctx).Warn("error stopping topic", "error", err, "topic", t)
+				}
+			}
+			delete(b.topics, str)
+		} else {
+			// Update the map with new RefCount
+			b.topics[str] = subs
 		}
 	}
 
@@ -253,11 +253,54 @@ func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid
 			continue
 		}
 		subs.subscriptions.Delete(skiplistSub{as.Subscription})
+
+		subs.RefCount--
+		if subs.RefCount == 0 {
+			if b.TopicStop != nil {
+				if err := b.TopicStop(ctx, t); err != nil {
+					logger.StdlibLogger(ctx).Warn("error stopping topic", "error", err, "topic", t)
+				}
+			}
+			delete(b.topics, str)
+		} else {
+			b.topics[str] = subs
+		}
 	}
 
 	// Then remove the subscription from our subscription map
 	delete(b.subs, subscriptionID)
+
+	b.recordConnectionMetrics(ctx)
 	return nil
+}
+
+func (b *broadcaster) recordConnectionMetrics(ctx context.Context) {
+	// This function assumes b.l is already locked by the caller.
+	websocketCount := 0
+	sseCount := 0
+
+	for _, as := range b.subs {
+		sub := as.Subscription
+		if sub.Protocol() == "websocket" {
+			websocketCount++
+		} else if sub.Protocol() == "sse" {
+			sseCount++
+		}
+	}
+
+	metrics.GaugeRealtimeConnectionsActive(ctx, int64(websocketCount), metrics.GaugeOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"protocol": "websocket",
+		},
+	})
+
+	metrics.GaugeRealtimeConnectionsActive(ctx, int64(sseCount), metrics.GaugeOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"protocol": "sse",
+		},
+	})
 }
 
 func (b *broadcaster) Close(ctx context.Context) error {
@@ -280,6 +323,14 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	}
 
 	go func() {
+		defer func() {
+			// Ensure we wait for all background routines to finish.
+			// Since we recover inside them, Wait() shouldn't panic, but let's be safe.
+			if r := b.wg.WaitAndRecover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic waiting for broadcaster shutdown", "panic", r)
+			}
+		}()
+
 		// After 5 minutes, close all connections.
 		<-time.After(ShutdownGracePeriod)
 
@@ -295,34 +346,132 @@ func (b *broadcaster) Close(ctx context.Context) error {
 	return nil
 }
 
+func (b *broadcaster) Write(ctx context.Context, envID uuid.UUID, channel string, data []byte) {
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "raw",
+		},
+	})
+
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	// Find all subscriptions for this channel across all topics
+	// Since we don't have a specific topic, we'll write to any subscription
+	// that has a matching channel in any of its topics
+	for _, topicSub := range b.topics {
+		if topicSub.EnvID == envID && topicSub.Channel == channel {
+			topicSub.eachSubscription(func(s Subscription) {
+				// Use Write() to forward raw bytes directly
+				if err := s.Write(data); err != nil {
+					logger.StdlibLogger(ctx).Warn(
+						"error writing raw data to subscription",
+						"error", err,
+						"channel", channel,
+						"sub_id", s.ID(),
+					)
+				}
+			})
+		}
+	}
+}
+
 func (b *broadcaster) Publish(ctx context.Context, m Message) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
-	wg := sync.WaitGroup{}
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "structured",
+		},
+	})
+
+	wg := conc.WaitGroup{}
 	for _, t := range m.Topics() {
 		tid := t.String()
 		found, ok := b.topics[tid]
+
 		if !ok {
 			continue
 		}
 
-		wg.Add(1)
-		go func(msg Message, t topicsub) {
+		wg.Go(func() {
+			t := found
 			// Ensure we set the correct topic name for the given topic.
 			// Messages always have a custom topic name (eg. the step name),
 			// but are broadcast to internal topics such as "$step";  we need
 			// to update that for each topic here.
+			msg := m
 			msg.Topic = t.Name
 
-			defer wg.Done()
 			t.eachSubscription(func(s Subscription) {
-				b.publishTo(ctx, s, m)
+				b.publishTo(ctx, s, msg)
 			})
-		}(m, found)
+		})
 	}
 
 	wg.Wait()
+}
+
+func (b *broadcaster) publishToTopic(ctx context.Context, t Topic, m Message) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "structured",
+		},
+	})
+
+	tid := t.String()
+	found, ok := b.topics[tid]
+	if !ok {
+		return
+	}
+
+	msg := m
+	msg.Topic = t.Name
+
+	found.eachSubscription(func(s Subscription) {
+		b.publishTo(ctx, s, msg)
+	})
+}
+
+func (b *broadcaster) writeToTopic(ctx context.Context, t Topic, data []byte) {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	metrics.IncrRealtimeMessagesPublishedTotal(ctx, metrics.CounterOpt{
+		PkgName: "realtime",
+		Tags: map[string]any{
+			"stage":   "fanout",
+			"payload": "raw",
+		},
+	})
+
+	tid := t.String()
+	found, ok := b.topics[tid]
+	if !ok {
+		return
+	}
+
+	found.eachSubscription(func(s Subscription) {
+		// Use Write() to forward raw bytes directly
+		if err := s.Write(data); err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"error writing raw data to subscription",
+				"error", err,
+				"topic", t.String(),
+				"sub_id", s.ID(),
+			)
+		}
+	})
 }
 
 // PublishStream publishes streams of data to any subscribers for a given datastream.
@@ -330,7 +479,7 @@ func (b *broadcaster) PublishChunk(ctx context.Context, m Message, c Chunk) {
 	b.l.RLock()
 	defer b.l.RUnlock()
 
-	wg := sync.WaitGroup{}
+	wg := conc.WaitGroup{}
 	for _, t := range m.Topics() {
 		tid := t.String()
 		found, ok := b.topics[tid]
@@ -338,13 +487,12 @@ func (b *broadcaster) PublishChunk(ctx context.Context, m Message, c Chunk) {
 			continue
 		}
 
-		wg.Add(1)
-		go func(t topicsub) {
-			defer wg.Done()
+		wg.Go(func() {
+			t := found
 			t.eachSubscription(func(s Subscription) {
 				b.publishStreamTo(ctx, s, c)
 			})
-		}(found)
+		})
 	}
 
 	wg.Wait()
@@ -375,7 +523,13 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 
 	// If this failed to write, attempt to resend the message until
 	// max attempts pass.
-	go func() {
+	b.wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic in doPublish retry", "panic", r, "sub_id", s.ID())
+			}
+		}()
+
 		var err error
 		for att := 1; att < MaxWriteAttempts; att++ {
 			<-time.After(WriteRetryInterval)
@@ -383,6 +537,13 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 				return
 			}
 		}
+		metrics.IncrRealtimeMessageDeliveryFailuresTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags: map[string]any{
+				"protocol": s.Protocol(),
+				"reason":   "write_failed",
+			},
+		})
 		logger.StdlibLogger(ctx).Warn(
 			"error publishing to subscription",
 			"error", err,
@@ -391,7 +552,7 @@ func (b *broadcaster) doPublish(ctx context.Context, s Subscription, f func() er
 		)
 		// TODO: mark the subscription as failing.  If the subscription
 		// continues to fail, ensure we close the subscription.
-	}()
+	})
 }
 
 // keepalive sends keepalives to the subscription within a specific interval, ensuring
@@ -418,6 +579,12 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 		}
 		if err != nil {
 			errCount += 1
+			metrics.IncrRealtimeKeepaliveFailuresTotal(ctx, metrics.CounterOpt{
+				PkgName: "realtime",
+				Tags: map[string]any{
+					"protocol": sub.Protocol(),
+				},
+			})
 		}
 		if errCount == MaxKeepaliveErrors {
 			// Close this subscription and quit.
@@ -460,6 +627,7 @@ type topicsub struct {
 	Topic
 
 	subscriptions *skiplist.SkipList
+	RefCount      int
 }
 
 func (t topicsub) eachSubscription(f func(s Subscription)) {

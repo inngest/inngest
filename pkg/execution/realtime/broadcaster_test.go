@@ -25,7 +25,11 @@ func TestBroadcaster(t *testing.T) {
 		messages = []Message{}
 		l        sync.Mutex
 	)
-	appender := func(m Message) error {
+	appender := func(b []byte) error {
+		var m Message
+		if err := json.Unmarshal(b, &m); err != nil {
+			return err
+		}
 		l.Lock()
 		messages = append(messages, m)
 		l.Unlock()
@@ -118,10 +122,10 @@ func TestBroadcaster(t *testing.T) {
 			messages = []Message{}
 
 			failed := false
-			sub := NewInmemorySubscription(id, func(m Message) error {
+			sub := NewInmemorySubscription(id, func(b []byte) error {
 				if failed {
 					failed = false
-					err := appender(m)
+					err := appender(b)
 					require.NoError(t, err)
 					return nil
 				}
@@ -148,105 +152,51 @@ func TestBroadcaster(t *testing.T) {
 	})
 }
 
-// TestBroadcasterConds ensures that the sync.Cond mechanisms work for subscribing and
-// unsubscribing
-func TestBroadcasterConds(t *testing.T) {
-	t.Run("single subscriber", func(t *testing.T) {
-		var (
-			ctx = context.Background()
-			b   = NewInProcessBroadcaster().(*broadcaster)
-			sub = NewInmemorySubscription(uuid.New(), nil)
-			msg = Message{
-				Kind:    streamingtypes.MessageKindData,
-				Data:    json.RawMessage(`"output"`),
-				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
-			}
-			unsubCalled int32
-			wg          sync.WaitGroup
-		)
+// TestBroadcasterHooks ensures that the TopicStart and TopicStop hooks work correctly
+func TestBroadcasterHooks(t *testing.T) {
+	t.Run("Lifecycle hooks", func(t *testing.T) {
+		b := NewInProcessBroadcaster()
 
-		wg.Add(1)
-		err := b.subscribe(
-			ctx,
-			sub,
-			msg.Topics(),
-			func(ctx context.Context, topic Topic) {
-				require.Nil(t, ctx.Err())
-				require.Equal(t, msg.Topics()[0], topic)
+		var startCalled, stopCalled int32
 
-				// We should have a closed ctx
-				<-time.After(20 * time.Millisecond)
-
-				require.NotNil(t, ctx.Err(), "expected ctx to be cancelled")
-				wg.Done()
-			},
-			func(ctx context.Context, t Topic) {
-				atomic.AddInt32(&unsubCalled, 1)
-			},
-		)
-
-		<-time.After(10 * time.Millisecond)
-
-		require.NoError(t, err)
-		err = b.Unsubscribe(ctx, sub.ID(), msg.Topics())
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&unsubCalled) >= int32(1)
-		}, time.Second, time.Millisecond, "unsubscribe should be called")
-		wg.Wait()
-	})
-
-	t.Run("single subscriber with same topic subscriptions", func(t *testing.T) {
-		var (
-			ctx = context.Background()
-			b   = NewInProcessBroadcaster().(*broadcaster)
-			sub = NewInmemorySubscription(uuid.New(), nil)
-			msg = Message{
-				Kind:    streamingtypes.MessageKindData,
-				Data:    json.RawMessage(`"output"`),
-				Channel: ulid.MustNew(ulid.Now(), rand.Reader).String(),
-			}
-			unsubCalled int32
-			wg          sync.WaitGroup
-		)
-
-		// This asserts that the subscribe and unsubscribe callbacks work, even if
-		// the actual underlying subscription<>topic pair has been deduplicated.
-		for i := 0; i < 10; i++ {
-			wg.Add(1)
-			err := b.subscribe(
-				ctx,
-				sub,
-				msg.Topics(),
-				func(ctx context.Context, topic Topic) {
-					require.Nil(t, ctx.Err())
-					require.Equal(t, msg.Topics()[0], topic)
-
-					// We should have a closed ctx
-					<-time.After(20 * time.Millisecond)
-
-					require.NotNil(t, ctx.Err(), "expected ctx to be cancelled")
-					wg.Done()
-				},
-				func(ctx context.Context, t Topic) {
-					atomic.AddInt32(&unsubCalled, 1)
-				},
-			)
-			require.NoError(t, err)
+		b.TopicStart = func(ctx context.Context, t Topic) error {
+			atomic.AddInt32(&startCalled, 1)
+			return nil
+		}
+		b.TopicStop = func(ctx context.Context, t Topic) error {
+			atomic.AddInt32(&stopCalled, 1)
+			return nil
 		}
 
-		<-time.After(10 * time.Millisecond)
+		sub1 := NewInmemorySubscription(uuid.New(), nil)
+		sub2 := NewInmemorySubscription(uuid.New(), nil)
+		msg := Message{
+			Kind:    streamingtypes.MessageKindData,
+			Channel: "test",
+			Topic:   "topic1",
+		}
 
-		err := b.Unsubscribe(ctx, sub.ID(), msg.Topics())
+		// 1. First subscribe -> Start called
+		err := b.Subscribe(context.Background(), sub1, msg.Topics())
 		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
+		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
 
-		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&unsubCalled) == int32(10)
-		}, time.Second, time.Millisecond, "unsubscribe should be called")
-		wg.Wait()
+		// 2. Second subscribe -> Start NOT called
+		err = b.Subscribe(context.Background(), sub2, msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&startCalled))
+
+		// 3. First unsubscribe -> Stop NOT called
+		err = b.Unsubscribe(context.Background(), sub1.ID(), msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(0), atomic.LoadInt32(&stopCalled))
+
+		// 4. Second unsubscribe -> Stop called
+		err = b.Unsubscribe(context.Background(), sub2.ID(), msg.Topics())
+		require.NoError(t, err)
+		require.Equal(t, int32(1), atomic.LoadInt32(&stopCalled))
 	})
-
 }
 
 func TestBroadcasterStream(t *testing.T) {
@@ -259,27 +209,44 @@ func TestBroadcasterStream(t *testing.T) {
 		streams  = []Chunk{}
 		l        sync.Mutex
 	)
-	appender := func(m Message) error {
-		l.Lock()
-		messages = append(messages, m)
-		l.Unlock()
+	appender := func(b []byte) error {
+		// First, check the "kind" field to determine the type
+		var kindCheck struct {
+			Kind string `json:"kind"`
+		}
+		if err := json.Unmarshal(b, &kindCheck); err != nil {
+			return err
+		}
+
+		switch kindCheck.Kind {
+		case "chunk":
+			var c Chunk
+			if err := json.Unmarshal(b, &c); err != nil {
+				return err
+			}
+			l.Lock()
+			streams = append(streams, c)
+			l.Unlock()
+		default:
+			var m Message
+			if err := json.Unmarshal(b, &m); err != nil {
+				return err
+			}
+			l.Lock()
+			messages = append(messages, m)
+			l.Unlock()
+		}
 		return nil
 	}
 
-	sub := NewInmemorySubscription(id, appender).(subMemory)
-	sub.chunkWriter = func(c Chunk) error {
-		l.Lock()
-		streams = append(streams, c)
-		l.Unlock()
-		return nil
-	}
+	sub := NewInmemorySubscription(id, appender)
 
-	// Subscribe to our topics
+	// This is the message we'll publish.
 	msg := Message{
 		Kind:    streamingtypes.MessageKindDataStreamStart,
 		Channel: "user:123",
 		Topic:   "openai",
-		Data:    json.RawMessage(`streamid123`),
+		Data:    json.RawMessage(`"streamid123"`),
 	}
 
 	err := b.Subscribe(ctx, sub, msg.Topics())
@@ -298,7 +265,7 @@ func TestBroadcasterStream(t *testing.T) {
 		require.EqualValues(t, 1, len(streams), streams)
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: "streamid123",
+			StreamID: `"streamid123"`,
 			Data:     "a",
 		}, streams[0])
 
@@ -307,7 +274,7 @@ func TestBroadcasterStream(t *testing.T) {
 		require.EqualValues(t, 2, len(streams), streams)
 		require.Equal(t, Chunk{
 			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-			StreamID: "streamid123",
+			StreamID: `"streamid123"`,
 			Data:     "b",
 		}, streams[1])
 	})
