@@ -1074,7 +1074,7 @@ func (m unshardedMgr) deletePausesForRun(ctx context.Context, callCtx context.Co
 		}
 	}
 
-	return nil
+	return pause.Client().Do(callCtx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, i.RunID)).Build()).Error()
 }
 
 func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
@@ -1277,11 +1277,6 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 func (m unshardedMgr) GetRunPauseIDs(ctx context.Context, runID ulid.ULID) ([]string, error) {
 	pause := m.u.Pauses()
 	return pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, runID)).Build()).AsStrSlice()
-}
-
-func (m unshardedMgr) DeleteRunPauseSet(ctx context.Context, runID ulid.ULID) error {
-	pause := m.u.Pauses()
-	return pause.Client().Do(ctx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, runID)).Build()).Error()
 }
 
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {

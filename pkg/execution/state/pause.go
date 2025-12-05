@@ -48,9 +48,6 @@ type PauseMutater interface {
 
 	// DeletePauseByID removes a pause by its ID.
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
-
-	// DeleteRunPauseSet deletes the set tracking pauses for a run
-	DeleteRunPauseSet(ctx context.Context, runID ulid.ULID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
