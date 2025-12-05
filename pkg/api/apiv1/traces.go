@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -127,8 +128,9 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 
 func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) int64 {
 	var (
-		errs atomic.Int64
-		wg   sync.WaitGroup
+		errs  atomic.Int64
+		total int64
+		wg    sync.WaitGroup
 	)
 
 	l := logger.StdlibLogger(ctx).With(
@@ -141,6 +143,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 
 		for _, ss := range rs.ScopeSpans {
 			for _, s := range ss.Spans {
+				total++
 
 				wg.Add(1)
 
@@ -155,7 +158,6 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 
 					err := a.commitSpan(ctx, l, auth, res, ss.Scope, s)
 					if err != nil {
-						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
 						return
 					}
@@ -165,6 +167,22 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	}
 
 	wg.Wait()
+
+	errCount := errs.Load()
+
+	metrics.IncrExtendedTraceSpansTotal(ctx, errCount, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"status": "failed",
+		},
+	})
+
+	metrics.IncrExtendedTraceSpansTotal(ctx, total-errCount, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"status": "success",
+		},
+	})
 
 	return errs.Load()
 }
