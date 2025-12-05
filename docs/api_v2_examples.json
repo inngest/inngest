@@ -28,6 +28,25 @@
       }
     }
   },
+  "/bulk/rerun": {
+    "post": {
+      "200": {
+        "// TODO": "Add example data for post /bulk/rerun 200"
+      },
+      "400": {
+        "// TODO": "Add example data for post /bulk/rerun 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /bulk/rerun 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /bulk/rerun 403"
+      },
+      "500": {
+        "// TODO": "Add example data for post /bulk/rerun 500"
+      }
+    }
+  },
   "/env/webhooks": {
     "get": {
       "200": {
