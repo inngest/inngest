@@ -225,8 +225,9 @@ func TestBlockMetadata_SameTimestamps(t *testing.T) {
 
 // mockBufferer implements the Bufferer interface for testing
 type mockBufferer struct {
-	mu     sync.RWMutex
-	pauses []*state.Pause
+	mu                   sync.RWMutex
+	pauses               []*state.Pause
+	deletePauseByIDCalled int
 }
 
 func (m *mockBufferer) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
@@ -308,6 +309,7 @@ func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
 }
 
 func (m *mockBufferer) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	m.deletePauseByIDCalled++
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, p := range m.pauses {
