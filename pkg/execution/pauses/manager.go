@@ -40,16 +40,22 @@ func WithBlockStoreEnabled(cb FeatureCallback) ManagerOpt {
 	}
 }
 
+func WithFlusher(flusher BlockFlushEnqueuer) ManagerOpt {
+	return func(mgr *manager) {
+		mgr.flusher = flusher
+	}
+}
+
 // NewManager returns a new pause writer, writing pauses to a Valkey/Redis/MemoryDB
 // compatible buffer
 //
 // Blocks are flushed from the buffer in background jobs enqueued to the given queue.
 // This prevents eg. executors and new-runs from retaining blocks in-memory.
-func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ...ManagerOpt) Manager {
+func NewManager(buf Bufferer, bs BlockStore, opts ...ManagerOpt) Manager {
 	mgr := &manager{
 		buf:               buf,
 		bs:                bs,
-		flusher:           flusher,
+		flusher:           nil,
 		flushDelay:        defaultFlushDelay,
 		blockFlushEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
 		blockStoreEnabled: func(ctx context.Context, acctID uuid.UUID) bool { return false },
@@ -66,7 +72,6 @@ func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ..
 func NewRedisOnlyManager(rsm state.PauseManager) Manager {
 	return NewManager(
 		StateBufferer(rsm),
-		nil,
 		nil,
 	)
 }
@@ -208,7 +213,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 
 	// If this is larger than the max buffer len, schedule a new block write.  We only
 	// enqueue this job once per index ID, using queue singletons to handle these.
-	if n >= m.bs.BlockSize() {
+	if n >= m.bs.BlockSize() && m.flusher != nil {
 		if err := m.flusher.Enqueue(ctx, index); err != nil && !errors.Is(err, redis_state.ErrQueueItemExists) {
 			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
 		}
