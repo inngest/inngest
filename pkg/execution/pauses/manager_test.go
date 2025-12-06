@@ -65,7 +65,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	inProcessFlusher := InMemoryFlushProcessor(blockStore).(*flushInProcess)
 
 	// Create manager with our configured flusher and a short flush delay
-	manager := NewManager(mockBufferer, blockStore, inProcessFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled)).(*manager)
+	manager := NewManager(mockBufferer, blockStore, WithFlusher(inProcessFlusher), WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled)).(*manager)
 	manager.flushDelay = 100 * time.Millisecond // Short delay for tests
 
 	// Create test index
@@ -156,7 +156,7 @@ func TestConsumePause(t *testing.T) {
 	mockBlockStore := &mockBlockStore{}
 	mockFlusher := &mockSimpleFlusher{}
 
-	manager := NewManager(mockBufferer, mockBlockStore, mockFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
+	manager := NewManager(mockBufferer, mockBlockStore, WithFlusher(mockFlusher), WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 
 	ctx := context.Background()
 	eventName := "test.event"
@@ -186,7 +186,7 @@ func TestDeletePauseByID(t *testing.T) {
 		mockBlockStore := &mockBlockStore{}
 		mockFlusher := &mockSimpleFlusher{}
 		
-		manager := NewManager(mockBufferer, mockBlockStore, mockFlusher, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
+		manager := NewManager(mockBufferer, mockBlockStore, WithFlusher(mockFlusher), WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 
 		ctx := context.Background()
 		pauseID := uuid.New()
@@ -210,7 +210,7 @@ func TestDeletePauseByID(t *testing.T) {
 		mockBlockStore := &mockBlockStore{}
 		mockFlusher := &mockSimpleFlusher{}
 
-		manager := NewManager(mockBufferer, mockBlockStore, mockFlusher)
+		manager := NewManager(mockBufferer, mockBlockStore, WithFlusher(mockFlusher))
 
 		ctx := context.Background()
 		pauseID := uuid.New()
@@ -233,7 +233,7 @@ func TestDeletePauseByID(t *testing.T) {
 		mockBufferer := &mockBufferer{}
 		mockFlusher := &mockSimpleFlusher{}
 
-		manager := NewManager(mockBufferer, nil, mockFlusher, WithBlockFlushEnabled(alwaysEnabled))
+		manager := NewManager(mockBufferer, nil, WithFlusher(mockFlusher), WithBlockFlushEnabled(alwaysEnabled))
 
 		ctx := context.Background()
 		pauseID := uuid.New()
