@@ -10,7 +10,7 @@
     "./src/**/*",
     "./.storybook/**/preview.tsx",
     "./tailwind.config.ts",
-    "../../apps/old_dashboard/src/components/Secret"
+    "../../apps/dashboard/src/components/Secret"
   ],
   "exclude": ["node_modules", "./dist/"]
 }

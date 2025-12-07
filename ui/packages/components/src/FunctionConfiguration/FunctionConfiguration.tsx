@@ -25,11 +25,11 @@ import {
   RiTimeLine,
 } from '@remixicon/react';
 
+import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
-import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/old_dashboard/src/gql/graphql';
 
 type InngestFunction =
   | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
