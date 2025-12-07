@@ -1,16 +1,14 @@
-'use client';
+import { useCallback } from "react";
+import { CombinedError, useMutation } from "urql";
 
-import { useCallback } from 'react';
-import { CombinedError, useMutation } from 'urql';
-
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 import type {
   CreateInsightsQueryMutation,
   InsightsQueryStatement,
   RemoveInsightsQueryMutation,
   ShareInsightsQueryMutation,
   UpdateInsightsQueryMutation,
-} from '@/gql/graphql';
+} from "@/gql/graphql";
 
 const createInsightsQueryDocument = graphql(`
   mutation CreateInsightsQuery($input: NewInsightsQuery!) {
@@ -70,13 +68,21 @@ export type SaveQueryArgs = { name: string; query: string };
 export type ShareQueryArgs = { id: string };
 export type UpdateQueryArgs = { id: string; name: string; query: string };
 
-export type MutationResult<T> = { ok: true; data: T } | { ok: false; error: 'unique' | 'other' };
+export type MutationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: "unique" | "other" };
 
 type UseModifySavedQueriesReturn = {
   deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
-  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  shareQuery: (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  saveQuery: (
+    args: SaveQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  shareQuery: (
+    args: ShareQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  updateQuery: (
+    args: UpdateQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
 };
 
 export function useModifySavedQueries(): UseModifySavedQueriesReturn {
@@ -87,39 +93,46 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
 
   const executeMutation = useCallback(
     async <T>(
-      fn: () => Promise<{ data?: T; error?: CombinedError }>
+      fn: () => Promise<{ data?: T; error?: CombinedError }>,
     ): Promise<{ ok: true; data: T } | { ok: false; error: CombinedError }> => {
       const res = await fn();
       if (res.error) return { ok: false, error: res.error };
-      if (res.data === undefined) return { ok: false, error: new CombinedError({}) };
+      if (res.data === undefined)
+        return { ok: false, error: new CombinedError({}) };
       return { ok: true, data: res.data };
     },
-    []
+    [],
   );
 
-  const deleteQuery = useCallback<(args: DeleteQueryArgs) => Promise<MutationResult<string[]>>>(
+  const deleteQuery = useCallback<
+    (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>
+  >(
     async ({ id }) => {
-      const result = await executeMutation<RemoveInsightsQueryMutation>(() => runRemove({ id }));
-      if (!result.ok) return { ok: false, error: 'other' };
+      const result = await executeMutation<RemoveInsightsQueryMutation>(() =>
+        runRemove({ id }),
+      );
+      if (!result.ok) return { ok: false, error: "other" };
 
       const ids = result.data.removeInsightsQuery?.ids;
-      if (ids === undefined) return { ok: false, error: 'other' };
+      if (ids === undefined) return { ok: false, error: "other" };
 
       return { ok: true, data: ids };
     },
-    [executeMutation, runRemove]
+    [executeMutation, runRemove],
   );
 
   const shareQuery = useCallback<
     (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>
   >(
     async ({ id }) => {
-      const result = await executeMutation<ShareInsightsQueryMutation>(() => runShare({ id }));
+      const result = await executeMutation<ShareInsightsQueryMutation>(() =>
+        runShare({ id }),
+      );
       if (!result.ok) return { ok: false, error: mapErrorToTag(result.error) };
 
       return { ok: true, data: result.data.shareInsightsQuery };
     },
-    [executeMutation, runShare]
+    [executeMutation, runShare],
   );
 
   const saveQuery = useCallback<
@@ -127,13 +140,13 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   >(
     async ({ name, query }) => {
       const result = await executeMutation<CreateInsightsQueryMutation>(() =>
-        runCreate({ input: { name, sql: query } })
+        runCreate({ input: { name, sql: query } }),
       );
       if (!result.ok) return { ok: false, error: mapErrorToTag(result.error) };
 
       return { ok: true, data: result.data.createInsightsQuery };
     },
-    [executeMutation, runCreate]
+    [executeMutation, runCreate],
   );
 
   const updateQuery = useCallback<
@@ -141,21 +154,21 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   >(
     async ({ id, name, query }) => {
       const result = await executeMutation<UpdateInsightsQueryMutation>(() =>
-        runUpdate({ id, input: { name, sql: query } })
+        runUpdate({ id, input: { name, sql: query } }),
       );
       if (!result.ok) return { ok: false, error: mapErrorToTag(result.error) };
 
       return { ok: true, data: result.data.updateInsightsQuery };
     },
-    [executeMutation, runUpdate]
+    [executeMutation, runUpdate],
   );
 
   return { deleteQuery, saveQuery, shareQuery, updateQuery };
 }
 
-function mapErrorToTag(error: CombinedError): 'unique' | 'other' {
+function mapErrorToTag(error: CombinedError): "unique" | "other" {
   const isUnique = error.graphQLErrors.some((g) =>
-    g.message.includes('uniq_insights_queries_name')
+    g.message.includes("uniq_insights_queries_name"),
   );
-  return isUnique ? 'unique' : 'other';
+  return isUnique ? "unique" : "other";
 }

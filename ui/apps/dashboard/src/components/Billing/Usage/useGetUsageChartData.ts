@@ -1,7 +1,7 @@
-import { useQuery } from 'urql';
+import { useQuery } from "urql";
 
-import { graphql } from '@/gql';
-import { type UsageDimension } from './types';
+import { graphql } from "@/gql";
+import { type UsageDimension } from "./types";
 
 const GetBillableSteps = graphql(`
   query GetBillableSteps($month: Int!, $year: Int!) {
@@ -46,7 +46,7 @@ export default function useGetUsageChartData({
   selectedPeriod,
   type,
 }: {
-  selectedPeriod: 'current' | 'previous';
+  selectedPeriod: "current" | "previous";
   type: UsageDimension;
 }) {
   const currentMonthIndex = new Date().getUTCMonth();
@@ -54,7 +54,10 @@ export default function useGetUsageChartData({
   const options = {
     previous: {
       month: currentMonthIndex === 0 ? 12 : currentMonthIndex,
-      year: currentMonthIndex === 0 ? new Date().getUTCFullYear() - 1 : new Date().getUTCFullYear(),
+      year:
+        currentMonthIndex === 0
+          ? new Date().getUTCFullYear() - 1
+          : new Date().getUTCFullYear(),
     },
     current: {
       month: currentMonthIndex + 1,

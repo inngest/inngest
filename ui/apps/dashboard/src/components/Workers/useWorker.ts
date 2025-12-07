@@ -1,15 +1,15 @@
-import { useCallback } from 'react';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
-import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
-import { useClient } from 'urql';
+import { useCallback } from "react";
+import { getTimestampDaysAgo } from "@inngest/components/utils/date";
+import { convertWorkerStatus } from "@inngest/components/utils/workerParser";
+import { useClient } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 import {
   ConnectV1ConnectionStatus,
   ConnectV1WorkerConnectionsOrderByField,
   type ConnectV1WorkerConnectionsOrderBy,
-} from '@/gql/graphql';
+} from "@/gql/graphql";
 
 const query = graphql(`
   query GetWorkerConnections(
@@ -85,14 +85,17 @@ export function useWorkers() {
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
+            startTime: getTimestampDaysAgo({
+              currentDate: new Date(),
+              days: 30,
+            }).toISOString(),
             appID: appID,
             status,
             cursor,
             first: pageSize,
             envID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -101,7 +104,7 @@ export function useWorkers() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const workersData = result.data.environment.workerConnections;
@@ -117,7 +120,7 @@ export function useWorkers() {
         totalCount: workersData.totalCount,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -155,12 +158,15 @@ export function useWorkersCount() {
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
+            startTime: getTimestampDaysAgo({
+              currentDate: new Date(),
+              days: 30,
+            }).toISOString(),
             appID: appID,
             envID,
             status,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -169,13 +175,13 @@ export function useWorkersCount() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const workersData = result.data.environment.workerConnections;
 
       return workersData.totalCount;
     },
-    [client, envID]
+    [client, envID],
   );
 }

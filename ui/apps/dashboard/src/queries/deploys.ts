@@ -1,8 +1,8 @@
-import { useQuery, type UseQueryResponse } from 'urql';
+import { useQuery, type UseQueryResponse } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { type GetDeployssQuery } from '@/gql/graphql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { type GetDeployssQuery } from "@/gql/graphql";
 
 const GetDeploysDocument = graphql(`
   query GetDeployss($environmentID: ID!) {
@@ -33,7 +33,10 @@ const GetDeploysDocument = graphql(`
 `);
 
 // TODO - Support pagination/cursors
-export const useDeploys = (): UseQueryResponse<GetDeployssQuery, { environmentID: string }> => {
+export const useDeploys = (): UseQueryResponse<
+  GetDeployssQuery,
+  { environmentID: string }
+> => {
   const environment = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetDeploysDocument,

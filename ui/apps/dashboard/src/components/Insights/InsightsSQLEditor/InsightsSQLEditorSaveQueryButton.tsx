@@ -1,30 +1,32 @@
-'use client';
-
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from "@inngest/components/Button/NewButton";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@inngest/components/Tooltip';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiSaveLine } from '@remixicon/react';
+} from "@inngest/components/Tooltip";
+import { cn } from "@inngest/components/utils/classNames";
+import { RiBookmarkFill, RiBookmarkLine } from "@remixicon/react";
 
-import { KeyboardShortcutTooltip } from '../KeyboardShortcutTooltip';
-import type { Tab } from '../types';
-import { useSaveTab } from './SaveTabContext';
-import { useDocumentShortcuts } from './actions/handleShortcuts';
+import { KeyboardShortcutTooltip } from "../KeyboardShortcutTooltip";
+import type { Tab } from "../types";
+import { useSaveTab } from "./SaveTabContext";
+import { useDocumentShortcuts } from "./actions/handleShortcuts";
 
 type InsightsSQLEditorSaveQueryButtonProps = {
   tab: Tab;
 };
 
-export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
-  const { canSave, isSaving, saveTab } = useSaveTab(tab);
+export function InsightsSQLEditorSaveQueryButton({
+  tab,
+}: InsightsSQLEditorSaveQueryButtonProps) {
+  const { canSave, isSaved, isSaving, saveTab } = useSaveTab(tab);
+
+  const Icon = isSaved ? RiBookmarkFill : RiBookmarkLine;
 
   useDocumentShortcuts([
     {
-      combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
+      combo: { alt: true, code: "KeyS", metaOrCtrl: true },
       handler: saveTab,
     },
   ]);
@@ -38,11 +40,14 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
             className="font-medium"
             disabled={!canSave}
             icon={
-              <RiSaveLine className={cn(!canSave ? 'text-disabled' : 'text-muted')} size={16} />
+              <Icon
+                className={cn(!canSave ? "text-disabled" : "text-muted")}
+                size={16}
+              />
             }
             iconSide="left"
             kind="secondary"
-            label="Save"
+            label={`${isSaved ? "Update" : "Save"} query`}
             loading={isSaving}
             onClick={() => {
               saveTab();
@@ -51,7 +56,9 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
           />
         </TooltipTrigger>
         <TooltipContent>
-          <KeyboardShortcutTooltip combo={{ alt: true, key: 'S', metaOrCtrl: true }} />
+          <KeyboardShortcutTooltip
+            combo={{ alt: true, key: "S", metaOrCtrl: true }}
+          />
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -1,6 +1,4 @@
-'use client';
-
-import { useBooleanFlag } from './hooks';
+import { useBooleanFlag } from "./hooks";
 
 type Props = {
   children: React.ReactNode;
@@ -9,7 +7,11 @@ type Props = {
 };
 
 // Conditionally renders children based on a feature flag.
-export function ClientFeatureFlag({ children, defaultValue = false, flag }: Props) {
+export function ClientFeatureFlag({
+  children,
+  defaultValue = false,
+  flag,
+}: Props) {
   const { value: isEnabled } = useBooleanFlag(flag, defaultValue);
 
   if (isEnabled) {

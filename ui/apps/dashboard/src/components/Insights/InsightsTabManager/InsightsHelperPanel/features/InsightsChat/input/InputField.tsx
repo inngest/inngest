@@ -1,5 +1,3 @@
-'use client';
-
 import {
   forwardRef,
   useCallback,
@@ -8,20 +6,20 @@ import {
   useRef,
   type HTMLAttributes,
   type KeyboardEventHandler,
-} from 'react';
-import { cn } from '@inngest/components/utils/classNames';
+} from "react";
+import { cn } from "@inngest/components/utils/classNames";
 
-import SendButton from './SendButton';
+import SendButton from "./SendButton";
 
-export type ChatStatus = 'idle' | 'submitted' | 'streaming' | 'error';
+export type ChatStatus = "idle" | "submitted" | "streaming" | "error";
 
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
     className={cn(
-      'border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-lg border pt-3',
-      className
+      "border-muted bg-surfaceBase w-full divide-y overflow-hidden rounded-lg border pt-3",
+      className,
     )}
     {...props}
   />
@@ -39,44 +37,45 @@ type PromptInputTextareaProps = {
   onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
 };
 
-export const PromptInputTextarea = forwardRef<HTMLTextAreaElement, PromptInputTextareaProps>(
-  ({ onChange, className, rows = 3, onKeyDown, disabled, ...props }, ref) => {
-    const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-      if (onKeyDown) onKeyDown(e);
-      if (!e.defaultPrevented && e.key === 'Enter' && !e.shiftKey) {
-        if (disabled) {
-          // When submission is disabled, allow Enter to insert a newline instead of submitting
-          return;
-        }
-        e.preventDefault();
-        e.currentTarget.form?.requestSubmit();
+export const PromptInputTextarea = forwardRef<
+  HTMLTextAreaElement,
+  PromptInputTextareaProps
+>(({ onChange, className, rows = 3, onKeyDown, disabled, ...props }, ref) => {
+  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (onKeyDown) onKeyDown(e);
+    if (!e.defaultPrevented && e.key === "Enter" && !e.shiftKey) {
+      if (disabled) {
+        // When submission is disabled, allow Enter to insert a newline instead of submitting
+        return;
       }
-    };
+      e.preventDefault();
+      e.currentTarget.form?.requestSubmit();
+    }
+  };
 
-    return (
-      <textarea
-        id="user-input"
-        ref={ref}
-        rows={rows}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          'bg-surfaceBase text-basis placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0',
-          className
-        )}
-        {...props}
-        onChange={(e) => onChange(e.currentTarget.value)}
-      />
-    );
-  }
-);
+  return (
+    <textarea
+      id="user-input"
+      ref={ref}
+      rows={rows}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "bg-surfaceBase text-basis placeholder-disabled focus:outline-primary-moderate w-full rounded-sm border-none p-3 text-sm outline-0 ring-0 transition-all focus:border-none focus:outline focus:ring-0 focus-visible:border-none focus-visible:outline-0 focus-visible:ring-0",
+        className,
+      )}
+      {...props}
+      onChange={(e) => onChange(e.currentTarget.value)}
+    />
+  );
+});
 
-PromptInputTextarea.displayName = 'PromptInputTextarea';
+PromptInputTextarea.displayName = "PromptInputTextarea";
 
 export const ResponsivePromptInput = ({
   value,
   onChange,
   onSubmit,
-  placeholder = 'Ask insights agent to query...',
+  placeholder = "Ask insights agent to query...",
   disabled = false,
   className,
 }: {
@@ -95,20 +94,26 @@ export const ResponsivePromptInput = ({
 
     // Compute vertical chrome to include in height clamping
     const style = window.getComputedStyle(el);
-    const lineHeight = parseFloat(style.lineHeight || '0');
-    const paddingY = parseFloat(style.paddingTop || '0') + parseFloat(style.paddingBottom || '0');
+    const lineHeight = parseFloat(style.lineHeight || "0");
+    const paddingY =
+      parseFloat(style.paddingTop || "0") +
+      parseFloat(style.paddingBottom || "0");
     const borderY =
-      parseFloat(style.borderTopWidth || '0') + parseFloat(style.borderBottomWidth || '0');
+      parseFloat(style.borderTopWidth || "0") +
+      parseFloat(style.borderBottomWidth || "0");
 
     // Define min/max rows similar to `prompt-input.tsx` usage
     const minRows = 1; // start compact; grows smoothly
     const maxRows = 10; // ~ `max-h-[30lh]`
 
     const minHeight = Math.max(0, lineHeight * minRows + paddingY + borderY);
-    const maxHeight = Math.max(minHeight, lineHeight * maxRows + paddingY + borderY);
+    const maxHeight = Math.max(
+      minHeight,
+      lineHeight * maxRows + paddingY + borderY,
+    );
 
     // Measure content height
-    el.style.height = 'auto';
+    el.style.height = "auto";
     const contentHeight = el.scrollHeight;
 
     const next = Math.min(Math.max(contentHeight, minHeight), maxHeight);
@@ -122,7 +127,7 @@ export const ResponsivePromptInput = ({
 
   useEffect(() => {
     const el = textareaRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => resizeTextarea());
     ro.observe(el);
     return () => ro.disconnect();
@@ -144,7 +149,10 @@ export const ResponsivePromptInput = ({
         </div>
         <div className="flex items-center justify-end px-3 pb-3">
           <div className="flex items-center gap-2">
-            <SendButton onClick={onSubmit} disabled={disabled || !value.trim()} />
+            <SendButton
+              onClick={onSubmit}
+              disabled={disabled || !value.trim()}
+            />
           </div>
         </div>
       </div>

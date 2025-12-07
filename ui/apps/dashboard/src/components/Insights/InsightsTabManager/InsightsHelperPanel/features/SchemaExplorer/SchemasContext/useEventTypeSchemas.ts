@@ -1,11 +1,9 @@
-'use client';
+import { useCallback } from "react";
+import type { PageInfo } from "@inngest/components/types/eventType";
+import { useClient } from "urql";
 
-import { useCallback } from 'react';
-import type { PageInfo } from '@inngest/components/types/eventType';
-import { useClient } from 'urql';
-
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const GET_EVENT_TYPE_SCHEMAS_QUERY = graphql(`
   query GetEventTypeSchemas($envID: ID!, $cursor: String, $nameSearch: String, $archived: Boolean) {
@@ -53,21 +51,21 @@ export function useEventTypeSchemas() {
         .query(
           GET_EVENT_TYPE_SCHEMAS_QUERY,
           { archived: false, cursor, envID, nameSearch },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
       if (result.error) throw new Error(result.error.message);
-      if (!result.data) throw new Error('no data returned');
+      if (!result.data) throw new Error("no data returned");
 
       const eventTypesData = result.data.environment.eventTypesV2;
       const events = eventTypesData.edges.map(({ node }) => ({
         name: node.name,
-        schema: node.latestSchema ?? '',
+        schema: node.latestSchema ?? "",
       }));
 
       return { events, pageInfo: eventTypesData.pageInfo };
     },
-    [client, envID]
+    [client, envID],
   );
 }

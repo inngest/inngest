@@ -1,6 +1,4 @@
-'use client';
-
-import { Pill } from '@inngest/components/Pill/Pill';
+import { Pill } from "@inngest/components/Pill/NewPill";
 
 type PaymentStatusPillProps = {
   status: String;
@@ -9,23 +7,23 @@ type PaymentStatusPillProps = {
 export default function PaymentStatusPill({ status }: PaymentStatusPillProps) {
   let pill;
   switch (status) {
-    case 'succeeded':
+    case "succeeded":
       pill = <Pill appearance="outlined">Paid</Pill>;
       break;
-    case 'requires_payment_method':
+    case "requires_payment_method":
       pill = (
         <Pill kind="error" appearance="outlined">
           Failed
         </Pill>
       );
       break;
-    case 'canceled':
+    case "canceled":
       pill = <Pill appearance="outlined">Canceled</Pill>;
       break;
-    case 'processing':
+    case "processing":
       pill = <Pill appearance="outlined">Processing</Pill>;
       break;
-    case 'requires_confirmation':
+    case "requires_confirmation":
       pill = (
         <Pill appearance="outlined" kind="warning">
           Awaiting payment

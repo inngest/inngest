@@ -1,10 +1,13 @@
-import { useContext } from 'react';
-import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
-import { useFlags } from 'launchdarkly-react-client-sdk';
+import { useContext } from "react";
+import type { BooleanFlag } from "@inngest/components/SharedContext/useBooleanFlag";
+import { useFlags } from "launchdarkly-react-client-sdk";
 
-import { IdentificationContext } from './ClientFeatureFlagProvider';
+import { IdentificationContext } from "./ClientFeatureFlagProvider";
 
-export function useBooleanFlag(flag: string, defaultValue: boolean = false): BooleanFlag {
+export function useBooleanFlag(
+  flag: string,
+  defaultValue: boolean = false,
+): BooleanFlag {
   const value: unknown = useFlags()[flag];
   const isIdentified = useIsIdentified();
 
@@ -12,12 +15,12 @@ export function useBooleanFlag(flag: string, defaultValue: boolean = false): Boo
     return { isReady: false, value: defaultValue };
   }
 
-  if (typeof value === 'undefined') {
+  if (typeof value === "undefined") {
     console.error(`flag ${flag} is not available`);
     return { isReady: false, value: defaultValue };
   }
 
-  if (typeof value !== 'boolean') {
+  if (typeof value !== "boolean") {
     console.error(`flag ${flag} is not a boolean`);
     return { isReady: false, value: defaultValue };
   }

@@ -1,9 +1,9 @@
-import type { RerunFromStepPayload } from '@inngest/components/SharedContext/useRerunFromStep';
-import { useMutation } from 'urql';
+import type { RerunFromStepPayload } from "@inngest/components/SharedContext/useRerunFromStep";
+import { useMutation } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { pathCreator } from "@/utils/urls";
 
 const rerun = graphql(`
   mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {
@@ -28,13 +28,19 @@ export const useRerunFromStep = () => {
       return {
         ...result,
         redirect: result.data?.rerun
-          ? pathCreator.runPopout({ envSlug: env.slug, runID: result.data.rerun })
+          ? pathCreator.runPopout({
+              envSlug: env.slug,
+              runID: result.data.rerun,
+            })
           : undefined,
       };
     } catch (error) {
-      console.error('error rerunning from step', error);
+      console.error("error rerunning from step", error);
       return {
-        error: error instanceof Error ? error : new Error('Error rerunning from step'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error("Error rerunning from step"),
         data: undefined,
       };
     }

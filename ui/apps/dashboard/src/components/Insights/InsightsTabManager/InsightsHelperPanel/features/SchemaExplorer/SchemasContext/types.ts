@@ -1,5 +1,5 @@
-import type { SchemaNode } from '@inngest/components/SchemaViewer/types';
-import type { PageInfo } from '@inngest/components/types/eventType';
+import type { SchemaNode } from "@inngest/components/SchemaViewer/types";
+import type { PageInfo } from "@inngest/components/types/eventType";
 
 export type UseSchemasArgs = {
   search: string;

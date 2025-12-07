@@ -1,7 +1,5 @@
-import React from 'react';
-
-import ClearThreadButton from './ClearThreadButton';
-import { ToggleChatButton } from './ToggleChatButton';
+import ClearThreadButton from "./ClearThreadButton";
+import { ToggleChatButton } from "./ToggleChatButton";
 
 type ChatHeaderProps = {
   onClearThread: () => void;

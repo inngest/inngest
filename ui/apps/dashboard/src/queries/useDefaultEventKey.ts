@@ -1,5 +1,5 @@
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const query = graphql(`
   query GetEventKeysForBlankSlate($environmentID: ID!) {
@@ -41,9 +41,9 @@ export function useDefaultEventKey({ envID }: { envID: string }) {
   };
 }
 
-function getDefaultEventKey<T extends { createdAt: string; name: null | string }>(
-  keys: T[]
-): T | undefined {
+function getDefaultEventKey<
+  T extends { createdAt: string; name: null | string },
+>(keys: T[]): T | undefined {
   const def = keys.find((k) => k.name && k.name.match(/default ingest/i));
 
   return (

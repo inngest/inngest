@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Run } from '@inngest/components/RunsPage/types';
-import { useQuery } from 'urql';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Run } from "@inngest/components/RunsPage/types";
+import { useQuery } from "urql";
 
-import { GetRunsDocument } from './queries';
-import { parseRunsData } from './utils';
+import { GetRunsDocument } from "./queries";
+import { parseRunsData } from "./utils";
 
 type UseRunsPaginationParams = {
   commonQueryVars: {
@@ -28,7 +28,7 @@ export function useRunsPagination({
 
   const [queryRes, refetch] = useQuery({
     query: GetRunsDocument,
-    requestPolicy: 'network-only',
+    requestPolicy: "network-only",
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
@@ -44,7 +44,10 @@ export function useRunsPagination({
   const hasNextPage = pageInfo?.hasNextPage ?? false;
 
   // Create a stable stringified version of commonQueryVars for dependency tracking
-  const queryVarsKey = useMemo(() => JSON.stringify(commonQueryVars), [commonQueryVars]);
+  const queryVarsKey = useMemo(
+    () => JSON.stringify(commonQueryVars),
+    [commonQueryVars],
+  );
 
   // When new data comes in, either replace (first page) or append (subsequent pages)
   useEffect(() => {
@@ -57,7 +60,11 @@ export function useRunsPagination({
         setAllRuns((prev) => {
           // Check if we already appended this page (avoid duplicates)
           const firstNewRun = newRuns[0];
-          if (prev.length > 0 && firstNewRun && prev.some((r) => r.id === firstNewRun.id)) {
+          if (
+            prev.length > 0 &&
+            firstNewRun &&
+            prev.some((r) => r.id === firstNewRun.id)
+          ) {
             return prev;
           }
           return [...prev, ...newRuns];

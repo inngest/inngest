@@ -1,18 +1,18 @@
-'use client';
+import { useEffect, useRef, useState } from "react";
+import { Input } from "@inngest/components/Forms/Input";
+import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
+import { cn } from "@inngest/components/utils/classNames";
 
-import { useEffect, useRef, useState } from 'react';
-import { Input } from '@inngest/components/Forms/Input';
-import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { cn } from '@inngest/components/utils/classNames';
-
-import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Tab } from '@/components/Insights/types';
+import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
+import type { Tab } from "@/components/Insights/types";
 
 type InsightsSQLEditorQueryTitleProps = {
   tab: Tab;
 };
 
-export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitleProps) {
+export function InsightsSQLEditorQueryTitle({
+  tab,
+}: InsightsSQLEditorQueryTitleProps) {
   const { onNameChange, queryName } = useInsightsStateMachineContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -46,7 +46,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
         }}
         onChange={(e) => onNameChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === 'Escape') {
+          if (e.key === "Enter" || e.key === "Escape") {
             e.preventDefault();
             inputRef.current?.blur();
           }
@@ -58,13 +58,13 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
   }
 
   return (
-    <OptionalTooltip side="bottom" tooltip={isTruncated ? queryName : ''}>
+    <OptionalTooltip side="bottom" tooltip={isTruncated ? queryName : ""}>
       <div
         className={cn(
-          'text-basis mr-2 flex h-8 w-[314px] cursor-pointer items-center rounded px-2 py-2 text-sm normal-case leading-normal transition-all duration-150',
+          "text-basis mr-2 flex h-8 w-[314px] cursor-pointer items-center rounded px-2 py-2 text-sm normal-case leading-normal transition-all duration-150",
           isHovered
-            ? 'bg-canvasSubtle border-muted border'
-            : 'bg-canvasBase border-muted border-transparent'
+            ? "bg-canvasSubtle border-muted border"
+            : "border border-transparent bg-transparent",
         )}
         onClick={() => {
           setIsEditing(true);

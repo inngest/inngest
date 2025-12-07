@@ -1,18 +1,16 @@
-'use client';
+import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@inngest/components/Button/NewButton";
+import { capitalCase } from "change-case";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { capitalCase } from 'change-case';
-
-import BillingCard from './BillingCard';
-import UpdateCardModal from './UpdateCardModal';
+import BillingCard from "./BillingCard";
+import UpdateCardModal from "./UpdateCardModal";
 
 export default function PaymentMethod({
   paymentMethod,
 }: {
   paymentMethod: {
-    __typename?: 'PaymentMethod';
+    __typename?: "PaymentMethod";
     brand: string;
     last4: string;
     expMonth: string;
@@ -22,11 +20,13 @@ export default function PaymentMethod({
   } | null;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const onSuccess = () => {
     setIsEditing(false);
-    router.refresh();
+    //
+    // Refresh the current route to reload data
+    navigate({ to: ".", replace: true });
   };
 
   return (
@@ -47,16 +47,26 @@ export default function PaymentMethod({
         <>
           <Row
             label="Credit Card"
-            value={`${capitalCase(paymentMethod.brand)} ending in ${paymentMethod.last4}`}
+            value={`${capitalCase(paymentMethod.brand)} ending in ${
+              paymentMethod.last4
+            }`}
           />
-          <Row label="Expiration" value={`${paymentMethod.expMonth}/${paymentMethod.expYear}`} />
+          <Row
+            label="Expiration"
+            value={`${paymentMethod.expMonth}/${paymentMethod.expYear}`}
+          />
         </>
       ) : (
         <p className="text-subtle text-sm font-medium">
           Please select a paid plan to add a payment method
         </p>
       )}
-      {isEditing && <UpdateCardModal onSuccess={onSuccess} onCancel={() => setIsEditing(false)} />}
+      {isEditing && (
+        <UpdateCardModal
+          onSuccess={onSuccess}
+          onCancel={() => setIsEditing(false)}
+        />
+      )}
     </BillingCard>
   );
 }

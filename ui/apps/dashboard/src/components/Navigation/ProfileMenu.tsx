@@ -1,24 +1,19 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-import NextLink from 'next/link';
-import { useClerk } from '@clerk/nextjs';
-import { Listbox } from '@headlessui/react';
+import { Listbox } from "@headlessui/react";
 import {
   RiArrowLeftRightLine,
   RiBillLine,
   RiEqualizerLine,
   RiGroupLine,
-  RiLogoutCircleLine,
   RiUserLine,
   RiUserSharedLine,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
-import { pathCreator } from '@/utils/urls';
+import ModeSwitch from "@inngest/components/ThemeMode/ModeSwitch";
 
-const ModeSwitch = dynamic(() => import('@inngest/components/ThemeMode/ModeSwitch'), {
-  ssr: false,
-});
+import { pathCreator } from "@/utils/urls";
+import { Link } from "@tanstack/react-router";
+import { SignOutButton } from "../Auth/SignOutButton";
+import type { FileRouteTypes } from "@/routeTree.gen";
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -27,7 +22,9 @@ type Props = React.PropsWithChildren<{
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
   return (
     <Listbox>
-      <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
+      <Listbox.Button className="w-full cursor-pointer ring-0">
+        {children}
+      </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
           <Listbox.Option
@@ -41,7 +38,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <NextLink href="/settings/user" scroll={false}>
+          <Link to="/settings/user" resetScroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="userProfile"
@@ -51,8 +48,11 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Your Profile</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="/settings/organization" scroll={false}>
+          </Link>
+          <Link
+            to={"/settings/organization" as FileRouteTypes["to"]}
+            resetScroll={false}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="org"
@@ -62,8 +62,14 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Your Organization</div>
               </div>
             </Listbox.Option>
-          </NextLink>
-          <NextLink href="/settings/organization/organization-members" scroll={false}>
+          </Link>
+
+          <Link
+            to={
+              "/settings/organization/organization-members" as FileRouteTypes["to"]
+            }
+            resetScroll={false}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -73,9 +79,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Members</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
 
-          <NextLink href={pathCreator.billing()} scroll={false}>
+          <Link to={pathCreator.billing()}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="billing"
@@ -85,9 +91,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Billing</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
 
-          <a href="/organization-list">
+          <Link to={"/organization-list" as FileRouteTypes["to"]}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -97,11 +103,11 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Switch Organization</div>
               </div>
             </Listbox.Option>
-          </a>
+          </Link>
 
           <hr className="border-subtle" />
 
-          <NextLink href="/sign-in/choose" scroll={false}>
+          <Link to={"/sign-in/choose" as FileRouteTypes["to"]}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchAccount"
@@ -111,43 +117,16 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                 <div>Switch Account</div>
               </div>
             </Listbox.Option>
-          </NextLink>
+          </Link>
           <hr className="border-subtle" />
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
           >
-            <SignOut isMarketplace={isMarketplace} />
+            <SignOutButton isMarketplace={isMarketplace} />
           </Listbox.Option>
         </Listbox.Options>
       </div>
     </Listbox>
   );
 };
-
-function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
-  const { signOut, session } = useClerk();
-
-  const content = (
-    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-      <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
-      <div>Sign Out </div>
-    </div>
-  );
-
-  if (!isMarketplace) {
-    // Sign out via Clerk.
-    return (
-      <button
-        onClick={async () => {
-          await signOut({ sessionId: session?.id, redirectUrl: '/sign-in/choose' });
-        }}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  // Sign out via our backend.
-  return <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/v1/logout`}>{content}</NextLink>;
-}

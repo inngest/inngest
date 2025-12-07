@@ -1,25 +1,37 @@
-'use client';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import useDebounce from "@inngest/components/hooks/useDebounce";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import useDebounce from '@inngest/components/hooks/useDebounce';
+import type {
+  SchemasContextValue,
+  UseSchemasArgs,
+  UseSchemasReturn,
+} from "./types";
+import { useSchemasQuery } from "./useSchemasQuery";
 
-import type { SchemasContextValue, UseSchemasArgs, UseSchemasReturn } from './types';
-import { useSchemasQuery } from './useSchemasQuery';
-
-const SchemasContext = createContext<SchemasContextValue | undefined>(undefined);
+const SchemasContext = createContext<SchemasContextValue | undefined>(
+  undefined,
+);
 
 export function SchemasProvider({ children }: { children: ReactNode }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const query = useSchemasQuery(search);
 
   return (
-    <SchemasContext.Provider value={{ ...query, setSearch }}>{children}</SchemasContext.Provider>
+    <SchemasContext.Provider value={{ ...query, setSearch }}>
+      {children}
+    </SchemasContext.Provider>
   );
 }
 
 function useSchemasContext(): SchemasContextValue {
   const ctx = useContext(SchemasContext);
-  if (!ctx) throw new Error('useSchemas must be used within SchemasProvider');
+  if (!ctx) throw new Error("useSchemas must be used within SchemasProvider");
 
   return ctx;
 }

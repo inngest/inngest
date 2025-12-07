@@ -1,12 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 import type {
   GetTraceResultPayload,
   TraceResult,
-} from '@inngest/components/SharedContext/useGetTraceResult';
-import { useClient } from 'urql';
+} from "@inngest/components/SharedContext/useGetTraceResult";
+import { useClient } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const query = graphql(`
   query TraceResult($envID: ID!, $traceID: String!) {
@@ -25,7 +25,9 @@ const query = graphql(`
   }
 `);
 
-export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise<TraceResult> {
+export function useGetTraceResult(): (
+  payload: GetTraceResultPayload,
+) => Promise<TraceResult> {
   const envID = useEnvironment().id;
   const client = useClient();
 
@@ -34,25 +36,29 @@ export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise
       let res;
       try {
         res = await client
-          .query(query, { envID: envID, traceID }, { requestPolicy: 'network-only' })
+          .query(
+            query,
+            { envID: envID, traceID },
+            { requestPolicy: "network-only" },
+          )
           .toPromise();
       } catch (e) {
         if (e instanceof Error) {
           throw e;
         }
-        throw new Error('unknown error');
+        throw new Error("unknown error");
       }
       if (res.error) {
         throw res.error;
       }
       if (!res.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       return {
         ...res.data.workspace.runTraceSpanOutputByID,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

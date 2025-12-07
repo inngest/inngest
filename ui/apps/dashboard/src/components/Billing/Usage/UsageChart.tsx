@@ -1,19 +1,21 @@
-'use client';
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Chart } from "@inngest/components/Chart/Chart";
 
-import { Alert } from '@inngest/components/Alert';
-import { Chart } from '@inngest/components/Chart/Chart';
-
-import { createChartOptions } from './transformData';
-import type { UsageDimension } from './types';
-import useGetUsageChartData from './useGetUsageChartData';
+import { createChartOptions } from "./transformData";
+import type { UsageDimension } from "./types";
+import useGetUsageChartData from "./useGetUsageChartData";
 
 type Props = {
   includedCountLimit?: number;
-  selectedPeriod: 'current' | 'previous';
+  selectedPeriod: "current" | "previous";
   type: UsageDimension;
 };
 
-export default function BillableUsageChart({ includedCountLimit, selectedPeriod, type }: Props) {
+export default function BillableUsageChart({
+  includedCountLimit,
+  selectedPeriod,
+  type,
+}: Props) {
   const { data, fetching } = useGetUsageChartData({
     selectedPeriod: selectedPeriod,
     type: type,
@@ -23,10 +25,10 @@ export default function BillableUsageChart({ includedCountLimit, selectedPeriod,
     return (
       <div className="flex h-full min-h-[297px] w-full items-center justify-center overflow-hidden">
         <Alert severity="warning">
-          Failed to load usage data. Please{' '}
+          Failed to load usage data. Please{" "}
           <Alert.Link severity="warning" href="/support">
             contact support
-          </Alert.Link>{' '}
+          </Alert.Link>{" "}
           if this does not resolve.
         </Alert>
       </div>

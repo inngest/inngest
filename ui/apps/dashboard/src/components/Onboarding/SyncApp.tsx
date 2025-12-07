@@ -1,41 +1,52 @@
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link';
-import TabCards from '@inngest/components/TabCards/TabCards';
-import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { RiCheckboxCircleFill, RiCloseCircleFill, RiInputCursorMove } from '@remixicon/react';
+import { useEffect, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Input } from "@inngest/components/Forms/Input";
+import { Link } from "@inngest/components/Link/NewLink";
+import TabCards from "@inngest/components/TabCards/TabCards";
+import { IconSpinner } from "@inngest/components/icons/Spinner";
+import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
+import { AppsIcon } from "@inngest/components/icons/sections/Apps";
+import {
+  RiCheckboxCircleFill,
+  RiCloseCircleFill,
+  RiInputCursorMove,
+} from "@remixicon/react";
 
-import { type CodedError } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
-import { OnboardingSteps } from '../Onboarding/types';
-import { SyncFailure } from '../SyncFailure';
-import CommonVercelErrors from './CommonVercelErrors';
-import { getVercelSyncs, syncAppManually, type VercelSyncsResponse } from './actions';
-import { type VercelApp } from './data';
-import useOnboardingStep from './useOnboardingStep';
-import { useOnboardingTracking } from './useOnboardingTracking';
-import { getNextStepName } from './utils';
+import { type CodedError } from "@/gql/graphql";
+import { pathCreator } from "@/utils/urls";
+import { OnboardingSteps } from "./types";
+import { SyncFailure } from "../SyncFailure";
+import CommonVercelErrors from "./CommonVercelErrors";
+
+import {
+  type VercelSyncsResponse,
+  type VercelApp,
+} from "@/queries/server/integrations/vercel";
+import useOnboardingStep from "./useOnboardingStep";
+import { useOnboardingTracking } from "./useOnboardingTracking";
+import { getNextStepName } from "./utils";
+import {
+  getVercelSyncs,
+  syncAppManually,
+} from "@/queries/server/integrations/vercel";
 
 export default function SyncApp() {
   const currentStepName = OnboardingSteps.SyncApp;
   const nextStepName = getNextStepName(currentStepName);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingVercelApps, setIsLoadingVercelApps] = useState(false);
   const [vercelSyncs, setVercelSyncs] = useState<VercelSyncsResponse>();
   const [error, setError] = useState<CodedError | null>();
   const [app, setApp] = useState<string | null>();
   const { updateCompletedSteps } = useOnboardingStep();
-  const router = useRouter();
+  const navigate = useNavigate();
   const tracking = useOnboardingTracking();
 
-  const searchParams = useSearchParams();
-  const fromNonVercel = searchParams.get('nonVercel') === 'true';
+  const search = useSearch({ strict: false }) as { nonVercel?: string };
+  const fromNonVercel = search.nonVercel === "true";
 
   const loadVercelSyncs = async () => {
     try {
@@ -44,7 +55,7 @@ export default function SyncApp() {
       setVercelSyncs(syncs);
       return syncs;
     } catch (err) {
-      console.error('Failed to load syncs: ', err);
+      console.error("Failed to load syncs: ", err);
     } finally {
       setIsLoadingVercelApps(false);
     }
@@ -57,14 +68,14 @@ export default function SyncApp() {
       const syncs = await loadVercelSyncs();
 
       const hasPendingSync = syncs?.apps.some(
-        (app: VercelApp) => app.latestSync?.status === 'pending'
+        (app: VercelApp) => app.latestSync?.status === "pending",
       );
 
       if (hasPendingSync) {
         intervalId = window.setInterval(async () => {
           const newSyncs = await loadVercelSyncs();
           const newHasPendingSync = newSyncs?.apps.some(
-            (app: VercelApp) => app.latestSync?.status === 'pending'
+            (app: VercelApp) => app.latestSync?.status === "pending",
           );
 
           // Clear interval if the pending syncs are resolved
@@ -84,31 +95,35 @@ export default function SyncApp() {
     };
   }, []);
 
-  console.log('vercel', vercelSyncs);
-
   const hasSuccessfulSync = vercelSyncs?.apps.some(
-    (app) => app.latestSync?.status === 'success' || app.latestSync?.status === 'duplicate'
+    (app) =>
+      app.latestSync?.status === "success" ||
+      app.latestSync?.status === "duplicate",
   );
 
   const handleSyncAppManually = async () => {
     setIsLoading(true);
     setError(null);
-    setApp('');
+    setApp("");
     try {
-      const { success, error, appName } = await syncAppManually(inputValue);
+      const { success, error, appName } = await syncAppManually({
+        data: {
+          appURL: inputValue,
+        },
+      });
       if (success) {
         setApp(appName);
         updateCompletedSteps(currentStepName, {
           metadata: {
-            completionSource: 'manual',
-            syncMethod: 'manual',
+            completionSource: "manual",
+            syncMethod: "manual",
           },
         });
       } else {
-        setError(error);
+        setError(error as CodedError);
       }
     } catch (err) {
-      setError({ message: 'An unexpected error occurred', code: '', data: '' });
+      setError({ message: "An unexpected error occurred", code: "", data: "" });
     } finally {
       setIsLoading(false);
     }
@@ -117,8 +132,8 @@ export default function SyncApp() {
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        Since your code is hosted on another platform, you need to register where your functions are
-        hosted with Inngest.{' '}
+        Since your code is hosted on another platform, you need to register
+        where your functions are hosted with Inngest.{" "}
         <Link
           className="inline-block"
           size="small"
@@ -130,7 +145,7 @@ export default function SyncApp() {
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choose syncing method:</h4>
-      <TabCards defaultValue={fromNonVercel ? 'manually' : 'vercel'}>
+      <TabCards defaultValue={fromNonVercel ? "manually" : "vercel"}>
         <TabCards.ButtonList>
           <TabCards.Button className="w-36" value="manually">
             <div className="flex items-center gap-1.5">
@@ -151,14 +166,14 @@ export default function SyncApp() {
             <p className="text-basis">Sync your app manually</p>
           </div>
           <p className="mb-4 text-sm">
-            Enter the URL of your application&apos;s serve endpoint to register your functions with
-            Inngest.
+            Enter the URL of your application&apos;s serve endpoint to register
+            your functions with Inngest.
           </p>
           <Alert severity="info">
             <p className="text-sm">
-              If you set up the serve handler at /api/inngest, and your domain is https://myapp.com,
-              you&apos;ll need to inform Inngest that your app is hosted at
-              https://myapp.com/api/inngest.
+              If you set up the serve handler at /api/inngest, and your domain
+              is https://myapp.com, you&apos;ll need to inform Inngest that your
+              app is hosted at https://myapp.com/api/inngest.
             </p>
             <Alert.Link
               severity="info"
@@ -171,7 +186,7 @@ export default function SyncApp() {
             </Alert.Link>
           </Alert>
           <Input
-            className={`${error && 'outline-error'} my-3 w-full`}
+            className={`${error && "outline-error"} my-3 w-full`}
             placeholder="https://myapp.com/api/inngest"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -198,7 +213,11 @@ export default function SyncApp() {
                 label="Sync app here"
                 onClick={() => {
                   tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: { type: 'btn-click', label: 'sync', syncMethod: 'manual' },
+                    metadata: {
+                      type: "btn-click",
+                      label: "sync",
+                      syncMethod: "manual",
+                    },
                   });
                   handleSyncAppManually();
                 }}
@@ -209,13 +228,15 @@ export default function SyncApp() {
                 onClick={() => {
                   updateCompletedSteps(currentStepName, {
                     metadata: {
-                      completionSource: 'manual',
+                      completionSource: "manual",
                     },
                   });
                   tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: { type: 'btn-click', label: 'skip' },
+                    metadata: { type: "btn-click", label: "skip" },
                   });
-                  router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                  navigate({
+                    to: pathCreator.onboardingSteps({ step: nextStepName }),
+                  });
                 }}
               />
             </div>
@@ -225,9 +246,15 @@ export default function SyncApp() {
               label="Next"
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: 'btn-click', label: 'next', syncMethod: 'manual' },
+                  metadata: {
+                    type: "btn-click",
+                    label: "next",
+                    syncMethod: "manual",
+                  },
                 });
-                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                navigate({
+                  to: pathCreator.onboardingSteps({ step: nextStepName }),
+                });
               }}
             />
           )}
@@ -249,17 +276,17 @@ export default function SyncApp() {
               onClick={() =>
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: {
-                    type: 'btn-click',
-                    label: 'view-integration',
-                    syncMethod: 'vercel',
+                    type: "btn-click",
+                    label: "view-integration",
+                    syncMethod: "vercel",
                   },
                 })
               }
             />
           </div>
           <p className="mb-4 text-sm">
-            Inngest <span className="font-medium">automatically</span> syncs your app upon
-            deployment, ensuring a seamless connection.
+            Inngest <span className="font-medium">automatically</span> syncs
+            your app upon deployment, ensuring a seamless connection.
           </p>
           {isLoadingVercelApps && !vercelSyncs && (
             <div className="text-link mb-4 flex items-center gap-1 text-sm">
@@ -293,8 +320,10 @@ export default function SyncApp() {
                   <SyncFailure
                     className="mb-4"
                     error={{
-                      message: vercelSyncs.unattachedSyncs[0]?.error || 'Unknown error',
-                      code: 'unknown',
+                      message:
+                        vercelSyncs.unattachedSyncs[0]?.error ||
+                        "Unknown error",
+                      code: "unknown",
                     }}
                   />
                   <CommonVercelErrors />
@@ -315,14 +344,20 @@ export default function SyncApp() {
             onClick={() => {
               updateCompletedSteps(currentStepName, {
                 metadata: {
-                  completionSource: 'manual',
-                  syncMethod: 'vercel',
+                  completionSource: "manual",
+                  syncMethod: "vercel",
                 },
               });
               tracking?.trackOnboardingAction(currentStepName, {
-                metadata: { type: 'btn-click', label: 'next', syncMethod: 'vercel' },
+                metadata: {
+                  type: "btn-click",
+                  label: "next",
+                  syncMethod: "vercel",
+                },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+              });
             }}
           />
         </TabCards.Content>
@@ -332,28 +367,28 @@ export default function SyncApp() {
 }
 
 const StatusIndicator = ({ status }: { status?: string }) => {
-  if (status === 'pending')
+  if (status === "pending")
     return (
       <div className="text-link flex items-center gap-1 text-sm">
         <IconSpinner className="fill-link h-4 w-4" />
         Syncing app
       </div>
     );
-  if (status === 'success')
+  if (status === "success")
     return (
       <div className="text-success flex items-center gap-1 text-sm">
         <RiCheckboxCircleFill className="text-success h-4 w-4" />
         App synced successfully
       </div>
     );
-  if (status === 'error')
+  if (status === "error")
     return (
       <div className="text-error flex items-center gap-1 text-sm">
         <RiCloseCircleFill className="text-error h-5 w-5" />
         App failed to sync
       </div>
     );
-  if (status === 'duplicate')
+  if (status === "duplicate")
     return (
       <div className="text-success flex items-center gap-1 text-sm">
         <RiCheckboxCircleFill className="text-success h-4 w-4" />

@@ -1,18 +1,17 @@
-'use client';
+import { useState } from "react";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { AlertModal } from '@inngest/components/Modal/AlertModal';
-import { RiAlertFill } from '@remixicon/react';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { Button } from "@inngest/components/Button/NewButton";
+import { AlertModal } from "@inngest/components/Modal/AlertModal";
+import { RiAlertFill } from "@remixicon/react";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import AdvancedObservabilityComponent from '@/components/Billing/Addons/AdvancedObservabilityModal';
-import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
-import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
-import { graphql } from '@/gql';
-import SlackChannelComponent from './SlackChannelModal';
+import AdvancedObservabilityComponent from "@/components/Billing/Addons/AdvancedObservabilityModal";
+import EntitlementListItemSelfServiceNumeric from "@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric";
+import { addonQtyCostString } from "@/components/Billing/Addons/pricing_help";
+import { graphql } from "@/gql";
+import SlackChannelComponent from "./SlackChannelModal";
+import { useNavigate } from "@tanstack/react-router";
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -48,28 +47,33 @@ export default function EntitlementListItemSelfService({
   addonPurchased?: boolean;
   onChange?: () => void;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [openSelfService, setOpenSelfService] = useState(false);
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [addonCost, setAddonCost] = useState(0);
   const [addonQty, setAddonQty] = useState(0);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
+  const [, updateAccountAddonQuantity] = useMutation(
+    UpdateAccountAddonQuantityDocument,
+  );
   const [err, setErr] = useState<String | null>(null);
 
-  const switchInput = typeof entitlement.currentValue === 'boolean';
-  const numericInput = typeof entitlement.currentValue === 'number';
+  const switchInput = typeof entitlement.currentValue === "boolean";
+  const numericInput = typeof entitlement.currentValue === "number";
 
   const isAdvancedObservability =
-    title === 'Log retention' || title === 'Metrics granularity' || title === 'Metrics freshness';
+    title === "Log retention" ||
+    title === "Metrics granularity" ||
+    title === "Metrics freshness";
 
-  const isDedicatedSlackChannel = title === 'Dedicated Slack Channel';
+  const isDedicatedSlackChannel = title === "Dedicated Slack Channel";
 
   const addonCostStr = addonQtyCostString(addonQty, addon);
 
   const addonConfirmTitle =
-    entitlement.currentValue === entitlement.planLimit || (switchInput && !entitlement.currentValue)
+    entitlement.currentValue === entitlement.planLimit ||
+    (switchInput && !entitlement.currentValue)
       ? `Add ${title.toLowerCase()} to plan`
       : `Change ${title.toLowerCase()} addon`;
 
@@ -93,8 +97,8 @@ export default function EntitlementListItemSelfService({
       if (onChange) {
         onChange();
       }
-      router.refresh();
-      toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
+      navigate({ to: ".", replace: true });
+      toast.success(`Addon ${isRemoving ? "removed" : "updated"} successfully`);
     }
     setIsRemoving(false);
   };
@@ -125,7 +129,7 @@ export default function EntitlementListItemSelfService({
         />
       );
     } else {
-      throw new Error('Boolean addons not supported yet');
+      throw new Error("Boolean addons not supported yet");
     }
   }
 
@@ -140,15 +144,18 @@ export default function EntitlementListItemSelfService({
           <p className="text-muted mb-1 text-sm italic">{description}</p>
           {err && (
             <p className="text-error text-xs">
-              <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
+              <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update
+              addon.{" "}
               <a href="/support" className="underline">
                 Contact support
-              </a>{' '}
+              </a>{" "}
               if this problem persists.
             </p>
           )}
           {entitlement.displayValue && !openSelfService ? (
-            <div className="text-basis pr-3 text-sm font-medium">{entitlement.displayValue}</div>
+            <div className="text-basis pr-3 text-sm font-medium">
+              {entitlement.displayValue}
+            </div>
           ) : null}
         </div>
         {!openSelfService && (
@@ -166,26 +173,28 @@ export default function EntitlementListItemSelfService({
           />
         )}
       </div>
-      {openSelfService && numericInput && typeof entitlement.currentValue === 'number' && (
-        <EntitlementListItemSelfServiceNumeric
-          entitlement={{
-            currentValue: entitlement.currentValue,
-            planLimit: entitlement.planLimit,
-            maxValue: entitlement.maxValue,
-          }}
-          addon={addon}
-          onCancel={() => {
-            setOpenSelfService(false);
-            setErr(null);
-          }}
-          onSubmit={(qty: number, cost: number) => {
-            setAddonQty(qty);
-            setAddonCost(cost);
-            setOpenConfirmationModal(true);
-            setOpenSelfService(false);
-          }}
-        />
-      )}
+      {openSelfService &&
+        numericInput &&
+        typeof entitlement.currentValue === "number" && (
+          <EntitlementListItemSelfServiceNumeric
+            entitlement={{
+              currentValue: entitlement.currentValue,
+              planLimit: entitlement.planLimit,
+              maxValue: entitlement.maxValue,
+            }}
+            addon={addon}
+            onCancel={() => {
+              setOpenSelfService(false);
+              setErr(null);
+            }}
+            onSubmit={(qty: number, cost: number) => {
+              setAddonQty(qty);
+              setAddonCost(cost);
+              setOpenConfirmationModal(true);
+              setOpenSelfService(false);
+            }}
+          />
+        )}
       {openConfirmationModal && (
         <AlertModal
           isOpen={openConfirmationModal}
@@ -193,9 +202,12 @@ export default function EntitlementListItemSelfService({
           onSubmit={handleSubmit}
           title={addonConfirmTitle}
           description={
-            'Are you sure you want to apply this change to your plan? ' + addonConfirmDescription
+            "Are you sure you want to apply this change to your plan? " +
+            addonConfirmDescription
           }
-          confirmButtonLabel={(addonCost || 0) > 0 ? 'Confirm and pay' : 'Confirm'}
+          confirmButtonLabel={
+            (addonCost || 0) > 0 ? "Confirm and pay" : "Confirm"
+          }
           cancelButtonLabel="Cancel"
           confirmButtonKind="primary"
         />

@@ -1,24 +1,25 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { Button, SplitButton } from '@inngest/components/Button';
+import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@inngest/components/Button/NewButton";
+import { SplitButton } from "@inngest/components/Button/SplitButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiArrowDownSLine } from '@remixicon/react';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { RiArrowDownSLine } from "@remixicon/react";
 
-import type { Environment } from '@/utils/environments';
-import { pathCreator } from '@/utils/urls';
+import type { Environment } from "@/utils/environments";
+import { pathCreator } from "@/utils/urls";
 
 type BranchEnvironmentActionsProps = {
   branchParent: Environment;
 };
 
-export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActionsProps) {
-  const router = useRouter();
+export function BranchEnvironmentActions({
+  branchParent,
+}: BranchEnvironmentActionsProps) {
+  const navigate = useNavigate();
 
   return (
     <SplitButton
@@ -28,7 +29,7 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           className="rounded-r-none border-r-0 text-sm"
           kind="primary"
           label="Sync new app"
-          href={pathCreator.apps({ envSlug: branchParent.slug })}
+          to={pathCreator.apps({ envSlug: branchParent.slug })}
           size="medium"
         />
       }
@@ -46,13 +47,21 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           <DropdownMenuContent>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(pathCreator.keys({ envSlug: branchParent.slug }))}
+              onSelect={() =>
+                navigate({
+                  to: pathCreator.keys({ envSlug: branchParent.slug }),
+                })
+              }
             >
               Manage event keys
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(pathCreator.signingKeys({ envSlug: branchParent.slug }))}
+              onSelect={() =>
+                navigate({
+                  to: pathCreator.signingKeys({ envSlug: branchParent.slug }),
+                })
+              }
             >
               Manage signing key
             </DropdownMenuItem>

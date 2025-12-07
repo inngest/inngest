@@ -1,13 +1,11 @@
-'use client';
-
-import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
+import type { SQLEditorMountCallback } from "@inngest/components/SQLEditor/SQLEditor";
 
 type Editor = Parameters<SQLEditorMountCallback>[0];
 type Monaco = Parameters<SQLEditorMountCallback>[1];
-type Model = NonNullable<ReturnType<Editor['getModel']>>;
-type Marker = Parameters<Monaco['editor']['setModelMarkers']>[2][number];
+type Model = NonNullable<ReturnType<Editor["getModel"]>>;
+type Marker = Parameters<Monaco["editor"]["setModelMarkers"]>[2][number];
 
-const OWNER = 'template-vars' as const;
+const OWNER = "template-vars" as const;
 
 // Matches "{{ <content> }}" where:
 // - at least one space follows the opening braces
@@ -53,7 +51,7 @@ function identifyTemplateVars(text: string) {
 
   for (const match of text.matchAll(PATTERN)) {
     const idx = match.index;
-    if (typeof idx !== 'number') continue;
+    if (typeof idx !== "number") continue;
 
     results.push({
       startIndex: idx,
@@ -64,7 +62,10 @@ function identifyTemplateVars(text: string) {
   return results;
 }
 
-type MarkerRange = Pick<Marker, 'startLineNumber' | 'startColumn' | 'endLineNumber' | 'endColumn'>;
+type MarkerRange = Pick<
+  Marker,
+  "startLineNumber" | "startColumn" | "endLineNumber" | "endColumn"
+>;
 
 function getTemplateVarsRanges(model: Model, matches: TemplateVarMatch[]) {
   return matches.map((m): MarkerRange => {
@@ -80,10 +81,14 @@ function getTemplateVarsRanges(model: Model, matches: TemplateVarMatch[]) {
   });
 }
 
-function assignTemplateVarsMarkers(monaco: Monaco, model: Model, ranges: MarkerRange[]) {
+function assignTemplateVarsMarkers(
+  monaco: Monaco,
+  model: Model,
+  ranges: MarkerRange[],
+) {
   const markers: Marker[] = ranges.map((range) => ({
     ...range,
-    message: 'A specific value is required for this template variable.',
+    message: "A specific value is required for this template variable.",
     severity: monaco.MarkerSeverity.Info,
   }));
 

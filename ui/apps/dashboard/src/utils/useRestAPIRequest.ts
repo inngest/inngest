@@ -1,14 +1,12 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/tanstack-react-start";
 import {
   baseFetchSkipped,
   baseFetchSucceeded,
   baseInitialFetchFailed,
   baseInitialFetchLoading,
   type FetchResult,
-} from '@inngest/components/types/fetch';
+} from "@inngest/components/types/fetch";
 
 export function useRestAPIRequest<T>({
   url,
@@ -18,7 +16,7 @@ export function useRestAPIRequest<T>({
   url: string | URL | null;
   method: string;
   pause?: boolean;
-}): Omit<FetchResult<T, { skippable: true }>, 'refetch'> {
+}): Omit<FetchResult<T, { skippable: true }>, "refetch"> {
   const { getToken } = useAuth();
   const [data, setData] = useState<any>();
   const [isLoading, setIsLoading] = useState<boolean>(false);

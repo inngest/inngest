@@ -1,11 +1,11 @@
-import { ReplayStatus } from '@inngest/components/types/replay';
-import { differenceInMilliseconds } from '@inngest/components/utils/date';
-import { useQuery } from '@tanstack/react-query';
-import { decodeTime } from 'ulid';
-import { useClient } from 'urql';
+import { ReplayStatus } from "@inngest/components/types/replay";
+import { differenceInMilliseconds } from "@inngest/components/utils/date";
+import { useQuery } from "@tanstack/react-query";
+import { decodeTime } from "ulid";
+import { useClient } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const getReplayQuery = graphql(`
   query GetReplay($envID: ID!, $replayID: ID!) {
@@ -31,15 +31,17 @@ export function useGetReplay(replayID: string) {
   const envID = useEnvironment().id;
   const client = useClient();
   return useQuery({
-    queryKey: ['replay', envID, replayID],
+    queryKey: ["replay", envID, replayID],
     queryFn: async () => {
-      const result = await client.query(getReplayQuery, { envID, replayID }).toPromise();
+      const result = await client
+        .query(getReplayQuery, { envID, replayID })
+        .toPromise();
 
       if (result.error) {
         throw result.error;
       }
       if (!result.data?.environment.replay) {
-        throw new Error('Replay not found');
+        throw new Error("Replay not found");
       }
 
       const replay = result.data.environment.replay;
@@ -48,9 +50,14 @@ export function useGetReplay(replayID: string) {
         ...replay,
         createdAt: new Date(replay.createdAt),
         runsCount: replay.functionRunsScheduledCount,
-        runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
-        fromRange: replay.fromRange ? new Date(decodeTime(replay.fromRange)) : undefined,
-        toRange: replay.toRange ? new Date(decodeTime(replay.toRange)) : undefined,
+        runsSkippedCount:
+          replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
+        fromRange: replay.fromRange
+          ? new Date(decodeTime(replay.fromRange))
+          : undefined,
+        toRange: replay.toRange
+          ? new Date(decodeTime(replay.toRange))
+          : undefined,
         filters: replay.filtersV2,
       };
 
@@ -59,7 +66,10 @@ export function useGetReplay(replayID: string) {
           ...baseReplay,
           status: ReplayStatus.Ended,
           endedAt: new Date(replay.endedAt),
-          duration: differenceInMilliseconds(new Date(replay.endedAt), new Date(replay.createdAt)),
+          duration: differenceInMilliseconds(
+            new Date(replay.endedAt),
+            new Date(replay.createdAt),
+          ),
         };
       }
 
@@ -97,7 +107,7 @@ export function useGetReplays(functionSlug: string) {
   const envID = useEnvironment().id;
   const client = useClient();
   return useQuery({
-    queryKey: ['replays', envID, functionSlug],
+    queryKey: ["replays", envID, functionSlug],
     queryFn: async () => {
       const result = await client
         .query(GetReplaysDocument, { environmentID: envID, functionSlug })
@@ -113,7 +123,9 @@ export function useGetReplays(functionSlug: string) {
             ...replay,
             createdAt: new Date(replay.createdAt),
             runsCount: replay.functionRunsScheduledCount,
-            runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
+            runsSkippedCount:
+              replay.functionRunsScheduledCount -
+              replay.functionRunsProcessedCount,
           };
 
           if (replay.endedAt) {
@@ -123,7 +135,7 @@ export function useGetReplays(functionSlug: string) {
               endedAt: new Date(replay.endedAt),
               duration: differenceInMilliseconds(
                 new Date(replay.endedAt),
-                new Date(replay.createdAt)
+                new Date(replay.createdAt),
               ),
             };
           }

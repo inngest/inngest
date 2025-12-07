@@ -1,7 +1,7 @@
 export interface InsightsFetchResult {
   columns: Array<{
     name: string;
-    type: 'date' | 'string' | 'number';
+    type: "date" | "string" | "number";
   }>;
   rows: Array<{
     id: string;
@@ -9,4 +9,4 @@ export interface InsightsFetchResult {
   }>;
 }
 
-export type InsightsStatus = 'error' | 'initial' | 'loading' | 'success';
+export type InsightsStatus = "error" | "initial" | "loading" | "success";

@@ -1,14 +1,13 @@
-'use client';
-
-import { useState } from 'react';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { useState } from "react";
+import { RiArrowDownSLine } from "@remixicon/react";
 
 import {
   QueryHelperPanelSectionContent,
   type QueryHelperPanelSectionContentProps,
-} from './QueryHelperPanelSectionContent';
+} from "./QueryHelperPanelSectionContent";
 
-interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
+interface QueryHelperPanelCollapsibleSectionProps
+  extends QueryHelperPanelSectionContentProps {
   activeSavedQueryId?: string;
   onQueryDelete: (queryId: string) => void;
   title: string;
@@ -35,7 +34,7 @@ export function QueryHelperPanelCollapsibleSection({
         </span>
         <RiArrowDownSLine
           className={`text-muted group-hover:text-basis h-4 w-4 transition-all duration-200 ${
-            isOpen ? 'rotate-180' : ''
+            isOpen ? "rotate-180" : ""
           }`}
         />
       </button>

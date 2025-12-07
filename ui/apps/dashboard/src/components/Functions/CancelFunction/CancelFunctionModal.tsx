@@ -1,13 +1,13 @@
-import { useCallback, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { RangePicker } from '@inngest/components/DatePicker';
-import { Input } from '@inngest/components/Forms/Input';
-import { Modal } from '@inngest/components/Modal';
-import { subtractDuration } from '@inngest/components/utils/date';
+import { useCallback, useState } from "react";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Button } from "@inngest/components/Button/NewButton";
+import { RangePicker } from "@inngest/components/DatePicker";
+import { Input } from "@inngest/components/Forms/Input";
+import { Modal } from "@inngest/components/Modal";
+import { subtractDuration } from "@inngest/components/utils/date";
 
-import { useCreateCancellation } from './useCreateCancellation';
-import { useRunCount, type RunCountInput } from './useRunCount';
+import { useCreateCancellation } from "./useCreateCancellation";
+import { useRunCount, type RunCountInput } from "./useRunCount";
 
 type Props = {
   envID: string;
@@ -52,7 +52,7 @@ export function CancelFunctionModal(props: Props) {
       if (e instanceof Error) {
         setCreationError(e);
       } else {
-        setCreationError(new Error('unknown error'));
+        setCreationError(new Error("unknown error"));
       }
       return;
     } finally {
@@ -79,10 +79,15 @@ export function CancelFunctionModal(props: Props) {
       <Modal.Body>
         <div className="flex flex-col gap-4">
           <div>
-            <label className="text-basis mb-1 text-sm font-medium" htmlFor="cancellation-name">
+            <label
+              className="text-basis mb-1 text-sm font-medium"
+              htmlFor="cancellation-name"
+            >
               Name (optional)
             </label>
-            <p className="text-muted mb-1 text-sm">Provide a name for this cancellation group</p>
+            <p className="text-muted mb-1 text-sm">
+              Provide a name for this cancellation group
+            </p>
 
             <Input
               name="cancellation-name"
@@ -96,7 +101,10 @@ export function CancelFunctionModal(props: Props) {
           </div>
 
           <div>
-            <label className="text-basis mb-1 text-sm font-medium" htmlFor="time-range">
+            <label
+              className="text-basis mb-1 text-sm font-medium"
+              htmlFor="time-range"
+            >
               Date range
             </label>
             <p className="text-muted mb-1 text-sm">
@@ -107,17 +115,21 @@ export function CancelFunctionModal(props: Props) {
               className="w-full"
               onChange={(range) =>
                 setTimeRange(
-                  range.type === 'relative'
-                    ? { start: subtractDuration(new Date(), range.duration), end: new Date() }
-                    : { start: range.start, end: range.end }
+                  range.type === "relative"
+                    ? {
+                        start: subtractDuration(new Date(), range.duration),
+                        end: new Date(),
+                      }
+                    : { start: range.start, end: range.end },
                 )
               }
             />
           </div>
 
           <Alert severity="info" className="text-sm">
-            This action will affect only queued and running function runs. All affected function
-            runs will immediately cancel, but their status may not update immediately.
+            This action will affect only queued and running function runs. All
+            affected function runs will immediately cancel, but their status may
+            not update immediately.
           </Alert>
 
           {countRes.error && (

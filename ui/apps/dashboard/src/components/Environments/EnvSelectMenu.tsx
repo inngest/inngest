@@ -1,12 +1,22 @@
-'use client';
+import { useState } from "react";
+import { Listbox } from "@headlessui/react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@inngest/components/Tooltip/Tooltip";
+import {
+  RiCloudLine,
+  RiErrorWarningLine,
+  RiExpandUpDownLine,
+} from "@remixicon/react";
 
-import { useState } from 'react';
-import { Listbox } from '@headlessui/react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiCloudLine, RiErrorWarningLine, RiExpandUpDownLine } from '@remixicon/react';
-
-import { useEnvironments } from '@/queries';
-import { getDefaultEnvironment, getTestEnvironments, type Environment } from '@/utils/environments';
+import { useEnvironments } from "@/queries";
+import {
+  getDefaultEnvironment,
+  getTestEnvironments,
+  type Environment,
+} from "@/utils/environments";
 
 type EnvSelectMenuProps = {
   onSelect?: (env: Environment) => void;
@@ -17,12 +27,15 @@ type EnvSelectMenuProps = {
 // It has no predefined on-select behavior.
 // It does not allow selecting branch or archived envs.
 // It defaults to the Production env.
-export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProps) {
+export default function EnvSelectMenu({
+  onSelect,
+  className,
+}: EnvSelectMenuProps) {
   const [{ data: envs = [], error }] = useEnvironments();
   const [selection, setSelection] = useState<Environment | null>(null);
 
   if (error) {
-    console.error('error fetching envs', error);
+    console.error("error fetching envs", error);
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -31,9 +44,12 @@ export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProp
             <div>Error</div>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="right" className="text-error bg-error rounded text-xs">
-          Error loading environments. Please refresh the page, and contact support if this keeps
-          happening.
+        <TooltipContent
+          side="right"
+          className="text-error bg-error rounded text-xs"
+        >
+          Error loading environments. Please refresh the page, and contact
+          support if this keeps happening.
         </TooltipContent>
       </Tooltip>
     );
@@ -55,18 +71,21 @@ export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProp
   }
 
   return (
-    <div className={className || ''}>
+    <div className={className || ""}>
       <Listbox value={selection} onChange={internalOnSelect}>
         {({ open }) => (
           <div className="bg-canvasBase relative flex">
             <Listbox.Button
-              className={`border-muted ${open && 'border-primary-intense'}
+              className={`border-muted ${open && "border-primary-intense"}
               bg-canvasBase text-primary-intense hover:bg-canvasSubtle 
               h-8 w-[258px] overflow-hidden rounded border px-2 text-sm`}
             >
               <div className="flex flex-row items-center justify-between">
                 <SelectedDisplay env={selection} />
-                <RiExpandUpDownLine className="text-muted h-4 w-4" aria-hidden="true" />
+                <RiExpandUpDownLine
+                  className="text-muted h-4 w-4"
+                  aria-hidden="true"
+                />
               </div>
             </Listbox.Button>
 
@@ -78,7 +97,9 @@ export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProp
                 <EnvItem env={defaultEnvironment} key={defaultEnvironment.id} />
               )}
               {testEnvironments.length > 0 &&
-                testEnvironments.map((env) => <EnvItem key={env.id} env={env} />)}
+                testEnvironments.map((env) => (
+                  <EnvItem key={env.id} env={env} />
+                ))}
             </Listbox.Options>
           </div>
         )}
@@ -102,7 +123,7 @@ const SelectedDisplay = ({ env }: { env: Environment | null }) => (
 
 const EnvItem = ({ env }: { env: Environment }) => (
   <Listbox.Option
-    key={'lo-' + env.id}
+    key={"lo-" + env.id}
     value={env}
     className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
   >

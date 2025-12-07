@@ -1,18 +1,16 @@
-'use client';
+import { useMemo } from "react";
+import { RiCloseLine } from "@remixicon/react";
 
-import { useMemo } from 'react';
-import { RiCloseLine } from '@remixicon/react';
-
-import { InsightsHelperPanelIcon } from './InsightsHelperPanelIcon';
+import { InsightsHelperPanelIcon } from "./InsightsHelperPanelIcon";
 import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from './constants';
-import { InsightsChat } from './features/InsightsChat/InsightsChat';
-import { SchemaExplorer } from './features/SchemaExplorer/SchemaExplorer';
+} from "./constants";
+import { InsightsChat } from "./features/InsightsChat/InsightsChat";
+import { SchemaExplorer } from "./features/SchemaExplorer/SchemaExplorer";
 
 type InsightsHelperPanelProps = {
   active: HelperTitle;
@@ -20,7 +18,11 @@ type InsightsHelperPanelProps = {
   onClose: () => void;
 };
 
-export function InsightsHelperPanel({ active, agentThreadId, onClose }: InsightsHelperPanelProps) {
+export function InsightsHelperPanel({
+  active,
+  agentThreadId,
+  onClose,
+}: InsightsHelperPanelProps) {
   const content = useMemo(() => {
     switch (active) {
       case INSIGHTS_AI: {

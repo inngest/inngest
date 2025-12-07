@@ -1,23 +1,21 @@
-'use client';
-
-import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
-import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
-import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
-import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
+import { InfiniteScrollTrigger } from "@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger";
+import { RunsPage } from "@inngest/components/RunsPage/NewRunsPage";
+import { useBooleanFlag } from "@inngest/components/SharedContext/useBooleanFlag";
+import { useCalculatedStartTime } from "@inngest/components/hooks/useCalculatedStartTime";
 import {
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useSearchParam';
-import { CombinedError, useQuery } from 'urql';
+} from "@inngest/components/hooks/useNewSearchParams";
+import { CombinedError, useQuery } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
-import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
-import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { AppFilterDocument, CountRunsDocument } from './queries';
-import { useRunsPagination } from './useRunsPagination';
-import { toRunStatuses, toTimeField } from './utils';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { useGetTrigger } from "@/components/RunDetails/useGetTrigger";
+import { GetFunctionPauseStateDocument, RunsOrderByField } from "@/gql/graphql";
+import { useAccountFeatures } from "@/utils/useAccountFeatures";
+import { AppFilterDocument, CountRunsDocument } from "./queries";
+import { useRunsPagination } from "./useRunsPagination";
+import { toRunStatuses, toTimeField } from "./utils";
 
 export const DEFAULT_POLL_INTERVAL = 1000;
 
@@ -27,54 +25,59 @@ export type RefreshRunsRef = {
 
 type FnProps = {
   functionSlug: string;
-  scope: 'fn';
+  scope: "fn";
 };
 
 type EnvProps = {
   functionSlug?: undefined;
-  scope: 'env';
+  scope: "env";
 };
 
 type Props = FnProps | EnvProps;
 
 const parseCelSearchError = (combinedError: CombinedError | undefined) => {
   return combinedError?.graphQLErrors.find(
-    (error) => error.extensions.code == 'expression_invalid'
+    (error) => error.extensions.code == "expression_invalid",
   );
 };
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   { functionSlug, scope }: Props,
-  ref
+  ref,
 ) {
   const env = useEnvironment();
 
   const [{ data: pauseData }] = useQuery({
-    pause: scope !== 'fn',
+    pause: scope !== "fn",
     query: GetFunctionPauseStateDocument,
     variables: {
       environmentID: env.id,
-      functionSlug: functionSlug ?? '',
+      functionSlug: functionSlug ?? "",
     },
   });
 
   const [appsRes] = useQuery({
-    pause: scope === 'fn',
+    pause: scope === "fn",
     query: AppFilterDocument,
     variables: { envSlug: env.slug },
   });
 
   const { booleanFlag } = useBooleanFlag();
 
-  const { value: tracePreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { value: tracePreviewEnabled } = booleanFlag(
+    "traces-preview",
+    true,
+    true,
+  );
 
-  const [appIDs] = useStringArraySearchParam('filterApp');
-  const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
-  const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
-  const [lastDays] = useSearchParam('last');
-  const [startTime] = useSearchParam('start');
-  const [endTime] = useSearchParam('end');
-  const [search] = useSearchParam('search');
+  const [appIDs] = useStringArraySearchParam("filterApp");
+  const [rawFilteredStatus] = useStringArraySearchParam("filterStatus");
+  const [rawTimeField = RunsOrderByField.QueuedAt] =
+    useSearchParam("timeField");
+  const [lastDays] = useSearchParam("last");
+  const [startTime] = useSearchParam("start");
+  const [endTime] = useSearchParam("end");
+  const [search] = useSearchParam("search");
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -110,7 +113,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       filteredStatus,
       timeField,
       search,
-    ]
+    ],
   );
 
   // Use the new hook to manage pagination
@@ -129,7 +132,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const [countRes] = useQuery({
     query: CountRunsDocument,
-    requestPolicy: 'network-only',
+    requestPolicy: "network-only",
     variables: commonQueryVars,
   });
 

@@ -1,16 +1,16 @@
-import type { Route } from 'next';
+import type { FileRouteTypes } from "@/routeTree.gen";
 
-export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
-export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
-export const DISCORD_URL = 'https://www.inngest.com/discord';
+export const WEBSITE_PRICING_URL = "https://www.inngest.com/pricing";
+export const WEBSITE_CONTACT_URL = "https://www.inngest.com/contact";
+export const DISCORD_URL = "https://www.inngest.com/discord";
 
 export const DOCS_URLS = {
-  SERVE: 'https://www.inngest.com/docs/sdk/serve',
+  SERVE: "https://www.inngest.com/docs/sdk/serve",
 };
 
 export const skipCacheSearchParam = {
-  name: 'skipCache',
-  value: 'true',
+  name: "skipCache",
+  value: "true",
 } as const;
 
 /**
@@ -18,10 +18,10 @@ export const skipCacheSearchParam = {
  */
 export function setSkipCacheSearchParam(url: string): string {
   let value = `${skipCacheSearchParam.name}=${skipCacheSearchParam.value}`;
-  if (url.includes('?')) {
-    url += '&' + value;
+  if (url.includes("?")) {
+    url += "&" + value;
   } else {
-    url += '?' + value;
+    url += "?" + value;
   }
   return url;
 }
@@ -37,60 +37,122 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
-  apps({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/apps` as Route;
+  apps({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/apps` as FileRouteTypes["to"];
   },
-  app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
-    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}` as Route;
+  app({
+    envSlug,
+    externalAppID,
+  }: {
+    envSlug: string;
+    externalAppID: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/apps/${encodeURIComponent(
+      externalAppID,
+    )}` as FileRouteTypes["to"];
   },
-  appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
-    return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
+  appSyncs({
+    envSlug,
+    externalAppID,
+  }: {
+    envSlug: string;
+    externalAppID: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/apps/${encodeURIComponent(
+      externalAppID,
+    )}/syncs` as FileRouteTypes["to"];
   },
-  billing({ ref, tab, highlight }: { ref?: string; tab?: string; highlight?: string } = {}): Route {
-    let path = '/billing';
+  billing({
+    ref,
+    tab,
+    highlight,
+  }: {
+    ref?: string;
+    tab?: string;
+    highlight?: string;
+  } = {}): FileRouteTypes["to"] {
+    let path = "/billing";
     if (tab) {
       path += `/${tab}`;
     }
 
     const query = new URLSearchParams();
     if (highlight) {
-      query.set('highlight', highlight);
+      query.set("highlight", highlight);
     }
     if (ref) {
-      query.set('ref', ref);
+      query.set("ref", ref);
     }
     if (query.toString()) {
       path += `?${query.toString()}`;
     }
 
-    return path as Route;
+    return path as FileRouteTypes["to"];
   },
-  createApp({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/apps/sync-new` as Route;
+  createApp({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/apps/sync-new` as FileRouteTypes["to"];
   },
-  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
-    return `/env/${envSlug}/events/${eventID}` as Route;
+  eventPopout({
+    envSlug,
+    eventID,
+  }: {
+    envSlug: string;
+    eventID: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/events/${eventID}` as FileRouteTypes["to"];
   },
-  eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
+  eventType({
+    envSlug,
+    eventName,
+  }: {
+    envSlug: string;
+    eventName: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(
+      eventName,
+    )}` as FileRouteTypes["to"];
   },
-  eventTypes({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/event-types` as Route;
+  eventTypes({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/event-types` as FileRouteTypes["to"];
   },
-  eventTypeEvents({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}/events` as Route;
+  eventTypeEvents({
+    envSlug,
+    eventName,
+  }: {
+    envSlug: string;
+    eventName: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(
+      eventName,
+    )}/events` as FileRouteTypes["to"];
   },
-  envs(): Route {
-    return '/env' as Route;
+  envs(): FileRouteTypes["to"] {
+    return "/env" as FileRouteTypes["to"];
   },
-  functions({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/functions` as Route;
+  functions({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/functions` as FileRouteTypes["to"];
   },
-  function({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}` as Route;
+  function({
+    envSlug,
+    functionSlug,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}` as FileRouteTypes["to"];
   },
-  functionReplays({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/replays` as Route;
+  functionReplays({
+    envSlug,
+    functionSlug,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}/replays` as FileRouteTypes["to"];
   },
   functionReplay({
     envSlug,
@@ -100,10 +162,10 @@ export const pathCreator = {
     envSlug: string;
     functionSlug: string;
     replayID: string;
-  }): Route {
+  }): FileRouteTypes["to"] {
     return `/env/${envSlug}/functions/${encodeURIComponent(
-      functionSlug
-    )}/replays/${replayID}` as Route;
+      functionSlug,
+    )}/replays/${replayID}` as FileRouteTypes["to"];
   },
   functionCancellations({
     envSlug,
@@ -111,39 +173,65 @@ export const pathCreator = {
   }: {
     envSlug: string;
     functionSlug: string;
-  }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/functions/${encodeURIComponent(
+      functionSlug,
+    )}/cancellations` as FileRouteTypes["to"];
   },
-  insights({ envSlug, ref }: { envSlug: string; ref?: string }): Route {
-    return `/env/${envSlug}/insights${ref ? `?ref=${ref}` : ''}` as Route;
+  insights({
+    envSlug,
+    ref,
+  }: {
+    envSlug: string;
+    ref?: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/insights${
+      ref ? `?ref=${ref}` : ""
+    }` as FileRouteTypes["to"];
   },
-  integrations(): Route {
-    return `/settings/integrations` as Route;
+  integrations(): FileRouteTypes["to"] {
+    return `/settings/integrations` as FileRouteTypes["to"];
   },
-  keys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/manage/keys` as Route;
+  keys({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/manage/keys` as FileRouteTypes["to"];
   },
-  pgIntegrationStep({ integration, step }: { integration: string; step?: string }): Route {
-    return `/settings/integrations/${integration}${step ? `/${step}` : ''}` as Route;
+  pgIntegrationStep({
+    integration,
+    step,
+  }: {
+    integration: string;
+    step?: string;
+  }): FileRouteTypes["to"] {
+    return `/settings/integrations/${integration}${
+      step ? `/${step}` : ""
+    }` as FileRouteTypes["to"];
   },
-  onboarding({ envSlug = 'production' }: { envSlug?: string } = {}): Route {
-    return `/env/${envSlug}/onboarding` as Route;
+  onboarding({
+    envSlug = "production",
+  }: { envSlug?: string } = {}): FileRouteTypes["to"] {
+    return `/env/${envSlug}/onboarding` as FileRouteTypes["to"];
   },
   onboardingSteps({
-    envSlug = 'production',
+    envSlug = "production",
     step,
     ref,
   }: {
     envSlug?: string;
     step?: string;
     ref?: string;
-  }): Route {
-    return `/env/${envSlug}/onboarding${step ? `/${step}` : ''}${
-      ref ? `?ref=${ref}` : ''
-    }` as Route;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/onboarding${step ? `/${step}` : ""}${
+      ref ? `?ref=${ref}` : ""
+    }` as FileRouteTypes["to"];
   },
-  runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
-    return `/env/${envSlug}/runs/${runID}` as Route;
+  runPopout({
+    envSlug,
+    runID,
+  }: {
+    envSlug: string;
+    runID: string;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/runs/${runID}` as FileRouteTypes["to"];
   },
   debugger({
     envSlug,
@@ -153,28 +241,30 @@ export const pathCreator = {
     envSlug: string;
     functionSlug: string;
     runID?: string;
-  }): Route {
-    return `/env/${envSlug}/debugger/${functionSlug}${runID ? `?runID=${runID}` : ''}` as Route;
+  }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/debugger/${functionSlug}${
+      runID ? `?runID=${runID}` : ""
+    }` as FileRouteTypes["to"];
   },
-  runs({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/runs` as Route;
+  runs({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/runs` as FileRouteTypes["to"];
   },
-  signingKeys({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/manage/signing-key` as Route;
+  signingKeys({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/manage/signing-key` as FileRouteTypes["to"];
   },
-  support({ ref }: { ref?: string } = {}): Route {
-    return `/support${ref ? `?ref=${ref}` : ''}` as Route;
+  support({ ref }: { ref?: string } = {}): FileRouteTypes["to"] {
+    return `/support${ref ? `?ref=${ref}` : ""}` as FileRouteTypes["to"];
   },
-  unattachedSyncs({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/unattached-syncs` as Route;
+  unattachedSyncs({ envSlug }: { envSlug: string }): FileRouteTypes["to"] {
+    return `/env/${envSlug}/unattached-syncs` as FileRouteTypes["to"];
   },
-  vercel(): Route {
-    return `/settings/integrations/vercel` as Route;
+  vercel(): FileRouteTypes["to"] {
+    return `/settings/integrations/vercel` as FileRouteTypes["to"];
   },
-  vercelSetup(): Route {
-    return `/settings/integrations/vercel/connect` as Route;
+  vercelSetup(): FileRouteTypes["to"] {
+    return `/settings/integrations/vercel/connect` as FileRouteTypes["to"];
   },
-  neon(): Route {
-    return `/settings/integrations/neon` as Route;
+  neon(): FileRouteTypes["to"] {
+    return `/settings/integrations/neon` as FileRouteTypes["to"];
   },
 };

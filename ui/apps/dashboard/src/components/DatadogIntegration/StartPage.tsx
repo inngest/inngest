@@ -1,11 +1,8 @@
-'use client';
+import { useEffect } from "react";
+import { useMutation } from "urql";
 
-import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useMutation } from 'urql';
-
-import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
-import { graphql } from '@/gql';
+import ConnectingView from "@/components/DatadogIntegration/ConnectingView";
+import { graphql } from "@/gql";
 
 const StartDatadogIntegrationDocument = graphql(`
   mutation StartDatadogIntegration($ddSite: String!, $ddDomain: String!) {
@@ -13,11 +10,17 @@ const StartDatadogIntegrationDocument = graphql(`
   }
 `);
 
-export default function StartPage({}) {
-  const [{ data, error }, startDdInt] = useMutation(StartDatadogIntegrationDocument);
-  const searchParams = useSearchParams();
-  const ddSite = searchParams.get('site');
-  const ddDomain = searchParams.get('domain');
+type StartPageProps = {
+  site: string | undefined;
+  domain: string | undefined;
+};
+
+export default function StartPage({ site, domain }: StartPageProps) {
+  const [{ data, error }, startDdInt] = useMutation(
+    StartDatadogIntegrationDocument,
+  );
+  const ddSite = site;
+  const ddDomain = domain;
   const oauthStateReady = ddSite && ddDomain;
 
   useEffect(() => {

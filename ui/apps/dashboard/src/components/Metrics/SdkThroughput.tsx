@@ -1,10 +1,14 @@
-import { Chart } from '@inngest/components/Chart/Chart';
-import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Chart } from "@inngest/components/Chart/Chart";
+import { Info } from "@inngest/components/Info/Info";
+import { Link } from "@inngest/components/Link/NewLink";
 
-import type { MetricsData, ScopedMetric, VolumeMetricsQuery } from '@/gql/graphql';
-import type { EntityLookup } from './Dashboard';
-import { getLineChartOptions, mapEntityLines } from './utils';
+import type {
+  MetricsData,
+  ScopedMetric,
+  VolumeMetricsQuery,
+} from "@/gql/graphql";
+import type { EntityLookup } from "./Dashboard";
+import { getLineChartOptions, mapEntityLines } from "./utils";
 
 const accumulator: { value: number; bucket: string }[] = [];
 
@@ -19,13 +23,13 @@ const sum = (metrics: ScopedMetric[]) =>
         value: (acc[index]?.value || 0) + item.value,
         bucket: item.bucket,
       })),
-    accumulator
+    accumulator,
   );
 
 const scopedMetric = (id: string, data: Array<MetricsData>) => ({
   id,
-  tagName: '',
-  tagValue: '',
+  tagName: "",
+  tagValue: "",
   data,
 });
 
@@ -33,10 +37,10 @@ export const mapSdkThroughput = ({
   sdkThroughputScheduled,
   sdkThroughputStarted,
   sdkThroughputEnded,
-}: VolumeMetricsQuery['workspace']) => {
-  const queued = 'Queued';
-  const started = 'Started';
-  const ended = 'Ended';
+}: VolumeMetricsQuery["workspace"]) => {
+  const queued = "Queued";
+  const started = "Started";
+  const ended = "Ended";
 
   //
   // a bit daft, fake an entity lookup so we can reuse the entity chart builder code
@@ -55,18 +59,25 @@ export const mapSdkThroughput = ({
   return mapEntityLines(metrics, entityLookup, { opacity: 0.1 });
 };
 
-export const SdkThroughput = ({ workspace }: { workspace?: VolumeMetricsQuery['workspace'] }) => {
+export const SdkThroughput = ({
+  workspace,
+}: {
+  workspace?: VolumeMetricsQuery["workspace"];
+}) => {
   const metrics = workspace && mapSdkThroughput(workspace);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex w-full flex-row items-center justify-between p-0">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          SDK request throughput{' '}
+          SDK request throughput{" "}
           <Info
             text="Total number of requests to Inngest SDKs from functions in your apps."
             action={
-              <Link className="text-sm" href="https://www.inngest.com/docs/sdk/overview">
+              <Link
+                className="text-sm"
+                href="https://www.inngest.com/docs/sdk/overview"
+              >
                 Learn more about SDK throughput.
               </Link>
             }

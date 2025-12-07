@@ -1,45 +1,62 @@
-'use client';
+import { useMemo, useState } from "react";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Search } from "@inngest/components/Forms/Search";
+import { StatusDot } from "@inngest/components/Status/StatusDot";
+import useDebounce from "@inngest/components/hooks/useDebounce";
 
-import { useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Search } from '@inngest/components/Forms/Search';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
-import useDebounce from '@inngest/components/hooks/useDebounce';
-
-import Toaster from '@/components/Toaster';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useEnvironments } from '@/queries';
-import { EnvironmentType, type Environment } from '@/utils/environments';
-import { BranchEnvironmentActions } from './BranchEnvironmentActions';
-import BranchEnvironmentListTable from './BranchEnvironmentListTable';
-import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
-import { EnvironmentsStatusSelector } from './EnvironmentsStatusSelector';
-import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
-import { EnvViewButton } from './row-actions/EnvViewButton';
+import Toaster from "@/components/Toast/Toaster";
+import LoadingIcon from "@/components/Icons/LoadingIcon";
+import { useEnvironments } from "@/queries";
+import { EnvironmentType, type Environment } from "@/utils/environments";
+import { BranchEnvironmentActions } from "./BranchEnvironmentActions";
+import BranchEnvironmentListTable from "./BranchEnvironmentListTable";
+import { CustomEnvironmentListTable } from "./CustomEnvironmentListTable";
+import { EnvironmentsStatusSelector } from "./EnvironmentsStatusSelector";
+import { EnvKeysDropdownButton } from "./row-actions/EnvKeysDropdownButton";
+import { EnvViewButton } from "./row-actions/EnvViewButton";
 
 export default function Environments() {
   const [{ data: envs = [], fetching }] = useEnvironments();
 
-  const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>('active');
+  const [filterStatus, setFilterStatus] = useState<"active" | "archived">(
+    "active",
+  );
 
-  const [searchInput, setSearchInput] = useState<string>('');
-  const [searchParam, setSearchParam] = useState<string>('');
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [searchParam, setSearchParam] = useState<string>("");
   const debouncedSearch = useDebounce(() => {
     setSearchParam(searchInput);
   }, 400);
 
-  const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
+  const branchParent = envs.find(
+    (env) => env.type === EnvironmentType.BranchParent,
+  );
 
   const branchEnvsData = useMemo(() => {
-    return filterEnvironments(EnvironmentType.BranchChild, searchParam, filterStatus, envs);
+    return filterEnvironments(
+      EnvironmentType.BranchChild,
+      searchParam,
+      filterStatus,
+      envs,
+    );
   }, [searchParam, envs, filterStatus]);
 
   const customEnvsData = useMemo(() => {
-    return filterEnvironments(EnvironmentType.Test, searchParam, filterStatus, envs);
+    return filterEnvironments(
+      EnvironmentType.Test,
+      searchParam,
+      filterStatus,
+      envs,
+    );
   }, [searchParam, envs, filterStatus]);
 
   const prodEnvsData = useMemo(() => {
-    return filterEnvironments(EnvironmentType.Production, searchParam, filterStatus, envs);
+    return filterEnvironments(
+      EnvironmentType.Production,
+      searchParam,
+      filterStatus,
+      envs,
+    );
   }, [searchParam, envs, filterStatus]);
 
   if (fetching) {
@@ -74,8 +91,8 @@ export default function Environments() {
                   Production
                 </h3>
                 <div className="flex flex-shrink-0 items-center gap-2 pl-2">
-                  <EnvViewButton env={{ slug: 'production' }} />
-                  <EnvKeysDropdownButton env={{ slug: 'production' }} />
+                  <EnvViewButton env={{ slug: "production" }} />
+                  <EnvKeysDropdownButton env={{ slug: "production" }} />
                 </div>
               </div>
             </div>
@@ -88,9 +105,9 @@ export default function Environments() {
           </div>
           <div className="flex w-full flex-wrap gap-3">
             <EnvironmentsStatusSelector
-              archived={filterStatus === 'archived'}
+              archived={filterStatus === "archived"}
               onChange={(archived: boolean) => {
-                setFilterStatus(archived ? 'archived' : 'active');
+                setFilterStatus(archived ? "archived" : "active");
               }}
             />
             <div className="min-w-[200px] flex-auto">
@@ -114,7 +131,9 @@ export default function Environments() {
             {isMultiProd && (
               <>
                 <div className="flex w-full flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-md font-medium">Production environments</h2>
+                  <h2 className="text-md font-medium">
+                    Production environments
+                  </h2>
                 </div>
                 <div className="border-subtle overflow-hidden rounded-md border">
                   <CustomEnvironmentListTable
@@ -130,7 +149,7 @@ export default function Environments() {
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
                 className="text-sm"
-                href="create-environment"
+                href="/create-environment"
                 kind="primary"
                 label="Create custom environment"
               />
@@ -149,7 +168,9 @@ export default function Environments() {
               <div className="flex w-full flex-wrap items-center justify-between gap-3">
                 <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
-                  <BranchEnvironmentActions branchParent={branchParent as Environment} />
+                  <BranchEnvironmentActions
+                    branchParent={branchParent as Environment}
+                  />
                 </div>
               </div>
               <div className="border-subtle overflow-hidden rounded-md border">
@@ -170,15 +191,18 @@ export default function Environments() {
 }
 
 // This is used to reset to page 1 when the filter or search changes.
-function getPaginationKey(filterStatus: 'active' | 'archived', searchParam: string) {
+function getPaginationKey(
+  filterStatus: "active" | "archived",
+  searchParam: string,
+) {
   return `${filterStatus}:${searchParam}`;
 }
 
 function filterEnvironments(
   type: EnvironmentType,
   searchParam: string,
-  filterStatus: 'active' | 'archived',
-  envs: Environment[]
+  filterStatus: "active" | "archived",
+  envs: Environment[],
 ) {
   const filtered: Environment[] = [];
   let total = 0;
@@ -189,8 +213,10 @@ function filterEnvironments(
     total++;
 
     const matchesSearch =
-      searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase());
-    const matchesStatus = filterStatus === 'archived' ? env.isArchived : !env.isArchived;
+      searchParam === "" ||
+      env.name.toLowerCase().includes(searchParam.toLowerCase());
+    const matchesStatus =
+      filterStatus === "archived" ? env.isArchived : !env.isArchived;
 
     if (matchesSearch && matchesStatus) filtered.push(env);
   }

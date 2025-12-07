@@ -1,22 +1,21 @@
-'use client';
+import { useState } from "react";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Button } from "@inngest/components/Button/NewButton";
+import { Modal } from "@inngest/components/Modal/Modal";
+import { resolveColor } from "@inngest/components/utils/colors";
+import { isDark } from "@inngest/components/utils/theme";
+import {
+  CardElement,
+  Elements,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 
-import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
-import { Modal } from '@inngest/components/Modal/Modal';
-import { resolveColor } from '@inngest/components/utils/colors';
-import { isDark } from '@inngest/components/utils/theme';
-import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import resolveConfig from 'tailwindcss/resolveConfig';
-import { useMutation } from 'urql';
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
-import tailwindConfig from '../../../../tailwind.config';
-
-const {
-  theme: { textColor, placeholderColor },
-} = resolveConfig(tailwindConfig);
+import { graphql } from "@/gql";
+import { placeholderColor, textColor } from "@/utils/tailwind";
 
 type CheckoutModalProps = {
   onCancel: () => void;
@@ -25,18 +24,27 @@ type CheckoutModalProps = {
 
 // Make sure to call `loadStripe` outside of a component’s render to avoid
 // recreating the `Stripe` object on every render.
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
+);
 
-export default function CheckoutModal({ onCancel, onSuccess }: CheckoutModalProps) {
+export default function CheckoutModal({
+  onCancel,
+  onSuccess,
+}: CheckoutModalProps) {
   return (
-    <Modal className="flex min-w-[600px] max-w-xl flex-col gap-4" isOpen={true} onClose={onCancel}>
+    <Modal
+      className="flex min-w-[600px] max-w-xl flex-col gap-4"
+      isOpen={true}
+      onClose={onCancel}
+    >
       <Modal.Header>Update your payment method</Modal.Header>
       <Modal.Body>
         <Elements
           stripe={stripePromise}
           options={{
-            mode: 'setup',
-            currency: 'usd',
+            mode: "setup",
+            currency: "usd",
           }}
         >
           <CheckoutForm onSuccess={onSuccess} />
@@ -63,7 +71,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const [, updatePaymentMethod] = useMutation(UpdatePaymentMethodDocument);
 
@@ -71,7 +79,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     // This should not happen since the button is disabled before this
     if (!stripe || !elements) {
-      console.error('Stripe Elements not loaded');
+      console.error("Stripe Elements not loaded");
       return;
     }
 
@@ -81,21 +89,25 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     if (submitError) {
       setLoading(false);
       return setError(
-        submitError.message || 'Sorry, there was an issue saving your payment information'
+        submitError.message ||
+          "Sorry, there was an issue saving your payment information",
       );
     }
     let token;
     try {
-      const result = await stripe.createToken(elements.getElement('card') as any);
+      const result = await stripe.createToken(
+        elements.getElement("card") as any,
+      );
       if (result.error) {
         setLoading(false);
         return setError(
-          result.error.message || 'Sorry, there was an issue saving your payment information'
+          result.error.message ||
+            "Sorry, there was an issue saving your payment information",
         );
       }
       token = result.token.id;
     } catch (err) {
-      setError('Sorry, there was an issue confirming your payment');
+      setError("Sorry, there was an issue confirming your payment");
       setLoading(false);
       return;
     }
@@ -104,7 +116,10 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(false);
 
     if (updateError) {
-      setError(updateError.message || 'Sorry, there was an issue confirming your payment');
+      setError(
+        updateError.message ||
+          "Sorry, there was an issue confirming your payment",
+      );
     } else {
       onSuccess();
     }
@@ -119,7 +134,9 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
               base: {
                 color: resolveColor(textColor.basis, isDark()),
                 iconColor: resolveColor(textColor.basis, isDark()),
-                '::placeholder': { color: resolveColor(placeholderColor.disabled, isDark()) },
+                "::placeholder": {
+                  color: resolveColor(placeholderColor.disabled, isDark()),
+                },
               },
               invalid: {
                 color: resolveColor(textColor.error, isDark()),

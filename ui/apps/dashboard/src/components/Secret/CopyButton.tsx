@@ -1,8 +1,10 @@
-'use client';
-
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
-import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@inngest/components/Tooltip";
+import { useCopyToClipboard } from "@inngest/components/hooks/useCopyToClipboard";
+import { RiCheckLine, RiFileCopy2Line } from "@remixicon/react";
 
 type Props = {
   value: string;
@@ -16,7 +18,7 @@ export function CopyButton({ value }: Props) {
     Icon = RiCheckLine;
   }
 
-  const label = 'Copy';
+  const label = "Copy";
 
   return (
     <Tooltip>

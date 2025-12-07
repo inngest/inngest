@@ -1,15 +1,13 @@
-'use client';
+import EmptyCard from "@inngest/components/Apps/EmptyCard";
+import { Button } from "@inngest/components/Button/NewButton";
+import { RiAddLine, RiExternalLinkLine } from "@remixicon/react";
 
-import { useRouter } from 'next/navigation';
-import EmptyCard from '@inngest/components/Apps/EmptyCard';
-import { Button } from '@inngest/components/Button';
-import { RiAddLine, RiExternalLinkLine } from '@remixicon/react';
-
-import { pathCreator } from '@/utils/urls';
-import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { pathCreator } from "@/utils/urls";
+import useOnboardingStep from "../Onboarding/useOnboardingStep";
+import { useNavigate } from "@tanstack/react-router";
 
 export function EmptyOnboardingCard() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { nextStep, lastCompletedStep } = useOnboardingStep();
 
   return (
@@ -17,21 +15,21 @@ export function EmptyOnboardingCard() {
       title="Sync your first Inngest App"
       description={
         <>
-          In Inngest, an app is a group of functions served on a single endpoint or server. The
-          first step is to create your app and functions, serve it, and test it locally with the
-          Inngest Dev Server.
+          In Inngest, an app is a group of functions served on a single endpoint
+          or server. The first step is to create your app and functions, serve
+          it, and test it locally with the Inngest Dev Server.
         </>
       }
       actions={
         <Button
           label="Get started"
           onClick={() =>
-            router.push(
-              pathCreator.onboardingSteps({
+            navigate({
+              to: pathCreator.onboardingSteps({
                 step: nextStep ? nextStep.name : lastCompletedStep?.name,
-                ref: 'app-apps-empty',
-              })
-            )
+                ref: "app-apps-empty",
+              }),
+            })
           }
         />
       }
@@ -40,15 +38,15 @@ export function EmptyOnboardingCard() {
 }
 
 export function EmptyActiveCard({ envSlug }: { envSlug: string }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <EmptyCard
       title="No active apps found"
       description={
         <>
-          Inngest lets you manage function deployments through apps. Sync your first app to display
-          it here.
+          Inngest lets you manage function deployments through apps. Sync your
+          first app to display it here.
         </>
       }
       actions={
@@ -65,7 +63,7 @@ export function EmptyActiveCard({ envSlug }: { envSlug: string }) {
             label="Sync new app"
             icon={<RiAddLine />}
             iconSide="left"
-            onClick={() => router.push(pathCreator.createApp({ envSlug }))}
+            onClick={() => navigate({ to: pathCreator.createApp({ envSlug }) })}
           />
         </>
       }
@@ -79,8 +77,8 @@ export function EmptyArchivedCard() {
       title="No archived apps found"
       description={
         <>
-          Apps can be archived and unarchived at any time. Once an app is archived, all of its
-          functions are archived.
+          Apps can be archived and unarchived at any time. Once an app is
+          archived, all of its functions are archived.
         </>
       }
       actions={

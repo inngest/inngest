@@ -1,24 +1,23 @@
-'use server';
+import { Suspense, type ReactNode } from "react";
 
-import { Suspense, type ReactNode } from 'react';
-
-import IncidentBanner from '@/app/(organization-active)/IncidentBanner';
-import { getNavCollapsed } from '@/app/actions';
-// import { BillingBanner } from '@/components/BillingBanner';
-// import { ExecutionOverageBanner } from '@/components/ExecutionOverage';
-import { getProfileDisplay } from '@/queries/server-only/profile';
-import type { Environment } from '@/utils/environments';
-import SideBar from './SideBar';
+import { type ProfileDisplayType } from "@/queries/server/profile";
+import type { Environment } from "@/utils/environments";
+import SideBar from "./SideBar";
+import IncidentBanner from "../Incident/IncidentBanner";
 
 type LayoutProps = {
+  collapsed: boolean | undefined;
   activeEnv?: Environment;
+  profile?: ProfileDisplayType;
   children: ReactNode;
 };
 
-export default async function Layout({ activeEnv, children }: LayoutProps) {
-  const collapsed = await getNavCollapsed();
-  const profile = await getProfileDisplay();
-
+export default function Layout({
+  collapsed,
+  activeEnv,
+  profile,
+  children,
+}: LayoutProps) {
   return (
     <div
       id="layout-scroll-container"
@@ -29,8 +28,8 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
       <div className="no-scrollbar flex w-full flex-col overflow-x-scroll">
         <IncidentBanner />
 
+        {/* disabled by Dan 11/22/2025 for performance reasons */}
         <Suspense>{/* <BillingBanner /> */}</Suspense>
-
         <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
 
         {children}

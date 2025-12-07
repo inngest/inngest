@@ -1,30 +1,28 @@
-'use client';
-
-import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
-import { Error } from '@inngest/components/Error/Error';
-import EntityFilter from '@inngest/components/Filter/EntityFilter';
-import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import type { RangeChangeProps } from "@inngest/components/DatePicker/RangePicker";
+import { Error } from "@inngest/components/Error/NewError";
+import EntityFilter from "@inngest/components/Filter/NewEntityFilter";
+import { TimeFilter } from "@inngest/components/Filter/TimeFilter";
+import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useSearchParam';
+} from "@inngest/components/hooks/useNewSearchParams";
 import {
   durationToString,
   parseDuration,
   subtractDuration,
   toDate,
   type DurationType,
-} from '@inngest/components/utils/date';
-import { useQuery } from 'urql';
+} from "@inngest/components/utils/date";
+import { useQuery } from "urql";
 
-import { graphql } from '@/gql';
-import { GetAccountEntitlementsDocument, MetricsScope } from '@/gql/graphql';
-import { MetricsOverview } from './Overview';
-import { MetricsVolume } from './Volume';
-import { convertLookup } from './utils';
+import { graphql } from "@/gql";
+import { GetAccountEntitlementsDocument, MetricsScope } from "@/gql/graphql";
+import { MetricsOverview } from "./Overview";
+import { MetricsVolume } from "./Volume";
+import { convertLookup } from "./utils";
 
 export type EntityType = {
   id: string;
@@ -47,18 +45,22 @@ export type MetricsFilters = {
 
 export const DEFAULT_DURATION = { hours: 24 };
 
-const getFrom = (start?: Date, duration?: DurationType | '') =>
+const getFrom = (start?: Date, duration?: DurationType | "") =>
   start || subtractDuration(new Date(), duration ? duration : DEFAULT_DURATION);
 
-const getDefaultRange = (start?: Date, end?: Date, duration?: DurationType | '') =>
+const getDefaultRange = (
+  start?: Date,
+  end?: Date,
+  duration?: DurationType | "",
+) =>
   start && end
     ? {
-        type: 'absolute' as const,
+        type: "absolute" as const,
         start: start,
         end: end,
       }
     : {
-        type: 'relative' as const,
+        type: "relative" as const,
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
@@ -101,12 +103,12 @@ const AccountConcurrencyLookupDocument = graphql(`
 `);
 
 export const Dashboard = ({ envSlug }: { envSlug: string }) => {
-  const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
-  const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
-  const [start] = useSearchParam('start');
-  const [end] = useSearchParam('end');
-  const [duration] = useSearchParam('duration');
-  const [autoRefresh] = useBooleanSearchParam('autoRefresh');
+  const [selectedApps, setApps, removeApps] = useStringArraySearchParam("apps");
+  const [selectedFns, setFns, removeFns] = useStringArraySearchParam("fns");
+  const [start] = useSearchParam("start");
+  const [end] = useSearchParam("end");
+  const [duration] = useSearchParam("duration");
+  const [autoRefresh] = useBooleanSearchParam("autoRefresh");
   const batchUpdate = useBatchedSearchParams();
 
   const parsedDuration = duration && parseDuration(duration);
@@ -140,15 +142,19 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const functions = data?.envBySlug?.workflows.data;
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
-  const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
-  const isMarketplace = Boolean(accountConcurrencyLimitRes?.account.marketplace);
+  const concurrencyLimit =
+    accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
+  const isMarketplace = Boolean(
+    accountConcurrencyLimitRes?.account.marketplace,
+  );
 
-  const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
+  const envLookup =
+    apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
   const mappedFunctions = convertLookup(functions);
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
 
-  error && console.error('Error fetcthing metrics lookup data', error);
+  error && console.error("Error fetcthing metrics lookup data", error);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -158,9 +164,13 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           daysAgoMax={logRetention}
           onDaysChange={(range: RangeChangeProps) => {
             batchUpdate({
-              duration: range.type === 'relative' ? durationToString(range.duration) : null,
-              start: range.type === 'absolute' ? range.start.toISOString() : null,
-              end: range.type === 'absolute' ? range.end.toISOString() : null,
+              duration:
+                range.type === "relative"
+                  ? durationToString(range.duration)
+                  : null,
+              start:
+                range.type === "absolute" ? range.start.toISOString() : null,
+              end: range.type === "absolute" ? range.end.toISOString() : null,
             });
           }}
         />
@@ -170,7 +180,9 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           <>
             <EntityFilter
               type="app"
-              onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
+              onFilterChange={(apps) =>
+                apps.length ? setApps(apps) : removeApps()
+              }
               selectedEntities={selectedApps || []}
               entities={apps || []}
             />
@@ -183,7 +195,9 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           </>
         )}
       </div>
-      {error && <Error message="There was an error fetching metrics filter data." />}
+      {error && (
+        <Error message="There was an error fetching metrics filter data." />
+      )}
       <div className="bg-canvasBase px-4">
         <MetricsOverview
           from={getFrom(parsedStart, parsedDuration)}

@@ -1,4 +1,6 @@
-export function getFormattedJSONObjectOrArrayString(value: string): null | string {
+export function getFormattedJSONObjectOrArrayString(
+  value: string,
+): null | string {
   if (!mayBeJSONArray(value) && !mayBeJSONObject(value)) return null;
 
   try {
@@ -9,9 +11,9 @@ export function getFormattedJSONObjectOrArrayString(value: string): null | strin
 }
 
 function mayBeJSONArray(str: string): boolean {
-  return str.startsWith('[') && str.endsWith(']');
+  return str.startsWith("[") && str.endsWith("]");
 }
 
 function mayBeJSONObject(str: string): boolean {
-  return str.startsWith('{') && str.endsWith('}');
+  return str.startsWith("{") && str.endsWith("}");
 }

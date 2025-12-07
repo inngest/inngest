@@ -1,11 +1,9 @@
-'use client';
+import { useCallback } from "react";
+import { maybeDateToString } from "@inngest/components/utils/date";
+import { useMutation } from "urql";
 
-import { useCallback } from 'react';
-import { maybeDateToString } from '@inngest/components/utils/date';
-import { useMutation } from 'urql';
-
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const query = graphql(`
   mutation CreateCancellation($input: CreateCancellationInput!) {
@@ -15,7 +13,11 @@ const query = graphql(`
   }
 `);
 
-export function useCreateCancellation({ functionSlug }: { functionSlug: string }) {
+export function useCreateCancellation({
+  functionSlug,
+}: {
+  functionSlug: string;
+}) {
   const envID = useEnvironment().id;
   const [, cancelFunction] = useMutation(query);
 
@@ -39,6 +41,6 @@ export function useCreateCancellation({ functionSlug }: { functionSlug: string }
         },
       });
     },
-    [cancelFunction, envID, functionSlug]
+    [cancelFunction, envID, functionSlug],
   );
 }

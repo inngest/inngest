@@ -1,15 +1,12 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
+import { useNavigate } from "@tanstack/react-router";
+import { neonMenuStepContent } from "@inngest/components/PostgresIntegrations/Neon/neonContent";
 import {
   IntegrationSteps,
   STEPS_ORDER,
   isValidStep,
-} from '@inngest/components/PostgresIntegrations/types';
-import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
-
-import { pathCreator } from '@/utils/urls';
+} from "@inngest/components/PostgresIntegrations/types";
+import StepsPageHeader from "@inngest/components/Steps/StepsPageHeader";
+import { pathCreator } from "@/utils/urls";
 
 export default function PageHeader({
   step,
@@ -20,10 +17,13 @@ export default function PageHeader({
   integration: string;
   steps?: IntegrationSteps[];
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   if (!isValidStep(step)) {
-    router.push(pathCreator.pgIntegrationStep({ integration }));
+    navigate({
+      to: pathCreator.pgIntegrationStep({ integration }),
+      params: { step: STEPS_ORDER[0]! },
+    });
     return;
   }
   const currentStep = steps.indexOf(step);

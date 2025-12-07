@@ -1,52 +1,54 @@
-import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
-import { InlineCode } from '@inngest/components/Code/InlineCode';
-import { Link } from '@inngest/components/Link';
-import TabCards from '@inngest/components/TabCards/TabCards';
-import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { IconCloudflare } from '@inngest/components/icons/platforms/Cloudflare';
-import { IconFlyIo } from '@inngest/components/icons/platforms/FlyIo';
-import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
-import { RiCheckboxCircleFill, RiCloudLine } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
+import { useNavigate } from "@tanstack/react-router";
+import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Button } from "@inngest/components/Button/NewButton";
+import { InlineCode } from "@inngest/components/Code/InlineCode";
+import { Link } from "@inngest/components/Link/NewLink";
+import TabCards from "@inngest/components/TabCards/TabCards";
+import { IconSpinner } from "@inngest/components/icons/Spinner";
+import { IconCloudflare } from "@inngest/components/icons/platforms/Cloudflare";
+import { IconFlyIo } from "@inngest/components/icons/platforms/FlyIo";
+import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
+import { RiCheckboxCircleFill, RiCloudLine } from "@remixicon/react";
+import useLocalStorage from "react-use/esm/useLocalStorage";
 
-import { useVercelIntegration } from '@/app/(organization-active)/(dashboard)/settings/integrations/vercel/useVercelIntegration';
-import { Secret } from '@/components/Secret';
-import { useDefaultEventKey } from '@/queries/useDefaultEventKey';
-import { pathCreator } from '@/utils/urls';
-import { useEnvironment } from '../Environments/environment-context';
-import { OnboardingSteps } from '../Onboarding/types';
-import useOnboardingStep from './useOnboardingStep';
-import { useOnboardingTracking } from './useOnboardingTracking';
-import { getNextStepName } from './utils';
+import { Secret } from "@/components/Secret";
+import { useDefaultEventKey } from "@/queries/useDefaultEventKey";
+import { pathCreator } from "@/utils/urls";
+import { useEnvironment } from "../Environments/environment-context";
+import { OnboardingSteps } from "./types";
+import useOnboardingStep from "./useOnboardingStep";
+import { useOnboardingTracking } from "./useOnboardingTracking";
+import { getNextStepName } from "./utils";
+import { useVercelIntegration } from "@/queries/useVercelIntegration";
 
 export default function DeployApp() {
   const currentStepName = OnboardingSteps.DeployApp;
   const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
-  const router = useRouter();
+  const navigate = useNavigate();
   const env = useEnvironment();
   const res = useDefaultEventKey({ envID: env.id });
-  const defaultEventKey = res.data?.defaultKey.presharedKey || 'Unknown key';
+  const defaultEventKey = res.data?.defaultKey.presharedKey || "Unknown key";
   const tracking = useOnboardingTracking();
   const [, setInstallingVercelFromOnboarding] = useLocalStorage(
-    'installingVercelFromOnboarding',
-    false
+    "installingVercelFromOnboarding",
+    false,
   );
 
   const { data, isLoading, error } = useVercelIntegration();
 
   const hasVercelIntegration = Boolean(data);
   const vercelProjects = data?.projects;
-  const enabledProjects = vercelProjects?.filter((project) => project.isEnabled) ?? [];
+  const enabledProjects =
+    vercelProjects?.filter((project) => project.isEnabled) ?? [];
 
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        Once your app is created, merge your changes and prepare your environment to deploy. Choose
-        your preferred hosting provider below and learn how to configure environment variables for a
-        secure production setup.
+        Once your app is created, merge your changes and prepare your
+        environment to deploy. Choose your preferred hosting provider below and
+        learn how to configure environment variables for a secure production
+        setup.
       </p>
 
       <h4 className="mb-4 text-sm font-medium">Choosing hosting provider:</h4>
@@ -78,15 +80,18 @@ export default function DeployApp() {
             <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
               <RiCloudLine className="text-basis h-4 w-4" />
             </div>
-            <p className="text-basis">All hosting providers (AWS, GCP, Azure, etc.)</p>
+            <p className="text-basis">
+              All hosting providers (AWS, GCP, Azure, etc.)
+            </p>
           </div>
           <p className="mb-4 text-sm">
-            Add the two environment variables required for your app to securely communicate with
-            Inngest. The process for adding these variables depends on your system setup.
+            Add the two environment variables required for your app to securely
+            communicate with Inngest. The process for adding these variables
+            depends on your system setup.
           </p>
           <p className="mb-6 text-sm">
-            These variables are compatible with any platform or runtime, including Docker,
-            Kubernetes, and others.{' '}
+            These variables are compatible with any platform or runtime,
+            including Docker, Kubernetes, and others.{" "}
             <Link
               size="small"
               href="https://www.inngest.com/docs/events/creating-an-event-key?ref=app-onboarding-deploy-app"
@@ -98,32 +103,47 @@ export default function DeployApp() {
           </p>
           <div className="text-basis text-sm font-medium">Event key</div>
           <p className="mb-2 text-sm">
-            The <InlineCode>INNGEST_EVENT_KEY</InlineCode> is used for sending events and invoking
-            functions
+            The <InlineCode>INNGEST_EVENT_KEY</InlineCode> is used for sending
+            events and invoking functions
           </p>
           <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis text-sm font-medium">Signing key</div>
           <p className="mb-2 text-sm">
-            The <InlineCode>INNGEST_SIGNING_KEY</InlineCode> is used for authenticating requests
-            between Inngest and your app
+            The <InlineCode>INNGEST_SIGNING_KEY</InlineCode> is used for
+            authenticating requests between Inngest and your app
           </p>
-          <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
+          <Secret
+            kind="signing-key"
+            secret={env.webhookSigningKey}
+            className="mb-6"
+          />
           <Button
             label="Next"
             onClick={() => {
               updateCompletedSteps(currentStepName, {
                 metadata: {
-                  completionSource: 'manual',
-                  hostingProvider: 'all',
+                  completionSource: "manual",
+                  hostingProvider: "all",
                 },
               });
               tracking?.trackOnboardingAction(currentStepName, {
-                metadata: { type: 'btn-click', label: 'skip', hostingProvider: 'all' },
+                metadata: {
+                  type: "btn-click",
+                  label: "skip",
+                  hostingProvider: "all",
+                },
               });
               tracking?.trackOnboardingAction(currentStepName, {
-                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'all' },
+                metadata: {
+                  type: "btn-click",
+                  label: "next",
+                  hostingProvider: "all",
+                },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>
@@ -142,18 +162,19 @@ export default function DeployApp() {
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: {
-                    type: 'btn-click',
-                    label: 'view-integration',
-                    hostingProvider: 'vercel',
+                    type: "btn-click",
+                    label: "view-integration",
+                    hostingProvider: "vercel",
                   },
                 });
-                router.push(pathCreator.vercel());
+                navigate({ to: pathCreator.vercel() });
               }}
             />
           </div>
           <p className="mb-4 text-sm">
-            The Vercel integration enables you to host your Inngest functions on the Vercel platform
-            and automatically syncs them every time you deploy code.{' '}
+            The Vercel integration enables you to host your Inngest functions on
+            the Vercel platform and automatically syncs them every time you
+            deploy code.{" "}
             <Link
               size="small"
               href="https://www.inngest.com/docs/deploy/vercel?ref=app-onboarding-deploy-app"
@@ -165,11 +186,12 @@ export default function DeployApp() {
           </p>
           <div className="border-subtle divide-subtle mb-4 divide-y border text-sm">
             <div className="flex items-center gap-2 px-3 py-2">
-              <RiCheckboxCircleFill className="text-primary-moderate h-4 w-4" /> Auto-syncs on every
-              deploy
+              <RiCheckboxCircleFill className="text-primary-moderate h-4 w-4" />{" "}
+              Auto-syncs on every deploy
             </div>
             <div className="flex items-center gap-2 px-3 py-2">
-              <RiCheckboxCircleFill className="text-primary-moderate h-4 w-4" /> Branch environments
+              <RiCheckboxCircleFill className="text-primary-moderate h-4 w-4" />{" "}
+              Branch environments
             </div>
           </div>
           {!hasVercelIntegration && (
@@ -178,10 +200,17 @@ export default function DeployApp() {
                 label="Connect Inngest to Vercel"
                 onClick={() => {
                   tracking?.trackOnboardingAction(currentStepName, {
-                    metadata: { type: 'btn-click', label: 'connect', hostingProvider: 'vercel' },
+                    metadata: {
+                      type: "btn-click",
+                      label: "connect",
+                      hostingProvider: "vercel",
+                    },
                   });
                   setInstallingVercelFromOnboarding(true);
-                  router.push(`https://vercel.com/integrations/inngest/new`);
+                  window.open(
+                    `https://vercel.com/integrations/inngest/new`,
+                    "_blank",
+                  );
                 }}
                 disabled={isLoading}
               />
@@ -195,8 +224,8 @@ export default function DeployApp() {
           )}
           {hasVercelIntegration && (
             <p className="text-success my-4 text-sm">
-              {enabledProjects.length} project{enabledProjects.length === 1 ? '' : 's'} enabled
-              successfully
+              {enabledProjects.length} project
+              {enabledProjects.length === 1 ? "" : "s"} enabled successfully
             </p>
           )}
           {error && (
@@ -210,14 +239,20 @@ export default function DeployApp() {
               onClick={() => {
                 updateCompletedSteps(currentStepName, {
                   metadata: {
-                    completionSource: 'manual',
-                    hostingProvider: 'vercel',
+                    completionSource: "manual",
+                    hostingProvider: "vercel",
                   },
                 });
                 tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: 'btn-click', label: 'next', hostingProvider: 'vercel' },
+                  metadata: {
+                    type: "btn-click",
+                    label: "next",
+                    hostingProvider: "vercel",
+                  },
                 });
-                router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+                navigate({
+                  to: pathCreator.onboardingSteps({ step: nextStepName }),
+                });
               }}
             />
           )}
@@ -230,8 +265,8 @@ export default function DeployApp() {
             <p className="text-basis">Cloudflare</p>
           </div>
           <p className="mb-4 text-sm">
-            You can configure the environment variables on Cloudflare using Wrangler or through
-            their dashboard.{' '}
+            You can configure the environment variables on Cloudflare using
+            Wrangler or through their dashboard.{" "}
             <Link
               size="small"
               href="https://developers.cloudflare.com/workers/configuration/environment-variables/"
@@ -244,20 +279,31 @@ export default function DeployApp() {
           <div className="text-basis mb-2 text-sm font-medium">Event key</div>
           <Secret kind="event-key" secret={defaultEventKey} className="mb-4" />
           <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
-          <Secret kind="signing-key" secret={env.webhookSigningKey} className="mb-6" />
+          <Secret
+            kind="signing-key"
+            secret={env.webhookSigningKey}
+            className="mb-6"
+          />
           <Button
             label="Next"
             onClick={() => {
               updateCompletedSteps(currentStepName, {
                 metadata: {
-                  completionSource: 'manual',
-                  hostingProvider: 'cloudflare',
+                  completionSource: "manual",
+                  hostingProvider: "cloudflare",
                 },
               });
               tracking?.trackOnboardingAction(currentStepName, {
-                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'cloudflare' },
+                metadata: {
+                  type: "btn-click",
+                  label: "next",
+                  hostingProvider: "cloudflare",
+                },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>
@@ -269,7 +315,8 @@ export default function DeployApp() {
             <p className="text-basis">Fly.io</p>
           </div>
           <p className="mb-4 text-sm">
-            You can configure the environment variables on Fly.io by adding the values below.{' '}
+            You can configure the environment variables on Fly.io by adding the
+            values below.{" "}
             <Link
               size="small"
               href="https://fly.io/docs/rails/the-basics/configuration/"
@@ -296,14 +343,21 @@ export default function DeployApp() {
             onClick={() => {
               updateCompletedSteps(currentStepName, {
                 metadata: {
-                  completionSource: 'manual',
-                  hostingProvider: 'flyio',
+                  completionSource: "manual",
+                  hostingProvider: "flyio",
                 },
               });
               tracking?.trackOnboardingAction(currentStepName, {
-                metadata: { type: 'btn-click', label: 'next', hostingProvider: 'flyio' },
+                metadata: {
+                  type: "btn-click",
+                  label: "next",
+                  hostingProvider: "flyio",
+                },
               });
-              router.push(pathCreator.onboardingSteps({ step: nextStepName }) + '?nonVercel=true');
+              navigate({
+                to: pathCreator.onboardingSteps({ step: nextStepName }),
+                search: { nonVercel: "true" },
+              });
             }}
           />
         </TabCards.Content>
