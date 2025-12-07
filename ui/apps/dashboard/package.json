@@ -23,9 +23,9 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "preinstall": "npx only-allow pnpm",
-    "env:pull": "vercel env pull",
-    "env:add": "vercel env add",
-    "env:rm": "vercel env rm"
+    "env:pull": "npx vercel env pull",
+    "env:add": "npx vercel env add",
+    "env:rm": "npx vercel env rm"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.26.5",
