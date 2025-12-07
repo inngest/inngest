@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from "@inngest/components/Button";
 import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
 import { RiChat3Line } from "@remixicon/react";
 

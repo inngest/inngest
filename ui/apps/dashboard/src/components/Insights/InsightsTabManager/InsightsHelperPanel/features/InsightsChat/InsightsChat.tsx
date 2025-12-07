@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type AgentStatus } from "@inngest/use-agent";
 
+import { formatSQL } from "@/components/Insights/InsightsSQLEditor/utils";
 import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
 import { Conversation, ConversationContent } from "./Conversation";
 import { EmptyState } from "./EmptyState";
@@ -10,10 +11,6 @@ import { ResponsivePromptInput } from "./input/InputField";
 import { AssistantMessage } from "./messages/AssistantMessage";
 import { ToolMessage } from "./messages/ToolMessage";
 import { UserMessage } from "./messages/UserMessage";
-import type { InsightsAgentConfig } from "./useInsightsAgent";
-import { type ToolPartFor } from "@inngest/use-agent";
-
-type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, "generate_sql">;
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -90,7 +87,9 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     if (!latest) return;
     if (lastAppliedSqlRef.current === latest) return;
     lastAppliedSqlRef.current = latest;
-    onSqlChange(latest.trim());
+    // Format the SQL before inserting it
+    const formattedSql = formatSQL(latest.trim());
+    onSqlChange(formattedSql);
     // Auto-run for snappy UX
     setTimeout(() => {
       try {
@@ -184,7 +183,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
                               return (
                                 <ToolMessage
                                   key={i}
-                                  part={part as GenerateSqlPart}
+                                  part={part}
                                   onSqlChange={onSqlChange}
                                   runQuery={runQuery}
                                 />

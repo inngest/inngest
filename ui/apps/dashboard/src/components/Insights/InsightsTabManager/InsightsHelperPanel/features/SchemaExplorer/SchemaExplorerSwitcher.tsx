@@ -1,5 +1,5 @@
 import { Fragment, type ReactElement } from "react";
-import { Alert } from "@inngest/components/Alert/Alert";
+import { Alert } from "@inngest/components/Alert/NewAlert";
 import { Button } from "@inngest/components/Button/NewButton";
 import { Skeleton } from "@inngest/components/Skeleton";
 

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useAllEventTypes } from "@/components/EventTypes/useEventTypes";
+import { useFetchAllEventTypes } from "@/components/EventTypes/useFetchAllEventTypes";
 import {
   useInsightsAgent,
   type ClientState,
@@ -190,16 +190,16 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  // Fetch event types and schemas once; keep it simple (no caching beyond query instance)
-  // TODO: seAllEventTypes has an implicit limit of 40, need to update this to fetch more than 40 events
-  const fetchAllEventTypes = useAllEventTypes();
+  // Fetch event types and schemas with pagination (up to 5 pages = 200 events)
+  const fetchAllEventTypes = useFetchAllEventTypes();
   const { data: eventsData } = useQuery({
     queryKey: ["insights", "all-event-types"],
     queryFn: async () => {
-      const events = await fetchAllEventTypes();
-      const names: string[] = events.map((e) => e.name);
+      const allEvents = await fetchAllEventTypes();
+
+      const names: string[] = allEvents.map((e) => e.name);
       const schemaMap: Record<string, string> = {};
-      for (const e of events) {
+      for (const e of allEvents) {
         const raw = (e.latestSchema || "").trim();
         if (!raw) continue;
         schemaMap[e.name] = raw;

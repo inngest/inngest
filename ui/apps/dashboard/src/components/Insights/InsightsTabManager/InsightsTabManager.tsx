@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useUser } from "@clerk/tanstack-react-start";
+
 import { Resizable } from "@inngest/components/Resizable/Resizable";
 import {
   AgentProvider,
@@ -46,6 +46,37 @@ import {
 import { InsightsTabPanel } from "./InsightsTabPanel";
 import { InsightsTabsList } from "./InsightsTabsList";
 import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from "./constants";
+import { useUser } from "@clerk/tanstack-react-start";
+
+const TABS_STORAGE_KEY = "insights-tabs-state";
+
+interface TabsStorageState {
+  tabs: Tab[];
+  activeTabId: string;
+}
+
+function getStoredTabs(): TabsStorageState | null {
+  // Skip during SSR - localStorage only exists in browser
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(TABS_STORAGE_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+function saveTabsToStorage(tabs: Tab[], activeTabId: string) {
+  // Skip during SSR - localStorage only exists in browser
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      TABS_STORAGE_KEY,
+      JSON.stringify({ tabs, activeTabId }),
+    );
+  } catch {}
+}
 
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
@@ -75,10 +106,28 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps,
 ): UseInsightsTabManagerReturn {
+  const [isMounted, setIsMounted] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const isInsightsAgentEnabled = useBooleanFlag("insights-agent");
   const isSchemaWidgetEnabled = useBooleanFlag("insights-schema-widget");
+
+  // Load from localStorage after mount (avoids hydration mismatch)
+  useEffect(() => {
+    const stored = getStoredTabs();
+    if (stored) {
+      setTabs(stored.tabs);
+      setActiveTabId(stored.activeTabId);
+    }
+    setIsMounted(true);
+  }, []);
+
+  // Save tabs to local storage whenever they change (only after initial mount)
+  useEffect(() => {
+    if (isMounted) {
+      saveTabsToStorage(tabs, activeTabId);
+    }
+  }, [tabs, activeTabId, isMounted]);
 
   // Map each UI tab to a stable agent thread id
   const agentThreadIdByTabRef = useRef<Record<string, string>>({});
@@ -101,13 +150,26 @@ export function useInsightsTabManager(
   const actions = useMemo(
     () => ({
       breakQueryAssociation: (savedQueryId: string) => {
-        setTabs((prevTabs) =>
-          prevTabs.map((tab) =>
-            tab.savedQueryId === savedQueryId
-              ? { ...tab, savedQueryId: undefined }
-              : tab,
-          ),
-        );
+        setTabs((prevTabs) => {
+          // Find the tab associated with this savedQueryId
+          const tabToClose = prevTabs.find(
+            (tab) => tab.savedQueryId === savedQueryId,
+          );
+
+          if (tabToClose) {
+            // Close the tab entirely when query is deleted
+            const newTabs = prevTabs.filter((tab) => tab.id !== tabToClose.id);
+            const newActiveTabId = getNewActiveTabAfterClose(
+              prevTabs,
+              tabToClose.id,
+              activeTabId,
+            );
+            if (newActiveTabId !== undefined) setActiveTabId(newActiveTabId);
+            return newTabs;
+          }
+
+          return prevTabs;
+        });
       },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
@@ -432,6 +494,24 @@ export function hasDiffWithSavedQuery(
   const savedQuery = savedQueries.find((q) => q.id === tab.savedQueryId);
   if (!savedQuery) return false;
   return savedQuery.name !== tab.name || savedQuery.sql !== tab.query;
+}
+
+/**
+ * Determines if a tab has unsaved changes by comparing against either:
+ * - The saved query state (if tab.savedQueryId exists), or
+ * - The blank state (for new unsaved queries)
+ */
+export function hasUnsavedChanges(
+  savedQueries: InsightsQueryStatement[] | undefined,
+  tab: Tab,
+): boolean {
+  // If tab is associated with a saved query, check diff with saved state
+  if (tab.savedQueryId !== undefined) {
+    return hasDiffWithSavedQuery(savedQueries, tab);
+  }
+
+  // For new queries, check if there's any content different from blank state
+  return tab.name !== UNTITLED_QUERY || tab.query !== "";
 }
 
 /**

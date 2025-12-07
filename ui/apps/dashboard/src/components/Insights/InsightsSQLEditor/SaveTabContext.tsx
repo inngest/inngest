@@ -32,7 +32,7 @@ export function SaveTabProvider({ children }: { children: React.ReactNode }) {
       const error = validateTab(tab);
       if (error) {
         toast.error(error);
-        return;
+        throw new Error(error);
       }
 
       setSavingTabIds((prev) => new Set(prev).add(tab.id));

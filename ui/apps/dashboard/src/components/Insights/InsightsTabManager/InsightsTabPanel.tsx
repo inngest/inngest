@@ -1,4 +1,3 @@
-import { Link } from "@inngest/components/Link/NewLink";
 import { Resizable } from "@inngest/components/Resizable/Resizable";
 
 import type { Tab } from "@/components/Insights/types";
@@ -11,10 +10,10 @@ import { InsightsSQLEditorQueryTitle } from "../InsightsSQLEditor/InsightsSQLEdi
 import { InsightsSQLEditorResultsTitle } from "../InsightsSQLEditor/InsightsSQLEditorResultsTitle";
 import { InsightsSQLEditorSaveQueryButton } from "../InsightsSQLEditor/InsightsSQLEditorSaveQueryButton";
 import { InsightsSQLEditorSavedQueryActionsButton } from "../InsightsSQLEditor/InsightsSQLEditorSavedQueryActionsButton";
+import { SQLEditorInstanceProvider } from "../InsightsSQLEditor/SQLEditorInstanceContext";
 import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
 import { Section } from "../Section";
 import { InsightsTabPanelTemplatesTab } from "./InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab";
-import { EXTERNAL_FEEDBACK_LINK } from "./constants";
 
 type InsightsTabPanelProps = {
   historyWindow?: number;
@@ -38,57 +37,54 @@ export function InsightsTabPanel({
   if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <Resizable
-        defaultSplitPercentage={37.5}
-        minSplitPercentage={20}
-        maxSplitPercentage={80}
-        first={
-          <Section
-            actions={
-              <>
-                <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
-                <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
-                <InsightsSQLEditorSaveQueryButton tab={tab} />
-                <InsightsSQLEditorQueryButton />
-              </>
-            }
-            className="h-full"
-            title={<InsightsSQLEditorQueryTitle tab={tab} />}
-          >
-            <InsightsSQLEditor />
-          </Section>
-        }
-        orientation="vertical"
-        second={
-          <Section
-            actions={
-              <>
-                <InsightsSQLEditorDownloadCSVButton temporarilyHide />
-                {isRunning && (
-                  <span className="text-muted mr-3 text-xs">
-                    Running query...
-                  </span>
-                )}
-                <Link
-                  href={EXTERNAL_FEEDBACK_LINK}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Send us feedback
-                </Link>
-              </>
-            }
-            className="border-subtle h-full border-t"
-            title={
-              <InsightsSQLEditorResultsTitle historyWindow={historyWindow} />
-            }
-          >
-            <InsightsDataTable />
-          </Section>
-        }
-        splitKey="insights-tab-panel-split-vertical"
-      />
-    </div>
+    <SQLEditorInstanceProvider>
+      <div className="flex h-full min-h-0 flex-col">
+        <Resizable
+          defaultSplitPercentage={37.5}
+          minSplitPercentage={20}
+          maxSplitPercentage={80}
+          first={
+            <Section
+              actions={
+                <div className="relative flex gap-2">
+                  <div className="absolute right-full">
+                    <InsightsSQLEditorQueryEditHistoryButton tab={tab} />
+                  </div>
+                  <InsightsSQLEditorSavedQueryActionsButton tab={tab} />
+                  <InsightsSQLEditorSaveQueryButton tab={tab} />
+                  <InsightsSQLEditorQueryButton />
+                </div>
+              }
+              className="h-full"
+              title={<InsightsSQLEditorQueryTitle tab={tab} />}
+            >
+              <InsightsSQLEditor />
+            </Section>
+          }
+          orientation="vertical"
+          second={
+            <Section
+              actions={
+                <>
+                  <InsightsSQLEditorDownloadCSVButton />
+                  {isRunning && (
+                    <span className="text-muted mr-3 text-xs">
+                      Running query...
+                    </span>
+                  )}
+                </>
+              }
+              className="border-subtle h-full border-t"
+              title={
+                <InsightsSQLEditorResultsTitle historyWindow={historyWindow} />
+              }
+            >
+              <InsightsDataTable />
+            </Section>
+          }
+          splitKey="insights-tab-panel-split-vertical"
+        />
+      </div>
+    </SQLEditorInstanceProvider>
   );
 }

@@ -17,7 +17,7 @@ export function Section({ actions, children, className, title }: SectionProps) {
       )}
     >
       <header className="border-subtle flex w-full items-center justify-between overflow-x-auto border-b px-4 py-2">
-        <div className="text-basis flex-shrink-0 text-xs font-medium tracking-wide">
+        <div className="text-basis bg-canvasBase relative z-10 flex-shrink-0 text-xs font-medium tracking-wide">
           {title}
         </div>
         {actions && (

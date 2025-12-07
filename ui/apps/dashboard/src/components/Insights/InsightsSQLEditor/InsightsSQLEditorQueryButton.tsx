@@ -17,7 +17,10 @@ function QueryButtonLabel({
   return (
     <div className="flex items-center gap-2">
       <span>Run query</span>
-      <KeyboardShortcut disabled={disabled} keys={["cmd", "ctrl", "enter"]} />
+      <KeyboardShortcut
+        backgroundColor={disabled ? "bg-muted" : "bg-primary-moderate"}
+        keys={["cmd", "ctrl", "enter"]}
+      />
     </div>
   );
 }
