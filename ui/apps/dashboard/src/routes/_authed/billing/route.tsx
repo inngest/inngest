@@ -5,7 +5,6 @@ import PageTitle from '@/components/Billing/PageTitle';
 import { MarketplaceAccessControl } from '@/components/Billing/MarketplaceAccessControl';
 import { getProfileDisplay } from '@/queries/server/profile';
 import { pathCreator } from '@/utils/urls';
-import Toaster from '@/components/Toast/Toaster';
 
 export const Route = createFileRoute('/_authed/billing')({
   component: BillingLayout,
@@ -59,7 +58,6 @@ function BillingLayout() {
             <Outlet />
           </div>
         </MarketplaceAccessControl>
-        <Toaster />
       </div>
     </>
   );

@@ -14,6 +14,7 @@ import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
 import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
 import { InngestClerkProvider } from '@/components/Clerk/Provider';
 import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
+import Toaster from '@/components/Toast/Toaster';
 import URQLProviderWrapper from '@/components/URQL/URQLProvider';
 import { navCollapsed } from '@/lib/nav';
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
@@ -82,6 +83,7 @@ function RootComponent() {
                 <Outlet />
               </TooltipProvider>
 
+              <Toaster />
               <SegmentAnalytics />
               <PageViewTracker />
             </ClientFeatureFlagProvider>
