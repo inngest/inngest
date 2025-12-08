@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunctionAIGatewayGatewayWaitForSignalRunCompleteStepFailedSyncRunComplete"
+const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunctionAIGatewayGatewayWaitForSignalRunCompleteStepFailedSyncRunCompleteDiscoveryRequest"
 
-var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66, 75, 82, 95, 106, 116, 131}
+var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66, 75, 82, 95, 106, 116, 131, 147}
 
-const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunctionaigatewaygatewaywaitforsignalruncompletestepfailedsyncruncomplete"
+const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunctionaigatewaygatewaywaitforsignalruncompletestepfailedsyncruncompletediscoveryrequest"
 
 func (i Opcode) String() string {
 	if i < 0 || i >= Opcode(len(_OpcodeIndex)-1) {
@@ -39,9 +39,10 @@ func _OpcodeNoOp() {
 	_ = x[OpcodeRunComplete-(11)]
 	_ = x[OpcodeStepFailed-(12)]
 	_ = x[OpcodeSyncRunComplete-(13)]
+	_ = x[OpcodeDiscoveryRequest-(14)]
 }
 
-var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction, OpcodeAIGateway, OpcodeGateway, OpcodeWaitForSignal, OpcodeRunComplete, OpcodeStepFailed, OpcodeSyncRunComplete}
+var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction, OpcodeAIGateway, OpcodeGateway, OpcodeWaitForSignal, OpcodeRunComplete, OpcodeStepFailed, OpcodeSyncRunComplete, OpcodeDiscoveryRequest}
 
 var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[0:4]:          OpcodeNone,
@@ -72,6 +73,8 @@ var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeLowerName[106:116]: OpcodeStepFailed,
 	_OpcodeName[116:131]:      OpcodeSyncRunComplete,
 	_OpcodeLowerName[116:131]: OpcodeSyncRunComplete,
+	_OpcodeName[131:147]:      OpcodeDiscoveryRequest,
+	_OpcodeLowerName[131:147]: OpcodeDiscoveryRequest,
 }
 
 var _OpcodeNames = []string{
@@ -89,6 +92,7 @@ var _OpcodeNames = []string{
 	_OpcodeName[95:106],
 	_OpcodeName[106:116],
 	_OpcodeName[116:131],
+	_OpcodeName[131:147],
 }
 
 // OpcodeString retrieves an enum value from the enum constants string name.

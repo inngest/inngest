@@ -1,6 +1,6 @@
 local cjson = cjson
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 local KEYS = KEYS
 local ARGV = ARGV
@@ -16,7 +16,8 @@ local enableDebugLogs = tonumber(ARGV[5]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -24,18 +25,14 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 	return opIdempotency
 end
-local hashedOperationIdempotencyKey = call("HGET", keyLeaseDetails, "oik")
-if
-	hashedOperationIdempotencyKey == false
-	or hashedOperationIdempotencyKey == nil
-	or hashedOperationIdempotencyKey == ""
-then
+local requestID = call("HGET", keyLeaseDetails, "req")
+if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
 	return cjson.encode(res)
 end
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, hashedOperationIdempotencyKey)
+local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	local res = {}
@@ -44,8 +41,13 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	return cjson.encode(res)
 end
 local requestDetails = cjson.decode(requestStateStr)
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local constraints = requestDetails.s
-debug("debugging release")
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 for _, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)

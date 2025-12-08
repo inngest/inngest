@@ -1,4 +1,4 @@
-import { graphql } from "@/gql";
+// import { graphql } from "@/gql";
 
 import {
   Organization,
@@ -7,7 +7,7 @@ import {
 } from "@clerk/tanstack-react-start/server";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
-import { inngestGQLAPI } from "./gqlApi";
+// import { inngestGQLAPI } from "./gqlApi";
 
 export type ProfileType = {
   user: User;
@@ -21,44 +21,24 @@ export type ProfileDisplayType = {
   orgProfilePic: string | null;
 };
 
-const ProfileQuery = graphql(`
-  query Profile {
-    account {
-      name
-      marketplace
-    }
-  }
-`);
+// const ProfileQuery = graphql(`
+//   query Profile {
+//     account {
+//       name
+//       marketplace
+//     }
+//   }
+// `);
 
 export const getProfileDisplay = createServerFn({
   method: "GET",
-}).handler(async () => {
-  let orgName: string | undefined;
-  let displayName: string;
-  let orgProfilePic: string | null;
-
-  const res = await inngestGQLAPI.request(ProfileQuery);
-  if (res.account.marketplace) {
-    // Marketplace users are not authed with Clerk.
-
-    orgName = res.account.name ?? undefined;
-    displayName = "System";
-    orgProfilePic = null;
-  } else {
-    const { user, org } = await getProfile();
-    orgName = org?.name;
-    displayName =
-      user.firstName || user.lastName
-        ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
-        : user.username ?? "";
-    orgProfilePic = org?.hasImage ? org.imageUrl : null;
-  }
-
+}).handler(async (): Promise<ProfileDisplayType> => {
+  // TODO: Implement profile display logic
+  // For now, return placeholder values
   return {
-    isMarketplace: Boolean(res.account.marketplace),
-    orgName,
-    displayName,
-    orgProfilePic,
+    isMarketplace: false,
+    displayName: "User",
+    orgProfilePic: null,
   };
 });
 

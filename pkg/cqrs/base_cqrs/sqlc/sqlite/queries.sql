@@ -473,7 +473,7 @@ WHERE span_id IN (
 )
 GROUP BY dynamic_span_id
 HAVING SUM(name = 'executor.step.discovery') > 0
-UNION
+UNION ALL
 SELECT
   run_id,
   trace_id,

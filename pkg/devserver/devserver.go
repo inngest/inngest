@@ -332,11 +332,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
-		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
-		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
 		redis_state.WithBacklogRefillLimit(10),
 		redis_state.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) redis_state.PartitionPausedInfo {
 			if paused, ok := pauseOverrides[functionID]; ok && paused {
@@ -749,14 +744,15 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:           l,
-			DB:            ds.Data,
-			Queue:         rq,
-			State:         ds.State,
-			Cron:          croner,
-			ShardSelector: shardSelector,
-			Port:          ds.Opts.DebugAPIPort,
-			PauseManager:  pauseMgr,
+			Log:             l,
+			DB:              ds.Data,
+			Queue:           rq,
+			State:           ds.State,
+			Cron:            croner,
+			ShardSelector:   shardSelector,
+			Port:            ds.Opts.DebugAPIPort,
+			PauseManager:    pauseMgr,
+			CapacityManager: capacityManager,
 		}))
 	}
 

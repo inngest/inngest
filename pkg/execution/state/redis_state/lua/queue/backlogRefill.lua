@@ -60,6 +60,8 @@ local keyBacklogActiveCheckCooldown  = KEYS[23]
 
 local keyPartitionNormalizeSet       = KEYS[24]
 
+local keyConstraintCheckIdempotency = KEYS[25]
+
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
@@ -81,11 +83,18 @@ local throttlePeriod = tonumber(ARGV[14])
 
 local keyPrefix = ARGV[15]
 
-local enableKeyQueues = tonumber(ARGV[16])
+local checkConstraints = tonumber(ARGV[16])
 
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
-local fallbackIdempotencyKey = ARGV[18]
+-- Constraint API rollout
+local itemCapacityLeaseIDs = {}
+if ARGV[18] ~= nil and ARGV[18] ~= "" and ARGV[18] ~= "null" then
+  local success, result = pcall(cjson.decode, ARGV[18])
+  if success and type(result) == "table" then
+    itemCapacityLeaseIDs = result
+  end
+end
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -153,9 +162,15 @@ local function check_active_capacity(now_ms, keyActiveSet, limit)
 	return tonumber(limit)
 end
 
-if enableKeyQueues == 1 then
-  -- Check throttle capacity
-  if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
+-- Check throttle capacity if configured
+local checkThrottle = checkConstraints == 1 and throttlePeriod > 0 and throttleLimit > 0
+-- Skip throttle GCRA checks if constraint check idempotency is set by Constraint API
+if checkConstraints and exists_without_ending(keyConstraintCheckIdempotency, ":-") and redis.call("EXISTS", keyConstraintCheckIdempotency) == 1 then
+  checkThrottle = false
+end
+
+if checkConstraints == 1 then
+  if (constraintCapacity == nil or constraintCapacity > 0) and checkThrottle then
     local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
     local remainingThrottleCapacity = gcraRes[1]
     local throttleRetryAt = gcraRes[2]
@@ -286,7 +301,12 @@ if refill > 0 then
       updatedData.rf = backlogID
       updatedData.rat = nowMS
 
-      if enableKeyQueues == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+      -- Update item with Capacity Lease ID if lease acquired
+      if itemCapacityLeaseIDs ~= nil and #itemCapacityLeaseIDs > 0 then
+        updatedData.clid = itemCapacityLeaseIDs[i]
+      end
+
+      if checkConstraints == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:v2:active:run:%s", keyPrefix, runID)
@@ -308,7 +328,7 @@ if refill > 0 then
     -- "Refill" items to ready set
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-    if enableKeyQueues == 1 then
+    if checkConstraints == 1 then
       addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilledItemIDs)
     end
 
@@ -323,7 +343,7 @@ if refill > 0 then
 end
 
 -- update gcra theoretical arrival time
-if throttleLimit > 0 and throttlePeriod > 0 then
+if checkThrottle then
   gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 

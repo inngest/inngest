@@ -115,6 +115,11 @@ const nextConfig = {
         issuer: fileLoaderRule.issuer,
         resourceQuery: { not: [...fileLoaderRule.resourceQuery.not, /url/] }, // exclude if *.svg?url
         use: ['@svgr/webpack'],
+      },
+      // Import markdown files as raw strings
+      {
+        test: /\.md$/i,
+        type: 'asset/source',
       }
     );
 

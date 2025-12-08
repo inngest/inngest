@@ -7,7 +7,7 @@ import (
 
 var (
 	// in milliseconds
-	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000}
+	DefaultBoundaries          = []float64{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000}
 	QueueItemLatencyBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
@@ -350,6 +350,33 @@ func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Durat
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_scavenger_shard_lease_age",
 		Description: "Distribution of scavenger expired lease age",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_start_latency",
+		Description: "Distribution of time it took to receive the API request and start processing",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partition_scavenge_duration",
+		Description: "Distribution of queue scavenger duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,

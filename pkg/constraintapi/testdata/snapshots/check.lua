@@ -1,12 +1,15 @@
 local cjson = cjson
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 local KEYS = KEYS
 local ARGV = ARGV
 local keyAccountLeases = KEYS[1]
 local keyOperationIdempotency = KEYS[2]
 local requestDetails = cjson.decode(ARGV[1])
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local keyPrefix = ARGV[2]
 local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) 
@@ -16,7 +19,8 @@ local enableDebugLogs = tonumber(ARGV[7]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 local function getConcurrencyCount(key)
@@ -57,12 +61,17 @@ local function retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_t
 end
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	if limit == 0 then
-		return { 0, now_ns + period_ns }
+		return { 0, now_ns + period_ns, 0 }
 	end
 	local emission_interval = period_ns / limit
 	local total_capacity = burst + 1
 	local delay_variation_tolerance = emission_interval * total_capacity
 	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+	local used_tokens = 0
+	if tat > now_ns then
+		local consumed_time = tat - now_ns
+		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
+	end
 	local increment = 1 * emission_interval
 	local new_tat
 	if now_ns > tat then
@@ -73,15 +82,17 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	local allow_at = new_tat - delay_variation_tolerance
 	local diff = now_ns - allow_at
 	if diff < 0 then
-		return { 0, allow_at }
+		return { 0, allow_at, used_tokens }
 	else
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-		return { remaining, 0 }
+		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
+		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
@@ -96,15 +107,15 @@ local function throttleCapacity(key, now_ms, period_ms, limit, burst)
 	local time_capacity_remain = now_ms + total_capacity_time - tat
 	local capacity = math.floor(time_capacity_remain / emission)
 	local final_capacity = math.min(capacity, limit + burst)
-	if final_capacity < 1 then
-		local next_available_at_ms = tat - total_capacity_time + emission
-		return { final_capacity, math.ceil(next_available_at_ms) }
-	else
-		return { final_capacity, 0 }
-	end
+	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
+	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
+	return { final_capacity, next_available_at_ms }
 end
 local configVersion = requestDetails.cv
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 local availableCapacity = nil
 local limitingConstraints = {}
 local retryAt = 0
@@ -120,10 +131,10 @@ for index, value in ipairs(constraints) do
 		local burst = math.floor(value.r.l / 10) 
 		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
-		constraintRetryAfter = rlRes[2] / 1000000 
+		constraintRetryAfter = toInteger(rlRes[2] / 1000000) 
 		local usage = {}
 		usage["l"] = value.r.l
-		usage["u"] = math.max(math.min(value.r.l - constraintCapacity, value.r.l), 0)
+		usage["u"] = rlRes[3] 
 		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		debug("evaluating concurrency")
@@ -151,7 +162,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = throttleRes[2] 
+		constraintRetryAfter = toInteger(throttleRes[2]) 
 		local usage = {}
 		usage["l"] = value.t.l
 		usage["u"] = math.max(math.min(value.t.l - constraintCapacity, value.t.l or 0), 0)
@@ -185,5 +196,7 @@ res["fr"] = fairnessReduction
 res["a"] = availableCapacity
 res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
-call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+if operationIdempotencyTTL > 0 then
+	call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+end
 return encoded

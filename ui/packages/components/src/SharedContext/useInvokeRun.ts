@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useShared, type SharedDefinitions } from './SharedContext';
+import { useShared } from './SharedContext';
 
 export interface InvokeRunPayload {
   envID?: string;

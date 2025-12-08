@@ -22,6 +22,9 @@ const (
 	// OpcodeSyncRunComplete represents a sync API-based function completion.  This is
 	// distinct from OpcodeRunComplete as it always contains a specific shape of data.
 	OpcodeSyncRunComplete
+	// OpcodeDiscoveryRequest indicates that an SDK wants another discovery
+	// request to be sent to resume execution.
+	OpcodeDiscoveryRequest
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.

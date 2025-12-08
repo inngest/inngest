@@ -220,6 +220,9 @@ type QueueKeyGenerator interface {
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
+	// PartitionScavengerIndex returns a key to a set holding in-progress jobs
+	// This allows us to scan and scavenge jobs where leases have expired (in the case of failed workers)
+	PartitionScavengerIndex(partitionID string) string
 	// ThrottleKey returns the throttle key for a given queue item.
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
@@ -331,6 +334,10 @@ func (u queueKeyGenerator) Concurrency(prefix, key string) string {
 
 func (u queueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("{%s}:concurrency:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) PartitionScavengerIndex(partitionID string) string {
+	return fmt.Sprintf("{%s}:scavenger:%s:sorted", u.queueDefaultKey, partitionID)
 }
 
 func (u queueKeyGenerator) RunIndex(runID ulid.ULID) string {

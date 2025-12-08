@@ -21,8 +21,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSubscriptionToken } from '@inngest/realtime';
 
-import { inngest } from '../../inngest/client';
-import { createChannel } from '../../inngest/realtime';
+import { inngest } from '@/lib/inngest/client';
+import { createChannel } from '@/lib/inngest/realtime';
 
 export type RequestBody = {
   userId?: string;

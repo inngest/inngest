@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { useLocation } from '@tanstack/react-router';
+import { useLocation, type LinkComponentProps } from '@tanstack/react-router';
 
 import { OptionalLink } from '../Link/NewOptionalLink';
-import { Pill } from '../Pill';
+import { Pill } from '../Pill/NewPill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
 
@@ -11,6 +11,7 @@ export const MenuItem = ({
   icon,
   collapsed,
   href,
+  to,
   prefetch = false,
   comingSoon = false,
   beta = false,
@@ -21,6 +22,7 @@ export const MenuItem = ({
   icon: ReactNode;
   collapsed: boolean;
   href?: string;
+  to?: LinkComponentProps['to'];
   prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;
   beta?: boolean;
@@ -28,10 +30,10 @@ export const MenuItem = ({
   className?: string;
 }) => {
   const location = useLocation();
-  const active = href && location.href.startsWith(href);
+  const active = (href || to) && location.href.startsWith(href || to || '');
 
   return (
-    <OptionalLink href={comingSoon ? '' : href} preload={prefetch}>
+    <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(
