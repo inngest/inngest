@@ -1,31 +1,28 @@
-import globals from 'globals';
-import pluginJs from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import pluginReactConfig from 'eslint-plugin-react/configs/recommended.js';
-import { fixupConfigRules } from '@eslint/compat';
+//  @ts-check
+
+import { tanstackConfig } from '@tanstack/eslint-config';
 
 export default [
-  { files: ['src/**/*.{mjs,ts,jsx,tsx}'] },
-  { languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } } },
-  { languageOptions: { globals: globals.browser } },
-  pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...fixupConfigRules(pluginReactConfig),
+  ...tanstackConfig,
   {
-    settings: {
-      react: {
-        version: 'detect',
-        pragma: 'React',
-        pragmaFrag: 'React.Fragment',
-      },
-    },
-  },
-  {
+    //
+    // TODO: Remove these overrides once migration is done
     rules: {
-      'react/react-in-jsx-scope': 'off',
+      'import/consistent-type-specifier-style': 'off',
+      'import/order': 'off',
+      'sort-imports': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@stylistic/spaced-comment': 'off',
+      'no-shadow': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/array-type': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off',
+      'prefer-const': 'off',
+      'no-empty-pattern': 'off',
+      'import/newline-after-import': 'off',
+      '@typescript-eslint/naming-convention': 'off',
+      'node/prefer-node-protocol': 'off',
     },
-  },
-  {
-    ignores: ['dist/'],
   },
 ];

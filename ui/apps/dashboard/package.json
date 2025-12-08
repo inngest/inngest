@@ -44,6 +44,7 @@
     "@sindresorhus/slugify": "^3.0.0",
     "@stripe/react-stripe-js": "^3.1.1",
     "@stripe/stripe-js": "^1.52.1",
+    "@tanstack/eslint-config": "^0.3.0",
     "@tanstack/nitro-v2-vite-plugin": "^1.132.31",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",
