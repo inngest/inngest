@@ -152,7 +152,7 @@ function TableRow(props: { env: Environment }) {
         } else {
           res = await disableAutoArchive({ id });
         }
-        success = !Boolean(res.error);
+        success = !res.error;
       } catch (err) {
         rollback();
         throw err;
@@ -185,9 +185,7 @@ function TableRow(props: { env: Environment }) {
         <h3
           className="text-basis flex items-center gap-2 break-words text-sm font-medium"
           title={
-            Boolean(lastDeployedAt)
-              ? `Last synced at ${lastDeployedAt}`
-              : undefined
+            lastDeployedAt ? `Last synced at ${lastDeployedAt}` : undefined
           }
         >
           <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />

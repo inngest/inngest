@@ -25,4 +25,7 @@ export default [
       'node/prefer-node-protocol': 'off',
     },
   },
+  {
+    ignores: ['src/gql/gql.ts', 'src/gql/graphql.ts'],
+  },
 ];

@@ -1,7 +1,7 @@
 import { Pill } from '@inngest/components/Pill/NewPill';
 
 type PaymentStatusPillProps = {
-  status: String;
+  status: string;
 };
 
 export default function PaymentStatusPill({ status }: PaymentStatusPillProps) {

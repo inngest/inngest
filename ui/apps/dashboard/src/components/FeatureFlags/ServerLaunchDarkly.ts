@@ -12,7 +12,6 @@ function initialize() {
 }
 
 export async function getLaunchDarklyClient(): Promise<LDClient> {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Since we run our app in a serverless environment, launchDarklyClient can potentially be persisted between invocations.
   if (!launchDarklyClient) {
     initialize();
   }

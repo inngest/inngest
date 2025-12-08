@@ -11,7 +11,7 @@ export const Route = createFileRoute(
 
 function NeonConnect() {
   const navigate = useNavigate();
-  const firstStep = STEPS_ORDER[0]!;
+  const firstStep = STEPS_ORDER[0];
 
   return (
     <ConnectPage

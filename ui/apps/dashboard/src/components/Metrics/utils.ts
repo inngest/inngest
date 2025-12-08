@@ -267,7 +267,7 @@ export const mapEntityLines = (
       data: item.metric.data.map(({ value }) => value),
       itemStyle: {
         color: resolveColor(
-          lineColors[i % lineColors.length]![0]!,
+          lineColors[i % lineColors.length][0],
           dark,
           lineColors[0]?.[1],
         ),

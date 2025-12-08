@@ -40,8 +40,8 @@ export type ShortcutBinding = {
 };
 
 type ModifiableEvent = {
-  preventDefault(): void;
-  stopPropagation(): void;
+  preventDefault: () => void;
+  stopPropagation: () => void;
 };
 
 function doAction(e: ModifiableEvent, handler: () => void) {

@@ -57,7 +57,7 @@ export default function EntitlementListItemSelfService({
   const [, updateAccountAddonQuantity] = useMutation(
     UpdateAccountAddonQuantityDocument,
   );
-  const [err, setErr] = useState<String | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const switchInput = typeof entitlement.currentValue === 'boolean';
   const numericInput = typeof entitlement.currentValue === 'number';

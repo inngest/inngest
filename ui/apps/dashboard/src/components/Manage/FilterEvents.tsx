@@ -60,7 +60,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
     });
   }
 
-  function handleTypeChange(id: String) {
+  function handleTypeChange(id: string) {
     const nextValue = { ...newFilter, type: id as 'allow' | 'deny' };
     validateSubmit(nextValue);
 

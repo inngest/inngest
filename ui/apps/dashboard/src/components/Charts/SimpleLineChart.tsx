@@ -190,9 +190,7 @@ export default function SimpleLineChart({
                     <ReferenceArea
                       key={`${name}+${k.dataKey}`}
                       x1={name}
-                      x2={
-                        index < data.length - 1 ? data[index + 1]!.name : name
-                      }
+                      x2={index < data.length - 1 ? data[index + 1].name : name}
                       fill={k.color}
                       fillOpacity={0.15}
                     />

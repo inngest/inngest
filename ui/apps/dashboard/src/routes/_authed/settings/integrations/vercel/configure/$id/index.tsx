@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
 import { Alert } from '@inngest/components/Alert/Alert';
@@ -83,16 +81,10 @@ function VercelConfigure() {
 
   useEffect(() => {
     setUpdated(JSON.stringify(originalProject) !== JSON.stringify(project));
-    //
-    // we only want to track updates on project changes, not originalProject
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
   useEffect(() => {
     project && setProject({ ...project, servePath: paths.join(',') });
-    //
-    // we only want to track updates on paths changes, not project
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paths]);
 
   const submit = useCallback(async () => {

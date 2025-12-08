@@ -45,8 +45,9 @@ export default function SyncApp() {
   const navigate = useNavigate();
   const tracking = useOnboardingTracking();
 
-  const search = useSearch({ strict: false }) as { nonVercel?: string };
-  const fromNonVercel = search.nonVercel === 'true';
+  const search = useSearch({ strict: false });
+  const fromNonVercel =
+    'nonVercel' in search ? search.nonVercel === 'true' : false;
 
   const loadVercelSyncs = async () => {
     try {

@@ -28,9 +28,10 @@ import {
 } from '@inngest/components/utils/date';
 import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 
-const DEFAULT_TIME = '1d';
 import { createFileRoute } from '@tanstack/react-router';
 import { useMemo, useCallback } from 'react';
+
+const DEFAULT_TIME = '1d';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug/')({
   component: RouteComponent,

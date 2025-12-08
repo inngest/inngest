@@ -22,7 +22,7 @@ export default function PageHeader({
   if (!isValidStep(step)) {
     navigate({
       to: pathCreator.pgIntegrationStep({ integration }),
-      params: { step: STEPS_ORDER[0]! },
+      params: { step: STEPS_ORDER[0] },
     });
     return;
   }

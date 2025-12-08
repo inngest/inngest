@@ -25,7 +25,7 @@ function NeonStep() {
   const { step } = Route.useParams();
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
   const navigate = useNavigate();
-  const firstStep = STEPS_ORDER[0]!;
+  const firstStep = STEPS_ORDER[0];
 
   function handleLostCredentials() {
     toast.error('Lost credentials. Going back to the first step.');

@@ -19,6 +19,5 @@ export function useLatestCallback<A extends unknown[], R>(
 
   return useCallback((...args: A) => {
     return latest.current(...args);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

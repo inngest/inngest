@@ -85,7 +85,7 @@ function createChartOption({
       ...seriesOptions,
       data: resp.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[1]?.[0]!, dark, lineColors[1]?.[1]),
+        color: resolveColor(lineColors[1][0], dark, lineColors[1][1]),
       },
       name: 'Concurrently running steps',
     },
@@ -109,7 +109,7 @@ function createChartOption({
         },
         lineStyle: {
           type: 'solid' as any,
-          color: resolveColor(lineColors[3]?.[0]!, dark, lineColors[3]?.[1]),
+          color: resolveColor(lineColors[3][0], dark, lineColors[3][1]),
         },
         symbol: 'none',
         tooltip: {

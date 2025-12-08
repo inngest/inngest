@@ -1,10 +1,11 @@
 import { graphql } from '@/gql';
-import type { CdcConnection } from '@/gql/graphql';
+
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getProductionEnvironment } from '@/queries/server/getEnvironment';
 import { createServerFn } from '@tanstack/react-start';
 
 import {
+  type CdcConnection,
   type CdcConnectionInput,
   type CdcSetupResponse,
   type DeleteResponse,

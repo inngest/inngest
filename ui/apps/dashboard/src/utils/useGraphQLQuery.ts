@@ -74,6 +74,7 @@ export function useSkippableGraphQLQuery<
   ResultT,
   { skippable: true }
 > {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- for some reason the linter thinks this is unnecessary
   const search = useSearch({ strict: false }) as Record<string, unknown>;
   const skipCache =
     search[skipCacheSearchParam.name] === skipCacheSearchParam.value;

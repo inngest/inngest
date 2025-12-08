@@ -189,7 +189,7 @@ function CheckoutForm({
       <div className="mb-2 min-h-[290px]">
         <PaymentElement />
       </div>
-      {Boolean(error) ? (
+      {error ? (
         <Alert severity="error" className="text-sm">
           {error}
         </Alert>

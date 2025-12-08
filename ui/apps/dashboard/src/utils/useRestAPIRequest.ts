@@ -73,7 +73,7 @@ export function useRestAPIRequest<T>({
     };
   }
 
-  if (!!pause) {
+  if (pause) {
     return {
       ...baseFetchSkipped,
     };
