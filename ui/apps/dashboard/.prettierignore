@@ -1,4 +1,6 @@
 **/build
 **/public
+.output
+dist
 pnpm-lock.yaml
 routeTree.gen.ts
