@@ -1288,6 +1288,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		})
 		require.NoError(t, err)
 		defer rc.Close()
+		now := time.Now()
+		clock := clockwork.NewFakeClockAt(now)
 
 		paused := make(map[uuid.UUID]bool)
 		q := NewQueue(
@@ -1300,8 +1302,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 					Paused: paused[fnID],
 				}
 			}),
+			WithClock(clock),
 		)
-		now := time.Now()
 		enqueue(q, now)
 		requirePartitionScoreEquals(t, r, &idA, now)
 
@@ -1323,7 +1325,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, q.UnpauseFunction(ctx, q.primaryQueueShard.Name, accountId, idA))
 
 		require.NoError(t, err)
-		items, err = q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		items, err = q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
