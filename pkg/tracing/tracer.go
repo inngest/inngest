@@ -57,7 +57,8 @@ type CreateSpanOptions struct {
 	StartTime          time.Time
 	EndTime            time.Time
 
-	Seed []byte
+	Seed   []byte
+	SpanID trace.SpanID
 
 	// DynamicSeed is optional and used for CreateOrUpdate operations
 	// This differs from Seed in that seed creates a deterministic trace and span ID while
@@ -209,6 +210,11 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	// YAY.  We love determinism.  This is important for eg. root spans.
 	if len(opts.Seed) > 0 {
 		ctx = setDeteterministicIDs(ctx, DeterministicSpanConfig(opts.Seed))
+	} else if opts.SpanID.IsValid() && opts.Parent != nil {
+		ctx = setDeteterministicIDs(ctx, DeterministicIDs{
+			TraceID: trace.SpanContextFromContext(ctx).TraceID(),
+			SpanID:  opts.SpanID,
+		})
 	}
 
 	tracer := tp.getTracer(opts.Metadata)
