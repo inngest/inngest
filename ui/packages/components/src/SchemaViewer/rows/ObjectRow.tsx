@@ -8,15 +8,23 @@ import { ValueRow } from './ValueRow';
 export type ObjectRowProps = { node: ObjectNode; typeLabelOverride?: string };
 
 export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.ReactElement {
-  const { isExpanded, toggle } = useExpansion();
+  const { isExpanded, toggleRecursive } = useExpansion();
 
   const open = isExpanded(node.path);
 
+  const handleToggle = () => {
+    const allDescendantPaths = collectAllExpandablePaths(node);
+    toggleRecursive(node.path, allDescendantPaths);
+  };
+
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex cursor-pointer items-center" onClick={() => toggle(node.path)}>
+      <div
+        className="hover:bg-canvasSubtle flex cursor-pointer items-center rounded"
+        onClick={handleToggle}
+      >
         <CollapsibleRowWidget open={open} />
-        <div className="-ml-0.5">
+        <div className="-ml-0.5 flex-1">
           <ValueRow
             boldName={open}
             node={makeFauxValueNode(node)}
@@ -47,4 +55,28 @@ export function ObjectRow({ node, typeLabelOverride }: ObjectRowProps): React.Re
 
 function makeFauxValueNode(node: SchemaNode): ValueNode {
   return { kind: 'value', name: node.name, path: node.path, type: 'object' };
+}
+
+function collectAllExpandablePaths(node: SchemaNode): string[] {
+  const paths: string[] = [];
+
+  function traverse(n: SchemaNode) {
+    if (n.kind === 'object') {
+      paths.push(n.path);
+      n.children.forEach(traverse);
+    } else if (n.kind === 'array') {
+      paths.push(n.path);
+      traverse(n.element);
+    } else if (n.kind === 'tuple') {
+      paths.push(n.path);
+      n.elements.forEach(traverse);
+    }
+  }
+
+  // Start with children to avoid adding the current node's path
+  if (node.kind === 'object') {
+    node.children.forEach(traverse);
+  }
+
+  return paths;
 }
