@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import type { UseNavigateResult } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import type { TabManagerActions } from "@/components/Insights/InsightsTabManager/InsightsTabManager";
@@ -8,7 +7,10 @@ import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQ
 interface UseDeepLinkHandlerParams {
   actions: TabManagerActions;
   activeSavedQueryId: string | undefined;
-  navigate: UseNavigateResult<string>;
+  navigate: (opts: {
+    search: (prev: Record<string, unknown>) => Record<string, unknown>;
+    replace?: boolean;
+  }) => void;
   search: Record<string, unknown>;
 }
 
@@ -76,6 +78,6 @@ export function useDeepLinkHandler({
         return next;
       },
       replace: true,
-    } as never);
+    });
   }, [activeSavedQueryId, search, navigate]);
 }
