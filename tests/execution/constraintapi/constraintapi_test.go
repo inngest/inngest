@@ -22,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -31,6 +32,9 @@ import (
 
 func TestConstraintEnforcement(t *testing.T) {
 	accountID, envID, fnID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	// Instantiate the user tracer singleton, for some reason we will run into race conditions otherwise
+	trace.UserTracer()
 
 	type deps struct {
 		cm    constraintapi.RolloutManager
@@ -1086,39 +1090,6 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 			}),
 		)
 
-		amount := 4
-
-		leaseIdempotencyKeys := make([]string, amount)
-		for i := range amount {
-			leaseIdempotencyKeys[i] = fmt.Sprintf("item%d", i)
-		}
-
-		// Claim concurrency capacity
-		acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-			Migration: constraintapi.MigrationIdentifier{
-				QueueShard: "test",
-			},
-			AccountID:            accountID,
-			IdempotencyKey:       "acquire",
-			Constraints:          constraints,
-			Amount:               amount,
-			EnvID:                envID,
-			FunctionID:           fnID,
-			Configuration:        config,
-			LeaseIdempotencyKeys: leaseIdempotencyKeys,
-			LeaseRunIDs:          make(map[string]ulid.ULID),
-			CurrentTime:          clock.Now(),
-			Duration:             5 * time.Second,
-			MaximumLifetime:      time.Hour,
-			Source: constraintapi.LeaseSource{
-				Service:           constraintapi.ServiceExecutor,
-				Location:          constraintapi.CallerLocationItemLease,
-				RunProcessingMode: constraintapi.RunProcessingModeBackground,
-			},
-		})
-		require.NoError(t, err)
-		require.Len(t, acquireResp.Leases, amount)
-
 		qi, err := q.EnqueueItem(
 			context.Background(),
 			defaultShard,
@@ -1177,6 +1148,38 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, qi)
 
+		amount := 4
+		leaseIdempotencyKeys := make([]string, amount)
+		for i := range amount {
+			leaseIdempotencyKeys[i] = util.XXHash(fmt.Sprintf("item%d", i))
+		}
+
+		// Claim concurrency capacity
+		acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			Migration: constraintapi.MigrationIdentifier{
+				QueueShard: "test",
+			},
+			AccountID:            accountID,
+			IdempotencyKey:       "acquire",
+			Constraints:          constraints,
+			Amount:               amount,
+			EnvID:                envID,
+			FunctionID:           fnID,
+			Configuration:        config,
+			LeaseIdempotencyKeys: leaseIdempotencyKeys,
+			LeaseRunIDs:          make(map[string]ulid.ULID),
+			CurrentTime:          clock.Now(),
+			Duration:             5 * time.Second,
+			MaximumLifetime:      time.Hour,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, acquireResp.Leases, amount)
+
 		keyThrottleState := kg.ThrottleKey(qi.Data.Throttle)
 		require.True(t, r.Exists(keyThrottleState))
 
@@ -1191,7 +1194,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		// Expect constraint check idempotency to be set
 		keyConstraintCheckIdempotency := cm.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
 			QueueShard: defaultShard.Name,
-		}, accountID, "item0")
+		}, accountID, util.XXHash("item0"))
 		require.True(t, r.Exists(keyConstraintCheckIdempotency))
 
 		// Should work because we handle constraint check idempotency
