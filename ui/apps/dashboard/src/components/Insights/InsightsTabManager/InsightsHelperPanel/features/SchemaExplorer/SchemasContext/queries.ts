@@ -39,13 +39,11 @@ export function buildEntryFromLatestSchema(
     const parsed = safeParseJSONSchema(latestSchema);
     if (parsed === null) return null;
 
-    const dataSchema = extractDataProperty(parsed);
-    if (dataSchema === null) return null;
-
+    // Show the full event schema instead of just the data property
     return {
       key: `fetched:${eventName}`,
       isShared: false,
-      node: transformJSONSchema({ ...dataSchema, title: eventName }),
+      node: transformJSONSchema({ ...parsed, title: eventName }),
     };
   } catch {
     return null;
