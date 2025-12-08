@@ -10,3 +10,6 @@
 
 # pnpm lock file
 pnpm-lock.yaml
+
+# Prettier config files
+**/.prettierrc*
