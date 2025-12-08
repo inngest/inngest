@@ -379,7 +379,7 @@ fragmentLoop:
 	}
 
 	if info != nil && isMetadata && parentSpanIDPtr != nil {
-		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments)
+		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
 		} else {
@@ -531,9 +531,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any) (*cqrs.SpanMetadata, error) {
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
 	ret := &cqrs.SpanMetadata{
-		Values: metadata.Values{},
+		Values:    metadata.Values{},
+		UpdatedAt: updatedAt,
 	}
 
 	for _, fragment := range fragments {
