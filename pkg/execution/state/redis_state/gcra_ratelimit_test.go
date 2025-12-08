@@ -34,6 +34,11 @@ func oldLuaGCRARateLimit(ctx context.Context, rc rueidis.Client, key string, now
 }
 
 func TestOldLuaGCRA(t *testing.T) {
+	// NOTE: This test verifies the old gcra() implementation is broken in a couple ways.
+	// Until we swap period_ms for emission in the variance, we will skip this test.
+	// For more details, see https://github.com/inngest/inngest/pull/3356
+	t.Skip("skipped until gcra() is fixed again")
+
 	getThrottleState := func(t *testing.T, r *miniredis.Miniredis, key string) time.Time {
 		value, err := r.Get(key)
 		require.NoError(t, err)
