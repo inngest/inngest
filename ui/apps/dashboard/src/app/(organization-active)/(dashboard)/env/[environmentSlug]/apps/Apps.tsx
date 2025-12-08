@@ -1,14 +1,17 @@
-'use client';
+"use client";
 
-import { SkeletonCard } from '@inngest/components/Apps/AppCard';
+import { SkeletonCard } from "@inngest/components/Apps/AppCard";
 
-import AppCards from '@/components/Apps/AppCards';
-import AppFAQ from '@/components/Apps/AppFAQ';
-import { EmptyActiveCard, EmptyArchivedCard } from '@/components/Apps/EmptyAppsCard';
-import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { useApps } from './useApps';
-import { useLatestUnattachedSync } from './useUnattachedSyncs';
+import AppCards from "@/components/Apps/AppCards";
+import AppFAQ from "@/components/Apps/AppFAQ";
+import {
+  EmptyActiveCard,
+  EmptyArchivedCard,
+} from "@/components/Apps/EmptyAppsCard";
+import { UnattachedSyncsCard } from "@/components/Apps/UnattachedSyncsCard";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { useApps } from "./useApps";
+import { useLatestUnattachedSync } from "./useUnattachedSyncs";
 
 type Props = {
   isArchived?: boolean;
@@ -53,7 +56,10 @@ export function Apps({ isArchived = false }: Props) {
         {hasApps && <AppCards apps={apps} envSlug={env.slug} />}
         {unattachedSyncRes.data && !isArchived && (
           <>
-            <UnattachedSyncsCard envSlug={env.slug} latestSyncTime={unattachedSyncRes.data} />
+            <UnattachedSyncsCard
+              envSlug={env.slug}
+              latestSyncTime={unattachedSyncRes.data}
+            />
             {!hasApps && <AppFAQ />}
           </>
         )}

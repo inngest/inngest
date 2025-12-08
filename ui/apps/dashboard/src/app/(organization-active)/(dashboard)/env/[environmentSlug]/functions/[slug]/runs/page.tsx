@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Runs } from '@/components/Runs';
+import { Runs } from "@/components/Runs";
 
 export default function Page({
   params,

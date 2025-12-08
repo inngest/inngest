@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react';
-import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
+import type { ReactNode } from "react";
+import { IconDatadog } from "@inngest/components/icons/platforms/Datadog";
 
-import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
-import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
-import { MetricsEntitlements } from '@/components/PrometheusIntegration/data';
+import IntegrationNotEnabledMessage from "@/components/Integration/IntegrationNotEnabledMessage";
+import MetricsExportEntitlementBanner from "@/components/Integration/MetricsExportEntitlementsBanner";
+import { MetricsEntitlements } from "@/components/PrometheusIntegration/data";
 
 type Props = {
   title?: string;
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export default async function DatadogSetupPage({
-  title = 'Datadog',
+  title = "Datadog",
   subtitle,
   showSubtitleDocsLink = true,
   showEntitlements = false,
@@ -24,7 +24,9 @@ export default async function DatadogSetupPage({
   const featureAvailable = metricsEntitlements.metricsExport.enabled;
 
   if (showSubtitleDocsLink && !subtitle) {
-    throw new Error('programming error: without a subtitle, docs link will not be shown');
+    throw new Error(
+      "programming error: without a subtitle, docs link will not be shown",
+    );
   }
 
   return (
@@ -49,13 +51,17 @@ export default async function DatadogSetupPage({
       )}
 
       <div className="text-sm font-normal">
-        {!featureAvailable && <IntegrationNotEnabledMessage integrationName="Datadog" />}
+        {!featureAvailable && (
+          <IntegrationNotEnabledMessage integrationName="Datadog" />
+        )}
 
         {featureAvailable && showEntitlements && (
           <MetricsExportEntitlementBanner
-            granularitySeconds={metricsEntitlements.metricsExportGranularity.limit}
+            granularitySeconds={
+              metricsEntitlements.metricsExportGranularity.limit
+            }
             freshnessSeconds={metricsEntitlements.metricsExportFreshness.limit}
-            className={'mb-12'}
+            className={"mb-12"}
           />
         )}
 

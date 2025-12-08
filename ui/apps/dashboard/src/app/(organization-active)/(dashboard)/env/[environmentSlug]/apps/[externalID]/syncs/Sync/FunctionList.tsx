@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
-import NextLink from 'next/link';
-import { Button } from '@inngest/components/Button';
-import { defaultLinkStyles } from '@inngest/components/Link';
-import type { Function } from '@inngest/components/types/function';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowDownSLine, RiArrowRightLine } from '@remixicon/react';
-import { useLocalStorage } from 'react-use';
+import { useMemo } from "react";
+import NextLink from "next/link";
+import { Button } from "@inngest/components/Button";
+import { defaultLinkStyles } from "@inngest/components/Link";
+import type { Function } from "@inngest/components/types/function";
+import { cn } from "@inngest/components/utils/classNames";
+import { RiArrowDownSLine, RiArrowRightLine } from "@remixicon/react";
+import { useLocalStorage } from "react-use";
 
 import {
   CollapsibleCardContent,
@@ -14,11 +14,11 @@ import {
   CollapsibleCardItem,
   CollapsibleCardRoot,
   CollapsibleCardTrigger,
-} from '@/components/CollapsibleCard';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { pathCreator } from '@/utils/urls';
+} from "@/components/CollapsibleCard";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { pathCreator } from "@/utils/urls";
 
-type Fn = Pick<Function, 'id' | 'name' | 'slug'>;
+type Fn = Pick<Function, "id" | "name" | "slug">;
 
 type Props = {
   className?: string;
@@ -28,14 +28,10 @@ type Props = {
 
 export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
   const env = useEnvironment();
-  const [isSyncedFunctionsCardOpen, setIsSyncedFunctionsCardOpen] = useLocalStorage(
-    'AppSyncedFunctionsOpened',
-    true
-  );
-  const [isRemovedFunctionsCardOpen, setIsRemovedFunctionsCardOpen] = useLocalStorage(
-    'AppRemovedFunctionsOpened',
-    true
-  );
+  const [isSyncedFunctionsCardOpen, setIsSyncedFunctionsCardOpen] =
+    useLocalStorage("AppSyncedFunctionsOpened", true);
+  const [isRemovedFunctionsCardOpen, setIsRemovedFunctionsCardOpen] =
+    useLocalStorage("AppRemovedFunctionsOpened", true);
 
   removedFunctions = useMemo(() => {
     return [...removedFunctions].sort((a, b) => {
@@ -53,7 +49,7 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
     <div className="flex flex-col gap-4">
       <CollapsibleCardRoot
         type="single"
-        defaultValue={isSyncedFunctionsCardOpen ? 'syncedFunctions' : undefined}
+        defaultValue={isSyncedFunctionsCardOpen ? "syncedFunctions" : undefined}
         collapsible
       >
         <CollapsibleCardItem value="syncedFunctions">
@@ -61,7 +57,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <p>Synced functions ({syncedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)}
+              onClick={() =>
+                setIsSyncedFunctionsCardOpen(!isSyncedFunctionsCardOpen)
+              }
             >
               <Button
                 className="group"
@@ -81,14 +79,17 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
 
                   return (
                     <NextLink
-                      href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
+                      href={pathCreator.function({
+                        envSlug: env.slug,
+                        functionSlug: fn.slug,
+                      })}
                       key={fn.id}
                     >
                       <div
                         className={cn(
                           defaultLinkStyles,
-                          'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
-                          !isLast && 'border-b'
+                          "border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium",
+                          !isLast && "border-b",
                         )}
                       >
                         {fn.name}
@@ -98,7 +99,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
                   );
                 })}
                 {syncedFunctions.length === 0 && (
-                  <div className="text-subtle p-2 text-center text-sm">No synced functions</div>
+                  <div className="text-subtle p-2 text-center text-sm">
+                    No synced functions
+                  </div>
                 )}
               </CollapsibleCardContent>
             )}
@@ -107,7 +110,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
       </CollapsibleCardRoot>
       <CollapsibleCardRoot
         type="single"
-        defaultValue={isRemovedFunctionsCardOpen ? 'RemovedFunctions' : undefined}
+        defaultValue={
+          isRemovedFunctionsCardOpen ? "RemovedFunctions" : undefined
+        }
         collapsible
       >
         <CollapsibleCardItem value="RemovedFunctions">
@@ -115,7 +120,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
             <p>Removed functions ({removedFunctions.length})</p>
             <CollapsibleCardTrigger
               asChild
-              onClick={() => setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)}
+              onClick={() =>
+                setIsRemovedFunctionsCardOpen(!isRemovedFunctionsCardOpen)
+              }
             >
               <Button
                 className="group"
@@ -134,14 +141,17 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
 
                 return (
                   <NextLink
-                    href={pathCreator.function({ envSlug: env.slug, functionSlug: fn.slug })}
+                    href={pathCreator.function({
+                      envSlug: env.slug,
+                      functionSlug: fn.slug,
+                    })}
                     key={fn.id}
                   >
                     <div
                       className={cn(
                         defaultLinkStyles,
-                        'border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium',
-                        !isLast && 'border-b'
+                        "border-subtle hover:bg-canvasSubtle/50 group flex w-full items-center gap-2 py-3 pl-4 pr-2 text-sm font-medium",
+                        !isLast && "border-b",
                       )}
                     >
                       {fn.name}
@@ -152,7 +162,9 @@ export function FunctionList({ removedFunctions, syncedFunctions }: Props) {
               })}
 
               {removedFunctions.length === 0 && (
-                <div className="text-subtle p-2 text-center text-sm">No removed functions</div>
+                <div className="text-subtle p-2 text-center text-sm">
+                  No removed functions
+                </div>
               )}
             </CollapsibleCardContent>
           )}

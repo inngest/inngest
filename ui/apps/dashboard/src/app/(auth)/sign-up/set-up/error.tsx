@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
-import { Button } from '@inngest/components/Button';
-import { Error as ErrorElement } from '@inngest/components/Error/Error';
-import * as Sentry from '@sentry/nextjs';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { Button } from "@inngest/components/Button";
+import { Error as ErrorElement } from "@inngest/components/Error/Error";
+import * as Sentry from "@sentry/nextjs";
 
 type UserSetupErrorProps = {
   error: Error & { digest?: string };
@@ -17,7 +17,9 @@ export default function UserSetupError({ error }: UserSetupErrorProps) {
   const router = useRouter();
 
   useEffect(() => {
-    Sentry.captureException(new Error('Failed to set up user', { cause: error }));
+    Sentry.captureException(
+      new Error("Failed to set up user", { cause: error }),
+    );
   }, [error]);
 
   return (
@@ -28,7 +30,7 @@ export default function UserSetupError({ error }: UserSetupErrorProps) {
           label="Contact Support"
           appearance="outlined"
           onClick={() => {
-            signOut(() => router.push('/support'));
+            signOut(() => router.push("/support"));
           }}
         />
       }

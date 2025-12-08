@@ -1,8 +1,13 @@
-import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/agent-kit';
-import { z } from 'zod';
+import {
+  anthropic,
+  createAgent,
+  createTool,
+  type AnyZodType,
+} from "@inngest/agent-kit";
+import { z } from "zod";
 
-import type { InsightsAgentState } from '../types';
-import systemPrompt from './system.md';
+import type { InsightsAgentState } from "../types";
+import systemPrompt from "./system.md";
 
 const SelectEventsParams = z.object({
   events: z
@@ -10,17 +15,17 @@ const SelectEventsParams = z.object({
       z.object({
         event_name: z.string(),
         reason: z.string(),
-      })
+      }),
     )
     .min(1)
     .max(6)
     .describe(
-      "An array of 1-6 event names selected from the list of available events that best match the user's intent."
+      "An array of 1-6 event names selected from the list of available events that best match the user's intent.",
     ),
 });
 
 export const selectEventsTool = createTool({
-  name: 'select_events',
+  name: "select_events",
   description:
     "Select 1-6 event names from the provided list that are most relevant to the user's query.",
   parameters: SelectEventsParams as unknown as AnyZodType, // (ted): need to align zod version; version 3.25 does not support same types as 3.22
@@ -29,7 +34,7 @@ export const selectEventsTool = createTool({
     if (!Array.isArray(events) || events.length === 0) {
       return {
         selected: [],
-        reason: 'No events selected.',
+        reason: "No events selected.",
         totalCandidates: network.state.data.eventTypes?.length || 0,
       };
     }
@@ -57,24 +62,27 @@ export const selectEventsTool = createTool({
 });
 
 export const eventMatcherAgent = createAgent<InsightsAgentState>({
-  name: 'Insights Event Matcher',
-  description: "Analyzes available events and selects 1-5 that best match the user's intent.",
+  name: "Insights Event Matcher",
+  description:
+    "Analyzes available events and selects 1-5 that best match the user's intent.",
   system: async ({ network }): Promise<string> => {
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
 
     const eventsList = sample.length
-      ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
-      : 'No event list is available. Ask the user to clarify which events they are interested in.';
+      ? `Available events (${
+          events.length
+        } total, showing up to 500):\n${sample.join("\n")}`
+      : "No event list is available. Ask the user to clarify which events they are interested in.";
 
     return `${systemPrompt}\n\n${eventsList}`;
   },
   model: anthropic({
-    model: 'claude-haiku-4-5',
+    model: "claude-haiku-4-5",
     defaultParameters: {
       max_tokens: 4096,
     },
   }),
   tools: [selectEventsTool],
-  tool_choice: 'select_events',
+  tool_choice: "select_events",
 });

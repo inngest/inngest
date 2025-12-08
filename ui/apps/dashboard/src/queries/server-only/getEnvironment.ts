@@ -1,6 +1,9 @@
-import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { workspacesToEnvironments, type Environment } from '@/utils/environments';
+import { graphql } from "@/gql";
+import graphqlAPI from "@/queries/graphqlAPI";
+import {
+  workspacesToEnvironments,
+  type Environment,
+} from "@/utils/environments";
 
 const GetEnvironmentBySlugDocument = graphql(`
   query GetEnvironmentBySlug($slug: String!) {
@@ -54,7 +57,9 @@ export async function getEnvironment({
 
   const environment = workspacesToEnvironments([query.envBySlug])[0];
   if (!environment) {
-    throw new Error(`Failed to convert workspace "${environmentSlug}" to environment`);
+    throw new Error(
+      `Failed to convert workspace "${environmentSlug}" to environment`,
+    );
   }
 
   return environment;

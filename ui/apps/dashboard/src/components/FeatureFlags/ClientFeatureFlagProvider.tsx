@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createContext, useEffect, useState } from 'react';
-import { useOrganization, useUser } from '@clerk/nextjs';
-import { useLDClient, withLDProvider } from 'launchdarkly-react-client-sdk';
+import { createContext, useEffect, useState } from "react";
+import { useOrganization, useUser } from "@clerk/nextjs";
+import { useLDClient, withLDProvider } from "launchdarkly-react-client-sdk";
 
 export const IdentificationContext = createContext({ isIdentified: false });
 
@@ -24,7 +24,7 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
 
     client
       .identify({
-        kind: 'multi',
+        kind: "multi",
         account: {
           key: accountID,
           name: organization.name,
@@ -32,7 +32,7 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
         user: {
           anonymous: false,
           key: externalID,
-          name: userName ?? 'Unknown',
+          name: userName ?? "Unknown",
         },
       })
       .then(() => {
@@ -53,8 +53,8 @@ let clientSideID: string;
 if (process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID) {
   clientSideID = process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID;
 } else {
-  console.error('missing NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID');
-  clientSideID = 'missing';
+  console.error("missing NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID");
+  clientSideID = "missing";
 }
 
 export const ClientFeatureFlagProvider = withLDProvider<any>({

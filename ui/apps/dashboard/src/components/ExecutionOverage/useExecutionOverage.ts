@@ -1,21 +1,25 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { trackEvent, useTrackingUser } from '@/utils/tracking';
-import { isFreePlan, parseExecutionOverageData, useExecutionOverageCheck } from './data';
+import { trackEvent, useTrackingUser } from "@/utils/tracking";
+import {
+  isFreePlan,
+  parseExecutionOverageData,
+  useExecutionOverageCheck,
+} from "./data";
 
-const STORAGE_KEY = 'executionOverageDismissedUntil';
+const STORAGE_KEY = "executionOverageDismissedUntil";
 
 const shouldShowExecutionCTA = (): boolean => {
-  if (typeof window === 'undefined') return true;
+  if (typeof window === "undefined") return true;
 
   const until = localStorage.getItem(STORAGE_KEY);
   return !until || new Date(until) < new Date();
 };
 
 const dismissExecutionCTA = (hours = 24): void => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   const until = new Date();
   until.setHours(until.getHours() + hours);
@@ -42,16 +46,16 @@ export function useExecutionOverage() {
 
       if (trackingUser) {
         trackEvent({
-          name: 'app/upsell.execution.overage.dismissed',
+          name: "app/upsell.execution.overage.dismissed",
           data: {
-            variant: 'banner',
+            variant: "banner",
           },
           user: trackingUser,
-          v: '2025-07-14.1',
+          v: "2025-07-14.1",
         });
       }
     },
-    [trackingUser]
+    [trackingUser],
   );
 
   const isBannerVisible =

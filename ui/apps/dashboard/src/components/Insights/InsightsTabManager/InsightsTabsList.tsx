@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Tabs from '@inngest/components/Tabs/Tabs';
+import { useState } from "react";
+import Tabs from "@inngest/components/Tabs/Tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@inngest/components/Tooltip';
+} from "@inngest/components/Tooltip";
 import {
   RiAddLine,
   RiBookReadLine,
@@ -16,17 +16,17 @@ import {
   RiContractLeftLine,
   RiExpandRightLine,
   RiHome4Line,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
-import { useSaveTabActions } from '@/components/Insights/InsightsSQLEditor/SaveTabContext';
-import { KeyboardShortcutTooltip } from '@/components/Insights/KeyboardShortcutTooltip';
-import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import type { Tab } from '@/components/Insights/types';
-import { hasUnsavedChanges } from './InsightsTabManager';
-import { TabContextMenu } from './TabContextMenu';
-import { useTabManagerActions } from './TabManagerContext';
-import { UnsavedChangesModal } from './UnsavedChangesModal';
-import { HOME_TAB, TEMPLATES_TAB } from './constants';
+import { useSaveTabActions } from "@/components/Insights/InsightsSQLEditor/SaveTabContext";
+import { KeyboardShortcutTooltip } from "@/components/Insights/KeyboardShortcutTooltip";
+import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
+import type { Tab } from "@/components/Insights/types";
+import { hasUnsavedChanges } from "./InsightsTabManager";
+import { TabContextMenu } from "./TabContextMenu";
+import { useTabManagerActions } from "./TabManagerContext";
+import { UnsavedChangesModal } from "./UnsavedChangesModal";
+import { HOME_TAB, TEMPLATES_TAB } from "./constants";
 
 /**
  * Filters a list of tab IDs to return only tabs with unsaved changes
@@ -34,11 +34,14 @@ import { HOME_TAB, TEMPLATES_TAB } from './constants';
 function getTabsWithUnsavedChanges(
   tabIds: string[],
   allTabs: Tab[],
-  queriesData: ReturnType<typeof useStoredQueries>['queries']['data']
+  queriesData: ReturnType<typeof useStoredQueries>["queries"]["data"],
 ): Tab[] {
   return tabIds
     .map((id) => allTabs.find((t) => t.id === id))
-    .filter((tab): tab is Tab => tab !== undefined && hasUnsavedChanges(queriesData, tab));
+    .filter(
+      (tab): tab is Tab =>
+        tab !== undefined && hasUnsavedChanges(queriesData, tab),
+    );
 }
 
 interface InsightsTabsListProps {
@@ -59,13 +62,23 @@ export function InsightsTabsList({
   const { saveTab } = useSaveTabActions();
   const [pendingCloseTabIds, setPendingCloseTabIds] = useState<string[]>([]);
 
-  const ActionTabIcon = isQueryHelperPanelVisible ? RiContractLeftLine : RiExpandRightLine;
+  const ActionTabIcon = isQueryHelperPanelVisible
+    ? RiContractLeftLine
+    : RiExpandRightLine;
   // Get all tabs with unsaved changes that are pending close
-  const unsavedTabsPendingClose = getTabsWithUnsavedChanges(pendingCloseTabIds, tabs, queries.data);
+  const unsavedTabsPendingClose = getTabsWithUnsavedChanges(
+    pendingCloseTabIds,
+    tabs,
+    queries.data,
+  );
 
   const processPendingCloseTabs = (tabIdsToClose: string[]) => {
     // Find all tabs with unsaved changes
-    const tabsWithUnsavedChanges = getTabsWithUnsavedChanges(tabIdsToClose, tabs, queries.data);
+    const tabsWithUnsavedChanges = getTabsWithUnsavedChanges(
+      tabIdsToClose,
+      tabs,
+      queries.data,
+    );
 
     if (tabsWithUnsavedChanges.length > 0) {
       // Show bulk confirmation modal for all unsaved tabs
@@ -110,7 +123,10 @@ export function InsightsTabsList({
       tabManagerActions.closeTab(id);
     });
 
-    if (!encounteredError && savedTabIds.length === unsavedTabsPendingClose.length) {
+    if (
+      !encounteredError &&
+      savedTabIds.length === unsavedTabsPendingClose.length
+    ) {
       // All tabs saved and closed successfully, close any remaining tabs without unsaved changes
       pendingCloseTabIds
         .filter((id) => !savedTabIds.includes(id))
@@ -120,13 +136,18 @@ export function InsightsTabsList({
       setPendingCloseTabIds([]);
     } else {
       // Update pending list to only include tabs that weren't saved
-      setPendingCloseTabIds((prev) => prev.filter((id) => !savedTabIds.includes(id)));
+      setPendingCloseTabIds((prev) =>
+        prev.filter((id) => !savedTabIds.includes(id)),
+      );
     }
   };
 
   return (
     <>
-      <TabContextMenu tabs={tabs} onProcessPendingCloseTabs={processPendingCloseTabs}>
+      <TabContextMenu
+        tabs={tabs}
+        onProcessPendingCloseTabs={processPendingCloseTabs}
+      >
         {({ handleContextMenu }) => (
           <TooltipProvider>
             <Tabs
@@ -148,7 +169,9 @@ export function InsightsTabsList({
                 <Tabs.IconTab
                   icon={<ActionTabIcon size={16} />}
                   onClick={onToggleQueryHelperPanelVisibility}
-                  title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
+                  title={`${
+                    isQueryHelperPanelVisible ? "Hide" : "Show"
+                  } sidebar`}
                 />
                 <Tabs.IconTab
                   icon={<RiHome4Line size={16} />}
@@ -178,7 +201,10 @@ export function InsightsTabsList({
                     </TooltipTrigger>
                     <TooltipContent>
                       Add new tab (
-                      <KeyboardShortcutTooltip combo={{ alt: true, key: 'T', metaOrCtrl: true }} />)
+                      <KeyboardShortcutTooltip
+                        combo={{ alt: true, key: "T", metaOrCtrl: true }}
+                      />
+                      )
                     </TooltipContent>
                   </Tooltip>
                 </div>

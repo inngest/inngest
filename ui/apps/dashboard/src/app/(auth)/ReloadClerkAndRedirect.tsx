@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 
-import LoadingIcon from '@/icons/LoadingIcon';
+import LoadingIcon from "@/icons/LoadingIcon";
 
 type ReloadClerkAndRedirectProps = {
   redirectURL: string;
@@ -16,7 +16,9 @@ type ReloadClerkAndRedirectProps = {
  *
  * @param {string} redirectURL - The URL to redirect to after reloading Clerk
  */
-export default function ReloadClerkAndRedirect({ redirectURL }: ReloadClerkAndRedirectProps) {
+export default function ReloadClerkAndRedirect({
+  redirectURL,
+}: ReloadClerkAndRedirectProps) {
   const { isLoaded, user } = useUser();
 
   useEffect(() => {

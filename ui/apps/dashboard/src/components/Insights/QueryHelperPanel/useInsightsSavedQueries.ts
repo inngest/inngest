@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo } from 'react';
-import { useQuery, type CombinedError } from 'urql';
+import { useCallback, useMemo } from "react";
+import { useQuery, type CombinedError } from "urql";
 
-import { graphql } from '@/gql';
-import type { InsightsQueryStatement } from '@/gql/graphql';
+import { graphql } from "@/gql";
+import type { InsightsQueryStatement } from "@/gql/graphql";
 import {
   useModifySavedQueries,
   type DeleteQueryArgs,
@@ -12,7 +12,7 @@ import {
   type SaveQueryArgs,
   type ShareQueryArgs,
   type UpdateQueryArgs,
-} from './useModifySavedQueries';
+} from "./useModifySavedQueries";
 
 const insightsSavedQueriesQuery = graphql(`
   query InsightsSavedQueries {
@@ -37,20 +37,30 @@ export interface UseInsightsSavedQueriesReturn {
   refetchSavedQueries: () => void;
   savedQueries: undefined | InsightsQueryStatement[];
   savedQueriesError: undefined | CombinedError;
-  saveQuery: (args: SaveQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  shareQuery: (args: ShareQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
-  updateQuery: (args: UpdateQueryArgs) => Promise<MutationResult<InsightsQueryStatement>>;
+  saveQuery: (
+    args: SaveQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  shareQuery: (
+    args: ShareQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
+  updateQuery: (
+    args: UpdateQueryArgs,
+  ) => Promise<MutationResult<InsightsQueryStatement>>;
 }
 
 export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
   const [result, reexecute] = useQuery({ query: insightsSavedQueriesQuery });
-  const { deleteQuery, saveQuery, shareQuery, updateQuery } = useModifySavedQueries();
+  const { deleteQuery, saveQuery, shareQuery, updateQuery } =
+    useModifySavedQueries();
 
   const refetchSavedQueries = useCallback(() => {
-    reexecute({ requestPolicy: 'network-only' });
+    reexecute({ requestPolicy: "network-only" });
   }, [reexecute]);
 
-  const savedQueries = useMemo(() => result.data?.account.insightsQueries, [result.data]);
+  const savedQueries = useMemo(
+    () => result.data?.account.insightsQueries,
+    [result.data],
+  );
 
   return {
     deleteQuery,

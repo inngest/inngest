@@ -1,13 +1,13 @@
-import { Header } from '@inngest/components/Header/Header';
+import { Header } from "@inngest/components/Header/Header";
 
-import Environments from '@/components/Environments/Environments';
-import Layout from '@/components/Layout/Layout';
+import Environments from "@/components/Environments/Environments";
+import Layout from "@/components/Layout/Layout";
 
 export default async function EnvsPage() {
   return (
     <Layout>
       <div className="flex-col">
-        <Header backNav={true} breadcrumb={[{ text: 'All Environments' }]} />
+        <Header backNav={true} breadcrumb={[{ text: "All Environments" }]} />
         <div className="no-scrollbar overflow-y-scroll px-6">
           <Environments />
         </div>

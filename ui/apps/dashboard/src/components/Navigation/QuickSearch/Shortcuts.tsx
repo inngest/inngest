@@ -8,14 +8,20 @@ import {
   RiPlugLine,
   RiSunLine,
   RiWindow2Line,
-} from '@remixicon/react';
-import { Command } from 'cmdk';
-import { useTheme } from 'next-themes';
+} from "@remixicon/react";
+import { Command } from "cmdk";
+import { useTheme } from "next-themes";
 
-import { DISCORD_URL, pathCreator } from '@/utils/urls';
-import { ResultItem } from './ResultItem';
+import { DISCORD_URL, pathCreator } from "@/utils/urls";
+import { ResultItem } from "./ResultItem";
 
-export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; envSlug: string }) {
+export default function Shortcuts({
+  onClose,
+  envSlug,
+}: {
+  onClose: () => void;
+  envSlug: string;
+}) {
   const { theme, setTheme } = useTheme();
   return (
     <>
@@ -63,10 +69,10 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
           value="sync-new-app"
           icon={<RiAddLine />}
         />
-        {theme !== 'dark' && (
+        {theme !== "dark" && (
           <ResultItem
             onClick={() => {
-              setTheme('dark');
+              setTheme("dark");
               onClose();
             }}
             text="Switch to dark mode"
@@ -74,10 +80,10 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
             icon={<RiMoonClearFill />}
           />
         )}
-        {theme !== 'light' && (
+        {theme !== "light" && (
           <ResultItem
             onClick={() => {
-              setTheme('light');
+              setTheme("light");
               onClose();
             }}
             text="Switch to light mode"
@@ -85,10 +91,10 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
             icon={<RiSunLine />}
           />
         )}
-        {theme !== 'system' && (
+        {theme !== "system" && (
           <ResultItem
             onClick={() => {
-              setTheme('system');
+              setTheme("system");
               onClose();
             }}
             text="Switch to system mode"
@@ -97,10 +103,13 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
           />
         )}
       </Command.Group>
-      <Command.Group heading="Help" className="text-muted text-xs [&_[cmdk-group-heading]]:mb-1">
+      <Command.Group
+        heading="Help"
+        className="text-muted text-xs [&_[cmdk-group-heading]]:mb-1"
+      >
         <ResultItem
           onClick={onClose}
-          path={'https://www.inngest.com/docs?ref=app-cmdk'}
+          path={"https://www.inngest.com/docs?ref=app-cmdk"}
           text="Go to documentation"
           value="go-to-documentation-docs"
           icon={<RiExternalLinkLine />}

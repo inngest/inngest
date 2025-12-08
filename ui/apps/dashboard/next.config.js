@@ -1,5 +1,5 @@
 // @ts-check
-const { withSentryConfig } = require('@sentry/nextjs');
+const { withSentryConfig } = require("@sentry/nextjs");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -10,79 +10,79 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'img.clerk.com',
+        protocol: "https",
+        hostname: "img.clerk.com",
       },
     ],
   },
-  transpilePackages: ['@inngest/components'],
+  transpilePackages: ["@inngest/components"],
   async redirects() {
     return [
       {
-        source: '/',
-        destination: '/env/production/apps',
+        source: "/",
+        destination: "/env/production/apps",
         permanent: false,
       },
       {
-        source: '/env/:slug/manage',
-        destination: '/env/:slug/manage/keys',
+        source: "/env/:slug/manage",
+        destination: "/env/:slug/manage/keys",
         permanent: false,
       },
       {
-        source: '/env/:slug/onboarding',
-        destination: '/env/production/onboarding/create-app',
+        source: "/env/:slug/onboarding",
+        destination: "/env/production/onboarding/create-app",
         permanent: false,
       },
       {
-        source: '/env/:slug((?!production)[^/]+)/onboarding/:step',
-        destination: '/env/:slug/apps',
+        source: "/env/:slug((?!production)[^/]+)/onboarding/:step",
+        destination: "/env/:slug/apps",
         permanent: false,
       },
       {
-        source: '/integrations/vercel',
-        destination: '/integrations/vercel/callback',
+        source: "/integrations/vercel",
+        destination: "/integrations/vercel/callback",
         permanent: false,
       },
       {
-        source: '/settings/billing',
-        destination: '/billing',
+        source: "/settings/billing",
+        destination: "/billing",
         permanent: false,
       },
       {
-        source: '/login',
-        destination: '/sign-in',
+        source: "/login",
+        destination: "/sign-in",
         permanent: false,
       },
       {
-        source: '/reset-password/reset',
-        destination: '/sign-in',
+        source: "/reset-password/reset",
+        destination: "/sign-in",
         permanent: false,
       },
       // Legacy Pages
       {
-        source: '/env/:slug/deploys',
-        destination: '/env/:slug/apps',
+        source: "/env/:slug/deploys",
+        destination: "/env/:slug/apps",
         permanent: false,
       },
       {
-        source: '/settings/team',
-        destination: '/settings/organization',
+        source: "/settings/team",
+        destination: "/settings/organization",
         permanent: false,
       },
       {
-        source: '/env/:slug/events/:name/logs/:rest*',
-        destination: '/env/:slug/event-types/:name/events',
+        source: "/env/:slug/events/:name/logs/:rest*",
+        destination: "/env/:slug/event-types/:name/events",
         permanent: false,
       },
       // Legacy signing key locations
       {
-        source: '/secrets',
-        destination: '/env/production/manage/signing-key',
+        source: "/secrets",
+        destination: "/env/production/manage/signing-key",
         permanent: false,
       },
       {
-        source: '/test/secrets',
-        destination: '/env/branch/manage/signing-key',
+        source: "/test/secrets",
+        destination: "/env/branch/manage/signing-key",
         permanent: false,
       },
     ];
@@ -92,7 +92,7 @@ const nextConfig = {
   sentry: {
     hideSourceMaps: false,
     // Tunnel sentry events to help circumvent ad-blockers.
-    tunnelRoute: '/api/sentry',
+    tunnelRoute: "/api/sentry",
   },
   webpack(config, { isServer }) {
     // Configures webpack to handle SVG files with SVGR. SVGR optimizes and transforms SVG files
@@ -100,7 +100,9 @@ const nextConfig = {
 
     // Grab the existing rule that handles SVG imports
     // @ts-ignore - this is a private property that is not typed
-    const fileLoaderRule = config.module.rules.find((rule) => rule.test?.test?.('.svg'));
+    const fileLoaderRule = config.module.rules.find((rule) =>
+      rule.test?.test?.(".svg"),
+    );
 
     config.module.rules.push(
       // Reapply the existing rule, but only for svg imports ending in ?url
@@ -114,13 +116,13 @@ const nextConfig = {
         test: /\.svg$/i,
         issuer: fileLoaderRule.issuer,
         resourceQuery: { not: [...fileLoaderRule.resourceQuery.not, /url/] }, // exclude if *.svg?url
-        use: ['@svgr/webpack'],
+        use: ["@svgr/webpack"],
       },
       // Import markdown files as raw strings
       {
         test: /\.md$/i,
-        type: 'asset/source',
-      }
+        type: "asset/source",
+      },
     );
 
     // Modify the file loader rule to ignore *.svg, since we have it handled now.

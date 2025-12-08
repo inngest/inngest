@@ -1,25 +1,26 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { ContextualBanner } from '@inngest/components/Banner';
-import { Button } from '@inngest/components/Button';
-import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
+import { useMemo } from "react";
+import { ContextualBanner } from "@inngest/components/Banner";
+import { Button } from "@inngest/components/Button";
+import { useBooleanLocalStorage } from "@inngest/components/hooks/useBooleanLocalStorage";
 
 // import { type EntitlementUsageQuery } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
-import { parseEntitlementUsage } from './parse';
+import { pathCreator } from "@/utils/urls";
+import { parseEntitlementUsage } from "./parse";
 
 export function BillingBannerView({}: // entitlementUsage,
 {
   // entitlementUsage: EntitlementUsageQuery['account']['entitlements'];
 }) {
-  const { bannerMessage, bannerSeverity, items } = parseEntitlementUsage(/*entitlementUsage*/);
+  const { bannerMessage, bannerSeverity, items } =
+    parseEntitlementUsage(/*entitlementUsage*/);
 
-  const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
+  const isVisible = useBooleanLocalStorage("BillingBanner:visible", true);
 
   const onDismiss = useMemo(() => {
     // Error banners can't be dismissed.
-    if (bannerSeverity === 'error') {
+    if (bannerSeverity === "error") {
       return;
     }
 
@@ -29,7 +30,7 @@ export function BillingBannerView({}: // entitlementUsage,
   }, [bannerSeverity, isVisible]);
 
   // Error banners are always visible.
-  if (!isVisible.value && bannerSeverity !== 'error') {
+  if (!isVisible.value && bannerSeverity !== "error") {
     return null;
   }
 
@@ -51,7 +52,10 @@ export function BillingBannerView({}: // entitlementUsage,
       cta={
         <Button
           appearance="outlined"
-          href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-banner' })}
+          href={pathCreator.billing({
+            tab: "plans",
+            ref: "app-billing-banner",
+          })}
           kind="secondary"
           label="Upgrade plan"
         />

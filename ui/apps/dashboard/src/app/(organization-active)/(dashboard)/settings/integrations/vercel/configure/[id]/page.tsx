@@ -1,16 +1,25 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import NextLink from 'next/link';
-import { useParams } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button/index';
-import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link/Link';
-import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch/Switch';
-import { RiAddLine, RiArrowRightSLine, RiDeleteBinLine, RiInformationLine } from '@remixicon/react';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useCallback, useEffect, useState } from "react";
+import NextLink from "next/link";
+import { useParams } from "next/navigation";
+import { Alert } from "@inngest/components/Alert/Alert";
+import { Button } from "@inngest/components/Button/index";
+import { Input } from "@inngest/components/Forms/Input";
+import { Link } from "@inngest/components/Link/Link";
+import {
+  Switch,
+  SwitchLabel,
+  SwitchWrapper,
+} from "@inngest/components/Switch/Switch";
+import {
+  RiAddLine,
+  RiArrowRightSLine,
+  RiDeleteBinLine,
+  RiInformationLine,
+} from "@remixicon/react";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
 import {
   CreateVercelAppDocument,
@@ -18,12 +27,12 @@ import {
   UpdateVercelAppDocument,
   VercelDeploymentProtection,
   type VercelProject,
-} from '@/gql/graphql';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useDefaultEnvironment } from '@/queries';
-import { useVercelIntegration } from '../../useVercelIntegration';
+} from "@/gql/graphql";
+import LoadingIcon from "@/icons/LoadingIcon";
+import { useDefaultEnvironment } from "@/queries";
+import { useVercelIntegration } from "../../useVercelIntegration";
 
-const defaultPath = '/api/inngest';
+const defaultPath = "/api/inngest";
 
 export default function VercelConfigure() {
   const [{ data: defaultEnv }] = useDefaultEnvironment();
@@ -55,7 +64,7 @@ export default function VercelConfigure() {
     // have been made as those operations are not idempotent upstream.
     const p = data.projects.find((p) => p.projectID === id);
     if (p) {
-      p.servePath && setPaths(p.servePath.split(','));
+      p.servePath && setPaths(p.servePath.split(","));
       setOriginalProject(p);
       setNotFound(false);
     } else {
@@ -75,7 +84,7 @@ export default function VercelConfigure() {
   }, [project]);
 
   useEffect(() => {
-    project && setProject({ ...project, servePath: paths.join(',') });
+    project && setProject({ ...project, servePath: paths.join(",") });
     //
     // we only want to track updates on paths changes, not project
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,18 +92,21 @@ export default function VercelConfigure() {
 
   const submit = useCallback(async () => {
     if (!defaultEnvID) {
-      console.error('no environment found');
+      console.error("no environment found");
       return;
     }
     if (!project) {
-      console.error('no project found');
+      console.error("no project found");
       return;
     }
     setMutating(true);
 
     //
     // if there are other change and isEnabled is still false, this is a no-op
-    if (project.isEnabled === originalProject?.isEnabled && !project.isEnabled) {
+    if (
+      project.isEnabled === originalProject?.isEnabled &&
+      !project.isEnabled
+    ) {
       setMutating(false);
       return;
     }
@@ -123,7 +135,9 @@ export default function VercelConfigure() {
               projectID: project.projectID,
               path: project.servePath,
               protectionBypassSecret: project.protectionBypassSecret,
-              originOverride: project.originOverride ? project.originOverride : undefined,
+              originOverride: project.originOverride
+                ? project.originOverride
+                : undefined,
             },
           });
 
@@ -136,9 +150,16 @@ export default function VercelConfigure() {
 
       //
       // TODO: new designs
-      toast.success('Changes saved!');
+      toast.success("Changes saved!");
     }
-  }, [createVercelApp, defaultEnvID, project, removeVercelApp, updateVercelApp, originalProject]);
+  }, [
+    createVercelApp,
+    defaultEnvID,
+    project,
+    removeVercelApp,
+    updateVercelApp,
+    originalProject,
+  ]);
 
   // Only show the "extra" settings (stuff besides the enablement toggle) if the
   // project is enabled. This is mostly because not all extra inputs are saved
@@ -180,7 +201,7 @@ export default function VercelConfigure() {
             <RiArrowRightSLine className="text-disabled h-4" />
             <NextLink
               href={{
-                pathname: '/settings/integrations/vercel',
+                pathname: "/settings/integrations/vercel",
                 query: { ts: Date.now() },
               }}
               prefetch={false}
@@ -190,21 +211,26 @@ export default function VercelConfigure() {
             <RiArrowRightSLine className="text-disabled h-4" />
             <div className="text-basis text-base">{project.name}</div>
           </div>
-          <div className="text-basis mb-2 mt-6 text-2xl font-medium">{project.name}</div>
-          {project.deploymentProtection !== VercelDeploymentProtection.Disabled && (
+          <div className="text-basis mb-2 mt-6 text-2xl font-medium">
+            {project.name}
+          </div>
+          {project.deploymentProtection !==
+            VercelDeploymentProtection.Disabled && (
             <div className="text-accent-intense mb-7 flex flex-row items-center justify-start text-sm leading-tight">
               <RiInformationLine className="mr-1 h-4 w-4" />
-              Vercel Deployment Protection might block syncing. Use the deployment protection key
-              option below to bypass.
+              Vercel Deployment Protection might block syncing. Use the
+              deployment protection key option below to bypass.
             </div>
           )}
 
           {project.canChangeEnabled && (
             <div className="border-subtle flex flex-col gap-2 rounded-md border p-6">
-              <div className="text-basis text-lg font-medium">Project status</div>
+              <div className="text-basis text-lg font-medium">
+                Project status
+              </div>
               <div className="text-muted text-base font-normal">
-                This determines whether or not Inngest will communicate with your Vercel
-                application.
+                This determines whether or not Inngest will communicate with
+                your Vercel application.
               </div>
               <SwitchWrapper>
                 <Switch
@@ -214,8 +240,11 @@ export default function VercelConfigure() {
                     setProject({ ...project, isEnabled: checked });
                   }}
                 />
-                <SwitchLabel htmlFor="override" className="text-muted text-sm leading-tight">
-                  {project.isEnabled ? 'Enabled' : 'Disabled'}
+                <SwitchLabel
+                  htmlFor="override"
+                  className="text-muted text-sm leading-tight"
+                >
+                  {project.isEnabled ? "Enabled" : "Disabled"}
                 </SwitchLabel>
               </SwitchWrapper>
             </div>
@@ -224,13 +253,18 @@ export default function VercelConfigure() {
           {areExtraSettingsVisible && (
             <>
               <div className="border-subtle mt-4 flex flex-col gap-2 rounded-md border p-6">
-                <div className="text-basis text-lg font-medium">Path information</div>
+                <div className="text-basis text-lg font-medium">
+                  Path information
+                </div>
                 <div className="text-muted text-base font-normal">
-                  Each Vercel project can serve one or more Inngest apps available on different URL
-                  paths.
+                  Each Vercel project can serve one or more Inngest apps
+                  available on different URL paths.
                 </div>
                 {paths.map((path, i) => (
-                  <div key={`serve-path-${i}`} className="flex flex-row items-center justify-start">
+                  <div
+                    key={`serve-path-${i}`}
+                    className="flex flex-row items-center justify-start"
+                  >
                     <div className="mr-2 w-full">
                       <Input
                         defaultValue={path}
@@ -248,7 +282,9 @@ export default function VercelConfigure() {
                         appearance="outlined"
                         icon={<RiDeleteBinLine className="h-5 w-5" />}
                         className="h-10 w-10"
-                        onClick={() => setPaths(paths.filter((_, n) => n !== i))}
+                        onClick={() =>
+                          setPaths(paths.filter((_, n) => n !== i))
+                        }
                       />
                     )}
                   </div>
@@ -262,7 +298,7 @@ export default function VercelConfigure() {
                     className="mt-3"
                     onClick={() => {
                       setProject({ ...project });
-                      setPaths([...paths, '']);
+                      setPaths([...paths, ""]);
                     }}
                   />
                 </div>
@@ -271,9 +307,11 @@ export default function VercelConfigure() {
                 <div
                   className={`border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6`}
                 >
-                  <div className="text-basis text-lg font-medium">Deployment protection key</div>
+                  <div className="text-basis text-lg font-medium">
+                    Deployment protection key
+                  </div>
                   <div className="text-muted text-base font-normal">
-                    Used to bypass deployment protection.{' '}
+                    Used to bypass deployment protection.{" "}
                     <Link
                       size="medium"
                       target="_blank"
@@ -287,21 +325,22 @@ export default function VercelConfigure() {
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, protectionBypassSecret: value })
                     }
-                    value={project.protectionBypassSecret ?? ''}
+                    value={project.protectionBypassSecret ?? ""}
                   />
                 </div>
                 <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6">
                   <div className="text-basis text-lg font-medium">
-                    Custom Production Domain <span className="text-sublte text-xs">(optional)</span>
+                    Custom Production Domain{" "}
+                    <span className="text-sublte text-xs">(optional)</span>
                   </div>
                   <div className="text-muted text-base font-normal">
-                    Set a custom domain to use for production instead of the URL generated by
-                    Vercel.
+                    Set a custom domain to use for production instead of the URL
+                    generated by Vercel.
                   </div>
                   <Input
                     className="text-basis mt-4 h-10 px-2 py-2 text-base"
                     placeholder="Add custom domain"
-                    value={project.originOverride ?? ''}
+                    value={project.originOverride ?? ""}
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, originOverride: value })
                     }
@@ -319,7 +358,9 @@ export default function VercelConfigure() {
               loading={mutating}
             />
             {updated && (
-              <div className="text-muted ml-4 text-[13px] leading-tight">Unsaved changes</div>
+              <div className="text-muted ml-4 text-[13px] leading-tight">
+                Unsaved changes
+              </div>
             )}
           </div>
         </div>

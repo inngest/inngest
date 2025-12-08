@@ -1,9 +1,13 @@
-import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
-import { GraphQLClient, type RequestMiddleware, type ResponseMiddleware } from 'graphql-request';
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
+import {
+  GraphQLClient,
+  type RequestMiddleware,
+  type ResponseMiddleware,
+} from "graphql-request";
 
-import 'server-only';
+import "server-only";
 
 const requestMiddleware: RequestMiddleware = async (request) => {
   const { getToken } = auth();
@@ -21,7 +25,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
     const allCookies = cookies()
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
-      .join('; ');
+      .join("; ");
 
     headers = {
       ...headers,
@@ -42,7 +46,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
  * @see {@link https://beta.nextjs.org/docs/api-reference/notfound#notfound}
  */
 const throwNotFoundError: ResponseMiddleware = (response) => {
-  if (response instanceof Error && response.message.includes('not found')) {
+  if (response instanceof Error && response.message.includes("not found")) {
     notFound();
   }
 };

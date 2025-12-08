@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
+import { useRouter } from "next/navigation";
+import { neonMenuStepContent } from "@inngest/components/PostgresIntegrations/Neon/neonContent";
 import {
   IntegrationSteps,
   STEPS_ORDER,
   isValidStep,
-} from '@inngest/components/PostgresIntegrations/types';
-import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
+} from "@inngest/components/PostgresIntegrations/types";
+import StepsPageHeader from "@inngest/components/Steps/StepsPageHeader";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 export default function PageHeader({
   step,

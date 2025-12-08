@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { Button } from '@inngest/components/Button';
-import { RiExternalLinkLine } from '@remixicon/react';
+import { Button } from "@inngest/components/Button";
+import { RiExternalLinkLine } from "@remixicon/react";
 
-import { SHOW_EXAMPLES_LINK } from '@/components/Insights/temp-flags';
-import { IconLayoutWrapper } from '../IconLayoutWrapper';
+import { SHOW_EXAMPLES_LINK } from "@/components/Insights/temp-flags";
+import { IconLayoutWrapper } from "../IconLayoutWrapper";
 
 export function NoResults() {
   const subheaderPrefix =

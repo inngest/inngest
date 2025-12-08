@@ -1,5 +1,5 @@
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const Query = graphql(`
   query GetSigningKeys($envID: ID!) {

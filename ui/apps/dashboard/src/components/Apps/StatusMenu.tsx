@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import NextLink from 'next/link';
-import { Select } from '@inngest/components/Select/Select';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
+import NextLink from "next/link";
+import { Select } from "@inngest/components/Select/Select";
+import { StatusDot } from "@inngest/components/Status/StatusDot";
 
-export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: boolean }) => {
-  const activeOption = { id: 'active', name: 'Active apps' };
-  const archivedOption = { id: 'archived', name: 'Archived apps' };
+export const StatusMenu = ({
+  envSlug,
+  archived,
+}: {
+  envSlug: string;
+  archived: boolean;
+}) => {
+  const activeOption = { id: "active", name: "Active apps" };
+  const archivedOption = { id: "archived", name: "Archived apps" };
   return (
     <Select
       onChange={() => null}
@@ -18,8 +24,8 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
     >
       <Select.Button className="w-[132px]">
         <div className="flex flex-row items-center gap-2">
-          <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
-          {archived ? 'Archived' : 'Active'}
+          <StatusDot status={archived ? "ARCHIVED" : "ACTIVE"} size="small" />
+          {archived ? "Archived" : "Active"}
         </div>
       </Select.Button>
       <Select.Options>

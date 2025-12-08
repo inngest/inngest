@@ -1,6 +1,6 @@
-'use server';
+"use server";
 
-import { deleteConn } from '@/components/PostgresIntegration/neonData';
+import { deleteConn } from "@/components/PostgresIntegration/neonData";
 
 export async function deleteConnection(id: string) {
   try {
@@ -8,7 +8,10 @@ export async function deleteConnection(id: string) {
 
     return { success: true, error: null };
   } catch (error) {
-    console.error('Error deleting cdc connection:', error);
-    return { success: false, error: 'Error removing Neon integration, please try again later.' };
+    console.error("Error deleting cdc connection:", error);
+    return {
+      success: false,
+      error: "Error removing Neon integration, please try again later.",
+    };
   }
 }

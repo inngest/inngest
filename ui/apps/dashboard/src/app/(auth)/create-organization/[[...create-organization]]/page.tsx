@@ -1,12 +1,12 @@
-import { revalidatePath } from 'next/cache';
-import { CreateOrganization } from '@clerk/nextjs';
+import { revalidatePath } from "next/cache";
+import { CreateOrganization } from "@clerk/nextjs";
 
-import SplitView from '@/app/(auth)/SplitView';
+import SplitView from "@/app/(auth)/SplitView";
 
 export default function CreateOrganizationPage() {
   // We run revalidatePath to clear Next.js cache so that the user doesn't get stale data from a
   // previous organization if they switch organizations.
-  revalidatePath('/', 'layout');
+  revalidatePath("/", "layout");
 
   return (
     <SplitView>

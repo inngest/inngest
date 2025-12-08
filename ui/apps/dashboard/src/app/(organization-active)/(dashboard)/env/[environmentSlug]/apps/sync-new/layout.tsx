@@ -1,4 +1,4 @@
-import { Header } from '@inngest/components/Header/Header';
+import { Header } from "@inngest/components/Header/Header";
 
 type SyncNewLayoutProps = {
   params: {
@@ -14,7 +14,10 @@ export default async function Layout({
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Apps', href: `/env/${environmentSlug}/apps` }, { text: 'Sync new' }]}
+        breadcrumb={[
+          { text: "Apps", href: `/env/${environmentSlug}/apps` },
+          { text: "Sync new" },
+        ]}
       />
       {children}
     </>

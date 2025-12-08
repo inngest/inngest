@@ -1,4 +1,4 @@
-import type { Severity } from '@inngest/components/Banner';
+import type { Severity } from "@inngest/components/Banner";
 
 // import type { EntitlementUsageQuery } from '@/gql/graphql';
 // import { BillingBannerTooltip } from './BillingBannerTooltip';
@@ -117,21 +117,24 @@ class Issues {
     if (this.maxIssueSeverity === IssueSeverity.hardLimitNear) {
       return (
         <>
-          <span className="font-semibold">High usage.</span> You are nearing the usage included in
-          your plan. Please upgrade to avoid service disruption.
+          <span className="font-semibold">High usage.</span> You are nearing the
+          usage included in your plan. Please upgrade to avoid service
+          disruption.
         </>
       );
     } else if (this.maxIssueSeverity === IssueSeverity.hardLimitReached) {
       return (
         <>
-          <span className="font-semibold">Limit exceeded.</span> You have exceeded the usage
-          included in your plan. Please upgrade to avoid service disruption.
+          <span className="font-semibold">Limit exceeded.</span> You have
+          exceeded the usage included in your plan. Please upgrade to avoid
+          service disruption.
         </>
       );
     } else {
       return (
         <>
-          <span className="font-semibold">Limit reached.</span> Performance may be impacted.
+          <span className="font-semibold">Limit reached.</span> Performance may
+          be impacted.
         </>
       );
     }
@@ -139,10 +142,10 @@ class Issues {
 
   getBannerSeverity(): Severity {
     if (this.maxIssueSeverity === IssueSeverity.hardLimitReached) {
-      return 'error';
+      return "error";
     }
 
-    return 'warning';
+    return "warning";
   }
 
   getItems(): [string, React.ReactNode][] {

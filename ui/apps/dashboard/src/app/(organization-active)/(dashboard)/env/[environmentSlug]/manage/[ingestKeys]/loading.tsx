@@ -1,4 +1,4 @@
-import LoadingIcon from '@/icons/LoadingIcon';
+import LoadingIcon from "@/icons/LoadingIcon";
 
 export default function KeysLoading() {
   return (

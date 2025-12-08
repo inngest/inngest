@@ -1,13 +1,14 @@
-'use client';
+"use client";
 
-import { ContextualBanner } from '@inngest/components/Banner';
-import { Button } from '@inngest/components/Button';
+import { ContextualBanner } from "@inngest/components/Banner";
+import { Button } from "@inngest/components/Button";
 
-import { pathCreator } from '@/utils/urls';
-import { useExecutionOverage } from './useExecutionOverage';
+import { pathCreator } from "@/utils/urls";
+import { useExecutionOverage } from "./useExecutionOverage";
 
 export function ExecutionOverageBanner() {
-  const { isBannerVisible, executionOverageData, dismiss } = useExecutionOverage();
+  const { isBannerVisible, executionOverageData, dismiss } =
+    useExecutionOverage();
 
   // Track CTA viewed when banner becomes visible (temporarily disabled).
   // useEffect(() => {
@@ -36,20 +37,28 @@ export function ExecutionOverageBanner() {
       title={
         <>
           <span className="font-semibold">
-            You&apos;ve used {new Intl.NumberFormat().format(executionOverageData.executionCount)}{' '}
-            executions but your plan includes{' '}
+            You&apos;ve used{" "}
+            {new Intl.NumberFormat().format(
+              executionOverageData.executionCount,
+            )}{" "}
+            executions but your plan includes{" "}
             {executionOverageData.executionLimit
-              ? new Intl.NumberFormat().format(executionOverageData.executionLimit)
-              : 'unlimited'}
+              ? new Intl.NumberFormat().format(
+                  executionOverageData.executionLimit,
+                )
+              : "unlimited"}
             .
-          </span>{' '}
+          </span>{" "}
           Upgrade to avoid disruptions.
         </>
       }
       cta={
         <Button
           appearance="outlined"
-          href={pathCreator.billing({ tab: 'plans', ref: 'execution-overage-banner' })}
+          href={pathCreator.billing({
+            tab: "plans",
+            ref: "execution-overage-banner",
+          })}
           kind="secondary"
           label="Upgrade plan"
         />

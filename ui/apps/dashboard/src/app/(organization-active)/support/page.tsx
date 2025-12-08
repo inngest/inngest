@@ -1,24 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { type Route } from 'next';
-import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
-import { Banner } from '@inngest/components/Banner';
-import { Button } from '@inngest/components/Button';
-import { Link } from '@inngest/components/Link';
-import { Pill } from '@inngest/components/Pill/Pill';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiArrowLeftLine, RiGithubFill } from '@remixicon/react';
-import { ThreadStatus, type ThreadPartsFragment } from '@team-plain/typescript-sdk';
-import { useQuery } from 'urql';
+import { useEffect, useState } from "react";
+import { type Route } from "next";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { Banner } from "@inngest/components/Banner";
+import { Button } from "@inngest/components/Button";
+import { Link } from "@inngest/components/Link";
+import { Pill } from "@inngest/components/Pill/Pill";
+import { cn } from "@inngest/components/utils/classNames";
+import { RiArrowLeftLine, RiGithubFill } from "@remixicon/react";
+import {
+  ThreadStatus,
+  type ThreadPartsFragment,
+} from "@team-plain/typescript-sdk";
+import { useQuery } from "urql";
 
-import { isEnterprisePlan } from '@/components/Billing/Plans/utils';
-import { graphql } from '@/gql';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { SupportForm } from './SupportForm';
-import { useSystemStatus } from './statusPage';
-import { type TicketType } from './ticketOptions';
+import { isEnterprisePlan } from "@/components/Billing/Plans/utils";
+import { graphql } from "@/gql";
+import LoadingIcon from "@/icons/LoadingIcon";
+import { SupportForm } from "./SupportForm";
+import { useSystemStatus } from "./statusPage";
+import { type TicketType } from "./ticketOptions";
 
 const GetAccountSupportInfoDocument = graphql(`
   query GetAccountSupportInfo {
@@ -46,7 +49,7 @@ export default function Page() {
   const plan = data?.account.plan;
   const isEnterprise = plan ? isEnterprisePlan(plan) : false;
   const isPaid = (plan?.amount || 0) > 0 || isEnterprise;
-  const preselectedTicketType = searchParams.get('q') as TicketType;
+  const preselectedTicketType = searchParams.get("q") as TicketType;
 
   return (
     <div className="h-full overflow-y-scroll">
@@ -59,14 +62,15 @@ export default function Page() {
             kind="secondary"
             icon={<RiArrowLeftLine />}
             iconSide="left"
-            label={isSignedIn ? 'Back To Dashboard' : 'Sign In To Dashboard'}
+            label={isSignedIn ? "Back To Dashboard" : "Sign In To Dashboard"}
           />
         </div>
         {/* Thanksgiving banner for limited support availability, won't show after November 29 and will removed this after */}
-        {new Date() < new Date('2025-11-29') && (
+        {new Date() < new Date("2025-11-29") && (
           <Banner severity="info" showIcon={false}>
-            In observance of Thanksgiving, our support team will have limited availability from
-            November 26–28. Thank you for your patience as response times may be delayed.
+            In observance of Thanksgiving, our support team will have limited
+            availability from November 26–28. Thank you for your patience as
+            response times may be delayed.
           </Banner>
         )}
         <header className="border-subtle flex items-center justify-between border-b py-6">
@@ -101,12 +105,16 @@ export default function Page() {
                 <div className="flex gap-2">
                   <Button
                     kind="primary"
-                    href={`${process.env.NEXT_PUBLIC_SIGN_IN_PATH}?ref=support` as Route}
+                    href={
+                      `${process.env.NEXT_PUBLIC_SIGN_IN_PATH}?ref=support` as Route
+                    }
                     label="Sign In"
                   />
                   <Button
                     kind="primary"
-                    href={`${process.env.NEXT_PUBLIC_SIGN_UP_PATH}?ref=support` as Route}
+                    href={
+                      `${process.env.NEXT_PUBLIC_SIGN_UP_PATH}?ref=support` as Route
+                    }
                     label="Sign Up"
                   />
                 </div>
@@ -129,13 +137,14 @@ export default function Page() {
               </div>
             ) : isEnterprise ? (
               <p>
-                Create a general request support ticket to request a dedicated Slack or Discord
-                channel with the Inngest team.
+                Create a general request support ticket to request a dedicated
+                Slack or Discord channel with the Inngest team.
               </p>
             ) : (
               <p>
-                Enterprise plans include live chat support including dedicated Slack channel and
-                support SLAs. To chat with someone about our enterprise plans,{' '}
+                Enterprise plans include live chat support including dedicated
+                Slack channel and support SLAs. To chat with someone about our
+                enterprise plans,{" "}
                 <Link
                   size="medium"
                   target="_blank"
@@ -151,7 +160,7 @@ export default function Page() {
 
           <SupportChannel title="Community">
             <p>
-              Chat with other developers and the Inngest team in our{' '}
+              Chat with other developers and the Inngest team in our{" "}
               <Link
                 target="_blank"
                 href="https://www.inngest.com/discord"
@@ -160,7 +169,7 @@ export default function Page() {
               >
                 Discord community
               </Link>
-              . Search for topics and questions in our{' '}
+              . Search for topics and questions in our{" "}
               <Link
                 href="https://discord.com/channels/842170679536517141/1051516534029291581"
                 className="inline-flex"
@@ -168,7 +177,7 @@ export default function Page() {
                 size="medium"
               >
                 #help-forum
-              </Link>{' '}
+              </Link>{" "}
               channel or submit your own question.
             </p>
             <Button
@@ -181,7 +190,9 @@ export default function Page() {
           <SupportChannel title="Open Source">
             <p>File an issue in our open source repos on Github:</p>
             <div>
-              <p className="mb-2 text-sm font-medium">Inngest CLI + Dev Server</p>
+              <p className="mb-2 text-sm font-medium">
+                Inngest CLI + Dev Server
+              </p>
               <Button
                 appearance="outlined"
                 kind="secondary"
@@ -214,7 +225,7 @@ export default function Page() {
 function SupportChannel({
   title,
   label,
-  className = '',
+  className = "",
   children,
 }: {
   title: string;
@@ -223,7 +234,7 @@ function SupportChannel({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('flex flex-col items-start gap-6 leading-7', className)}>
+    <div className={cn("flex flex-col items-start gap-6 leading-7", className)}>
       <h2 className="flex items-center gap-4 text-lg font-semibold">
         {title}
         {label && <Pill>{label}</Pill>}
@@ -241,9 +252,9 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
       async function fetchTickets() {
         setIsFetchingTickets(true);
         const result = await fetch(`/api/support-tickets`, {
-          method: 'GET',
-          credentials: 'include',
-          redirect: 'error',
+          method: "GET",
+          credentials: "include",
+          redirect: "error",
         });
         const body = await result.json();
         if (body) {
@@ -253,7 +264,7 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
       }
       fetchTickets();
     },
-    [isSignedIn]
+    [isSignedIn],
   );
 
   return isFetchingTickets ? (
@@ -278,7 +289,11 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
               </span>
               <span className="flex gap-2">
                 {ticket.labels.map((label) => (
-                  <Pill appearance="outlined" key={label.id} className="whitespace-nowrap">
+                  <Pill
+                    appearance="outlined"
+                    key={label.id}
+                    className="whitespace-nowrap"
+                  >
                     {label.labelType.name}
                   </Pill>
                 ))}
@@ -294,10 +309,22 @@ function SupportTickets({ isSignedIn }: { isSignedIn?: boolean }) {
 }
 
 const FOOTER_NAV_ITEMS = [
-  { name: 'Documentation', url: 'https://www.inngest.com/docs?ref=support-center' },
-  { name: 'Privacy', url: 'https://www.inngest.com/privacy?ref=support-center' },
-  { name: 'Terms & Conditions', url: 'https://www.inngest.com/terms?ref=support-center' },
-  { name: 'Security', url: 'https://www.inngest.com/security?ref=support-center' },
+  {
+    name: "Documentation",
+    url: "https://www.inngest.com/docs?ref=support-center",
+  },
+  {
+    name: "Privacy",
+    url: "https://www.inngest.com/privacy?ref=support-center",
+  },
+  {
+    name: "Terms & Conditions",
+    url: "https://www.inngest.com/terms?ref=support-center",
+  },
+  {
+    name: "Security",
+    url: "https://www.inngest.com/security?ref=support-center",
+  },
 ];
 
 function Footer() {

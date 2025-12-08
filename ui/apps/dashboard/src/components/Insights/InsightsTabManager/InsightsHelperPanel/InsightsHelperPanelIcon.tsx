@@ -1,6 +1,11 @@
-'use client';
+"use client";
 
-import { RiBookOpenLine, RiFeedbackLine, RiNodeTree, RiSparkling2Line } from '@remixicon/react';
+import {
+  RiBookOpenLine,
+  RiFeedbackLine,
+  RiNodeTree,
+  RiSparkling2Line,
+} from "@remixicon/react";
 
 import {
   DOCUMENTATION,
@@ -8,7 +13,7 @@ import {
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from './constants';
+} from "./constants";
 
 type InsightsHelperPanelIconProps = {
   className?: string;

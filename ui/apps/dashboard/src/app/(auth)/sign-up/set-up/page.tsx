@@ -1,6 +1,6 @@
-import ReloadClerkAndRedirect from '@/app/(auth)/ReloadClerkAndRedirect';
-import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
+import ReloadClerkAndRedirect from "@/app/(auth)/ReloadClerkAndRedirect";
+import { graphql } from "@/gql";
+import graphqlAPI from "@/queries/graphqlAPI";
 
 const CreateUserDocument = graphql(`
   mutation CreateUser {

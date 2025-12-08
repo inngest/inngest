@@ -1,20 +1,22 @@
-import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
-import { Card } from '@inngest/components/Card/Card';
-import { formatDayString } from '@inngest/components/utils/date';
+import { Alert } from "@inngest/components/Alert/Alert";
+import { Button } from "@inngest/components/Button";
+import { Card } from "@inngest/components/Card/Card";
+import { formatDayString } from "@inngest/components/utils/date";
 
-import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
-import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
-import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
+import EntitlementListItem from "@/components/Billing/Addons/EntitlementListItem";
+import BillingInformation from "@/components/Billing/BillingDetails/BillingInformation";
+import PaymentMethod from "@/components/Billing/BillingDetails/PaymentMethod";
 // import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { isHobbyFreePlan /*isHobbyPlan*/ } from '@/components/Billing/Plans/utils';
+import {
+  isHobbyFreePlan /*isHobbyPlan*/,
+} from "@/components/Billing/Plans/utils";
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
-} from '@/components/Billing/data';
-import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
-import { pathCreator } from '@/utils/urls';
+} from "@/components/Billing/data";
+import { ServerFeatureFlag } from "@/components/FeatureFlags/ServerFeatureFlag";
+import { pathCreator } from "@/utils/urls";
 
 function kbyteDisplayValue(kibibytes: number): string {
   if (kibibytes >= 1024) {
@@ -23,19 +25,20 @@ function kbyteDisplayValue(kibibytes: number): string {
   return `${kibibytes} KiB`;
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const { addons, entitlements } = await getEntitlementUsage();
-  const { plan: currentPlan, subscription: currentSubscription } = await getCurrentPlan();
+  const { plan: currentPlan, subscription: currentSubscription } =
+    await getCurrentPlan();
   const billing = await getBillingDetails();
 
   if (!currentPlan) {
-    throw new Error('Failed to fetch current plan');
+    throw new Error("Failed to fetch current plan");
   }
 
   const refetch = async () => {
-    'use server';
+    "use server";
     await getCurrentPlan();
     await getEntitlementUsage();
     await getBillingDetails();
@@ -90,9 +93,10 @@ export default async function Page() {
 
   const nextInvoiceAmount = currentPlan.amount
     ? `$${(currentPlan.amount / 100).toFixed(2)}`
-    : 'Free';
+    : "Free";
   const overageAllowed =
-    (entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed) &&
+    (entitlements.runCount.overageAllowed ||
+      entitlements.stepCount.overageAllowed) &&
     !isHobbyFreePlan(currentPlan);
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
@@ -119,7 +123,10 @@ export default async function Page() {
                 appearance="outlined"
                 kind="secondary"
                 label="Upgrade plan"
-                href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+                href={pathCreator.billing({
+                  tab: "plans",
+                  ref: "app-billing-page-overview",
+                })}
               />
             }
           >
@@ -135,7 +142,10 @@ export default async function Page() {
                 appearance="outlined"
                 kind="secondary"
                 label="Upgrade plan"
-                href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+                href={pathCreator.billing({
+                  tab: "plans",
+                  ref: "app-billing-page-overview",
+                })}
               />
             }
           >
@@ -150,7 +160,10 @@ export default async function Page() {
             <Button
               appearance="ghost"
               label="Change plan"
-              href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+              href={pathCreator.billing({
+                tab: "plans",
+                ref: "app-billing-page-overview",
+              })}
             />
           </div>
           {/* {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
@@ -189,7 +202,7 @@ export default async function Page() {
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
                 displayValue: `${entitlements.history.limit} day${
-                  entitlements.history.limit === 1 ? '' : 's'
+                  entitlements.history.limit === 1 ? "" : "s"
                 }`,
               }}
               addon={advancedObservabilityAddon}
@@ -202,8 +215,12 @@ export default async function Page() {
               description="Granularity of exported metrics data points"
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
-                displayValue: `${entitlements.metricsExportGranularity.limit / 60} minute${
-                  entitlements.metricsExportGranularity.limit / 60 === 1 ? '' : 's'
+                displayValue: `${
+                  entitlements.metricsExportGranularity.limit / 60
+                } minute${
+                  entitlements.metricsExportGranularity.limit / 60 === 1
+                    ? ""
+                    : "s"
                 }`,
               }}
               addon={advancedObservabilityAddon}
@@ -216,15 +233,22 @@ export default async function Page() {
               description="How recent exported metrics data is"
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
-                displayValue: `${entitlements.metricsExportFreshness.limit / 60} minute${
-                  entitlements.metricsExportFreshness.limit / 60 === 1 ? '' : 's'
+                displayValue: `${
+                  entitlements.metricsExportFreshness.limit / 60
+                } minute${
+                  entitlements.metricsExportFreshness.limit / 60 === 1
+                    ? ""
+                    : "s"
                 }`,
               }}
               addon={advancedObservabilityAddon}
               onChange={refetch}
             />
           </ServerFeatureFlag>
-          <ServerFeatureFlag flag="dedicated-slack-channel" defaultValue={false}>
+          <ServerFeatureFlag
+            flag="dedicated-slack-channel"
+            defaultValue={false}
+          >
             <EntitlementListItem
               increaseInHigherPlan={false}
               planName={currentPlan.name}
@@ -232,7 +256,9 @@ export default async function Page() {
               description="Dedicated Slack channel for support"
               entitlement={{
                 currentValue: entitlements.slackChannel.enabled,
-                displayValue: entitlements.slackChannel.enabled ? 'Enabled' : 'Not enabled',
+                displayValue: entitlements.slackChannel.enabled
+                  ? "Enabled"
+                  : "Not enabled",
               }}
               addon={{
                 ...addons.slackChannel,
@@ -262,7 +288,9 @@ export default async function Page() {
             description="Sign BAAs for healthcare services"
             entitlement={{
               currentValue: entitlements.hipaa.enabled,
-              displayValue: entitlements.hipaa.enabled ? 'Enabled' : 'Not enabled',
+              displayValue: entitlements.hipaa.enabled
+                ? "Enabled"
+                : "Not enabled",
             }}
           />
           <EntitlementListItem
@@ -279,7 +307,7 @@ export default async function Page() {
             <Button
               appearance="outlined"
               label="Chat with a product expert"
-              href={pathCreator.support({ ref: 'app-billing-overview' })}
+              href={pathCreator.support({ ref: "app-billing-overview" })}
             />
           </div>
         </Card.Content>
@@ -290,23 +318,31 @@ export default async function Page() {
             <p className="text-muted mb-1">Next subscription payment</p>
             <p className="text-basis text-lg">
               {nextInvoiceAmount}
-              {overageAllowed && <span className="text-tertiary-moderate">*</span>}
+              {overageAllowed && (
+                <span className="text-tertiary-moderate">*</span>
+              )}
             </p>
             {nextInvoiceDate && (
               <>
-                <p className="text-subtle mb-1 mt-4 text-xs font-medium">Payment due date</p>
+                <p className="text-subtle mb-1 mt-4 text-xs font-medium">
+                  Payment due date
+                </p>
                 <p className="text-basis text-sm">{nextInvoiceDate}</p>
               </>
             )}
             {overageAllowed && (
               <p className="text-subtle mt-4 text-xs italic">
-                <span className="text-tertiary-moderate">*</span>Base plan cost. Additional usage
-                calculated at the start of the next billing cycle.
+                <span className="text-tertiary-moderate">*</span>Base plan cost.
+                Additional usage calculated at the start of the next billing
+                cycle.
               </p>
             )}
           </Card.Content>
         </Card>
-        <BillingInformation billingEmail={billing.billingEmail} accountName={billing.name} />
+        <BillingInformation
+          billingEmail={billing.billingEmail}
+          accountName={billing.name}
+        />
         <PaymentMethod paymentMethod={paymentMethod} />
       </div>
     </div>

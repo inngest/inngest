@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { type Route } from 'next';
-import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Link } from '@inngest/components/Link';
-import { Pill } from '@inngest/components/Pill/Pill';
-import { TextClickToCopy } from '@inngest/components/Text';
-import { Time } from '@inngest/components/Time';
-import { methodTypes, type App } from '@inngest/components/types/app';
-import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
+import { type Route } from "next";
+import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
+import { Link } from "@inngest/components/Link";
+import { Pill } from "@inngest/components/Pill/Pill";
+import { TextClickToCopy } from "@inngest/components/Text";
+import { Time } from "@inngest/components/Time";
+import { methodTypes, type App } from "@inngest/components/types/app";
+import { RiArrowLeftRightLine, RiInfinityLine } from "@remixicon/react";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncStatusPill } from '@/components/SyncStatusPill';
-import { PlatformSection } from './PlatformSection';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { SyncStatusPill } from "@/components/SyncStatusPill";
+import { PlatformSection } from "./PlatformSection";
 
 type Props = {
   // Optional because this card is used in the "unattached syncs" page, and
@@ -42,7 +42,7 @@ type Sync = {
   status: string;
   url: string | null;
   appVersion: string | null;
-} & React.ComponentProps<typeof PlatformSection>['sync'];
+} & React.ComponentProps<typeof PlatformSection>["sync"];
 
 export function AppInfoCard({
   app,
@@ -62,7 +62,11 @@ export function AppInfoCard({
           {linkToSyncs && <Time value={sync.lastSyncedAt} />}
           {!linkToSyncs && app.externalID && (
             <Link
-              href={`/env/${env.slug}/apps/${encodeURIComponent(app.externalID)}/syncs` as Route}
+              href={
+                `/env/${env.slug}/apps/${encodeURIComponent(
+                  app.externalID,
+                )}/syncs` as Route
+              }
               size="small"
             >
               <Time value={sync.lastSyncedAt} />
@@ -85,14 +89,14 @@ export function AppInfoCard({
       <AppDetailsCard title="App information" className={className}>
         {/* Row 1 */}
         <AppDetailsCard.Item
-          detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
+          detail={<div className="truncate">{app?.externalID ?? "-"}</div>}
           term="App ID"
           loading={loading}
         />
         <AppDetailsCard.Item
           detail={
             <div className="truncate">
-              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : '-'}
+              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : "-"}
             </div>
           }
           term="SDK version"
@@ -100,25 +104,27 @@ export function AppInfoCard({
         />
         <AppDetailsCard.Item
           className="col-span-2"
-          detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
+          detail={<div className="truncate">{lastSyncValue ?? "-"}</div>}
           term="Last sync"
           loading={loading}
         />
 
         {/* Row 2 */}
         <AppDetailsCard.Item
-          detail={<div className="truncate">{sync?.framework ?? '-'}</div>}
+          detail={<div className="truncate">{sync?.framework ?? "-"}</div>}
           term="Framework"
           loading={loading}
         />
         <AppDetailsCard.Item
-          detail={<div className="truncate">{sync?.sdkLanguage || '-'}</div>}
+          detail={<div className="truncate">{sync?.sdkLanguage || "-"}</div>}
           term="Language"
           loading={loading}
         />
         <AppDetailsCard.Item
           className="col-span-2"
-          detail={<TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>}
+          detail={
+            <TextClickToCopy truncate>{sync?.url ?? "-"}</TextClickToCopy>
+          }
           term="URL"
           loading={loading}
         />
@@ -133,7 +139,9 @@ export function AppInfoCard({
                 ) : (
                   <RiArrowLeftRightLine className="h-4 w-4" />
                 )}
-                <div className="lowercase first-letter:capitalize">{app.method}</div>
+                <div className="lowercase first-letter:capitalize">
+                  {app.method}
+                </div>
               </div>
             }
           />
@@ -144,14 +152,16 @@ export function AppInfoCard({
               {sync?.appVersion || app?.appVersion ? (
                 <Pill>{sync?.appVersion || app?.appVersion}</Pill>
               ) : (
-                '-'
+                "-"
               )}
             </div>
           }
           term="App version"
           loading={loading}
         />
-        {app?.method === methodTypes.Connect && workerCounter && <>{workerCounter}</>}
+        {app?.method === methodTypes.Connect && workerCounter && (
+          <>{workerCounter}</>
+        )}
 
         {/* Row 4 */}
         {sync && <PlatformSection sync={sync} />}

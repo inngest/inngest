@@ -7,7 +7,7 @@
 module.exports = {
   plugins: [
     {
-      name: 'preset-default',
+      name: "preset-default",
       params: {
         overrides: {
           // Removing viewBox attribute causes CSS scaling to break.
@@ -18,6 +18,6 @@ module.exports = {
     },
     // This makes sure that IDs inside SVG files don't collide with one another so that styles
     // applied to one don't leak into others.
-    'prefixIds',
+    "prefixIds",
   ],
 };

@@ -1,15 +1,18 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
-import { FunctionsTable } from '@inngest/components/Functions/FunctionsTable';
-import { Header } from '@inngest/components/Header/Header';
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button/Button";
+import { FunctionsTable } from "@inngest/components/Functions/FunctionsTable";
+import { Header } from "@inngest/components/Header/Header";
+import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
 
-import { FunctionInfo } from '@/components/Functions/FunctionInfo';
-import { useFunctionVolume, useFunctions } from '@/components/Functions/useFunctions';
-import { pathCreator } from '@/utils/urls';
+import { FunctionInfo } from "@/components/Functions/FunctionInfo";
+import {
+  useFunctionVolume,
+  useFunctions,
+} from "@/components/Functions/useFunctions";
+import { pathCreator } from "@/utils/urls";
 
 export default function FunctionPage({
   params: { environmentSlug: envSlug },
@@ -22,11 +25,20 @@ export default function FunctionPage({
       // The shared component library is environment-agnostic, so it needs a way to
       // generate URLs without knowing about environments
       function: (params: { functionSlug: string }) =>
-        pathCreator.function({ envSlug: envSlug, functionSlug: params.functionSlug }),
+        pathCreator.function({
+          envSlug: envSlug,
+          functionSlug: params.functionSlug,
+        }),
       eventType: (params: { eventName: string }) =>
-        pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
+        pathCreator.eventType({
+          envSlug: envSlug,
+          eventName: params.eventName,
+        }),
       app: (params: { externalAppID: string }) =>
-        pathCreator.app({ envSlug: envSlug, externalAppID: params.externalAppID }),
+        pathCreator.app({
+          envSlug: envSlug,
+          externalAppID: params.externalAppID,
+        }),
     };
   }, [envSlug]);
   const getFunctions = useFunctions();
@@ -34,7 +46,10 @@ export default function FunctionPage({
 
   return (
     <>
-      <Header breadcrumb={[{ text: 'Functions' }]} infoIcon={<FunctionInfo />} />
+      <Header
+        breadcrumb={[{ text: "Functions" }]}
+        infoIcon={<FunctionInfo />}
+      />
       <FunctionsTable
         pathCreator={internalPathCreator}
         getFunctions={getFunctions}

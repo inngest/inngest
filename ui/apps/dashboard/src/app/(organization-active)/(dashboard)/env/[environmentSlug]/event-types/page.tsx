@@ -1,18 +1,21 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
-import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
-import { Header } from '@inngest/components/Header/Header';
-import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button/Button";
+import { EventTypesTable } from "@inngest/components/EventTypes/EventTypesTable";
+import { Header } from "@inngest/components/Header/Header";
+import { RefreshButton } from "@inngest/components/Refresh/RefreshButton";
+import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
 
-import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
-import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
-import { useEventTypeVolume, useEventTypes } from '@/components/EventTypes/useEventTypes';
-import SendEventButton from '@/components/Events/SendEventButton';
-import { pathCreator } from '@/utils/urls';
+import { ActionsMenu } from "@/components/EventTypes/ActionsMenu";
+import { EventTypesInfo } from "@/components/EventTypes/EventTypesInfo";
+import {
+  useEventTypeVolume,
+  useEventTypes,
+} from "@/components/EventTypes/useEventTypes";
+import SendEventButton from "@/components/Events/SendEventButton";
+import { pathCreator } from "@/utils/urls";
 
 export default function EventTypesPage({
   params: { environmentSlug: envSlug },
@@ -25,9 +28,15 @@ export default function EventTypesPage({
       // The shared component library is environment-agnostic, so it needs a way to
       // generate URLs without knowing about environments
       function: (params: { functionSlug: string }) =>
-        pathCreator.function({ envSlug: envSlug, functionSlug: params.functionSlug }),
+        pathCreator.function({
+          envSlug: envSlug,
+          functionSlug: params.functionSlug,
+        }),
       eventType: (params: { eventName: string }) =>
-        pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
+        pathCreator.eventType({
+          envSlug: envSlug,
+          eventName: params.eventName,
+        }),
     };
   }, [envSlug]);
   const getEventTypes = useEventTypes();
@@ -36,7 +45,7 @@ export default function EventTypesPage({
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Event Types' }]}
+        breadcrumb={[{ text: "Event Types" }]}
         infoIcon={<EventTypesInfo />}
         action={
           <div className="flex items-center gap-1.5">

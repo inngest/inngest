@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { SkeletonCard } from '@inngest/components/Apps/AppCard';
-import { Button } from '@inngest/components/Button';
-import { Header } from '@inngest/components/Header/Header';
-import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
-import { RiAddLine } from '@remixicon/react';
+import { useEffect, useState } from "react";
+import { SkeletonCard } from "@inngest/components/Apps/AppCard";
+import { Button } from "@inngest/components/Button";
+import { Header } from "@inngest/components/Header/Header";
+import { Info } from "@inngest/components/Info/Info";
+import { Link } from "@inngest/components/Link/Link";
+import { RiAddLine } from "@remixicon/react";
 
-import AppFAQ from '@/components/Apps/AppFAQ';
-import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
-import { StatusMenu } from '@/components/Apps/StatusMenu';
-import { getProdApps } from '@/components/Onboarding/actions';
-import { staticSlugs } from '@/utils/environments';
-import { pathCreator } from '@/utils/urls';
-import { Apps } from './Apps';
+import AppFAQ from "@/components/Apps/AppFAQ";
+import { EmptyOnboardingCard } from "@/components/Apps/EmptyAppsCard";
+import { StatusMenu } from "@/components/Apps/StatusMenu";
+import { getProdApps } from "@/components/Onboarding/actions";
+import { staticSlugs } from "@/utils/environments";
+import { pathCreator } from "@/utils/urls";
+import { Apps } from "./Apps";
 
 const AppInfo = () => (
   <Info
@@ -40,10 +40,11 @@ async function fetchInitialData(): Promise<LoadingState> {
       return { hasProductionApps: true, isLoading: false };
     }
     const { apps, unattachedSyncs } = result;
-    const hasAppsOrUnattachedSyncs = apps.length > 0 || unattachedSyncs.length > 0;
+    const hasAppsOrUnattachedSyncs =
+      apps.length > 0 || unattachedSyncs.length > 0;
     return { hasProductionApps: hasAppsOrUnattachedSyncs, isLoading: false };
   } catch (error) {
-    console.error('Error fetching production apps', error);
+    console.error("Error fetching production apps", error);
     return { hasProductionApps: false, isLoading: false };
   }
 }
@@ -60,7 +61,7 @@ export default function AppsPage({
     isLoading: true,
   });
 
-  const isArchived = archived === 'true';
+  const isArchived = archived === "true";
 
   useEffect(() => {
     fetchInitialData().then((data) => {
@@ -68,12 +69,13 @@ export default function AppsPage({
     });
   }, []);
 
-  const displayOnboarding = envSlug === staticSlugs.production && !hasProductionApps;
+  const displayOnboarding =
+    envSlug === staticSlugs.production && !hasProductionApps;
 
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Apps' }]}
+        breadcrumb={[{ text: "Apps" }]}
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (

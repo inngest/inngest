@@ -1,5 +1,5 @@
-import { graphql } from '@/gql';
-import graphqlAPI from '@/queries/graphqlAPI';
+import { graphql } from "@/gql";
+import graphqlAPI from "@/queries/graphqlAPI";
 
 const metricsEntitlementsDocument = graphql(`
   query MetricsEntitlements {

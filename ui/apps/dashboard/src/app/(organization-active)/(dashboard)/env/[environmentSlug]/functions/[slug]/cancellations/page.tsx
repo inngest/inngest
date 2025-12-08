@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { CancellationTable } from './CancellationTable';
+import { CancellationTable } from "./CancellationTable";
 
 type Props = {
   params: {

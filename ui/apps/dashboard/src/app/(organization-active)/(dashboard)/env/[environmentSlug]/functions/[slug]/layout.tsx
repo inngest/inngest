@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import React, { useCallback, useState } from 'react';
-import { Header } from '@inngest/components/Header/Header';
-import { InvokeModal } from '@inngest/components/InvokeButton';
-import { Pill } from '@inngest/components/Pill';
-import { RiPauseCircleLine } from '@remixicon/react';
-import { useMutation } from 'urql';
+import React, { useCallback, useState } from "react";
+import { Header } from "@inngest/components/Header/Header";
+import { InvokeModal } from "@inngest/components/InvokeButton";
+import { Pill } from "@inngest/components/Pill";
+import { RiPauseCircleLine } from "@remixicon/react";
+import { useMutation } from "urql";
 
-import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
-import { ArchivedFuncBanner } from '@/components/ArchivedFuncBanner';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { ActionsMenu } from '@/components/Functions/ActionMenu';
-import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
-import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
-import NewReplayModal from '@/components/Replay/NewReplayModal';
-import { graphql } from '@/gql';
-import { FunctionTriggerTypes } from '@/gql/graphql';
-import { useFunction } from '@/queries';
+import { ArchivedAppBanner } from "@/components/ArchivedAppBanner";
+import { ArchivedFuncBanner } from "@/components/ArchivedFuncBanner";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
+import { ActionsMenu } from "@/components/Functions/ActionMenu";
+import { CancelFunctionModal } from "@/components/Functions/CancelFunction/CancelFunctionModal";
+import { PauseFunctionModal } from "@/components/Functions/PauseFunction/PauseModal";
+import NewReplayModal from "@/components/Replay/NewReplayModal";
+import { graphql } from "@/gql";
+import { FunctionTriggerTypes } from "@/gql/graphql";
+import { useFunction } from "@/queries";
 
 const InvokeFunctionDocument = graphql(`
   mutation InvokeFunction($envID: UUID!, $data: Map, $functionSlug: String!, $user: Map) {
@@ -47,7 +47,7 @@ export default function FunctionLayout({
   const [, invokeFunction] = useMutation(InvokeFunctionDocument);
   const env = useEnvironment();
 
-  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
+  const isBulkCancellationEnabled = useBooleanFlag("bulk-cancellation-ui");
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -58,7 +58,13 @@ export default function FunctionLayout({
     }) ?? false;
 
   const invokeAction = useCallback(
-    ({ data, user }: { data: Record<string, unknown>; user: Record<string, unknown> | null }) => {
+    ({
+      data,
+      user,
+    }: {
+      data: Record<string, unknown>;
+      user: Record<string, unknown> | null;
+    }) => {
       invokeFunction({
         envID: env.id,
         data,
@@ -67,7 +73,7 @@ export default function FunctionLayout({
       });
       setInvokeOpen(false);
     },
-    [env.id, functionSlug, invokeFunction]
+    [env.id, functionSlug, invokeFunction],
   );
 
   const externalAppID = data?.workspace.workflow?.app.name;
@@ -114,12 +120,16 @@ export default function FunctionLayout({
       )}
       <Header
         breadcrumb={[
-          { text: 'Functions', href: `/env/${environmentSlug}/functions` },
-          { text: fn?.name || 'Function' },
+          { text: "Functions", href: `/env/${environmentSlug}/functions` },
+          { text: fn?.name || "Function" },
         ]}
         infoIcon={
           isPaused && (
-            <Pill kind="warning" icon={<RiPauseCircleLine className="h-4 w-4" />} iconSide="left">
+            <Pill
+              kind="warning"
+              icon={<RiPauseCircleLine className="h-4 w-4" />}
+              iconSide="left"
+            >
               Paused
             </Pill>
           )
@@ -139,16 +149,23 @@ export default function FunctionLayout({
         }
         tabs={[
           {
-            children: 'Dashboard',
+            children: "Dashboard",
             href: `/env/${environmentSlug}/functions/${slug}`,
             exactRouteMatch: true,
           },
-          { children: 'Runs', href: `/env/${environmentSlug}/functions/${slug}/runs` },
-          { children: 'Replays', href: `/env/${environmentSlug}/functions/${slug}/replays` },
-          ...(isBulkCancellationEnabled.isReady && isBulkCancellationEnabled.value
+          {
+            children: "Runs",
+            href: `/env/${environmentSlug}/functions/${slug}/runs`,
+          },
+          {
+            children: "Replays",
+            href: `/env/${environmentSlug}/functions/${slug}/replays`,
+          },
+          ...(isBulkCancellationEnabled.isReady &&
+          isBulkCancellationEnabled.value
             ? [
                 {
-                  children: 'Cancellations',
+                  children: "Cancellations",
                   href: `/env/${environmentSlug}/functions/${slug}/cancellations`,
                 },
               ]

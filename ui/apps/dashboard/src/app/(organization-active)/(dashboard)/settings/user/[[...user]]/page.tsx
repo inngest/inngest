@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { UserProfile } from '@clerk/nextjs';
+import { UserProfile } from "@clerk/nextjs";
 
 export default function UserSettingsPage() {
   return (
@@ -10,12 +10,12 @@ export default function UserSettingsPage() {
         path="/settings/user"
         appearance={{
           layout: {
-            logoPlacement: 'none',
+            logoPlacement: "none",
           },
           elements: {
-            navbar: 'hidden',
-            scrollBox: 'bg-canvasBase shadow-none',
-            pageScrollBox: 'pt-6 px-2',
+            navbar: "hidden",
+            scrollBox: "bg-canvasBase shadow-none",
+            pageScrollBox: "pt-6 px-2",
           },
         }}
       >
@@ -26,12 +26,12 @@ export default function UserSettingsPage() {
         path="/settings/security"
         appearance={{
           layout: {
-            logoPlacement: 'none',
+            logoPlacement: "none",
           },
           elements: {
-            navbar: 'hidden',
-            scrollBox: 'bg-canvasBase shadow-none',
-            pageScrollBox: 'pt-0 px-2',
+            navbar: "hidden",
+            scrollBox: "bg-canvasBase shadow-none",
+            pageScrollBox: "pt-0 px-2",
           },
         }}
       >

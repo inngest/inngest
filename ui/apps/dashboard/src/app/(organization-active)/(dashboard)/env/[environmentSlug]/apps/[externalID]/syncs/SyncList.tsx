@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { Skeleton } from '@inngest/components/Skeleton';
-import { Time } from '@inngest/components/Time';
+import { Skeleton } from "@inngest/components/Skeleton";
+import { Time } from "@inngest/components/Time";
 // import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import { cn } from '@inngest/components/utils/classNames';
+import { cn } from "@inngest/components/utils/classNames";
 
-import { SyncStatusPill } from '@/components/SyncStatusPill';
+import { SyncStatusPill } from "@/components/SyncStatusPill";
 
 type Props = {
   className?: string;
@@ -40,8 +40,8 @@ export function SyncList({
   return (
     <div
       className={cn(
-        'border-muted bg-canvasBase w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r sm:w-1/3',
-        className
+        "border-muted bg-canvasBase w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r sm:w-1/3",
+        className,
       )}
     >
       {loading && (
@@ -52,16 +52,16 @@ export function SyncList({
       {!loading && (
         <ul className="w-full">
           {syncs.map((sync) => {
-            let bgColor = 'bg-canvasBase';
+            let bgColor = "bg-canvasBase";
             if (sync.id === selectedSyncID) {
-              bgColor = 'bg-canvasSubtle';
+              bgColor = "bg-canvasSubtle";
             }
 
             return (
               <li
                 className={cn(
-                  'border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-b',
-                  bgColor
+                  "border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-b",
+                  bgColor,
                 )}
                 key={sync.id}
                 onClick={() => onClick(sync.id)}
@@ -71,13 +71,17 @@ export function SyncList({
                     <SyncStatusPill status={sync.status} />
                   </div>
                   <div className="flex-1 py-4 pl-2 align-middle sm:pl-0">
-                    <Time className="text-wrap" value={sync.lastSyncedAt} copyable={false} />
+                    <Time
+                      className="text-wrap"
+                      value={sync.lastSyncedAt}
+                      copyable={false}
+                    />
                   </div>
                 </div>
                 <div
                   className="hidden items-center gap-1 align-middle md:p-2 lg:p-4 min-[1120px]:flex"
                   title={`${sync.syncedFunctions.length} ${
-                    sync.syncedFunctions.length === 1 ? 'function' : 'functions'
+                    sync.syncedFunctions.length === 1 ? "function" : "functions"
                   }`}
                 >
                   {/* {sync.syncedFunctions.length > 0 && (

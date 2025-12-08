@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { Disclosure } from '@headlessui/react';
-import { Button } from '@inngest/components/Button';
-import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { cn } from '@inngest/components/utils/classNames';
-import { type ToolPartFor } from '@inngest/use-agent';
-import { RiCheckLine, RiCloseLine, RiPlayLine } from '@remixicon/react';
+import { Disclosure } from "@headlessui/react";
+import { Button } from "@inngest/components/Button";
+import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
+import { cn } from "@inngest/components/utils/classNames";
+import { type ToolPartFor } from "@inngest/use-agent";
+import { RiCheckLine, RiCloseLine, RiPlayLine } from "@remixicon/react";
 
-import type { InsightsAgentConfig } from '../useInsightsAgent';
+import type { InsightsAgentConfig } from "../useInsightsAgent";
 
-type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, 'generate_sql'>;
+type GenerateSqlPart = ToolPartFor<InsightsAgentConfig, "generate_sql">;
 
 function GenerateSqlToolUI({
   part,
@@ -39,8 +39,8 @@ function GenerateSqlToolUI({
               <Disclosure.Button className="flex items-center justify-center">
                 <div
                   className={cn(
-                    'flex h-4 w-4 items-center justify-center rounded-full',
-                    errorMessage ? 'bg-error' : 'bg-btnPrimary'
+                    "flex h-4 w-4 items-center justify-center rounded-full",
+                    errorMessage ? "bg-error" : "bg-btnPrimary",
                   )}
                 >
                   {errorMessage ? (
@@ -50,14 +50,16 @@ function GenerateSqlToolUI({
                   )}
                 </div>
               </Disclosure.Button>
-              <span className="font-sm">{title || 'Generated SQL'}</span>
+              <span className="font-sm">{title || "Generated SQL"}</span>
             </div>
 
             {!!sql && (
               <div className="flex items-center gap-2">
                 <OptionalTooltip tooltip="Run this query" side="bottom">
                   <Button
-                    icon={<RiPlayLine className="text-subtle size-8 scale-110" />}
+                    icon={
+                      <RiPlayLine className="text-subtle size-8 scale-110" />
+                    }
                     appearance="ghost"
                     size="small"
                     onClick={() => {
@@ -91,5 +93,11 @@ export const ToolMessage = ({
   onSqlChange: (sql: string) => void;
   runQuery: () => void;
 }) => {
-  return <GenerateSqlToolUI part={part} onSqlChange={onSqlChange} runQuery={runQuery} />;
+  return (
+    <GenerateSqlToolUI
+      part={part}
+      onSqlChange={onSqlChange}
+      runQuery={runQuery}
+    />
+  );
 };

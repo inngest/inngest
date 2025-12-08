@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { baseInitialFetchFailed } from '@inngest/components/types/fetch';
-import { maybeDateToString } from '@inngest/components/utils/date';
+import { baseInitialFetchFailed } from "@inngest/components/types/fetch";
+import { maybeDateToString } from "@inngest/components/utils/date";
 
-import { graphql } from '@/gql';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useSkippableGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const query = graphql(`
   query GetCancellationRunCount(
@@ -33,10 +33,10 @@ export function useRunCount(input?: RunCountInput) {
     query,
     skip: !input,
     variables: {
-      envID: input?.envID ?? '',
-      functionSlug: input?.functionSlug ?? '',
+      envID: input?.envID ?? "",
+      functionSlug: input?.functionSlug ?? "",
       queuedAtMin: maybeDateToString(input?.queuedAtMin) ?? null,
-      queuedAtMax: maybeDateToString(input?.queuedAtMax) ?? '',
+      queuedAtMax: maybeDateToString(input?.queuedAtMax) ?? "",
     },
   });
 
@@ -44,7 +44,7 @@ export function useRunCount(input?: RunCountInput) {
     if (!res.data.environment.function) {
       return {
         ...baseInitialFetchFailed,
-        error: new Error('function not found'),
+        error: new Error("function not found"),
       };
     }
 

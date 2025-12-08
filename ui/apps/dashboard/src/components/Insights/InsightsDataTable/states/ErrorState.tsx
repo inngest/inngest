@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { Banner } from '@inngest/components/Banner/Banner';
-import { Button } from '@inngest/components/Button/Button';
+import { Banner } from "@inngest/components/Banner/Banner";
+import { Button } from "@inngest/components/Button/Button";
 
-import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useInsightsStateMachineContext } from "../../InsightsStateMachineContext/InsightsStateMachineContext";
 
-const FALLBACK_ERROR = 'Something went wrong. Please try again.';
+const FALLBACK_ERROR = "Something went wrong. Please try again.";
 
 export function ErrorState() {
   const { error, runQuery } = useInsightsStateMachineContext();
@@ -30,5 +30,5 @@ export function ErrorState() {
 }
 
 function pruneGraphQLError(error: Error) {
-  return error.message.replace(/^\[GraphQL\] /, '');
+  return error.message.replace(/^\[GraphQL\] /, "");
 }

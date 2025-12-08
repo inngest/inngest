@@ -1,6 +1,6 @@
-import type { Route } from 'next';
-import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Link } from '@inngest/components/Link';
+import type { Route } from "next";
+import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
+import { Link } from "@inngest/components/Link";
 
 type Props = {
   className?: string;
@@ -15,7 +15,13 @@ type Props = {
 
 export function AppGitCard({ className, sync }: Props) {
   const { commitAuthor, commitHash, commitMessage, commitRef, repoURL } = sync;
-  if (!commitAuthor && !commitHash && !commitMessage && !commitRef && !repoURL) {
+  if (
+    !commitAuthor &&
+    !commitHash &&
+    !commitMessage &&
+    !commitRef &&
+    !repoURL
+  ) {
     return null;
   }
 
@@ -23,7 +29,11 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="small">
+        <Link
+          href={`${repoURL}/commit/${commitHash}` as Route}
+          target="_blank"
+          size="small"
+        >
           <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
@@ -31,14 +41,18 @@ export function AppGitCard({ className, sync }: Props) {
       commitHashValue = commitHash.substring(0, 7);
     }
   } else {
-    commitHashValue = '-';
+    commitHashValue = "-";
   }
 
   let commitRefValue;
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="small">
+        <Link
+          href={`${repoURL}/tree/${commitRef}` as Route}
+          target="_blank"
+          size="small"
+        >
           <span className="truncate">{commitRef}</span>
         </Link>
       );
@@ -46,7 +60,7 @@ export function AppGitCard({ className, sync }: Props) {
       commitRefValue = commitRef;
     }
   } else {
-    commitRefValue = '-';
+    commitRefValue = "-";
   }
 
   let repositoryValue;
@@ -57,18 +71,34 @@ export function AppGitCard({ className, sync }: Props) {
       </Link>
     );
   } else {
-    repositoryValue = '-';
+    repositoryValue = "-";
   }
 
   return (
     <AppDetailsCard className={className} title="Commit information">
       {/* Row 1 */}
-      <AppDetailsCard.Item className="col-span-4" detail={commitMessage} term="Commit message" />
+      <AppDetailsCard.Item
+        className="col-span-4"
+        detail={commitMessage}
+        term="Commit message"
+      />
 
       {/* Row 2 */}
-      <AppDetailsCard.Item className="truncate" detail={commitAuthor} term="Commit author" />
-      <AppDetailsCard.Item className="truncate" detail={commitRefValue} term="Commit ref" />
-      <AppDetailsCard.Item className="truncate" detail={commitHashValue} term="Commit hash" />
+      <AppDetailsCard.Item
+        className="truncate"
+        detail={commitAuthor}
+        term="Commit author"
+      />
+      <AppDetailsCard.Item
+        className="truncate"
+        detail={commitRefValue}
+        term="Commit ref"
+      />
+      <AppDetailsCard.Item
+        className="truncate"
+        detail={commitHashValue}
+        term="Commit hash"
+      />
 
       {/* Row 3 */}
       <AppDetailsCard.Item

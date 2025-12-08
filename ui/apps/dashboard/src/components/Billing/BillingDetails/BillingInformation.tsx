@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
-import BillingCard from './BillingCard';
+import { graphql } from "@/gql";
+import BillingCard from "./BillingCard";
 
 const updateBillingInformationDocument = graphql(`
   mutation UpdateAccount($input: UpdateAccount!) {
@@ -27,10 +27,12 @@ export default function BillingInformation({
   accountName: string | null | undefined;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [email, setEmail] = useState(billingEmail || '');
-  const [name, setName] = useState(accountName || '');
+  const [email, setEmail] = useState(billingEmail || "");
+  const [name, setName] = useState(accountName || "");
   const isSaveDisabled = email === billingEmail && name === accountName;
-  const [, updateBillingInformation] = useMutation(updateBillingInformationDocument);
+  const [, updateBillingInformation] = useMutation(
+    updateBillingInformationDocument,
+  );
   const router = useRouter();
 
   function onEditButtonClick() {
@@ -49,14 +51,18 @@ export default function BillingInformation({
     e.preventDefault();
     if (isSaveDisabled) return;
 
-    updateBillingInformation({ input: { billingEmail: email, name } }).then((result) => {
-      if (result.error) {
-        toast.error(`Billing information has not been updated: ${result.error.message}`);
-      } else {
-        toast.success(`Billing information was successfully updated`);
-        router.refresh();
-      }
-    });
+    updateBillingInformation({ input: { billingEmail: email, name } }).then(
+      (result) => {
+        if (result.error) {
+          toast.error(
+            `Billing information has not been updated: ${result.error.message}`,
+          );
+        } else {
+          toast.success(`Billing information was successfully updated`);
+          router.refresh();
+        }
+      },
+    );
     setIsEditing(false);
   }
 

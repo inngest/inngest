@@ -1,24 +1,24 @@
-import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { NextResponse } from "next/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { getTimestampDaysAgo } from "@inngest/components/utils/date";
 import {
   PlainClient,
   type CreateThreadInput,
   type ThreadPartsFragment,
   type UpsertCustomTimelineEntryInput,
-} from '@team-plain/typescript-sdk';
+} from "@team-plain/typescript-sdk";
 
 import {
   labelTypeIDs,
   ticketTypeTitles,
   type BugSeverity,
   type TicketType,
-} from '@/app/(organization-active)/support/ticketOptions';
+} from "@/app/(organization-active)/support/ticketOptions";
 
 const apiKey = process.env.PLAIN_API_KEY;
 
 if (!apiKey) {
-  throw new Error('PLAIN_API_KEY environment variable is not set');
+  throw new Error("PLAIN_API_KEY environment variable is not set");
 }
 
 const client = new PlainClient({
@@ -40,8 +40,8 @@ export type RequestBody = {
 };
 
 function createComponents(
-  ticket: RequestBody['ticket']
-): UpsertCustomTimelineEntryInput['components'] {
+  ticket: RequestBody["ticket"],
+): UpsertCustomTimelineEntryInput["components"] {
   return [
     {
       componentText: {
@@ -90,7 +90,10 @@ const getCustomerId = async (email: string, name?: string) => {
 export async function POST(req: Request) {
   const { userId } = auth();
   if (!userId) {
-    return NextResponse.json({ error: 'Please sign in to create a ticket' }, { status: 401 });
+    return NextResponse.json(
+      { error: "Please sign in to create a ticket" },
+      { status: 401 },
+    );
   }
 
   // In production validation of the request body might be necessary.
@@ -134,7 +137,9 @@ export async function POST(req: Request) {
   // Plain only supports priority 0-3, ignore the lowest for now
   // NOTE - We should probably split out the "technical guidance" issues as a separate type and
   // keep other issues as 0-3 priority customer issues
-  const severity = body.ticket.severity ? parseInt(body.ticket.severity, 10) : null;
+  const severity = body.ticket.severity
+    ? parseInt(body.ticket.severity, 10)
+    : null;
   if (severity && severity < 4) {
     thread.priority = severity;
   }
@@ -142,8 +147,14 @@ export async function POST(req: Request) {
   const threadRes = await client.createThread(thread);
 
   if (threadRes.error) {
-    console.error('error creating ticket via support API', JSON.stringify(threadRes.error));
-    return NextResponse.json({ error: threadRes.error.message }, { status: 500 });
+    console.error(
+      "error creating ticket via support API",
+      JSON.stringify(threadRes.error),
+    );
+    return NextResponse.json(
+      { error: threadRes.error.message },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json(
@@ -151,7 +162,7 @@ export async function POST(req: Request) {
       error: null,
       threadId: threadRes.data.id,
     },
-    { status: 200 }
+    { status: 200 },
   );
 }
 
@@ -159,7 +170,10 @@ export async function GET() {
   const user = await currentUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'Please sign in to view your tickets' }, { status: 401 });
+    return NextResponse.json(
+      { error: "Please sign in to view your tickets" },
+      { status: 401 },
+    );
   }
   const emails = user.emailAddresses.map((email) => email.emailAddress);
   let threads: ThreadPartsFragment[] = [];
@@ -182,12 +196,16 @@ export async function GET() {
     if (threadsRes.error) {
       continue;
     }
-    const oneMonthAgo = getTimestampDaysAgo({ currentDate: new Date(), days: 30 });
+    const oneMonthAgo = getTimestampDaysAgo({
+      currentDate: new Date(),
+      days: 30,
+    });
     threads = threads.concat(
       threadsRes.data.threads.filter(
         (thread) =>
-          parseInt(thread.updatedAt.unixTimestamp, 10) > Math.floor(oneMonthAgo.getTime() / 1000)
-      )
+          parseInt(thread.updatedAt.unixTimestamp, 10) >
+          Math.floor(oneMonthAgo.getTime() / 1000),
+      ),
     );
   }
 
@@ -195,6 +213,6 @@ export async function GET() {
     {
       data: threads,
     },
-    { status: 200 }
+    { status: 200 },
   );
 }

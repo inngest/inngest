@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert';
-import { Header } from '@inngest/components/Header/Header';
-import { methodTypes } from '@inngest/components/types/app';
-import type { CombinedError } from 'urql';
+import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { Alert } from "@inngest/components/Alert";
+import { Header } from "@inngest/components/Header/Header";
+import { methodTypes } from "@inngest/components/types/app";
+import type { CombinedError } from "urql";
 
-import { ActionsMenu } from '@/components/Apps/ActionsMenu';
-import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { ArchiveModal } from './ArchiveModal';
-import { ResyncButton } from './ResyncButton';
-import { UnarchiveButton } from './UnarchiveButton';
-import { ValidateModal } from './ValidateButton/ValidateModal';
-import { useNavData } from './useNavData';
+import { ActionsMenu } from "@/components/Apps/ActionsMenu";
+import { ArchivedAppBanner } from "@/components/ArchivedAppBanner";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { ArchiveModal } from "./ArchiveModal";
+import { ResyncButton } from "./ResyncButton";
+import { UnarchiveButton } from "./UnarchiveButton";
+import { ValidateModal } from "./ValidateButton/ValidateModal";
+import { useNavData } from "./useNavData";
 
 type Props = React.PropsWithChildren<{
   params: {
@@ -24,13 +24,15 @@ type Props = React.PropsWithChildren<{
 
 const NotFound = ({ externalID }: { externalID: string }) => (
   <div className="mt-4 flex place-content-center">
-    <Alert severity="warning">{externalID} app not found in this environment</Alert>
+    <Alert severity="warning">
+      {externalID} app not found in this environment
+    </Alert>
   </div>
 );
 
 const Error = ({ error, externalID }: { error: Error; externalID: string }) => {
   {
-    if (error.message.includes('no rows')) {
+    if (error.message.includes("no rows")) {
       return <NotFound externalID={externalID} />;
     }
 
@@ -71,12 +73,14 @@ export default function Layout({ children, params: { externalID } }: Props) {
       )}
       <Header
         breadcrumb={[
-          { text: 'Apps', href: `/env/${env.slug}/apps` },
+          { text: "Apps", href: `/env/${env.slug}/apps` },
           {
-            text: res.data?.name || '',
-            href: pathname.endsWith('/syncs') ? `/env/${env.slug}/apps/${externalID}` : '',
+            text: res.data?.name || "",
+            href: pathname.endsWith("/syncs")
+              ? `/env/${env.slug}/apps/${externalID}`
+              : "",
           },
-          ...(pathname.endsWith('/syncs') ? [{ text: 'All syncs' }] : []),
+          ...(pathname.endsWith("/syncs") ? [{ text: "All syncs" }] : []),
         ]}
         loading={res.isLoading}
         action={
@@ -90,7 +94,8 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 showValidate={() => setShowValidate(true)}
                 disableResync={true}
                 disableValidate={
-                  res.data.isParentArchived || res.data.method === methodTypes.Connect
+                  res.data.isParentArchived ||
+                  res.data.method === methodTypes.Connect
                 }
               />
             )}
@@ -111,7 +116,10 @@ export default function Layout({ children, params: { externalID } }: Props) {
       <div className="bg-canvasBase no-scrollbar mx-auto flex h-full w-full flex-col overflow-y-auto">
         <div className="bg-canvasBase h-full overflow-hidden">
           {res.error ? (
-            <Error error={res.error as CombinedError} externalID={externalAppID} />
+            <Error
+              error={res.error as CombinedError}
+              externalID={externalAppID}
+            />
           ) : !res.data?.id && !res.isLoading ? (
             <NotFound externalID={externalAppID} />
           ) : (

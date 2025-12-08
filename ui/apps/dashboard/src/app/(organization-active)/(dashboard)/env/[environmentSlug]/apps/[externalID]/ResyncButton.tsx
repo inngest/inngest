@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { methodTypes } from '@inngest/components/types/app';
-import { RiRefreshLine } from '@remixicon/react';
+import { useState } from "react";
+import { Button } from "@inngest/components/Button";
+import { methodTypes } from "@inngest/components/types/app";
+import { RiRefreshLine } from "@remixicon/react";
 
-import ResyncModal from './ResyncModal';
+import ResyncModal from "./ResyncModal";
 
 type Props = {
   appExternalID: string;
@@ -27,9 +27,9 @@ export function ResyncButton({
       <Button
         onClick={() => setIsModalVisible(true)}
         disabled={disabled}
-        appearance={appMethod === methodTypes.Connect ? 'outlined' : 'solid'}
+        appearance={appMethod === methodTypes.Connect ? "outlined" : "solid"}
         kind="primary"
-        label={appMethod === methodTypes.Connect ? 'Migrate' : 'Resync'}
+        label={appMethod === methodTypes.Connect ? "Migrate" : "Resync"}
         icon={<RiRefreshLine />}
         iconSide="left"
       />

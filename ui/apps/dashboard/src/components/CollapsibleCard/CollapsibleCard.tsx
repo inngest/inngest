@@ -1,6 +1,6 @@
-import { forwardRef } from 'react';
-import * as AccordionPrimitive from '@radix-ui/react-accordion';
-import { AnimatePresence, motion } from 'framer-motion';
+import { forwardRef } from "react";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { AnimatePresence, motion } from "framer-motion";
 
 export const CollapsibleCardRoot = AccordionPrimitive.Root;
 
@@ -35,11 +35,11 @@ const CollapsibleCardContent = forwardRef<
         exit={{
           y: 0,
           opacity: 0.2,
-          transition: { duration: 0.2, type: 'tween' },
+          transition: { duration: 0.2, type: "tween" },
         }}
         transition={{
           duration: 0.15,
-          type: 'tween',
+          type: "tween",
         }}
       >
         {children}

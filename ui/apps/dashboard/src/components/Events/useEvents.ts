@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
-import { useClient } from 'urql';
+import { useCallback } from "react";
+import { useClient } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 export const eventsQuery = graphql(`
   query GetEventsV2(
@@ -93,7 +93,7 @@ export function useEvents() {
             eventNames,
             includeInternalEvents,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -102,7 +102,7 @@ export function useEvents() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const eventsData = result.data.environment.eventsV2;
@@ -125,7 +125,7 @@ export function useEvents() {
         totalCount: eventsData.totalCount,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -160,7 +160,7 @@ export function useEventDetails() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -169,17 +169,19 @@ export function useEventDetails() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const eventData = result.data.environment.eventV2;
       return {
         ...eventData,
         receivedAt: new Date(eventData.receivedAt),
-        occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+        occurredAt: eventData.occurredAt
+          ? new Date(eventData.occurredAt)
+          : undefined,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -206,7 +208,7 @@ export function useEventPayload() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -215,13 +217,13 @@ export function useEventPayload() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const eventData = result.data.environment.eventV2.raw;
       return { payload: eventData };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -258,7 +260,7 @@ export function useEventRuns() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: "network-only" },
         )
         .toPromise();
 
@@ -267,7 +269,7 @@ export function useEventRuns() {
       }
 
       if (!result.data) {
-        throw new Error('no data returned');
+        throw new Error("no data returned");
       }
 
       const eventData = result.data.environment.eventV2;
@@ -283,6 +285,6 @@ export function useEventRuns() {
         })),
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

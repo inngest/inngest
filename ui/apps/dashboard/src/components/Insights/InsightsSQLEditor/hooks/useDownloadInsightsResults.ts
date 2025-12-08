@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 
-import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
+import type { InsightsFetchResult } from "../../InsightsStateMachineContext/types";
 
 /**
  * Triggers a file download in the browser by creating a temporary blob URL
@@ -15,7 +15,7 @@ function downloadFile(content: string, filename: string, contentType: string) {
   const url = URL.createObjectURL(blob);
 
   try {
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
@@ -36,13 +36,13 @@ function downloadFile(content: string, filename: string, contentType: string) {
  */
 function needsCSVQuoting(value: string): boolean {
   return (
-    value.includes(',') ||
+    value.includes(",") ||
     value.includes('"') ||
     value.includes("'") ||
-    value.includes('\n') ||
-    value.includes('\r') ||
-    value.startsWith(' ') ||
-    value.endsWith(' ')
+    value.includes("\n") ||
+    value.includes("\r") ||
+    value.startsWith(" ") ||
+    value.endsWith(" ")
   );
 }
 
@@ -70,7 +70,7 @@ function convertToCSV(data: InsightsFetchResult): string {
 
   // Create header row
   const headers = columns.map((col) => col.name);
-  const csvRows = [headers.join(',')];
+  const csvRows = [headers.join(",")];
 
   // Add data rows
   rows.forEach((row) => {
@@ -79,7 +79,7 @@ function convertToCSV(data: InsightsFetchResult): string {
 
       // Handle null/undefined
       if (value === null || value === undefined) {
-        return '';
+        return "";
       }
 
       // Handle dates
@@ -97,10 +97,10 @@ function convertToCSV(data: InsightsFetchResult): string {
       return stringValue;
     });
 
-    csvRows.push(values.join(','));
+    csvRows.push(values.join(","));
   });
 
-  return csvRows.join('\n');
+  return csvRows.join("\n");
 }
 
 /**
@@ -121,7 +121,7 @@ function convertToJSON(data: InsightsFetchResult): string {
   return JSON.stringify(
     jsonData,
     (_key, value) => (value instanceof Date ? value.toISOString() : value),
-    2
+    2,
   );
 }
 
@@ -132,7 +132,7 @@ function convertToJSON(data: InsightsFetchResult): string {
  * @returns A filesystem-safe timestamp string
  */
 function generateTimestamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
 }
 
 /**
@@ -149,12 +149,12 @@ function sanitizeQueryName(queryName: string): string {
   return (
     queryName
       .trim()
-      .replace(/\s+/g, '_') // Replace whitespace with underscores
-      .replace(/[^A-Za-z0-9_]/g, '') || 'insights-query' // Remove non-alphanumeric chars except underscores
+      .replace(/\s+/g, "_") // Replace whitespace with underscores
+      .replace(/[^A-Za-z0-9_]/g, "") || "insights-query" // Remove non-alphanumeric chars except underscores
   );
 }
 
-export type DownloadFormat = 'csv' | 'json';
+export type DownloadFormat = "csv" | "json";
 
 /**
  * Custom hook that provides download functionality for Insights query results.
@@ -169,35 +169,35 @@ export type DownloadFormat = 'csv' | 'json';
  */
 export function useDownloadInsightsResults(
   data: InsightsFetchResult | undefined,
-  queryName?: string
+  queryName?: string,
 ) {
   const downloadAsCSV = useCallback(() => {
     if (!data) return;
 
     const csv = convertToCSV(data);
-    const filename = sanitizeQueryName(queryName || 'insights-query');
+    const filename = sanitizeQueryName(queryName || "insights-query");
     const timestamp = generateTimestamp();
-    downloadFile(csv, `${filename}-${timestamp}.csv`, 'text/csv');
+    downloadFile(csv, `${filename}-${timestamp}.csv`, "text/csv");
   }, [data, queryName]);
 
   const downloadAsJSON = useCallback(() => {
     if (!data) return;
 
     const json = convertToJSON(data);
-    const filename = sanitizeQueryName(queryName || 'insights-query');
+    const filename = sanitizeQueryName(queryName || "insights-query");
     const timestamp = generateTimestamp();
-    downloadFile(json, `${filename}-${timestamp}.json`, 'application/json');
+    downloadFile(json, `${filename}-${timestamp}.json`, "application/json");
   }, [data, queryName]);
 
   const download = useCallback(
     (format: DownloadFormat) => {
-      if (format === 'csv') {
+      if (format === "csv") {
         downloadAsCSV();
       } else {
         downloadAsJSON();
       }
     },
-    [downloadAsCSV, downloadAsJSON]
+    [downloadAsCSV, downloadAsJSON],
   );
 
   return {

@@ -1,7 +1,7 @@
-'use server';
+"use server";
 
-import { type InvokeFunctionMutationVariables } from '@/gql/graphql';
-import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+import { type InvokeFunctionMutationVariables } from "@/gql/graphql";
+import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
 import {
   getInvokeFunctionLookups,
   getProductionApps,
@@ -11,7 +11,7 @@ import {
   syncNewApp,
   type UnattachedSync,
   type VercelApp,
-} from './data';
+} from "./data";
 
 export async function syncAppManually(appURL: string) {
   try {
@@ -23,10 +23,10 @@ export async function syncAppManually(appURL: string) {
     return {
       success: true,
       error: null,
-      appName: response.syncNewApp.app?.externalID || 'Unknown App',
+      appName: response.syncNewApp.app?.externalID || "Unknown App",
     };
   } catch (error) {
-    console.error('Error syncing app:', error);
+    console.error("Error syncing app:", error);
     return { success: false, error: null, appName: null };
   }
 }
@@ -35,7 +35,7 @@ export async function invokeFunction({
   functionSlug,
   user,
   data,
-}: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) {
+}: Pick<InvokeFunctionMutationVariables, "data" | "functionSlug" | "user">) {
   try {
     await invokeFn({ functionSlug, user, data });
 
@@ -43,7 +43,7 @@ export async function invokeFunction({
       success: true,
     };
   } catch (error) {
-    console.error('Error invoking function:', error);
+    console.error("Error invoking function:", error);
 
     if (error instanceof Error) {
       return {
@@ -54,7 +54,7 @@ export async function invokeFunction({
 
     return {
       success: false,
-      error: 'Unknown error occurred while invoking function',
+      error: "Unknown error occurred while invoking function",
     };
   }
 }
@@ -78,7 +78,7 @@ export async function getProdApps() {
     const { apps, unattachedSyncs } = response.environment;
     return { apps, unattachedSyncs };
   } catch (error) {
-    console.error('Error fetching production apps:', error);
+    console.error("Error fetching production apps:", error);
     return null;
   }
 }
@@ -95,18 +95,20 @@ export async function getVercelSyncs(): Promise<VercelSyncsResponse> {
 
     // Filter apps to only include those with latestSync.platform === "vercel", that are active
     const vercelApps = syncs.apps.filter(
-      (app) => app.latestSync?.platform === 'vercel' && !app.isArchived
+      (app) => app.latestSync?.platform === "vercel" && !app.isArchived,
     );
 
     // Filter unattachedSyncs to only include those with a vercelDeploymentURL
-    const unattachedSyncs = syncs.unattachedSyncs.filter((sync) => sync.vercelDeploymentURL);
+    const unattachedSyncs = syncs.unattachedSyncs.filter(
+      (sync) => sync.vercelDeploymentURL,
+    );
 
     return {
       apps: vercelApps,
       unattachedSyncs: unattachedSyncs,
     };
   } catch (error) {
-    console.error('Error fetching vercel apps:', error);
+    console.error("Error fetching vercel apps:", error);
     return { apps: [], unattachedSyncs: [] };
   }
 }

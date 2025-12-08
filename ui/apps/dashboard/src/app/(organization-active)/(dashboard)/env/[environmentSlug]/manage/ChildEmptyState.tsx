@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import type { Route } from 'next';
-import { Button } from '@inngest/components/Button';
+import type { Route } from "next";
+import { Button } from "@inngest/components/Button";
 
-import { staticSlugs } from '@/utils/environments';
+import { staticSlugs } from "@/utils/environments";
 
 export default function ChildEmptyState() {
   return (
@@ -14,8 +14,8 @@ export default function ChildEmptyState() {
             Manage Keys for All Branch Environments
           </h3>
           <p className="text-subtle mt-2 text-sm font-medium normal-case">
-            Keys are shared for all branch environments. The Inngest SDK can automatically route
-            your events to the correct branch.
+            Keys are shared for all branch environments. The Inngest SDK can
+            automatically route your events to the correct branch.
           </p>
           <div className="border-subtle mt-6 flex items-center gap-2 border-t py-4">
             <Button

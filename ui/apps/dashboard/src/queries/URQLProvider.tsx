@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
-import * as Sentry from '@sentry/nextjs';
-import { authExchange } from '@urql/exchange-auth';
-import { requestPolicyExchange } from '@urql/exchange-request-policy';
-import { retryExchange } from '@urql/exchange-retry';
+import { useMemo } from "react";
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import * as Sentry from "@sentry/nextjs";
+import { authExchange } from "@urql/exchange-auth";
+import { requestPolicyExchange } from "@urql/exchange-request-policy";
+import { retryExchange } from "@urql/exchange-retry";
 import {
   CombinedError,
   Provider,
@@ -15,9 +15,9 @@ import {
   createClient,
   fetchExchange,
   mapExchange,
-} from 'urql';
+} from "urql";
 
-import SignInRedirectErrors from '@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors';
+import SignInRedirectErrors from "@/app/(auth)/sign-in/[[...sign-in]]/SignInRedirectErrors";
 
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
@@ -26,7 +26,11 @@ import SignInRedirectErrors from '@/app/(auth)/sign-in/[[...sign-in]]/SignInRedi
  * @returns {JSX.Element}
  * @constructor
  */
-export default function URQLProviderWrapper({ children }: { children: React.ReactNode }) {
+export default function URQLProviderWrapper({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { isSignedIn, orgId } = useAuth();
 
   return <URQLProvider key={`${isSignedIn}-${orgId}`}>{children}</URQLProvider>;
@@ -42,14 +46,15 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
       fetchOptions: {
         // Necessary to include HTTP-only cookies. This is used for non-Clerk
         // auth.
-        credentials: 'include',
+        credentials: "include",
       },
       exchanges: [
         requestPolicyExchange({
           // The amount of time in ms that has to go by before we upgrade the operation's request policy to `cache-and-network`.
           ttl: 30_000, // 30 seconds (same value as Next.js’ Full Route Cache)
           // Only upgrade if the request policy is not `cache-only`
-          shouldUpgrade: (operation) => operation.context.requestPolicy !== 'cache-only',
+          shouldUpgrade: (operation) =>
+            operation.context.requestPolicy !== "cache-only",
         }),
         cacheExchange,
         mapExchange({
@@ -60,9 +65,9 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
               Sentry.captureException(error);
               signOut(() => {
                 router.push(
-                  `${process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in'}?error=${
-                    SignInRedirectErrors.Unauthenticated
-                  }` as Route
+                  `${
+                    process.env.NEXT_PUBLIC_SIGN_IN_PATH || "/sign-in"
+                  }?error=${SignInRedirectErrors.Unauthenticated}` as Route,
                 );
               });
             }
@@ -98,6 +103,6 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
 function isUnauthenticatedError(error: CombinedError): boolean {
   return (
     error.response?.status === 401 ||
-    error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED')
+    error.graphQLErrors.some((e) => e.extensions.code === "UNAUTHENTICATED")
   );
 }

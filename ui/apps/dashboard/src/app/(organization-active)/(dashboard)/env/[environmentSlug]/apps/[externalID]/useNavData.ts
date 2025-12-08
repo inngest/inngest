@@ -1,5 +1,5 @@
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const query = graphql(`
   query AppNavData($envID: ID!, $externalAppID: String!) {
@@ -19,7 +19,13 @@ const query = graphql(`
   }
 `);
 
-export function useNavData({ envID, externalAppID }: { envID: string; externalAppID: string }) {
+export function useNavData({
+  envID,
+  externalAppID,
+}: {
+  envID: string;
+  externalAppID: string;
+}) {
   const res = useGraphQLQuery({
     query,
     variables: { envID, externalAppID },
@@ -48,11 +54,11 @@ export function useNavData({ envID, externalAppID }: { envID: string; externalAp
  * be 100% new.
  */
 function removeSyncIDFromURL(url: string): string {
-  if (!url.startsWith('http')) {
-    url = 'https://' + url;
+  if (!url.startsWith("http")) {
+    url = "https://" + url;
   }
 
   const urlObj = new URL(url);
-  urlObj.searchParams.delete('deployId');
+  urlObj.searchParams.delete("deployId");
   return urlObj.toString();
 }

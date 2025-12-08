@@ -1,6 +1,6 @@
-import { usePathname } from 'next/navigation';
+import { usePathname } from "next/navigation";
 
-import { getManageKey } from '@/utils/urls';
+import { getManageKey } from "@/utils/urls";
 
 export default function useManagePageTerminology() {
   const pathname = usePathname();
@@ -17,16 +17,16 @@ export default function useManagePageTerminology() {
 
   const source: ContentProps = {
     keys: {
-      name: 'Event Key',
-      type: 'key',
-      titleType: 'Key',
-      param: 'keys',
+      name: "Event Key",
+      type: "key",
+      titleType: "Key",
+      param: "keys",
     },
     webhooks: {
-      name: 'Webhook',
-      type: 'webhook',
-      titleType: 'Webhook',
-      param: 'webhooks',
+      name: "Webhook",
+      type: "webhook",
+      titleType: "Webhook",
+      param: "webhooks",
     },
   };
 

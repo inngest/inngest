@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { usePaginationUI } from '@inngest/components/Pagination';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { usePaginationUI } from "@inngest/components/Pagination";
+import { StatusDot } from "@inngest/components/Status/StatusDot";
 
-import type { Environment } from '@/utils/environments';
-import { FilterResultDetails } from './FilterResultDetails';
-import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
-import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
-import { EnvViewButton } from './row-actions/EnvViewButton';
+import type { Environment } from "@/utils/environments";
+import { FilterResultDetails } from "./FilterResultDetails";
+import { EnvArchiveButton } from "./row-actions/EnvArchiveButton/EnvArchiveButton";
+import { EnvKeysDropdownButton } from "./row-actions/EnvKeysDropdownButton";
+import { EnvViewButton } from "./row-actions/EnvViewButton";
 
 const PER_PAGE = 5;
 
@@ -34,7 +34,10 @@ export function CustomEnvironmentListTable({
         <table className="w-full">
           <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
+              <th
+                scope="col"
+                className="text-muted min-w-48 px-4 py-3 text-xs font-medium"
+              >
                 Name
               </th>
               <th scope="col" className="w-24 pr-4 text-right"></th>
@@ -43,18 +46,26 @@ export function CustomEnvironmentListTable({
           <tbody className="divide-subtle divide-y px-4 py-3">
             {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={3}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No custom environments exist
                 </td>
               </tr>
             ) : visibleCustomEnvs.length === 0 ? (
               <tr>
-                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={3}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No results found
                 </td>
               </tr>
             ) : (
-              visibleCustomEnvs.map((env) => <TableRow env={env} key={env.id} />)
+              visibleCustomEnvs.map((env) => (
+                <TableRow env={env} key={env.id} />
+              ))
             )}
           </tbody>
         </table>
@@ -78,7 +89,7 @@ function TableRow(props: { env: Environment }) {
     <tr>
       <td className="max-w-80 px-4 py-3">
         <h3 className="text-basis flex items-center gap-2 break-words text-sm font-medium">
-          <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
+          <StatusDot status={isArchived ? "ARCHIVED" : "ACTIVE"} size="small" />
           {name}
         </h3>
       </td>

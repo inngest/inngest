@@ -1,4 +1,4 @@
-import { NotFoundIcon } from '@/icons/NotFoundIcon';
+import { NotFoundIcon } from "@/icons/NotFoundIcon";
 
 export const NotFound = ({}) => {
   return (

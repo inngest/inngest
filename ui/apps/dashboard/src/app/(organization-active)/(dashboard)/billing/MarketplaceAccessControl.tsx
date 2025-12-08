@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { redirect, usePathname } from 'next/navigation';
+import { redirect, usePathname } from "next/navigation";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 // Whitelist of paths that marketplace users can access
-const marketplaceAllowedPaths = ['/usage'] as const;
+const marketplaceAllowedPaths = ["/usage"] as const;
 
 interface Props {
   isMarketplace: boolean;
@@ -18,11 +18,13 @@ export default function MarketplaceAccessControl({
   const pathname = usePathname();
 
   if (isMarketplace) {
-    const isAllowed = marketplaceAllowedPaths.some((allowedPath) => pathname.endsWith(allowedPath));
+    const isAllowed = marketplaceAllowedPaths.some((allowedPath) =>
+      pathname.endsWith(allowedPath),
+    );
 
     if (!isAllowed) {
       // Redirect to usage page if trying to access non-whitelisted page
-      redirect(pathCreator.billing({ tab: 'usage' }));
+      redirect(pathCreator.billing({ tab: "usage" }));
     }
   }
 

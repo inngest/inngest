@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { type Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
-import { useQuery } from 'urql';
+import { useMemo } from "react";
+import { type Route } from "next";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
+import { useQuery } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { pathCreator } from "@/utils/urls";
 
 const GetFailedFunctionRunsDocument = graphql(`
   query GetFailedFunctionRuns(
@@ -64,7 +64,12 @@ export default function LatestFailedFunctionRuns({
   }, []);
 
   const environment = useEnvironment();
-  const [{ data: failedFunctionRunsResponse, fetching: isFetchingFailedFunctionRuns }] = useQuery({
+  const [
+    {
+      data: failedFunctionRunsResponse,
+      fetching: isFetchingFailedFunctionRuns,
+    },
+  ] = useQuery({
     query: GetFailedFunctionRunsDocument,
     variables: {
       environmentID: environment.id,
@@ -76,7 +81,9 @@ export default function LatestFailedFunctionRuns({
   const router = useRouter();
 
   const failedFunctionRuns =
-    failedFunctionRunsResponse?.environment.function?.failedRuns?.edges?.map((edge) => edge?.node);
+    failedFunctionRunsResponse?.environment.function?.failedRuns?.edges?.map(
+      (edge) => edge?.node,
+    );
 
   return (
     <div>
@@ -86,7 +93,9 @@ export default function LatestFailedFunctionRuns({
           appearance="outlined"
           kind="secondary"
           href={
-            `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/runs` as Route
+            `/env/${environmentSlug}/functions/${encodeURIComponent(
+              functionSlug,
+            )}/runs` as Route
           }
           label="View all runs"
         />
@@ -116,7 +125,10 @@ export default function LatestFailedFunctionRuns({
                   if (!functionRun) {
                     return (
                       <tr key={index} className="opacity-50">
-                        <td colSpan={2} className="p-4 text-center font-semibold">
+                        <td
+                          colSpan={2}
+                          className="p-4 text-center font-semibold"
+                        >
                           Error: could not load function run
                         </td>
                       </tr>
@@ -135,12 +147,18 @@ export default function LatestFailedFunctionRuns({
                       className="hover:bg-canvasSubtle/50 cursor-pointer truncate transition-all"
                       onClick={() =>
                         router.push(
-                          pathCreator.runPopout({ envSlug: environmentSlug, runID: functionRun.id })
+                          pathCreator.runPopout({
+                            envSlug: environmentSlug,
+                            runID: functionRun.id,
+                          }),
                         )
                       }
                     >
                       <td className="flex items-center gap-6 p-4">
-                        <TimeCell format="relative" date={new Date(functionRun.endedAt)} />
+                        <TimeCell
+                          format="relative"
+                          date={new Date(functionRun.endedAt)}
+                        />
 
                         <TimeCell date={new Date(functionRun.endedAt)} />
                       </td>

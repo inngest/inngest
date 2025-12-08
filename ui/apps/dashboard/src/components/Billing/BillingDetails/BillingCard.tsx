@@ -1,4 +1,4 @@
-import { cn } from '@inngest/components/utils/classNames';
+import { cn } from "@inngest/components/utils/classNames";
 
 export default function BillingCard({
   heading,
@@ -12,7 +12,7 @@ export default function BillingCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('border-subtle rounded-md border px-6 py-4', className)}>
+    <div className={cn("border-subtle rounded-md border px-6 py-4", className)}>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-muted">{heading}</h2>
         {actions}

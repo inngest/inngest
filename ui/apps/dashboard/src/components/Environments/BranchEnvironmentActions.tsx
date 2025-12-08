@@ -1,23 +1,25 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { Button, SplitButton } from '@inngest/components/Button';
+import { useRouter } from "next/navigation";
+import { Button, SplitButton } from "@inngest/components/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiArrowDownSLine } from '@remixicon/react';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { RiArrowDownSLine } from "@remixicon/react";
 
-import type { Environment } from '@/utils/environments';
-import { pathCreator } from '@/utils/urls';
+import type { Environment } from "@/utils/environments";
+import { pathCreator } from "@/utils/urls";
 
 type BranchEnvironmentActionsProps = {
   branchParent: Environment;
 };
 
-export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActionsProps) {
+export function BranchEnvironmentActions({
+  branchParent,
+}: BranchEnvironmentActionsProps) {
   const router = useRouter();
 
   return (
@@ -46,13 +48,19 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           <DropdownMenuContent>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(pathCreator.keys({ envSlug: branchParent.slug }))}
+              onSelect={() =>
+                router.push(pathCreator.keys({ envSlug: branchParent.slug }))
+              }
             >
               Manage event keys
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(pathCreator.signingKeys({ envSlug: branchParent.slug }))}
+              onSelect={() =>
+                router.push(
+                  pathCreator.signingKeys({ envSlug: branchParent.slug }),
+                )
+              }
             >
               Manage signing key
             </DropdownMenuItem>

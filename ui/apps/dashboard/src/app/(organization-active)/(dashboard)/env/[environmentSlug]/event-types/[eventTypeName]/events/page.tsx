@@ -1,4 +1,4 @@
-import EventsPage from '@/components/Events/EventsPage';
+import EventsPage from "@/components/Events/EventsPage";
 
 export default function Page({
   params: { environmentSlug: envSlug, eventTypeName },

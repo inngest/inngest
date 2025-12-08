@@ -1,5 +1,5 @@
 const SignInRedirectErrors = {
-  Unauthenticated: 'unauthenticated',
+  Unauthenticated: "unauthenticated",
 } as const;
 
 export type SignInRedirectError = keyof typeof SignInRedirectErrors;

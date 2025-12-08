@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import useGetUsageChartData from "@/components/Billing/Usage/useGetUsageChartData";
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const executionOverageQuery = graphql(`
   query ExecutionOverageCheck {
@@ -35,8 +35,8 @@ export function useExecutionOverageCheck() {
 
   // Get current month's execution usage data
   const { data: usageData } = useGetUsageChartData({
-    selectedPeriod: 'current',
-    type: 'execution',
+    selectedPeriod: "current",
+    type: "execution",
   });
 
   return {
@@ -48,12 +48,12 @@ export function useExecutionOverageCheck() {
 
 export function isFreePlan(planSlug: string | null): boolean {
   if (!planSlug) return false;
-  return planSlug.toLowerCase().includes('free');
+  return planSlug.toLowerCase().includes("free");
 }
 
 export function parseExecutionOverageData(
   data: any,
-  usageData: any[]
+  usageData: any[],
 ): ExecutionOverageData | null {
   if (!data?.account) return null;
 

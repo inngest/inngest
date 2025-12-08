@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Header } from '@inngest/components/Header/Header';
+import { useState } from "react";
+import { Header } from "@inngest/components/Header/Header";
 
-import { ActionsMenu } from '@/components/Events/ActionsMenu';
-import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
-import SendEventButton from '@/components/Events/SendEventButton';
-import { pathCreator } from '@/utils/urls';
+import { ActionsMenu } from "@/components/Events/ActionsMenu";
+import ArchiveEventModal from "@/components/Events/ArchiveEventModal";
+import SendEventButton from "@/components/Events/SendEventButton";
+import { pathCreator } from "@/utils/urls";
 
 type EventLayoutProps = {
   children: React.ReactNode;
@@ -27,17 +27,20 @@ export default function EventLayout({
     <>
       <Header
         breadcrumb={[
-          { text: 'Event types', href: pathCreator.eventTypes({ envSlug }) },
-          { text: eventName, href: pathCreator.eventType({ envSlug, eventName }) },
+          { text: "Event types", href: pathCreator.eventTypes({ envSlug }) },
+          {
+            text: eventName,
+            href: pathCreator.eventType({ envSlug, eventName }),
+          },
         ]}
         tabs={[
           {
             href: pathCreator.eventType({ envSlug, eventName }),
-            children: 'Dashboard',
+            children: "Dashboard",
             exactRouteMatch: true,
           },
           {
-            children: 'Events',
+            children: "Events",
             href: pathCreator.eventTypeEvents({ envSlug, eventName }),
           },
         ]}

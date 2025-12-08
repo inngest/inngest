@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { Link } from '@inngest/components/Link';
-import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
+import { Link } from "@inngest/components/Link";
+import { IconPrometheus } from "@inngest/components/icons/platforms/Prometheus";
 
-import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
-import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
-import ConfigSteps from '@/components/PrometheusIntegration/ConfigSteps';
+import IntegrationNotEnabledMessage from "@/components/Integration/IntegrationNotEnabledMessage";
+import MetricsExportEntitlementBanner from "@/components/Integration/MetricsExportEntitlementsBanner";
+import ConfigSteps from "@/components/PrometheusIntegration/ConfigSteps";
 
 type Props = {
   metricsExportEnabled: boolean;
@@ -28,8 +28,8 @@ export default function SetupPage({
       </div>
 
       <div className="text-muted mb-6 w-full text-base font-normal">
-        This integration allows your Prometheus server to scrape metrics about your Inngest
-        environment.{' '}
+        This integration allows your Prometheus server to scrape metrics about
+        your Inngest environment.{" "}
         <Link
           target="_blank"
           size="medium"
@@ -44,7 +44,7 @@ export default function SetupPage({
           <MetricsExportEntitlementBanner
             granularitySeconds={metricsGranularitySeconds}
             freshnessSeconds={metricsFreshnessSeconds}
-            className={'mb-6'}
+            className={"mb-6"}
           />
           <ConfigSteps metricsGranularitySeconds={metricsGranularitySeconds} />
         </>

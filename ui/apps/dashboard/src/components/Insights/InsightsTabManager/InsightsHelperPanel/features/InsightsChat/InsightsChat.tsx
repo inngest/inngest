@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AgentStatus } from '@inngest/use-agent';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type AgentStatus } from "@inngest/use-agent";
 
-import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
-import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import { Conversation, ConversationContent } from './Conversation';
-import { EmptyState } from './EmptyState';
-import { useInsightsChatProvider } from './InsightsChatProvider';
-import { LoadingIndicator } from './LoadingIndicator';
-import { ResponsivePromptInput } from './input/InputField';
-import { AssistantMessage } from './messages/AssistantMessage';
-import { ToolMessage } from './messages/ToolMessage';
-import { UserMessage } from './messages/UserMessage';
+import { formatSQL } from "@/components/Insights/InsightsSQLEditor/utils";
+import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
+import { Conversation, ConversationContent } from "./Conversation";
+import { EmptyState } from "./EmptyState";
+import { useInsightsChatProvider } from "./InsightsChatProvider";
+import { LoadingIndicator } from "./LoadingIndicator";
+import { ResponsivePromptInput } from "./input/InputField";
+import { AssistantMessage } from "./messages/AssistantMessage";
+import { ToolMessage } from "./messages/ToolMessage";
+import { UserMessage } from "./messages/UserMessage";
 
 // Helper: derive dynamic loading text from event-driven flags
 function getLoadingMessage(flags: {
@@ -28,15 +28,15 @@ function getLoadingMessage(flags: {
   if (textCompleted) return null;
   if (toolName) {
     switch (toolName) {
-      case 'select_events':
-        return 'Analyzing events…';
-      case 'generate_sql':
-        return 'Generating query...';
+      case "select_events":
+        return "Analyzing events…";
+      case "generate_sql":
+        return "Generating query...";
       default:
-        return 'Thinking...';
+        return "Thinking...";
     }
   }
-  return 'Thinking…';
+  return "Thinking…";
 }
 
 type InsightsChatProps = {
@@ -54,7 +54,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   } = useInsightsStateMachineContext();
 
   // State for the chat's input value
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
 
   // Provider-backed agent state and actions
   const {
@@ -71,10 +71,11 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   } = useInsightsChatProvider();
 
   // Derive loading flags for this thread from provider
-  const { networkActive, textStreaming, textCompleted, currentToolName } = useMemo(
-    () => getThreadFlags(agentThreadId),
-    [getThreadFlags, agentThreadId]
-  );
+  const { networkActive, textStreaming, textCompleted, currentToolName } =
+    useMemo(
+      () => getThreadFlags(agentThreadId),
+      [getThreadFlags, agentThreadId],
+    );
 
   // Thread switching is handled by ActiveThreadBridge at the TabManager level
 
@@ -110,9 +111,9 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       const message = inputValue.trim();
-      if (!message || status !== 'ready') return;
+      if (!message || status !== "ready") return;
       // Clear input immediately for snappier UX
-      setInputValue('');
+      setInputValue("");
       // Capture client state snapshot at send-time
       try {
         setThreadClientState(agentThreadId, {
@@ -121,7 +122,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
           schemas,
           currentQuery: currentSql,
           tabTitle,
-          mode: 'insights_sql_playground',
+          mode: "insights_sql_playground",
           timestamp: Date.now(),
         });
       } catch {}
@@ -137,7 +138,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
       eventTypes,
       schemas,
       tabTitle,
-    ]
+    ],
   );
 
   const loadingText = getLoadingMessage({
@@ -151,7 +152,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
   return (
     <div
       className={`border-subtle flex h-full w-full shrink-0 flex-col border-l bg-white ${
-        className ?? ''
+        className ?? ""
       }`}
     >
       <div className="bg-surfaceBase flex h-full w-full flex-col">
@@ -164,20 +165,23 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
             ) : (
               <div className="flex-1 space-y-4 p-3">
                 {messages.map((m) => (
-                  <div key={m.id} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                    {m.role === 'user'
+                  <div
+                    key={m.id}
+                    className={m.role === "user" ? "text-right" : "text-left"}
+                  >
+                    {m.role === "user"
                       ? m.parts.map((part, i) => {
-                          if (part.type === 'text') {
+                          if (part.type === "text") {
                             return <UserMessage key={i} part={part} />;
                           }
                           return null;
                         })
                       : m.parts.map((part, i) => {
-                          if (part.type === 'text') {
+                          if (part.type === "text") {
                             return <AssistantMessage key={i} part={part} />;
                           }
-                          if (part.type === 'tool-call') {
-                            if (part.toolName === 'generate_sql') {
+                          if (part.type === "tool-call") {
+                            if (part.toolName === "generate_sql") {
                               return (
                                 <ToolMessage
                                   key={i}
@@ -205,7 +209,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
             value={inputValue}
             onChange={setInputValue}
             onSubmit={handleSubmit}
-            disabled={status !== 'ready'}
+            disabled={status !== "ready"}
           />
         </div>
       </div>

@@ -1,12 +1,12 @@
-import 'server-only';
-import { graphql } from '@/gql';
+import "server-only";
+import { graphql } from "@/gql";
 import {
   type EntitlementUsageQuery,
   type GetBillingDetailsQuery,
   type GetCurrentPlanQuery,
   type GetPlansQuery,
-} from '@/gql/graphql';
-import graphqlAPI from '@/queries/graphqlAPI';
+} from "@/gql/graphql";
+import graphqlAPI from "@/queries/graphqlAPI";
 
 export const entitlementUsageDocument = graphql(`
   query EntitlementUsage {
@@ -127,19 +127,23 @@ export const entitlementUsageDocument = graphql(`
 
 export const entitlementUsage = async () => {
   try {
-    const res = await graphqlAPI.request<EntitlementUsageQuery>(entitlementUsageDocument);
+    const res = await graphqlAPI.request<EntitlementUsageQuery>(
+      entitlementUsageDocument,
+    );
 
     // TODO: Replace this with a proper programmatic check. Relying on the plan
     // name is fragile.
-    const isCustomPlan = (res.account.plan?.name ?? '').toLowerCase().includes('enterprise');
+    const isCustomPlan = (res.account.plan?.name ?? "")
+      .toLowerCase()
+      .includes("enterprise");
 
     return {
       ...res.account,
       isCustomPlan,
     };
   } catch (error) {
-    console.error('Error fetching entitlement usage:', error);
-    throw new Error('Failed to fetch entitlement usage');
+    console.error("Error fetching entitlement usage:", error);
+    throw new Error("Failed to fetch entitlement usage");
   }
 };
 
@@ -210,11 +214,13 @@ export const currentPlanDocument = graphql(`
 
 export const currentPlan = async () => {
   try {
-    const res = await graphqlAPI.request<GetCurrentPlanQuery>(currentPlanDocument);
+    const res = await graphqlAPI.request<GetCurrentPlanQuery>(
+      currentPlanDocument,
+    );
     return res.account;
   } catch (error) {
-    console.error('Error fetching current plan:', error);
-    throw new Error('Failed to fetch current plan');
+    console.error("Error fetching current plan:", error);
+    throw new Error("Failed to fetch current plan");
   }
 };
 
@@ -237,11 +243,13 @@ export const billingDetailsDocument = graphql(`
 
 export const billingDetails = async () => {
   try {
-    const res = await graphqlAPI.request<GetBillingDetailsQuery>(billingDetailsDocument);
+    const res = await graphqlAPI.request<GetBillingDetailsQuery>(
+      billingDetailsDocument,
+    );
     return res.account;
   } catch (error) {
-    console.error('Error fetching billing details:', error);
-    throw new Error('Failed to fetch billing details');
+    console.error("Error fetching billing details:", error);
+    throw new Error("Failed to fetch billing details");
   }
 };
 
@@ -280,7 +288,7 @@ export const plans = async () => {
     const res = await graphqlAPI.request<GetPlansQuery>(plansDocument);
     return res.plans;
   } catch (error) {
-    console.error('Error fetching plans:', error);
-    throw new Error('Failed to fetch plans');
+    console.error("Error fetching plans:", error);
+    throw new Error("Failed to fetch plans");
   }
 };

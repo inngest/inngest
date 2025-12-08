@@ -5,10 +5,10 @@ import {
   type Organization,
   type OrganizationMembership,
   type User,
-} from '@clerk/nextjs/server';
+} from "@clerk/nextjs/server";
 
-import { graphql } from '@/gql';
-import graphqlAPI from '../graphqlAPI';
+import { graphql } from "@/gql";
+import graphqlAPI from "../graphqlAPI";
 
 export type ProfileType = {
   user: User;
@@ -41,15 +41,15 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
     // Marketplace users are not authed with Clerk.
 
     orgName = res.account.name ?? undefined;
-    displayName = 'System';
+    displayName = "System";
     orgProfilePic = null;
   } else {
     const { user, org } = await getProfile();
     orgName = org?.name;
     displayName =
       user.firstName || user.lastName
-        ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
-        : user.username ?? '';
+        ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
+        : user.username ?? "";
     orgProfilePic = org?.hasImage ? org.imageUrl : null;
   }
 
@@ -65,14 +65,16 @@ export const getProfile = async (): Promise<ProfileType> => {
   const user = await currentUser();
 
   if (!user) {
-    throw new Error('User is not logged in');
+    throw new Error("User is not logged in");
   }
 
   const { orgId } = auth();
   return { user, org: orgId ? await getOrg(orgId) : undefined };
 };
 
-export const getOrg = async (organizationId: string): Promise<Organization | undefined> => {
+export const getOrg = async (
+  organizationId: string,
+): Promise<Organization | undefined> => {
   if (!organizationId) {
     return undefined;
   }

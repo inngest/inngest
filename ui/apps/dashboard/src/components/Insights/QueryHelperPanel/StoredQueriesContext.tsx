@@ -1,13 +1,20 @@
-'use client';
+"use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { toast } from 'sonner';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { toast } from "sonner";
 
-import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import type { QuerySnapshot, Tab } from '@/components/Insights/types';
-import type { InsightsQueryStatement } from '@/gql/graphql';
-import { getOrderedSavedQueries } from '../queries';
-import { useInsightsSavedQueries } from './useInsightsSavedQueries';
+import type { TabManagerActions } from "@/components/Insights/InsightsTabManager/InsightsTabManager";
+import type { QuerySnapshot, Tab } from "@/components/Insights/types";
+import type { InsightsQueryStatement } from "@/gql/graphql";
+import { getOrderedSavedQueries } from "../queries";
+import { useInsightsSavedQueries } from "./useInsightsSavedQueries";
 
 interface StoredQueriesContextValue {
   deleteQuery: (queryId: string) => void;
@@ -28,14 +35,19 @@ interface StoredQueriesContextValue {
   shareQuery: (queryId: string) => void;
 }
 
-const StoredQueriesContext = createContext<undefined | StoredQueriesContextValue>(undefined);
+const StoredQueriesContext = createContext<
+  undefined | StoredQueriesContextValue
+>(undefined);
 
 interface StoredQueriesProviderProps {
   children: ReactNode;
   tabManagerActions: TabManagerActions;
 }
 
-export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
+export function StoredQueriesProvider({
+  children,
+  tabManagerActions,
+}: StoredQueriesProviderProps) {
   const [querySnapshots, setQuerySnapshots] = useState<QuerySnapshot[]>([]);
 
   const {
@@ -62,10 +74,10 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
           refetchSavedQueries();
-          toast.success('Successfully updated query');
+          toast.success("Successfully updated query");
         } else {
           const errorMessage = `Failed to update query${
-            result.error === 'unique' ? ': name must be unique' : ''
+            result.error === "unique" ? ": name must be unique" : ""
           }`;
           toast.error(errorMessage);
           throw new Error(errorMessage);
@@ -78,17 +90,17 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
           refetchSavedQueries();
-          toast.success('Successfully saved query');
+          toast.success("Successfully saved query");
         } else {
           const errorMessage = `Failed to save query${
-            result.error === 'unique' ? ': name must be unique' : ''
+            result.error === "unique" ? ": name must be unique" : ""
           }`;
           toast.error(errorMessage);
           throw new Error(errorMessage);
         }
       }
     },
-    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions]
+    [beSaveQuery, beUpdateQuery, refetchSavedQueries, tabManagerActions],
   );
 
   const deleteQuery = useCallback(
@@ -99,12 +111,12 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         // This is necessary because the query never returns anything that matches the list by __typename.
         // It returns only a list of deleted IDs.
         refetchSavedQueries();
-        toast.success('Query deleted');
+        toast.success("Query deleted");
       } else {
-        toast.error('Failed to delete query');
+        toast.error("Failed to delete query");
       }
     },
-    [beDeleteQuery, refetchSavedQueries, tabManagerActions]
+    [beDeleteQuery, refetchSavedQueries, tabManagerActions],
   );
 
   const shareQuery = useCallback(
@@ -115,12 +127,12 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
         // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
         // that we have a consistent type name to match on regardless of existing saved queries.
         refetchSavedQueries();
-        toast.success('Query shared with your organization');
+        toast.success("Query shared with your organization");
       } else {
-        toast.error('Failed to share query with your organization');
+        toast.error("Failed to share query with your organization");
       }
     },
-    [beShareQuery, refetchSavedQueries]
+    [beShareQuery, refetchSavedQueries],
   );
 
   const deleteQuerySnapshot = useCallback((snapshotId: string) => {
@@ -141,7 +153,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 
   const orderedQuerySnapshots = useMemo(
     () => ({ data: querySnapshots, error: undefined, isLoading: false }),
-    [querySnapshots]
+    [querySnapshots],
   );
 
   return (
@@ -165,7 +177,9 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
 export function useStoredQueries(): StoredQueriesContextValue {
   const context = useContext(StoredQueriesContext);
   if (context === undefined) {
-    throw new Error('useStoredQueries must be used within a StoredQueriesProvider');
+    throw new Error(
+      "useStoredQueries must be used within a StoredQueriesProvider",
+    );
   }
 
   return context;

@@ -1,5 +1,5 @@
-import { MenuItem } from '@inngest/components/Menu/MenuItem';
-import { RiPlugLine } from '@remixicon/react';
+import { MenuItem } from "@inngest/components/Menu/MenuItem";
+import { RiPlugLine } from "@remixicon/react";
 
 export const Integrations = ({ collapsed }: { collapsed: boolean }) => (
   <MenuItem

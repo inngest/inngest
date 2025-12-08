@@ -1,24 +1,37 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/Auth';
-import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/Connect';
-import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/Format';
-import { IntegrationSteps, STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
-import { toast } from 'sonner';
+import { useRouter } from "next/navigation";
+import NeonAuth from "@inngest/components/PostgresIntegrations/Neon/Auth";
+import NeonConnect from "@inngest/components/PostgresIntegrations/Neon/Connect";
+import NeonFormat from "@inngest/components/PostgresIntegrations/Neon/Format";
+import {
+  IntegrationSteps,
+  STEPS_ORDER,
+} from "@inngest/components/PostgresIntegrations/types";
+import { toast } from "sonner";
 
-import { useSteps } from '@/components/PostgresIntegration/Context';
-import { pathCreator } from '@/utils/urls';
-import { verifyAutoSetup, verifyCredentials, verifyLogicalReplication } from './actions';
+import { useSteps } from "@/components/PostgresIntegration/Context";
+import { pathCreator } from "@/utils/urls";
+import {
+  verifyAutoSetup,
+  verifyCredentials,
+  verifyLogicalReplication,
+} from "./actions";
 
-export default function NeonStep({ params: { step } }: { params: { step: string } }) {
+export default function NeonStep({
+  params: { step },
+}: {
+  params: { step: string };
+}) {
   const { setStepsCompleted, credentials, setCredentials } = useSteps();
   const router = useRouter();
   const firstStep = STEPS_ORDER[0]!;
 
   function handleLostCredentials() {
-    toast.error('Lost credentials. Going back to the first step.');
-    router.push(pathCreator.pgIntegrationStep({ integration: 'neon', step: firstStep }));
+    toast.error("Lost credentials. Going back to the first step.");
+    router.push(
+      pathCreator.pgIntegrationStep({ integration: "neon", step: firstStep }),
+    );
   }
 
   if (step === IntegrationSteps.Authorize) {

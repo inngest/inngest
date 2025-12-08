@@ -1,19 +1,19 @@
-import { useRef, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { Modal } from '@inngest/components/Modal';
-import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
-import { methodTypes } from '@inngest/components/types/app';
-import { cn } from '@inngest/components/utils/classNames';
-import { RiLoopLeftLine } from '@remixicon/react';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useRef, useState } from "react";
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
+import { Modal } from "@inngest/components/Modal";
+import { Switch, SwitchLabel, SwitchWrapper } from "@inngest/components/Switch";
+import { methodTypes } from "@inngest/components/types/app";
+import { cn } from "@inngest/components/utils/classNames";
+import { RiLoopLeftLine } from "@remixicon/react";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import type { CodedError } from '@/codedError';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
-import { graphql } from '@/gql';
+import type { CodedError } from "@/codedError";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { SyncFailure } from "@/components/SyncFailure/SyncFailure";
+import { graphql } from "@/gql";
 
 const ResyncAppDocument = graphql(`
   mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {
@@ -73,15 +73,15 @@ export default function ResyncModal({
           additionalTypenames: [
             // Bust the cache for the Workflow type to prevent the functions
             // list from being stale
-            'Workflow',
+            "Workflow",
           ],
-        }
+        },
       );
       if (res.error) {
         throw res.error;
       }
       if (!res.data) {
-        throw new Error('No API response data');
+        throw new Error("No API response data");
       }
 
       if (res.data.resyncApp.error) {
@@ -90,11 +90,11 @@ export default function ResyncModal({
       }
 
       setFailure(undefined);
-      toast.success('Synced app');
+      toast.success("Synced app");
       onClose();
     } catch (error) {
       setFailure({
-        code: 'unknown',
+        code: "unknown",
       });
     } finally {
       setIsSyncing(false);
@@ -104,16 +104,23 @@ export default function ResyncModal({
   const isConnect = appMethod === methodTypes.Connect;
 
   return (
-    <Modal className="w-[800px]" initialFocus={syncButtonRef} isOpen={isOpen} onClose={onClose}>
+    <Modal
+      className="w-[800px]"
+      initialFocus={syncButtonRef}
+      isOpen={isOpen}
+      onClose={onClose}
+    >
       <Modal.Header>
         <div className="flex flex-row items-center gap-3">
           <RiLoopLeftLine className="h-6 w-6" />
-          <h2 className="text-lg font-medium">{isConnect ? 'Migrate to serve' : 'Resync app'}</h2>
+          <h2 className="text-lg font-medium">
+            {isConnect ? "Migrate to serve" : "Resync app"}
+          </h2>
         </div>
       </Modal.Header>
       <Modal.Body>
         <>
-          {platform === 'vercel' && !failure && (
+          {platform === "vercel" && !failure && (
             <Alert className="my-6" severity="info" showIcon={false}>
               Vercel generates a unique URL for each deployment (
               <Alert.Link
@@ -124,20 +131,21 @@ export default function ResyncModal({
               >
                 see docs
               </Alert.Link>
-              ). Please confirm that you are using the correct URL if you choose a deployment&apos;s
-              generated URL instead of a static domain for your app.
+              ). Please confirm that you are using the correct URL if you choose
+              a deployment&apos;s generated URL instead of a static domain for
+              your app.
             </Alert>
           )}
           {isConnect ? (
             <p className="my-6">
-              Apps using connect automatically sync every time they connect to Inngest - a manual
-              resync is not necessary. Migrate the app to use HTTP via &quot;serve&quot; by setting
-              your URL.
+              Apps using connect automatically sync every time they connect to
+              Inngest - a manual resync is not necessary. Migrate the app to use
+              HTTP via &quot;serve&quot; by setting your URL.
             </p>
           ) : (
             <p className="my-6">
-              This initiates the sync request to your app which pushes the updated function
-              configuration to Inngest.
+              This initiates the sync request to your app which pushes the
+              updated function configuration to Inngest.
             </p>
           )}
 
@@ -152,7 +160,7 @@ export default function ResyncModal({
                 setOverrideValue(e.target.value);
               }}
               readOnly={!isURLOverridden}
-              className={cn(!isURLOverridden && 'bg-disabled')}
+              className={cn(!isURLOverridden && "bg-disabled")}
             />
           </div>
           <div className="mb-6">
@@ -178,8 +186,8 @@ export default function ResyncModal({
                 >
                   docs
                 </Alert.Link>
-                ) is not changed before resyncing. Changing the app ID will result in the creation
-                of a new app in this environment.
+                ) is not changed before resyncing. Changing the app ID will
+                result in the creation of a new app in this environment.
               </p>
             )}
           </div>
@@ -201,7 +209,7 @@ export default function ResyncModal({
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"
-          label={isConnect ? 'Migrate app' : 'Resync app'}
+          label={isConnect ? "Migrate app" : "Resync app"}
         />
       </Modal.Footer>
     </Modal>

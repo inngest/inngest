@@ -1,39 +1,48 @@
-import { createState, type AgentMessageChunk } from '@inngest/agent-kit';
-import type { GetFunctionInput } from 'inngest';
-import { v4 as uuidv4 } from 'uuid';
+import { createState, type AgentMessageChunk } from "@inngest/agent-kit";
+import type { GetFunctionInput } from "inngest";
+import { v4 as uuidv4 } from "uuid";
 
-import { inngest } from '../client';
-import { createChannel } from '../realtime';
-import { createInsightsNetwork } from './agents/network';
-import type { InsightsAgentState } from './agents/types';
+import { inngest } from "../client";
+import { createChannel } from "../realtime";
+import { createInsightsNetwork } from "./agents/network";
+import type { InsightsAgentState } from "./agents/types";
 
 export const runAgentNetwork = inngest.createFunction(
   {
-    id: 'run-insights-agent',
-    name: 'Insights SQL Agent',
+    id: "run-insights-agent",
+    name: "Insights SQL Agent",
   },
-  { event: 'insights-agent/chat.requested' },
+  { event: "insights-agent/chat.requested" },
   async ({
     event,
     publish,
     step,
-  }: GetFunctionInput<typeof inngest, 'insights-agent/chat.requested'>) => {
-    const { threadId: providedThreadId, userMessage, userId, channelKey, history } = event.data;
+  }: GetFunctionInput<typeof inngest, "insights-agent/chat.requested">) => {
+    const {
+      threadId: providedThreadId,
+      userMessage,
+      userId,
+      channelKey,
+      history,
+    } = event.data;
 
     // Validate required userId
     if (!userId) {
-      throw new Error('userId is required for agent chat execution');
+      throw new Error("userId is required for agent chat execution");
     }
 
     // Generate a threadId
-    const threadId = await step.run('generate-thread-id', async () => {
+    const threadId = await step.run("generate-thread-id", async () => {
       return providedThreadId || uuidv4();
     });
 
     // Determine the target channel for publishing (channelKey takes priority)
-    const targetChannel = await step.run('generate-target-channel', async () => {
-      return channelKey || userId;
-    });
+    const targetChannel = await step.run(
+      "generate-target-channel",
+      async () => {
+        return channelKey || userId;
+      },
+    );
 
     try {
       const clientState = userMessage.state || {};
@@ -47,8 +56,8 @@ export const runAgentNetwork = inngest.createFunction(
           {
             messages: history,
             threadId,
-          }
-        )
+          },
+        ),
       );
 
       // Run the network with streaming enabled
@@ -63,23 +72,26 @@ export const runAgentNetwork = inngest.createFunction(
       return {
         success: true,
         threadId,
-        message: 'Agent network completed successfully',
+        message: "Agent network completed successfully",
       };
     } catch (error) {
       // Best-effort error event publish; ignore errors here
       const errorChunk: AgentMessageChunk = {
-        event: 'error',
+        event: "error",
         data: {
-          error: error instanceof Error ? error.message : 'An unknown error occurred',
-          scope: 'network',
+          error:
+            error instanceof Error
+              ? error.message
+              : "An unknown error occurred",
+          scope: "network",
           recoverable: true,
-          agentId: 'network',
+          agentId: "network",
           threadId, // Include threadId for client filtering
           userId, // Include userId for channel routing
         },
         timestamp: Date.now(),
         sequenceNumber: 0,
-        id: 'publish-0:network:error',
+        id: "publish-0:network:error",
       };
       try {
         // Use the same target channel as the main flow
@@ -88,5 +100,5 @@ export const runAgentNetwork = inngest.createFunction(
 
       throw error;
     }
-  }
+  },
 );

@@ -1,15 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Card } from '@inngest/components/Card/Card';
-import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
-import { Pill } from '@inngest/components/Pill';
-import { Select } from '@inngest/components/Select/Select';
-import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
+import { useState } from "react";
+import { Button } from "@inngest/components/Button";
+import { Card } from "@inngest/components/Card/Card";
+import { Info } from "@inngest/components/Info/Info";
+import { Link } from "@inngest/components/Link/Link";
+import { Pill } from "@inngest/components/Pill";
+import { Select } from "@inngest/components/Select/Select";
+import { RiInformationLine, RiRefreshLine } from "@remixicon/react";
 
-import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
+import {
+  VercelDeploymentProtection,
+  type VercelIntegration,
+} from "@/gql/graphql";
 
 // type DisableProjectProps = {
 //   isOpen: boolean;
@@ -31,9 +34,13 @@ import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphq
 //   </AlertModal>
 // );
 
-export default function VercelProjects({ integration }: { integration: VercelIntegration }) {
+export default function VercelProjects({
+  integration,
+}: {
+  integration: VercelIntegration;
+}) {
   const { projects } = integration;
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState("all");
 
   return (
     <div className="mt-8 flex flex-col">
@@ -50,7 +57,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
           />
 
           <Select
-            value={{ id: 'all', name: 'All' }}
+            value={{ id: "all", name: "All" }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
             className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
@@ -61,11 +68,16 @@ export default function VercelProjects({ integration }: { integration: VercelInt
               </span>
             </Select.Button>
             <Select.Options>
-              {['all', 'disabled', 'enabled'].map((o, i) => {
+              {["all", "disabled", "enabled"].map((o, i) => {
                 return (
-                  <Select.Option key={`option-${i}`} option={{ id: o, name: o }}>
+                  <Select.Option
+                    key={`option-${i}`}
+                    option={{ id: o, name: o }}
+                  >
                     <span className="inline-flex w-full items-center justify-between gap-2">
-                      <label className="text-sm lowercase first-letter:capitalize">{o}</label>
+                      <label className="text-sm lowercase first-letter:capitalize">
+                        {o}
+                      </label>
                     </span>
                   </Select.Option>
                 );
@@ -76,26 +88,36 @@ export default function VercelProjects({ integration }: { integration: VercelInt
       </div>
       {projects
         .filter((p) =>
-          filter === 'all' ? true : filter === 'enabled' ? p.isEnabled : !p.isEnabled
+          filter === "all"
+            ? true
+            : filter === "enabled"
+            ? p.isEnabled
+            : !p.isEnabled,
         )
         .map((p, i) => (
           <Card
             key={`vercel-projects-${i}`}
             className="mt-4"
             accentPosition="left"
-            accentColor={p.isEnabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
+            accentColor={p.isEnabled ? "bg-primary-intense" : "bg-surfaceMuted"}
           >
             <Card.Content className="h-36 p-6">
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col">
                   <div>
-                    <Pill kind={p.isEnabled ? 'primary' : 'default'} className="h-6">
-                      {p.isEnabled ? 'enabled' : 'disabled'}
+                    <Pill
+                      kind={p.isEnabled ? "primary" : "default"}
+                      className="h-6"
+                    >
+                      {p.isEnabled ? "enabled" : "disabled"}
                     </Pill>
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start gap-1">
-                    <div className="text-basis text-xl font-medium">{p.name}</div>
-                    {p.deploymentProtection !== VercelDeploymentProtection.Disabled && (
+                    <div className="text-basis text-xl font-medium">
+                      {p.name}
+                    </div>
+                    {p.deploymentProtection !==
+                      VercelDeploymentProtection.Disabled && (
                       <Info
                         text={
                           <>
@@ -103,8 +125,8 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                               Deployment protection is enabled
                             </div>
                             <div className="mt-2 text-sm font-normal">
-                              Inngest may not be able to communicate with your application by
-                              default.
+                              Inngest may not be able to communicate with your
+                              application by default.
                             </div>
                           </>
                         }
@@ -131,7 +153,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                     appearance="outlined"
                     label="Configure"
                     href={`/settings/integrations/vercel/configure/${encodeURIComponent(
-                      p.projectID
+                      p.projectID,
                     )}`}
                   />
                 </div>

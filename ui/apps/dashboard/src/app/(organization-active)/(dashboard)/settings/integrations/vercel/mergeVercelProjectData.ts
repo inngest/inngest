@@ -1,5 +1,8 @@
-import { type VercelApp } from '@/gql/graphql';
-import { type VercelProject, type VercelProjectViaAPI } from './VercelIntegration';
+import { type VercelApp } from "@/gql/graphql";
+import {
+  type VercelProject,
+  type VercelProjectViaAPI,
+} from "./VercelIntegration";
 
 export default function mergeVercelProjectData({
   vercelProjects = [],
@@ -10,7 +13,7 @@ export default function mergeVercelProjectData({
 }): VercelProject[] {
   const projects: VercelProject[] = vercelProjects.map((project) => {
     const savedProject = savedProjects.find(
-      (savedProject) => savedProject.projectID === project.id
+      (savedProject) => savedProject.projectID === project.id,
     );
     const isProjectEnabled = savedProject !== undefined;
     return {

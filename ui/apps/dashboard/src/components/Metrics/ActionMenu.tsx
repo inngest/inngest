@@ -1,20 +1,21 @@
-'use client';
+"use client";
 
-import { Button } from '@inngest/components/Button';
+import { Button } from "@inngest/components/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { Switch } from '@inngest/components/Switch';
-import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { RiSettingsLine } from '@remixicon/react';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { Switch } from "@inngest/components/Switch";
+import { useSearchParam } from "@inngest/components/hooks/useSearchParam";
+import { RiSettingsLine } from "@remixicon/react";
 
 export const AUTO_REFRESH_INTERVAL = 5;
 
 export const MetricsActionMenu = () => {
-  const [autoRefresh, setAutoRefresh, removeAutoRefresh] = useSearchParam('autoRefresh');
+  const [autoRefresh, setAutoRefresh, removeAutoRefresh] =
+    useSearchParam("autoRefresh");
 
   return (
     <DropdownMenu>
@@ -37,14 +38,14 @@ export const MetricsActionMenu = () => {
               </div>
             </div>
             <Switch
-              checked={autoRefresh === 'true'}
+              checked={autoRefresh === "true"}
               className="data-[state=checked]:bg-primary-moderate cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                if (autoRefresh === 'true') {
+                if (autoRefresh === "true") {
                   removeAutoRefresh();
                 } else {
-                  setAutoRefresh('true');
+                  setAutoRefresh("true");
                 }
               }}
             />

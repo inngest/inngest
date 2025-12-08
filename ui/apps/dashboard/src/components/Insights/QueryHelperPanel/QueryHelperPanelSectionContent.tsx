@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import type { InsightsQueryStatement } from '@/gql/graphql';
-import type { QuerySnapshot } from '../types';
-import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
-import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
+import type { InsightsQueryStatement } from "@/gql/graphql";
+import type { QuerySnapshot } from "../types";
+import { QueryHelperPanelSectionContentNoData } from "./QueryHelperPanelSectionContentNoData";
+import { QueryHelperPanelSectionItem } from "./QueryHelperPanelSectionItem";
 
 export interface QueryHelperPanelSectionContentProps {
   activeSavedQueryId?: string;
@@ -14,7 +14,7 @@ export interface QueryHelperPanelSectionContentProps {
     error: undefined | string;
     isLoading: boolean;
   };
-  sectionType: 'history' | 'saved' | 'shared';
+  sectionType: "history" | "saved" | "shared";
 }
 
 export function QueryHelperPanelSectionContent({
@@ -27,11 +27,17 @@ export function QueryHelperPanelSectionContent({
   const { data, error, isLoading } = queries;
 
   if (isLoading && !data?.length) {
-    return <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>;
+    return (
+      <QueryHelperPanelStaticMessage>Loading...</QueryHelperPanelStaticMessage>
+    );
   }
 
   if (error && !data?.length) {
-    return <QueryHelperPanelStaticMessage>Failed to load queries</QueryHelperPanelStaticMessage>;
+    return (
+      <QueryHelperPanelStaticMessage>
+        Failed to load queries
+      </QueryHelperPanelStaticMessage>
+    );
   }
 
   // TODO: Update message for shared queries to reference right-clicking on query when implemented.
@@ -39,18 +45,18 @@ export function QueryHelperPanelSectionContent({
     return (
       <QueryHelperPanelSectionContentNoData
         primary={
-          sectionType === 'history'
-            ? 'No query history'
-            : sectionType === 'saved'
-            ? 'No saved queries'
-            : 'No shared queries'
+          sectionType === "history"
+            ? "No query history"
+            : sectionType === "saved"
+            ? "No saved queries"
+            : "No shared queries"
         }
         secondary={
-          sectionType === 'history'
-            ? 'You will find the last 10 queries that ran successfully here.'
-            : sectionType === 'saved'
-            ? 'Click the save query button to easily access your queries later.'
-            : 'Share queries with your org by right-clicking on the query.'
+          sectionType === "history"
+            ? "You will find the last 10 queries that ran successfully here."
+            : sectionType === "saved"
+            ? "Click the save query button to easily access your queries later."
+            : "Share queries with your org by right-clicking on the query."
         }
         sectionType={sectionType}
       />

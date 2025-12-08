@@ -1,19 +1,27 @@
-'use client';
+"use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import { toast } from "sonner";
 
-import { getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
-import { HOME_TAB, TEMPLATES_TAB } from '../InsightsTabManager/constants';
-import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
-import type { Tab } from '../types';
+import { getIsSavedQuery } from "../InsightsTabManager/InsightsTabManager";
+import { HOME_TAB, TEMPLATES_TAB } from "../InsightsTabManager/constants";
+import { useStoredQueries } from "../QueryHelperPanel/StoredQueriesContext";
+import type { Tab } from "../types";
 
 type SaveTabContextValue = {
   saveTab: (tab: Tab) => Promise<void>;
   savingTabIds: ReadonlySet<string>;
 };
 
-const SaveTabContext = createContext<SaveTabContextValue | undefined>(undefined);
+const SaveTabContext = createContext<SaveTabContextValue | undefined>(
+  undefined,
+);
 
 export function SaveTabProvider({ children }: { children: React.ReactNode }) {
   const { saveQuery } = useStoredQueries();
@@ -41,20 +49,23 @@ export function SaveTabProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [saveQuery, setSavingTabIds, savingTabIds]
+    [saveQuery, setSavingTabIds, savingTabIds],
   );
 
   const value = useMemo<SaveTabContextValue>(
     () => ({ saveTab, savingTabIds }),
-    [saveTab, savingTabIds]
+    [saveTab, savingTabIds],
   );
 
-  return <SaveTabContext.Provider value={value}>{children}</SaveTabContext.Provider>;
+  return (
+    <SaveTabContext.Provider value={value}>{children}</SaveTabContext.Provider>
+  );
 }
 
 export function useSaveTabActions(): SaveTabContextValue {
   const ctx = useContext(SaveTabContext);
-  if (!ctx) throw new Error('useSaveTabActions must be used within SaveTabProvider');
+  if (!ctx)
+    throw new Error("useSaveTabActions must be used within SaveTabProvider");
 
   return ctx;
 }
@@ -69,17 +80,17 @@ export function useSaveTab(tab: Tab) {
       isSaving: savingTabIds.has(tab.id),
       saveTab: () => saveTab(tab),
     }),
-    [saveTab, savingTabIds, tab]
+    [saveTab, savingTabIds, tab],
   );
 }
 
 function validateTab(tab: Tab): null | string {
-  if (!isQueryTab(tab)) return 'Only query tabs can be saved.';
-  if (tab.name === '') return 'Unable to save query: name is required.';
-  if (tab.query === '') return 'Unable to save query: query is empty.';
+  if (!isQueryTab(tab)) return "Only query tabs can be saved.";
+  if (tab.name === "") return "Unable to save query: name is required.";
+  if (tab.query === "") return "Unable to save query: query is empty.";
   return null;
 }
 
-function isQueryTab(tab: Pick<Tab, 'id'>): boolean {
+function isQueryTab(tab: Pick<Tab, "id">): boolean {
   return tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id;
 }

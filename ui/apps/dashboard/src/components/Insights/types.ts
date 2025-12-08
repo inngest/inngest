@@ -5,9 +5,9 @@ export interface QuerySnapshot {
   query: string;
 }
 
-export interface QueryTemplate extends Omit<QuerySnapshot, 'isSnapshot'> {
+export interface QueryTemplate extends Omit<QuerySnapshot, "isSnapshot"> {
   explanation: string;
-  templateKind: 'error' | 'success' | 'time' | 'warning';
+  templateKind: "error" | "success" | "time" | "warning";
 }
 
 export interface Tab {

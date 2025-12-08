@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { Modal } from '@inngest/components/Modal';
+import { useCallback, useEffect, useState } from "react";
+import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
+import { Modal } from "@inngest/components/Modal";
 
-import { type AppCheckResult } from '@/gql/graphql';
-import { Checks } from './Checks';
-import { ConfigDetail } from './ConfigDetail';
-import { HTTPInfo } from './HTTPInfo';
-import { useGetAppInfo } from './getAppInfo';
+import { type AppCheckResult } from "@/gql/graphql";
+import { Checks } from "./Checks";
+import { ConfigDetail } from "./ConfigDetail";
+import { HTTPInfo } from "./HTTPInfo";
+import { useGetAppInfo } from "./getAppInfo";
 
 type Props = {
   isOpen: boolean;
@@ -52,13 +52,13 @@ export function ValidateModal(props: Props) {
         if (error instanceof Error) {
           setError(error);
         } else {
-          setError(new Error('unknown error'));
+          setError(new Error("unknown error"));
         }
       } finally {
         setIsLoading(false);
       }
     },
-    [getAppInfo]
+    [getAppInfo],
   );
 
   useEffect(() => {
@@ -78,8 +78,8 @@ export function ValidateModal(props: Props) {
         </p>
 
         <p className="text-muted text-sm">
-          Note: The app will only return privileged information if {"it's"} using this{' '}
-          {"environment's"} signing key.
+          Note: The app will only return privileged information if {"it's"}{" "}
+          using this {"environment's"} signing key.
         </p>
 
         <div className="my-4 flex flex-1 gap-4">
@@ -120,13 +120,17 @@ export function ValidateModal(props: Props) {
 
             <AccordionList type="multiple" defaultValue={[]}>
               <AccordionList.Item value="config">
-                <AccordionList.Trigger className="text-sm">SDK configuration</AccordionList.Trigger>
+                <AccordionList.Trigger className="text-sm">
+                  SDK configuration
+                </AccordionList.Trigger>
                 <AccordionList.Content className="px-9">
                   <ConfigDetail data={data} />
                 </AccordionList.Content>
               </AccordionList.Item>
               <AccordionList.Item value="http">
-                <AccordionList.Trigger className="text-sm">HTTP response</AccordionList.Trigger>
+                <AccordionList.Trigger className="text-sm">
+                  HTTP response
+                </AccordionList.Trigger>
                 <AccordionList.Content className="px-9">
                   <HTTPInfo data={data} />
                 </AccordionList.Content>

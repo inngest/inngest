@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import ConnectPage from '@inngest/components/PostgresIntegrations/ConnectPage';
-import { connectContent } from '@inngest/components/PostgresIntegrations/Supabase/supabaseContent';
-import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/types';
+import { useRouter } from "next/navigation";
+import ConnectPage from "@inngest/components/PostgresIntegrations/ConnectPage";
+import { connectContent } from "@inngest/components/PostgresIntegrations/Supabase/supabaseContent";
+import { STEPS_ORDER } from "@inngest/components/PostgresIntegrations/types";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 export default function Connect() {
   const router = useRouter();
@@ -14,7 +14,12 @@ export default function Connect() {
     <ConnectPage
       content={connectContent}
       onStartInstallation={() => {
-        router.push(pathCreator.pgIntegrationStep({ integration: 'supabase', step: firstStep }));
+        router.push(
+          pathCreator.pgIntegrationStep({
+            integration: "supabase",
+            step: firstStep,
+          }),
+        );
       }}
     />
   );

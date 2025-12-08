@@ -1,8 +1,8 @@
-import { useMutation } from 'urql';
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
-import { useDefaultEnvironment } from '@/queries';
-import type VercelIntegration from './VercelIntegration';
+import { graphql } from "@/gql";
+import { useDefaultEnvironment } from "@/queries";
+import type VercelIntegration from "./VercelIntegration";
 
 const CreateVercelAppDocument = graphql(`
   mutation CreateVercelApp($input: CreateVercelAppInput!) {
@@ -28,7 +28,9 @@ const RemoveVercelAppDocument = graphql(`
   }
 `);
 
-export default function useUpdateVercelIntegration(initialVercelIntegration: VercelIntegration) {
+export default function useUpdateVercelIntegration(
+  initialVercelIntegration: VercelIntegration,
+) {
   const [{ data: environment }] = useDefaultEnvironment();
 
   const [, createVercelApp] = useMutation(CreateVercelAppDocument);
@@ -41,23 +43,28 @@ export default function useUpdateVercelIntegration(initialVercelIntegration: Ver
 
     const projectsToCreate = projects.filter((project) => {
       const initialProject = initialProjects.find(
-        (initialProject) => initialProject.id === project.id
+        (initialProject) => initialProject.id === project.id,
       );
       const projectIsNew = !initialProject;
-      const projectHasBeenEnabled = !projectIsNew && !initialProject.isEnabled && project.isEnabled;
+      const projectHasBeenEnabled =
+        !projectIsNew && !initialProject.isEnabled && project.isEnabled;
       return projectIsNew || projectHasBeenEnabled;
     });
 
     const projectsToUpdate = projects.filter((project) => {
       const initialProject = initialProjects.find(
-        (initialProject) => initialProject.id === project.id
+        (initialProject) => initialProject.id === project.id,
       );
-      return initialProject && project.isEnabled && project.servePath !== initialProject.servePath;
+      return (
+        initialProject &&
+        project.isEnabled &&
+        project.servePath !== initialProject.servePath
+      );
     });
 
     const projectsToRemove = projects.filter((project) => {
       const initialProject = initialProjects.find(
-        (initialProject) => initialProject.id === project.id
+        (initialProject) => initialProject.id === project.id,
       );
       const projectIsNew = !initialProject;
       const projectHasBeenDisabled =
@@ -72,14 +79,14 @@ export default function useUpdateVercelIntegration(initialVercelIntegration: Ver
           projectID: project.id,
           workspaceID: environment!.id,
         },
-      })
+      }),
     );
 
     const updateVercelAppPromises = projectsToUpdate.map((project) => {
       return updateVercelApp({
         input: {
           projectID: project.id,
-          path: project.servePath ?? '',
+          path: project.servePath ?? "",
         },
       });
     });
@@ -90,7 +97,7 @@ export default function useUpdateVercelIntegration(initialVercelIntegration: Ver
           projectID: project.id,
           workspaceID: environment!.id,
         },
-      })
+      }),
     );
 
     return Promise.all([

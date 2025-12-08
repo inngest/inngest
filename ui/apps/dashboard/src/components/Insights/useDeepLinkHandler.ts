@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
-import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { ReadonlyURLSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
+import { useEffect, useRef } from "react";
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import type { ReadonlyURLSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
-import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import type { TabManagerActions } from "@/components/Insights/InsightsTabManager/InsightsTabManager";
+import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
 
 interface UseDeepLinkHandlerParams {
   actions: TabManagerActions;
@@ -26,7 +26,7 @@ export function useDeepLinkHandler({
   useEffect(() => {
     if (hasProcessedInitialQueryId.current) return;
 
-    const queryIdFromUrl = searchParams.get('query_id');
+    const queryIdFromUrl = searchParams.get("query_id");
     if (!queryIdFromUrl) {
       hasProcessedInitialQueryId.current = true;
       return;
@@ -46,7 +46,9 @@ export function useDeepLinkHandler({
       actions.createTabFromQuery(savedQuery);
     } else {
       // Show error toast if query not found
-      toast.error('Unable to load query; please ensure that you have access to it');
+      toast.error(
+        "Unable to load query; please ensure that you have access to it",
+      );
     }
   }, [searchParams, queries.data, isSavedQueriesFetching, actions]);
 
@@ -55,7 +57,7 @@ export function useDeepLinkHandler({
     // Don't sync URL until we've processed the initial query_id
     if (!hasProcessedInitialQueryId.current) return;
 
-    const currentQueryId = searchParams.get('query_id');
+    const currentQueryId = searchParams.get("query_id");
     const newQueryId = activeSavedQueryId;
 
     // Don't update if URL already has the correct query_id
@@ -64,13 +66,15 @@ export function useDeepLinkHandler({
     const params = new URLSearchParams(searchParams.toString());
 
     if (newQueryId) {
-      params.set('query_id', newQueryId);
+      params.set("query_id", newQueryId);
     } else {
-      params.delete('query_id');
+      params.delete("query_id");
     }
 
     // Update URL without triggering navigation
-    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    const newUrl = params.toString()
+      ? `?${params.toString()}`
+      : window.location.pathname;
     router.replace(newUrl, { scroll: false });
   }, [activeSavedQueryId, searchParams, router]);
 }

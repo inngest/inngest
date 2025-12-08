@@ -1,11 +1,15 @@
-'use client';
+"use client";
 
-import { EventDetails } from '@inngest/components/Events/EventDetails';
-import { useReplayModal } from '@inngest/components/Events/useReplayModal';
+import { EventDetails } from "@inngest/components/Events/EventDetails";
+import { useReplayModal } from "@inngest/components/Events/useReplayModal";
 
-import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
-import { SendEventModal } from '@/components/Events/SendEventModal';
-import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
+import { ExpandedRowActions } from "@/components/Events/ExpandedRowActions";
+import { SendEventModal } from "@/components/Events/SendEventModal";
+import {
+  useEventDetails,
+  useEventPayload,
+  useEventRuns,
+} from "@/components/Events/useEvents";
 
 type Props = {
   params: {
@@ -18,7 +22,8 @@ export default function Page({ params }: Props) {
   const eventID = decodeURIComponent(params.eventID);
   const envSlug = params.environmentSlug;
 
-  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
+  const { isModalVisible, selectedEvent, openModal, closeModal } =
+    useReplayModal();
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();

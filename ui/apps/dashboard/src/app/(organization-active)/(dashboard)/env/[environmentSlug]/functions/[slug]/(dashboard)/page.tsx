@@ -1,29 +1,35 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo } from 'react';
-import type { Route } from 'next';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
-import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
-import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
-import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
-import { useBatchedSearchParams, useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { cn } from '@inngest/components/utils/classNames';
-import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { ErrorBoundary } from '@sentry/nextjs';
+import { useCallback, useMemo } from "react";
+import type { Route } from "next";
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
+import type { RangeChangeProps } from "@inngest/components/DatePicker/RangePicker";
+import { TimeFilter } from "@inngest/components/Filter/TimeFilter";
+import { FunctionConfiguration } from "@inngest/components/FunctionConfiguration";
+import { useCalculatedStartTime } from "@inngest/components/hooks/useCalculatedStartTime";
+import {
+  useBatchedSearchParams,
+  useSearchParam,
+} from "@inngest/components/hooks/useSearchParam";
+import { cn } from "@inngest/components/utils/classNames";
+import {
+  durationToString,
+  parseDuration,
+} from "@inngest/components/utils/date";
+import { ErrorBoundary } from "@sentry/nextjs";
 
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useFunction, useFunctionUsage } from '@/queries';
-import { pathCreator } from '@/utils/urls';
-import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import FunctionRunRateLimitChart from './FunctionRateLimitChart';
-import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
-import FunctionThroughputChart from './FunctionThroughputChart';
-import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
-import SDKRequestThroughputChart from './SDKRequestThroughput';
-import StepBacklogChart from './StepBacklogChart';
-import StepsRunningChart from './StepsRunningChart';
+import LoadingIcon from "@/icons/LoadingIcon";
+import { useFunction, useFunctionUsage } from "@/queries";
+import { pathCreator } from "@/utils/urls";
+import { useAccountFeatures } from "@/utils/useAccountFeatures";
+import FunctionRunRateLimitChart from "./FunctionRateLimitChart";
+import FunctionRunsChart, { type UsageMetrics } from "./FunctionRunsChart";
+import FunctionThroughputChart from "./FunctionThroughputChart";
+import LatestFailedFunctionRuns from "./LatestFailedFunctionRuns";
+import SDKRequestThroughputChart from "./SDKRequestThroughput";
+import StepBacklogChart from "./StepBacklogChart";
+import StepsRunningChart from "./StepsRunningChart";
 
 type FunctionDashboardProps = {
   params: {
@@ -32,12 +38,14 @@ type FunctionDashboardProps = {
   };
 };
 
-const DEFAULT_TIME = '1d';
+const DEFAULT_TIME = "1d";
 
-export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
-  const [lastDays] = useSearchParam('last');
-  const [startTime] = useSearchParam('start');
-  const [endTime] = useSearchParam('end');
+export default function FunctionDashboardPage({
+  params,
+}: FunctionDashboardProps) {
+  const [lastDays] = useSearchParam("last");
+  const [startTime] = useSearchParam("start");
+  const [endTime] = useSearchParam("end");
 
   const batchUpdate = useBatchedSearchParams();
 
@@ -52,12 +60,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const handleDaysChange = useCallback(
     (range: RangeChangeProps) => {
       batchUpdate({
-        last: range.type === 'relative' ? durationToString(range.duration) : null,
-        start: range.type === 'absolute' ? range.start.toISOString() : null,
-        end: range.type === 'absolute' ? range.end.toISOString() : null,
+        last:
+          range.type === "relative" ? durationToString(range.duration) : null,
+        start: range.type === "absolute" ? range.start.toISOString() : null,
+        end: range.type === "absolute" ? range.end.toISOString() : null,
       });
     },
-    [batchUpdate]
+    [batchUpdate],
   );
 
   const features = useAccountFeatures();
@@ -85,7 +94,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     return (
       <>
         <div className="mt-4 flex place-content-center">
-          <Alert severity="warning">Function not yet deployed to this environment</Alert>
+          <Alert severity="warning">
+            Function not yet deployed to this environment
+          </Alert>
         </div>
       </>
     );
@@ -100,17 +111,21 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     {
       totalRuns: 0,
       totalFailures: 0,
-    }
+    },
   );
 
   const failureRate = !usageMetrics?.totalRuns
-    ? '0.00'
-    : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
+    ? "0.00"
+    : (
+        ((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) *
+        100
+      ).toFixed(2);
 
-  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.externalID}` as Route;
+  let appRoute =
+    `/env/${params.environmentSlug}/apps/${function_.app.externalID}` as Route;
   let billingUrl = pathCreator.billing({
-    tab: 'plans',
-    ref: 'concurrency-limit-popover',
+    tab: "plans",
+    ref: "concurrency-limit-popover",
   });
 
   return (
@@ -125,8 +140,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 </h3>
                 <span className="text-xl font-medium ">
                   {usageMetrics?.totalRuns.toLocaleString(undefined, {
-                    notation: 'compact',
-                    compactDisplay: 'short',
+                    notation: "compact",
+                    compactDisplay: "short",
                   })}
                 </span>
               </div>
@@ -136,8 +151,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 </h3>
                 <span
                   className={cn(
-                    'text-xl font-medium',
-                    failureRate === '0.00' ? 'text-subtle' : 'text-error'
+                    "text-xl font-medium",
+                    failureRate === "0.00" ? "text-subtle" : "text-error",
                   )}
                 >{`${failureRate}%`}</span>
               </div>
@@ -147,17 +162,17 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 defaultValue={
                   lastDays
                     ? {
-                        type: 'relative',
+                        type: "relative",
                         duration: parseDuration(lastDays),
                       }
                     : startTime && endTime
                     ? {
-                        type: 'absolute',
+                        type: "absolute",
                         start: new Date(startTime),
                         end: new Date(endTime),
                       }
                     : {
-                        type: 'relative',
+                        type: "relative",
                         duration: parseDuration(DEFAULT_TIME),
                       }
                 }

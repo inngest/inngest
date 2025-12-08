@@ -1,1 +1,1 @@
-export { SyncFailure } from './SyncFailure';
+export { SyncFailure } from "./SyncFailure";

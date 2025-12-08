@@ -1,10 +1,10 @@
-'use server';
+"use server";
 
-import { Header } from '@inngest/components/Header/Header';
-import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
+import { Header } from "@inngest/components/Header/Header";
+import { RefreshButton } from "@inngest/components/Refresh/RefreshButton";
 
-import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
-import { Dashboard } from '@/components/Metrics/Dashboard';
+import { MetricsActionMenu } from "@/components/Metrics/ActionMenu";
+import { Dashboard } from "@/components/Metrics/Dashboard";
 
 type MetricsProps = {
   params: {
@@ -12,11 +12,13 @@ type MetricsProps = {
   };
 };
 
-export default async function MetricsPage({ params: { environmentSlug: envSlug } }: MetricsProps) {
+export default async function MetricsPage({
+  params: { environmentSlug: envSlug },
+}: MetricsProps) {
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Metrics' }]}
+        breadcrumb={[{ text: "Metrics" }]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
             <RefreshButton />

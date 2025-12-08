@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { Select } from '@inngest/components/Select/Select';
-import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { Select } from "@inngest/components/Select/Select";
+import { StatusDot } from "@inngest/components/Status/StatusDot";
 
 type EnvironmentsStatusSelectorProps = {
   archived: boolean;
   onChange: (archived: boolean) => void;
 };
 
-const ACTIVE_OPTION = { id: 'active', name: 'Active environments' };
-const ARCHIVED_OPTION = { id: 'archived', name: 'Archived environments' };
+const ACTIVE_OPTION = { id: "active", name: "Active environments" };
+const ARCHIVED_OPTION = { id: "archived", name: "Archived environments" };
 
 export function EnvironmentsStatusSelector({
   archived,
@@ -17,7 +17,7 @@ export function EnvironmentsStatusSelector({
 }: EnvironmentsStatusSelectorProps) {
   return (
     <Select
-      onChange={(value) => onChange(value.id === 'archived')}
+      onChange={(value) => onChange(value.id === "archived")}
       isLabelVisible={false}
       label="Select environment status"
       multiple={false}
@@ -25,8 +25,8 @@ export function EnvironmentsStatusSelector({
     >
       <Select.Button className="w-[200px] shrink-0">
         <div className="mr-1 flex flex-row items-center gap-2 overflow-hidden whitespace-nowrap">
-          <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
-          {archived ? 'Archived environments' : 'Active environments'}
+          <StatusDot status={archived ? "ARCHIVED" : "ACTIVE"} size="small" />
+          {archived ? "Archived environments" : "Active environments"}
         </div>
       </Select.Button>
       <Select.Options>

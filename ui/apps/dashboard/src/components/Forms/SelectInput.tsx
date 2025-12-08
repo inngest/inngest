@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import * as Select from '@radix-ui/react-select';
-import { RiArrowDownSLine, RiCheckLine } from '@remixicon/react';
+import { useEffect, useState } from "react";
+import * as Select from "@radix-ui/react-select";
+import { RiArrowDownSLine, RiCheckLine } from "@remixicon/react";
 
 export type SelectOption<T extends string> = {
   label: string | React.ReactNode;
@@ -66,7 +66,9 @@ export function SelectInput<T extends string>(props: SelectProps<T>) {
                   </Select.ItemIndicator>
                 </span>
                 {opt.description && (
-                  <span className="text-subtle block text-xs font-normal">{opt.description}</span>
+                  <span className="text-subtle block text-xs font-normal">
+                    {opt.description}
+                  </span>
                 )}
               </Select.Item>
             );

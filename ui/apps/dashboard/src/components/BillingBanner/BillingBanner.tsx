@@ -1,5 +1,5 @@
-import { entitlementUsage } from '@/components/Billing/data';
-import { BillingBannerView } from './BillingBannerView';
+import { entitlementUsage } from "@/components/Billing/data";
+import { BillingBannerView } from "./BillingBannerView";
 
 export async function BillingBanner() {
   let data;

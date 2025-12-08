@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import NextLink from 'next/link';
-import { useClerk } from '@clerk/nextjs';
-import { Listbox } from '@headlessui/react';
+import dynamic from "next/dynamic";
+import NextLink from "next/link";
+import { useClerk } from "@clerk/nextjs";
+import { Listbox } from "@headlessui/react";
 import {
   RiArrowLeftRightLine,
   RiBillLine,
@@ -12,13 +12,16 @@ import {
   RiLogoutCircleLine,
   RiUserLine,
   RiUserSharedLine,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
-const ModeSwitch = dynamic(() => import('@inngest/components/ThemeMode/ModeSwitch'), {
-  ssr: false,
-});
+const ModeSwitch = dynamic(
+  () => import("@inngest/components/ThemeMode/ModeSwitch"),
+  {
+    ssr: false,
+  },
+);
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -27,7 +30,9 @@ type Props = React.PropsWithChildren<{
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
   return (
     <Listbox>
-      <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
+      <Listbox.Button className="w-full cursor-pointer ring-0">
+        {children}
+      </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
           <Listbox.Option
@@ -63,7 +68,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </div>
             </Listbox.Option>
           </NextLink>
-          <NextLink href="/settings/organization/organization-members" scroll={false}>
+          <NextLink
+            href="/settings/organization/organization-members"
+            scroll={false}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="members"
@@ -140,7 +148,10 @@ function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
     return (
       <button
         onClick={async () => {
-          await signOut({ sessionId: session?.id, redirectUrl: '/sign-in/choose' });
+          await signOut({
+            sessionId: session?.id,
+            redirectUrl: "/sign-in/choose",
+          });
         }}
       >
         {content}
@@ -149,5 +160,9 @@ function SignOut({ isMarketplace }: { isMarketplace: boolean }) {
   }
 
   // Sign out via our backend.
-  return <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/v1/logout`}>{content}</NextLink>;
+  return (
+    <NextLink href={`${process.env.NEXT_PUBLIC_API_URL}/v1/logout`}>
+      {content}
+    </NextLink>
+  );
 }

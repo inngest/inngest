@@ -2,10 +2,10 @@ import {
   transformFramework,
   transformLanguage,
   transformPlatform,
-} from '@inngest/components/utils/appsParser';
+} from "@inngest/components/utils/appsParser";
 
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const query = graphql(`
   query Sync($envID: ID!, $externalAppID: String!, $syncID: ID!) {

@@ -1,12 +1,15 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
-import EventsPage from '@/components/Events/EventsPage';
+import EventsPage from "@/components/Events/EventsPage";
 
-const EventsFeedback = dynamic(() => import('@/components/Surveys/EventsFeedback'), {
-  ssr: false,
-});
+const EventsFeedback = dynamic(
+  () => import("@/components/Surveys/EventsFeedback"),
+  {
+    ssr: false,
+  },
+);
 
 export default function Page({
   params: { environmentSlug: envSlug },

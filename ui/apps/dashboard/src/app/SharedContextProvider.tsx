@@ -1,21 +1,25 @@
-'use client';
+"use client";
 
 import {
   SharedProvider,
   type SharedHandlers,
-} from '@inngest/components/SharedContext/SharedContext';
+} from "@inngest/components/SharedContext/SharedContext";
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { useCancelRun } from '@/queries/useCancelRun';
-import { useGetRun } from '@/queries/useGetRun';
-import { useGetTraceResult } from '@/queries/useGetTraceResult';
-import { useInvokeRun } from '@/queries/useInvokeRun';
-import { useRerun } from '@/queries/useRerun';
-import { useRerunFromStep } from '@/queries/useRerunFromStep';
-import { usePathCreator } from '@/utils/usePathCreator';
-import { useSystemStatus } from './(organization-active)/support/statusPage';
+import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
+import { useCancelRun } from "@/queries/useCancelRun";
+import { useGetRun } from "@/queries/useGetRun";
+import { useGetTraceResult } from "@/queries/useGetTraceResult";
+import { useInvokeRun } from "@/queries/useInvokeRun";
+import { useRerun } from "@/queries/useRerun";
+import { useRerunFromStep } from "@/queries/useRerunFromStep";
+import { usePathCreator } from "@/utils/usePathCreator";
+import { useSystemStatus } from "./(organization-active)/support/statusPage";
 
-export const SharedContextProvider = ({ children }: { children: React.ReactNode }) => {
+export const SharedContextProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const rerunFromStep = useRerunFromStep();
   const invokeRun = useInvokeRun();
   const rerun = useRerun();

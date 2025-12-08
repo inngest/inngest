@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { StatusCell } from '@inngest/components/Table/Cell';
-import { Time } from '@inngest/components/Time';
-import { formatMilliseconds } from '@inngest/components/utils/date';
+import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
+import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
+import { StatusCell } from "@inngest/components/Table/Cell";
+import { Time } from "@inngest/components/Time";
+import { formatMilliseconds } from "@inngest/components/utils/date";
 
-import { useGetReplay } from '@/components/Replay/useGetReplay';
+import { useGetReplay } from "@/components/Replay/useGetReplay";
 
 type Props = {
   params: {
@@ -18,7 +18,7 @@ export default function Page({ params }: Props) {
   const replayID = decodeURIComponent(params.replayID);
   const { data: replay, isLoading, error } = useGetReplay(replayID);
   if (!replay && !isLoading) {
-    console.error('No replay found');
+    console.error("No replay found");
     return null;
   }
 
@@ -38,21 +38,27 @@ export default function Page({ params }: Props) {
         <StatusCell
           size="small"
           status={replay.status}
-          label={replay.status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'}
+          label={
+            replay.status === "ENDED" ? "Queuing complete" : "Queuing runs"
+          }
         />
       )}
       <AppDetailsCard title="Replay information" className="mt-9">
         <AppDetailsCard.Item
           term="Started queuing"
-          detail={replay?.createdAt ? <Time value={replay.createdAt} /> : '-'}
+          detail={replay?.createdAt ? <Time value={replay.createdAt} /> : "-"}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Completed queuing"
-          detail={replay?.endedAt ? <Time value={replay.endedAt} /> : '-'}
+          detail={replay?.endedAt ? <Time value={replay.endedAt} /> : "-"}
           loading={isLoading}
         />
-        <AppDetailsCard.Item term="Queued runs" detail={replay?.runsCount} loading={isLoading} />
+        <AppDetailsCard.Item
+          term="Queued runs"
+          detail={replay?.runsCount}
+          loading={isLoading}
+        />
         <AppDetailsCard.Item
           term="Skipped runs"
           detail={replay?.runsSkippedCount}
@@ -60,17 +66,17 @@ export default function Page({ params }: Props) {
         />
         <AppDetailsCard.Item
           term="Duration"
-          detail={replay?.duration ? formatMilliseconds(replay.duration) : '-'}
+          detail={replay?.duration ? formatMilliseconds(replay.duration) : "-"}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Replay from"
-          detail={replay?.fromRange ? <Time value={replay.fromRange} /> : '-'}
+          detail={replay?.fromRange ? <Time value={replay.fromRange} /> : "-"}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Replay to"
-          detail={replay?.toRange ? <Time value={replay.toRange} /> : '-'}
+          detail={replay?.toRange ? <Time value={replay.toRange} /> : "-"}
           loading={isLoading}
         />
         <AppDetailsCard.Item
@@ -79,11 +85,16 @@ export default function Page({ params }: Props) {
             replay?.filters?.statuses.length ? (
               <div className="flex flex-wrap gap-2">
                 {replay.filters.statuses.map((status: string) => (
-                  <StatusCell key={status} status={status} label={status} size="small" />
+                  <StatusCell
+                    key={status}
+                    status={status}
+                    label={status}
+                    size="small"
+                  />
                 ))}
               </div>
             ) : (
-              '-'
+              "-"
             )
           }
           loading={isLoading}

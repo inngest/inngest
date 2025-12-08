@@ -1,10 +1,10 @@
-import { Card } from '@inngest/components/Card';
-import { Pill } from '@inngest/components/Pill';
-import { Time } from '@inngest/components/Time';
-import { RiStarFill } from '@remixicon/react';
+import { Card } from "@inngest/components/Card";
+import { Pill } from "@inngest/components/Pill";
+import { Time } from "@inngest/components/Time";
+import { RiStarFill } from "@remixicon/react";
 
-import { Secret } from '@/components/Secret';
-import { DeleteSigningKeyButton } from './DeleteSigningKeyButton';
+import { Secret } from "@/components/Secret";
+import { DeleteSigningKeyButton } from "./DeleteSigningKeyButton";
 
 type Props = {
   signingKey: {
@@ -20,20 +20,20 @@ type Props = {
 };
 
 export function SigningKey({ signingKey }: Props) {
-  let accentColor = 'bg-primary-moderate';
+  let accentColor = "bg-primary-moderate";
   let controls = null;
   let description = null;
-  let title = 'Current key';
+  let title = "Current key";
 
   if (!signingKey.isActive) {
-    accentColor = 'bg-accent-moderate';
+    accentColor = "bg-accent-moderate";
     controls = (
       <div className="flex gap-2">
         <DeleteSigningKeyButton signingKeyID={signingKey.id} />
       </div>
     );
-    description = 'This key is inactive. You can activate it using rotation.';
-    title = 'New key';
+    description = "This key is inactive. You can activate it using rotation.";
+    title = "New key";
   }
 
   let pill = null;
@@ -59,7 +59,11 @@ export function SigningKey({ signingKey }: Props) {
           <p className="text-subtle text-sm">{description}</p>
         </div>
 
-        <Secret className="mb-4" kind="signing-key" secret={signingKey.decryptedValue} />
+        <Secret
+          className="mb-4"
+          kind="signing-key"
+          secret={signingKey.decryptedValue}
+        />
       </Card.Content>
 
       <Card.Footer className="text-subtle flex text-sm">
@@ -67,7 +71,11 @@ export function SigningKey({ signingKey }: Props) {
           Created at <Time value={signingKey.createdAt} />
         </span>
 
-        {signingKey.user && <span>Created by {signingKey.user.name ?? signingKey.user.email}</span>}
+        {signingKey.user && (
+          <span>
+            Created by {signingKey.user.name ?? signingKey.user.email}
+          </span>
+        )}
       </Card.Footer>
     </Card>
   );

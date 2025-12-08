@@ -1,9 +1,13 @@
-import Image from 'next/image';
-import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import Image from "next/image";
+import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
 
-import { getProfileDisplay } from '@/queries/server-only/profile';
+import { getProfileDisplay } from "@/queries/server-only/profile";
 
-export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default async function SettingsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const profile = await getProfileDisplay();
   return (
     <div className="h-full overflow-y-scroll">
@@ -24,7 +28,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
                   alt="org-profile-pic"
                 />
               ) : (
-                profile.orgName?.substring(0, 2) || '?'
+                profile.orgName?.substring(0, 2) || "?"
               )}
             </div>
             <p>{profile.orgName}</p>

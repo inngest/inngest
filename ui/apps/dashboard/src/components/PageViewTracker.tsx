@@ -1,9 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { usePathname, useSearchParams, useSelectedLayoutSegments } from 'next/navigation';
-import Script from 'next/script';
-import { useOrganization, useUser } from '@clerk/nextjs';
+import { useEffect, useState } from "react";
+import {
+  usePathname,
+  useSearchParams,
+  useSelectedLayoutSegments,
+} from "next/navigation";
+import Script from "next/script";
+import { useOrganization, useUser } from "@clerk/nextjs";
 
 declare global {
   interface Window {
@@ -34,10 +38,10 @@ export default function PageViewTracker() {
         return;
       }
       setLastUrl(url);
-      const ref = searchParams.get('ref') || null;
+      const ref = searchParams.get("ref") || null;
       // NOTE - This may fire before the entire view loads
       window.inngest.send({
-        name: 'app/page.viewed',
+        name: "app/page.viewed",
         data: {
           routeSegments: segments,
           ref,
@@ -49,12 +53,12 @@ export default function PageViewTracker() {
           ...(!!organization?.publicMetadata.accountID && {
             account_id: organization.publicMetadata.accountID,
           }),
-          screen_resolution: `${window.screen.width * window.devicePixelRatio}x${
-            window.screen.height * window.devicePixelRatio
-          }`,
+          screen_resolution: `${
+            window.screen.width * window.devicePixelRatio
+          }x${window.screen.height * window.devicePixelRatio}`,
           screen_size: `${window.screen.width}x${window.screen.height}`,
         },
-        v: '2023-05-11.1',
+        v: "2023-05-11.1",
       });
     },
     [
@@ -68,7 +72,7 @@ export default function PageViewTracker() {
       user?.primaryEmailAddress?.emailAddress,
       user?.fullName,
       organization?.publicMetadata.accountID,
-    ]
+    ],
   );
 
   function onScriptLoad() {
@@ -77,8 +81,8 @@ export default function PageViewTracker() {
       options.host = process.env.NEXT_PUBLIC_EVENT_API_HOST;
     }
     if (!process.env.NEXT_PUBLIC_INNGEST_EVENT_KEY) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Set NEXT_PUBLIC_INNGEST_EVENT_KEY to track page views');
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Set NEXT_PUBLIC_INNGEST_EVENT_KEY to track page views");
       }
       return;
     }
@@ -89,7 +93,10 @@ export default function PageViewTracker() {
 
   return (
     <>
-      <Script src="https://unpkg.com/@inngest/browser/inngest.min.js" onLoad={onScriptLoad} />
+      <Script
+        src="https://unpkg.com/@inngest/browser/inngest.min.js"
+        onLoad={onScriptLoad}
+      />
     </>
   );
 }

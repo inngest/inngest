@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 
-import { useEventTypes } from './useEventTypes';
+import { useEventTypes } from "./useEventTypes";
 
 /**
  * Hook to fetch all event types with pagination support
@@ -24,7 +24,10 @@ export function useFetchAllEventTypes() {
         });
 
         allEvents.push(
-          ...result.events.map((e) => ({ name: e.name, latestSchema: e.latestSchema }))
+          ...result.events.map((e) => ({
+            name: e.name,
+            latestSchema: e.latestSchema,
+          })),
         );
         pageCount++;
 
@@ -39,6 +42,6 @@ export function useFetchAllEventTypes() {
 
       return allEvents;
     },
-    [getEventTypes]
+    [getEventTypes],
   );
 }

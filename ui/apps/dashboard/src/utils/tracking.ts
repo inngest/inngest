@@ -1,4 +1,4 @@
-import { useOrganization, useUser } from '@clerk/nextjs';
+import { useOrganization, useUser } from "@clerk/nextjs";
 
 type TrackingUser = {
   external_id: string | null;
@@ -32,7 +32,7 @@ export function useTrackingUser() {
 }
 
 export function trackEvent({ name, data, user, v }: TrackingEvent): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   const event = {
     name,

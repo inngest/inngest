@@ -1,6 +1,6 @@
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from "@inngest/components/Button/Button";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 type ExpandedRowProps = {
   eventName?: string;
@@ -9,14 +9,21 @@ type ExpandedRowProps = {
   envSlug: string;
 };
 
-export function ExpandedRowActions({ eventName, payload, onReplay, envSlug }: ExpandedRowProps) {
-  const isInternalEvent = eventName?.startsWith('inngest/');
+export function ExpandedRowActions({
+  eventName,
+  payload,
+  onReplay,
+  envSlug,
+}: ExpandedRowProps) {
+  const isInternalEvent = eventName?.startsWith("inngest/");
 
   return (
     <div className="flex items-center gap-2">
       <Button
         label="Go to event type"
-        href={eventName ? pathCreator.eventType({ envSlug, eventName }) : undefined}
+        href={
+          eventName ? pathCreator.eventType({ envSlug, eventName }) : undefined
+        }
         appearance="outlined"
         size="small"
         disabled={!eventName}

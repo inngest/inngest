@@ -1,19 +1,22 @@
-import { useState } from 'react';
-import Image from 'next/image';
-import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { Button } from '@inngest/components/Button/Button';
-import { Link } from '@inngest/components/Link';
+import { useState } from "react";
+import Image from "next/image";
+import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
+import { Button } from "@inngest/components/Button/Button";
+import { Link } from "@inngest/components/Link";
 
-import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
-import appActiveListDark from '@/images/app-active-list-dark.png';
-import appActiveListLight from '@/images/app-active-list-light.jpg';
+import { ValidateModal } from "@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal";
+import appActiveListDark from "@/images/app-active-list-dark.png";
+import appActiveListLight from "@/images/app-active-list-light.jpg";
 
 export default function AppFAQ() {
   const [showValidate, setShowValidate] = useState(false);
 
   return (
     <>
-      <ValidateModal isOpen={showValidate} onClose={() => setShowValidate(false)} />
+      <ValidateModal
+        isOpen={showValidate}
+        onClose={() => setShowValidate(false)}
+      />
 
       <AccordionList className="" type="multiple" defaultValue={[]}>
         <AccordionList.Item value="no-app">
@@ -34,8 +37,9 @@ export default function AppFAQ() {
               />
               <div>
                 <p className="text-muted mb-4 text-sm">
-                  If your app is running but not appearing here, check its health status by clicking
-                  on the button to diagnose any issues. If the issue persists, refer to our{' '}
+                  If your app is running but not appearing here, check its
+                  health status by clicking on the button to diagnose any
+                  issues. If the issue persists, refer to our{" "}
                   <Link
                     href="https://www.inngest.com/docs/apps/cloud#troubleshooting?ref=apps-list-empty"
                     target="_blank"

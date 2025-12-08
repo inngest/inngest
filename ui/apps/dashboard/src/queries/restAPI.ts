@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
-import ky from 'ky';
+import { auth } from "@clerk/nextjs/server";
+import ky from "ky";
 
-export { HTTPError } from 'ky';
+export { HTTPError } from "ky";
 
 const restAPI = ky.create({
   prefixUrl: `${process.env.NEXT_PUBLIC_API_URL}/v1`,
@@ -15,7 +15,7 @@ const restAPI = ky.create({
         // Marketplace users don't auth with Clerk.
         if (!sessionToken) return;
 
-        request.headers.set('Authorization', `Bearer ${sessionToken}`);
+        request.headers.set("Authorization", `Bearer ${sessionToken}`);
       },
     ],
   },

@@ -1,32 +1,34 @@
-import { Header } from '@inngest/components/Header/Header';
+import { Header } from "@inngest/components/Header/Header";
 
-import PageTitle from '@/components/Billing/PageTitle';
-import Layout from '@/components/Layout/Layout';
-import Toaster from '@/components/Toaster';
-import { getProfileDisplay } from '@/queries/server-only/profile';
-import { pathCreator } from '@/utils/urls';
-import MarketplaceAccessControl from './MarketplaceAccessControl';
+import PageTitle from "@/components/Billing/PageTitle";
+import Layout from "@/components/Layout/Layout";
+import Toaster from "@/components/Toaster";
+import { getProfileDisplay } from "@/queries/server-only/profile";
+import { pathCreator } from "@/utils/urls";
+import MarketplaceAccessControl from "./MarketplaceAccessControl";
 
-export default async function BillingLayout({ children }: React.PropsWithChildren) {
+export default async function BillingLayout({
+  children,
+}: React.PropsWithChildren) {
   const profile = await getProfileDisplay();
 
   let tabs = [
     {
-      children: 'Overview',
+      children: "Overview",
       href: pathCreator.billing(),
       exactRouteMatch: true,
     },
     {
-      children: 'Usage',
-      href: pathCreator.billing({ tab: 'usage' }),
+      children: "Usage",
+      href: pathCreator.billing({ tab: "usage" }),
     },
     {
-      children: 'Payments',
-      href: pathCreator.billing({ tab: 'payments' }),
+      children: "Payments",
+      href: pathCreator.billing({ tab: "payments" }),
     },
     {
-      children: 'Plans',
-      href: pathCreator.billing({ tab: 'plans' }),
+      children: "Plans",
+      href: pathCreator.billing({ tab: "plans" }),
     },
   ];
   if (profile.isMarketplace) {
@@ -40,7 +42,7 @@ export default async function BillingLayout({ children }: React.PropsWithChildre
       <div className="bg-canvasSubtle flex h-full flex-col">
         <Header
           backNav={true}
-          breadcrumb={[{ text: 'Billing', href: pathCreator.billing() }]}
+          breadcrumb={[{ text: "Billing", href: pathCreator.billing() }]}
           tabs={tabs}
         />
         <MarketplaceAccessControl isMarketplace={profile.isMarketplace}>

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { RiErrorWarningLine } from '@remixicon/react';
-import * as Sentry from '@sentry/nextjs';
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { RiErrorWarningLine } from "@remixicon/react";
+import * as Sentry from "@sentry/nextjs";
 
-import { getManageKey } from '@/utils/urls';
+import { getManageKey } from "@/utils/urls";
 
 type EventKeyErrorProps = {
   error: Error & { digest?: string };
@@ -20,13 +20,13 @@ export default function EventKeyError({ error }: EventKeyErrorProps) {
   const pathname = usePathname();
   const page = getManageKey(pathname);
 
-  let label = '';
+  let label = "";
   switch (page) {
-    case 'keys':
-      label = 'Event Key';
+    case "keys":
+      label = "Event Key";
       break;
-    case 'webhooks':
-      label = 'Webhook';
+    case "webhooks":
+      label = "Webhook";
       break;
   }
 
@@ -35,11 +35,11 @@ export default function EventKeyError({ error }: EventKeyErrorProps) {
       <div className="text-error inline-flex items-center gap-2">
         <RiErrorWarningLine className="h-4 w-4" />
         <h2 className="text-sm">
-          {'Failed to load this ' +
+          {"Failed to load this " +
             label +
-            '. This ' +
+            ". This " +
             label +
-            ' will likely not belong to this environment.'}
+            " will likely not belong to this environment."}
         </h2>
       </div>
     </div>

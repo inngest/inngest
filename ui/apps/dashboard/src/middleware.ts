@@ -1,27 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 import {
   clerkMiddleware,
   createRouteMatcher,
   type ClerkMiddlewareAuth,
-} from '@clerk/nextjs/server';
-import type { NextMiddlewareRequestParam } from 'node_modules/@clerk/nextjs/dist/types/server/types';
+} from "@clerk/nextjs/server";
+import type { NextMiddlewareRequestParam } from "node_modules/@clerk/nextjs/dist/types/server/types";
 
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/support',
-  '/api/sentry',
-  '/api/inngest(.*)',
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/support",
+  "/api/sentry",
+  "/api/inngest(.*)",
 ]);
 
 const homepagePath = process.env.NEXT_PUBLIC_HOME_PATH;
 if (!homepagePath) {
-  throw new Error('The NEXT_PUBLIC_HOME_PATH environment variable is not set');
+  throw new Error("The NEXT_PUBLIC_HOME_PATH environment variable is not set");
 }
 
 const afterAuth = async (
   authMiddleware: ClerkMiddlewareAuth,
-  request: NextMiddlewareRequestParam
+  request: NextMiddlewareRequestParam,
 ) => {
   const auth = authMiddleware();
   const isSignedIn = !!auth.userId;
@@ -33,18 +33,18 @@ const afterAuth = async (
     return auth.redirectToSignIn({ returnBackUrl: request.url });
   }
 
-  if (!isUserSetup && request.nextUrl.pathname !== '/sign-up/set-up') {
-    return NextResponse.redirect(new URL('/sign-up/set-up', request.url));
+  if (!isUserSetup && request.nextUrl.pathname !== "/sign-up/set-up") {
+    return NextResponse.redirect(new URL("/sign-up/set-up", request.url));
   }
 
   if (
     isUserSetup &&
     !hasActiveOrganization &&
-    !request.nextUrl.pathname.startsWith('/create-organization') &&
-    !request.nextUrl.pathname.startsWith('/organization-list')
+    !request.nextUrl.pathname.startsWith("/create-organization") &&
+    !request.nextUrl.pathname.startsWith("/organization-list")
   ) {
-    const organizationListURL = new URL('/organization-list', request.url);
-    organizationListURL.searchParams.append('redirect_url', request.url);
+    const organizationListURL = new URL("/organization-list", request.url);
+    organizationListURL.searchParams.append("redirect_url", request.url);
     return NextResponse.redirect(organizationListURL);
   }
 
@@ -52,10 +52,12 @@ const afterAuth = async (
     isUserSetup &&
     hasActiveOrganization &&
     !isOrganizationSetup &&
-    !request.nextUrl.pathname.startsWith('/create-organization') &&
-    !request.nextUrl.pathname.startsWith('/organization-list')
+    !request.nextUrl.pathname.startsWith("/create-organization") &&
+    !request.nextUrl.pathname.startsWith("/organization-list")
   ) {
-    return NextResponse.redirect(new URL('/create-organization/set-up', request.url));
+    return NextResponse.redirect(
+      new URL("/create-organization/set-up", request.url),
+    );
   }
 
   return NextResponse.next();
@@ -64,7 +66,7 @@ const afterAuth = async (
 export default clerkMiddleware((auth, request) => {
   const hasJwtCookie = request.cookies.getAll().some((cookie) => {
     // Our non-Clerk JWT is either named "jwt" or "jwt-staging".
-    return cookie.name.startsWith('jwt');
+    return cookie.name.startsWith("jwt");
   });
 
   if (hasJwtCookie) {
@@ -88,6 +90,6 @@ export default clerkMiddleware((auth, request) => {
 export const config = {
   matcher: [
     // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
   ],
 };

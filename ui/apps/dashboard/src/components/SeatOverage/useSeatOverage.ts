@@ -1,21 +1,21 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { trackEvent, useTrackingUser } from '@/utils/tracking';
-import { parseSeatOverageData, useSeatOverageCheck } from './data';
+import { trackEvent, useTrackingUser } from "@/utils/tracking";
+import { parseSeatOverageData, useSeatOverageCheck } from "./data";
 
-const STORAGE_KEY = 'seatOverageDismissedUntil';
+const STORAGE_KEY = "seatOverageDismissedUntil";
 
 const shouldShowSeatCTA = (): boolean => {
-  if (typeof window === 'undefined') return true;
+  if (typeof window === "undefined") return true;
 
   const until = localStorage.getItem(STORAGE_KEY);
   return !until || new Date(until) < new Date();
 };
 
 const dismissSeatCTA = (hours = 24): void => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   const until = new Date();
   until.setHours(until.getHours() + hours);
@@ -42,20 +42,24 @@ export function useSeatOverage() {
 
       if (trackingUser) {
         trackEvent({
-          name: 'app/upsell.seat.overage.dismissed',
+          name: "app/upsell.seat.overage.dismissed",
           data: {
-            variant: 'widget',
+            variant: "widget",
           },
           user: trackingUser,
-          v: '2025-07-14.1',
+          v: "2025-07-14.1",
         });
       }
     },
-    [trackingUser]
+    [trackingUser],
   );
 
   const isWidgetVisible =
-    !error && seatOverageData && seatOverageData.hasExceeded && isReady && shouldShow;
+    !error &&
+    seatOverageData &&
+    seatOverageData.hasExceeded &&
+    isReady &&
+    shouldShow;
 
   return {
     isWidgetVisible,

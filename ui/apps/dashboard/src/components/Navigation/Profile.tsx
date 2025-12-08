@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 
-import { ProfileMenu } from './ProfileMenu';
+import { ProfileMenu } from "./ProfileMenu";
 
 export type ProfileType = {
   displayName: string;
@@ -12,12 +12,18 @@ export type ProfileType = {
   orgProfilePic: string | null;
 };
 
-export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
+export const Profile = ({
+  collapsed,
+  profile,
+}: {
+  collapsed: boolean;
+  profile: ProfileType;
+}) => {
   const pathname = usePathname();
   const active =
-    pathname.startsWith('/settings/organization') ||
-    pathname.startsWith('/billing') ||
-    pathname.startsWith('/settings/user');
+    pathname.startsWith("/settings/organization") ||
+    pathname.startsWith("/billing") ||
+    pathname.startsWith("/settings/user");
 
   return (
     <ProfileMenu isMarketplace={profile.isMarketplace}>
@@ -26,11 +32,11 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
       >
         <div
           className={`flex w-full flex-row items-center rounded p-1 ${
-            collapsed ? 'justify-center' : 'justify-start'
+            collapsed ? "justify-center" : "justify-start"
           } ${
             active
-              ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
-              : 'hover:bg-canvasSubtle text-subtle'
+              ? "bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle"
+              : "hover:bg-canvasSubtle text-subtle"
           }`}
         >
           <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
@@ -43,7 +49,7 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
                 alt="org-profile-pic"
               />
             ) : (
-              profile.orgName?.substring(0, 2) || '?'
+              profile.orgName?.substring(0, 2) || "?"
             )}
           </div>
 

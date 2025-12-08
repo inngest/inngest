@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { Modal } from '@inngest/components/Modal';
-import { useMutation } from 'urql';
+import { useState } from "react";
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
+import { Modal } from "@inngest/components/Modal";
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 
 const Mutation = graphql(`
   mutation DeleteSigningKey($signingKeyID: UUID!) {
@@ -38,8 +38,8 @@ export function DeleteSigningKeyModal(props: Props) {
         { signingKeyID },
         {
           // Bust cache
-          additionalTypenames: ['SigningKey'],
-        }
+          additionalTypenames: ["SigningKey"],
+        },
       );
       if (res.error) {
         throw res.error;
@@ -48,7 +48,7 @@ export function DeleteSigningKeyModal(props: Props) {
       onClose();
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError('Unknown error');
+        setError("Unknown error");
         return;
       }
 
@@ -63,11 +63,13 @@ export function DeleteSigningKeyModal(props: Props) {
       <Modal.Header>Permanently delete key</Modal.Header>
 
       <Modal.Body>
-        <p className="mb-4">Are you sure you want to permanently delete this key?</p>
+        <p className="mb-4">
+          Are you sure you want to permanently delete this key?
+        </p>
 
         <Alert severity="info">
-          This key is inactive, so deletion will not affect communication between Inngest and your
-          apps.
+          This key is inactive, so deletion will not affect communication
+          between Inngest and your apps.
         </Alert>
       </Modal.Body>
 
@@ -79,7 +81,12 @@ export function DeleteSigningKeyModal(props: Props) {
         )}
 
         <div className="flex justify-end gap-2">
-          <Button label="Close" appearance="outlined" kind="secondary" onClick={onClose} />
+          <Button
+            label="Close"
+            appearance="outlined"
+            kind="secondary"
+            onClick={onClose}
+          />
           <Button
             onClick={onConfirm}
             disabled={isFetching}

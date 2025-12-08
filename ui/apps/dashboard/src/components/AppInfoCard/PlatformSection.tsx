@@ -1,6 +1,6 @@
-import type { Route } from 'next';
-import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
-import { Link } from '@inngest/components/Link';
+import type { Route } from "next";
+import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
+import { Link } from "@inngest/components/Link";
 
 type Props = {
   sync: {
@@ -13,8 +13,13 @@ type Props = {
 };
 
 export function PlatformSection({ sync }: Props) {
-  const { platform, vercelDeploymentID, vercelDeploymentURL, vercelProjectID, vercelProjectURL } =
-    sync;
+  const {
+    platform,
+    vercelDeploymentID,
+    vercelDeploymentURL,
+    vercelProjectID,
+    vercelProjectURL,
+  } = sync;
   if (!platform) {
     return null;
   }
@@ -27,7 +32,7 @@ export function PlatformSection({ sync }: Props) {
       </Link>
     );
   } else {
-    deploymentValue = '-';
+    deploymentValue = "-";
   }
 
   let projectValue;
@@ -38,12 +43,15 @@ export function PlatformSection({ sync }: Props) {
       </Link>
     );
   } else {
-    projectValue = '-';
+    projectValue = "-";
   }
 
   return (
     <>
-      <AppDetailsCard.Item detail={<div className="truncate">{platform}</div>} term="Platform" />
+      <AppDetailsCard.Item
+        detail={<div className="truncate">{platform}</div>}
+        term="Platform"
+      />
       <AppDetailsCard.Item detail={projectValue} term="Vercel project" />
       <AppDetailsCard.Item detail={deploymentValue} term="Vercel deployment" />
     </>

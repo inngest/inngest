@@ -1,4 +1,4 @@
-import { Button } from '@inngest/components/Button';
+import { Button } from "@inngest/components/Button";
 
 type Props = {
   showArchive: () => void;

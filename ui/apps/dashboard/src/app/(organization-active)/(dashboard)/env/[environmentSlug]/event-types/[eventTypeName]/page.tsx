@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import NextLink from 'next/link';
-import { useEventTypeVolume } from '@inngest/components/EventTypes/useEventTypeVolume';
-import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import { RiArrowRightSLine } from '@remixicon/react';
+import NextLink from "next/link";
+import { useEventTypeVolume } from "@inngest/components/EventTypes/useEventTypeVolume";
+import { FunctionsIcon } from "@inngest/components/icons/sections/Functions";
+import { RiArrowRightSLine } from "@remixicon/react";
 
-import Block from '@/components/Block';
-import SimpleBarChart from '@/components/Charts/SimpleBarChart';
+import Block from "@/components/Block";
+import SimpleBarChart from "@/components/Charts/SimpleBarChart";
 import {
   useEventTypeVolume as getEventTypeVolume,
   useEventType,
-} from '@/components/EventTypes/useEventTypes';
-import LatestLogsList from '@/components/Events/LatestLogsList';
+} from "@/components/EventTypes/useEventTypes";
+import LatestLogsList from "@/components/Events/LatestLogsList";
 
 type EventDashboardProps = {
   params: {
@@ -20,15 +20,17 @@ type EventDashboardProps = {
   };
 };
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
 export default function EventDashboard({ params }: EventDashboardProps) {
   const eventNameDecoded = decodeURIComponent(params.eventTypeName);
   const { data, isLoading: isLoadingVolume } = useEventTypeVolume(
     eventNameDecoded,
-    getEventTypeVolume()
+    getEventTypeVolume(),
   );
-  const { data: eventType, isLoading } = useEventType({ eventName: eventNameDecoded });
+  const { data: eventType, isLoading } = useEventType({
+    eventName: eventNameDecoded,
+  });
 
   const { volume } = data || {};
 
@@ -48,9 +50,9 @@ export default function EventDashboard({ params }: EventDashboardProps) {
           data={parsedVolumeData}
           legend={[
             {
-              name: 'Events',
-              dataKey: 'count',
-              color: 'rgb(var(--color-primary-subtle) / 1)',
+              name: "Events",
+              dataKey: "count",
+              color: "rgb(var(--color-primary-subtle) / 1)",
               default: true,
             },
           ]}
@@ -58,14 +60,19 @@ export default function EventDashboard({ params }: EventDashboardProps) {
           totalDescription="24 Hour Volume"
           loading={isLoadingVolume}
         />
-        <LatestLogsList environmentSlug={params.environmentSlug} eventName={eventNameDecoded} />
+        <LatestLogsList
+          environmentSlug={params.environmentSlug}
+          eventName={eventNameDecoded}
+        />
       </main>
       <aside className="border-subtle bg-canvasSubtle overflow-y-auto border border-t-0 px-6 py-4">
         <Block title="Triggered Functions">
           {eventType && eventType.functions.length > 0
             ? eventType.functions.map((f) => (
                 <NextLink
-                  href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(f.slug)}`}
+                  href={`/env/${
+                    params.environmentSlug
+                  }/functions/${encodeURIComponent(f.slug)}`}
                   key={f.id}
                   className="border-subtle bg-canvasBase hover:bg-canvasMuted mb-4 block overflow-hidden rounded border p-4"
                 >
@@ -81,7 +88,9 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                 </NextLink>
               ))
             : !isLoading && (
-                <p className="my-4 text-sm leading-6">No functions triggered by this event.</p>
+                <p className="my-4 text-sm leading-6">
+                  No functions triggered by this event.
+                </p>
               )}
         </Block>
       </aside>

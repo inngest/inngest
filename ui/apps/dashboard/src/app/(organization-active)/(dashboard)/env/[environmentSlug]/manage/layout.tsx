@@ -1,6 +1,6 @@
-import { ManageHeader } from '@/components/Manage/Header';
-import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import ChildEmptyState from './ChildEmptyState';
+import { ManageHeader } from "@/components/Manage/Header";
+import { getEnvironment } from "@/queries/server-only/getEnvironment";
+import ChildEmptyState from "./ChildEmptyState";
 
 type ManageLayoutProps = {
   children: React.ReactNode;
@@ -9,7 +9,10 @@ type ManageLayoutProps = {
   };
 };
 
-export default async function ManageLayout({ children, params }: ManageLayoutProps) {
+export default async function ManageLayout({
+  children,
+  params,
+}: ManageLayoutProps) {
   const environment = await getEnvironment({
     environmentSlug: params.environmentSlug,
   });

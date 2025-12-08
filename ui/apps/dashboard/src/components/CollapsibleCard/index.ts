@@ -5,4 +5,4 @@ export {
   CollapsibleCardTrigger,
   CollapsibleCardContentWrapper,
   CollapsibleCardContent,
-} from './CollapsibleCard';
+} from "./CollapsibleCard";

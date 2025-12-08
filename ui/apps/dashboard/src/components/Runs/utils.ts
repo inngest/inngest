@@ -1,12 +1,15 @@
-import type { Run } from '@inngest/components/RunsPage/types';
-import { isFunctionRunStatus, type FunctionRunStatus } from '@inngest/components/types/functionRun';
-import { toMaybeDate } from '@inngest/components/utils/date';
+import type { Run } from "@inngest/components/RunsPage/types";
+import {
+  isFunctionRunStatus,
+  type FunctionRunStatus,
+} from "@inngest/components/types/functionRun";
+import { toMaybeDate } from "@inngest/components/utils/date";
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
   RunsOrderByField as FunctionRunTimeFieldEnum,
   type FunctionRunV2,
-} from '@/gql/graphql';
+} from "@/gql/graphql";
 
 /**
  * Convert a run status union type into an enum. This is necessary because
@@ -14,23 +17,23 @@ import {
  */
 export function toRunStatus(status: FunctionRunStatus): FunctionRunStatusEnum {
   switch (status) {
-    case 'CANCELLED':
+    case "CANCELLED":
       return FunctionRunStatusEnum.Cancelled;
-    case 'COMPLETED':
+    case "COMPLETED":
       return FunctionRunStatusEnum.Completed;
-    case 'FAILED':
+    case "FAILED":
       return FunctionRunStatusEnum.Failed;
-    case 'QUEUED':
+    case "QUEUED":
       return FunctionRunStatusEnum.Queued;
-    case 'RUNNING':
+    case "RUNNING":
       return FunctionRunStatusEnum.Running;
-    case 'WAITING':
+    case "WAITING":
       return FunctionRunStatusEnum.Running;
-    case 'PAUSED':
+    case "PAUSED":
       return FunctionRunStatusEnum.Paused;
-    case 'SKIPPED':
+    case "SKIPPED":
       return FunctionRunStatusEnum.Skipped;
-    case 'UNKNOWN':
+    case "UNKNOWN":
       return FunctionRunStatusEnum.Unknown;
   }
 }
@@ -55,13 +58,15 @@ export function toRunStatuses(statuses: string[]): FunctionRunStatusEnum[] {
  * Convert a time field union type into an enum. This is necessary because
  * TypeScript treats as enums as nominal types, which causes silly type errors.
  */
-export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined {
+export function toTimeField(
+  time: string,
+): FunctionRunTimeFieldEnum | undefined {
   switch (time) {
-    case 'ENDED_AT':
+    case "ENDED_AT":
       return FunctionRunTimeFieldEnum.EndedAt;
-    case 'QUEUED_AT':
+    case "QUEUED_AT":
       return FunctionRunTimeFieldEnum.QueuedAt;
-    case 'STARTED_AT':
+    case "STARTED_AT":
       return FunctionRunTimeFieldEnum.StartedAt;
     default:
       console.error(`unexpected time field: ${time}`);
@@ -70,7 +75,14 @@ export function toTimeField(time: string): FunctionRunTimeFieldEnum | undefined 
 
 type PickedFunctionRunV2 = Pick<
   FunctionRunV2,
-  'id' | 'queuedAt' | 'startedAt' | 'status' | 'endedAt' | 'eventName' | 'isBatch' | 'cronSchedule'
+  | "id"
+  | "queuedAt"
+  | "startedAt"
+  | "status"
+  | "endedAt"
+  | "eventName"
+  | "isBatch"
+  | "cronSchedule"
 >;
 type PickedFunctionRunV2EdgeWithNode = {
   node: PickedFunctionRunV2 & {
@@ -88,13 +100,17 @@ type PickedFunctionRunV2EdgeWithNode = {
 /**
  * Parses the runs data into the table format
  */
-export function parseRunsData(runsData: PickedFunctionRunV2EdgeWithNode[] | undefined): Run[] {
+export function parseRunsData(
+  runsData: PickedFunctionRunV2EdgeWithNode[] | undefined,
+): Run[] {
   return (
     runsData?.map((edge) => {
       const startedAt = toMaybeDate(edge.node.startedAt);
       let durationMS = null;
       if (startedAt) {
-        durationMS = (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() - startedAt.getTime();
+        durationMS =
+          (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() -
+          startedAt.getTime();
       }
 
       return {

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 type ScrollControlProps = {
   containerId: string;
@@ -19,10 +19,11 @@ export default function ScrollControl({ containerId }: ScrollControlProps) {
     const el = document.getElementById(containerId);
     if (!el) return;
 
-    el.style.overflowY = pathname === '/env/production/insights' ? 'hidden' : 'scroll';
+    el.style.overflowY =
+      pathname === "/env/production/insights" ? "hidden" : "scroll";
 
     return () => {
-      el.style.overflowY = '';
+      el.style.overflowY = "";
     };
   }, [containerId, pathname]);
 

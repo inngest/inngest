@@ -1,8 +1,12 @@
-import 'server-only';
-import { graphql } from '@/gql';
-import { type CdcConnectionInput, type CdcSetupResponse, type DeleteResponse } from '@/gql/graphql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+import "server-only";
+import { graphql } from "@/gql";
+import {
+  type CdcConnectionInput,
+  type CdcSetupResponse,
+  type DeleteResponse,
+} from "@/gql/graphql";
+import graphqlAPI from "@/queries/graphqlAPI";
+import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
 
 const testAuthDocument = graphql(`
   mutation testCredentials($input: CDCConnectionInput!, $envID: UUID!) {
@@ -16,10 +20,13 @@ const testAuthDocument = graphql(`
 export const testAuth = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcTestCredentials: CdcSetupResponse }>(testAuthDocument, {
-    envID: environment.id,
-    input: input,
-  });
+  return await graphqlAPI.request<{ cdcTestCredentials: CdcSetupResponse }>(
+    testAuthDocument,
+    {
+      envID: environment.id,
+      input: input,
+    },
+  );
 };
 
 const testLogicalReplicationDocument = graphql(`
@@ -34,13 +41,12 @@ const testLogicalReplicationDocument = graphql(`
 export const testLogicalReplication = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcTestLogicalReplication: CdcSetupResponse }>(
-    testLogicalReplicationDocument,
-    {
-      envID: environment.id,
-      input: input,
-    }
-  );
+  return await graphqlAPI.request<{
+    cdcTestLogicalReplication: CdcSetupResponse;
+  }>(testLogicalReplicationDocument, {
+    envID: environment.id,
+    input: input,
+  });
 };
 
 const testAutoSetupDocument = graphql(`
@@ -55,10 +61,13 @@ const testAutoSetupDocument = graphql(`
 export const testAutoSetup = async (input: CdcConnectionInput) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcAutoSetup: CdcSetupResponse }>(testAutoSetupDocument, {
-    envID: environment.id,
-    input: input,
-  });
+  return await graphqlAPI.request<{ cdcAutoSetup: CdcSetupResponse }>(
+    testAutoSetupDocument,
+    {
+      envID: environment.id,
+      input: input,
+    },
+  );
 };
 
 const deleteConnDocument = graphql(`
@@ -72,8 +81,11 @@ const deleteConnDocument = graphql(`
 export const deleteConn = async (id: string) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(deleteConnDocument as any, {
-    envID: environment.id,
-    id: id,
-  });
+  return await graphqlAPI.request<{ cdcDelete: DeleteResponse }>(
+    deleteConnDocument as any,
+    {
+      envID: environment.id,
+      id: id,
+    },
+  );
 };

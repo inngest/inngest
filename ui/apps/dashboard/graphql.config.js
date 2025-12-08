@@ -1,4 +1,4 @@
-const { loadEnvConfig } = require('@next/env');
+const { loadEnvConfig } = require("@next/env");
 
 loadEnvConfig(process.cwd());
 
@@ -13,12 +13,12 @@ const config = {
       },
     },
   ],
-  documents: './src/**/*.{tsx,ts}',
+  documents: "./src/**/*.{tsx,ts}",
   extensions: {
     codegen: {
       generates: {
-        './src/gql/': {
-          preset: 'client',
+        "./src/gql/": {
+          preset: "client",
           config: {
             avoidOptionals: {
               defaultValue: false, // Default values only work if fields can be undefined.
@@ -26,42 +26,42 @@ const config = {
               inputValue: false, // We don't want to always specify optional fields in mutations.
               object: true,
             },
-            defaultScalarType: 'unknown',
+            defaultScalarType: "unknown",
             strictScalars: true,
             useTypeImports: true,
             scalars: {
-              BillingPeriod: 'unknown',
-              Bytes: 'string',
-              DSN: 'unknown',
-              EdgeType: 'unknown',
-              FilterType: 'string',
-              IngestSource: 'string',
-              Int64: 'number',
-              IP: 'string',
-              JSON: 'null | boolean | number | string | Record<string, unknown> | unknown[]',
-              Map: 'Record<string, unknown>',
-              NullString: 'null | string',
-              NullTime: 'null | string',
-              Period: 'unknown',
-              Role: 'unknown',
-              Runtime: 'unknown',
-              SchemaSource: 'unknown',
-              SearchObject: 'unknown',
-              SegmentType: 'unknown',
-              SpanMetadataKind: 'string',
-              SpanMetadataScope: 'string',
-              SpanMetadataValues: 'Record<string, any>',
-              Time: 'string',
-              Timerange: 'unknown',
-              ULID: 'string',
-              Unknown: 'unknown',
-              Upload: 'unknown',
-              UUID: 'string',
+              BillingPeriod: "unknown",
+              Bytes: "string",
+              DSN: "unknown",
+              EdgeType: "unknown",
+              FilterType: "string",
+              IngestSource: "string",
+              Int64: "number",
+              IP: "string",
+              JSON: "null | boolean | number | string | Record<string, unknown> | unknown[]",
+              Map: "Record<string, unknown>",
+              NullString: "null | string",
+              NullTime: "null | string",
+              Period: "unknown",
+              Role: "unknown",
+              Runtime: "unknown",
+              SchemaSource: "unknown",
+              SearchObject: "unknown",
+              SegmentType: "unknown",
+              SpanMetadataKind: "string",
+              SpanMetadataScope: "string",
+              SpanMetadataValues: "Record<string, any>",
+              Time: "string",
+              Timerange: "unknown",
+              ULID: "string",
+              Unknown: "unknown",
+              Upload: "unknown",
+              UUID: "string",
             },
           },
           presetConfig: {
             fragmentMasking: {
-              unmaskFunctionName: 'getFragmentData',
+              unmaskFunctionName: "getFragmentData",
             },
           },
         },

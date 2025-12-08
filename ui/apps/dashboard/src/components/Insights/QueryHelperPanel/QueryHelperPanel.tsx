@@ -1,23 +1,32 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
+import { useMemo } from "react";
+import { RiAddCircleFill, RiBookReadLine } from "@remixicon/react";
 
-import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import type { InsightsQueryStatement } from '@/gql/graphql';
-import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
-import { useStoredQueries } from './StoredQueriesContext';
+import { useTabManagerActions } from "@/components/Insights/InsightsTabManager/TabManagerContext";
+import type { InsightsQueryStatement } from "@/gql/graphql";
+import { QueryHelperPanelCollapsibleSection } from "./QueryHelperPanelCollapsibleSection";
+import { useStoredQueries } from "./StoredQueriesContext";
 
 interface QueryHelperPanelProps {
   activeSavedQueryId?: string;
 }
 
-export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) {
+export function QueryHelperPanel({
+  activeSavedQueryId,
+}: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } = useStoredQueries();
+  const { deleteQuery, deleteQuerySnapshot, querySnapshots, queries } =
+    useStoredQueries();
 
-  const sharedQueries = useMemo(() => limitQueriesByType('shared', queries), [queries]);
-  const savedQueries = useMemo(() => limitQueriesByType('saved', queries), [queries]);
+  const sharedQueries = useMemo(
+    () => limitQueriesByType("shared", queries),
+    [queries],
+  );
+  const savedQueries = useMemo(
+    () => limitQueriesByType("saved", queries),
+    [queries],
+  );
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
@@ -38,7 +47,9 @@ export function QueryHelperPanel({ activeSavedQueryId }: QueryHelperPanelProps) 
             onClick={tabManagerActions.openTemplatesTab}
           >
             <RiBookReadLine className="h-4 w-4" />
-            <span className="ml-2.5 text-sm font-medium leading-tight">Browse templates</span>
+            <span className="ml-2.5 text-sm font-medium leading-tight">
+              Browse templates
+            </span>
           </button>
         </div>
       </div>
@@ -78,9 +89,14 @@ type QueriesResponse = {
   isLoading: boolean;
 };
 
-function limitQueriesByType(type: 'shared' | 'saved', queries: QueriesResponse) {
+function limitQueriesByType(
+  type: "shared" | "saved",
+  queries: QueriesResponse,
+) {
   return {
     ...queries,
-    data: queries.data?.filter((query) => (type === 'shared' ? query.shared : !query.shared)),
+    data: queries.data?.filter((query) =>
+      type === "shared" ? query.shared : !query.shared,
+    ),
   };
 }

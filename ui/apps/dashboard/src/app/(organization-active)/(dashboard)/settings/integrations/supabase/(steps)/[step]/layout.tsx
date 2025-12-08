@@ -1,7 +1,7 @@
-import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/types';
+import { IntegrationSteps } from "@inngest/components/PostgresIntegrations/types";
 
-import PageHeader from '@/components/PostgresIntegration/PageHeader';
-import StepsMenu from '@/components/PostgresIntegration/StepsMenu';
+import PageHeader from "@/components/PostgresIntegration/PageHeader";
+import StepsMenu from "@/components/PostgresIntegration/StepsMenu";
 
 // SUpabase has two steps.
 const steps = [IntegrationSteps.Authorize, IntegrationSteps.ConnectDb];

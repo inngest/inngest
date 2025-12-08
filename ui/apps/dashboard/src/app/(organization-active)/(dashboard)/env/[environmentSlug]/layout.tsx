@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react';
-import { Alert } from '@inngest/components/Alert/Alert';
+import type { ReactNode } from "react";
+import { Alert } from "@inngest/components/Alert/Alert";
 
-import { SharedContextProvider } from '@/app/SharedContextProvider';
-import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
-import { getEnv } from '@/components/Environments/data';
-import { EnvironmentProvider } from '@/components/Environments/environment-context';
-import Layout from '@/components/Layout/Layout';
-import Toaster from '@/components/Toaster';
-import type { Environment } from '@/utils/environments';
+import { SharedContextProvider } from "@/app/SharedContextProvider";
+import { ArchivedEnvBanner } from "@/components/ArchivedEnvBanner";
+import { getEnv } from "@/components/Environments/data";
+import { EnvironmentProvider } from "@/components/Environments/environment-context";
+import Layout from "@/components/Layout/Layout";
+import Toaster from "@/components/Toaster";
+import type { Environment } from "@/utils/environments";
 
 type RootLayoutProps = {
   params: {

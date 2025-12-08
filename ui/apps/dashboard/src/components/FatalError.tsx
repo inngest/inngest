@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import * as Sentry from '@sentry/nextjs';
+import { useEffect } from "react";
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
+import * as Sentry from "@sentry/nextjs";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 type Props = {
   error: Error & { digest?: string };
@@ -33,7 +33,8 @@ export function FatalError({ error, reset }: Props) {
         <p className="mb-4 font-semibold">{error.message}</p>
 
         <p>
-          An error occurred! Refresh the page to try again. If the problem persists, contact{' '}
+          An error occurred! Refresh the page to try again. If the problem
+          persists, contact{" "}
           <Alert.Link
             size="medium"
             severity="error"

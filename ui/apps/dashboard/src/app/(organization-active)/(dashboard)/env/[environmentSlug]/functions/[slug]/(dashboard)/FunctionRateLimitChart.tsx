@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import colors from 'tailwindcss/colors';
-import { useQuery } from 'urql';
+import colors from "tailwindcss/colors";
+import { useQuery } from "urql";
 
-import SimpleLineChart from '@/components/Charts/SimpleLineChart';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import SimpleLineChart from "@/components/Charts/SimpleLineChart";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const GetFunctionRateLimitDocument = graphql(`
   query GetFunctionRateLimitDocument(
@@ -45,20 +45,22 @@ export default function FunctionRunRateLimitChart({
 }: FunctionRateLimitChartProps) {
   const environment = useEnvironment();
 
-  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
-    query: GetFunctionRateLimitDocument,
-    variables: {
-      environmentID: environment.id,
-      fnSlug: functionSlug,
-      startTime,
-      endTime,
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery(
+    {
+      query: GetFunctionRateLimitDocument,
+      variables: {
+        environmentID: environment.id,
+        fnSlug: functionSlug,
+        startTime,
+        endTime,
+      },
     },
-  });
+  );
 
   const ratelimit = data?.environment.function?.ratelimit.data ?? [];
 
   const metrics = Array.from({ length: ratelimit.length }).map((_, idx) => ({
-    name: ratelimit[idx]?.bucket || '',
+    name: ratelimit[idx]?.bucket || "",
     values: {
       ratelimit: ratelimit[idx]?.value ?? 0,
     },
@@ -69,7 +71,13 @@ export default function FunctionRunRateLimitChart({
       title="Function RateLimit"
       desc="The number of runs that got dropped due to rate limit settings"
       data={metrics}
-      legend={[{ name: 'Rate Limited', dataKey: 'ratelimit', color: colors.slate['500'] }]}
+      legend={[
+        {
+          name: "Rate Limited",
+          dataKey: "ratelimit",
+          color: colors.slate["500"],
+        },
+      ]}
       isLoading={isFetchingMetrics}
       error={metricsError}
     />

@@ -2,15 +2,19 @@ import type {
   ChartProps,
   LegendComponentOption,
   LineSeriesOption,
-} from '@inngest/components/Chart/Chart';
-import { resolveColor } from '@inngest/components/utils/colors';
-import { differenceInMilliseconds, lightFormat, toDate } from '@inngest/components/utils/date';
-import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
+} from "@inngest/components/Chart/Chart";
+import { resolveColor } from "@inngest/components/utils/colors";
+import {
+  differenceInMilliseconds,
+  lightFormat,
+  toDate,
+} from "@inngest/components/utils/date";
+import { isDark } from "@inngest/components/utils/theme";
+import resolveConfig from "tailwindcss/resolveConfig";
 
-import type { MetricsData, MetricsResponse, ScopedMetric } from '@/gql/graphql';
-import tailwindConfig from '../../../tailwind.config';
-import type { EntityLookup, EntityType } from './Dashboard';
+import type { MetricsData, MetricsResponse, ScopedMetric } from "@/gql/graphql";
+import tailwindConfig from "../../../tailwind.config";
+import type { EntityLookup, EntityType } from "./Dashboard";
 
 const {
   theme: { colors, backgroundColor, textColor, borderColor },
@@ -28,19 +32,19 @@ export type LineChartData = {
 };
 
 export const lineColors = [
-  [colors.accent.subtle, '#ec9923'],
-  [colors.primary.moderate, '#2c9b63'],
-  [colors.secondary.moderate, '#2389f1'],
-  [colors.tertiary.moderate, '#f54a3f'],
-  [colors.quaternary.coolxIntense, '#6222df'],
+  [colors.accent.subtle, "#ec9923"],
+  [colors.primary.moderate, "#2c9b63"],
+  [colors.secondary.moderate, "#2389f1"],
+  [colors.tertiary.moderate, "#f54a3f"],
+  [colors.quaternary.coolxIntense, "#6222df"],
 ];
 
 export const seriesOptions: LineSeriesOption = {
-  type: 'line',
+  type: "line",
   showSymbol: false,
   lineStyle: { width: 1 },
   triggerLineEvent: true,
-  emphasis: { focus: 'none' },
+  emphasis: { focus: "none" },
 };
 
 export const dateFormat = (dateString: string, diff: number) => {
@@ -52,10 +56,10 @@ export const dateFormat = (dateString: string, diff: number) => {
   const d = Math.abs(diff);
 
   return d < 6000 // a minute
-    ? lightFormat(date, 'HH:mm:ss:SSS')
+    ? lightFormat(date, "HH:mm:ss:SSS")
     : d <= 8.64e7 // a day
-    ? lightFormat(date, 'HH:mm')
-    : lightFormat(date, 'MM/dd:HH');
+    ? lightFormat(date, "HH:mm")
+    : lightFormat(date, "MM/dd:HH");
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -66,22 +70,29 @@ export const timeDiff = (start?: string, end?: string) =>
 export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
   entities
     ? entities.reduce(
-        (acc, v) => ({ ...acc, [v.id]: { id: v.id, name: v.name, slug: v.slug } }),
-        {}
+        (acc, v) => ({
+          ...acc,
+          [v.id]: { id: v.id, name: v.name, slug: v.slug },
+        }),
+        {},
       )
     : {};
 
 export const sum = (data?: MetricsData[]) =>
   data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
 
-export const formatNumber = (number?: number | bigint) => (number || 0).toLocaleString(undefined);
+export const formatNumber = (number?: number | bigint) =>
+  (number || 0).toLocaleString(undefined);
 
 export const marker = (color: string) =>
   `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;
       border-width: 1px;border-color:${color};background-color:${color};"></span>`;
 
 export const formatDimension = (param: any) => {
-  const color = typeof param.color === 'object' ? param.color?.colorStops[0]?.color : param.color;
+  const color =
+    typeof param.color === "object"
+      ? param.color?.colorStops[0]?.color
+      : param.color;
 
   //
   // FYI using vanilla html in formatter because rendering react here causes
@@ -100,24 +111,26 @@ export const formatDimension = (param: any) => {
 
 const tooltipFormatter = (params: any) => {
   return Array.isArray(params) && params[0]
-    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${params[0].axisValue}</div>${params
+    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${
+        params[0].axisValue
+      }</div>${params
         .sort((a: any, b: any) => b.value - a.value)
         .map((p: any) => formatDimension(p))
-        .join('')}</div>`
-    : '';
+        .join("")}</div>`
+    : "";
 };
 
 export const getLineChartOptions = (
-  data: Partial<ChartProps['option']>,
-  legendData?: LegendComponentOption['data']
-): ChartProps['option'] => {
+  data: Partial<ChartProps["option"]>,
+  legendData?: LegendComponentOption["data"],
+): ChartProps["option"] => {
   const dark = isDark();
   return {
     tooltip: {
-      trigger: 'axis',
-      renderMode: 'html',
+      trigger: "axis",
+      renderMode: "html",
       enterable: true,
-      position: 'top',
+      position: "top",
       backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
       borderColor: resolveColor(borderColor.subtle, dark),
       textStyle: { color: resolveColor(textColor.basis, dark) },
@@ -129,42 +142,47 @@ export const getLineChartOptions = (
       //
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
-      appendTo: () => document.getElementById('chart-tooltip'),
+      appendTo: () => document.getElementById("chart-tooltip"),
       transitionDuration: 1.5,
       formatter: (params) => tooltipFormatter(params),
       padding: 0,
-      extraCssText: 'max-height: 300px; overflow-y: scroll;',
-      className: 'no-scrollbar',
+      extraCssText: "max-height: 300px; overflow-y: scroll;",
+      className: "no-scrollbar",
     },
     legend: {
-      type: 'scroll',
-      bottom: '0%',
-      left: '0%',
-      icon: 'circle',
+      type: "scroll",
+      bottom: "0%",
+      left: "0%",
+      icon: "circle",
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { fontSize: '12px', color: resolveColor(textColor.basis, dark) },
+      textStyle: {
+        fontSize: "12px",
+        color: resolveColor(textColor.basis, dark),
+      },
       data: legendData,
     },
     grid: {
-      top: '10%',
-      left: '1%',
-      right: '0%',
-      bottom: '15%',
+      top: "10%",
+      left: "1%",
+      right: "0%",
+      bottom: "15%",
       containLabel: true,
     },
     yAxis: {
-      type: 'value',
+      type: "value",
       minInterval: 1,
       splitLine: {
-        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
+        lineStyle: { color: resolveColor(borderColor.subtle, dark, "#E2E2E2") },
       },
     },
     ...data,
   };
 };
 
-export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) => {
+export const getXAxis = (
+  metrics: ScopedMetric[] | MetricsResponse | undefined,
+) => {
   const dark = isDark();
 
   let series: MetricsData[] | undefined;
@@ -180,13 +198,13 @@ export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) 
   const dataLength = series?.length || 30;
 
   return {
-    type: 'category' as const,
+    type: "category" as const,
     boundaryGap: true,
-    data: series?.map(({ bucket }) => bucket) || ['No Data Found'],
+    data: series?.map(({ bucket }) => bucket) || ["No Data Found"],
     axisPointer: {
       show: true,
       snap: true,
-      type: 'line' as const,
+      type: "line" as const,
       label: {
         show: false,
         borderWidth: 1,
@@ -213,14 +231,15 @@ export const getXAxis = (metrics: ScopedMetric[] | MetricsResponse | undefined) 
 export const mapEntityLines = (
   metrics: ScopedMetric[],
   entities: EntityLookup,
-  areaStyle?: { opacity: number }
+  areaStyle?: { opacity: number },
 ) => {
   const dark = isDark();
 
   // Create series with names first
   const seriesWithNames = metrics.map((f, index) => {
     // For worker metrics, use tagValue as the series name if available
-    const seriesName = f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
+    const seriesName =
+      f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
 
     return {
       metric: f,
@@ -238,7 +257,11 @@ export const mapEntityLines = (
       name: item.name,
       data: item.metric.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[i % lineColors.length]![0]!, dark, lineColors[0]?.[1]),
+        color: resolveColor(
+          lineColors[i % lineColors.length]![0]!,
+          dark,
+          lineColors[0]?.[1],
+        ),
       },
       areaStyle,
     };

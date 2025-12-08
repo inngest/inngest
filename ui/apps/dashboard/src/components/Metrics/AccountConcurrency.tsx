@@ -1,15 +1,20 @@
-import { Button } from '@inngest/components/Button';
-import { Chart, type LineSeriesOption } from '@inngest/components/Chart/Chart';
-import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
-import { resolveColor } from '@inngest/components/utils/colors';
-import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
+import { Button } from "@inngest/components/Button";
+import { Chart, type LineSeriesOption } from "@inngest/components/Chart/Chart";
+import { Info } from "@inngest/components/Info/Info";
+import { Link } from "@inngest/components/Link/Link";
+import { resolveColor } from "@inngest/components/utils/colors";
+import { isDark } from "@inngest/components/utils/theme";
+import resolveConfig from "tailwindcss/resolveConfig";
 
-import type { MetricsResponse } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
-import tailwindConfig from '../../../tailwind.config';
-import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
+import type { MetricsResponse } from "@/gql/graphql";
+import { pathCreator } from "@/utils/urls";
+import tailwindConfig from "../../../tailwind.config";
+import {
+  getLineChartOptions,
+  getXAxis,
+  lineColors,
+  seriesOptions,
+} from "./utils";
 
 type Props = {
   data: MetricsResponse | undefined;
@@ -17,7 +22,11 @@ type Props = {
   isMarketplace: boolean;
 };
 
-export function AccountConcurrency({ data, limit, isMarketplace = false }: Props) {
+export function AccountConcurrency({
+  data,
+  limit,
+  isMarketplace = false,
+}: Props) {
   let option = {};
   if (data) {
     option = createChartOption({ limit, resp: data });
@@ -43,14 +52,21 @@ export function AccountConcurrency({ data, limit, isMarketplace = false }: Props
         {!isMarketplace && (
           <Button
             appearance="outlined"
-            href={pathCreator.billing({ highlight: 'concurrency', ref: 'app-concurrency-chart' })}
+            href={pathCreator.billing({
+              highlight: "concurrency",
+              ref: "app-concurrency-chart",
+            })}
             kind="secondary"
             label="Increase Concurrency"
           />
         )}
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart className="h-full w-full" group="metricsDashboard" option={option} />
+        <Chart
+          className="h-full w-full"
+          group="metricsDashboard"
+          option={option}
+        />
       </div>
     </div>
   );
@@ -65,7 +81,7 @@ function createChartOption({
 }: {
   limit: number | undefined;
   resp: MetricsResponse;
-}): React.ComponentProps<typeof Chart>['option'] {
+}): React.ComponentProps<typeof Chart>["option"] {
   const dark = isDark();
 
   let series: LineSeriesOption[] = [
@@ -75,7 +91,7 @@ function createChartOption({
       itemStyle: {
         color: resolveColor(lineColors[1]?.[0]!, dark, lineColors[1]?.[1]),
       },
-      name: 'Concurrently running steps',
+      name: "Concurrently running steps",
     },
   ];
 
@@ -84,22 +100,22 @@ function createChartOption({
       ...seriesOptions,
       markLine: {
         animation: false,
-        data: [{ yAxis: limit, name: 'Concurrency Limit', symbol: 'none' }],
+        data: [{ yAxis: limit, name: "Concurrency Limit", symbol: "none" }],
         emphasis: {
           label: {
-            color: 'inherit',
+            color: "inherit",
             formatter: ({ value }: any) => {
               return ` Plan Limit: ${value}\n\n`;
             },
-            position: 'insideStartTop' as const,
+            position: "insideStartTop" as const,
             show: true,
           },
         },
         lineStyle: {
-          type: 'solid' as any,
+          type: "solid" as any,
           color: resolveColor(lineColors[3]?.[0]!, dark, lineColors[3]?.[1]),
         },
-        symbol: 'none',
+        symbol: "none",
         tooltip: {
           show: false,
         },
@@ -118,7 +134,7 @@ function createChartOption({
         return max;
       },
       splitLine: {
-        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
+        lineStyle: { color: resolveColor(borderColor.subtle, dark, "#E2E2E2") },
       },
     },
   });

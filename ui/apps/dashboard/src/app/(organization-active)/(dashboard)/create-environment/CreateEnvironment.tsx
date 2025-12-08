@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
+import { Link } from "@inngest/components/Link";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 
 const CreateEnvironmentDocument = graphql(`
   mutation CreateEnvironment($name: String!) {
@@ -22,14 +22,14 @@ export default function CreateEnvironment({}) {
   const router = useRouter();
   const [, createEnvironment] = useMutation(CreateEnvironmentDocument);
   const [isDisabled, setDisabled] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDisabled(true);
 
     const form = new FormData(event.currentTarget);
-    const name = form.get('name') as string | null;
+    const name = form.get("name") as string | null;
     if (!name) {
       return;
     }
@@ -38,11 +38,11 @@ export default function CreateEnvironment({}) {
     setDisabled(false);
     if (result.error) {
       toast.error(`Failed to create new environment`);
-      setError('Failed to create a new environment');
+      setError("Failed to create a new environment");
       return;
     }
     toast.success(`Created new environment`);
-    router.push('/env');
+    router.push("/env");
   }
 
   return (
@@ -57,12 +57,12 @@ export default function CreateEnvironment({}) {
         </p>
         <ul className="ml-8 flex list-disc flex-col gap-2 text-sm">
           <li>
-            Each environment has its own keys, event history, and functions. All data is isolated
-            within each environment.
+            Each environment has its own keys, event history, and functions. All
+            data is isolated within each environment.
           </li>
           <li>
-            You can sync multiple apps to the same environment to fully simulate your production
-            environment.
+            You can sync multiple apps to the same environment to fully simulate
+            your production environment.
           </li>
           <li>You can create as many environments as you need.</li>
         </ul>
@@ -75,7 +75,10 @@ export default function CreateEnvironment({}) {
           </Link>
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="my-8 flex flex-row items-start gap-4">
+      <form
+        onSubmit={handleSubmit}
+        className="my-8 flex flex-row items-start gap-4"
+      >
         <Input
           className="min-w-[300px]"
           type="text"
@@ -84,7 +87,12 @@ export default function CreateEnvironment({}) {
           required
           error={error}
         />
-        <Button kind="primary" type="submit" disabled={isDisabled} label="Create environment" />
+        <Button
+          kind="primary"
+          type="submit"
+          disabled={isDisabled}
+          label="Create environment"
+        />
       </form>
     </div>
   );

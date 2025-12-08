@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useContext, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { Input } from '@inngest/components/Forms/Input';
-import { Modal } from '@inngest/components/Modal';
-import { toast } from 'sonner';
+import { useContext, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
+import { Modal } from "@inngest/components/Modal";
+import { toast } from "sonner";
 
-import useManagePageTerminology from '../useManagePageTerminology';
-import { Context } from './Context';
+import useManagePageTerminology from "../useManagePageTerminology";
+import { Context } from "./Context";
 
 type EditKeyNameProps = {
   isOpen: boolean;
@@ -17,8 +17,13 @@ type EditKeyNameProps = {
   keyName: string | null;
 };
 
-export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKeyNameProps) {
-  const [inputValue, setInputValue] = useState(keyName ?? '');
+export default function EditKeyModal({
+  keyID,
+  keyName,
+  isOpen,
+  onClose,
+}: EditKeyNameProps) {
+  const [inputValue, setInputValue] = useState(keyName ?? "");
   const [isDisabled, setDisabled] = useState(true);
   const { save, fetching } = useContext(Context);
   const router = useRouter();
@@ -50,7 +55,7 @@ export default function EditKeyModal({ keyID, keyName, isOpen, onClose }: EditKe
   return (
     <Modal
       isOpen={isOpen}
-      className={'w-1/4'}
+      className={"w-1/4"}
       onClose={onClose}
       title={`Edit the ${currentContent?.name} Name`}
       footer={

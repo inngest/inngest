@@ -1,2 +1,2 @@
-export * from './environments';
-export * from './functions';
+export * from "./environments";
+export * from "./functions";

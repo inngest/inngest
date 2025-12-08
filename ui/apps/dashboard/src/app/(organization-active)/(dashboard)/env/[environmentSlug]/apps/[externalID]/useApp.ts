@@ -2,10 +2,10 @@ import {
   transformFramework,
   transformLanguage,
   transformPlatform,
-} from '@inngest/components/utils/appsParser';
+} from "@inngest/components/utils/appsParser";
 
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 const query = graphql(`
   query App($envID: ID!, $externalAppID: String!) {
@@ -51,7 +51,13 @@ const query = graphql(`
   }
 `);
 
-export function useApp({ envID, externalAppID }: { envID: string; externalAppID: string }) {
+export function useApp({
+  envID,
+  externalAppID,
+}: {
+  envID: string;
+  externalAppID: string;
+}) {
   const res = useGraphQLQuery({
     pollIntervalInMilliseconds: 10_000,
     query,

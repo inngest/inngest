@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { Alert } from '@inngest/components/Alert';
-import { Card } from '@inngest/components/Card';
-import { InlineCode } from '@inngest/components/Code';
-import { Link } from '@inngest/components/Link';
+import { Alert } from "@inngest/components/Alert";
+import { Card } from "@inngest/components/Card";
+import { InlineCode } from "@inngest/components/Code";
+import { Link } from "@inngest/components/Link";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { EnvironmentType } from '@/utils/environments';
-import { CreateSigningKeyButton } from './CreateSigningKeyButton';
-import { RotateSigningKeyButton } from './RotateSigningKeyButton';
-import { SigningKey } from './SigningKey';
-import { useSigningKeys } from './useSigningKeys';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import LoadingIcon from "@/icons/LoadingIcon";
+import { EnvironmentType } from "@/utils/environments";
+import { CreateSigningKeyButton } from "./CreateSigningKeyButton";
+import { RotateSigningKeyButton } from "./RotateSigningKeyButton";
+import { SigningKey } from "./SigningKey";
+import { useSigningKeys } from "./useSigningKeys";
 
 export default function Page() {
   const env = useEnvironment();
@@ -31,11 +31,11 @@ export default function Page() {
   const activeKeys = data.filter((key) => key.isActive);
   if (!activeKeys[0]) {
     // Unreachable
-    throw new Error('No active key found');
+    throw new Error("No active key found");
   }
   if (activeKeys.length > 1) {
     // Unreachable
-    throw new Error('More than one active key found');
+    throw new Error("More than one active key found");
   }
   const activeKey = activeKeys[0];
   const inactiveKeys = data.filter((key) => !key.isActive);
@@ -43,7 +43,10 @@ export default function Page() {
   return (
     <div>
       {env.type === EnvironmentType.BranchParent && (
-        <Alert className="flex items-center justify-center rounded-none text-sm" severity="info">
+        <Alert
+          className="flex items-center justify-center rounded-none text-sm"
+          severity="info"
+        >
           Signing keys are shared for all branch environments
         </Alert>
       )}
@@ -53,7 +56,8 @@ export default function Page() {
             <h1 className="mb-2 text-2xl">Signing keys</h1>
 
             <p className="text-muted mb-8 text-sm">
-              Signing keys are secrets used for secure communication between Inngest and your apps.
+              Signing keys are secrets used for secure communication between
+              Inngest and your apps.
               <Link
                 target="_blank"
                 href="https://www.inngest.com/docs/security#signing-keys-and-sdk-security"
@@ -75,11 +79,12 @@ export default function Page() {
             <h2 className="mb-2 mt-4 text-xl">Rotation</h2>
 
             <div className="text-subtle mb-8 text-sm">
-              Create a new signing key and update environment variables in your app: set{' '}
-              <InlineCode>INNGEST_SIGNING_KEY</InlineCode> to the value of the{' '}
-              <span className="font-bold">new key</span> and{' '}
-              <InlineCode>INNGEST_SIGNING_KEY_FALLBACK</InlineCode> to the value of the{' '}
-              <span className="font-bold">current key</span>. Deploy your apps and then click the{' '}
+              Create a new signing key and update environment variables in your
+              app: set <InlineCode>INNGEST_SIGNING_KEY</InlineCode> to the value
+              of the <span className="font-bold">new key</span> and{" "}
+              <InlineCode>INNGEST_SIGNING_KEY_FALLBACK</InlineCode> to the value
+              of the <span className="font-bold">current key</span>. Deploy your
+              apps and then click the{" "}
               <span className="font-bold">Rotate key</span> button.
             </div>
 
@@ -90,18 +95,23 @@ export default function Page() {
                     <p className="mb-2 font-medium">Rotate key</p>
 
                     <p className="text-subtle text-sm">
-                      This action replaces the <span className="font-bold">current key</span> with
-                      the <span className="font-bold">new key</span>, permanently deleting the
-                      current key.
+                      This action replaces the{" "}
+                      <span className="font-bold">current key</span> with the{" "}
+                      <span className="font-bold">new key</span>, permanently
+                      deleting the current key.
                     </p>
                   </div>
 
-                  <RotateSigningKeyButton disabled={inactiveKeys.length === 0} envID={env.id} />
+                  <RotateSigningKeyButton
+                    disabled={inactiveKeys.length === 0}
+                    envID={env.id}
+                  />
                 </div>
 
                 <Alert severity="warning" className="text-sm">
                   <p>
-                    Rotation may cause downtime if your SDK does not meet the minimum version.
+                    Rotation may cause downtime if your SDK does not meet the
+                    minimum version.
                     <Alert.Link
                       severity="warning"
                       target="_blank"

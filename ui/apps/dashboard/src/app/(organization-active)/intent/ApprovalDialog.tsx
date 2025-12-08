@@ -1,5 +1,5 @@
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Alert } from "@inngest/components/Alert";
+import { Button } from "@inngest/components/Button";
 
 export default function ApprovalDialog({
   title,
@@ -9,7 +9,7 @@ export default function ApprovalDialog({
   onCancel,
   onApprove,
   isLoading = false,
-  error = '',
+  error = "",
 }: {
   title: string;
   description: React.ReactNode;

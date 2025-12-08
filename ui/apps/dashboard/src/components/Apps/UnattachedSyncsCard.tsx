@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
-import { Card } from '@inngest/components/Card/Card';
-import { Time } from '@inngest/components/Time';
-import { RiLinkUnlinkM } from '@remixicon/react';
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button/Button";
+import { Card } from "@inngest/components/Card/Card";
+import { Time } from "@inngest/components/Time";
+import { RiLinkUnlinkM } from "@remixicon/react";
 
-import { pathCreator } from '@/utils/urls';
+import { pathCreator } from "@/utils/urls";
 
 type Props = {
   className?: string;
@@ -25,9 +25,12 @@ export function UnattachedSyncsCard({ envSlug, latestSyncTime }: Props) {
               <RiLinkUnlinkM className="h-7 w-7" />
             </div>
             <div>
-              <div className="mb-0.5 flex items-center gap-2 text-xl">Unattached syncs</div>
+              <div className="mb-0.5 flex items-center gap-2 text-xl">
+                Unattached syncs
+              </div>
               <p className="text-muted text-sm">
-                Unattached syncs are failed syncs that could not be associated with an app.
+                Unattached syncs are failed syncs that could not be associated
+                with an app.
               </p>
             </div>
           </div>
@@ -36,7 +39,9 @@ export function UnattachedSyncsCard({ envSlug, latestSyncTime }: Props) {
             label="View details"
             appearance="outlined"
             kind="secondary"
-            onClick={() => router.push(pathCreator.unattachedSyncs({ envSlug }))}
+            onClick={() =>
+              router.push(pathCreator.unattachedSyncs({ envSlug }))
+            }
           />
         </div>
       </div>

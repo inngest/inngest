@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { AlertModal } from '@inngest/components/Modal';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useState } from "react";
+import { Alert } from "@inngest/components/Alert";
+import { AlertModal } from "@inngest/components/Modal";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 
 type Props = {
   appID: string;
@@ -26,10 +26,10 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       let message: string;
       if (isArchived) {
         error = (await unarchiveApp({ appID })).error;
-        message = 'Unarchived app';
+        message = "Unarchived app";
       } else {
         error = (await archiveApp({ appID })).error;
-        message = 'Archived app';
+        message = "Archived app";
       }
       if (error) {
         throw error;
@@ -41,7 +41,7 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       if (error instanceof Error) {
         setError(error);
       } else {
-        setError(new Error('unknown error'));
+        setError(new Error("unknown error"));
       }
     } finally {
       setIsLoading(false);
@@ -54,7 +54,9 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={onConfirm}
-      title={`Are you sure you want to ${isArchived ? 'unarchive' : 'archive'} this app?`}
+      title={`Are you sure you want to ${
+        isArchived ? "unarchive" : "archive"
+      } this app?`}
       className="w-[600px]"
     >
       <ul className="list-inside list-disc p-6 pb-0">
@@ -68,7 +70,9 @@ export function ArchiveModal({ appID, isArchived, isOpen, onClose }: Props) {
           <>
             <li>New function runs will not trigger.</li>
             <li>Existing function runs will be cancelled.</li>
-            <li>Functions will still be visible, including their run history.</li>
+            <li>
+              Functions will still be visible, including their run history.
+            </li>
             <li>You may unarchive at any time.</li>
           </>
         )}

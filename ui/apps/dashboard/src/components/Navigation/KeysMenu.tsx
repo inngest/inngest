@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import NextLink from 'next/link';
-import { Listbox } from '@headlessui/react';
-import { Button } from '@inngest/components/Button';
-import { RiKey2Line } from '@remixicon/react';
+import NextLink from "next/link";
+import { Listbox } from "@headlessui/react";
+import { Button } from "@inngest/components/Button";
+import { RiKey2Line } from "@remixicon/react";
 
-import type { Environment as EnvType } from '@/utils/environments';
+import type { Environment as EnvType } from "@/utils/environments";
 
 export default function KeysMenu({
   activeEnv,
@@ -19,7 +19,7 @@ export default function KeysMenu({
       <Listbox.Button as="div" className="group">
         <Button
           kind="secondary"
-          appearance={collapsed ? 'ghost' : 'outlined'}
+          appearance={collapsed ? "ghost" : "outlined"}
           size="medium"
           icon={<RiKey2Line className="fill-subtle w-[18px]" />}
           className="group-data-[headlessui-state=open]:border-primary-moderate"
@@ -35,7 +35,10 @@ export default function KeysMenu({
               Event keys
             </Listbox.Option>
           </NextLink>
-          <NextLink href={`/env/${activeEnv.slug}/manage/signing-key`} prefetch={true}>
+          <NextLink
+            href={`/env/${activeEnv.slug}/manage/signing-key`}
+            prefetch={true}
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signingKeys"

@@ -1,21 +1,25 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button/Button';
-import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
-import { EventsTable } from '@inngest/components/Events/EventsTable';
-import { useReplayModal } from '@inngest/components/Events/useReplayModal';
-import { Header } from '@inngest/components/Header/Header';
-import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button/Button";
+import { EventsActionMenu } from "@inngest/components/Events/EventsActionMenu";
+import { EventsTable } from "@inngest/components/Events/EventsTable";
+import { useReplayModal } from "@inngest/components/Events/useReplayModal";
+import { Header } from "@inngest/components/Header/Header";
+import { RefreshButton } from "@inngest/components/Refresh/RefreshButton";
+import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
 
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
-import { EventInfo } from '@/components/Events/EventInfo';
-import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
-import SendEventButton from '@/components/Events/SendEventButton';
-import { SendEventModal } from '@/components/Events/SendEventModal';
-import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
-import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { useAllEventTypes } from "@/components/EventTypes/useEventTypes";
+import { EventInfo } from "@/components/Events/EventInfo";
+import { ExpandedRowActions } from "@/components/Events/ExpandedRowActions";
+import SendEventButton from "@/components/Events/SendEventButton";
+import { SendEventModal } from "@/components/Events/SendEventModal";
+import {
+  useEventDetails,
+  useEventPayload,
+  useEvents,
+} from "@/components/Events/useEvents";
+import { useAccountFeatures } from "@/utils/useAccountFeatures";
 
 export default function EventsPage({
   environmentSlug: envSlug,
@@ -29,7 +33,8 @@ export default function EventsPage({
   singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
-  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
+  const { isModalVisible, selectedEvent, openModal, closeModal } =
+    useReplayModal();
 
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
@@ -41,7 +46,7 @@ export default function EventsPage({
     <>
       {showHeader && (
         <Header
-          breadcrumb={[{ text: 'Events' }]}
+          breadcrumb={[{ text: "Events" }]}
           infoIcon={<EventInfo />}
           action={
             <div className="flex items-center gap-1.5">

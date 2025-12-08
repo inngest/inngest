@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { z } from 'zod';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { z } from "zod";
 
-import { inngest } from '@/lib/inngest/client';
+import { inngest } from "@/lib/inngest/client";
 
 // Zod schema for UserMessage
 const userMessageSchema = z.object({
-  id: z.string().uuid('Valid message ID is required'),
-  content: z.string().min(1, 'Message content is required'),
-  role: z.literal('user'),
+  id: z.string().uuid("Valid message ID is required"),
+  content: z.string().min(1, "Message content is required"),
+  role: z.literal("user"),
   state: z.record(z.unknown()).optional(),
   clientTimestamp: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
     // Authenticate the user using Clerk
     const { userId } = auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Please sign in to create a token' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Please sign in to create a token" },
+        { status: 401 },
+      );
     }
 
     const body = await req.json();
@@ -37,18 +40,25 @@ export async function POST(req: NextRequest) {
     const validationResult = chatRequestSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: validationResult.error.errors[0]?.message ?? 'Invalid request' },
-        { status: 400 }
+        {
+          error: validationResult.error.errors[0]?.message ?? "Invalid request",
+        },
+        { status: 400 },
       );
     }
 
-    const { userMessage, threadId: providedThreadId, channelKey, history } = validationResult.data;
+    const {
+      userMessage,
+      threadId: providedThreadId,
+      channelKey,
+      history,
+    } = validationResult.data;
 
     // Channel-first validation: require either userId OR channelKey
     if (!userId && !channelKey) {
       return NextResponse.json(
-        { error: 'Either userId or channelKey is required' },
-        { status: 400 }
+        { error: "Either userId or channelKey is required" },
+        { status: 400 },
       );
     }
 
@@ -59,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // Send event to Inngest to trigger the agent chat
     await inngest.send({
-      name: 'insights-agent/chat.requested',
+      name: "insights-agent/chat.requested",
       data: {
         threadId: threadId ?? undefined,
         history,
@@ -75,8 +85,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to start chat' },
-      { status: 500 }
+      {
+        error: error instanceof Error ? error.message : "Failed to start chat",
+      },
+      { status: 500 },
     );
   }
 }

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { useOrganization, useUser } from '@clerk/nextjs';
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useOrganization, useUser } from "@clerk/nextjs";
 
-import { analytics } from '@/utils/segment';
+import { analytics } from "@/utils/segment";
 
 export default function Analytics() {
   const pathname = usePathname();
@@ -21,7 +21,7 @@ export default function Analytics() {
     }
     setLastUrl(url);
     analytics.page(null, {
-      ref: searchParams.get('ref'),
+      ref: searchParams.get("ref"),
     });
   }, [pathname, searchParams, lastUrl]);
 

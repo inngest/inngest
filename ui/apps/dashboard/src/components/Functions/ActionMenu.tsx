@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { Button } from '@inngest/components/Button';
+import { Button } from "@inngest/components/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { IconReplay } from '@inngest/components/icons/Replay';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
+import { IconReplay } from "@inngest/components/icons/Replay";
 import {
   RiArrowDownSLine,
   RiCloseCircleLine,
   RiFlashlightFill,
   RiPauseCircleLine,
   RiPlayCircleLine,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
-import { useBooleanFlag } from '../FeatureFlags/hooks';
+import { useBooleanFlag } from "../FeatureFlags/hooks";
 
 export type FunctionActions = {
   showCancel: () => void;
@@ -36,7 +36,7 @@ export const ActionsMenu = ({
   archived,
   paused,
 }: FunctionActions) => {
-  const { value: cancelEnabled } = useBooleanFlag('bulk-cancellation-ui');
+  const { value: cancelEnabled } = useBooleanFlag("bulk-cancellation-ui");
 
   return (
     <DropdownMenu>
@@ -57,7 +57,9 @@ export const ActionsMenu = ({
         <OptionalTooltip
           tooltip={
             (archived || paused) &&
-            `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
+            `Invoke not available, function is ${
+              archived ? "archived" : "paused"
+            }.`
           }
         >
           <DropdownMenuItem onSelect={showInvoke} disabled={archived || paused}>
@@ -65,20 +67,24 @@ export const ActionsMenu = ({
             Invoke
           </DropdownMenuItem>
         </OptionalTooltip>
-        <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
+        <OptionalTooltip
+          tooltip={archived && "Pause not available, function is archived."}
+        >
           <DropdownMenuItem onSelect={showPause} disabled={archived}>
             {paused ? (
               <RiPlayCircleLine className="h-4 w-4" />
             ) : (
               <RiPauseCircleLine className="h-4 w-4" />
             )}
-            {paused ? 'Resume' : 'Pause'}
+            {paused ? "Resume" : "Pause"}
           </DropdownMenuItem>
         </OptionalTooltip>
         <OptionalTooltip
           tooltip={
             (archived || paused) &&
-            `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
+            `Replay not available, function is ${
+              archived ? "archived" : "paused"
+            }.`
           }
         >
           <DropdownMenuItem onSelect={showReplay} disabled={archived || paused}>

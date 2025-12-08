@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import colors from 'tailwindcss/colors';
-import { useQuery } from 'urql';
+import colors from "tailwindcss/colors";
+import { useQuery } from "urql";
 
-import SimpleLineChart from '@/components/Charts/SimpleLineChart';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import SimpleLineChart from "@/components/Charts/SimpleLineChart";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 const GetStepBacklogDocument = graphql(`
   query GetStepBacklogMetrics(
@@ -52,15 +52,17 @@ export default function StepBacklogChart({
 }: StepBacklogChartProps) {
   const environment = useEnvironment();
 
-  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
-    query: GetStepBacklogDocument,
-    variables: {
-      environmentID: environment.id,
-      fnSlug: functionSlug,
-      startTime,
-      endTime,
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery(
+    {
+      query: GetStepBacklogDocument,
+      variables: {
+        environmentID: environment.id,
+        fnSlug: functionSlug,
+        startTime,
+        endTime,
+      },
     },
-  });
+  );
 
   const scheduled = data?.environment.function?.scheduled.data ?? [];
   const sleeping = data?.environment.function?.sleeping.data ?? [];
@@ -68,7 +70,7 @@ export default function StepBacklogChart({
   const maxLength = Math.max(scheduled.length, sleeping.length);
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name: scheduled[idx]?.bucket || sleeping[idx]?.bucket || '',
+    name: scheduled[idx]?.bucket || sleeping[idx]?.bucket || "",
     values: {
       scheduled: scheduled[idx]?.value ?? 0,
       sleeping: sleeping[idx]?.value ?? 0,
@@ -81,8 +83,8 @@ export default function StepBacklogChart({
       desc="The backlog status of steps for this function at point in time. This data shows the value at the time of instrumentation, and is different from throughput."
       data={metrics}
       legend={[
-        { name: 'Queued', dataKey: 'scheduled', color: colors.slate['500'] },
-        { name: 'Sleeping', dataKey: 'sleeping', color: colors.teal['500'] },
+        { name: "Queued", dataKey: "scheduled", color: colors.slate["500"] },
+        { name: "Sleeping", dataKey: "sleeping", color: colors.teal["500"] },
       ]}
       isLoading={isFetchingMetrics}
       error={metricsError}

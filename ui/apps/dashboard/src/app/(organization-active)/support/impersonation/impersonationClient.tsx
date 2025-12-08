@@ -1,12 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useClerk, useSignIn } from '@clerk/nextjs';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useClerk, useSignIn } from "@clerk/nextjs";
 
-import LoadingIcon from '@/icons/LoadingIcon';
+import LoadingIcon from "@/icons/LoadingIcon";
 
-export default function ImpersonationClient({ actorToken }: { actorToken: string }) {
+export default function ImpersonationClient({
+  actorToken,
+}: {
+  actorToken: string;
+}) {
   const { isLoaded, signIn } = useSignIn();
   const { setActive } = useClerk();
   const router = useRouter();
@@ -17,15 +21,15 @@ export default function ImpersonationClient({ actorToken }: { actorToken: string
     const performImpersonation = async () => {
       try {
         const { createdSessionId } = await signIn.create({
-          strategy: 'ticket',
+          strategy: "ticket",
           ticket: actorToken,
         });
 
         await setActive({ session: createdSessionId });
-        router.push('/');
+        router.push("/");
       } catch (err) {
-        console.error('Impersonation failed:', JSON.stringify(err, null, 2));
-        router.push('/');
+        console.error("Impersonation failed:", JSON.stringify(err, null, 2));
+        router.push("/");
       }
     };
 

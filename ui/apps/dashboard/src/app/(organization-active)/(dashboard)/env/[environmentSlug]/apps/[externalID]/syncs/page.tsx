@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { useSearchParam } from "@inngest/components/hooks/useSearchParam";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { Sync } from './Sync';
-import { SyncList } from './SyncList';
-import { useSyncs } from './useSyncs';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { Sync } from "./Sync";
+import { SyncList } from "./SyncList";
+import { useSyncs } from "./useSyncs";
 
 type Props = {
   params: {
@@ -16,7 +16,7 @@ type Props = {
 export default function Page({ params }: Props) {
   const externalAppID = decodeURIComponent(params.externalID);
   const env = useEnvironment();
-  const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');
+  const [selectedSyncID, setSelectedSyncID] = useSearchParam("sync-id");
 
   const syncsRes = useSyncs({ envID: env.id, externalAppID });
   if (syncsRes.error) {
@@ -34,7 +34,9 @@ export default function Page({ params }: Props) {
     return (
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
-          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">No syncs found</p>
+          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">
+            No syncs found
+          </p>
         </div>
       </div>
     );
@@ -48,7 +50,10 @@ export default function Page({ params }: Props) {
         syncs={syncsRes.data}
       />
 
-      <Sync externalAppID={externalAppID} syncID={selectedSyncID ?? firstSync.id} />
+      <Sync
+        externalAppID={externalAppID}
+        syncID={selectedSyncID ?? firstSync.id}
+      />
     </div>
   );
 }

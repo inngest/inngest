@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { createContext, useCallback, useContext, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
-import { makeQuerySnapshot } from '../queries';
-import type { InsightsFetchResult, InsightsStatus } from './types';
-import { useFetchInsights } from './useFetchInsights';
+import { useStoredQueries } from "../QueryHelperPanel/StoredQueriesContext";
+import { makeQuerySnapshot } from "../queries";
+import type { InsightsFetchResult, InsightsStatus } from "./types";
+import { useFetchInsights } from "./useFetchInsights";
 
 interface InsightsStateMachineContextValue {
   data: InsightsFetchResult | undefined;
@@ -19,7 +19,8 @@ interface InsightsStateMachineContextValue {
   status: InsightsStatus;
 }
 
-const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
+const InsightsStateMachineContext =
+  createContext<InsightsStateMachineContextValue | null>(null);
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
@@ -46,7 +47,7 @@ export function InsightsStateMachineContextProvider({
   const { data, error, isError, isFetching, refetch } = useQuery({
     enabled: false,
     gcTime: 0,
-    queryKey: ['insights', tabId],
+    queryKey: ["insights", tabId],
     queryFn: () => {
       return fetchInsights({ query, queryName }, (query, queryName) => {
         saveQuerySnapshot(makeQuerySnapshot(query, queryName));
@@ -82,7 +83,7 @@ export function useInsightsStateMachineContext() {
   const context = useContext(InsightsStateMachineContext);
   if (!context) {
     throw new Error(
-      'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider'
+      "useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider",
     );
   }
 
@@ -100,8 +101,8 @@ export function getInsightsStatus({
   isError,
   isLoading,
 }: GetInsightsStatusParams): InsightsStatus {
-  if (isLoading) return 'loading';
-  if (isError) return 'error';
-  if (data !== undefined) return 'success';
-  return 'initial';
+  if (isLoading) return "loading";
+  if (isError) return "error";
+  if (data !== undefined) return "success";
+  return "initial";
 }

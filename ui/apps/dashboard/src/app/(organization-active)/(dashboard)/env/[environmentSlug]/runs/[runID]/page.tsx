@@ -1,4 +1,4 @@
-import { DashboardRunDetails } from '@/components/RunDetails/RunDetails';
+import { DashboardRunDetails } from "@/components/RunDetails/RunDetails";
 
 type Props = {
   params: {

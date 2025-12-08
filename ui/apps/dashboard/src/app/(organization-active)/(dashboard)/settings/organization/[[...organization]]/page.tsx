@@ -1,4 +1,4 @@
-import { OrganizationProfile } from '@clerk/nextjs';
+import { OrganizationProfile } from "@clerk/nextjs";
 
 export default async function OrganizationSettingsPage() {
   return (
@@ -8,12 +8,12 @@ export default async function OrganizationSettingsPage() {
         path="/settings/organization"
         appearance={{
           layout: {
-            logoPlacement: 'none',
+            logoPlacement: "none",
           },
           elements: {
-            navbar: 'hidden',
-            scrollBox: 'bg-canvasBase shadow-none',
-            pageScrollBox: 'pt-6 px-2 w-full',
+            navbar: "hidden",
+            scrollBox: "bg-canvasBase shadow-none",
+            pageScrollBox: "pt-6 px-2 w-full",
           },
         }}
       />

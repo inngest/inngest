@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { URQLProvider } from '@/queries/URQLProvider';
+import { URQLProvider } from "@/queries/URQLProvider";
 
 const queryClient = new QueryClient();
 

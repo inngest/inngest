@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { Error } from '@inngest/components/Error/Error';
-import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
+import { useState } from "react";
+import { Error } from "@inngest/components/Error/Error";
+import { RiArrowDownSFill, RiArrowRightSFill } from "@remixicon/react";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
-import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
-import type { MetricsFilters } from './Dashboard';
-import { FailedFunctions } from './FailedFunctions';
-import { FunctionStatus } from './FunctionStatus';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { useSkippableGraphQLQuery } from "@/utils/useGraphQLQuery";
+import { AUTO_REFRESH_INTERVAL } from "./ActionMenu";
+import type { MetricsFilters } from "./Dashboard";
+import { FailedFunctions } from "./FailedFunctions";
+import { FunctionStatus } from "./FunctionStatus";
 
 const GetFunctionStatusMetrics = graphql(`
   query FunctionStatusMetrics(
@@ -157,7 +157,7 @@ export const MetricsOverview = ({
     variables,
   });
 
-  error && console.error('Error fetcthing metrics data for', variables, error);
+  error && console.error("Error fetcthing metrics data for", variables, error);
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
@@ -172,7 +172,9 @@ export const MetricsOverview = ({
       </div>
       {overviewOpen && (
         <>
-          {error && <Error message="There was an error fetching overview metrics data." />}
+          {error && (
+            <Error message="There was an error fetching overview metrics data." />
+          )}
           <div className="relative flex w-full flex-row flex-wrap items-center justify-start gap-2 overflow-hidden md:flex-nowrap">
             <FunctionStatus totals={data?.workspace.totals} />
             <FailedFunctions

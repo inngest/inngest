@@ -1,1 +1,1 @@
-export { AppInfoCard } from './AppInfoCard';
+export { AppInfoCard } from "./AppInfoCard";

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useMutation } from 'urql';
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation } from "urql";
 
-import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
-import { graphql } from '@/gql';
+import ConnectingView from "@/components/DatadogIntegration/ConnectingView";
+import { graphql } from "@/gql";
 
 const FinishDatadogIntegrationDocument = graphql(`
   mutation FinishDatadogIntegrationDocument(
@@ -28,13 +28,15 @@ const FinishDatadogIntegrationDocument = graphql(`
 `);
 
 export default function FinishPage({}) {
-  const [{ data, error }, finishDdInt] = useMutation(FinishDatadogIntegrationDocument);
+  const [{ data, error }, finishDdInt] = useMutation(
+    FinishDatadogIntegrationDocument,
+  );
   const searchParams = useSearchParams();
-  const ddSite = searchParams.get('site');
-  const ddDomain = searchParams.get('domain');
-  const authCode = searchParams.get('code');
-  const orgID = searchParams.get('dd_oid');
-  const orgName = searchParams.get('dd_org_name');
+  const ddSite = searchParams.get("site");
+  const ddDomain = searchParams.get("domain");
+  const authCode = searchParams.get("code");
+  const orgID = searchParams.get("dd_oid");
+  const orgName = searchParams.get("dd_org_name");
   const oauthStateReady = ddSite && ddDomain && authCode && orgID && orgName;
 
   useEffect(() => {
@@ -49,11 +51,19 @@ export default function FinishPage({}) {
       ddSite: ddSite,
       ddDomain: ddDomain,
     });
-  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain, oauthStateReady]);
+  }, [
+    finishDdInt,
+    orgID,
+    orgName,
+    authCode,
+    ddSite,
+    ddDomain,
+    oauthStateReady,
+  ]);
 
   useEffect(() => {
     if (data) {
-      window.location.href = '/settings/integrations/datadog';
+      window.location.href = "/settings/integrations/datadog";
     }
   }, [data]);
 

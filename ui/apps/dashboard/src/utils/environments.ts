@@ -1,7 +1,7 @@
-import slugify from '@sindresorhus/slugify';
+import slugify from "@sindresorhus/slugify";
 
-import { EnvironmentType, type Workspace } from '@/gql/graphql';
-import { type NonEmptyArray } from '@/utils/isNonEmptyArray';
+import { EnvironmentType, type Workspace } from "@/gql/graphql";
+import { type NonEmptyArray } from "@/utils/isNonEmptyArray";
 
 export { EnvironmentType };
 
@@ -21,9 +21,11 @@ export type Environment = {
 
 export function getActiveEnvironment(
   environments: NonEmptyArray<Environment>,
-  environmentSlug: string
+  environmentSlug: string,
 ): Environment | null {
-  const activeEnvironment = environments.find((e) => e.slug === environmentSlug);
+  const activeEnvironment = environments.find(
+    (e) => e.slug === environmentSlug,
+  );
   if (activeEnvironment) {
     return activeEnvironment;
   }
@@ -31,7 +33,7 @@ export function getActiveEnvironment(
 }
 
 export function getDefaultEnvironment(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment | null {
   let isMultiProd = false;
   let prodCount = 0;
@@ -52,8 +54,8 @@ export function getDefaultEnvironment(
   if (env) {
     return {
       ...env,
-      slug: 'production',
-      name: 'Production',
+      slug: "production",
+      name: "Production",
     };
   }
   return null;
@@ -65,7 +67,7 @@ function getRecentCutOffDate(): Date {
 
 export function getSortedBranchEnvironments(
   environments: NonEmptyArray<Environment>,
-  includeArchived = true
+  includeArchived = true,
 ): Environment[] {
   return environments
     .filter((env) => {
@@ -101,26 +103,26 @@ export function getSortedBranchEnvironments(
 }
 
 export function getRecentBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
   return getSortedBranchEnvironments(environments).filter(
-    (env) => new Date(env.createdAt) > cutOffDate
+    (env) => new Date(env.createdAt) > cutOffDate,
   );
 }
 export function getNonRecentBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
   return getSortedBranchEnvironments(environments).filter(
-    (env) => new Date(env.createdAt) < cutOffDate
+    (env) => new Date(env.createdAt) < cutOffDate,
   );
 }
 
 // Get parent test environments created by the user, not branch envs or legacy test mode
 export function getTestEnvironments(
   environments: NonEmptyArray<Environment>,
-  includeArchived = true
+  includeArchived = true,
 ): Environment[] {
   return environments.filter((env) => {
     if (!includeArchived && env.isArchived) {
@@ -133,18 +135,18 @@ export function getTestEnvironments(
 export function workspaceToEnvironment(
   workspace: Pick<
     Workspace,
-    | 'id'
-    | 'name'
-    | 'slug'
-    | 'parentID'
-    | 'test'
-    | 'type'
-    | 'webhookSigningKey'
-    | 'createdAt'
-    | 'isArchived'
-    | 'isAutoArchiveEnabled'
-    | 'lastDeployedAt'
-  >
+    | "id"
+    | "name"
+    | "slug"
+    | "parentID"
+    | "test"
+    | "type"
+    | "webhookSigningKey"
+    | "createdAt"
+    | "isArchived"
+    | "isAutoArchiveEnabled"
+    | "lastDeployedAt"
+  >,
 ): Environment {
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
@@ -168,8 +170,8 @@ export function workspaceToEnvironment(
 }
 
 export const staticSlugs = {
-  production: 'production',
-  branch: 'branch',
+  production: "production",
+  branch: "branch",
 } as const;
 
 type getEnvironmentSlugProps = {
@@ -185,11 +187,11 @@ export function getEnvironmentSlug({
   environmentSlug,
   environmentType,
 }: getEnvironmentSlugProps): string {
-  let slug = environmentSlug || '';
+  let slug = environmentSlug || "";
   if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
   } else if (!slug) {
-    slug = `${slugify(environmentName)}-${environmentID.split('-')[0]}`;
+    slug = `${slugify(environmentName)}-${environmentID.split("-")[0]}`;
   }
 
   return slug;
@@ -200,18 +202,18 @@ export function getEnvironmentSlug({
 export function workspacesToEnvironments(
   workspaces: Pick<
     Workspace,
-    | 'id'
-    | 'name'
-    | 'slug'
-    | 'parentID'
-    | 'test'
-    | 'type'
-    | 'webhookSigningKey'
-    | 'createdAt'
-    | 'isArchived'
-    | 'isAutoArchiveEnabled'
-    | 'lastDeployedAt'
-  >[]
+    | "id"
+    | "name"
+    | "slug"
+    | "parentID"
+    | "test"
+    | "type"
+    | "webhookSigningKey"
+    | "createdAt"
+    | "isArchived"
+    | "isAutoArchiveEnabled"
+    | "lastDeployedAt"
+  >[],
 ): Environment[] {
   return workspaces.map(workspaceToEnvironment).sort((a, b) => {
     // Sort production environments first.

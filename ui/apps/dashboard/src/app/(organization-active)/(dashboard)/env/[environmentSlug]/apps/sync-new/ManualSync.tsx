@@ -1,22 +1,22 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { type Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { InlineCode } from '@inngest/components/Code';
-import { Input } from '@inngest/components/Forms/Input';
-import { Link } from '@inngest/components/Link';
-import { useLocalStorage } from 'react-use';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useMemo, useState } from "react";
+import { type Route } from "next";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { InlineCode } from "@inngest/components/Code";
+import { Input } from "@inngest/components/Forms/Input";
+import { Link } from "@inngest/components/Link";
+import { useLocalStorage } from "react-use";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import type { CodedError } from '@/codedError';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { Secret } from '@/components/Secret';
-import { SyncFailure } from '@/components/SyncFailure';
-import { graphql } from '@/gql';
-import { pathCreator } from '@/utils/urls';
+import type { CodedError } from "@/codedError";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { Secret } from "@/components/Secret";
+import { SyncFailure } from "@/components/SyncFailure";
+import { graphql } from "@/gql";
+import { pathCreator } from "@/utils/urls";
 
 const SyncNewAppDocument = graphql(`
   mutation SyncNewApp($appURL: String!, $envID: UUID!) {
@@ -39,7 +39,7 @@ type Props = {
 };
 
 export default function ManualSync({ appsURL }: Props) {
-  const [input = '', setInput] = useLocalStorage('deploymentUrl', '');
+  const [input = "", setInput] = useLocalStorage("deploymentUrl", "");
   const [failure, setFailure] = useState<CodedError>();
   const [isSyncing, setIsSyncing] = useState(false);
   const router = useRouter();
@@ -62,7 +62,7 @@ export default function ManualSync({ appsURL }: Props) {
         throw res.error;
       }
       if (!res.data) {
-        throw new Error('No API response data');
+        throw new Error("No API response data");
       }
 
       if (res.data.syncNewApp.error) {
@@ -71,7 +71,7 @@ export default function ManualSync({ appsURL }: Props) {
       }
 
       setFailure(undefined);
-      toast.success('Synced app');
+      toast.success("Synced app");
 
       const { externalID } = res.data.syncNewApp.app ?? {};
       let navURL;
@@ -88,7 +88,7 @@ export default function ManualSync({ appsURL }: Props) {
       router.push(navURL);
     } catch (error) {
       setFailure({
-        code: 'unknown',
+        code: "unknown",
       });
     } finally {
       setIsSyncing(false);
@@ -110,12 +110,13 @@ export default function ManualSync({ appsURL }: Props) {
   return (
     <>
       <p>
-        To integrate your code hosted on another platform with Inngest, you need to inform Inngest
-        about the location of your app and functions.
+        To integrate your code hosted on another platform with Inngest, you need
+        to inform Inngest about the location of your app and functions.
       </p>
       <br />
       <p>
-        For example, imagine that your <InlineCode>serve()</InlineCode> handler (
+        For example, imagine that your <InlineCode>serve()</InlineCode> handler
+        (
         <Link
           size="small"
           className="inline-flex"
@@ -123,21 +124,26 @@ export default function ManualSync({ appsURL }: Props) {
         >
           see docs
         </Link>
-        ) is located at /api/inngest, and your domain is myapp.com. In this scenario, you&apos;ll
-        need to inform Inngest that your apps and functions are hosted at
-        https://myapp.com/api/inngest.
+        ) is located at /api/inngest, and your domain is myapp.com. In this
+        scenario, you&apos;ll need to inform Inngest that your apps and
+        functions are hosted at https://myapp.com/api/inngest.
       </p>
       <br />
       <p>
-        After you&apos;ve set up the serve API and deployed your code,{' '}
+        After you&apos;ve set up the serve API and deployed your code,{" "}
         <span className="font-semibold">
-          enter the URL of your project&apos;s serve endpoint to sync your app with Inngest
+          enter the URL of your project&apos;s serve endpoint to sync your app
+          with Inngest
         </span>
-        . Verify that you assigned the signing key below to the{' '}
+        . Verify that you assigned the signing key below to the{" "}
         <InlineCode>INNGEST_SIGNING_KEY</InlineCode> environment variable:
       </p>
 
-      <Secret className="my-6" kind="event-key" secret={env.webhookSigningKey} />
+      <Secret
+        className="my-6"
+        kind="event-key"
+        secret={env.webhookSigningKey}
+      />
 
       <div className="border-subtle border-t">
         <label htmlFor="url" className="text-muted my-2 block">
@@ -154,7 +160,11 @@ export default function ManualSync({ appsURL }: Props) {
         {failure && !isSyncing && <SyncFailure error={failure} />}
       </div>
       <div className="flex items-center justify-between pt-6">
-        <Link href="https://www.inngest.com/docs/apps/cloud" target="_blank" size="small">
+        <Link
+          href="https://www.inngest.com/docs/apps/cloud"
+          target="_blank"
+          size="small"
+        >
           View Docs
         </Link>
         <div className="flex items-center gap-3">

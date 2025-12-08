@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { RiDeleteBin2Line } from '@remixicon/react';
+import { useState } from "react";
+import { Button } from "@inngest/components/Button";
+import { RiDeleteBin2Line } from "@remixicon/react";
 
-import { DeleteSigningKeyModal } from './DeleteSigningKeyModal';
+import { DeleteSigningKeyModal } from "./DeleteSigningKeyModal";
 
 type Props = {
   signingKeyID: string;

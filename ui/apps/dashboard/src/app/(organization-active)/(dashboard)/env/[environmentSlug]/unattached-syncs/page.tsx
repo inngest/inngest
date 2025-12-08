@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
+import { useSearchParam } from "@inngest/components/hooks/useSearchParam";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { SyncList } from '../apps/[externalID]/syncs/SyncList';
-import { Sync } from './Sync';
-import { useSyncs } from './useSyncs';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { SyncList } from "../apps/[externalID]/syncs/SyncList";
+import { Sync } from "./Sync";
+import { useSyncs } from "./useSyncs";
 
 export default function Page() {
   const env = useEnvironment();
-  const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');
+  const [selectedSyncID, setSelectedSyncID] = useSearchParam("sync-id");
 
   const syncsRes = useSyncs({ envID: env.id });
   if (syncsRes.error) {
@@ -27,7 +27,9 @@ export default function Page() {
     return (
       <div className="h-full w-full overflow-y-auto">
         <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
-          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">No syncs found</p>
+          <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">
+            No syncs found
+          </p>
         </div>
       </div>
     );

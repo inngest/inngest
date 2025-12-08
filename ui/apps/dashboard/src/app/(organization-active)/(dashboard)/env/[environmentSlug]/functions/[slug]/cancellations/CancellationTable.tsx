@@ -1,19 +1,25 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo, useState, type UIEventHandler } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { IDCell, Table, TableBlankState, TextCell, TimeCell } from '@inngest/components/Table';
+import { useCallback, useMemo, useState, type UIEventHandler } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import {
+  IDCell,
+  Table,
+  TableBlankState,
+  TextCell,
+  TimeCell,
+} from "@inngest/components/Table";
 import {
   RiCloseCircleLine,
   RiDeleteBinLine,
   RiExternalLinkLine,
   RiRefreshLine,
-} from '@remixicon/react';
-import { createColumnHelper } from '@tanstack/react-table';
+} from "@remixicon/react";
+import { createColumnHelper } from "@tanstack/react-table";
 
-import { DeleteCancellationModal } from './DeleteCancellationModal';
-import { useCancellations } from './useCancellations';
+import { DeleteCancellationModal } from "./DeleteCancellationModal";
+import { useCancellations } from "./useCancellations";
 
 type Cancellation = {
   createdAt: string;
@@ -50,7 +56,8 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
       if (items.length > 0 && hasNextPage) {
-        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
+        const { scrollHeight, scrollTop, clientHeight } =
+          event.target as HTMLDivElement;
 
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
@@ -59,7 +66,7 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
         }
       }
     },
-    [fetchNextPage, hasNextPage, items, isFetching]
+    [fetchNextPage, hasNextPage, items, isFetching],
   );
 
   return (
@@ -107,32 +114,36 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
 
 const columnHelper = createColumnHelper<Cancellation>();
 
-function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelete) => void }) {
+function useColumns({
+  setPendingDelete,
+}: {
+  setPendingDelete: (obj: PendingDelete) => void;
+}) {
   return useMemo(() => {
     return [
-      columnHelper.accessor('name', {
-        header: 'Name',
+      columnHelper.accessor("name", {
+        header: "Name",
         cell: (props) => {
           return <TextCell>{props.getValue()}</TextCell>;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor('createdAt', {
-        header: 'Created at',
+      columnHelper.accessor("createdAt", {
+        header: "Created at",
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor('id', {
-        header: 'ID',
+      columnHelper.accessor("id", {
+        header: "ID",
         cell: (props) => {
           return <IDCell>{props.getValue()}</IDCell>;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor('queuedAtMin', {
-        header: 'Minimum queued at (filter)',
+      columnHelper.accessor("queuedAtMin", {
+        header: "Minimum queued at (filter)",
         cell: (props) => {
           const value = props.getValue();
           if (!value) {
@@ -143,15 +154,15 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
         },
         enableSorting: false,
       }),
-      columnHelper.accessor('queuedAtMax', {
-        header: 'Maximum queued at (filter)',
+      columnHelper.accessor("queuedAtMax", {
+        header: "Maximum queued at (filter)",
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
         enableSorting: false,
       }),
       columnHelper.display({
-        id: 'actions',
+        id: "actions",
         header: undefined, // Needed to enable the iconOnly styles in the table
         cell: (props) => {
           const data = props.row.original;

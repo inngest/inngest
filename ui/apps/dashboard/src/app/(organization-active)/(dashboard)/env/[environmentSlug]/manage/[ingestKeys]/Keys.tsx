@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { notFound } from 'next/navigation';
-import { Skeleton } from '@inngest/components/Skeleton';
+import { notFound } from "next/navigation";
+import { Skeleton } from "@inngest/components/Skeleton";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-import KeysListItem from './KeysListItem';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
+import KeysListItem from "./KeysListItem";
 
 const GetKeysDocument = graphql(`
   query GetIngestKeys($environmentID: ID!) {

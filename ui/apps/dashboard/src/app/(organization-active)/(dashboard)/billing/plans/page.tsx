@@ -1,30 +1,33 @@
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from "@inngest/components/Link/Link";
 
-import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { type Plan } from '@/components/Billing/Plans/utils';
-import { currentPlan as getCurrentPlan } from '@/components/Billing/data';
-import { pathCreator } from '@/utils/urls';
+import {
+  HorizontalPlanCard,
+  VerticalPlanCard,
+} from "@/components/Billing/Plans/PlanCard";
+import { type Plan } from "@/components/Billing/Plans/utils";
+import { currentPlan as getCurrentPlan } from "@/components/Billing/data";
+import { pathCreator } from "@/utils/urls";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const { plan: currentPlan } = await getCurrentPlan();
 
-  if (!currentPlan) throw new Error('Failed to fetch current plan');
+  if (!currentPlan) throw new Error("Failed to fetch current plan");
 
   const refetchCurrentPlan = async () => {
-    'use server';
+    "use server";
     return await getCurrentPlan();
   };
 
   // Hard-coded plan information (mirrors pricing page definitions)
   const plans: Plan[] = [
     {
-      id: 'n/a',
-      slug: 'hobby-free-2025-08-08',
-      name: 'Hobby',
+      id: "n/a",
+      slug: "hobby-free-2025-08-08",
+      name: "Hobby",
       amount: 0,
-      billingPeriod: 'month',
+      billingPeriod: "month",
       entitlements: {
         concurrency: { limit: 5 },
         history: { limit: 1 }, // 24h
@@ -34,11 +37,11 @@ export default async function Page() {
       isFree: true,
     },
     {
-      id: 'n/a',
-      slug: 'pro-2025-08-08',
-      name: 'Pro',
+      id: "n/a",
+      slug: "pro-2025-08-08",
+      name: "Pro",
       amount: 7_500, // $75.00
-      billingPeriod: 'month',
+      billingPeriod: "month",
       entitlements: {
         concurrency: { limit: 100 },
         history: { limit: 7 },
@@ -48,11 +51,11 @@ export default async function Page() {
       isFree: false,
     },
     {
-      id: 'n/a',
-      slug: 'enterprise',
-      name: 'Enterprise',
+      id: "n/a",
+      slug: "enterprise",
+      name: "Enterprise",
       amount: Infinity,
-      billingPeriod: 'month',
+      billingPeriod: "month",
       entitlements: {
         concurrency: { limit: 100 },
         history: { limit: 7 },
@@ -86,13 +89,13 @@ export default async function Page() {
         ))}
       </div>
       <div className="mt-4 text-center text-sm">
-        Cancel your plan by selecting the downgrade option. If you are having trouble downgrading,
-        please{' '}
+        Cancel your plan by selecting the downgrade option. If you are having
+        trouble downgrading, please{" "}
         <Link
           className="inline"
           target="_blank"
           size="small"
-          href={pathCreator.support({ ref: 'app-billing-plans-footer' })}
+          href={pathCreator.support({ ref: "app-billing-plans-footer" })}
         >
           contact us
         </Link>

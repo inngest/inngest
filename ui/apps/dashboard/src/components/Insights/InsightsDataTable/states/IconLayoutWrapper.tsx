@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { RiTableView } from '@remixicon/react';
+import { RiTableView } from "@remixicon/react";
 
 type IconLayoutWrapperProps = {
   action: React.ReactNode;
@@ -8,7 +8,11 @@ type IconLayoutWrapperProps = {
   subheader: string;
 };
 
-export function IconLayoutWrapper({ action, header, subheader }: IconLayoutWrapperProps) {
+export function IconLayoutWrapper({
+  action,
+  header,
+  subheader,
+}: IconLayoutWrapperProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4">
       <div className="flex max-w-[410px] flex-col items-center gap-4">

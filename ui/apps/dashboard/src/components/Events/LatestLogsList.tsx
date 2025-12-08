@@ -1,12 +1,12 @@
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import { Pill } from '@inngest/components/Pill';
-import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
-import { useQuery } from 'urql';
+import { useRouter } from "next/navigation";
+import { Button } from "@inngest/components/Button";
+import { Pill } from "@inngest/components/Pill";
+import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
+import { useQuery } from "urql";
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
+import { pathCreator } from "@/utils/urls";
 
 const GetLatestEventLogs = graphql(`
   query GetLatestEventLogs($name: String, $environmentID: ID!) {
@@ -30,23 +30,32 @@ type LatestLogsListProps = {
   eventName: string;
 };
 
-export default function LatestLogsList({ environmentSlug, eventName }: LatestLogsListProps) {
+export default function LatestLogsList({
+  environmentSlug,
+  eventName,
+}: LatestLogsListProps) {
   const environment = useEnvironment();
   const router = useRouter();
 
-  const [{ data: LatestLogsResponse, fetching: fetchingLatestLogs }] = useQuery({
-    query: GetLatestEventLogs,
-    variables: {
-      environmentID: environment.id,
-      name: eventName,
+  const [{ data: LatestLogsResponse, fetching: fetchingLatestLogs }] = useQuery(
+    {
+      query: GetLatestEventLogs,
+      variables: {
+        environmentID: environment.id,
+        name: eventName,
+      },
     },
-  });
+  );
 
   const list = LatestLogsResponse?.events?.data[0]?.recent;
 
-  const orderedList = list?.sort((a: { receivedAt: string }, b: { receivedAt: string }) => {
-    return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
-  });
+  const orderedList = list?.sort(
+    (a: { receivedAt: string }, b: { receivedAt: string }) => {
+      return (
+        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+      );
+    },
+  );
 
   return (
     <>
@@ -97,7 +106,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                           pathCreator.eventPopout({
                             envSlug: environmentSlug,
                             eventID: e.id,
-                          })
+                          }),
                         )
                       }
                     >
@@ -107,7 +116,10 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                           date={new Date(e.receivedAt)}
                           copyable={false}
                         />
-                        <TimeCell date={new Date(e.receivedAt)} copyable={true} />
+                        <TimeCell
+                          date={new Date(e.receivedAt)}
+                          copyable={true}
+                        />
                       </td>
                       <td>
                         <IDCell>{e.id}</IDCell>

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { graphql } from '@/gql';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { graphql } from "@/gql";
+import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
 
 export const vercelIntegrationQuery = graphql(`
   query VercelIntegration {

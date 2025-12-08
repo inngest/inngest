@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { RiLoader2Line } from '@remixicon/react';
+import { RiLoader2Line } from "@remixicon/react";
 
-export const LoadingIndicator = ({ text = 'Thinking…' }: { text?: string }) => {
+export const LoadingIndicator = ({ text = "Thinking…" }: { text?: string }) => {
   return (
     <div className="text-subtle flex items-center justify-start py-4">
       <RiLoader2Line className="text-light h-4 w-4 animate-spin duration-1000" />

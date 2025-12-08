@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import type { ReactElement } from 'react';
+import type { ReactElement } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from "@remixicon/react";
 
-import type { InsightsQueryStatement } from '@/gql/graphql';
-import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorInstanceContext';
-import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
-import { isQuerySnapshot } from './queries';
-import type { QuerySnapshot } from './types';
+import type { InsightsQueryStatement } from "@/gql/graphql";
+import { useSQLEditorInstance } from "./InsightsSQLEditor/SQLEditorInstanceContext";
+import { useStoredQueries } from "./QueryHelperPanel/StoredQueriesContext";
+import { isQuerySnapshot } from "./queries";
+import type { QuerySnapshot } from "./types";
 
 type QueryActionsMenuProps = {
   onOpenChange?: (open: boolean) => void;
@@ -47,7 +47,7 @@ export function QueryActionsMenu({
     if (!editor) return;
 
     // Trigger the format document action
-    editor.getAction('editor.action.formatDocument')?.run();
+    editor.getAction("editor.action.formatDocument")?.run();
   };
 
   return (
@@ -55,7 +55,10 @@ export function QueryActionsMenu({
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {editorRef && (
-          <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={handleFormatSQL}>
+          <DropdownMenuItem
+            className="text-basis px-4 outline-none"
+            onSelect={handleFormatSQL}
+          >
             <RiAlignLeft className="size-4" />
             <span>Format SQL</span>
           </DropdownMenuItem>
@@ -88,6 +91,8 @@ export function QueryActionsMenu({
   );
 }
 
-function isActualQueryAndUnshared(query: InsightsQueryStatement | QuerySnapshot | undefined) {
+function isActualQueryAndUnshared(
+  query: InsightsQueryStatement | QuerySnapshot | undefined,
+) {
   return query !== undefined && !isQuerySnapshot(query) && !query.shared;
 }

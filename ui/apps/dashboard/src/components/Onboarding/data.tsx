@@ -1,7 +1,7 @@
-import 'server-only';
-import { cache } from 'react';
+import "server-only";
+import { cache } from "react";
 
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 import {
   type App,
   type Deploy,
@@ -10,9 +10,9 @@ import {
   type InvokeFunctionMutationVariables,
   type ProductionAppsQuery,
   type SyncResponse,
-} from '@/gql/graphql';
-import graphqlAPI from '@/queries/graphqlAPI';
-import { getProductionEnvironment } from '@/queries/server-only/getEnvironment';
+} from "@/gql/graphql";
+import graphqlAPI from "@/queries/graphqlAPI";
+import { getProductionEnvironment } from "@/queries/server-only/getEnvironment";
 
 export const SyncOnboardingAppDocument = graphql(`
   mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {
@@ -33,10 +33,13 @@ export const SyncOnboardingAppDocument = graphql(`
 export const syncNewApp = async (appURL: string) => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<{ syncNewApp: SyncResponse }>(SyncOnboardingAppDocument, {
-    envID: environment.id,
-    appURL: appURL,
-  });
+  return await graphqlAPI.request<{ syncNewApp: SyncResponse }>(
+    SyncOnboardingAppDocument,
+    {
+      envID: environment.id,
+      appURL: appURL,
+    },
+  );
 };
 
 export const InvokeFunctionOnboardingDocument = graphql(`
@@ -49,7 +52,7 @@ export const invokeFn = async ({
   functionSlug,
   user,
   data,
-}: Pick<InvokeFunctionMutationVariables, 'data' | 'functionSlug' | 'user'>) => {
+}: Pick<InvokeFunctionMutationVariables, "data" | "functionSlug" | "user">) => {
   const environment = await getProductionEnvironment();
 
   return await graphqlAPI.request<{ invokeFunction: InvokeFunctionMutation }>(
@@ -59,7 +62,7 @@ export const invokeFn = async ({
       functionSlug: functionSlug,
       user: user,
       data: data,
-    }
+    },
   );
 };
 
@@ -100,7 +103,9 @@ const fetchLookups = async ({
   pageSize: number;
 }) =>
   graphqlAPI.request<{
-    envBySlug: { workflows: { data: []; page: { page: number; totalPages: number } } };
+    envBySlug: {
+      workflows: { data: []; page: { page: number; totalPages: number } };
+    };
   }>(InvokeFunctionLookupDocument, { envSlug, page, pageSize });
 
 export const getInvokeFunctionLookups = cache(async (envSlug: string) => {
@@ -155,9 +160,12 @@ export const GetVercelAppsOnboardingDocument = graphql(`
 export const getProductionApps = async () => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<ProductionAppsQuery>(GetProductionAppsDocument, {
-    envID: environment.id,
-  });
+  return await graphqlAPI.request<ProductionAppsQuery>(
+    GetProductionAppsDocument,
+    {
+      envID: environment.id,
+    },
+  );
 };
 
 export const GetProductionAppsDocument = graphql(`
@@ -176,16 +184,27 @@ export const GetProductionAppsDocument = graphql(`
 export const getVercelApps = async () => {
   const environment = await getProductionEnvironment();
 
-  return await graphqlAPI.request<GetVercelAppsQuery>(GetVercelAppsOnboardingDocument, {
-    envID: environment.id,
-  });
+  return await graphqlAPI.request<GetVercelAppsQuery>(
+    GetVercelAppsOnboardingDocument,
+    {
+      envID: environment.id,
+    },
+  );
 };
 
-export type VercelApp = Pick<App, 'id' | 'name' | 'externalID'> & {
+export type VercelApp = Pick<App, "id" | "name" | "externalID"> & {
   latestSync: Pick<
     Deploy,
-    'id' | 'error' | 'platform' | 'vercelDeploymentID' | 'vercelProjectID' | 'status'
+    | "id"
+    | "error"
+    | "platform"
+    | "vercelDeploymentID"
+    | "vercelProjectID"
+    | "status"
   > | null;
 };
 
-export type UnattachedSync = Pick<Deploy, 'lastSyncedAt' | 'error' | 'url' | 'vercelDeploymentURL'>;
+export type UnattachedSync = Pick<
+  Deploy,
+  "lastSyncedAt" | "error" | "url" | "vercelDeploymentURL"
+>;

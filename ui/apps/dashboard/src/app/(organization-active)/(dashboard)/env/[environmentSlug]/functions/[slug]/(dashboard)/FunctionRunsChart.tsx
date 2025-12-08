@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useQuery } from 'urql';
+import { useQuery } from "urql";
 
-import StackedBarChart from '@/components/Charts/StackedBarChart';
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
+import StackedBarChart from "@/components/Charts/StackedBarChart";
+import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from "@/gql";
 
 export type UsageMetrics = { totalRuns: number; totalFailures: number };
 
@@ -59,16 +59,21 @@ export default function FunctionRunsChart({
 }: FunctionRunsChartProps) {
   const environment = useEnvironment();
 
-  const [{ data, error: functionRunsMetricsError, fetching: isFetchingFunctionRunsMetrics }] =
-    useQuery({
-      query: GetFunctionRunsMetricsDocument,
-      variables: {
-        environmentID: environment.id,
-        functionSlug,
-        startTime,
-        endTime,
-      },
-    });
+  const [
+    {
+      data,
+      error: functionRunsMetricsError,
+      fetching: isFetchingFunctionRunsMetrics,
+    },
+  ] = useQuery({
+    query: GetFunctionRunsMetricsDocument,
+    variables: {
+      environmentID: environment.id,
+      functionSlug,
+      startTime,
+      endTime,
+    },
+  });
 
   let metrics: {
     name: string;
@@ -98,12 +103,20 @@ export default function FunctionRunsChart({
       title="Function Runs"
       data={metrics}
       legend={[
-        { name: 'Completed', dataKey: 'completed', color: 'rgb(var(--color-primary-subtle) / 1)' },
-        { name: 'Failed', dataKey: 'failed', color: 'rgb(var(--color-tertiary-subtle) / 1)' },
         {
-          name: 'Cancelled',
-          dataKey: 'canceled',
-          color: 'rgb(var(--color-foreground-cancelled) / 1)',
+          name: "Completed",
+          dataKey: "completed",
+          color: "rgb(var(--color-primary-subtle) / 1)",
+        },
+        {
+          name: "Failed",
+          dataKey: "failed",
+          color: "rgb(var(--color-tertiary-subtle) / 1)",
+        },
+        {
+          name: "Cancelled",
+          dataKey: "canceled",
+          color: "rgb(var(--color-foreground-cancelled) / 1)",
         },
       ]}
       isLoading={isFetchingFunctionRunsMetrics}

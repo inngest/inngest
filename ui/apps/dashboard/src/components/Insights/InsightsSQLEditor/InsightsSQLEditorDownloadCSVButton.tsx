@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { Button } from '@inngest/components/Button/Button';
+import { Button } from "@inngest/components/Button/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import { RiCodeBlock, RiDownloadLine, RiTableView } from '@remixicon/react';
+} from "@inngest/components/DropdownMenu/DropdownMenu";
+import { RiCodeBlock, RiDownloadLine, RiTableView } from "@remixicon/react";
 
-import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
-import { useDownloadInsightsResults } from './hooks/useDownloadInsightsResults';
+import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
+import { useDownloadInsightsResults } from "./hooks/useDownloadInsightsResults";
 
 interface InsightsSQLEditorDownloadCSVButtonProps {
   temporarilyHide?: boolean;
@@ -20,7 +20,10 @@ export function InsightsSQLEditorDownloadCSVButton({
   temporarilyHide = false,
 }: InsightsSQLEditorDownloadCSVButtonProps) {
   const { data, status, queryName } = useInsightsStateMachineContext();
-  const { downloadAsCSV, downloadAsJSON } = useDownloadInsightsResults(data, queryName);
+  const { downloadAsCSV, downloadAsJSON } = useDownloadInsightsResults(
+    data,
+    queryName,
+  );
 
   // Maintain layout consistency when the button is temporarily hidden.
   if (temporarilyHide) {
@@ -36,7 +39,7 @@ export function InsightsSQLEditorDownloadCSVButton({
     );
   }
 
-  const hasData = status === 'success' && data && data.rows.length > 0;
+  const hasData = status === "success" && data && data.rows.length > 0;
 
   if (!hasData) {
     return (

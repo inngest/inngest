@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import CounterInput from '@inngest/components/Forms/CounterInput';
+import { useState } from "react";
+import { Button } from "@inngest/components/Button";
+import CounterInput from "@inngest/components/Forms/CounterInput";
 
 export default function EntitlementListItemSelfServiceNumeric({
   entitlement,
@@ -23,14 +23,19 @@ export default function EntitlementListItemSelfServiceNumeric({
   onSubmit?: (quantity: number, cost: number) => void;
 }) {
   if (!onSubmit || !onCancel) {
-    throw new Error('onSubmit and onCancel are required');
+    throw new Error("onSubmit and onCancel are required");
   }
 
-  const startingInputValue = Math.max(entitlement.currentValue, entitlement.planLimit);
+  const startingInputValue = Math.max(
+    entitlement.currentValue,
+    entitlement.planLimit,
+  );
   const [inputValue, setInputValue] = useState(startingInputValue);
   const [inputValid, setInputValid] = useState(true);
 
-  const inputQuantity = Math.ceil((inputValue - entitlement.planLimit) / addon.quantityPer);
+  const inputQuantity = Math.ceil(
+    (inputValue - entitlement.planLimit) / addon.quantityPer,
+  );
   const cost = inputQuantity * addon.price;
   const costStr = (cost / 100).toFixed(2);
 
@@ -48,7 +53,12 @@ export default function EntitlementListItemSelfServiceNumeric({
         {inputValid && <p className="text-muted text-sm">Cost: ${costStr}</p>}
       </div>
       <div className="flex items-center gap-2">
-        <Button kind="secondary" appearance="ghost" onClick={onCancel} label="Cancel" />
+        <Button
+          kind="secondary"
+          appearance="ghost"
+          onClick={onCancel}
+          label="Cancel"
+        />
         <Button
           appearance="outlined"
           disabled={inputValue == startingInputValue || !inputValid}

@@ -1,5 +1,5 @@
-import PageHeader from '@/components/PostgresIntegration/PageHeader';
-import StepsMenu from '@/components/PostgresIntegration/StepsMenu';
+import PageHeader from "@/components/PostgresIntegration/PageHeader";
+import StepsMenu from "@/components/PostgresIntegration/StepsMenu";
 
 export default function Layout({
   children,

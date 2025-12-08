@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { AlertModal } from '@inngest/components/Modal/AlertModal';
-import { toast } from 'sonner';
-import { useMutation } from 'urql';
+import { useCallback, useEffect, useState } from "react";
+import { Alert } from "@inngest/components/Alert";
+import { AlertModal } from "@inngest/components/Modal/AlertModal";
+import { toast } from "sonner";
+import { useMutation } from "urql";
 
-import { graphql } from '@/gql';
+import { graphql } from "@/gql";
 
 const ArchiveEnvironmentDocument = graphql(`
   mutation ArchiveEnvironment($id: ID!) {
@@ -65,11 +65,11 @@ export function EnvironmentArchiveModal(props: Props) {
       }
 
       onSuccess();
-      toast.success(`Environment ${isArchived ? 'unarchived' : 'archived'}`);
+      toast.success(`Environment ${isArchived ? "unarchived" : "archived"}`);
       setError(undefined);
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError('Unknown error');
+        setError("Unknown error");
         return;
       }
 
@@ -84,31 +84,33 @@ export function EnvironmentArchiveModal(props: Props) {
       className="max-w-xl"
       isOpen={isOpen}
       onClose={onCancel}
-      title={`${isArchived ? 'Unarchive' : 'Archive'} environment`}
-      confirmButtonLabel={isArchived ? 'Unarchive' : 'Archive'}
+      title={`${isArchived ? "Unarchive" : "Archive"} environment`}
+      confirmButtonLabel={isArchived ? "Unarchive" : "Archive"}
       onSubmit={onSubmit}
       isLoading={isLoading}
       description={`Are you sure you want to ${
-        isArchived ? 'unarchive' : 'archive'
+        isArchived ? "unarchive" : "archive"
       } this environment?`}
     >
       <div className="p-6 pb-0">
         {isArchived && (
           <p className="pb-4 text-sm">
-            Any active functions within this environment will become triggerable.
+            Any active functions within this environment will become
+            triggerable.
           </p>
         )}
 
         {!isArchived && (
           <p className="pb-4 text-sm">
-            Functions within this environment will no longer be triggerable. Nothing will be deleted
-            and you can unarchive at any time.
+            Functions within this environment will no longer be triggerable.
+            Nothing will be deleted and you can unarchive at any time.
           </p>
         )}
 
         {!isArchived && isBranchEnv && (
           <p className="pb-4 text-sm">
-            Since this is a branch environment, any future app syncs will unarchive the environment.
+            Since this is a branch environment, any future app syncs will
+            unarchive the environment.
           </p>
         )}
         {error && <Alert severity="error">{error}</Alert>}

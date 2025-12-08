@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { useState } from "react";
+import { Button } from "@inngest/components/Button";
 
-import { RotateSigningKeyModal } from './RotateSigningKeyModal';
+import { RotateSigningKeyModal } from "./RotateSigningKeyModal";
 
 type Props = {
   disabled?: boolean;

@@ -1,11 +1,15 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Button } from '@inngest/components/Button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiSearchLine } from '@remixicon/react';
+import { useEffect, useState } from "react";
+import { Button } from "@inngest/components/Button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@inngest/components/Tooltip/Tooltip";
+import { RiSearchLine } from "@remixicon/react";
 
-import { QuickSearchModal } from './QuickSearchModal';
+import { QuickSearchModal } from "./QuickSearchModal";
 
 type Props = {
   collapsed: boolean;
@@ -18,16 +22,16 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setIsOpen((open) => !open);
       }
     }
 
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
@@ -45,12 +49,18 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
               kind="secondary"
               onClick={() => setIsOpen(true)}
               size="small"
-              label={<span className="hidden group-hover/search:block">Search</span>}
+              label={
+                <span className="hidden group-hover/search:block">Search</span>
+              }
             />
           </TooltipTrigger>
 
-          <TooltipContent className="w-32 rounded text-xs" side="bottom" sideOffset={2}>
-            You can also use <span className="font-bold">⌘ K</span> or{' '}
+          <TooltipContent
+            className="w-32 rounded text-xs"
+            side="bottom"
+            sideOffset={2}
+          >
+            You can also use <span className="font-bold">⌘ K</span> or{" "}
             <span className="font-bold">Ctrl K</span> to search
           </TooltipContent>
         </Tooltip>

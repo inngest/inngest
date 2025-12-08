@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import NextLink from 'next/link';
-import { Listbox } from '@headlessui/react';
-import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import NextLink from "next/link";
+import { Listbox } from "@headlessui/react";
+import { MenuItem } from "@inngest/components/Menu/MenuItem";
 import {
   RiArticleLine,
   RiBookReadLine,
@@ -11,14 +11,20 @@ import {
   RiMailLine,
   RiQuestionLine,
   RiRoadMapLine,
-} from '@remixicon/react';
+} from "@remixicon/react";
 
-import { useSystemStatus } from '@/app/(organization-active)/support/statusPage';
-import { pathCreator } from '@/utils/urls';
-import useOnboardingStep from '../Onboarding/useOnboardingStep';
-import SystemStatusIcon from './SystemStatusIcon';
+import { useSystemStatus } from "@/app/(organization-active)/support/statusPage";
+import { pathCreator } from "@/utils/urls";
+import useOnboardingStep from "../Onboarding/useOnboardingStep";
+import SystemStatusIcon from "./SystemStatusIcon";
 
-export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget: () => void }) => {
+export const Help = ({
+  collapsed,
+  showWidget,
+}: {
+  collapsed: boolean;
+  showWidget: () => void;
+}) => {
   const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
 
@@ -33,7 +39,10 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border ring-0 focus:outline-none">
-          <NextLink href="https://www.inngest.com/docs?ref=support-center" target="_blank">
+          <NextLink
+            href="https://www.inngest.com/docs?ref=support-center"
+            target="_blank"
+          >
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="docs"
@@ -84,7 +93,10 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
               value="status"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <SystemStatusIcon status={status} className="mx-0 mr-2 h-3.5 w-3.5" />
+                <SystemStatusIcon
+                  status={status}
+                  className="mx-0 mr-2 h-3.5 w-3.5"
+                />
                 <div>Status</div>
               </div>
             </Listbox.Option>
@@ -104,7 +116,7 @@ export const Help = ({ collapsed, showWidget }: { collapsed: boolean; showWidget
           <NextLink
             href={pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,
-              ref: 'app-navbar-help',
+              ref: "app-navbar-help",
             })}
             onClick={() => showWidget()}
           >

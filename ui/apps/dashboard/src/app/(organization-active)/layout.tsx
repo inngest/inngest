@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
-import { ClientSideProviders } from './ClientSideProviders';
+import { ClientSideProviders } from "./ClientSideProviders";
 
 type OrganizationActiveLayoutProps = {
   children: ReactNode;

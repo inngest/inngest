@@ -1,7 +1,11 @@
-import React from 'react';
-import { GoogleTagManager } from '@next/third-parties/google';
+import React from "react";
+import { GoogleTagManager } from "@next/third-parties/google";
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <>
       {children}

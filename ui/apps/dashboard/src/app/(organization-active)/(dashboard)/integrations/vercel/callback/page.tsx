@@ -1,9 +1,9 @@
-import type { Route } from 'next';
-import { Link } from '@inngest/components/Link/Link';
-import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import type { Route } from "next";
+import { Link } from "@inngest/components/Link/Link";
+import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
 
-import VercelConnect from './connect';
-import createVercelIntegration from './createVercelIntegration';
+import VercelConnect from "./connect";
+import createVercelIntegration from "./createVercelIntegration";
 
 export type VercelCallbackProps = {
   searchParams: {
@@ -22,9 +22,11 @@ export type VercelCallbackProps = {
   };
 };
 
-export default async function VercelCallbackPage({ searchParams }: VercelCallbackProps) {
+export default async function VercelCallbackPage({
+  searchParams,
+}: VercelCallbackProps) {
   if (!searchParams.code) {
-    throw new Error('Missing Vercel authorization code');
+    throw new Error("Missing Vercel authorization code");
   }
   const vercelIntegration = await createVercelIntegration({
     vercelAuthorizationCode: searchParams.code,
@@ -35,17 +37,23 @@ export default async function VercelCallbackPage({ searchParams }: VercelCallbac
       <div className="mb-7 flex h-12 w-12 items-center justify-center rounded bg-black">
         <IconVercel className="text-alwaysWhite h-6 w-6" />
       </div>
-      <div className="text-basis mb-2 text-2xl leading-loose">Connect Vercel to Inngest</div>
+      <div className="text-basis mb-2 text-2xl leading-loose">
+        Connect Vercel to Inngest
+      </div>
       <div className="text-muted mb-7 text-base">
-        Select the Vercel projects that have Inngest functions. You can optionally specify server
-        route other than the default <span className="font-semibold">(`/api/inngest`)</span>.{' '}
-        <Link size="medium" href={'/create-organization/set-up' as Route}>
+        Select the Vercel projects that have Inngest functions. You can
+        optionally specify server route other than the default{" "}
+        <span className="font-semibold">(`/api/inngest`)</span>.{" "}
+        <Link size="medium" href={"/create-organization/set-up" as Route}>
           Learn more
         </Link>
       </div>
-      <VercelConnect searchParams={searchParams} integrations={vercelIntegration} />
+      <VercelConnect
+        searchParams={searchParams}
+        integrations={vercelIntegration}
+      />
     </div>
   );
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";

@@ -1,8 +1,8 @@
 export enum VercelDeploymentProtection {
-  Disabled = '',
-  ProdDeploymentURLsAndAllPreviews = 'prod_deployment_urls_and_all_previews',
-  Previews = 'preview',
-  All = 'all',
+  Disabled = "",
+  ProdDeploymentURLsAndAllPreviews = "prod_deployment_urls_and_all_previews",
+  Previews = "preview",
+  All = "all",
 }
 
 export type VercelProject = {
