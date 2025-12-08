@@ -9,6 +9,9 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 
+import PageViewTracker from "@/components/Analytics/PageViewTracker";
+import SegmentAnalytics from "@/components/Analytics/SegmentAnalytics";
+import SentryUserIdentification from "@/components/Analytics/SentryUserIdentification";
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
 import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
 import URQLProviderWrapper from "@/components/URQL/URQLProvider";
@@ -18,8 +21,6 @@ import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
 import { QueryClient } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import SentryUserIdentification from "@/components/Analytics/SentryUserIdentification";
-import PageViewTracker from "@/components/Analytics/PageViewTracker";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -81,6 +82,7 @@ function RootComponent() {
                 <Outlet />
               </TooltipProvider>
 
+              <SegmentAnalytics />
               <PageViewTracker />
             </ClientFeatureFlagProvider>
           </URQLProviderWrapper>

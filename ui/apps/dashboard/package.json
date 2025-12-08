@@ -39,6 +39,7 @@
     "@radix-ui/react-select": "^1.2.2",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@remixicon/react": "^4.7.0",
+    "@segment/analytics-next": "^1.81.1",
     "@sentry/tanstackstart-react": "^10.26.0",
     "@sindresorhus/slugify": "^3.0.0",
     "@stripe/react-stripe-js": "^3.1.1",
