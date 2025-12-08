@@ -265,6 +265,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		EndTime:            time.Unix(0, int64(s.EndTimeUnixNano)),
 		Parent:             parent,
 		RawOtelSpanOptions: []trace.SpanStartOption{trace.WithAttributes(attrs...)},
+		SpanID:             trace.SpanID(s.SpanId),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create span: %w", err)
