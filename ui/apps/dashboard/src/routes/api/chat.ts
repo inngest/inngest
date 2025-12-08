@@ -1,14 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "@clerk/tanstack-react-start/server";
-import { z } from "zod";
-import { inngest } from "@/lib/inngest/client";
+import { createFileRoute } from '@tanstack/react-router';
+import { auth } from '@clerk/tanstack-react-start/server';
+import { z } from 'zod';
+import { inngest } from '@/lib/inngest/client';
 
 //
 // Zod schema for UserMessage
 const userMessageSchema = z.object({
-  id: z.string().uuid("Valid message ID is required"),
-  content: z.string().min(1, "Message content is required"),
-  role: z.literal("user"),
+  id: z.string().uuid('Valid message ID is required'),
+  content: z.string().min(1, 'Message content is required'),
+  role: z.literal('user'),
   state: z.record(z.unknown()).optional(),
   clientTimestamp: z.string().optional(),
   systemPrompt: z.string().optional(),
@@ -24,7 +24,7 @@ const chatRequestSchema = z.object({
   history: z.array(z.any()).optional(),
 });
 
-export const Route = createFileRoute("/api/chat")({
+export const Route = createFileRoute('/api/chat')({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -34,10 +34,10 @@ export const Route = createFileRoute("/api/chat")({
           const { userId } = await auth();
           if (!userId) {
             return new Response(
-              JSON.stringify({ error: "Please sign in to create a token" }),
+              JSON.stringify({ error: 'Please sign in to create a token' }),
               {
                 status: 401,
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': 'application/json' },
               },
             );
           }
@@ -52,11 +52,11 @@ export const Route = createFileRoute("/api/chat")({
               JSON.stringify({
                 error:
                   validationResult.error.errors[0]?.message ??
-                  "Invalid request",
+                  'Invalid request',
               }),
               {
                 status: 400,
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': 'application/json' },
               },
             );
           }
@@ -73,11 +73,11 @@ export const Route = createFileRoute("/api/chat")({
           if (!userId && !channelKey) {
             return new Response(
               JSON.stringify({
-                error: "Either userId or channelKey is required",
+                error: 'Either userId or channelKey is required',
               }),
               {
                 status: 400,
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': 'application/json' },
               },
             );
           }
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/api/chat")({
           //
           // Send event to Inngest to trigger the agent chat
           await inngest.send({
-            name: "insights-agent/chat.requested",
+            name: 'insights-agent/chat.requested',
             data: {
               threadId: threadId ?? undefined,
               history,
@@ -108,18 +108,18 @@ export const Route = createFileRoute("/api/chat")({
             }),
             {
               status: 200,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         } catch (error) {
           return new Response(
             JSON.stringify({
               error:
-                error instanceof Error ? error.message : "Failed to start chat",
+                error instanceof Error ? error.message : 'Failed to start chat',
             }),
             {
               status: 500,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }

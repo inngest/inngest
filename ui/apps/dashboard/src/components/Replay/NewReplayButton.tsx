@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import NewReplayModal from "@/components/Replay/NewReplayModal";
+import NewReplayModal from '@/components/Replay/NewReplayModal';
 
 type NewReplayButtonProps = {
   functionSlug: string;

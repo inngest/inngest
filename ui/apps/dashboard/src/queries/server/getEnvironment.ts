@@ -1,8 +1,8 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
-import { workspacesToEnvironments } from "@/utils/environments";
-import { createServerFn } from "@tanstack/react-start";
-import { graphqlAPI } from "../graphqlAPI";
+import { workspacesToEnvironments } from '@/utils/environments';
+import { createServerFn } from '@tanstack/react-start';
+import { graphqlAPI } from '../graphqlAPI';
 
 const GetEnvironmentBySlugDocument = graphql(`
   query GetEnvironmentBySlug($slug: String!) {
@@ -45,7 +45,7 @@ type GetEnvironmentParams = {
 };
 
 export const getEnvironment = createServerFn({
-  method: "GET",
+  method: 'GET',
 })
   .inputValidator((data: GetEnvironmentParams) => data)
   .handler(async ({ data }) => {
@@ -68,7 +68,7 @@ export const getEnvironment = createServerFn({
   });
 
 export const getProductionEnvironment = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   const query = await graphqlAPI.request(GetProductionWorkspaceDocument);
   const environment = workspacesToEnvironments([query.defaultEnv])[0];

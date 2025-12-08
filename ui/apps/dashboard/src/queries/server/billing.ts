@@ -1,26 +1,26 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 import {
   type EntitlementUsageQuery,
   type GetBillingDetailsQuery,
   type GetCurrentPlanQuery,
   type GetPlansQuery,
-} from "@/gql/graphql";
-import graphqlAPI from "@/queries/graphqlAPI";
-import { createServerFn } from "@tanstack/react-start";
+} from '@/gql/graphql';
+import graphqlAPI from '@/queries/graphqlAPI';
+import { createServerFn } from '@tanstack/react-start';
 
 //
 // Transform billingPeriod from unknown to string to satisfy createServerFn serialization
 // billingPeriod is actually a string (e.g., "month", "year") but GraphQL types it as unknown
 type TransformBillingPeriod<T> = T extends { plan: infer P | null }
-  ? Omit<T, "plan"> & {
+  ? Omit<T, 'plan'> & {
       plan: P extends { billingPeriod: unknown }
-        ? Omit<P, "billingPeriod"> & { billingPeriod: string }
+        ? Omit<P, 'billingPeriod'> & { billingPeriod: string }
         : P;
     }
   : T;
 
 type TransformPlanBillingPeriod<T> = T extends { billingPeriod: unknown }
-  ? Omit<T, "billingPeriod"> & { billingPeriod: string }
+  ? Omit<T, 'billingPeriod'> & { billingPeriod: string }
   : T;
 
 export const entitlementUsageDocument = graphql(`
@@ -141,7 +141,7 @@ export const entitlementUsageDocument = graphql(`
 `);
 
 export const entitlementUsage = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   try {
     const res = await graphqlAPI.request<EntitlementUsageQuery>(
@@ -150,17 +150,17 @@ export const entitlementUsage = createServerFn({
 
     // TODO: Replace this with a proper programmatic check. Relying on the plan
     // name is fragile.
-    const isCustomPlan = (res.account.plan?.name ?? "")
+    const isCustomPlan = (res.account.plan?.name ?? '')
       .toLowerCase()
-      .includes("enterprise");
+      .includes('enterprise');
 
     return {
       ...res.account,
       isCustomPlan,
     };
   } catch (error) {
-    console.error("Error fetching entitlement usage:", error);
-    throw new Error("Failed to fetch entitlement usage");
+    console.error('Error fetching entitlement usage:', error);
+    throw new Error('Failed to fetch entitlement usage');
   }
 });
 
@@ -230,9 +230,9 @@ export const currentPlanDocument = graphql(`
 `);
 
 export const currentPlan = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(
-  async (): Promise<TransformBillingPeriod<GetCurrentPlanQuery["account"]>> => {
+  async (): Promise<TransformBillingPeriod<GetCurrentPlanQuery['account']>> => {
     const res = await graphqlAPI.request<GetCurrentPlanQuery>(
       currentPlanDocument,
     );
@@ -244,7 +244,7 @@ export const currentPlan = createServerFn({
             billingPeriod: res.account.plan.billingPeriod as string,
           }
         : null,
-    } as TransformBillingPeriod<GetCurrentPlanQuery["account"]>;
+    } as TransformBillingPeriod<GetCurrentPlanQuery['account']>;
   },
 );
 
@@ -266,7 +266,7 @@ export const billingDetailsDocument = graphql(`
 `);
 
 export const billingDetails = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   const res = await graphqlAPI.request<GetBillingDetailsQuery>(
     billingDetailsDocument,
@@ -305,11 +305,11 @@ export const plansDocument = graphql(`
 `);
 
 export const plans = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(
   async (): Promise<
     Array<
-      TransformPlanBillingPeriod<NonNullable<GetPlansQuery["plans"][0]> | null>
+      TransformPlanBillingPeriod<NonNullable<GetPlansQuery['plans'][0]> | null>
     >
   > => {
     try {
@@ -323,12 +323,12 @@ export const plans = createServerFn({
           : null,
       ) as Array<
         TransformPlanBillingPeriod<NonNullable<
-          GetPlansQuery["plans"][0]
+          GetPlansQuery['plans'][0]
         > | null>
       >;
     } catch (error) {
-      console.error("Error fetching plans:", error);
-      throw new Error("Failed to fetch plans");
+      console.error('Error fetching plans:', error);
+      throw new Error('Failed to fetch plans');
     }
   },
 );

@@ -1,6 +1,6 @@
-import { graphql } from "@/gql";
-import graphqlAPI from "@/queries/graphqlAPI";
-import { createServerFn } from "@tanstack/react-start";
+import { graphql } from '@/gql';
+import graphqlAPI from '@/queries/graphqlAPI';
+import { createServerFn } from '@tanstack/react-start';
 
 const metricsEntitlementsDocument = graphql(`
   query MetricsEntitlements {
@@ -22,7 +22,7 @@ const metricsEntitlementsDocument = graphql(`
 `);
 
 export const MetricsEntitlements = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   const response = await graphqlAPI.request(metricsEntitlementsDocument);
 

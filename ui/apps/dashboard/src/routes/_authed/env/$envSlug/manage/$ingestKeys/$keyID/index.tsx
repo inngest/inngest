@@ -1,26 +1,26 @@
-import { graphql } from "@/gql";
-import { EnvironmentType } from "@/gql/graphql";
-import { useEnvironment } from "@/components/Environments/environment-context";
+import { graphql } from '@/gql';
+import { EnvironmentType } from '@/gql/graphql';
+import { useEnvironment } from '@/components/Environments/environment-context';
 
-import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@inngest/components/DropdownMenu";
-import { RiMore2Line, RiPencilLine, RiDeleteBinLine } from "@remixicon/react";
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+} from '@inngest/components/DropdownMenu';
+import { RiMore2Line, RiPencilLine, RiDeleteBinLine } from '@remixicon/react';
+import { createFileRoute, notFound } from '@tanstack/react-router';
+import { useState } from 'react';
 
-import { Secret, type SecretKind } from "@/components/Secret/Secret";
-import EditKeyNameModal from "@/components/Manage/EditKeyNameModal";
-import TransformEvent from "@/components/Manage/TransformEvent";
-import DeleteKeyModal from "@/components/Manage/DeleteKeyModal";
-import FilterEvents from "@/components/Manage/FilterEvents";
-import { Provider } from "@/components/Manage/Context";
+import { Secret, type SecretKind } from '@/components/Secret/Secret';
+import EditKeyNameModal from '@/components/Manage/EditKeyNameModal';
+import TransformEvent from '@/components/Manage/TransformEvent';
+import DeleteKeyModal from '@/components/Manage/DeleteKeyModal';
+import FilterEvents from '@/components/Manage/FilterEvents';
+import { Provider } from '@/components/Manage/Context';
 
 const GetKeyDocument = graphql(`
   query GetIngestKey($environmentID: ID!, $keyID: ID!) {
@@ -43,14 +43,14 @@ const GetKeyDocument = graphql(`
   }
 `);
 
-const SOURCE_INTEGRATION = "integration";
+const SOURCE_INTEGRATION = 'integration';
 
-function isFilterType(value: string): value is "allow" | "deny" {
-  return value === "allow" || value === "deny";
+function isFilterType(value: string): value is 'allow' | 'deny' {
+  return value === 'allow' || value === 'deny';
 }
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/manage/$ingestKeys/$keyID/",
+  '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/',
 )({
   component: KeyComponent,
 });
@@ -92,17 +92,17 @@ function KeyComponent() {
 
   let secretKind: SecretKind;
   let value;
-  if (ingestKeys === "webhooks") {
-    secretKind = "webhook-path";
-    value = key.url || "";
+  if (ingestKeys === 'webhooks') {
+    secretKind = 'webhook-path';
+    value = key.url || '';
   } else {
-    secretKind = "event-key";
+    secretKind = 'event-key';
     value = key.presharedKey;
   }
 
   return (
     <div>
-      {ingestKeys === "keys" &&
+      {ingestKeys === 'keys' &&
         environment.type === EnvironmentType.BranchParent && (
           <Alert
             className="flex items-center rounded-none text-sm"
@@ -148,8 +148,8 @@ function KeyComponent() {
                 onClose={() => setIsDeleteKeyModalVisible(false)}
                 description={
                   isIntegration
-                    ? "Warning: This key was created via integration. Please confirm that you are no longer using it before deleting."
-                    : ""
+                    ? 'Warning: This key was created via integration. Please confirm that you are no longer using it before deleting.'
+                    : ''
                 }
               />
               <EditKeyNameModal

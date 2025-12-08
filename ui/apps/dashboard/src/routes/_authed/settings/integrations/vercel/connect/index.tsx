@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Link } from "@inngest/components/Link/NewLink";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
+import { createFileRoute } from '@tanstack/react-router';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Link } from '@inngest/components/Link/NewLink';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/vercel/connect/",
+  '/_authed/settings/integrations/vercel/connect/',
 )({
   component: VercelConnect,
 });
@@ -21,7 +21,7 @@ function VercelConnect() {
       </div>
       <div className="text-muted mb-7 w-full text-base font-normal">
         This integration enables you to host your Inngest functions on the
-        Vercel platform and automatically sync them every time you deploy code.{" "}
+        Vercel platform and automatically sync them every time you deploy code.{' '}
         <Link
           target="_blank"
           size="medium"

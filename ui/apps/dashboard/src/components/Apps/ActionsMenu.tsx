@@ -1,17 +1,17 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
   RiArchive2Line,
   RiFirstAidKitLine,
   RiMore2Line,
   RiRefreshLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
 export type AppActions = {
   isArchived: boolean;
@@ -54,7 +54,7 @@ export const ActionsMenu = ({
         )}
         <OptionalTooltip
           tooltip={
-            disableValidate ? "App health check not available." : undefined
+            disableValidate ? 'App health check not available.' : undefined
           }
         >
           <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
@@ -66,7 +66,7 @@ export const ActionsMenu = ({
           <OptionalTooltip
             tooltip={
               disableArchive
-                ? "Parent app is archived. Archive action not available."
+                ? 'Parent app is archived. Archive action not available.'
                 : undefined
             }
           >
@@ -76,7 +76,7 @@ export const ActionsMenu = ({
               className="text-error"
             >
               <RiArchive2Line className="h-4 w-4" />
-              {isArchived ? "Unarchive app" : "Archive app"}
+              {isArchived ? 'Unarchive app' : 'Archive app'}
             </DropdownMenuItem>
           </OptionalTooltip>
         )}

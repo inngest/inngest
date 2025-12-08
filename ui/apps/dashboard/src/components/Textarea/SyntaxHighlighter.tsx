@@ -1,8 +1,8 @@
-import { forwardRef } from "react";
-import { cn } from "@inngest/components/utils/classNames";
-import ReactSyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import colors from "tailwindcss/colors";
+import { forwardRef } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
+import ReactSyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import colors from 'tailwindcss/colors';
 
 type SyntaxHighlighterProps = {
   language: string;
@@ -12,16 +12,16 @@ type SyntaxHighlighterProps = {
 
 const theme = {
   ...atomOneDark,
-  "hljs-attr": { color: colors.indigo["400"] },
-  "hljs-string": { color: colors.teal["400"] },
-  "hljs-number": { color: colors.amber["300"] },
+  'hljs-attr': { color: colors.indigo['400'] },
+  'hljs-string': { color: colors.teal['400'] },
+  'hljs-number': { color: colors.amber['300'] },
 };
 
 const SyntaxHighlighter = forwardRef(function SyntaxHighlighter(
   { language, children, className }: SyntaxHighlighterProps,
   ref: React.ForwardedRef<HTMLPreElement>,
 ) {
-  const PreWithRef = (preProps: React.ComponentProps<"pre">) => (
+  const PreWithRef = (preProps: React.ComponentProps<'pre'>) => (
     <pre {...preProps} ref={ref} />
   );
 
@@ -31,8 +31,8 @@ const SyntaxHighlighter = forwardRef(function SyntaxHighlighter(
       language={language}
       showLineNumbers={false}
       style={theme}
-      customStyle={{ backgroundColor: "transparent" }}
-      className={cn("font-mono text-sm font-light", className)}
+      customStyle={{ backgroundColor: 'transparent' }}
+      className={cn('font-mono text-sm font-light', className)}
     >
       {children}
     </ReactSyntaxHighlighter>

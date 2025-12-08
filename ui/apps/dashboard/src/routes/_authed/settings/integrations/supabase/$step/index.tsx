@@ -1,20 +1,20 @@
-import Auth from "@inngest/components/PostgresIntegrations/Neon/NewAuth";
-import Connect from "@inngest/components/PostgresIntegrations/Neon/NewConnect";
+import Auth from '@inngest/components/PostgresIntegrations/Neon/NewAuth';
+import Connect from '@inngest/components/PostgresIntegrations/Neon/NewConnect';
 import {
   IntegrationSteps,
   STEPS_ORDER,
-} from "@inngest/components/PostgresIntegrations/newTypes";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
+} from '@inngest/components/PostgresIntegrations/newTypes';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 
-import { useSteps } from "@/components/PostgresIntegration/Context";
+import { useSteps } from '@/components/PostgresIntegration/Context';
 import {
   verifyAutoSetup,
   verifyCredentials,
-} from "@/queries/server/integrations/db";
+} from '@/queries/server/integrations/db';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/supabase/$step/",
+  '/_authed/settings/integrations/supabase/$step/',
 )({
   component: SupabaseStep,
 });
@@ -26,9 +26,9 @@ function SupabaseStep() {
   const firstStep = STEPS_ORDER[0]!;
 
   function handleLostCredentials() {
-    toast.error("Lost credentials. Going back to the first step.");
+    toast.error('Lost credentials. Going back to the first step.');
     navigate({
-      to: "/settings/integrations/supabase/$step",
+      to: '/settings/integrations/supabase/$step',
       params: { step: firstStep },
     });
   }

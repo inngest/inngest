@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import * as Select from "@radix-ui/react-select";
-import { RiArrowDownSLine, RiCheckLine } from "@remixicon/react";
+import { useEffect, useState } from 'react';
+import * as Select from '@radix-ui/react-select';
+import { RiArrowDownSLine, RiCheckLine } from '@remixicon/react';
 
 export type SelectOption<T extends string> = {
   label: string | React.ReactNode;

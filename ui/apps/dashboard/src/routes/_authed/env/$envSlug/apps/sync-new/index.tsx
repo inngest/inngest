@@ -1,15 +1,15 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { CodeLine } from "@inngest/components/CodeLine";
-import { Link } from "@inngest/components/Link/NewLink";
-import TabCards from "@inngest/components/TabCards/TabCards";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
-import { RiCodeLine, RiInputCursorMove } from "@remixicon/react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Button } from '@inngest/components/Button/NewButton';
+import { CodeLine } from '@inngest/components/CodeLine';
+import { Link } from '@inngest/components/Link/NewLink';
+import TabCards from '@inngest/components/TabCards/TabCards';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { RiCodeLine, RiInputCursorMove } from '@remixicon/react';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
-import { ManualSync } from "@/components/Apps/SyncNew/ManualSync";
-import { pathCreator } from "@/utils/urls";
+import { ManualSync } from '@/components/Apps/SyncNew/ManualSync';
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps/sync-new/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/apps/sync-new/')({
   component: SyncNewPage,
 });
 
@@ -24,7 +24,7 @@ function SyncNewPage() {
         <h2 className="text-basis mb-4 text-xl">Sync your app to Inngest</h2>
         <p className="mb-6 text-sm">
           Since your code is hosted on another platform, you need to register
-          where your functions are hosted with Inngest.{" "}
+          where your functions are hosted with Inngest.{' '}
           <Link
             className="inline-block"
             size="small"
@@ -95,7 +95,7 @@ function SyncNewPage() {
                 You can sync from your machine or automate this within a CI/CD
                 pipeline.
                 <span className="font-semibold">
-                  {" "}
+                  {' '}
                   Send a PUT request to your own application&apos;s serve
                   endpoint using the following command:
                 </span>

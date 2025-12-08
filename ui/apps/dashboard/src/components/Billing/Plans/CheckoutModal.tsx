@@ -1,26 +1,26 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Modal } from "@inngest/components/Modal/Modal";
-import { resolveColor } from "@inngest/components/utils/colors";
-import { isDark } from "@inngest/components/utils/theme";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Modal } from '@inngest/components/Modal/Modal';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import {
   Elements,
   PaymentElement,
   useElements,
   useStripe,
-} from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import { useMutation } from "urql";
+} from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import { type StripeSubscriptionItemsInput } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import { type StripeSubscriptionItemsInput } from '@/gql/graphql';
 import {
   backgroundColor,
   colors,
   textColor,
   placeholderColor,
-} from "@/utils/tailwind";
+} from '@/utils/tailwind';
 
 export type CheckoutItem = {
   /* Inngest plan slug */
@@ -39,7 +39,7 @@ type CheckoutModalProps = {
 // Make sure to call `loadStripe` outside of a component’s render to avoid
 // recreating the `Stripe` object on every render.
 const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
 );
 
 export default function CheckoutModal({
@@ -50,7 +50,7 @@ export default function CheckoutModal({
   const amount = items.reduce((total, item) => {
     return total + item.amount * item.quantity;
   }, 0);
-  const planName = items.map((item) => item.name).join(", ");
+  const planName = items.map((item) => item.name).join(', ');
   return (
     <Modal
       className="flex min-w-[600px] max-w-xl flex-col gap-4"
@@ -63,9 +63,9 @@ export default function CheckoutModal({
         <Elements
           stripe={stripePromise}
           options={{
-            mode: "subscription",
+            mode: 'subscription',
             amount: amount,
-            currency: "usd",
+            currency: 'usd',
             appearance: {
               variables: {
                 colorText: resolveColor(textColor.basis, isDark()),
@@ -111,7 +111,7 @@ function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const [, createStripeSubscription] = useMutation(
     CreateStripeSubscriptionDocument,
@@ -121,7 +121,7 @@ function CheckoutForm({
     e.preventDefault();
     // This should not happen since the button is disabled before this
     if (!stripe || !elements) {
-      console.error("Stripe Elements not loaded");
+      console.error('Stripe Elements not loaded');
       return;
     }
 
@@ -131,7 +131,7 @@ function CheckoutForm({
     if (submitError) {
       return setError(
         submitError.message ||
-          "Sorry, there was an issue saving your payment information",
+          'Sorry, there was an issue saving your payment information',
       );
     }
 
@@ -149,11 +149,11 @@ function CheckoutForm({
     if (createSubscriptionError) {
       return setError(
         createSubscriptionError.message ||
-          "Sorry, there was an issue changing your subscription",
+          'Sorry, there was an issue changing your subscription',
       );
     }
 
-    const clientSecret = data?.createStripeSubscription.clientSecret || "";
+    const clientSecret = data?.createStripeSubscription.clientSecret || '';
     // If there is no client secret, the payment is already associated with the subscription,
     // we can return success early
     if (!clientSecret) {
@@ -167,17 +167,17 @@ function CheckoutForm({
       confirmParams: {
         // TODO - Use PUBLIC_APP_URL from other branch changes
         return_url: new URL(
-          "/account/billing",
+          '/account/billing',
           process.env.NEXT_PUBLIC_APP_URL,
         ).toString(),
       },
-      redirect: "if_required",
+      redirect: 'if_required',
     });
 
     if (stripeConfirmPaymentError) {
       setError(
         stripeConfirmPaymentError.message ||
-          "Sorry, there was an issue confirming your payment",
+          'Sorry, there was an issue confirming your payment',
       );
     } else {
       onSuccess();

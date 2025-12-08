@@ -1,16 +1,16 @@
-import { useCallback, useRef, useState } from "react";
-import { Search } from "@inngest/components/Forms/Search";
-import { InfiniteScrollTrigger } from "@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger";
-import { Pill } from "@inngest/components/Pill/Pill";
-import { SchemaViewer } from "@inngest/components/SchemaViewer/SchemaViewer";
-import type { ValueNode } from "@inngest/components/SchemaViewer/types";
+import { useCallback, useRef, useState } from 'react';
+import { Search } from '@inngest/components/Forms/Search';
+import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
+import { Pill } from '@inngest/components/Pill/Pill';
+import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
+import type { ValueNode } from '@inngest/components/SchemaViewer/types';
 
-import { SchemaExplorerSwitcher } from "./SchemaExplorerSwitcher";
-import { useSchemas } from "./SchemasContext/SchemasContext";
-import { useSchemasInUse } from "./useSchemasInUse";
+import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
+import { useSchemas } from './SchemasContext/SchemasContext';
+import { useSchemasInUse } from './useSchemasInUse';
 
 export function SchemaExplorer() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const {
     entries,
@@ -27,7 +27,7 @@ export function SchemaExplorer() {
   const { schemasInUse } = useSchemasInUse();
 
   const renderSharedAdornment = useCallback((node: ValueNode) => {
-    if (node.path !== "events") return null;
+    if (node.path !== 'events') return null;
     return (
       <Pill
         appearance="outlined"
@@ -41,7 +41,7 @@ export function SchemaExplorer() {
 
   const renderEntry = useCallback(
     (entry: (typeof entries)[number], preventExpand: boolean = false) => {
-      const isCommonEventSchema = entry.key === "common:events";
+      const isCommonEventSchema = entry.key === 'common:events';
 
       return (
         <SchemaViewer
@@ -53,7 +53,7 @@ export function SchemaExplorer() {
             preventExpand
               ? undefined
               : isCommonEventSchema
-              ? ["events"]
+              ? ['events']
               : undefined
           }
           node={entry.node}
@@ -119,6 +119,6 @@ function computeSharedEventSchemaType(
   node: ValueNode,
   baseLabel: string,
 ): string {
-  if (node.path === "events.data" && baseLabel === "string") return "JSON";
+  if (node.path === 'events.data' && baseLabel === 'string') return 'JSON';
   return baseLabel;
 }

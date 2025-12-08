@@ -1,4 +1,4 @@
-import { RiTableView } from "@remixicon/react";
+import { RiTableView } from '@remixicon/react';
 
 type IconLayoutWrapperProps = {
   action: React.ReactNode;

@@ -1,22 +1,22 @@
-import NeonAuth from "@inngest/components/PostgresIntegrations/Neon/NewAuth";
-import NeonConnect from "@inngest/components/PostgresIntegrations/Neon/NewConnect";
-import NeonFormat from "@inngest/components/PostgresIntegrations/Neon/NewFormat";
+import NeonAuth from '@inngest/components/PostgresIntegrations/Neon/NewAuth';
+import NeonConnect from '@inngest/components/PostgresIntegrations/Neon/NewConnect';
+import NeonFormat from '@inngest/components/PostgresIntegrations/Neon/NewFormat';
 import {
   IntegrationSteps,
   STEPS_ORDER,
-} from "@inngest/components/PostgresIntegrations/newTypes";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
+} from '@inngest/components/PostgresIntegrations/newTypes';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 
-import { useSteps } from "@/components/PostgresIntegration/Context";
+import { useSteps } from '@/components/PostgresIntegration/Context';
 import {
   verifyAutoSetup,
   verifyCredentials,
   verifyLogicalReplication,
-} from "@/queries/server/integrations/db";
+} from '@/queries/server/integrations/db';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/neon/$step/",
+  '/_authed/settings/integrations/neon/$step/',
 )({
   component: NeonStep,
 });
@@ -28,9 +28,9 @@ function NeonStep() {
   const firstStep = STEPS_ORDER[0]!;
 
   function handleLostCredentials() {
-    toast.error("Lost credentials. Going back to the first step.");
+    toast.error('Lost credentials. Going back to the first step.');
     navigate({
-      to: "/settings/integrations/neon/$step",
+      to: '/settings/integrations/neon/$step',
       params: { step: firstStep },
     });
   }

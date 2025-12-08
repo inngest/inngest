@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { useClerk, useSignIn } from "@clerk/tanstack-react-start";
+import { useEffect } from 'react';
+import { useClerk, useSignIn } from '@clerk/tanstack-react-start';
 
-import LoadingIcon from "@/components/Icons/LoadingIcon";
-import { useNavigate } from "@tanstack/react-router";
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useNavigate } from '@tanstack/react-router';
 
 export default function ImpersonationClient({
   actorToken,
@@ -19,15 +19,15 @@ export default function ImpersonationClient({
     const performImpersonation = async () => {
       try {
         const { createdSessionId } = await signIn.create({
-          strategy: "ticket",
+          strategy: 'ticket',
           ticket: actorToken,
         });
 
         await setActive({ session: createdSessionId });
-        navigate({ to: "/" });
+        navigate({ to: '/' });
       } catch (err) {
-        console.error("Impersonation failed:", JSON.stringify(err, null, 2));
-        navigate({ to: "/" });
+        console.error('Impersonation failed:', JSON.stringify(err, null, 2));
+        navigate({ to: '/' });
       }
     };
 

@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import { usePaginationUI } from "@inngest/components/Pagination";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
-import { Switch } from "@inngest/components/Switch";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useCallback, useEffect, useState } from 'react';
+import { usePaginationUI } from '@inngest/components/Pagination';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { Switch } from '@inngest/components/Switch';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import { type Environment } from "@/utils/environments";
-import { notNullish } from "@/utils/typeGuards";
-import { FilterResultDetails } from "./FilterResultDetails";
-import { EnvArchiveButton } from "./row-actions/EnvArchiveButton/EnvArchiveButton";
-import { EnvViewButton } from "./row-actions/EnvViewButton";
+import { graphql } from '@/gql';
+import { type Environment } from '@/utils/environments';
+import { notNullish } from '@/utils/typeGuards';
+import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -190,7 +190,7 @@ function TableRow(props: { env: Environment }) {
               : undefined
           }
         >
-          <StatusDot status={isArchived ? "ARCHIVED" : "ACTIVE"} size="small" />
+          <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {name}
         </h3>
       </td>
@@ -204,8 +204,8 @@ function TableRow(props: { env: Environment }) {
             onClick={() => onClickAutoArchive(id, !isAutoArchiveEnabled)}
             title={
               isAutoArchiveEnabled
-                ? "Click to disable auto archive"
-                : "Click to enable auto archive"
+                ? 'Click to disable auto archive'
+                : 'Click to enable auto archive'
             }
           />
         )}

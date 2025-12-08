@@ -1,23 +1,23 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { MenuItem } from "@inngest/components/Menu/NewMenuItem";
-import SegmentedProgressBar from "@inngest/components/ProgressBar/SegmentedProgressBar";
+import { Button } from '@inngest/components/Button/NewButton';
+import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
+import SegmentedProgressBar from '@inngest/components/ProgressBar/SegmentedProgressBar';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
+} from '@inngest/components/Tooltip/Tooltip';
 import {
   RiBookReadLine,
   RiCheckboxCircleFill,
   RiCloseLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import { onboardingWidgetContent } from "../Onboarding/content";
-import { OnboardingSteps, steps } from "../Onboarding/types";
-import useOnboardingStep from "../Onboarding/useOnboardingStep";
-import { useOnboardingTracking } from "../Onboarding/useOnboardingTracking";
-import { Link, useNavigate, type FileRouteTypes } from "@tanstack/react-router";
+import { pathCreator } from '@/utils/urls';
+import { onboardingWidgetContent } from '../Onboarding/content';
+import { OnboardingSteps, steps } from '../Onboarding/types';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useOnboardingTracking } from '../Onboarding/useOnboardingTracking';
+import { Link, useNavigate, type FileRouteTypes } from '@tanstack/react-router';
 
 export default function OnboardingWidget({
   collapsed,
@@ -42,8 +42,8 @@ export default function OnboardingWidget({
           to={
             pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,
-              ref: "app-onboarding-widget",
-            }) as FileRouteTypes["to"]
+              ref: 'app-onboarding-widget',
+            }) as FileRouteTypes['to']
           }
           className="border-muted border"
           collapsed={collapsed}
@@ -56,7 +56,7 @@ export default function OnboardingWidget({
         <Link
           to={pathCreator.onboardingSteps({
             step: nextStep ? nextStep.name : lastCompletedStep?.name,
-            ref: "app-onboarding-widget",
+            ref: 'app-onboarding-widget',
           })}
           className="text-basis bg-canvasBase hover:bg-canvasSubtle border-subtle mb-5 block rounded border p-3 leading-tight"
         >
@@ -65,7 +65,7 @@ export default function OnboardingWidget({
               <div className="flex items-center justify-between">
                 <p
                   className={`${
-                    lastCompletedStep?.isFinalStep && "text-success"
+                    lastCompletedStep?.isFinalStep && 'text-success'
                   } flex items-center gap-0.5 font-medium`}
                 >
                   {lastCompletedStep?.isFinalStep && (
@@ -85,8 +85,8 @@ export default function OnboardingWidget({
                         e.preventDefault();
                         tracking?.trackOnboardingAction(undefined, {
                           metadata: {
-                            type: "btn-click",
-                            label: "close-widget",
+                            type: 'btn-click',
+                            label: 'close-widget',
                             totalStepsCompleted: totalStepsCompleted,
                           },
                         });
@@ -120,7 +120,7 @@ export default function OnboardingWidget({
                 onClick={(e) => {
                   e.preventDefault();
                   navigate({
-                    to: pathCreator.billing() + "?ref=app-onboarding-widget",
+                    to: pathCreator.billing() + '?ref=app-onboarding-widget',
                   });
                 }}
               />

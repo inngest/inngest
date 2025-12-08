@@ -1,8 +1,8 @@
-import { Banner } from "@inngest/components/Banner";
+import { Banner } from '@inngest/components/Banner';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const Query = graphql(`
   query GetArchivedFuncBannerData($envID: ID!, $funcID: ID!) {

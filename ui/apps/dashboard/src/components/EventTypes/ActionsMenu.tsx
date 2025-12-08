@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
-import { type EventType } from "@inngest/components/types/eventType";
-import { RiArchive2Line, RiMoreFill, RiPlayLine } from "@remixicon/react";
-import { type Row } from "@tanstack/react-table";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { type EventType } from '@inngest/components/types/eventType';
+import { RiArchive2Line, RiMoreFill, RiPlayLine } from '@remixicon/react';
+import { type Row } from '@tanstack/react-table';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import ArchiveEventModal from "../Events/ArchiveEventModal";
-import { SendEventModal } from "../Events/SendEventModal";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import ArchiveEventModal from '../Events/ArchiveEventModal';
+import { SendEventModal } from '../Events/SendEventModal';
 
 export const ActionsMenu = (row: Row<EventType>) => {
   const { isArchived } = useEnvironment();
@@ -35,7 +35,7 @@ export const ActionsMenu = (row: Row<EventType>) => {
         <DropdownMenuContent align="end">
           <OptionalTooltip
             tooltip={
-              isArchived && "Cannot send events. Environment is archived."
+              isArchived && 'Cannot send events. Environment is archived.'
             }
           >
             <DropdownMenuItem
@@ -50,7 +50,7 @@ export const ActionsMenu = (row: Row<EventType>) => {
             </DropdownMenuItem>
           </OptionalTooltip>
           <OptionalTooltip
-            tooltip={row.original.archived && "Send event to unarchive it."}
+            tooltip={row.original.archived && 'Send event to unarchive it.'}
           >
             <DropdownMenuItem
               onClick={(e) => {
@@ -61,7 +61,7 @@ export const ActionsMenu = (row: Row<EventType>) => {
               className="text-error"
             >
               <RiArchive2Line className="h-4 w-4" />
-              {row.original.archived ? "Unarchive event" : "Archive event"}
+              {row.original.archived ? 'Unarchive event' : 'Archive event'}
             </DropdownMenuItem>
           </OptionalTooltip>
         </DropdownMenuContent>

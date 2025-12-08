@@ -1,10 +1,10 @@
-import EmptyCard from "@inngest/components/Apps/EmptyCard";
-import { Button } from "@inngest/components/Button/NewButton";
-import { RiAddLine, RiExternalLinkLine } from "@remixicon/react";
+import EmptyCard from '@inngest/components/Apps/EmptyCard';
+import { Button } from '@inngest/components/Button/NewButton';
+import { RiAddLine, RiExternalLinkLine } from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import useOnboardingStep from "../Onboarding/useOnboardingStep";
-import { useNavigate } from "@tanstack/react-router";
+import { pathCreator } from '@/utils/urls';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import { useNavigate } from '@tanstack/react-router';
 
 export function EmptyOnboardingCard() {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ export function EmptyOnboardingCard() {
             navigate({
               to: pathCreator.onboardingSteps({
                 step: nextStep ? nextStep.name : lastCompletedStep?.name,
-                ref: "app-apps-empty",
+                ref: 'app-apps-empty',
               }),
             })
           }

@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Link } from "@inngest/components/Link/NewLink";
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Link } from '@inngest/components/Link/NewLink';
 
-import appActiveListDark from "@/components/Images/app-active-list-dark.png";
-import appActiveListLight from "@/components/Images/app-active-list-light.jpg";
-import { ValidateModal } from "./ValidateButton/ValidateModal";
-import { Image } from "@unpic/react";
+import appActiveListDark from '@/components/Images/app-active-list-dark.png';
+import appActiveListLight from '@/components/Images/app-active-list-light.jpg';
+import { ValidateModal } from './ValidateButton/ValidateModal';
+import { Image } from '@unpic/react';
 
 export default function AppFAQ() {
   const [showValidate, setShowValidate] = useState(false);
@@ -42,7 +42,7 @@ export default function AppFAQ() {
                 <p className="text-muted mb-4 text-sm">
                   If your app is running but not appearing here, check its
                   health status by clicking on the button to diagnose any
-                  issues. If the issue persists, refer to our{" "}
+                  issues. If the issue persists, refer to our{' '}
                   <Link
                     href="https://www.inngest.com/docs/apps/cloud#troubleshooting?ref=apps-list-empty"
                     target="_blank"

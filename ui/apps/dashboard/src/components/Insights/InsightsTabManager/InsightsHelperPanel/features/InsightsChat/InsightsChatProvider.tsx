@@ -1,5 +1,5 @@
-import type { AgentStatus, ToolOutputOf } from "@inngest/use-agent";
-import { useQuery } from "@tanstack/react-query";
+import type { AgentStatus, ToolOutputOf } from '@inngest/use-agent';
+import { useQuery } from '@tanstack/react-query';
 import {
   createContext,
   useCallback,
@@ -8,15 +8,15 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";
+} from 'react';
 
-import { useFetchAllEventTypes } from "@/components/EventTypes/useFetchAllEventTypes";
+import { useFetchAllEventTypes } from '@/components/EventTypes/useFetchAllEventTypes';
 import {
   useInsightsAgent,
   type ClientState,
   type InsightsAgentConfig,
   type InsightsAgentEvent,
-} from "./useInsightsAgent";
+} from './useInsightsAgent';
 
 type ThreadFlags = {
   networkActive: boolean;
@@ -27,7 +27,7 @@ type ThreadFlags = {
 
 type ContextValue = {
   // Core from useAgents
-  messages: ReturnType<typeof useInsightsAgent>["messages"];
+  messages: ReturnType<typeof useInsightsAgent>['messages'];
   status: AgentStatus;
   currentThreadId: string | null;
   setCurrentThreadId: (id: string) => void;
@@ -93,13 +93,13 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
   const onEvent = useCallback((evt: InsightsAgentEvent) => {
     try {
       const tid =
-        typeof evt.data.threadId === "string" ? evt.data.threadId : undefined;
+        typeof evt.data.threadId === 'string' ? evt.data.threadId : undefined;
       if (!tid) return;
 
       setThreadFlags((prev) => {
         const prevFlags = prev[tid] ?? defaultFlags;
         switch (evt.event) {
-          case "run.started": {
+          case 'run.started': {
             return {
               ...prev,
               [tid]: {
@@ -110,7 +110,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
               },
             };
           }
-          case "text.delta": {
+          case 'text.delta': {
             return {
               ...prev,
               [tid]: {
@@ -120,7 +120,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
               },
             };
           }
-          case "tool_call.arguments.delta": {
+          case 'tool_call.arguments.delta': {
             // evt is narrowed by the discriminant here
             const toolName = evt.data.toolName;
             return {
@@ -128,37 +128,37 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
               [tid]: {
                 ...prevFlags,
                 currentToolName:
-                  typeof toolName === "string" && toolName.length > 0
+                  typeof toolName === 'string' && toolName.length > 0
                     ? toolName
                     : prevFlags.currentToolName,
               },
             };
           }
-          case "part.completed": {
+          case 'part.completed': {
             // evt is narrowed by the discriminant here
             const partType = evt.data.type;
             // Clear tool name once tool step completes
             const nextFlags: ThreadFlags = {
               ...prevFlags,
               currentToolName:
-                partType === "tool-output" || partType === "tool-call"
+                partType === 'tool-output' || partType === 'tool-call'
                   ? null
                   : prevFlags.currentToolName,
             };
 
             // If text part completes, mark completion
-            if (partType === "text") {
+            if (partType === 'text') {
               nextFlags.textStreaming = false;
               nextFlags.textCompleted = true;
             }
 
             // Capture generated SQL from tool-output (typed via manifest)
             if (
-              partType === "tool-output" &&
-              evt.data.toolName === "generate_sql"
+              partType === 'tool-output' &&
+              evt.data.toolName === 'generate_sql'
             ) {
               const output = evt.data.finalContent as
-                | ToolOutputOf<InsightsAgentConfig, "generate_sql">
+                | ToolOutputOf<InsightsAgentConfig, 'generate_sql'>
                 | undefined;
               const sql = output?.data.sql;
               if (sql && sql.length > 0) {
@@ -172,7 +172,7 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
               [tid]: nextFlags,
             };
           }
-          case "stream.ended": {
+          case 'stream.ended': {
             return {
               ...prev,
               [tid]: {
@@ -193,14 +193,14 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
   // Fetch event types and schemas with pagination (up to 5 pages = 200 events)
   const fetchAllEventTypes = useFetchAllEventTypes();
   const { data: eventsData } = useQuery({
-    queryKey: ["insights", "all-event-types"],
+    queryKey: ['insights', 'all-event-types'],
     queryFn: async () => {
       const allEvents = await fetchAllEventTypes();
 
       const names: string[] = allEvents.map((e) => e.name);
       const schemaMap: Record<string, string> = {};
       for (const e of allEvents) {
-        const raw = (e.latestSchema || "").trim();
+        const raw = (e.latestSchema || '').trim();
         if (!raw) continue;
         schemaMap[e.name] = raw;
       }
@@ -225,12 +225,12 @@ export function InsightsChatProvider({ children }: { children: ReactNode }) {
       }
       // Fallback minimal state
       return {
-        sqlQuery: "",
+        sqlQuery: '',
         eventTypes: eventsData?.names ?? [],
         schemas: eventsData?.schemaMap ?? null,
-        currentQuery: "",
-        tabTitle: "",
-        mode: "insights_sql_playground",
+        currentQuery: '',
+        tabTitle: '',
+        mode: 'insights_sql_playground',
         timestamp: Date.now(),
       } as ClientState;
     },
@@ -291,7 +291,7 @@ export function useInsightsChatProvider(): ContextValue {
   const ctx = useContext(InsightsChatContext);
   if (!ctx)
     throw new Error(
-      "useInsightsChatProvider must be used within InsightsChatProvider",
+      'useInsightsChatProvider must be used within InsightsChatProvider',
     );
   return ctx;
 }

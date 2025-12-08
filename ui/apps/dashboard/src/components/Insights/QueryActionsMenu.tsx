@@ -1,17 +1,17 @@
-import type { ReactElement } from "react";
+import type { ReactElement } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
-import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from "@remixicon/react";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
+import { RiAlignLeft, RiDeleteBinLine, RiShare2Line } from '@remixicon/react';
 
-import type { InsightsQueryStatement } from "@/gql/graphql";
-import { useSQLEditorInstance } from "./InsightsSQLEditor/SQLEditorInstanceContext";
-import { useStoredQueries } from "./QueryHelperPanel/StoredQueriesContext";
-import { isQuerySnapshot } from "./queries";
-import type { QuerySnapshot } from "./types";
+import type { InsightsQueryStatement } from '@/gql/graphql';
+import { useSQLEditorInstance } from './InsightsSQLEditor/SQLEditorInstanceContext';
+import { useStoredQueries } from './QueryHelperPanel/StoredQueriesContext';
+import { isQuerySnapshot } from './queries';
+import type { QuerySnapshot } from './types';
 
 type QueryActionsMenuProps = {
   onOpenChange?: (open: boolean) => void;
@@ -45,7 +45,7 @@ export function QueryActionsMenu({
     if (!editor) return;
 
     // Trigger the format document action
-    editor.getAction("editor.action.formatDocument")?.run();
+    editor.getAction('editor.action.formatDocument')?.run();
   };
 
   return (

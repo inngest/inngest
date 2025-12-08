@@ -1,5 +1,5 @@
-import { graphql } from "@/gql";
-import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
+import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query AppSyncs($envID: ID!, $externalAppID: String!) {

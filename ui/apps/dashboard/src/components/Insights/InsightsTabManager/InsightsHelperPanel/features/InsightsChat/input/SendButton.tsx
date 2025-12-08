@@ -1,5 +1,5 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { RiArrowUpLine } from "@remixicon/react";
+import { Button } from '@inngest/components/Button/NewButton';
+import { RiArrowUpLine } from '@remixicon/react';
 
 type SendButtonProps = {
   onClick: (e: React.FormEvent) => void;

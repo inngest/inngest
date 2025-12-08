@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { useClient } from "urql";
+import { useQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const quickSearchQuery = graphql(`
   query QuickSearch($term: String!, $envSlug: String!) {
@@ -41,7 +41,7 @@ export function useQuickSearch({
   const client = useClient();
 
   return useQuery({
-    queryKey: ["quick-search", term, envSlug],
+    queryKey: ['quick-search', term, envSlug],
     queryFn: async () => {
       const res = await client.query(quickSearchQuery, {
         envSlug,
@@ -51,7 +51,7 @@ export function useQuickSearch({
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("No data");
+        throw new Error('No data');
       }
       return res.data.account.quickSearch;
     },

@@ -1,12 +1,12 @@
-import { createContext, useState } from "react";
-import { useMutation, type CombinedError } from "urql";
+import { createContext, useState } from 'react';
+import { useMutation, type CombinedError } from 'urql';
 
-import { graphql } from "@/gql";
-import type { GetIngestKeyQuery } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import type { GetIngestKeyQuery } from '@/gql/graphql';
 
 type IngestKey = Omit<
-  GetIngestKeyQuery["environment"]["ingestKey"],
-  "__typename"
+  GetIngestKeyQuery['environment']['ingestKey'],
+  '__typename'
 >;
 type PartialIngestKey = Partial<IngestKey>;
 
@@ -20,7 +20,7 @@ type IngestKeyContext = {
 
 export const Context = createContext<IngestKeyContext>({
   save: async () => {
-    console.log("warning: must use provider");
+    console.log('warning: must use provider');
     return { error: undefined };
   },
 });
@@ -55,7 +55,7 @@ export function Provider({
 
   async function save(updates: PartialIngestKey) {
     if (updates.id !== state.id) {
-      return { error: new Error("ID did not match when saving state") };
+      return { error: new Error('ID did not match when saving state') };
     }
     const newState = { ...state, ...updates };
     setState(newState);

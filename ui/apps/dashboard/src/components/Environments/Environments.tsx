@@ -1,29 +1,29 @@
-import { useMemo, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Search } from "@inngest/components/Forms/Search";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
-import useDebounce from "@inngest/components/hooks/useDebounce";
+import { useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Search } from '@inngest/components/Forms/Search';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 
-import Toaster from "@/components/Toast/Toaster";
-import LoadingIcon from "@/components/Icons/LoadingIcon";
-import { useEnvironments } from "@/queries";
-import { EnvironmentType, type Environment } from "@/utils/environments";
-import { BranchEnvironmentActions } from "./BranchEnvironmentActions";
-import BranchEnvironmentListTable from "./BranchEnvironmentListTable";
-import { CustomEnvironmentListTable } from "./CustomEnvironmentListTable";
-import { EnvironmentsStatusSelector } from "./EnvironmentsStatusSelector";
-import { EnvKeysDropdownButton } from "./row-actions/EnvKeysDropdownButton";
-import { EnvViewButton } from "./row-actions/EnvViewButton";
+import Toaster from '@/components/Toast/Toaster';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useEnvironments } from '@/queries';
+import { EnvironmentType, type Environment } from '@/utils/environments';
+import { BranchEnvironmentActions } from './BranchEnvironmentActions';
+import BranchEnvironmentListTable from './BranchEnvironmentListTable';
+import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
+import { EnvironmentsStatusSelector } from './EnvironmentsStatusSelector';
+import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 export default function Environments() {
   const [{ data: envs = [], fetching }] = useEnvironments();
 
-  const [filterStatus, setFilterStatus] = useState<"active" | "archived">(
-    "active",
+  const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>(
+    'active',
   );
 
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [searchParam, setSearchParam] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [searchParam, setSearchParam] = useState<string>('');
   const debouncedSearch = useDebounce(() => {
     setSearchParam(searchInput);
   }, 400);
@@ -91,8 +91,8 @@ export default function Environments() {
                   Production
                 </h3>
                 <div className="flex flex-shrink-0 items-center gap-2 pl-2">
-                  <EnvViewButton env={{ slug: "production" }} />
-                  <EnvKeysDropdownButton env={{ slug: "production" }} />
+                  <EnvViewButton env={{ slug: 'production' }} />
+                  <EnvKeysDropdownButton env={{ slug: 'production' }} />
                 </div>
               </div>
             </div>
@@ -105,9 +105,9 @@ export default function Environments() {
           </div>
           <div className="flex w-full flex-wrap gap-3">
             <EnvironmentsStatusSelector
-              archived={filterStatus === "archived"}
+              archived={filterStatus === 'archived'}
               onChange={(archived: boolean) => {
-                setFilterStatus(archived ? "archived" : "active");
+                setFilterStatus(archived ? 'archived' : 'active');
               }}
             />
             <div className="min-w-[200px] flex-auto">
@@ -192,7 +192,7 @@ export default function Environments() {
 
 // This is used to reset to page 1 when the filter or search changes.
 function getPaginationKey(
-  filterStatus: "active" | "archived",
+  filterStatus: 'active' | 'archived',
   searchParam: string,
 ) {
   return `${filterStatus}:${searchParam}`;
@@ -201,7 +201,7 @@ function getPaginationKey(
 function filterEnvironments(
   type: EnvironmentType,
   searchParam: string,
-  filterStatus: "active" | "archived",
+  filterStatus: 'active' | 'archived',
   envs: Environment[],
 ) {
   const filtered: Environment[] = [];
@@ -213,10 +213,10 @@ function filterEnvironments(
     total++;
 
     const matchesSearch =
-      searchParam === "" ||
+      searchParam === '' ||
       env.name.toLowerCase().includes(searchParam.toLowerCase());
     const matchesStatus =
-      filterStatus === "archived" ? env.isArchived : !env.isArchived;
+      filterStatus === 'archived' ? env.isArchived : !env.isArchived;
 
     if (matchesSearch && matchesStatus) filtered.push(env);
   }

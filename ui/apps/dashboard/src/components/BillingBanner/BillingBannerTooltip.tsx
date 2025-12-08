@@ -2,8 +2,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip";
-import { RiQuestionLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip';
+import { RiQuestionLine } from '@remixicon/react';
 
 export function BillingBannerTooltip({
   children,

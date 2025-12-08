@@ -1,16 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 
-import { KeyboardShortcut } from "@/components/Insights/KeyboardShortcut";
-import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
-import type { Tab } from "@/components/Insights/types";
-import { hasUnsavedChanges } from "./InsightsTabManager";
-import { useTabManagerActions } from "./TabManagerContext";
-import { HOME_TAB } from "./constants";
+import { KeyboardShortcut } from '@/components/Insights/KeyboardShortcut';
+import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '@/components/Insights/types';
+import { hasUnsavedChanges } from './InsightsTabManager';
+import { useTabManagerActions } from './TabManagerContext';
+import { HOME_TAB } from './constants';
 
 interface TabContextMenuProps {
   tabs: Tab[];
@@ -84,7 +84,7 @@ export function TabContextMenu({
               <span className="ml-auto">
                 <KeyboardShortcut
                   color="text-muted"
-                  keys={["cmd", "ctrl", "alt", "t"]}
+                  keys={['cmd', 'ctrl', 'alt', 't']}
                 />
               </span>
             </DropdownMenuItem>

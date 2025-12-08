@@ -1,11 +1,11 @@
-import ProgressBar from "@inngest/components/ProgressBar/ProgressBar";
+import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiInformationLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiInformationLine } from '@remixicon/react';
 
 export type Data = {
   title: string;
@@ -50,15 +50,15 @@ export async function LimitBar({
       <div className="mt-1 text-left">
         <span
           className={cn(
-            "text-medium text-basis text-sm font-medium",
-            !isUnlimited && current > limit && overageAllowed && "text-warning",
-            !isUnlimited && current > limit && !overageAllowed && "text-error",
+            'text-medium text-basis text-sm font-medium',
+            !isUnlimited && current > limit && overageAllowed && 'text-warning',
+            !isUnlimited && current > limit && !overageAllowed && 'text-error',
           )}
         >
           {current.toLocaleString()}
         </span>
         <span className="text-muted text-sm">
-          /{isUnlimited ? "unlimited" : limit.toLocaleString()}
+          /{isUnlimited ? 'unlimited' : limit.toLocaleString()}
         </span>
       </div>
     </div>

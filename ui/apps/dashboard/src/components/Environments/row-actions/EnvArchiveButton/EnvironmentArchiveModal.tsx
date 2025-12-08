@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { AlertModal } from "@inngest/components/Modal/AlertModal";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useCallback, useEffect, useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const ArchiveEnvironmentDocument = graphql(`
   mutation ArchiveEnvironment($id: ID!) {
@@ -63,11 +63,11 @@ export function EnvironmentArchiveModal(props: Props) {
       }
 
       onSuccess();
-      toast.success(`Environment ${isArchived ? "unarchived" : "archived"}`);
+      toast.success(`Environment ${isArchived ? 'unarchived' : 'archived'}`);
       setError(undefined);
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError("Unknown error");
+        setError('Unknown error');
         return;
       }
 
@@ -82,12 +82,12 @@ export function EnvironmentArchiveModal(props: Props) {
       className="max-w-xl"
       isOpen={isOpen}
       onClose={onCancel}
-      title={`${isArchived ? "Unarchive" : "Archive"} environment`}
-      confirmButtonLabel={isArchived ? "Unarchive" : "Archive"}
+      title={`${isArchived ? 'Unarchive' : 'Archive'} environment`}
+      confirmButtonLabel={isArchived ? 'Unarchive' : 'Archive'}
       onSubmit={onSubmit}
       isLoading={isLoading}
       description={`Are you sure you want to ${
-        isArchived ? "unarchive" : "archive"
+        isArchived ? 'unarchive' : 'archive'
       } this environment?`}
     >
       <div className="p-6 pb-0">

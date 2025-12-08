@@ -1,5 +1,5 @@
-import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
-import { Link } from "@inngest/components/Link/NewLink";
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
+import { Link } from '@inngest/components/Link/NewLink';
 
 type Props = {
   className?: string;
@@ -40,7 +40,7 @@ export const AppGitCard = ({ className, sync }: Props) => {
       commitHashValue = commitHash.substring(0, 7);
     }
   } else {
-    commitHashValue = "-";
+    commitHashValue = '-';
   }
 
   let commitRefValue;
@@ -59,7 +59,7 @@ export const AppGitCard = ({ className, sync }: Props) => {
       commitRefValue = commitRef;
     }
   } else {
-    commitRefValue = "-";
+    commitRefValue = '-';
   }
 
   let repositoryValue;
@@ -70,7 +70,7 @@ export const AppGitCard = ({ className, sync }: Props) => {
       </Link>
     );
   } else {
-    repositoryValue = "-";
+    repositoryValue = '-';
   }
 
   return (

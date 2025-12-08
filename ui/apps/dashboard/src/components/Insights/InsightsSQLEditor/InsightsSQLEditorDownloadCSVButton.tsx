@@ -1,14 +1,14 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
-import { RiCodeBlock, RiDownloadLine, RiTableView } from "@remixicon/react";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
+import { RiCodeBlock, RiDownloadLine, RiTableView } from '@remixicon/react';
 
-import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
-import { useDownloadInsightsResults } from "./hooks/useDownloadInsightsResults";
+import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useDownloadInsightsResults } from './hooks/useDownloadInsightsResults';
 
 interface InsightsSQLEditorDownloadCSVButtonProps {
   temporarilyHide?: boolean;
@@ -37,7 +37,7 @@ export function InsightsSQLEditorDownloadCSVButton({
     );
   }
 
-  const hasData = status === "success" && data && data.rows.length > 0;
+  const hasData = status === 'success' && data && data.rows.length > 0;
 
   if (!hasData) {
     return (

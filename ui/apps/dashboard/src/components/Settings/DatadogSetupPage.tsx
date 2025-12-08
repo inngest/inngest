@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
-import { IconDatadog } from "@inngest/components/icons/platforms/Datadog";
+import type { ReactNode } from 'react';
+import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 
-import IntegrationNotEnabledMessage from "@/components/Integration/IntegrationNotEnabledMessage";
-import MetricsExportEntitlementBanner from "@/components/Integration/MetricsExportEntitlementsBanner";
+import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
+import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
 
 type Props = {
   title?: string;
@@ -18,7 +18,7 @@ type Props = {
 };
 
 export default function DatadogSetupPage({
-  title = "Datadog",
+  title = 'Datadog',
   subtitle,
   showSubtitleDocsLink = true,
   showEntitlements = false,
@@ -29,7 +29,7 @@ export default function DatadogSetupPage({
 
   if (showSubtitleDocsLink && !subtitle) {
     throw new Error(
-      "programming error: without a subtitle, docs link will not be shown",
+      'programming error: without a subtitle, docs link will not be shown',
     );
   }
 
@@ -65,7 +65,7 @@ export default function DatadogSetupPage({
               metricsEntitlements.metricsExportGranularity.limit
             }
             freshnessSeconds={metricsEntitlements.metricsExportFreshness.limit}
-            className={"mb-12"}
+            className={'mb-12'}
           />
         )}
 

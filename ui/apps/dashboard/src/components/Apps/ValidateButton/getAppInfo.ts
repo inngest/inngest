@@ -1,9 +1,9 @@
-import { useCallback } from "react";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { fetchWithTimeout } from "@/queries/fetch";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { fetchWithTimeout } from '@/queries/fetch';
 
 const query = graphql(`
   query CheckApp($envID: ID!, $url: String!) {
@@ -68,18 +68,18 @@ export function useGetAppInfo() {
         },
         {
           fetch: fetchWithTimeout(5_000),
-          requestPolicy: "network-only",
+          requestPolicy: 'network-only',
         },
       );
       if (res.error) {
-        if (res.error.message.includes("signal is aborted")) {
+        if (res.error.message.includes('signal is aborted')) {
           throw new Error(`Request timed out`);
         }
 
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("No data");
+        throw new Error('No data');
       }
       return res.data.env.appCheck;
     },

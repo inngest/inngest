@@ -1,23 +1,23 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import IntegrationsPage from "@inngest/components/PostgresIntegrations/NewIntegrationPage";
-import { integrationPageContent } from "@inngest/components/PostgresIntegrations/Supabase/newSupabaseContent";
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import IntegrationsPage from '@inngest/components/PostgresIntegrations/NewIntegrationPage';
+import { integrationPageContent } from '@inngest/components/PostgresIntegrations/Supabase/newSupabaseContent';
 
-import { PostgresIntegrations } from "@/queries/server/integrations/db";
-import { deleteConn } from "@/queries/server/integrations/db";
+import { PostgresIntegrations } from '@/queries/server/integrations/db';
+import { deleteConn } from '@/queries/server/integrations/db';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/supabase/",
+  '/_authed/settings/integrations/supabase/',
 )({
   component: SupabasePage,
   loader: async () => {
     const postgresIntegrations = await PostgresIntegrations();
     const conn = postgresIntegrations.find(
-      (connection) => connection.slug === "supabase",
+      (connection) => connection.slug === 'supabase',
     );
 
     if (!conn) {
       throw redirect({
-        to: "/settings/integrations/supabase/connect",
+        to: '/settings/integrations/supabase/connect',
       });
     }
 
@@ -33,10 +33,10 @@ function SupabasePage() {
       await deleteConn({ data: { id } });
       return { success: true, error: null };
     } catch (error) {
-      console.error("Error deleting connection:", error);
+      console.error('Error deleting connection:', error);
       return {
         success: false,
-        error: "Error removing Supabase integration, please try again later.",
+        error: 'Error removing Supabase integration, please try again later.',
       };
     }
   };

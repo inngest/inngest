@@ -1,16 +1,16 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { SplitButton } from "@inngest/components/Button/SplitButton";
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { SplitButton } from '@inngest/components/Button/SplitButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
-import { RiArrowDownSLine } from "@remixicon/react";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
+import { RiArrowDownSLine } from '@remixicon/react';
 
-import type { Environment } from "@/utils/environments";
-import { pathCreator } from "@/utils/urls";
+import type { Environment } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 type BranchEnvironmentActionsProps = {
   branchParent: Environment;

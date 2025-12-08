@@ -1,28 +1,28 @@
-import type { RangeChangeProps } from "@inngest/components/DatePicker/RangePicker";
-import { Error } from "@inngest/components/Error/NewError";
-import EntityFilter from "@inngest/components/Filter/NewEntityFilter";
-import { TimeFilter } from "@inngest/components/Filter/TimeFilter";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
+import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
+import { Error } from '@inngest/components/Error/NewError';
+import EntityFilter from '@inngest/components/Filter/NewEntityFilter';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
-} from "@inngest/components/hooks/useNewSearchParams";
+} from '@inngest/components/hooks/useNewSearchParams';
 import {
   durationToString,
   parseDuration,
   subtractDuration,
   toDate,
   type DurationType,
-} from "@inngest/components/utils/date";
-import { useQuery } from "urql";
+} from '@inngest/components/utils/date';
+import { useQuery } from 'urql';
 
-import { graphql } from "@/gql";
-import { GetAccountEntitlementsDocument, MetricsScope } from "@/gql/graphql";
-import { MetricsOverview } from "./Overview";
-import { MetricsVolume } from "./Volume";
-import { convertLookup } from "./utils";
+import { graphql } from '@/gql';
+import { GetAccountEntitlementsDocument, MetricsScope } from '@/gql/graphql';
+import { MetricsOverview } from './Overview';
+import { MetricsVolume } from './Volume';
+import { convertLookup } from './utils';
 
 export type EntityType = {
   id: string;
@@ -45,22 +45,22 @@ export type MetricsFilters = {
 
 export const DEFAULT_DURATION = { hours: 24 };
 
-const getFrom = (start?: Date, duration?: DurationType | "") =>
+const getFrom = (start?: Date, duration?: DurationType | '') =>
   start || subtractDuration(new Date(), duration ? duration : DEFAULT_DURATION);
 
 const getDefaultRange = (
   start?: Date,
   end?: Date,
-  duration?: DurationType | "",
+  duration?: DurationType | '',
 ) =>
   start && end
     ? {
-        type: "absolute" as const,
+        type: 'absolute' as const,
         start: start,
         end: end,
       }
     : {
-        type: "relative" as const,
+        type: 'relative' as const,
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
@@ -103,12 +103,12 @@ const AccountConcurrencyLookupDocument = graphql(`
 `);
 
 export const Dashboard = ({ envSlug }: { envSlug: string }) => {
-  const [selectedApps, setApps, removeApps] = useStringArraySearchParam("apps");
-  const [selectedFns, setFns, removeFns] = useStringArraySearchParam("fns");
-  const [start] = useSearchParam("start");
-  const [end] = useSearchParam("end");
-  const [duration] = useSearchParam("duration");
-  const [autoRefresh] = useBooleanSearchParam("autoRefresh");
+  const [selectedApps, setApps, removeApps] = useStringArraySearchParam('apps');
+  const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
+  const [start] = useSearchParam('start');
+  const [end] = useSearchParam('end');
+  const [duration] = useSearchParam('duration');
+  const [autoRefresh] = useBooleanSearchParam('autoRefresh');
   const batchUpdate = useBatchedSearchParams();
 
   const parsedDuration = duration && parseDuration(duration);
@@ -154,7 +154,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
 
-  error && console.error("Error fetcthing metrics lookup data", error);
+  error && console.error('Error fetcthing metrics lookup data', error);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -165,12 +165,12 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           onDaysChange={(range: RangeChangeProps) => {
             batchUpdate({
               duration:
-                range.type === "relative"
+                range.type === 'relative'
                   ? durationToString(range.duration)
                   : null,
               start:
-                range.type === "absolute" ? range.start.toISOString() : null,
-              end: range.type === "absolute" ? range.end.toISOString() : null,
+                range.type === 'absolute' ? range.start.toISOString() : null,
+              end: range.type === 'absolute' ? range.end.toISOString() : null,
             });
           }}
         />

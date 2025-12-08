@@ -1,4 +1,4 @@
-const usageDimensions = ["execution", "run", "step"] as const;
+const usageDimensions = ['execution', 'run', 'step'] as const;
 export type UsageDimension = (typeof usageDimensions)[number];
 export function isUsageDimension(
   dimension: string,

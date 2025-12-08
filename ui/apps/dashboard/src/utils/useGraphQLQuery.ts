@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from 'react';
 
 import {
   baseFetchSkipped,
@@ -8,11 +8,11 @@ import {
   baseRefetchFailed,
   baseRefetchLoading,
   type FetchResult,
-} from "@inngest/components/types/fetch";
-import { useQuery, type TypedDocumentNode, type UseQueryArgs } from "urql";
+} from '@inngest/components/types/fetch';
+import { useQuery, type TypedDocumentNode, type UseQueryArgs } from 'urql';
 
-import { skipCacheSearchParam } from "./urls";
-import { useSearch } from "@tanstack/react-router";
+import { skipCacheSearchParam } from './urls';
+import { useSearch } from '@tanstack/react-router';
 
 type Args<
   ResultT extends { [key in string]: unknown },
@@ -20,7 +20,7 @@ type Args<
 > = {
   query: TypedDocumentNode<ResultT, VariablesT>;
   variables: VariablesT;
-  context?: UseQueryArgs<VariablesT, ResultT>["context"];
+  context?: UseQueryArgs<VariablesT, ResultT>['context'];
   pollIntervalInMilliseconds?: number;
 };
 
@@ -91,7 +91,7 @@ export function useSkippableGraphQLQuery<
     variables,
     context,
     pause: skip,
-    requestPolicy: skipCache ? "network-only" : undefined,
+    requestPolicy: skipCache ? 'network-only' : undefined,
   });
 
   if (res.data) {
@@ -106,7 +106,7 @@ export function useSkippableGraphQLQuery<
     }
 
     const timeoutID = setTimeout(
-      () => executeQuery({ requestPolicy: "network-only" }),
+      () => executeQuery({ requestPolicy: 'network-only' }),
       pollIntervalInMilliseconds,
     );
     return () => clearTimeout(timeoutID);
@@ -116,7 +116,7 @@ export function useSkippableGraphQLQuery<
     return () =>
       executeQuery({
         // Ignore cache
-        requestPolicy: "network-only",
+        requestPolicy: 'network-only',
       });
   }, [executeQuery]);
 
@@ -164,7 +164,7 @@ export function useSkippableGraphQLQuery<
     // Should be unreachable.
     return {
       ...baseInitialFetchFailed,
-      error: new Error("finished loading but missing data"),
+      error: new Error('finished loading but missing data'),
       refetch,
     };
   }

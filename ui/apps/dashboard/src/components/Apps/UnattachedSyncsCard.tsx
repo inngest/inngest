@@ -1,10 +1,10 @@
-import { Button } from "@inngest/components/Button/Button";
-import { Card } from "@inngest/components/Card/Card";
-import { Time } from "@inngest/components/Time";
-import { RiLinkUnlinkM } from "@remixicon/react";
+import { Button } from '@inngest/components/Button/Button';
+import { Card } from '@inngest/components/Card/Card';
+import { Time } from '@inngest/components/Time';
+import { RiLinkUnlinkM } from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
+import { pathCreator } from '@/utils/urls';
+import { useNavigate } from '@tanstack/react-router';
 
 type Props = {
   className?: string;

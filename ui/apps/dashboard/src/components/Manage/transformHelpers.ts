@@ -5,7 +5,7 @@ const defaultCommentBlock = `// Rename this webhook to give the events a unique 
 // XXX: our server-side JS AST parser does not like ES6 style functions.
 export const createTransform = ({
   eventName = `"webhook/request.received"`,
-  dataParam = "evt",
+  dataParam = 'evt',
   commentBlock = defaultCommentBlock,
 }): string => {
   return `// transform accepts the incoming JSON payload from your

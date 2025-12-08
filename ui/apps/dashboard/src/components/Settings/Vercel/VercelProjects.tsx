@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card/Card";
-import { Info } from "@inngest/components/Info/Info";
-import { Link } from "@inngest/components/Link/NewLink";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { Select } from "@inngest/components/Select/NewSelect";
-import { RiInformationLine, RiRefreshLine } from "@remixicon/react";
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card/Card';
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link/NewLink';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { Select } from '@inngest/components/Select/NewSelect';
+import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
 
 import {
   VercelDeploymentProtection,
   type VercelIntegration,
-} from "@/gql/graphql";
+} from '@/gql/graphql';
 
 export function VercelProjects({
   integration,
@@ -20,7 +20,7 @@ export function VercelProjects({
   integration: VercelIntegration;
 }) {
   const { projects } = integration;
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState('all');
 
   return (
     <div className="mt-8 flex flex-col">
@@ -37,7 +37,7 @@ export function VercelProjects({
           />
 
           <Select
-            value={{ id: "all", name: "All" }}
+            value={{ id: 'all', name: 'All' }}
             onChange={(o) => setFilter(o.name)}
             label="Show"
             className="text-muted bg-canvasBase ml-4 h-6 rounded-sm text-xs leading-tight"
@@ -48,7 +48,7 @@ export function VercelProjects({
               </span>
             </Select.Button>
             <Select.Options>
-              {["all", "disabled", "enabled"].map((o, i) => {
+              {['all', 'disabled', 'enabled'].map((o, i) => {
                 return (
                   <Select.Option
                     key={`option-${i}`}
@@ -68,9 +68,9 @@ export function VercelProjects({
       </div>
       {projects
         .filter((p) =>
-          filter === "all"
+          filter === 'all'
             ? true
-            : filter === "enabled"
+            : filter === 'enabled'
             ? p.isEnabled
             : !p.isEnabled,
         )
@@ -79,17 +79,17 @@ export function VercelProjects({
             key={`vercel-projects-${i}`}
             className="mt-4"
             accentPosition="left"
-            accentColor={p.isEnabled ? "bg-primary-intense" : "bg-surfaceMuted"}
+            accentColor={p.isEnabled ? 'bg-primary-intense' : 'bg-surfaceMuted'}
           >
             <Card.Content className="h-36 p-6">
               <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-col">
                   <div>
                     <Pill
-                      kind={p.isEnabled ? "primary" : "default"}
+                      kind={p.isEnabled ? 'primary' : 'default'}
                       className="h-6"
                     >
-                      {p.isEnabled ? "enabled" : "disabled"}
+                      {p.isEnabled ? 'enabled' : 'disabled'}
                     </Pill>
                   </div>
                   <div className="mt-4 flex flex-row items-center justify-start gap-1">

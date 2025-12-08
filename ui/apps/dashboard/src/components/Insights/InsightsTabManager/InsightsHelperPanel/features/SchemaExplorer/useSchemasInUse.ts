@@ -1,25 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import useDebounce from "@inngest/components/hooks/useDebounce";
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from 'react';
+import useDebounce from '@inngest/components/hooks/useDebounce';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import { useInsightsStateMachineContext } from "../../../../InsightsStateMachineContext/InsightsStateMachineContext";
-import { buildEntryFromLatestSchema } from "./SchemasContext/queries";
-import type { SchemaEntry, SchemaEvent } from "./SchemasContext/types";
-import { useEventTypeSchemas } from "./SchemasContext/useEventTypeSchemas";
-import { makeTitleOnlyEntry } from "./SchemasContext/utils";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { useInsightsStateMachineContext } from '../../../../InsightsStateMachineContext/InsightsStateMachineContext';
+import { buildEntryFromLatestSchema } from './SchemasContext/queries';
+import type { SchemaEntry, SchemaEvent } from './SchemasContext/types';
+import { useEventTypeSchemas } from './SchemasContext/useEventTypeSchemas';
+import { makeTitleOnlyEntry } from './SchemasContext/utils';
 
 export function useSchemasInUse(): { schemasInUse: SchemaEntry[] } {
   const { possibleEventNames } = useDetectPossibleEvents();
   const env = useEnvironment();
-  const isSchemaWidgetEnabled = useBooleanFlag("insights-schema-widget");
+  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
   const getEventTypeSchemas = useEventTypeSchemas();
 
   const results = useQueries({
     queries: possibleEventNames.map((name) => ({
       enabled: isSchemaWidgetEnabled.value,
-      queryKey: ["schema-explorer-event-type-in-use", env.id, { name }],
+      queryKey: ['schema-explorer-event-type-in-use', env.id, { name }],
       queryFn: () => getEventTypeSchemas({ cursor: null, nameSearch: name }),
       refetchOnMount: false,
       refetchOnReconnect: false,

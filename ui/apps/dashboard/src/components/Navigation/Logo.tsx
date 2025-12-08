@@ -1,9 +1,9 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
-import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
-import { RiContractLeftLine, RiContractRightLine } from "@remixicon/react";
-import { QuickSearch } from "./QuickSearch/QuickSearch";
-import { Link } from "@tanstack/react-router";
+import { Button } from '@inngest/components/Button/NewButton';
+import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
+import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
+import { QuickSearch } from './QuickSearch/QuickSearch';
+import { Link } from '@tanstack/react-router';
 
 type LogoProps = {
   collapsed: boolean;
@@ -23,11 +23,11 @@ const NavToggle = ({
     const toggled = !collapsed;
     setCollapsed(toggled);
 
-    if (typeof window !== "undefined") {
-      window.cookieStore.set("navCollapsed", toggled ? "true" : "false");
+    if (typeof window !== 'undefined') {
+      window.cookieStore.set('navCollapsed', toggled ? 'true' : 'false');
       //
       // some downstream things, like charts, may need to redraw themselves
-      setTimeout(() => window.dispatchEvent(new Event("navToggle")), 200);
+      setTimeout(() => window.dispatchEvent(new Event('navToggle')), 200);
     }
   };
 
@@ -37,7 +37,7 @@ const NavToggle = ({
       appearance="ghost"
       size="small"
       onClick={toggle}
-      className={"hidden group-hover:block"}
+      className={'hidden group-hover:block'}
       icon={
         collapsed ? (
           <RiContractRightLine className="text-muted h-5 w-5" />
@@ -58,12 +58,12 @@ export default function Logo({
   return (
     <div
       className={`${
-        collapsed ? "mx-auto" : "mx-4"
+        collapsed ? 'mx-auto' : 'mx-4'
       } mt-4 flex h-[28px] flex-row items-center justify-between`}
     >
       <div
         className={`flex flex-row items-center justify-start ${
-          collapsed ? "" : "mr-1"
+          collapsed ? '' : 'mr-1'
         } `}
       >
         {collapsed ? (

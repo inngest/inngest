@@ -1,13 +1,13 @@
-import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
-import { createFileRoute } from "@tanstack/react-router";
+import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { Sync } from "@/components/Apps/Syncs/Sync";
-import { SyncList } from "@/components/Apps/Syncs/SyncList";
-import { useSyncs } from "@/components/Apps/useSyncs";
-import { useEnvironment } from "@/components/Environments/environment-context";
+import { Sync } from '@/components/Apps/Syncs/Sync';
+import { SyncList } from '@/components/Apps/Syncs/SyncList';
+import { useSyncs } from '@/components/Apps/useSyncs';
+import { useEnvironment } from '@/components/Environments/environment-context';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/apps/$externalID/syncs/",
+  '/_authed/env/$envSlug/apps/$externalID/syncs/',
 )({
   component: SyncsPage,
 });
@@ -15,7 +15,7 @@ export const Route = createFileRoute(
 function SyncsPage() {
   const { externalID } = Route.useParams();
   const env = useEnvironment();
-  const [selectedSyncID, setSelectedSyncID] = useSearchParam("sync-id");
+  const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');
 
   const syncsRes = useSyncs({
     envID: env.id,

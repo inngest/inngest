@@ -1,9 +1,9 @@
-import colors from "tailwindcss/colors";
-import { useQuery } from "urql";
+import colors from 'tailwindcss/colors';
+import { useQuery } from 'urql';
 
-import SimpleLineChart from "@/components/Charts/SimpleLineChart";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import SimpleLineChart from '@/components/Charts/SimpleLineChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const GetSDKReqMetricsDocument = graphql(`
   query GetSDKRequestMetrics(
@@ -101,9 +101,9 @@ export default function SDKRequestThroughputChart({
       desc="The number of requests to your SDKs over time running the function and steps, including retries."
       data={metrics}
       legend={[
-        { name: "Queued", dataKey: "queued", color: colors.slate["500"] },
-        { name: "Started", dataKey: "started", color: colors.sky["500"] },
-        { name: "Ended", dataKey: "ended", color: colors.teal["500"] },
+        { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingMetrics}
       error={metricsError}

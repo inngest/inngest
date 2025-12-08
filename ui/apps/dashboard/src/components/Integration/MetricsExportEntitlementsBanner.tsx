@@ -1,12 +1,12 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   RiArrowRightUpLine,
   RiHistoryLine,
   RiTimer2Line,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { entitlementSecondsToStr } from "@/utils/entitlementTimeFmt";
-import { pathCreator } from "@/utils/urls";
+import { entitlementSecondsToStr } from '@/utils/entitlementTimeFmt';
+import { pathCreator } from '@/utils/urls';
 
 type Props = {
   granularitySeconds: number;
@@ -24,19 +24,19 @@ export default function MetricsExportEntitlementBanner({
       <div
         className={`border-subtle p-3 pt-2 ${className}`}
         style={{
-          borderWidth: "1px",
-          borderRadius: "4px",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
+          borderWidth: '1px',
+          borderRadius: '4px',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
         }}
       >
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: "1",
-            gap: "0.3rem",
+            display: 'flex',
+            flexDirection: 'column',
+            flex: '1',
+            gap: '0.3rem',
           }}
         >
           <div>
@@ -46,37 +46,37 @@ export default function MetricsExportEntitlementBanner({
           </div>
           <div
             style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: "0.3rem",
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '0.3rem',
             }}
           >
             <span className="text-light inline-block">
               <RiTimer2Line
                 className="h-4 w-4"
-                style={{ marginTop: "0.24rem" }}
+                style={{ marginTop: '0.24rem' }}
               />
             </span>
             <span className="text-muted inline-block">Granularity</span>
             <span
               className="inline-block font-medium"
-              style={{ marginLeft: "0.5rem" }}
+              style={{ marginLeft: '0.5rem' }}
             >
               {entitlementSecondsToStr(granularitySeconds)}
             </span>
             <span
               className="text-light inline-block"
-              style={{ marginLeft: "2.5rem" }}
+              style={{ marginLeft: '2.5rem' }}
             >
               <RiHistoryLine
                 className="h-4 w-4"
-                style={{ marginTop: "0.24rem" }}
+                style={{ marginTop: '0.24rem' }}
               />
             </span>
             <span className="text-muted inline-block">Delay</span>
             <span
               className="inline-block font-medium"
-              style={{ marginLeft: "0.5rem" }}
+              style={{ marginLeft: '0.5rem' }}
             >
               {entitlementSecondsToStr(freshnessSeconds)}
             </span>
@@ -94,8 +94,8 @@ export default function MetricsExportEntitlementBanner({
             }
             className="text-sm"
             href={pathCreator.billing({
-              tab: "plans",
-              ref: "metrics-export-entitlements-banner",
+              tab: 'plans',
+              ref: 'metrics-export-entitlements-banner',
             })}
           />
         </div>

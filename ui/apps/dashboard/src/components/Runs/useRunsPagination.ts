@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Run } from "@inngest/components/RunsPage/types";
-import { useQuery } from "urql";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Run } from '@inngest/components/RunsPage/types';
+import { useQuery } from 'urql';
 
-import { GetRunsDocument } from "./queries";
-import { parseRunsData } from "./utils";
+import { GetRunsDocument } from './queries';
+import { parseRunsData } from './utils';
 
 type UseRunsPaginationParams = {
   commonQueryVars: {
@@ -28,7 +28,7 @@ export function useRunsPagination({
 
   const [queryRes, refetch] = useQuery({
     query: GetRunsDocument,
-    requestPolicy: "network-only",
+    requestPolicy: 'network-only',
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,

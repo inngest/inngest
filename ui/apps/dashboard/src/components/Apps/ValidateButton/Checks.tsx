@@ -1,7 +1,7 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Alert } from '@inngest/components/Alert/NewAlert';
 
-import { SdkMode, SecretCheck, type AppCheckResult } from "@/gql/graphql";
-import { isAppInfoMissingData } from "./utils";
+import { SdkMode, SecretCheck, type AppCheckResult } from '@/gql/graphql';
+import { isAppInfoMissingData } from './utils';
 
 type Props = {
   appInfo: AppCheckResult;
@@ -63,18 +63,18 @@ export function Checks({ appInfo }: Props) {
       {issues
         .sort(({ result }) => {
           // Sort by severity
-          if (result.severity === "critical") {
+          if (result.severity === 'critical') {
             return -1;
           }
-          if (result.severity === "error") {
+          if (result.severity === 'error') {
             return 0;
           }
           return 1;
         })
         .map(({ id, result }) => {
-          let severity: React.ComponentProps<typeof Alert>["severity"];
-          if (result.severity === "critical") {
-            severity = "error";
+          let severity: React.ComponentProps<typeof Alert>['severity'];
+          if (result.severity === 'critical') {
+            severity = 'error';
           } else {
             severity = result.severity;
           }
@@ -91,7 +91,7 @@ export function Checks({ appInfo }: Props) {
 
 type CheckResult = {
   message: string;
-  severity: "critical" | "error" | "warning";
+  severity: 'critical' | 'error' | 'warning';
 };
 
 const checks: Record<
@@ -104,13 +104,13 @@ const checks: Record<
     }
 
     if (
-      !["https://api.inngest.com", "https://api.inngest.com/"].includes(
+      !['https://api.inngest.com', 'https://api.inngest.com/'].includes(
         appInfo.apiOrigin.value,
       )
     ) {
       return {
         message: `Non-standard API origin: ${appInfo.apiOrigin.value}`,
-        severity: "error",
+        severity: 'error',
       };
     }
   },
@@ -118,8 +118,8 @@ const checks: Record<
     if (appInfo.authenticationSucceeded?.value === false) {
       return {
         message:
-          "Authentication failed. Your SDK may be using the wrong signing key",
-        severity: "error",
+          'Authentication failed. Your SDK may be using the wrong signing key',
+        severity: 'error',
       };
     }
   },
@@ -129,28 +129,28 @@ const checks: Record<
     }
 
     if (
-      !["https://inn.gs", "https://inn.gs/"].includes(
+      !['https://inn.gs', 'https://inn.gs/'].includes(
         appInfo.eventAPIOrigin.value,
       )
     ) {
       return {
         message: `Non-standard event API origin: ${appInfo.eventAPIOrigin.value}`,
-        severity: "error",
+        severity: 'error',
       };
     }
   },
   eventKey: (appInfo) => {
     if (appInfo.eventKeyStatus === SecretCheck.Incorrect) {
       return {
-        message: "Event key is incorrect",
-        severity: "error",
+        message: 'Event key is incorrect',
+        severity: 'error',
       };
     }
 
     if (appInfo.eventKeyStatus === SecretCheck.Missing) {
       return {
-        message: "No event key",
-        severity: "warning",
+        message: 'No event key',
+        severity: 'warning',
       };
     }
   },
@@ -161,8 +161,8 @@ const checks: Record<
 
     if (!appInfo.isSDK) {
       return {
-        message: "Response did not come from an Inngest SDK",
-        severity: "error",
+        message: 'Response did not come from an Inngest SDK',
+        severity: 'error',
       };
     }
   },
@@ -174,22 +174,22 @@ const checks: Record<
     if (appInfo.mode !== SdkMode.Cloud) {
       return {
         message: `Not in Cloud mode`,
-        severity: "error",
+        severity: 'error',
       };
     }
   },
   signingKey: (appInfo) => {
     if (appInfo.signingKeyStatus === SecretCheck.Incorrect) {
       return {
-        message: "Signing key is incorrect",
-        severity: "error",
+        message: 'Signing key is incorrect',
+        severity: 'error',
       };
     }
 
     if (appInfo.signingKeyStatus === SecretCheck.Missing) {
       return {
-        message: "No signing key",
-        severity: "error",
+        message: 'No signing key',
+        severity: 'error',
       };
     }
   },

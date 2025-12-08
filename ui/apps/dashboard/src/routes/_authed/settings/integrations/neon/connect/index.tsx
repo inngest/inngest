@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import ConnectPage from "@inngest/components/PostgresIntegrations/NewConnectPage";
-import { neonConnectContent } from "@inngest/components/PostgresIntegrations/Neon/newNeonContent";
-import { STEPS_ORDER } from "@inngest/components/PostgresIntegrations/newTypes";
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import ConnectPage from '@inngest/components/PostgresIntegrations/NewConnectPage';
+import { neonConnectContent } from '@inngest/components/PostgresIntegrations/Neon/newNeonContent';
+import { STEPS_ORDER } from '@inngest/components/PostgresIntegrations/newTypes';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/neon/connect/",
+  '/_authed/settings/integrations/neon/connect/',
 )({
   component: NeonConnect,
 });
@@ -18,7 +18,7 @@ function NeonConnect() {
       content={neonConnectContent}
       onStartInstallation={() => {
         navigate({
-          to: "/settings/integrations/neon/$step",
+          to: '/settings/integrations/neon/$step',
           params: { step: firstStep },
         });
       }}

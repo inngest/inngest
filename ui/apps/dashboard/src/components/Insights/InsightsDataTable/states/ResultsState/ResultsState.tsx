@@ -1,6 +1,6 @@
-import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
-import { NoResults } from "./NoResults";
-import { ResultsTable } from "./ResultsTable";
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import { NoResults } from './NoResults';
+import { ResultsTable } from './ResultsTable';
 
 export function ResultsState() {
   const { data } = useInsightsStateMachineContext();

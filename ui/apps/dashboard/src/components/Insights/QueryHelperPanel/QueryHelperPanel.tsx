@@ -1,10 +1,10 @@
-import { useMemo } from "react";
-import { RiAddCircleFill, RiBookReadLine } from "@remixicon/react";
+import { useMemo } from 'react';
+import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
-import { useTabManagerActions } from "@/components/Insights/InsightsTabManager/TabManagerContext";
-import type { InsightsQueryStatement } from "@/gql/graphql";
-import { QueryHelperPanelCollapsibleSection } from "./QueryHelperPanelCollapsibleSection";
-import { useStoredQueries } from "./StoredQueriesContext";
+import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
+import type { InsightsQueryStatement } from '@/gql/graphql';
+import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
+import { useStoredQueries } from './StoredQueriesContext';
 
 interface QueryHelperPanelProps {
   activeSavedQueryId?: string;
@@ -18,11 +18,11 @@ export function QueryHelperPanel({
     useStoredQueries();
 
   const sharedQueries = useMemo(
-    () => limitQueriesByType("shared", queries),
+    () => limitQueriesByType('shared', queries),
     [queries],
   );
   const savedQueries = useMemo(
-    () => limitQueriesByType("saved", queries),
+    () => limitQueriesByType('saved', queries),
     [queries],
   );
 
@@ -88,13 +88,13 @@ type QueriesResponse = {
 };
 
 function limitQueriesByType(
-  type: "shared" | "saved",
+  type: 'shared' | 'saved',
   queries: QueriesResponse,
 ) {
   return {
     ...queries,
     data: queries.data?.filter((query) =>
-      type === "shared" ? query.shared : !query.shared,
+      type === 'shared' ? query.shared : !query.shared,
     ),
   };
 }

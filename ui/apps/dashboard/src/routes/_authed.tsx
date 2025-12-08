@@ -1,12 +1,12 @@
-import { fetchClerkAuth, jwtAuth } from "@/lib/auth";
-import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
+import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
-import Layout from "@/components/Layout/Layout";
-import { navCollapsed } from "@/lib/nav";
-import { getEnvironment } from "@/queries/server/getEnvironment";
-import { getProfileDisplay } from "@/queries/server/profile";
+import Layout from '@/components/Layout/Layout';
+import { navCollapsed } from '@/lib/nav';
+import { getEnvironment } from '@/queries/server/getEnvironment';
+import { getProfileDisplay } from '@/queries/server/profile';
 
-export const Route = createFileRoute("/_authed")({
+export const Route = createFileRoute('/_authed')({
   component: Authed,
   beforeLoad: async ({ location }) => {
     const isJWTAuth = await jwtAuth();
@@ -33,13 +33,13 @@ export const Route = createFileRoute("/_authed")({
       : undefined;
 
     if (params.envSlug && !env) {
-      throw notFound({ data: { error: "Environment not found" } });
+      throw notFound({ data: { error: 'Environment not found' } });
     }
 
     const profile = await getProfileDisplay();
 
     if (!profile) {
-      throw notFound({ data: { error: "Profile not found" } });
+      throw notFound({ data: { error: 'Profile not found' } });
     }
 
     return {

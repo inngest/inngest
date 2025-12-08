@@ -1,9 +1,9 @@
-import { useCallback } from "react";
-import type { Trigger } from "@inngest/components/TriggerDetails/NewTriggerDetails";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import type { Trigger } from '@inngest/components/TriggerDetails/NewTriggerDetails';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const query = graphql(`
   query GetRunTraceTrigger($envID: ID!, $runID: String!) {
@@ -33,20 +33,20 @@ export function useGetTrigger(): (runID: string) => Promise<Trigger> {
           .query(
             query,
             { envID: envID, runID },
-            { requestPolicy: "network-only" },
+            { requestPolicy: 'network-only' },
           )
           .toPromise();
       } catch (e) {
         if (e instanceof Error) {
           throw e;
         }
-        throw new Error("unknown error");
+        throw new Error('unknown error');
       }
       if (res.error) {
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
       return res.data.workspace.runTrigger;
     },

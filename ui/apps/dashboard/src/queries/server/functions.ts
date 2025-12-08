@@ -1,13 +1,13 @@
-import { type InvokeFunctionOnboardingMutationVariables } from "@/gql/graphql";
-import { getProductionEnvironment } from "@/queries/server/getEnvironment";
+import { type InvokeFunctionOnboardingMutationVariables } from '@/gql/graphql';
+import { getProductionEnvironment } from '@/queries/server/getEnvironment';
 import {
   getInvokeFunctionLookups,
   invokeFn,
   preloadInvokeFunctionLookups,
-} from "@/components/Onboarding/data";
-import { createServerFn } from "@tanstack/react-start";
+} from '@/components/Onboarding/data';
+import { createServerFn } from '@tanstack/react-start';
 
-export const invokeFunction = createServerFn({ method: "POST" })
+export const invokeFunction = createServerFn({ method: 'POST' })
   .inputValidator(
     (data: {
       functionSlug: string;
@@ -27,7 +27,7 @@ export const invokeFunction = createServerFn({ method: "POST" })
         success: true,
       };
     } catch (error) {
-      console.error("Error invoking function:", error);
+      console.error('Error invoking function:', error);
 
       if (error instanceof Error) {
         return {
@@ -38,12 +38,12 @@ export const invokeFunction = createServerFn({ method: "POST" })
 
       return {
         success: false,
-        error: "Unknown error occurred while invoking function",
+        error: 'Unknown error occurred while invoking function',
       };
     }
   });
 
-export const prefetchFunctions = createServerFn({ method: "GET" }).handler(
+export const prefetchFunctions = createServerFn({ method: 'GET' }).handler(
   async () => {
     const environment = await getProductionEnvironment();
 

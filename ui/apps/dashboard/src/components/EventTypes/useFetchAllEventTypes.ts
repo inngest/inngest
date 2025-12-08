@@ -1,6 +1,6 @@
-import { useCallback } from "react";
+import { useCallback } from 'react';
 
-import { useEventTypes } from "./useEventTypes";
+import { useEventTypes } from './useEventTypes';
 
 /**
  * Hook to fetch all event types with pagination support

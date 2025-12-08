@@ -1,13 +1,13 @@
-import { useMemo } from "react";
-import { Error } from "@inngest/components/Error/NewError";
+import { useMemo } from 'react';
+import { Error } from '@inngest/components/Error/NewError';
 import {
   Tooltip as CustomTooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip";
-import { cn } from "@inngest/components/utils/classNames";
-import { minuteTime } from "@inngest/components/utils/date";
-import { RiInformationLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
+import { minuteTime } from '@inngest/components/utils/date';
+import { RiInformationLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
@@ -17,9 +17,9 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+} from 'recharts';
 
-import LoadingIcon from "@/components/Icons/LoadingIcon";
+import LoadingIcon from '@/components/Icons/LoadingIcon';
 
 type BarChartProps = {
   className?: string;
@@ -78,7 +78,7 @@ function CustomizedYAxisTick(props: AxisProps) {
 }
 
 export default function StackedBarChart({
-  className = "",
+  className = '',
   height = 200,
   title,
   desc,
@@ -98,7 +98,7 @@ export default function StackedBarChart({
   return (
     <div
       className={cn(
-        "border-subtle bg-canvasBase border-b px-6 py-4",
+        'border-subtle bg-canvasBase border-b px-6 py-4',
         className,
       )}
     >
@@ -161,7 +161,7 @@ export default function StackedBarChart({
               />
               <YAxis
                 allowDecimals={false}
-                domain={[0, "auto"]}
+                domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
@@ -190,17 +190,17 @@ export default function StackedBarChart({
                               style={{ backgroundColor: l?.color || p.color }}
                             ></span>
                             {p.value?.toLocaleString(undefined, {
-                              notation: "compact",
-                              compactDisplay: "short",
-                            })}{" "}
+                              notation: 'compact',
+                              compactDisplay: 'short',
+                            })}{' '}
                             {l?.name || p.name}
                           </div>
                         );
-                      }) || ""}
+                      }) || ''}
                     </div>
                   );
                 }}
-                wrapperStyle={{ outline: "none" }}
+                wrapperStyle={{ outline: 'none' }}
                 cursor={false}
               />
 

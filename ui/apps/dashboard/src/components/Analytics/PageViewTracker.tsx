@@ -1,6 +1,6 @@
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-import { useLocation, useMatches, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
+import { useLocation, useMatches, useSearch } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 
 declare global {
   interface Window {
@@ -18,7 +18,7 @@ export const useRouteSegments = () => {
   if (!last) {
     return [];
   }
-  return last.id.split("/").filter(Boolean);
+  return last.id.split('/').filter(Boolean);
 };
 
 export default function PageViewTracker() {
@@ -43,10 +43,10 @@ export default function PageViewTracker() {
 
       // NOTE - This may fire before the entire view loads
       window.inngest.send({
-        name: "app/page.viewed",
+        name: 'app/page.viewed',
         data: {
           routeSegments,
-          ref: "ref" in search ? search.ref : null,
+          ref: 'ref' in search ? search.ref : null,
         },
         user: {
           external_id: user.externalId,
@@ -60,7 +60,7 @@ export default function PageViewTracker() {
           }x${window.screen.height * window.devicePixelRatio}`,
           screen_size: `${window.screen.width}x${window.screen.height}`,
         },
-        v: "2023-05-11.1",
+        v: '2023-05-11.1',
       });
     },
     [
@@ -86,8 +86,8 @@ export default function PageViewTracker() {
         options.host = eventApiHost;
       }
       if (!eventKey) {
-        if (import.meta.env.MODE !== "production") {
-          console.warn("Set VITE_INNGEST_EVENT_KEY to track page views");
+        if (import.meta.env.MODE !== 'production') {
+          console.warn('Set VITE_INNGEST_EVENT_KEY to track page views');
         }
         return;
       }
@@ -96,8 +96,8 @@ export default function PageViewTracker() {
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/@inngest/browser/inngest.min.js";
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/@inngest/browser/inngest.min.js';
     script.async = true;
 
     script.onload = () => {
@@ -109,8 +109,8 @@ export default function PageViewTracker() {
         options.host = eventApiHost;
       }
       if (!eventKey) {
-        if (import.meta.env.MODE !== "production") {
-          console.warn("Set VITE_INNGEST_EVENT_KEY to track page views");
+        if (import.meta.env.MODE !== 'production') {
+          console.warn('Set VITE_INNGEST_EVENT_KEY to track page views');
         }
         return;
       }

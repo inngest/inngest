@@ -1,12 +1,12 @@
-import { Suspense } from "react";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
+import { Suspense } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 
-import type { Environment as EnvType } from "@/utils/environments";
-import Environments from "./Environments";
-import KeysMenu from "./KeysMenu";
-import Manage from "./Manage";
-import Monitor from "./Monitor";
-import type { FileRouteTypes } from "@tanstack/react-router";
+import type { Environment as EnvType } from '@/utils/environments';
+import Environments from './Environments';
+import KeysMenu from './KeysMenu';
+import Manage from './Manage';
+import Monitor from './Monitor';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type NavProps = {
   collapsed: boolean;
@@ -15,14 +15,14 @@ export type NavProps = {
 };
 
 export const getNavRoute = (activeEnv: EnvType, link: string) =>
-  `/env/${activeEnv.slug}/${link}` as FileRouteTypes["to"];
+  `/env/${activeEnv.slug}/${link}` as FileRouteTypes['to'];
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (
     <div className={`text-basis mx-4 mt-4 flex h-full flex-col`}>
       <div
         className={`flex ${
-          collapsed ? "flex-col" : "flex-row"
+          collapsed ? 'flex-col' : 'flex-row'
         } w-full justify-between gap-x-1 gap-y-2`}
       >
         <Suspense fallback={<Skeleton className={`h-8 w-full`} />}>

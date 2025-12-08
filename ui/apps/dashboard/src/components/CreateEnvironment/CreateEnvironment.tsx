@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { Link } from "@inngest/components/Link/NewLink";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { Link } from '@inngest/components/Link/NewLink';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const CreateEnvironmentDocument = graphql(`
   mutation CreateEnvironment($name: String!) {
@@ -20,14 +20,14 @@ export const CreateEnvironment = () => {
   const navigate = useNavigate();
   const [, createEnvironment] = useMutation(CreateEnvironmentDocument);
   const [isDisabled, setDisabled] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDisabled(true);
 
     const form = new FormData(event.currentTarget);
-    const name = form.get("name") as string | null;
+    const name = form.get('name') as string | null;
     if (!name) {
       return;
     }
@@ -36,11 +36,11 @@ export const CreateEnvironment = () => {
     setDisabled(false);
     if (result.error) {
       toast.error(`Failed to create new environment`);
-      setError("Failed to create a new environment");
+      setError('Failed to create a new environment');
       return;
     }
     toast.success(`Created new environment`);
-    navigate({ to: "/env" });
+    navigate({ to: '/env' });
   };
 
   return (

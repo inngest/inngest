@@ -1,36 +1,36 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { ClientOnly, useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card/Card";
-import { InlineCode } from "@inngest/components/Code";
-import CommandBlock from "@inngest/components/CodeBlock/NewCommandBlock";
-import { Link } from "@inngest/components/Link/NewLink";
-import { IconSpinner } from "@inngest/components/icons/Spinner";
-import { useDevServer } from "@inngest/components/utils/useDevServer";
-import { RiCheckboxCircleFill, RiExternalLinkLine } from "@remixicon/react";
+import { ClientOnly, useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card/Card';
+import { InlineCode } from '@inngest/components/Code';
+import CommandBlock from '@inngest/components/CodeBlock/NewCommandBlock';
+import { Link } from '@inngest/components/Link/NewLink';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { useDevServer } from '@inngest/components/utils/useDevServer';
+import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import { OnboardingSteps } from "./types";
-import useOnboardingStep from "./useOnboardingStep";
-import { useOnboardingTracking } from "./useOnboardingTracking";
-import { getNextStepName } from "./utils";
+import { pathCreator } from '@/utils/urls';
+import { OnboardingSteps } from './types';
+import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { getNextStepName } from './utils';
 
 const tabs = [
   {
-    title: "npm",
-    content: "npx inngest-cli@latest dev",
-    language: "shell",
+    title: 'npm',
+    content: 'npx inngest-cli@latest dev',
+    language: 'shell',
   },
   {
-    title: "yarn",
-    content: "yarn dlx inngest-cli@latest dev",
-    language: "shell",
+    title: 'yarn',
+    content: 'yarn dlx inngest-cli@latest dev',
+    language: 'shell',
   },
   {
-    title: "pnpm",
-    content: "pnpm dlx inngest-cli@latest dev",
-    language: "shell",
+    title: 'pnpm',
+    content: 'pnpm dlx inngest-cli@latest dev',
+    language: 'shell',
   },
 ];
 
@@ -38,7 +38,7 @@ export default function CreateApp() {
   const currentStepName = OnboardingSteps.CreateApp;
   const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
-  const [activeTab, setActiveTab] = useState(tabs[0]?.title || "");
+  const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
   const currentTabContent =
     tabs.find((tab) => tab.title === activeTab) || tabs[0];
   const navigate = useNavigate();
@@ -54,7 +54,7 @@ export default function CreateApp() {
       </p>
       <p className="mb-6 text-sm">
         The Dev Server will guide you through setup and help you build and test
-        functions end to end.{" "}
+        functions end to end.{' '}
         <Link
           className="inline-block"
           size="small"
@@ -94,7 +94,7 @@ export default function CreateApp() {
               )}
             </div>
             <p className="text-sm">
-              Open the Dev Server at{" "}
+              Open the Dev Server at{' '}
               <InlineCode>http://localhost:8288</InlineCode> and follow the
               guide to create your app.
             </p>
@@ -110,7 +110,7 @@ export default function CreateApp() {
               rel="noopener noreferrer"
               onClick={() =>
                 tracking?.trackOnboardingAction(currentStepName, {
-                  metadata: { type: "btn-click", label: "open-dev-server" },
+                  metadata: { type: 'btn-click', label: 'open-dev-server' },
                 })
               }
             />
@@ -129,11 +129,11 @@ export default function CreateApp() {
           onClick={() => {
             updateCompletedSteps(currentStepName, {
               metadata: {
-                completionSource: "manual",
+                completionSource: 'manual',
               },
             });
             tracking?.trackOnboardingAction(currentStepName, {
-              metadata: { type: "btn-click", label: "next" },
+              metadata: { type: 'btn-click', label: 'next' },
             });
             navigate({
               to: pathCreator.onboardingSteps({ step: nextStepName }),
@@ -146,11 +146,11 @@ export default function CreateApp() {
           onClick={() => {
             updateCompletedSteps(currentStepName, {
               metadata: {
-                completionSource: "manual",
+                completionSource: 'manual',
               },
             });
             tracking?.trackOnboardingAction(currentStepName, {
-              metadata: { type: "btn-click", label: "skip" },
+              metadata: { type: 'btn-click', label: 'skip' },
             });
             navigate({
               to: pathCreator.onboardingSteps({ step: nextStepName }),

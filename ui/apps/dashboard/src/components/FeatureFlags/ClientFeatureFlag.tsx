@@ -1,4 +1,4 @@
-import { useBooleanFlag } from "./hooks";
+import { useBooleanFlag } from './hooks';
 
 type Props = {
   children: React.ReactNode;

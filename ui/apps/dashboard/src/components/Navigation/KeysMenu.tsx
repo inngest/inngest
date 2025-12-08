@@ -1,10 +1,10 @@
-import { Listbox } from "@headlessui/react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { RiKey2Line } from "@remixicon/react";
+import { Listbox } from '@headlessui/react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { RiKey2Line } from '@remixicon/react';
 
-import type { Environment as EnvType } from "@/utils/environments";
-import { Link } from "@tanstack/react-router";
-import { pathCreator } from "@/utils/urls";
+import type { Environment as EnvType } from '@/utils/environments';
+import { Link } from '@tanstack/react-router';
+import { pathCreator } from '@/utils/urls';
 
 export default function KeysMenu({
   activeEnv,
@@ -18,7 +18,7 @@ export default function KeysMenu({
       <Listbox.Button as="div" className="group">
         <Button
           kind="secondary"
-          appearance={collapsed ? "ghost" : "outlined"}
+          appearance={collapsed ? 'ghost' : 'outlined'}
           size="medium"
           icon={<RiKey2Line className="fill-subtle w-[18px]" />}
           className="group-data-[headlessui-state=open]:border-primary-moderate"

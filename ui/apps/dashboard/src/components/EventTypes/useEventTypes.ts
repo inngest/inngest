@@ -1,10 +1,10 @@
-import { useCallback } from "react";
-import { getTimestampDaysAgo } from "@inngest/components/utils/date";
-import { useQuery } from "@tanstack/react-query";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { useQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 // prettier-ignore
 const query = graphql(`
@@ -60,7 +60,7 @@ export function useEventTypes() {
             cursor,
             nameSearch,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -69,13 +69,13 @@ export function useEventTypes() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventTypesData = result.data.environment.eventTypesV2;
       const events = eventTypesData.edges.map(({ node }) => ({
         name: node.name,
-        latestSchema: "",
+        latestSchema: '',
         functions: node.functions.edges.map((f) => f.node),
         archived,
       }));
@@ -131,7 +131,7 @@ export function useEventTypeVolume() {
             startTime,
             endTime,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -140,7 +140,7 @@ export function useEventTypeVolume() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventType = result.data.environment.eventType;
@@ -187,7 +187,7 @@ export function useEventType({ eventName }: { eventName: string }) {
   const client = useClient();
 
   return useQuery({
-    queryKey: ["event-type", envID, eventName],
+    queryKey: ['event-type', envID, eventName],
     queryFn: async () => {
       const result = await client
         .query(eventTypeQuery, { envID, eventName })
@@ -232,7 +232,7 @@ export function useAllEventTypes() {
 
   return useCallback(async () => {
     const result = await client
-      .query(allEventTypesQuery, { envID }, { requestPolicy: "network-only" })
+      .query(allEventTypesQuery, { envID }, { requestPolicy: 'network-only' })
       .toPromise();
 
     if (result.error) {
@@ -240,14 +240,14 @@ export function useAllEventTypes() {
     }
 
     if (!result.data) {
-      throw new Error("no data returned");
+      throw new Error('no data returned');
     }
 
     const eventsData = result.data.environment.eventTypesV2;
     const events = eventsData.edges.map(({ node }) => ({
       id: node.name,
       name: node.name,
-      latestSchema: "",
+      latestSchema: '',
     }));
 
     return events;

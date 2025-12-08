@@ -1,9 +1,9 @@
-import { Pill } from "@inngest/components/Pill/NewPill";
+import { Pill } from '@inngest/components/Pill/NewPill';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
+} from '@inngest/components/Tooltip/Tooltip';
 
 const ROW_LIMIT = 1000;
 
@@ -16,10 +16,10 @@ export function InsightsSQLEditorResultsTitle({
 }: InsightsSQLEditorResultsTitleProps) {
   const historyText = historyWindow
     ? `${historyWindow} days`
-    : "specified by plan";
+    : 'specified by plan';
   const tooltipText = historyWindow
     ? `Based on your plan, results are limited to the past ${historyWindow} days.`
-    : "Historical data availability is specified by your plan.";
+    : 'Historical data availability is specified by your plan.';
 
   return (
     <div className="mr-1 flex items-center gap-2">

@@ -1,12 +1,12 @@
-import { Link } from "@inngest/components/Link/NewLink";
-import { Pill, PillContent } from "@inngest/components/Pill/NewPill";
-import { HorizontalPillList } from "@inngest/components/Pill/NewHorizontalPillList";
-import { methodTypes, type AppKind } from "@inngest/components/types/app";
-import { RiExternalLinkLine } from "@remixicon/react";
+import { Link } from '@inngest/components/Link/NewLink';
+import { Pill, PillContent } from '@inngest/components/Pill/NewPill';
+import { HorizontalPillList } from '@inngest/components/Pill/NewHorizontalPillList';
+import { methodTypes, type AppKind } from '@inngest/components/types/app';
+import { RiExternalLinkLine } from '@remixicon/react';
 
-import { syncKind, syncStatusText } from "@/components/Apps/SyncStatusPill";
-import { pathCreator } from "@/utils/urls";
-import type { FlattenedApp } from "./useApps";
+import { syncKind, syncStatusText } from '@/components/Apps/SyncStatusPill';
+import { pathCreator } from '@/utils/urls';
+import type { FlattenedApp } from './useApps';
 
 const getAppCardContent = ({
   app,
@@ -15,25 +15,25 @@ const getAppCardContent = ({
   app: FlattenedApp;
   envSlug: string;
 }) => {
-  const statusKey = app.status ?? "default";
+  const statusKey = app.status ?? 'default';
   const appKind: AppKind = app.isArchived
-    ? "default"
+    ? 'default'
     : // API apps don't currently have sync status, consider them green for now
     app.method === methodTypes.Api
-    ? "primary"
-    : syncKind[statusKey] ?? "default";
+    ? 'primary'
+    : syncKind[statusKey] ?? 'default';
 
   const status = app.isArchived
-    ? "Archived"
+    ? 'Archived'
     : syncStatusText[statusKey] ?? null;
 
   const footerHeaderTitle = app.error ? (
     `Error: ${app.error}`
   ) : app.functionCount === 0 ? (
-    "There are currently no functions registered at this URL."
+    'There are currently no functions registered at this URL.'
   ) : (
     <>
-      {app.functionCount} {app.functionCount === 1 ? "function" : "functions"}{" "}
+      {app.functionCount} {app.functionCount === 1 ? 'function' : 'functions'}{' '}
       found
     </>
   );
@@ -90,7 +90,7 @@ const getAppCardContent = ({
                           <Pill
                             appearance="outlined"
                             to={
-                              trigger.type === "EVENT"
+                              trigger.type === 'EVENT'
                                 ? pathCreator.eventType({
                                     envSlug,
                                     eventName: trigger.value,

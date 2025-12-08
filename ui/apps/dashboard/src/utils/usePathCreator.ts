@@ -1,8 +1,8 @@
-import { useMemo } from "react";
-import type { PathCreator } from "@inngest/components/SharedContext/usePathCreator";
+import { useMemo } from 'react';
+import type { PathCreator } from '@inngest/components/SharedContext/usePathCreator';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { pathCreator as internalPathCreator } from "@/utils/urls";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { pathCreator as internalPathCreator } from '@/utils/urls';
 
 export const usePathCreator = () => {
   const env = useEnvironment();

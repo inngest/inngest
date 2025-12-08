@@ -1,9 +1,9 @@
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { Header } from '@inngest/components/Header/NewHeader';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { pathCreator } from "@/utils/urls";
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps/sync-new")({
+export const Route = createFileRoute('/_authed/env/$envSlug/apps/sync-new')({
   component: SyncNewLayout,
 });
 
@@ -14,8 +14,8 @@ function SyncNewLayout() {
     <>
       <Header
         breadcrumb={[
-          { text: "Apps", href: pathCreator.apps({ envSlug }) },
-          { text: "Sync new" },
+          { text: 'Apps', href: pathCreator.apps({ envSlug }) },
+          { text: 'Sync new' },
         ]}
       />
       <Outlet />

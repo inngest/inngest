@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import CounterInput from "@inngest/components/Forms/CounterInput";
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import CounterInput from '@inngest/components/Forms/CounterInput';
 
 export default function EntitlementListItemSelfServiceNumeric({
   entitlement,
@@ -21,7 +21,7 @@ export default function EntitlementListItemSelfServiceNumeric({
   onSubmit?: (quantity: number, cost: number) => void;
 }) {
   if (!onSubmit || !onCancel) {
-    throw new Error("onSubmit and onCancel are required");
+    throw new Error('onSubmit and onCancel are required');
   }
 
   const startingInputValue = Math.max(

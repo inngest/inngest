@@ -1,7 +1,7 @@
-import { useId, useRef, useState } from "react";
-import { cn } from "@inngest/components/utils/classNames";
+import { useId, useRef, useState } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 
-import SyntaxHighlighter from "@/components/Textarea/SyntaxHighlighter";
+import SyntaxHighlighter from '@/components/Textarea/SyntaxHighlighter';
 
 type CodeEditorProps = {
   language: string;
@@ -15,7 +15,7 @@ type CodeEditorProps = {
 
 export default function CodeEditor({
   language,
-  initialCode = "",
+  initialCode = '',
   onCodeChange,
   label,
   name,
@@ -41,14 +41,14 @@ export default function CodeEditor({
   }
 
   const textAreaID = useId();
-  const numberOfLines = (readOnly ? initialCode : code).split("\n").length;
+  const numberOfLines = (readOnly ? initialCode : code).split('\n').length;
   const numberOfLinesArray = Array.from(
     { length: numberOfLines },
     (_, i) => i + 1,
   );
 
   return (
-    <div className={cn("flex min-h-[200px] font-mono", className)}>
+    <div className={cn('flex min-h-[200px] font-mono', className)}>
       <label className="hidden" htmlFor={textAreaID}>
         {label ?? name}
       </label>

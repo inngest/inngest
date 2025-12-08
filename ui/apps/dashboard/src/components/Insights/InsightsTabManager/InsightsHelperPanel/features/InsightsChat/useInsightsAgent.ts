@@ -3,9 +3,9 @@ import {
   type AgentKitEvent,
   type UseAgentsConfig,
   type UseAgentsReturn,
-} from "@inngest/use-agent";
+} from '@inngest/use-agent';
 
-import type { ToolManifest } from "@/lib/inngest/functions/agents/types";
+import type { ToolManifest } from '@/lib/inngest/functions/agents/types';
 
 export type ClientState = {
   sqlQuery: string;
@@ -13,7 +13,7 @@ export type ClientState = {
   schemas: Record<string, unknown> | null;
   currentQuery: string;
   tabTitle: string;
-  mode: "insights_sql_playground";
+  mode: 'insights_sql_playground';
   timestamp: number;
 };
 

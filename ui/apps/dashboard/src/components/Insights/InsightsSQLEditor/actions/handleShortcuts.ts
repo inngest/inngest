@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import type { SQLEditorMountCallback } from "@inngest/components/SQLEditor/SQLEditor";
+import { useEffect, useRef } from 'react';
+import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
 type EditorInstance = Parameters<SQLEditorMountCallback>[0];
-type MonacoKeyEvent = Parameters<Parameters<EditorInstance["onKeyDown"]>[0]>[0];
+type MonacoKeyEvent = Parameters<Parameters<EditorInstance['onKeyDown']>[0]>[0];
 
 type ModKeyState = {
   altKey?: boolean;
@@ -18,7 +18,7 @@ type NormalizedKeyEvent = ModKeyState & {
 
 type DomKeyCombo = {
   alt?: boolean;
-  code: KeyboardEvent["code"];
+  code: KeyboardEvent['code'];
   keyCode?: never; // ensure mutual exclusivity at the type level
   metaOrCtrl?: boolean;
   shift?: boolean;
@@ -64,12 +64,12 @@ function findMatchingHandler(
   for (const { combo, handler } of bindings) {
     if (!modsMatch(ev, combo)) continue;
 
-    if ("code" in combo) {
+    if ('code' in combo) {
       if (ev.code !== combo.code) continue;
       return handler;
     }
 
-    if ("keyCode" in combo) {
+    if ('keyCode' in combo) {
       if (ev.keyCode !== combo.keyCode) continue;
       return handler;
     }
@@ -101,8 +101,8 @@ export function useDocumentShortcuts(bindings: ReadonlyArray<ShortcutBinding>) {
       if (handler !== undefined) return doAction(e, handler);
     }
 
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
 
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 }

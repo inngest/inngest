@@ -1,1 +1,1 @@
-export { Secret } from "./Secret";
+export { Secret } from './Secret';

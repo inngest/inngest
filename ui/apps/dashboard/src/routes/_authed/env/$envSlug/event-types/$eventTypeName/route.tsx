@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { useState } from 'react';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { ActionsMenu } from "@/components/Events/ActionsMenu";
-import ArchiveEventModal from "@/components/Events/ArchiveEventModal";
-import SendEventButton from "@/components/Events/SendEventButton";
-import { pathCreator } from "@/utils/urls";
+import { ActionsMenu } from '@/components/Events/ActionsMenu';
+import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
+import SendEventButton from '@/components/Events/SendEventButton';
+import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/event-types/$eventTypeName",
+  '/_authed/env/$envSlug/event-types/$eventTypeName',
 )({
   component: EventTypeLayout,
 });
@@ -22,7 +22,7 @@ function EventTypeLayout() {
     <>
       <Header
         breadcrumb={[
-          { text: "Event types", href: pathCreator.eventTypes({ envSlug }) },
+          { text: 'Event types', href: pathCreator.eventTypes({ envSlug }) },
           {
             text: eventName,
             href: pathCreator.eventType({ envSlug, eventName }),
@@ -31,11 +31,11 @@ function EventTypeLayout() {
         tabs={[
           {
             href: pathCreator.eventType({ envSlug, eventName }),
-            children: "Dashboard",
+            children: 'Dashboard',
             exactRouteMatch: true,
           },
           {
-            children: "Events",
+            children: 'Events',
             href: pathCreator.eventTypeEvents({ envSlug, eventName }),
           },
         ]}

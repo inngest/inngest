@@ -1,6 +1,6 @@
-import { isStringArray } from "@inngest/components/utils/array";
+import { isStringArray } from '@inngest/components/utils/array';
 
-import type { AppCheckResult } from "@/gql/graphql";
+import type { AppCheckResult } from '@/gql/graphql';
 
 type Props = {
   data: AppCheckResult;
@@ -29,7 +29,7 @@ export function HTTPInfo({ data }: Props) {
             return (
               <tr className="border-subtle text-basis border-b text-sm" key={k}>
                 <td className="px-3 py-1.5">{k}</td>
-                <td className="py-1.5">{v.join(", ")}</td>
+                <td className="py-1.5">{v.join(', ')}</td>
               </tr>
             );
           })}

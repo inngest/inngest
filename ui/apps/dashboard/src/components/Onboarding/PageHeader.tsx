@@ -1,9 +1,9 @@
-import { useNavigate } from "@tanstack/react-router";
-import StepsPageHeader from "@inngest/components/Steps/StepsPageHeader";
+import { useNavigate } from '@tanstack/react-router';
+import StepsPageHeader from '@inngest/components/Steps/StepsPageHeader';
 
-import { onboardingMenuStepContent } from "@/components/Onboarding/content";
-import { isValidStep, steps } from "@/components/Onboarding/types";
-import { pathCreator } from "@/utils/urls";
+import { onboardingMenuStepContent } from '@/components/Onboarding/content';
+import { isValidStep, steps } from '@/components/Onboarding/types';
+import { pathCreator } from '@/utils/urls';
 
 export default function PageHeader({ stepName }: { stepName: string }) {
   const navigate = useNavigate();

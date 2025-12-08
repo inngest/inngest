@@ -5,50 +5,50 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";
+} from 'react';
 
-import { Resizable } from "@inngest/components/Resizable/Resizable";
+import { Resizable } from '@inngest/components/Resizable/Resizable';
 import {
   AgentProvider,
   createInMemorySessionTransport,
-} from "@inngest/use-agent";
-import { ulid } from "ulid";
-import { v4 as uuidv4 } from "uuid";
+} from '@inngest/use-agent';
+import { ulid } from 'ulid';
+import { v4 as uuidv4 } from 'uuid';
 
-import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import { InsightsStateMachineContextProvider } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type {
   QuerySnapshot,
   QueryTemplate,
   Tab,
-} from "@/components/Insights/types";
-import type { InsightsQueryStatement } from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
-import { isQuerySnapshot, isQueryTemplate } from "../queries";
-import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from "../temp-flags";
-import { InsightsHelperPanel } from "./InsightsHelperPanel/InsightsHelperPanel";
+} from '@/components/Insights/types';
+import type { InsightsQueryStatement } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { isQuerySnapshot, isQueryTemplate } from '../queries';
+import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
+import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
 import {
   InsightsHelperPanelControl,
   type HelperItem,
-} from "./InsightsHelperPanel/InsightsHelperPanelControl";
-import { InsightsHelperPanelIcon } from "./InsightsHelperPanel/InsightsHelperPanelIcon";
+} from './InsightsHelperPanel/InsightsHelperPanelControl';
+import { InsightsHelperPanelIcon } from './InsightsHelperPanel/InsightsHelperPanelIcon';
 import {
   DOCUMENTATION,
   INSIGHTS_AI,
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from "./InsightsHelperPanel/constants";
+} from './InsightsHelperPanel/constants';
 import {
   InsightsChatProvider,
   useInsightsChatProvider,
-} from "./InsightsHelperPanel/features/InsightsChat/InsightsChatProvider";
-import { InsightsTabPanel } from "./InsightsTabPanel";
-import { InsightsTabsList } from "./InsightsTabsList";
-import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from "./constants";
-import { useUser } from "@clerk/tanstack-react-start";
+} from './InsightsHelperPanel/features/InsightsChat/InsightsChatProvider';
+import { InsightsTabPanel } from './InsightsTabPanel';
+import { InsightsTabsList } from './InsightsTabsList';
+import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
+import { useUser } from '@clerk/tanstack-react-start';
 
-const TABS_STORAGE_KEY = "insights-tabs-state";
+const TABS_STORAGE_KEY = 'insights-tabs-state';
 
 interface TabsStorageState {
   tabs: Tab[];
@@ -57,7 +57,7 @@ interface TabsStorageState {
 
 function getStoredTabs(): TabsStorageState | null {
   // Skip during SSR - localStorage only exists in browser
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   try {
     const stored = localStorage.getItem(TABS_STORAGE_KEY);
     if (!stored) return null;
@@ -69,7 +69,7 @@ function getStoredTabs(): TabsStorageState | null {
 
 function saveTabsToStorage(tabs: Tab[], activeTabId: string) {
   // Skip during SSR - localStorage only exists in browser
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(
       TABS_STORAGE_KEY,
@@ -87,7 +87,7 @@ export interface TabManagerActions {
   ) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
-  updateTab: (id: string, patch: Partial<Omit<Tab, "id">>) => void;
+  updateTab: (id: string, patch: Partial<Omit<Tab, 'id'>>) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -109,8 +109,8 @@ export function useInsightsTabManager(
   const [isMounted, setIsMounted] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
-  const isInsightsAgentEnabled = useBooleanFlag("insights-agent");
-  const isSchemaWidgetEnabled = useBooleanFlag("insights-schema-widget");
+  const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
+  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
   // Load from localStorage after mount (avoids hydration mismatch)
   useEffect(() => {
@@ -229,7 +229,7 @@ export function useInsightsTabManager(
           setActiveTabId(TEMPLATES_TAB.id);
         }
       },
-      updateTab: (id: string, tab: Partial<Omit<Tab, "id">>) => {
+      updateTab: (id: string, tab: Partial<Omit<Tab, 'id'>>) => {
         setTabs((prevTabs) =>
           prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)),
         );
@@ -341,7 +341,7 @@ function InsightsTabManagerInternal({
       title: SUPPORT,
       icon: <InsightsHelperPanelIcon title={SUPPORT} />,
       action: noOp,
-      href: pathCreator.support({ ref: "app-insights" }),
+      href: pathCreator.support({ ref: 'app-insights' }),
     });
 
     return items;
@@ -369,8 +369,8 @@ function InsightsTabManagerInternal({
           <div
             className={
               tab.id === activeTabId
-                ? "h-full w-full"
-                : "h-0 w-full overflow-hidden"
+                ? 'h-full w-full'
+                : 'h-0 w-full overflow-hidden'
             }
           >
             <div className="flex h-full w-full">
@@ -511,7 +511,7 @@ export function hasUnsavedChanges(
   }
 
   // For new queries, check if there's any content different from blank state
-  return tab.name !== UNTITLED_QUERY || tab.query !== "";
+  return tab.name !== UNTITLED_QUERY || tab.query !== '';
 }
 
 /**
@@ -527,7 +527,7 @@ export function getIsSavedQuery(tab: Tab): boolean {
 }
 
 function makeEmptyUnsavedTab(): Tab {
-  return { id: ulid(), name: UNTITLED_QUERY, query: "" };
+  return { id: ulid(), name: UNTITLED_QUERY, query: '' };
 }
 
 function ActiveThreadBridge({

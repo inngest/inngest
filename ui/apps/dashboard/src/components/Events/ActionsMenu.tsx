@@ -1,6 +1,6 @@
-import { Listbox } from "@headlessui/react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { RiArchive2Line, RiMore2Line } from "@remixicon/react";
+import { Listbox } from '@headlessui/react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { RiArchive2Line, RiMore2Line } from '@remixicon/react';
 
 export type EventActions = {
   archive: () => void;
@@ -29,7 +29,7 @@ export const ActionsMenu = ({ archive }: EventActions) => {
               size="medium"
               icon={<RiArchive2Line className="h-4 w-4" />}
               iconSide="left"
-              label={"Archive event"}
+              label={'Archive event'}
               className="m-0 w-full justify-start"
               onClick={archive}
             />

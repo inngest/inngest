@@ -1,16 +1,16 @@
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { AppsIcon } from "@inngest/components/icons/sections/Apps";
-import { EventLogsIcon } from "@inngest/components/icons/sections/EventLogs";
-import { EventsIcon } from "@inngest/components/icons/sections/Events";
-import { FunctionsIcon } from "@inngest/components/icons/sections/Functions";
-import { RunsIcon } from "@inngest/components/icons/sections/Runs";
-import { RiQuestionMark } from "@remixicon/react";
-import { useNavigate } from "@tanstack/react-router";
-import { Command } from "cmdk";
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { RiQuestionMark } from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
+import { Command } from 'cmdk';
 
 type Props = {
   isDifferentEnv?: boolean;
-  kind?: "app" | "event" | "eventType" | "function" | "run";
+  kind?: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
   path?: string;
   text: string;
@@ -56,19 +56,19 @@ export function ResultItem({
   );
 }
 
-function getKindDetails(kind: Props["kind"]) {
+function getKindDetails(kind: Props['kind']) {
   switch (kind) {
-    case "app":
-      return { name: "App", icon: <AppsIcon /> };
-    case "event":
-      return { name: "Event", icon: <EventsIcon /> };
-    case "eventType":
-      return { name: "Event Type", icon: <EventLogsIcon /> };
-    case "function":
-      return { name: "Function", icon: <FunctionsIcon /> };
-    case "run":
-      return { name: "Run", icon: <RunsIcon /> };
+    case 'app':
+      return { name: 'App', icon: <AppsIcon /> };
+    case 'event':
+      return { name: 'Event', icon: <EventsIcon /> };
+    case 'eventType':
+      return { name: 'Event Type', icon: <EventLogsIcon /> };
+    case 'function':
+      return { name: 'Function', icon: <FunctionsIcon /> };
+    case 'run':
+      return { name: 'Run', icon: <RunsIcon /> };
     default:
-      return { name: "Unknown", icon: <RiQuestionMark /> };
+      return { name: 'Unknown', icon: <RiQuestionMark /> };
   }
 }

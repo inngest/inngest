@@ -1,10 +1,10 @@
-import { InlineCode } from "@inngest/components/Code";
-import { RiInformationLine } from "@remixicon/react";
-import { useState } from "react";
+import { InlineCode } from '@inngest/components/Code';
+import { RiInformationLine } from '@remixicon/react';
+import { useState } from 'react';
 
-import EnvSelectMenu from "@/components/Environments/EnvSelectMenu";
-import { type Environment } from "@/utils/environments";
-import { CodeBlock } from "@inngest/components/CodeBlock/NewCodeBlock";
+import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
+import { type Environment } from '@/utils/environments';
+import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
 
 type Props = {
   metricsGranularitySeconds: number;
@@ -16,7 +16,7 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
     selectedEnv,
     metricsGranularitySeconds,
   );
-  const envName = selectedEnv ? selectedEnv.name : "";
+  const envName = selectedEnv ? selectedEnv.name : '';
 
   return (
     <>
@@ -28,7 +28,7 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
         <div className="border-subtle ml-3 border-l">
           <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['1']">
             <div className="text-basis mb-4 text-base">
-              Select an environment to view its Prometheus{" "}
+              Select an environment to view its Prometheus{' '}
               <InlineCode>scrape_config</InlineCode>.
             </div>
             <EnvSelectMenu onSelect={setSelectedEnv} />
@@ -38,7 +38,7 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
         <div className="ml-3">
           <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-5 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['2']">
             <div className="text-basis mb-2 text-base">
-              Add this item to the <InlineCode>scrape_configs</InlineCode>{" "}
+              Add this item to the <InlineCode>scrape_configs</InlineCode>{' '}
               section of your Prometheus configuration.
             </div>
             <div className="text-muted mb-4 text-base">
@@ -51,7 +51,7 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
               tab={{
                 content: scrapeConfigContent,
                 readOnly: true,
-                language: "yaml",
+                language: 'yaml',
               }}
             />
           </div>
@@ -66,11 +66,11 @@ function scrapeConfigTmpl(
   metricsGranularitySeconds: number,
 ) {
   if (!env) {
-    return "# add to your Prometheus scrape_configs:";
+    return '# add to your Prometheus scrape_configs:';
   }
 
   const scrapeInterval =
-    Math.max(30, metricsGranularitySeconds / 5).toFixed(0) + "s";
+    Math.max(30, metricsGranularitySeconds / 5).toFixed(0) + 's';
 
   return `# add to your Prometheus scrape_configs:
   - job_name: 'inngest-${env.slug}'

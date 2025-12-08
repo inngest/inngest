@@ -1,22 +1,22 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card/Card";
-import { formatDayString } from "@inngest/components/utils/date";
-import { createFileRoute } from "@tanstack/react-router";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card/Card';
+import { formatDayString } from '@inngest/components/utils/date';
+import { createFileRoute } from '@tanstack/react-router';
 
-import EntitlementListItem from "@/components/Billing/Addons/EntitlementListItem";
-import BillingInformation from "@/components/Billing/BillingDetails/BillingInformation";
-import PaymentMethod from "@/components/Billing/BillingDetails/PaymentMethod";
-import { isHobbyFreePlan } from "@/components/Billing/Plans/utils";
-import { ClientFeatureFlag } from "@/components/FeatureFlags/ClientFeatureFlag";
+import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
+import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
+import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
+import { isHobbyFreePlan } from '@/components/Billing/Plans/utils';
+import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
-} from "@/queries/server/billing";
-import { pathCreator } from "@/utils/urls";
+} from '@/queries/server/billing';
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/billing/")({
+export const Route = createFileRoute('/_authed/billing/')({
   component: BillingComponent,
   ssr: true,
   loader: async () => {
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_authed/billing/")({
     const billing = await getBillingDetails();
 
     if (!currentPlan) {
-      throw new Error("Failed to fetch current plan");
+      throw new Error('Failed to fetch current plan');
     }
 
     return {
@@ -63,7 +63,7 @@ function BillingComponent() {
 
   const nextInvoiceAmount = currentPlan.amount
     ? `$${(currentPlan.amount / 100).toFixed(2)}`
-    : "Free";
+    : 'Free';
   const overageAllowed =
     (entitlements.runCount.overageAllowed ||
       entitlements.stepCount.overageAllowed) &&
@@ -94,8 +94,8 @@ function BillingComponent() {
                 kind="secondary"
                 label="Upgrade plan"
                 href={pathCreator.billing({
-                  tab: "plans",
-                  ref: "app-billing-page-overview",
+                  tab: 'plans',
+                  ref: 'app-billing-page-overview',
                 })}
               />
             }
@@ -113,8 +113,8 @@ function BillingComponent() {
                 kind="secondary"
                 label="Upgrade plan"
                 href={pathCreator.billing({
-                  tab: "plans",
-                  ref: "app-billing-page-overview",
+                  tab: 'plans',
+                  ref: 'app-billing-page-overview',
                 })}
               />
             }
@@ -131,8 +131,8 @@ function BillingComponent() {
               appearance="ghost"
               label="Change plan"
               href={pathCreator.billing({
-                tab: "plans",
-                ref: "app-billing-page-overview",
+                tab: 'plans',
+                ref: 'app-billing-page-overview',
               })}
             />
           </div>
@@ -169,7 +169,7 @@ function BillingComponent() {
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
                 displayValue: `${entitlements.history.limit} day${
-                  entitlements.history.limit === 1 ? "" : "s"
+                  entitlements.history.limit === 1 ? '' : 's'
                 }`,
               }}
               addon={advancedObservabilityAddon}
@@ -187,8 +187,8 @@ function BillingComponent() {
                 entitlements.metricsExportGranularity.limit / 60
               } minute${
                 entitlements.metricsExportGranularity.limit / 60 === 1
-                  ? ""
-                  : "s"
+                  ? ''
+                  : 's'
               }`,
             }}
             addon={advancedObservabilityAddon}
@@ -204,7 +204,7 @@ function BillingComponent() {
               displayValue: `${
                 entitlements.metricsExportFreshness.limit / 60
               } minute${
-                entitlements.metricsExportFreshness.limit / 60 === 1 ? "" : "s"
+                entitlements.metricsExportFreshness.limit / 60 === 1 ? '' : 's'
               }`,
             }}
             addon={advancedObservabilityAddon}
@@ -222,8 +222,8 @@ function BillingComponent() {
               entitlement={{
                 currentValue: entitlements.slackChannel.enabled,
                 displayValue: entitlements.slackChannel.enabled
-                  ? "Enabled"
-                  : "Not enabled",
+                  ? 'Enabled'
+                  : 'Not enabled',
               }}
               addon={{
                 ...addons.slackChannel,
@@ -254,8 +254,8 @@ function BillingComponent() {
             entitlement={{
               currentValue: entitlements.hipaa.enabled,
               displayValue: entitlements.hipaa.enabled
-                ? "Enabled"
-                : "Not enabled",
+                ? 'Enabled'
+                : 'Not enabled',
             }}
           />
           <EntitlementListItem
@@ -272,7 +272,7 @@ function BillingComponent() {
             <Button
               appearance="outlined"
               label="Chat with a product expert"
-              href={pathCreator.support({ ref: "app-billing-overview" })}
+              href={pathCreator.support({ ref: 'app-billing-overview' })}
             />
           </div>
         </Card.Content>

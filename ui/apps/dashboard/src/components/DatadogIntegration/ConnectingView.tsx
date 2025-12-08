@@ -1,5 +1,5 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { IconSpinner } from "@inngest/components/icons/Spinner";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 type Props = {
   errorMessage?: string;
@@ -10,7 +10,7 @@ export default function SetupPage({ errorMessage }: Props) {
     if (
       errorMessage
         .toLowerCase()
-        .includes("api key with this name already exists")
+        .includes('api key with this name already exists')
     ) {
       return (
         <Alert severity="warning" className="text-base">
@@ -34,7 +34,7 @@ export default function SetupPage({ errorMessage }: Props) {
         Connection failed.
         <Alert.Link severity="error" target="_blank" href="/support">
           Please contact Inngest support if this error persists.
-        </Alert.Link>{" "}
+        </Alert.Link>{' '}
         <br />
         <code>{errorMessage}</code>
       </Alert>

@@ -1,6 +1,6 @@
-import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
-import { cn } from "@inngest/components/utils/classNames";
+import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { cn } from '@inngest/components/utils/classNames';
 
 type QueryHelperPanelSectionItemRowProps = {
   icon: ReactNode;
@@ -38,14 +38,14 @@ export const QueryHelperPanelSectionItemRow = forwardRef<
       <div
         ref={ref}
         className={cn(
-          "text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors",
-          isActive ? "bg-canvasSubtle" : "hover:bg-canvasSubtle",
+          'text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors',
+          isActive ? 'bg-canvasSubtle' : 'hover:bg-canvasSubtle',
         )}
         onClick={onClick}
         onContextMenu={onContextMenu}
       >
         {icon}
-        <OptionalTooltip side="right" tooltip={isTruncated ? text : ""}>
+        <OptionalTooltip side="right" tooltip={isTruncated ? text : ''}>
           <span
             ref={textRef}
             className="flex-1 overflow-hidden truncate text-ellipsis whitespace-nowrap"
@@ -58,4 +58,4 @@ export const QueryHelperPanelSectionItemRow = forwardRef<
   },
 );
 
-QueryHelperPanelSectionItemRow.displayName = "QueryHelperPanelSectionItemRow";
+QueryHelperPanelSectionItemRow.displayName = 'QueryHelperPanelSectionItemRow';

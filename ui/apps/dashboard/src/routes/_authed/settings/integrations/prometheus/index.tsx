@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
 
-import SetupPage from "@/components/PrometheusIntegration/SetupPage";
-import { MetricsEntitlements } from "@/queries/server/entitlements";
+import SetupPage from '@/components/PrometheusIntegration/SetupPage';
+import { MetricsEntitlements } from '@/queries/server/entitlements';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/prometheus/",
+  '/_authed/settings/integrations/prometheus/',
 )({
   component: PrometheusPage,
   loader: async () => {

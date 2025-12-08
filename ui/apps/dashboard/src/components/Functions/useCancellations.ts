@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useClient } from "urql";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const query = graphql(`
   query GetFnCancellations($after: String, $envSlug: String!, $fnSlug: String!) {
@@ -52,14 +52,14 @@ export function useCancellations({
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("No data");
+        throw new Error('No data');
       }
 
       if (!res.data.env) {
-        throw new Error("environment not found");
+        throw new Error('environment not found');
       }
       if (!res.data.env.fn) {
-        throw new Error("function not found");
+        throw new Error('function not found');
       }
 
       setHasNextPage(res.data.env.fn.cancellations.pageInfo.hasNextPage);
@@ -70,7 +70,7 @@ export function useCancellations({
   );
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
-    queryKey: ["runs"],
+    queryKey: ['runs'],
     queryFn,
     refetchInterval: 2500,
     initialPageParam: null,

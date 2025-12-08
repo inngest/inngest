@@ -1,22 +1,22 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card/Card";
-import { Checkbox } from "@inngest/components/Checkbox/Checkbox";
-import { Input } from "@inngest/components/Forms/Input";
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card/Card';
+import { Checkbox } from '@inngest/components/Checkbox/Checkbox';
+import { Input } from '@inngest/components/Forms/Input';
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
   RiCloseLine,
   RiInformationLine,
-} from "@remixicon/react";
-import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { useLocalStorage } from "react-use";
+} from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
+import { useState } from 'react';
+import { useLocalStorage } from 'react-use';
 
-import { OnboardingSteps } from "@/components/Onboarding/types";
-import useOnboardingStep from "@/components/Onboarding/useOnboardingStep";
-import type { VercelIntegration } from "@/queries/server/integrations/vercel";
-import useUpdateVercelIntegration from "./useUpdateVercelIntegration";
-import { ONBOARDING_VERCEL_NEXT_URL } from "@/components/Onboarding/utils";
+import { OnboardingSteps } from '@/components/Onboarding/types';
+import useOnboardingStep from '@/components/Onboarding/useOnboardingStep';
+import type { VercelIntegration } from '@/queries/server/integrations/vercel';
+import useUpdateVercelIntegration from './useUpdateVercelIntegration';
+import { ONBOARDING_VERCEL_NEXT_URL } from '@/components/Onboarding/utils';
 
 const PAGE_SIZE = 4;
 
@@ -42,7 +42,7 @@ export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
   const [custom, setCustom] = useState<string[]>([]);
   const { updateCompletedSteps } = useOnboardingStep();
   const [installingVercelFromOnboarding, setInstallingVercelFromOnboarding] =
-    useLocalStorage("installingVercelFromOnboarding", false);
+    useLocalStorage('installingVercelFromOnboarding', false);
 
   const updateVercelIntegration = useUpdateVercelIntegration(integrations);
 
@@ -73,13 +73,13 @@ export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
     setSaving(false);
     updateCompletedSteps(OnboardingSteps.DeployApp, {
       metadata: {
-        completionSource: "automatic",
-        hostingProvider: "vercel",
+        completionSource: 'automatic',
+        hostingProvider: 'vercel',
       },
     });
 
     navigate({
-      to: "/integrations/vercel/callback/success",
+      to: '/integrations/vercel/callback/success',
       search: {
         onSuccessRedirectURL: installingVercelFromOnboarding
           ? ONBOARDING_VERCEL_NEXT_URL
@@ -108,7 +108,7 @@ export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
             <div
               key={`project-list-${i}`}
               className={`flex h-[72px] flex-row items-center justify-between ${
-                i !== end && "border-b"
+                i !== end && 'border-b'
               } border-subtle group px-6`}
             >
               <div className="flex flex-row items-center justify-start">
@@ -163,7 +163,7 @@ export const Connect = ({ searchParams, integrations }: VercelConnectProps) => {
               {[...Array(pages)].map((_, i) => (
                 <Button
                   key={`page-${i}`}
-                  appearance={page === i + 1 ? "solid" : "ghost"}
+                  appearance={page === i + 1 ? 'solid' : 'ghost'}
                   disabled={page === i + 1}
                   label={i + 1}
                   onClick={() => setPage(i + 1)}

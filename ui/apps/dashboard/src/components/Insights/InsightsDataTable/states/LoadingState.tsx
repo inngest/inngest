@@ -1,6 +1,6 @@
-import { memo } from "react";
-import { Table } from "@inngest/components/Table";
-import { type ColumnDef } from "@tanstack/react-table";
+import { memo } from 'react';
+import { Table } from '@inngest/components/Table';
+import { type ColumnDef } from '@tanstack/react-table';
 
 type LoadingRowData = {
   col1?: unknown;
@@ -9,9 +9,9 @@ type LoadingRowData = {
 };
 
 const LOADING_COLUMNS: ColumnDef<LoadingRowData, unknown>[] = [
-  { id: "col1", header: undefined, accessorKey: "col1" },
-  { id: "col2", header: undefined, accessorKey: "col2" },
-  { id: "col3", header: undefined, accessorKey: "col3" },
+  { id: 'col1', header: undefined, accessorKey: 'col1' },
+  { id: 'col2', header: undefined, accessorKey: 'col2' },
+  { id: 'col3', header: undefined, accessorKey: 'col3' },
 ];
 
 // This component will freeze the UI if it's not memoized and

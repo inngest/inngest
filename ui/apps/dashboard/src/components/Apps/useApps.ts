@@ -1,21 +1,21 @@
-import { methodTypes } from "@inngest/components/types/app";
-import type { Function } from "@inngest/components/types/function";
+import { methodTypes } from '@inngest/components/types/app';
+import type { Function } from '@inngest/components/types/function';
 import {
   transformFramework,
   transformLanguage,
   transformPlatform,
-} from "@inngest/components/utils/appsParser";
-import { useQuery } from "@tanstack/react-query";
-import { useClient } from "urql";
+} from '@inngest/components/utils/appsParser';
+import { useQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
-import { graphql } from "@/gql";
-import { type AppsQuery } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import { type AppsQuery } from '@/gql/graphql';
 
 export type FlattenedApp = Omit<
-  AppsQuery["environment"]["apps"][number],
-  "latestSync" | "functions"
+  AppsQuery['environment']['apps'][number],
+  'latestSync' | 'functions'
 > & {
-  __typename?: "App";
+  __typename?: 'App';
   lastSyncedAt?: Date;
   error?: string | null;
   framework?: string | null;
@@ -73,13 +73,13 @@ export function useApps({
   const client = useClient();
 
   return useQuery({
-    queryKey: ["apps", envID, isArchived],
+    queryKey: ['apps', envID, isArchived],
     queryFn: async () => {
       const result = await client
         .query(
           query,
           { envID, filter: { archived: isArchived } },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -93,7 +93,7 @@ export function useApps({
           .map(({ latestSync, functions, ...app }) => {
             const latestSyncData: Omit<
               FlattenedApp,
-              keyof typeof app | "functions"
+              keyof typeof app | 'functions'
             > = latestSync
               ? {
                   lastSyncedAt: new Date(latestSync.lastSyncedAt),
@@ -131,7 +131,7 @@ export function useApps({
                 ...fn,
                 triggers: fn.triggers,
               })),
-              __typename: "App" as const,
+              __typename: 'App' as const,
             };
           })
           .filter((app) => app.lastSyncedAt || app.method === methodTypes.Api);

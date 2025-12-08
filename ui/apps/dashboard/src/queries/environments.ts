@@ -1,18 +1,18 @@
-import { useMemo } from "react";
-import { useQuery, type UseQueryResponse } from "urql";
+import { useMemo } from 'react';
+import { useQuery, type UseQueryResponse } from 'urql';
 
-import { graphql } from "@/gql";
-import type { Workspace } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import type { Workspace } from '@/gql/graphql';
 import {
   workspaceToEnvironment,
   workspacesToEnvironments,
   type Environment,
-} from "@/utils/environments";
+} from '@/utils/environments';
 
 export function useDefaultEnvironment(): UseQueryResponse<Environment> {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
     query: GetDefaultEnvironmentDocument,
-    requestPolicy: "cache-first",
+    requestPolicy: 'cache-first',
   });
 
   const environment = useMemo(() => {
@@ -82,7 +82,7 @@ const GetDefaultEnvironmentDocument = graphql(`
 export const useEnvironments = (): UseQueryResponse<Environment[]> => {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
     query: GetEnvironmentsDocument,
-    requestPolicy: "cache-first",
+    requestPolicy: 'cache-first',
   });
 
   const environments = useMemo(() => {
@@ -97,7 +97,7 @@ export const useEnvironment = (
 ): UseQueryResponse<Environment> => {
   const [{ fetching, data, error, stale }, refetch] = useQuery({
     query: GetEnvironmentBySlugDocument,
-    requestPolicy: "cache-first",
+    requestPolicy: 'cache-first',
     variables: { slug: environmentSlug },
   });
 

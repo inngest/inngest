@@ -1,12 +1,12 @@
-import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
-import { createFileRoute } from "@tanstack/react-router";
+import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { SyncList } from "@/components/Apps/Syncs/SyncList";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { Sync } from "@/components/UnattachedSyncs/Sync";
-import { useSyncs } from "@/components/UnattachedSyncs/useSyncs";
+import { SyncList } from '@/components/Apps/Syncs/SyncList';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { Sync } from '@/components/UnattachedSyncs/Sync';
+import { useSyncs } from '@/components/UnattachedSyncs/useSyncs';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/unattached-syncs/")(
+export const Route = createFileRoute('/_authed/env/$envSlug/unattached-syncs/')(
   {
     component: UnattachedSyncsPage,
   },
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authed/env/$envSlug/unattached-syncs/")(
 
 function UnattachedSyncsPage() {
   const env = useEnvironment();
-  const [selectedSyncID, setSelectedSyncID] = useSearchParam("sync-id");
+  const [selectedSyncID, setSelectedSyncID] = useSearchParam('sync-id');
 
   const syncsRes = useSyncs({ envID: env.id });
 

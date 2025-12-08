@@ -1,26 +1,26 @@
 /// <reference types="vite/client" />
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import * as React from "react";
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import * as React from 'react';
 
 import {
   HeadContent,
   Outlet,
   Scripts,
   createRootRouteWithContext,
-} from "@tanstack/react-router";
+} from '@tanstack/react-router';
 
-import PageViewTracker from "@/components/Analytics/PageViewTracker";
-import SegmentAnalytics from "@/components/Analytics/SegmentAnalytics";
-import SentryUserIdentification from "@/components/Analytics/SentryUserIdentification";
-import { InngestClerkProvider } from "@/components/Clerk/Provider";
-import { ClientFeatureFlagProvider } from "@/components/FeatureFlags/ClientFeatureFlagProvider";
-import URQLProviderWrapper from "@/components/URQL/URQLProvider";
-import { navCollapsed } from "@/lib/nav";
-import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
-import globalsCss from "@inngest/components/AppRoot/globals.css?url";
-import { TooltipProvider } from "@inngest/components/Tooltip";
-import { QueryClient } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
+import PageViewTracker from '@/components/Analytics/PageViewTracker';
+import SegmentAnalytics from '@/components/Analytics/SegmentAnalytics';
+import SentryUserIdentification from '@/components/Analytics/SentryUserIdentification';
+import { InngestClerkProvider } from '@/components/Clerk/Provider';
+import { ClientFeatureFlagProvider } from '@/components/FeatureFlags/ClientFeatureFlagProvider';
+import URQLProviderWrapper from '@/components/URQL/URQLProvider';
+import { navCollapsed } from '@/lib/nav';
+import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
+import globalsCss from '@inngest/components/AppRoot/globals.css?url';
+import { TooltipProvider } from '@inngest/components/Tooltip';
+import { QueryClient } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -28,36 +28,36 @@ export const Route = createRootRouteWithContext<{
   head: () => ({
     meta: [
       {
-        charSet: "utf-8",
+        charSet: 'utf-8',
       },
       {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
+        name: 'viewport',
+        content: 'width=device-width, initial-scale=1',
       },
       {
-        title: "Inngest Dashboard",
-        description: "The Inngest Cloud dashboard",
+        title: 'Inngest Dashboard',
+        description: 'The Inngest Cloud dashboard',
       },
     ],
 
     links: [
       {
-        rel: "stylesheet",
+        rel: 'stylesheet',
         href: globalsCss,
       },
       {
-        rel: "stylesheet",
+        rel: 'stylesheet',
         href: fontsCss,
       },
       {
-        rel: "icon",
-        url: "/favicon-june-2025-light.svg",
-        media: "(prefers-color-scheme: light)",
+        rel: 'icon',
+        url: '/favicon-june-2025-light.svg',
+        media: '(prefers-color-scheme: light)',
       },
       {
-        rel: "icon",
-        url: "/favicon-june-2025-dark.svg",
-        media: "(prefers-color-scheme: dark)",
+        rel: 'icon',
+        url: '/favicon-june-2025-dark.svg',
+        media: '(prefers-color-scheme: dark)',
       },
     ],
   }),

@@ -1,23 +1,23 @@
-import { useState } from "react";
-import { AlertModal } from "@inngest/components/Modal";
-import { Select } from "@inngest/components/Select/Select";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { AlertModal } from '@inngest/components/Modal';
+import { Select } from '@inngest/components/Select/Select';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 type CurrentRunHandlingOption = {
   name: string;
   id: string;
 };
-const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = "suspend";
-const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = "cancel";
+const CURRENT_RUN_HANDLING_STRATEGY_SUSPEND = 'suspend';
+const CURRENT_RUN_HANDLING_STRATEGY_CANCEL = 'cancel';
 const currentRunHandlingOptions = [
   {
-    name: "Pause immediately, then cancel after 7 days",
+    name: 'Pause immediately, then cancel after 7 days',
     id: CURRENT_RUN_HANDLING_STRATEGY_SUSPEND,
   },
-  { name: "Cancel immediately", id: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
+  { name: 'Cancel immediately', id: CURRENT_RUN_HANDLING_STRATEGY_CANCEL },
 ] as const;
 const defaultCurrentRunHandlingOption = currentRunHandlingOptions[0];
 
@@ -90,12 +90,12 @@ export function PauseFunctionModal({
     onCloseWrapper();
   }
 
-  let confirmButtonLabel = isPaused ? "Resume Function" : "Pause Function";
+  let confirmButtonLabel = isPaused ? 'Resume Function' : 'Pause Function';
   if (
     !isPaused &&
     currentRunHandlingStrategy.id === CURRENT_RUN_HANDLING_STRATEGY_CANCEL
   ) {
-    confirmButtonLabel = "Pause & Cancel Runs";
+    confirmButtonLabel = 'Pause & Cancel Runs';
   }
 
   return (
@@ -103,10 +103,10 @@ export function PauseFunctionModal({
       isOpen={isOpen}
       onClose={onCloseWrapper}
       onSubmit={isPaused ? handleResume : handlePause}
-      title={`${isPaused ? "Resume" : "Pause"} function “${functionName}”`}
+      title={`${isPaused ? 'Resume' : 'Pause'} function “${functionName}”`}
       className="w-1/3"
       confirmButtonLabel={confirmButtonLabel}
-      confirmButtonKind={isPaused ? "primary" : "danger"}
+      confirmButtonKind={isPaused ? 'primary' : 'danger'}
       cancelButtonLabel="Close"
     >
       {isPaused && (
@@ -156,7 +156,7 @@ export function PauseFunctionModal({
               <Select.Button isLabelVisible={false}>
                 <div className="">
                   {currentRunHandlingStrategy.name ||
-                    "How should currently-running runs be handled?"}
+                    'How should currently-running runs be handled?'}
                 </div>
               </Select.Button>
               <Select.Options>

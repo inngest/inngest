@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-import * as Sentry from "@sentry/tanstackstart-react";
+import { useEffect } from 'react';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
+import * as Sentry from '@sentry/tanstackstart-react';
 
 export default function SentryUserIdentification() {
   const { user, isSignedIn } = useUser();
@@ -17,11 +17,11 @@ export default function SentryUserIdentification() {
 
     const accountID = organization?.publicMetadata.accountID;
 
-    if (typeof accountID !== "undefined" && typeof accountID !== "string") {
+    if (typeof accountID !== 'undefined' && typeof accountID !== 'string') {
       Sentry.setUser(baseUser);
       Sentry.captureException(
         new Error(
-          "Expected organization.publicMetadata.accountID to be a string when defined.",
+          'Expected organization.publicMetadata.accountID to be a string when defined.',
         ),
       );
       return;

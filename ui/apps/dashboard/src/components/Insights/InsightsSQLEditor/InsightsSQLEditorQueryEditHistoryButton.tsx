@@ -1,19 +1,19 @@
-import { useMemo, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@inngest/components/Popover";
+} from '@inngest/components/Popover';
 import {
   format as formatDate,
   isValid,
   relativeTime,
   toMaybeDate,
-} from "@inngest/components/utils/date";
+} from '@inngest/components/utils/date';
 
-import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
-import type { Tab } from "../types";
+import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '../types';
 
 type InsightsSQLEditorQueryEditHistoryButtonProps = { tab: Tab };
 
@@ -55,7 +55,7 @@ export function InsightsSQLEditorQueryEditHistoryButton({
             appearance="ghost"
             className="active:bg-canvasSubtle focus:bg-canvasSubtle text-muted font-medium"
             kind="secondary"
-            label={`${hasEdits ? "Edited" : "Created"} ${labelRelative}`}
+            label={`${hasEdits ? 'Edited' : 'Created'} ${labelRelative}`}
             size="medium"
           />
         </div>
@@ -86,11 +86,11 @@ function AuthorshipDate({ author, date, label }: AuthorshipDateProps) {
 
   return (
     <div>
-      <span className="text-muted">{label}</span>{" "}
-      <span className="text-basis font-medium">{author}</span>{" "}
+      <span className="text-muted">{label}</span>{' '}
+      <span className="text-basis font-medium">{author}</span>{' '}
       {d !== null && isValid(d) && (
         <time className="text-muted" dateTime={d.toISOString()}>
-          {formatDate(d, "dd MMM, yyyy")}
+          {formatDate(d, 'dd MMM, yyyy')}
         </time>
       )}
     </div>
@@ -106,7 +106,7 @@ function getSafeRelativeText(value: string): undefined | string {
   // This guards against clock skew where the action appears to have happened in the future.
   const deltaMillis = d.getTime() - Date.now();
   if (deltaMillis > 0 && deltaMillis < ONE_MINUTE_IN_MILLIS) {
-    return "less than a minute ago";
+    return 'less than a minute ago';
   }
 
   return relativeTime(d);

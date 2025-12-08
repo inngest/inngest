@@ -1,4 +1,4 @@
-import { steps, type OnboardingSteps } from "./types";
+import { steps, type OnboardingSteps } from './types';
 
 export function getNextStepName(
   currentStepName: OnboardingSteps,

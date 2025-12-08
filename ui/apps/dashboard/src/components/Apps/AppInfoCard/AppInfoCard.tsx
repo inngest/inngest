@@ -1,15 +1,15 @@
-import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
-import { Link } from "@inngest/components/Link/NewLink";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { TextClickToCopy } from "@inngest/components/Text";
-import { Time } from "@inngest/components/Time";
-import { methodTypes, type App } from "@inngest/components/types/app";
-import { RiArrowLeftRightLine, RiInfinityLine } from "@remixicon/react";
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
+import { Link } from '@inngest/components/Link/NewLink';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { TextClickToCopy } from '@inngest/components/Text';
+import { Time } from '@inngest/components/Time';
+import { methodTypes, type App } from '@inngest/components/types/app';
+import { RiArrowLeftRightLine, RiInfinityLine } from '@remixicon/react';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { SyncStatusPill } from "@/components/Apps/SyncStatusPill";
-import { pathCreator } from "@/utils/urls";
-import { PlatformSection } from "./PlatformSection";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { SyncStatusPill } from '@/components/Apps/SyncStatusPill';
+import { pathCreator } from '@/utils/urls';
+import { PlatformSection } from './PlatformSection';
 
 type Props = {
   //
@@ -41,7 +41,7 @@ type Sync = {
   status: string;
   url: string | null;
   appVersion: string | null;
-} & React.ComponentProps<typeof PlatformSection>["sync"];
+} & React.ComponentProps<typeof PlatformSection>['sync'];
 
 export const AppInfoCard = ({
   app,
@@ -86,14 +86,14 @@ export const AppInfoCard = ({
     <>
       <AppDetailsCard title="App information" className={className}>
         <AppDetailsCard.Item
-          detail={<div className="truncate">{app?.externalID ?? "-"}</div>}
+          detail={<div className="truncate">{app?.externalID ?? '-'}</div>}
           term="App ID"
           loading={loading}
         />
         <AppDetailsCard.Item
           detail={
             <div className="truncate">
-              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : "-"}
+              {sync?.sdkVersion ? <Pill>{sync.sdkVersion}</Pill> : '-'}
             </div>
           }
           term="SDK version"
@@ -101,25 +101,25 @@ export const AppInfoCard = ({
         />
         <AppDetailsCard.Item
           className="col-span-2"
-          detail={<div className="truncate">{lastSyncValue ?? "-"}</div>}
+          detail={<div className="truncate">{lastSyncValue ?? '-'}</div>}
           term="Last sync"
           loading={loading}
         />
 
         <AppDetailsCard.Item
-          detail={<div className="truncate">{sync?.framework ?? "-"}</div>}
+          detail={<div className="truncate">{sync?.framework ?? '-'}</div>}
           term="Framework"
           loading={loading}
         />
         <AppDetailsCard.Item
-          detail={<div className="truncate">{sync?.sdkLanguage || "-"}</div>}
+          detail={<div className="truncate">{sync?.sdkLanguage || '-'}</div>}
           term="Language"
           loading={loading}
         />
         <AppDetailsCard.Item
           className="col-span-2"
           detail={
-            <TextClickToCopy truncate>{sync?.url ?? "-"}</TextClickToCopy>
+            <TextClickToCopy truncate>{sync?.url ?? '-'}</TextClickToCopy>
           }
           term="URL"
           loading={loading}
@@ -147,7 +147,7 @@ export const AppInfoCard = ({
               {sync?.appVersion || app?.appVersion ? (
                 <Pill>{sync?.appVersion || app?.appVersion}</Pill>
               ) : (
-                "-"
+                '-'
               )}
             </div>
           }

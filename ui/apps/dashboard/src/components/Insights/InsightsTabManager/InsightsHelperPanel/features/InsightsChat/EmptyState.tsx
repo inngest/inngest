@@ -1,5 +1,5 @@
-import { Link } from "@inngest/components/Link/NewLink";
-import { RiChatPollLine } from "@remixicon/react";
+import { Link } from '@inngest/components/Link/NewLink';
+import { RiChatPollLine } from '@remixicon/react';
 
 export function EmptyState() {
   return (
@@ -14,9 +14,9 @@ export function EmptyState() {
           </h3>
           <p className="text-muted text-sm">
             Share the event insights you need and our AI assistant will generate
-            the SQL query.{" "}
+            the SQL query.{' '}
             <span>
-              {" "}
+              {' '}
               <Link
                 className="text-link inline-flex text-sm"
                 href="https://www.inngest.com/docs/platform/monitor/insights"

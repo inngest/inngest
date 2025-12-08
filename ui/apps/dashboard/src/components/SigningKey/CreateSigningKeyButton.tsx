@@ -1,8 +1,8 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { RiAddLine } from "@remixicon/react";
-import { useMutation } from "urql";
+import { Button } from '@inngest/components/Button/NewButton';
+import { RiAddLine } from '@remixicon/react';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const Mutation = graphql(`
   mutation CreateSigningKey($envID: UUID!) {

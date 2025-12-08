@@ -1,8 +1,8 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { SettingsHeader } from "@/components/Settings/SettingsHeader";
+import { SettingsHeader } from '@/components/Settings/SettingsHeader';
 
-export const Route = createFileRoute("/_authed/settings")({
+export const Route = createFileRoute('/_authed/settings')({
   component: SettingsLayout,
 });
 

@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState } from "react";
-import { createFileRoute, Link as RouterLink } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/Alert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { Link } from "@inngest/components/Link/NewLink";
+import { useCallback, useEffect, useState } from 'react';
+import { createFileRoute, Link as RouterLink } from '@tanstack/react-router';
+import { Alert } from '@inngest/components/Alert/Alert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { Link } from '@inngest/components/Link/NewLink';
 import {
   Switch,
   SwitchLabel,
   SwitchWrapper,
-} from "@inngest/components/Switch/Switch";
+} from '@inngest/components/Switch/Switch';
 import {
   RiAddLine,
   RiArrowRightSLine,
   RiDeleteBinLine,
   RiInformationLine,
-} from "@remixicon/react";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+} from '@remixicon/react';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
 import {
   CreateVercelAppDocument,
@@ -26,15 +26,15 @@ import {
   UpdateVercelAppDocument,
   VercelDeploymentProtection,
   type VercelProject,
-} from "@/gql/graphql";
-import LoadingIcon from "@/components/Icons/LoadingIcon";
-import { useDefaultEnvironment } from "@/queries";
-import { useVercelIntegration } from "@/queries/useVercelIntegration";
+} from '@/gql/graphql';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useDefaultEnvironment } from '@/queries';
+import { useVercelIntegration } from '@/queries/useVercelIntegration';
 
-const defaultPath = "/api/inngest";
+const defaultPath = '/api/inngest';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/vercel/configure/$id/",
+  '/_authed/settings/integrations/vercel/configure/$id/',
 )({
   component: VercelConfigure,
 });
@@ -69,7 +69,7 @@ function VercelConfigure() {
     // have been made as those operations are not idempotent upstream.
     const p = data.projects.find((p) => p.projectID === id);
     if (p) {
-      p.servePath && setPaths(p.servePath.split(","));
+      p.servePath && setPaths(p.servePath.split(','));
       setOriginalProject(p);
       setNotFound(false);
     } else {
@@ -89,7 +89,7 @@ function VercelConfigure() {
   }, [project]);
 
   useEffect(() => {
-    project && setProject({ ...project, servePath: paths.join(",") });
+    project && setProject({ ...project, servePath: paths.join(',') });
     //
     // we only want to track updates on paths changes, not project
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,11 +97,11 @@ function VercelConfigure() {
 
   const submit = useCallback(async () => {
     if (!defaultEnvID) {
-      console.error("no environment found");
+      console.error('no environment found');
       return;
     }
     if (!project) {
-      console.error("no project found");
+      console.error('no project found');
       return;
     }
     setMutating(true);
@@ -153,7 +153,7 @@ function VercelConfigure() {
     } else {
       setOriginalProject(project);
 
-      toast.success("Changes saved!");
+      toast.success('Changes saved!');
     }
   }, [
     createVercelApp,
@@ -242,7 +242,7 @@ function VercelConfigure() {
                   htmlFor="override"
                   className="text-muted text-sm leading-tight"
                 >
-                  {project.isEnabled ? "Enabled" : "Disabled"}
+                  {project.isEnabled ? 'Enabled' : 'Disabled'}
                 </SwitchLabel>
               </SwitchWrapper>
             </div>
@@ -296,7 +296,7 @@ function VercelConfigure() {
                     className="mt-3"
                     onClick={() => {
                       setProject({ ...project });
-                      setPaths([...paths, ""]);
+                      setPaths([...paths, '']);
                     }}
                   />
                 </div>
@@ -309,7 +309,7 @@ function VercelConfigure() {
                     Deployment protection key
                   </div>
                   <div className="text-muted text-base font-normal">
-                    Used to bypass deployment protection.{" "}
+                    Used to bypass deployment protection.{' '}
                     <Link
                       size="medium"
                       target="_blank"
@@ -323,12 +323,12 @@ function VercelConfigure() {
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, protectionBypassSecret: value })
                     }
-                    value={project.protectionBypassSecret ?? ""}
+                    value={project.protectionBypassSecret ?? ''}
                   />
                 </div>
                 <div className="border-subtle mt-4 flex w-full flex-col gap-2 rounded-md border p-6">
                   <div className="text-basis text-lg font-medium">
-                    Custom Production Domain{" "}
+                    Custom Production Domain{' '}
                     <span className="text-sublte text-xs">(optional)</span>
                   </div>
                   <div className="text-muted text-base font-normal">
@@ -338,7 +338,7 @@ function VercelConfigure() {
                   <Input
                     className="text-basis mt-4 h-10 px-2 py-2 text-base"
                     placeholder="Add custom domain"
-                    value={project.originOverride ?? ""}
+                    value={project.originOverride ?? ''}
                     onChange={({ target: { value } }) =>
                       setProject({ ...project, originOverride: value })
                     }

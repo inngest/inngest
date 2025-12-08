@@ -1,5 +1,5 @@
-import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
-import { Link } from "@inngest/components/Link/NewLink";
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
+import { Link } from '@inngest/components/Link/NewLink';
 
 type Props = {
   sync: {
@@ -31,7 +31,7 @@ export const PlatformSection = ({ sync }: Props) => {
       </Link>
     );
   } else {
-    deploymentValue = "-";
+    deploymentValue = '-';
   }
 
   let projectValue;
@@ -42,7 +42,7 @@ export const PlatformSection = ({ sync }: Props) => {
       </Link>
     );
   } else {
-    projectValue = "-";
+    projectValue = '-';
   }
 
   return (

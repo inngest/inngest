@@ -1,12 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
 
-import CreateApp from "@/components/Onboarding/CreateApp";
-import DeployApp from "@/components/Onboarding/DeployApp";
-import SyncApp from "@/components/Onboarding/SyncApp";
-import { OnboardingSteps } from "@/components/Onboarding/types";
-import InvokeFn from "@/components/Onboarding/InvokeFn";
+import CreateApp from '@/components/Onboarding/CreateApp';
+import DeployApp from '@/components/Onboarding/DeployApp';
+import SyncApp from '@/components/Onboarding/SyncApp';
+import { OnboardingSteps } from '@/components/Onboarding/types';
+import InvokeFn from '@/components/Onboarding/InvokeFn';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/onboarding/$step/")(
+export const Route = createFileRoute('/_authed/env/$envSlug/onboarding/$step/')(
   {
     component: OnboardingStepPage,
   },

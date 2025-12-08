@@ -1,21 +1,21 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { FunctionList } from "@inngest/components/Apps/NewFunctionList";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
-import WorkerCounter from "@inngest/components/Workers/ConnectedWorkersDescription";
-import { methodTypes } from "@inngest/components/types/app";
-import { RiListCheck } from "@remixicon/react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { FunctionList } from '@inngest/components/Apps/NewFunctionList';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
+import { methodTypes } from '@inngest/components/types/app';
+import { RiListCheck } from '@remixicon/react';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
-import { AppGitCard } from "@/components/Apps/AppGitCard/AppGitCard";
-import { AppInfoCard } from "@/components/Apps/AppInfoCard/AppInfoCard";
-import { useApp } from "@/components/Apps/useApp";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import WorkersSection from "@/components/Workers/WorkersSection";
-import { useWorkersCount } from "@/components/Workers/useWorker";
-import { pathCreator } from "@/utils/urls";
+import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';
+import { AppInfoCard } from '@/components/Apps/AppInfoCard/AppInfoCard';
+import { useApp } from '@/components/Apps/useApp';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import WorkersSection from '@/components/Workers/WorkersSection';
+import { useWorkersCount } from '@/components/Workers/useWorker';
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps/$externalID/")(
+export const Route = createFileRoute('/_authed/env/$envSlug/apps/$externalID/')(
   {
     component: AppPage,
   },

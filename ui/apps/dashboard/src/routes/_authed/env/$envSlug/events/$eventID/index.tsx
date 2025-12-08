@@ -1,16 +1,16 @@
-import { EventDetails } from "@inngest/components/Events/NewEventDetails";
-import { useReplayModal } from "@inngest/components/Events/useReplayModal";
-import { createFileRoute } from "@tanstack/react-router";
+import { EventDetails } from '@inngest/components/Events/NewEventDetails';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { ExpandedRowActions } from "@/components/Events/ExpandedRowActions";
-import { SendEventModal } from "@/components/Events/SendEventModal";
+import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
+import { SendEventModal } from '@/components/Events/SendEventModal';
 import {
   useEventDetails,
   useEventPayload,
   useEventRuns,
-} from "@/components/Events/useEvents";
+} from '@/components/Events/useEvents';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/events/$eventID/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/events/$eventID/')({
   component: EventDetailsPage,
 });
 

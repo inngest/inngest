@@ -1,19 +1,19 @@
-import { useRef, useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { Modal } from "@inngest/components/Modal";
-import { Switch, SwitchLabel, SwitchWrapper } from "@inngest/components/Switch";
-import { methodTypes } from "@inngest/components/types/app";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiLoopLeftLine } from "@remixicon/react";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { Modal } from '@inngest/components/Modal';
+import { Switch, SwitchLabel, SwitchWrapper } from '@inngest/components/Switch';
+import { methodTypes } from '@inngest/components/types/app';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiLoopLeftLine } from '@remixicon/react';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import type { CodedError } from "@/utils/codedError";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { SyncFailure } from "@/components/SyncFailure/SyncFailure";
-import { graphql } from "@/gql";
+import type { CodedError } from '@/utils/codedError';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { SyncFailure } from '@/components/SyncFailure/SyncFailure';
+import { graphql } from '@/gql';
 
 const ResyncAppDocument = graphql(`
   mutation ResyncApp($appExternalID: String!, $appURL: String, $envID: UUID!) {
@@ -73,7 +73,7 @@ export default function ResyncModal({
           additionalTypenames: [
             // Bust the cache for the Workflow type to prevent the functions
             // list from being stale
-            "Workflow",
+            'Workflow',
           ],
         },
       );
@@ -81,7 +81,7 @@ export default function ResyncModal({
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("No API response data");
+        throw new Error('No API response data');
       }
 
       if (res.data.resyncApp.error) {
@@ -90,11 +90,11 @@ export default function ResyncModal({
       }
 
       setFailure(undefined);
-      toast.success("Synced app");
+      toast.success('Synced app');
       onClose();
     } catch (error) {
       setFailure({
-        code: "unknown",
+        code: 'unknown',
       });
     } finally {
       setIsSyncing(false);
@@ -114,13 +114,13 @@ export default function ResyncModal({
         <div className="flex flex-row items-center gap-3">
           <RiLoopLeftLine className="h-6 w-6" />
           <h2 className="text-lg font-medium">
-            {isConnect ? "Migrate to serve" : "Resync app"}
+            {isConnect ? 'Migrate to serve' : 'Resync app'}
           </h2>
         </div>
       </Modal.Header>
       <Modal.Body>
         <>
-          {platform === "vercel" && !failure && (
+          {platform === 'vercel' && !failure && (
             <Alert className="my-6" severity="info" showIcon={false}>
               Vercel generates a unique URL for each deployment (
               <Alert.Link
@@ -160,7 +160,7 @@ export default function ResyncModal({
                 setOverrideValue(e.target.value);
               }}
               readOnly={!isURLOverridden}
-              className={cn(!isURLOverridden && "bg-disabled")}
+              className={cn(!isURLOverridden && 'bg-disabled')}
             />
           </div>
           <div className="mb-6">
@@ -209,7 +209,7 @@ export default function ResyncModal({
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"
-          label={isConnect ? "Migrate app" : "Resync app"}
+          label={isConnect ? 'Migrate app' : 'Resync app'}
         />
       </Modal.Footer>
     </Modal>

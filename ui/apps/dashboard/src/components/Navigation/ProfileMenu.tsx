@@ -1,4 +1,4 @@
-import { Listbox } from "@headlessui/react";
+import { Listbox } from '@headlessui/react';
 import {
   RiArrowLeftRightLine,
   RiBillLine,
@@ -6,14 +6,14 @@ import {
   RiGroupLine,
   RiUserLine,
   RiUserSharedLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import ModeSwitch from "@inngest/components/ThemeMode/ModeSwitch";
+import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 
-import { pathCreator } from "@/utils/urls";
-import { Link } from "@tanstack/react-router";
-import { SignOutButton } from "../Auth/SignOutButton";
-import type { FileRouteTypes } from "@/routeTree.gen";
+import { pathCreator } from '@/utils/urls';
+import { Link } from '@tanstack/react-router';
+import { SignOutButton } from '../Auth/SignOutButton';
+import type { FileRouteTypes } from '@/routeTree.gen';
 
 type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
@@ -50,7 +50,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </Link>
           <Link
-            to={"/settings/organization" as FileRouteTypes["to"]}
+            to={'/settings/organization' as FileRouteTypes['to']}
             resetScroll={false}
           >
             <Listbox.Option
@@ -66,7 +66,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <Link
             to={
-              "/settings/organization/organization-members" as FileRouteTypes["to"]
+              '/settings/organization/organization-members' as FileRouteTypes['to']
             }
             resetScroll={false}
           >
@@ -93,7 +93,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           </Link>
 
-          <Link to={"/organization-list" as FileRouteTypes["to"]}>
+          <Link to={'/organization-list' as FileRouteTypes['to']}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchOrg"
@@ -107,7 +107,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <Link to={"/sign-in/choose" as FileRouteTypes["to"]}>
+          <Link to={'/sign-in/choose' as FileRouteTypes['to']}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="switchAccount"

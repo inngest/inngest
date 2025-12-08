@@ -4,22 +4,22 @@ import {
   useEffect,
   useState,
   type ReactNode,
-} from "react";
-import useDebounce from "@inngest/components/hooks/useDebounce";
+} from 'react';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 
 import type {
   SchemasContextValue,
   UseSchemasArgs,
   UseSchemasReturn,
-} from "./types";
-import { useSchemasQuery } from "./useSchemasQuery";
+} from './types';
+import { useSchemasQuery } from './useSchemasQuery';
 
 const SchemasContext = createContext<SchemasContextValue | undefined>(
   undefined,
 );
 
 export function SchemasProvider({ children }: { children: ReactNode }) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const query = useSchemasQuery(search);
 
   return (
@@ -31,7 +31,7 @@ export function SchemasProvider({ children }: { children: ReactNode }) {
 
 function useSchemasContext(): SchemasContextValue {
   const ctx = useContext(SchemasContext);
-  if (!ctx) throw new Error("useSchemas must be used within SchemasProvider");
+  if (!ctx) throw new Error('useSchemas must be used within SchemasProvider');
 
   return ctx;
 }

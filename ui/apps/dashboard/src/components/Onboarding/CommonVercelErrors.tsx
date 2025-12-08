@@ -1,11 +1,11 @@
-import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
-import { Link } from "@inngest/components/Link/NewLink";
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { Link } from '@inngest/components/Link/NewLink';
 
 export default function CommonVercelErrors() {
   return (
     <div className="my-6">
       <p className="bg-canvasSubtle border-subtle text-subtle rounded-t-lg border border-b-0 px-3 py-2 text-sm font-medium">
-        {" "}
+        {' '}
         Why might the syncs fail, and how can I resolve it?
       </p>
       <AccordionList
@@ -25,7 +25,7 @@ export default function CommonVercelErrors() {
             <p>
               Inngest may not be able to communicate with your application by
               default. The sync can fail if the deployment protection key
-              isn&apos;t bypassed.{" "}
+              isn&apos;t bypassed.{' '}
               <Link
                 className="inline"
                 size="small"

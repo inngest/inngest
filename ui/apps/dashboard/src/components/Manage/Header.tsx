@@ -1,10 +1,10 @@
-import { Header } from "@inngest/components/Header/NewHeader";
+import { Header } from '@inngest/components/Header/NewHeader';
 
-import CreateKeyButton from "@/components/Manage/CreateKeyButton";
-import { EventKeyInfo } from "./EventKeyInfo";
-import { SigningKeyInfo } from "./SigningKeyInfo";
-import { WebhookInfo } from "./WebhookInfo";
-import { useLocation } from "@tanstack/react-router";
+import CreateKeyButton from '@/components/Manage/CreateKeyButton';
+import { EventKeyInfo } from './EventKeyInfo';
+import { SigningKeyInfo } from './SigningKeyInfo';
+import { WebhookInfo } from './WebhookInfo';
+import { useLocation } from '@tanstack/react-router';
 
 export const ManageHeader = () => {
   const location = useLocation();
@@ -12,15 +12,15 @@ export const ManageHeader = () => {
   return (
     <Header
       breadcrumb={[
-        ...(pathname.includes("/webhooks") ? [{ text: "Webhooks" }] : []),
-        ...(pathname.includes("/keys") ? [{ text: "Event Keys" }] : []),
-        ...(pathname.includes("/signing-key") ? [{ text: "Signing Key" }] : []),
+        ...(pathname.includes('/webhooks') ? [{ text: 'Webhooks' }] : []),
+        ...(pathname.includes('/keys') ? [{ text: 'Event Keys' }] : []),
+        ...(pathname.includes('/signing-key') ? [{ text: 'Signing Key' }] : []),
       ]}
       infoIcon={
         <>
-          {pathname.includes("/webhooks") && <WebhookInfo />}
-          {pathname.includes("/keys") && <EventKeyInfo />}
-          {pathname.includes("/signing-key") && <SigningKeyInfo />}
+          {pathname.includes('/webhooks') && <WebhookInfo />}
+          {pathname.includes('/keys') && <EventKeyInfo />}
+          {pathname.includes('/signing-key') && <SigningKeyInfo />}
         </>
       }
       action={<CreateKeyButton />}

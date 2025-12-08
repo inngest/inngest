@@ -2,25 +2,25 @@ import {
   ClientOnly,
   createFileRoute,
   useNavigate,
-} from "@tanstack/react-router";
-import { useMemo } from "react";
+} from '@tanstack/react-router';
+import { useMemo } from 'react';
 
-import { Button } from "@inngest/components/Button/NewButton";
-import { EventTypesTable } from "@inngest/components/EventTypes/NewEventTypesTable";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { RefreshButton } from "@inngest/components/Refresh/NewRefreshButton";
-import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
+import { Button } from '@inngest/components/Button/NewButton';
+import { EventTypesTable } from '@inngest/components/EventTypes/NewEventTypesTable';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { RefreshButton } from '@inngest/components/Refresh/NewRefreshButton';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-import { ActionsMenu } from "@/components/EventTypes/ActionsMenu";
-import { EventTypesInfo } from "@/components/EventTypes/EventTypesInfo";
+import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
+import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
 import {
   useEventTypeVolume,
   useEventTypes,
-} from "@/components/EventTypes/useEventTypes";
-import SendEventButton from "@/components/Events/SendEventButton";
-import { pathCreator } from "@/utils/urls";
+} from '@/components/EventTypes/useEventTypes';
+import SendEventButton from '@/components/Events/SendEventButton';
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/event-types/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/event-types/')({
   component: EventTypesComponent,
 });
 
@@ -50,7 +50,7 @@ export default function EventTypesComponent() {
   return (
     <>
       <Header
-        breadcrumb={[{ text: "Event Types" }]}
+        breadcrumb={[{ text: 'Event Types' }]}
         infoIcon={<EventTypesInfo />}
         action={
           <div className="flex items-center gap-1.5">
@@ -70,7 +70,7 @@ export default function EventTypesComponent() {
               <Button
                 appearance="outlined"
                 label="Refresh"
-                onClick={() => navigate({ to: "." })}
+                onClick={() => navigate({ to: '.' })}
                 icon={<RiRefreshLine />}
                 iconSide="left"
               />

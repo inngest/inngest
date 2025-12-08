@@ -1,11 +1,11 @@
-import { useCallback, useMemo } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useCallback, useMemo } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import { buildSchemaEntriesFromQueryData } from "./queries";
-import type { SchemaEntry } from "./types";
-import { useEventTypeSchemas } from "./useEventTypeSchemas";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { buildSchemaEntriesFromQueryData } from './queries';
+import type { SchemaEntry } from './types';
+import { useEventTypeSchemas } from './useEventTypeSchemas';
 
 // Hard cap to guard against excessive fetching and to encourage the use of search.
 const MAX_SCHEMA_ITEMS = 800;
@@ -15,7 +15,7 @@ const MAX_SCHEMA_ITEMS = 800;
 const MAX_PAGES = 30;
 
 export function useSchemasQuery(search: string) {
-  const isSchemaWidgetEnabled = useBooleanFlag("insights-schema-widget");
+  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
   const getEventTypeSchemas = useEventTypeSchemas();
   const env = useEnvironment();
@@ -23,7 +23,7 @@ export function useSchemasQuery(search: string) {
   const query = useInfiniteQuery({
     enabled: isSchemaWidgetEnabled.value,
     queryKey: [
-      "schema-explorer-event-types",
+      'schema-explorer-event-types',
       env.id,
       { nameSearch: search || null },
     ],
@@ -53,7 +53,7 @@ export function useSchemasQuery(search: string) {
 
   const guardedFetchNextPage = useCallback(() => {
     if (hasFetchedMax) {
-      console.error("Max schemas fetched.");
+      console.error('Max schemas fetched.');
       return;
     }
     query.fetchNextPage();

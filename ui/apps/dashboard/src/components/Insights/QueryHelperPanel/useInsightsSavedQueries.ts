@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from "react";
-import { useQuery, type CombinedError } from "urql";
+import { useCallback, useMemo } from 'react';
+import { useQuery, type CombinedError } from 'urql';
 
-import { graphql } from "@/gql";
-import type { InsightsQueryStatement } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import type { InsightsQueryStatement } from '@/gql/graphql';
 import {
   useModifySavedQueries,
   type DeleteQueryArgs,
@@ -10,7 +10,7 @@ import {
   type SaveQueryArgs,
   type ShareQueryArgs,
   type UpdateQueryArgs,
-} from "./useModifySavedQueries";
+} from './useModifySavedQueries';
 
 const insightsSavedQueriesQuery = graphql(`
   query InsightsSavedQueries {
@@ -52,7 +52,7 @@ export function useInsightsSavedQueries(): UseInsightsSavedQueriesReturn {
     useModifySavedQueries();
 
   const refetchSavedQueries = useCallback(() => {
-    reexecute({ requestPolicy: "network-only" });
+    reexecute({ requestPolicy: 'network-only' });
   }, [reexecute]);
 
   const savedQueries = useMemo(

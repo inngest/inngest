@@ -1,6 +1,6 @@
-import { Button } from "@inngest/components/Button";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
-import { RiContractRightLine } from "@remixicon/react";
+import { Button } from '@inngest/components/Button';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { RiContractRightLine } from '@remixicon/react';
 
 export const ToggleChatButton = ({
   className,

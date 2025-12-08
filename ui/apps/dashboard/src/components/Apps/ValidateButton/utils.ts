@@ -1,8 +1,8 @@
-import { SecretCheck, type AppCheckResult } from "@/gql/graphql";
+import { SecretCheck, type AppCheckResult } from '@/gql/graphql';
 
 export function isAppInfoMissingData(appInfo: AppCheckResult): boolean {
   for (const [k, v] of Object.entries(appInfo)) {
-    if (k === "error") {
+    if (k === 'error') {
       continue;
     }
     if (v === null || v === SecretCheck.Unknown) {

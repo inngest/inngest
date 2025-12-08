@@ -1,17 +1,17 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@inngest/components/Tooltip";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiSaveLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiSaveLine } from '@remixicon/react';
 
-import { KeyboardShortcutTooltip } from "../KeyboardShortcutTooltip";
-import type { Tab } from "../types";
-import { useSaveTab } from "./SaveTabContext";
-import { useDocumentShortcuts } from "./actions/handleShortcuts";
+import { KeyboardShortcutTooltip } from '../KeyboardShortcutTooltip';
+import type { Tab } from '../types';
+import { useSaveTab } from './SaveTabContext';
+import { useDocumentShortcuts } from './actions/handleShortcuts';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
   tab: Tab;
@@ -24,7 +24,7 @@ export function InsightsSQLEditorSaveQueryButton({
 
   useDocumentShortcuts([
     {
-      combo: { alt: true, code: "KeyS", metaOrCtrl: true },
+      combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
       handler: saveTab,
     },
   ]);
@@ -39,7 +39,7 @@ export function InsightsSQLEditorSaveQueryButton({
             disabled={!canSave}
             icon={
               <RiSaveLine
-                className={cn(!canSave ? "text-disabled" : "text-muted")}
+                className={cn(!canSave ? 'text-disabled' : 'text-muted')}
                 size={16}
               />
             }
@@ -55,7 +55,7 @@ export function InsightsSQLEditorSaveQueryButton({
         </TooltipTrigger>
         <TooltipContent>
           <KeyboardShortcutTooltip
-            combo={{ alt: true, key: "S", metaOrCtrl: true }}
+            combo={{ alt: true, key: 'S', metaOrCtrl: true }}
           />
         </TooltipContent>
       </Tooltip>

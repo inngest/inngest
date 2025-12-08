@@ -1,5 +1,5 @@
-import { graphql } from "@/gql";
-import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
+import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
   query AppNavData($envID: ID!, $externalAppID: String!) {
@@ -53,11 +53,11 @@ export const useNavData = ({
 // Removes the sync ID from the URL. This is important since we want the sync to
 // be 100% new.
 const removeSyncIDFromURL = (url: string): string => {
-  if (!url.startsWith("http")) {
-    url = "https://" + url;
+  if (!url.startsWith('http')) {
+    url = 'https://' + url;
   }
 
   const urlObj = new URL(url);
-  urlObj.searchParams.delete("deployId");
+  urlObj.searchParams.delete('deployId');
   return urlObj.toString();
 };

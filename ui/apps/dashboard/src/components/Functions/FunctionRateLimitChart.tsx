@@ -1,9 +1,9 @@
-import colors from "tailwindcss/colors";
-import { useQuery } from "urql";
+import colors from 'tailwindcss/colors';
+import { useQuery } from 'urql';
 
-import SimpleLineChart from "@/components/Charts/SimpleLineChart";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import SimpleLineChart from '@/components/Charts/SimpleLineChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const GetFunctionRateLimitDocument = graphql(`
   query GetFunctionRateLimitDocument(
@@ -58,7 +58,7 @@ export default function FunctionRunRateLimitChart({
   const ratelimit = data?.environment.function?.ratelimit.data ?? [];
 
   const metrics = Array.from({ length: ratelimit.length }).map((_, idx) => ({
-    name: ratelimit[idx]?.bucket || "",
+    name: ratelimit[idx]?.bucket || '',
     values: {
       ratelimit: ratelimit[idx]?.value ?? 0,
     },
@@ -71,9 +71,9 @@ export default function FunctionRunRateLimitChart({
       data={metrics}
       legend={[
         {
-          name: "Rate Limited",
-          dataKey: "ratelimit",
-          color: colors.slate["500"],
+          name: 'Rate Limited',
+          dataKey: 'ratelimit',
+          color: colors.slate['500'],
         },
       ]}
       isLoading={isFetchingMetrics}

@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { cn } from "@inngest/components/utils/classNames";
+import type { ReactNode } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 
 export interface SectionProps {
   actions?: ReactNode;
@@ -12,7 +12,7 @@ export function Section({ actions, children, className, title }: SectionProps) {
   return (
     <div
       className={cn(
-        "flex h-full w-full min-w-0 flex-col overflow-hidden",
+        'flex h-full w-full min-w-0 flex-col overflow-hidden',
         className,
       )}
     >

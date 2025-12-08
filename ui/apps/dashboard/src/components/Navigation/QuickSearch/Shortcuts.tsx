@@ -8,12 +8,12 @@ import {
   RiPlugLine,
   RiSunLine,
   RiWindow2Line,
-} from "@remixicon/react";
-import { Command } from "cmdk";
-import { useTheme } from "next-themes";
+} from '@remixicon/react';
+import { Command } from 'cmdk';
+import { useTheme } from 'next-themes';
 
-import { DISCORD_URL, pathCreator } from "@/utils/urls";
-import { ResultItem } from "./ResultItem";
+import { DISCORD_URL, pathCreator } from '@/utils/urls';
+import { ResultItem } from './ResultItem';
 
 export default function Shortcuts({
   onClose,
@@ -69,10 +69,10 @@ export default function Shortcuts({
           value="sync-new-app"
           icon={<RiAddLine />}
         />
-        {theme !== "dark" && (
+        {theme !== 'dark' && (
           <ResultItem
             onClick={() => {
-              setTheme("dark");
+              setTheme('dark');
               onClose();
             }}
             text="Switch to dark mode"
@@ -80,10 +80,10 @@ export default function Shortcuts({
             icon={<RiMoonClearFill />}
           />
         )}
-        {theme !== "light" && (
+        {theme !== 'light' && (
           <ResultItem
             onClick={() => {
-              setTheme("light");
+              setTheme('light');
               onClose();
             }}
             text="Switch to light mode"
@@ -91,10 +91,10 @@ export default function Shortcuts({
             icon={<RiSunLine />}
           />
         )}
-        {theme !== "system" && (
+        {theme !== 'system' && (
           <ResultItem
             onClick={() => {
-              setTheme("system");
+              setTheme('system');
               onClose();
             }}
             text="Switch to system mode"
@@ -109,7 +109,7 @@ export default function Shortcuts({
       >
         <ResultItem
           onClick={onClose}
-          path={"https://www.inngest.com/docs?ref=app-cmdk"}
+          path={'https://www.inngest.com/docs?ref=app-cmdk'}
           text="Go to documentation"
           value="go-to-documentation-docs"
           icon={<RiExternalLinkLine />}

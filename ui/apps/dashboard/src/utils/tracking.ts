@@ -1,4 +1,4 @@
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
 type TrackingUser = {
   external_id: string | null;
@@ -32,7 +32,7 @@ export function useTrackingUser() {
 }
 
 export function trackEvent({ name, data, user, v }: TrackingEvent): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
 
   const event = {
     name,

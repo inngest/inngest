@@ -2,14 +2,14 @@ import {
   GraphQLClient,
   type RequestMiddleware,
   type ResponseMiddleware,
-} from "graphql-request";
-import { notFound } from "@tanstack/react-router";
+} from 'graphql-request';
+import { notFound } from '@tanstack/react-router';
 
 const requestMiddleware: RequestMiddleware = async (request) => {
   //
   // Lazy import server-only modules to prevent them from being bundled for the client
-  const { auth } = await import("@clerk/tanstack-react-start/server");
-  const { getCookies } = await import("@tanstack/react-start/server");
+  const { auth } = await import('@clerk/tanstack-react-start/server');
+  const { getCookies } = await import('@tanstack/react-start/server');
 
   const { getToken } = await auth();
   const sessionToken = await getToken();
@@ -26,7 +26,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
     const allCookies = getCookies();
     const cookieString = Object.entries(allCookies)
       .map(([name, value]) => `${name}=${value}`)
-      .join("; ");
+      .join('; ');
 
     headers = {
       ...headers,
@@ -45,7 +45,7 @@ const requestMiddleware: RequestMiddleware = async (request) => {
  * handled gracefully by an enclosing `not-found` file.
  */
 const throwNotFoundError: ResponseMiddleware = (response) => {
-  if (response instanceof Error && response.message.includes("not found")) {
+  if (response instanceof Error && response.message.includes('not found')) {
     notFound();
   }
 };

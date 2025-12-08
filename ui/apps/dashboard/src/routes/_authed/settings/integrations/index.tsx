@@ -1,15 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
 
-import { IntegrationsList } from "@/components/Settings/IntegrationsList";
-import { PostgresIntegrations } from "@/queries/server/integrations/db";
-import { getVercelIntegration } from "@/queries/server/integrations/vercel";
+import { IntegrationsList } from '@/components/Settings/IntegrationsList';
+import { PostgresIntegrations } from '@/queries/server/integrations/db';
+import { getVercelIntegration } from '@/queries/server/integrations/vercel';
 
-export const Route = createFileRoute("/_authed/settings/integrations/")({
+export const Route = createFileRoute('/_authed/settings/integrations/')({
   component: IntegrationsPage,
   loader: async () => {
     let allIntegrations: React.ComponentProps<
       typeof IntegrationsList
-    >["integrations"] = await PostgresIntegrations();
+    >['integrations'] = await PostgresIntegrations();
 
     const integration = await getVercelIntegration();
     if (integration) {
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authed/settings/integrations/")({
             enabled: true,
             error: integration.message,
             projects: [],
-            slug: "vercel",
+            slug: 'vercel',
           },
           ...allIntegrations,
         ];
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authed/settings/integrations/")({
             enabled: true,
             isMarketplace: integration.isMarketplace,
             projects: integration.projects,
-            slug: "vercel",
+            slug: 'vercel',
           },
           ...allIntegrations,
         ];

@@ -1,30 +1,30 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Listbox } from "@headlessui/react";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
+import { Listbox } from '@headlessui/react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
-import { cn } from "@inngest/components/utils/classNames";
+} from '@inngest/components/Tooltip/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCloudFill,
   RiCloudLine,
   RiErrorWarningLine,
   RiExpandUpDownLine,
   RiLoopLeftLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { useEnvironments } from "@/queries";
+import { useEnvironments } from '@/queries';
 import {
   EnvironmentType,
   getDefaultEnvironment,
   getSortedBranchEnvironments,
   getTestEnvironments,
   type Environment,
-} from "@/utils/environments";
+} from '@/utils/environments';
 
 // Some URLs cannot just swap between environments,
 // we need to redirect to a less specific resource URL that is shared across environments
@@ -34,44 +34,44 @@ const useSwitchablePathname = (): string => {
   const pathname = location.pathname;
 
   // Parse pathname into segments (TanStack Router doesn't have route groups like Next.js)
-  const segments = pathname.split("/").filter((segment) => segment.length > 0);
+  const segments = pathname.split('/').filter((segment) => segment.length > 0);
 
   // Accounts are not environment specific
   if (pathname.match(/^\/settings\//)) {
-    return "/functions";
+    return '/functions';
   }
 
   if (pathname.match(/^\/billing\/.+$/)) {
-    return "/apps";
+    return '/apps';
   }
 
   // Deploys should always move to the root resource level
-  if (segments[0] === "apps") {
-    return "/apps";
+  if (segments[0] === 'apps') {
+    return '/apps';
   }
   // Manage paths, we drop the id at the end
-  if (segments[0] === "manage") {
-    return "/" + segments.slice(0, 2).join("/");
+  if (segments[0] === 'manage') {
+    return '/' + segments.slice(0, 2).join('/');
   }
 
   // Logs are specific to a given environment, return to the function dashboard
-  if (segments[0] === "functions" && segments[2] === "logs") {
-    return "/" + segments.slice(0, 3).join("/");
+  if (segments[0] === 'functions' && segments[2] === 'logs') {
+    return '/' + segments.slice(0, 3).join('/');
   }
 
   if (segments.length === 0) {
-    return "/functions"; // default if selected from /env
+    return '/functions'; // default if selected from /env
   }
 
-  return "/" + segments.join("/");
+  return '/' + segments.join('/');
 };
 
 const selectedName = (name: string, collapsed: boolean) => {
   switch (name) {
-    case "Production":
-      return collapsed ? "PR" : name;
-    case "Branch Environments":
-      return collapsed ? "BE" : name;
+    case 'Production':
+      return collapsed ? 'PR' : name;
+    case 'Branch Environments':
+      return collapsed ? 'BE' : name;
     default:
       return collapsed ? name.substring(0, 2).toUpperCase() : name;
   }
@@ -86,20 +86,20 @@ const SelectedDisplay = ({
 }) => (
   <span
     className={`flex flex-row items-center ${
-      collapsed ? "" : "min-w-0 truncate"
+      collapsed ? '' : 'min-w-0 truncate'
     }`}
   >
     {selected ? (
       <span className="block">
         {selected.type === EnvironmentType.BranchParent
-          ? selectedName("Branch Environments", collapsed)
+          ? selectedName('Branch Environments', collapsed)
           : selectedName(selected.name, collapsed)}
       </span>
     ) : (
       <>
         {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
         <span className="block">
-          {selectedName("All Environments", collapsed)}
+          {selectedName('All Environments', collapsed)}
         </span>
       </>
     )}
@@ -108,9 +108,9 @@ const SelectedDisplay = ({
 
 const tooltip = (selected: Environment | null) =>
   !selected
-    ? "All Environments"
+    ? 'All Environments'
     : selected.type === EnvironmentType.BranchParent
-    ? "Branch Environments"
+    ? 'Branch Environments'
     : selected.name;
 
 type EnvironmentSelectMenuProps = {
@@ -128,7 +128,7 @@ export default function EnvironmentSelectMenu({
   const [{ data: envs = [], error }] = useEnvironments();
 
   if (error) {
-    console.error("error fetching envs", error);
+    console.error('error fetching envs', error);
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -176,14 +176,14 @@ export default function EnvironmentSelectMenu({
           <OptionalTooltip tooltip={collapsed && tooltip(selected)}>
             <Listbox.Button
               className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
-                collapsed ? `w-8` : !activeEnv ? "w-[196px]" : "w-[158px]"
+                collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
               } h-8 overflow-hidden rounded border text-sm ${
-                open && "border-primary-intense"
+                open && 'border-primary-intense'
               }`}
             >
               <div
                 className={`flex flex-row items-center  ${
-                  collapsed ? "justify-center" : "justify-between"
+                  collapsed ? 'justify-center' : 'justify-between'
                 }`}
               >
                 <SelectedDisplay selected={selected} collapsed={collapsed} />
@@ -247,17 +247,17 @@ export default function EnvironmentSelectMenu({
 function EnvironmentItem({
   environment,
   name,
-  variant = "normal",
+  variant = 'normal',
 }: {
   environment: Environment;
   name?: string;
-  variant?: "compact" | "normal";
+  variant?: 'compact' | 'normal';
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
-    statusColorClass = "bg-surfaceMuted";
+    statusColorClass = 'bg-surfaceMuted';
   } else {
-    statusColorClass = "bg-primary-moderate";
+    statusColorClass = 'bg-primary-moderate';
   }
 
   return (
@@ -265,13 +265,13 @@ function EnvironmentItem({
       key={environment.id}
       value={environment}
       className={cn(
-        "bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal",
-        variant === "compact" && "py-2",
+        'bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
+        variant === 'compact' && 'py-2',
       )}
     >
       <span
         className={cn(
-          "block h-1.5 w-1.5 shrink-0 rounded-full",
+          'block h-1.5 w-1.5 shrink-0 rounded-full',
           statusColorClass,
         )}
       />

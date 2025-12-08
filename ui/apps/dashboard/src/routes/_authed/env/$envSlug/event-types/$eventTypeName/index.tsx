@@ -1,19 +1,19 @@
-import { useEventTypeVolume } from "@inngest/components/EventTypes/useEventTypeVolume";
-import { FunctionsIcon } from "@inngest/components/icons/sections/Functions";
-import { RiArrowRightSLine } from "@remixicon/react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEventTypeVolume } from '@inngest/components/EventTypes/useEventTypeVolume';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { RiArrowRightSLine } from '@remixicon/react';
+import { createFileRoute, Link } from '@tanstack/react-router';
 
-import Block from "@/components/EventTypes/Block";
-import SimpleBarChart from "@/components/Charts/SimpleBarChart";
+import Block from '@/components/EventTypes/Block';
+import SimpleBarChart from '@/components/Charts/SimpleBarChart';
 import {
   useEventTypeVolume as getEventTypeVolume,
   useEventType,
-} from "@/components/EventTypes/useEventTypes";
-import LatestLogsList from "@/components/Events/LatestLogsList";
-import { pathCreator } from "@/utils/urls";
+} from '@/components/EventTypes/useEventTypes';
+import LatestLogsList from '@/components/Events/LatestLogsList';
+import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/event-types/$eventTypeName/",
+  '/_authed/env/$envSlug/event-types/$eventTypeName/',
 )({
   component: EventTypeDashboard,
 });
@@ -47,9 +47,9 @@ function EventTypeDashboard() {
           data={parsedVolumeData}
           legend={[
             {
-              name: "Events",
-              dataKey: "count",
-              color: "rgb(var(--color-primary-subtle) / 1)",
+              name: 'Events',
+              dataKey: 'count',
+              color: 'rgb(var(--color-primary-subtle) / 1)',
               default: true,
             },
           ]}

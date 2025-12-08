@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { cn } from "@inngest/components/utils/classNames";
-import { minuteTime } from "@inngest/components/utils/date";
+import { useMemo } from 'react';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { cn } from '@inngest/components/utils/classNames';
+import { minuteTime } from '@inngest/components/utils/date';
 import {
   Bar,
   BarChart,
@@ -10,13 +10,13 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+} from 'recharts';
 
 type BarChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
-  period: string | "24 Hours";
+  period: string | '24 Hours';
   total?: number;
   totalDescription?: string;
   loading?: boolean;
@@ -70,7 +70,7 @@ function CustomizedYAxisTick(props: AxisProps) {
 }
 
 export default function SimpleBarChart({
-  className = "",
+  className = '',
   height = 200,
   title,
   period,
@@ -88,7 +88,7 @@ export default function SimpleBarChart({
   return (
     <div
       className={cn(
-        "border-subtle bg-canvasBase border-b px-6 py-4",
+        'border-subtle bg-canvasBase border-b px-6 py-4',
         className,
       )}
     >
@@ -134,7 +134,7 @@ export default function SimpleBarChart({
               />
               <YAxis
                 allowDecimals={false}
-                domain={[0, "auto"]}
+                domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
@@ -166,11 +166,11 @@ export default function SimpleBarChart({
                             {p.value} {l?.name || p.name}
                           </div>
                         );
-                      }) || ""}
+                      }) || ''}
                     </div>
                   );
                 }}
-                wrapperStyle={{ outline: "none" }}
+                wrapperStyle={{ outline: 'none' }}
                 cursor={false}
               />
 

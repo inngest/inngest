@@ -1,18 +1,18 @@
-import { useContext, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import ToggleGroup from "@inngest/components/ToggleGroup/ToggleGroup";
-import { toast } from "sonner";
+import { useContext, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
+import { toast } from 'sonner';
 
-import CodeEditor from "@/components/Textarea/CodeEditor";
-import { Context } from "./Context";
-import { FilterEditor } from "./FilterEditor";
-import { useNavigate } from "@tanstack/react-router";
+import CodeEditor from '@/components/Textarea/CodeEditor';
+import { Context } from './Context';
+import { FilterEditor } from './FilterEditor';
+import { useNavigate } from '@tanstack/react-router';
 
 type FilterEventsProps = {
   keyID: string;
   keyName: string | null;
   filter: {
-    type: "allow" | "deny";
+    type: 'allow' | 'deny';
     ips: string[] | null;
     events: string[] | null;
   };
@@ -41,7 +41,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
       // If there are no event or IPs then we need to switch to a denylist. The
       // backend rejects empty allowlists because that means "reject
       // everything".
-      const type = "deny";
+      const type = 'deny';
 
       filter = { ...filter, type };
       setNewFilter(filter);
@@ -52,16 +52,16 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
       filter,
     }).then((result) => {
       if (result.error) {
-        toast.error("Event key filter has not been updated");
+        toast.error('Event key filter has not been updated');
       } else {
-        toast.success("Event key filter updated");
-        navigate({ to: "." });
+        toast.success('Event key filter updated');
+        navigate({ to: '.' });
       }
     });
   }
 
   function handleTypeChange(id: String) {
-    const nextValue = { ...newFilter, type: id as "allow" | "deny" };
+    const nextValue = { ...newFilter, type: id as 'allow' | 'deny' };
     validateSubmit(nextValue);
 
     if (newFilter.type !== id) {
@@ -69,9 +69,9 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
     }
   }
 
-  function handleCodeChange(name: "events" | "ips", code: string) {
+  function handleCodeChange(name: 'events' | 'ips', code: string) {
     const values = [];
-    for (const line of code.trim().split("\n")) {
+    for (const line of code.trim().split('\n')) {
       const value = line.trim();
       if (value) {
         values.push(value);
@@ -112,15 +112,15 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
         <FilterEditor filter="events" list={newFilter.type}>
           <CodeEditor
             language="plaintext"
-            initialCode={(filter.events || []).join("\n")}
-            onCodeChange={(code) => handleCodeChange("events", code)}
+            initialCode={(filter.events || []).join('\n')}
+            onCodeChange={(code) => handleCodeChange('events', code)}
           />
         </FilterEditor>
         <FilterEditor filter="IPs" list={newFilter.type}>
           <CodeEditor
             language="plaintext"
-            initialCode={(newFilter.ips || []).join("\n")}
-            onCodeChange={(code) => handleCodeChange("ips", code)}
+            initialCode={(newFilter.ips || []).join('\n')}
+            onCodeChange={(code) => handleCodeChange('ips', code)}
           />
         </FilterEditor>
       </div>

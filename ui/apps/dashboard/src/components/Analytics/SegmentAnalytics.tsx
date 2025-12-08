@@ -1,8 +1,8 @@
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-import { useLocation, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
+import { useLocation, useSearch } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 
-import { analytics } from "@/utils/segment";
+import { analytics } from '@/utils/segment';
 
 export default function SegmentAnalytics() {
   const location = useLocation();
@@ -19,7 +19,7 @@ export default function SegmentAnalytics() {
     setLastUrl(location.href);
 
     analytics.page(null, {
-      ref: "ref" in search ? search.ref : null,
+      ref: 'ref' in search ? search.ref : null,
     });
   }, [location, search, lastUrl]);
 

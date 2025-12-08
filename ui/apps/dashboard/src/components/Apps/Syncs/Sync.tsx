@@ -1,10 +1,10 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { RiErrorWarningLine } from "@remixicon/react";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { RiErrorWarningLine } from '@remixicon/react';
 
-import { AppGitCard } from "@/components/Apps/AppGitCard/AppGitCard";
-import { AppInfoCard } from "@/components/Apps/AppInfoCard/AppInfoCard";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useSync } from "./useSync";
+import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';
+import { AppInfoCard } from '@/components/Apps/AppInfoCard/AppInfoCard';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useSync } from './useSync';
 
 type Props = {
   externalAppID: string;
@@ -16,7 +16,7 @@ export const Sync = ({ externalAppID, syncID }: Props) => {
 
   const syncRes = useSync({ envID: env.id, externalAppID, syncID });
   if (syncRes.error) {
-    if (syncRes.error.message.includes("no rows")) {
+    if (syncRes.error.message.includes('no rows')) {
       return (
         <div className="h-full w-full overflow-y-auto">
           <div className="mx-auto w-full max-w-[1200px] p-4">
@@ -52,7 +52,7 @@ export const Sync = ({ externalAppID, syncID }: Props) => {
           </Alert>
         )}
 
-        {sync.status === "duplicate" && (
+        {sync.status === 'duplicate' && (
           <Alert className="mb-4" severity="info">
             Function configurations have not changed since the last successful
             sync. Logic in function handlers may have changed, but they are not

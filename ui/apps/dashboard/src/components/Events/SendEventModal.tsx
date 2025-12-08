@@ -1,20 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Modal } from "@inngest/components/Modal/Modal";
-import TabCards from "@inngest/components/TabCards/TabCards";
-import ky from "ky";
-import { toast } from "sonner";
+import { useCallback, useMemo, useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Modal } from '@inngest/components/Modal/Modal';
+import TabCards from '@inngest/components/TabCards/TabCards';
+import ky from 'ky';
+import { toast } from 'sonner';
 
-import { useQuery } from "urql";
-import { z } from "zod";
+import { useQuery } from 'urql';
+import { z } from 'zod';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import CodeEditor from "@/components/Textarea/CodeEditor";
-import { graphql } from "@/gql";
-import { EnvironmentType } from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import CodeEditor from '@/components/Textarea/CodeEditor';
+import { graphql } from '@/gql';
+import { EnvironmentType } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { useNavigate } from '@tanstack/react-router';
 
 const eventSchema = z.object({
   name: z.string(),
@@ -60,41 +60,41 @@ const buildTabs = ({
 }: TabType) => {
   return [
     {
-      tabLabel: "JSON Editor",
-      tabTitle: "Send Custom JSON",
-      submitButtonLabel: "Send event",
+      tabLabel: 'JSON Editor',
+      tabTitle: 'Send Custom JSON',
+      submitButtonLabel: 'Send event',
       submitButtonEnabled: Boolean(eventKey),
       submitAction: sendEventAction,
-      codeLanguage: "json",
+      codeLanguage: 'json',
       initialCode: JSON.stringify(payload, null, 2),
     },
     {
-      tabLabel: "SDK",
-      tabTitle: "Send with the SDK",
-      submitButtonLabel: "Copy Code",
+      tabLabel: 'SDK',
+      tabTitle: 'Send with the SDK',
+      submitButtonLabel: 'Copy Code',
       submitButtonEnabled: true,
       submitAction: copyToClipboardAction,
-      codeLanguage: "javascript",
+      codeLanguage: 'javascript',
       initialCode: `import { Inngest } from 'inngest';
 
 const inngest = new Inngest({
   name: 'Your App Name',
-  eventKey: '${eventKey || "<EVENT_KEY>"}',${
-        isBranchChild ? `\n  env: '${envName}',` : ""
+  eventKey: '${eventKey || '<EVENT_KEY>'}',${
+        isBranchChild ? `\n  env: '${envName}',` : ''
       }
 });
 
 await inngest.send(${JSON.stringify(payload, null, 2)});`,
     },
     {
-      tabLabel: "cURL",
-      tabTitle: "Send with cURL",
-      submitButtonLabel: "Copy Code",
+      tabLabel: 'cURL',
+      tabTitle: 'Send with cURL',
+      submitButtonLabel: 'Copy Code',
       submitButtonEnabled: true,
       submitAction: copyToClipboardAction,
-      codeLanguage: "bash",
+      codeLanguage: 'bash',
       initialCode: `curl ${sendEventURL} \\${
-        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ""
+        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
       }
   --data '${JSON.stringify(payload)}'`,
     },
@@ -102,7 +102,7 @@ await inngest.send(${JSON.stringify(payload, null, 2)});`,
 };
 
 export function SendEventModal({
-  eventName = "Your Event Name",
+  eventName = 'Your Event Name',
   isOpen,
   onClose,
   initialData,
@@ -128,7 +128,7 @@ export function SendEventModal({
       }
       return { name: eventName, data: {} };
     } catch (error) {
-      console.error("Failed to parse initialData:", error);
+      console.error('Failed to parse initialData:', error);
       return { name: eventName, data: {} };
     }
   });
@@ -138,10 +138,10 @@ export function SendEventModal({
   const eventKey = usePreferDefaultEventKey();
   const hasEventKey = Boolean(eventKey);
   const protocol =
-    process.env.NODE_ENV === "development" ? "http://" : "https://";
+    process.env.NODE_ENV === 'development' ? 'http://' : 'https://';
   const sendEventURL = `${protocol}${
     process.env.NEXT_PUBLIC_EVENT_API_HOST
-  }/e/${eventKey || "<EVENT_KEY>"}`;
+  }/e/${eventKey || '<EVENT_KEY>'}`;
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
@@ -170,19 +170,19 @@ export function SendEventModal({
       event.preventDefault();
       const form = event.currentTarget;
       const formData = new FormData(form);
-      const jsonString = formData.get("code") as string;
+      const jsonString = formData.get('code') as string;
 
       let jsonEvent: any;
       try {
         jsonEvent = JSON.parse(jsonString);
       } catch (error) {
-        toast.error("Could not parse JSON. Please check your syntax.");
+        toast.error('Could not parse JSON. Please check your syntax.');
         return;
       }
 
-      const headers: { ["x-inngest-env"]?: string } = {};
+      const headers: { ['x-inngest-env']?: string } = {};
       if (isBranchChild) {
-        headers["x-inngest-env"] = envName;
+        headers['x-inngest-env'] = envName;
       }
 
       const sendEvent = ky.post(sendEventURL, {
@@ -191,14 +191,14 @@ export function SendEventModal({
       });
 
       toast.promise(sendEvent, {
-        loading: "Loading...",
+        loading: 'Loading...',
         success: () => {
-          navigate({ to: "." });
+          navigate({ to: '.' });
           onClose();
           window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
-          return "Event sent!";
+          return 'Event sent!';
         },
-        error: "Could not send event. Please try again later.",
+        error: 'Could not send event. Please try again later.',
       });
     },
     [envName, isBranchChild, onClose, navigate, sendEventURL],
@@ -209,16 +209,16 @@ export function SendEventModal({
       event.preventDefault();
       const form = event.currentTarget;
       const formData = new FormData(form);
-      const code = formData.get("code") as string;
+      const code = formData.get('code') as string;
 
       toast.promise(navigator.clipboard.writeText(code), {
-        loading: "Loading...",
+        loading: 'Loading...',
         success: () => {
-          navigate({ to: "." });
+          navigate({ to: '.' });
           onClose();
-          return "Copied to clipboard!";
+          return 'Copied to clipboard!';
         },
-        error: "Could not copy to clipboard.",
+        error: 'Could not copy to clipboard.',
       });
     },
     [onClose, navigate],
@@ -274,13 +274,13 @@ export function SendEventModal({
           {!hasEventKey && (
             <Alert severity="warning" className="mb-2 text-sm">
               There are no Event Keys for this environment. Please create an
-              Event Key in{" "}
+              Event Key in{' '}
               <Alert.Link
                 to={pathCreator.keys({ envSlug: environment.slug })}
                 severity="warning"
               >
                 the Manage tab
-              </Alert.Link>{" "}
+              </Alert.Link>{' '}
               first.
             </Alert>
           )}
@@ -350,7 +350,7 @@ function usePreferDefaultEventKey(): string | undefined {
   const eventKeys = data?.environment.eventKeys;
 
   const defaultKey = eventKeys?.find((eventKey) => {
-    return eventKey.name?.toLowerCase().startsWith("default in");
+    return eventKey.name?.toLowerCase().startsWith('default in');
   })?.value;
 
   return defaultKey ?? eventKeys?.[0]?.value;

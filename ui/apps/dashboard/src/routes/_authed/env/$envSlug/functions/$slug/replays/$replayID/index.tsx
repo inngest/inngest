@@ -1,14 +1,14 @@
-import AppDetailsCard from "@inngest/components/Apps/AppDetailsCard";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
-import { StatusCell } from "@inngest/components/Table/Cell";
-import { Time } from "@inngest/components/Time";
-import { formatMilliseconds } from "@inngest/components/utils/date";
-import { createFileRoute } from "@tanstack/react-router";
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { StatusCell } from '@inngest/components/Table/Cell';
+import { Time } from '@inngest/components/Time';
+import { formatMilliseconds } from '@inngest/components/utils/date';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { useGetReplay } from "@/components/Replay/useGetReplay";
+import { useGetReplay } from '@/components/Replay/useGetReplay';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/functions/$slug/replays/$replayID/",
+  '/_authed/env/$envSlug/functions/$slug/replays/$replayID/',
 )({
   component: ReplayDetailsPage,
 });
@@ -18,7 +18,7 @@ function ReplayDetailsPage() {
   const { data: replay, isLoading, error } = useGetReplay(replayID);
 
   if (!replay && !isLoading) {
-    console.error("No replay found");
+    console.error('No replay found');
     return null;
   }
 
@@ -39,19 +39,19 @@ function ReplayDetailsPage() {
           size="small"
           status={replay.status}
           label={
-            replay.status === "ENDED" ? "Queuing complete" : "Queuing runs"
+            replay.status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'
           }
         />
       )}
       <AppDetailsCard title="Replay information" className="mt-9">
         <AppDetailsCard.Item
           term="Started queuing"
-          detail={replay?.createdAt ? <Time value={replay.createdAt} /> : "-"}
+          detail={replay?.createdAt ? <Time value={replay.createdAt} /> : '-'}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Completed queuing"
-          detail={replay?.endedAt ? <Time value={replay.endedAt} /> : "-"}
+          detail={replay?.endedAt ? <Time value={replay.endedAt} /> : '-'}
           loading={isLoading}
         />
         <AppDetailsCard.Item
@@ -66,17 +66,17 @@ function ReplayDetailsPage() {
         />
         <AppDetailsCard.Item
           term="Duration"
-          detail={replay?.duration ? formatMilliseconds(replay.duration) : "-"}
+          detail={replay?.duration ? formatMilliseconds(replay.duration) : '-'}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Replay from"
-          detail={replay?.fromRange ? <Time value={replay.fromRange} /> : "-"}
+          detail={replay?.fromRange ? <Time value={replay.fromRange} /> : '-'}
           loading={isLoading}
         />
         <AppDetailsCard.Item
           term="Replay to"
-          detail={replay?.toRange ? <Time value={replay.toRange} /> : "-"}
+          detail={replay?.toRange ? <Time value={replay.toRange} /> : '-'}
           loading={isLoading}
         />
         <AppDetailsCard.Item
@@ -94,7 +94,7 @@ function ReplayDetailsPage() {
                 ))}
               </div>
             ) : (
-              "-"
+              '-'
             )
           }
           loading={isLoading}

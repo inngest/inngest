@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { useUser } from "@clerk/tanstack-react-start";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Link } from "@inngest/components/Link/NewLink";
-import { isAfter, sub } from "@inngest/components/utils/date";
-import { RiCloseLine } from "@remixicon/react";
+import { useEffect, useState } from 'react';
+import { useUser } from '@clerk/tanstack-react-start';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Link } from '@inngest/components/Link/NewLink';
+import { isAfter, sub } from '@inngest/components/utils/date';
+import { RiCloseLine } from '@remixicon/react';
 
-const HIDE_NEW_USER_SURVEY = "inngest-new-use-survey-hide";
+const HIDE_NEW_USER_SURVEY = 'inngest-new-use-survey-hide';
 
 export default function NewUser() {
   const [open, setOpen] = useState(false);
@@ -20,7 +20,7 @@ export default function NewUser() {
           months: 2,
         }),
       ) &&
-      window.localStorage.getItem(HIDE_NEW_USER_SURVEY) !== "true"
+      window.localStorage.getItem(HIDE_NEW_USER_SURVEY) !== 'true'
     ) {
       setOpen(true);
     }
@@ -28,7 +28,7 @@ export default function NewUser() {
 
   const dismiss = () => {
     setOpen(false);
-    window.localStorage.setItem(HIDE_NEW_USER_SURVEY, "true");
+    window.localStorage.setItem(HIDE_NEW_USER_SURVEY, 'true');
   };
 
   return (

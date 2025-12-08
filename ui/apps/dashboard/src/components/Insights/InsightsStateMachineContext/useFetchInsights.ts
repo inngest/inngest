@@ -1,11 +1,11 @@
-import { useCallback } from "react";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { InsightsColumnType, type InsightsResultsQuery } from "@/gql/graphql";
-import { UNTITLED_QUERY } from "../InsightsTabManager/constants";
-import type { InsightsFetchResult } from "./types";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { InsightsColumnType, type InsightsResultsQuery } from '@/gql/graphql';
+import { UNTITLED_QUERY } from '../InsightsTabManager/constants';
+import type { InsightsFetchResult } from './types';
 
 export interface FetchInsightsParams {
   query: string;
@@ -41,11 +41,11 @@ export function useFetchInsights() {
         .query(
           insightResultsQuery,
           { query, workspaceID: environment.id },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
       if (res.error) throw res.error;
-      if (!res.data) throw new Error("No data");
+      if (!res.data) throw new Error('No data');
 
       cb(query, queryName === UNTITLED_QUERY ? undefined : queryName);
       return transformInsightsResponse(res.data.insights);
@@ -58,16 +58,16 @@ export function useFetchInsights() {
 
 function mapColumnType(
   columnType: InsightsColumnType,
-): "date" | "number" | "string" {
+): 'date' | 'number' | 'string' {
   switch (columnType) {
     case InsightsColumnType.Date:
-      return "date";
+      return 'date';
     case InsightsColumnType.Number:
-      return "number";
+      return 'number';
     case InsightsColumnType.String:
     case InsightsColumnType.Unknown:
     default:
-      return "string";
+      return 'string';
   }
 }
 
@@ -104,7 +104,7 @@ function transformValuesByColumns(
 }
 
 function transformInsightsResponse(
-  insights: InsightsResultsQuery["insights"],
+  insights: InsightsResultsQuery['insights'],
 ): InsightsFetchResult {
   return {
     columns: insights.columns.map((col) => ({

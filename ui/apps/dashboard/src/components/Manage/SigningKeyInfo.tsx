@@ -1,5 +1,5 @@
-import { Info } from "@inngest/components/Info/Info";
-import { Link } from "@inngest/components/Link/NewLink";
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link/NewLink';
 
 export const SigningKeyInfo = () => (
   <Info
@@ -7,7 +7,7 @@ export const SigningKeyInfo = () => (
         application."
     action={
       <Link
-        href={"https://www.inngest.com/docs/platform/signing-keys"}
+        href={'https://www.inngest.com/docs/platform/signing-keys'}
         target="_blank"
       >
         Learn how create a webhook

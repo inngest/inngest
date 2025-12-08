@@ -1,8 +1,8 @@
-import Keys from "@/components/Manage/Keys";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import Keys from '@/components/Manage/Keys';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/manage/$ingestKeys",
+  '/_authed/env/$envSlug/manage/$ingestKeys',
 )({
   component: KeysLayout,
 });

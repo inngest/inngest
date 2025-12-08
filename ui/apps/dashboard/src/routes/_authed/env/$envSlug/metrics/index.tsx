@@ -1,10 +1,10 @@
-import { MetricsActionMenu } from "@/components/Metrics/ActionMenu";
-import { Dashboard } from "@/components/Metrics/Dashboard";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { RefreshButton } from "@inngest/components/Refresh/NewRefreshButton";
-import { createFileRoute } from "@tanstack/react-router";
+import { MetricsActionMenu } from '@/components/Metrics/ActionMenu';
+import { Dashboard } from '@/components/Metrics/Dashboard';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { RefreshButton } from '@inngest/components/Refresh/NewRefreshButton';
+import { createFileRoute } from '@tanstack/react-router';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/metrics/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/metrics/')({
   component: MetricsComponent,
 });
 
@@ -13,7 +13,7 @@ function MetricsComponent() {
   return (
     <>
       <Header
-        breadcrumb={[{ text: "Metrics" }]}
+        breadcrumb={[{ text: 'Metrics' }]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
             <RefreshButton />

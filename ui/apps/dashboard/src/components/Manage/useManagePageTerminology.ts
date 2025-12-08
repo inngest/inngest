@@ -1,6 +1,6 @@
-import { useLocation } from "@tanstack/react-router";
+import { useLocation } from '@tanstack/react-router';
 
-import { getManageKey } from "@/utils/urls";
+import { getManageKey } from '@/utils/urls';
 
 export default function useManagePageTerminology() {
   const location = useLocation();
@@ -18,16 +18,16 @@ export default function useManagePageTerminology() {
 
   const source: ContentProps = {
     keys: {
-      name: "Event Key",
-      type: "key",
-      titleType: "Key",
-      param: "keys",
+      name: 'Event Key',
+      type: 'key',
+      titleType: 'Key',
+      param: 'keys',
     },
     webhooks: {
-      name: "Webhook",
-      type: "webhook",
-      titleType: "Webhook",
-      param: "webhooks",
+      name: 'Webhook',
+      type: 'webhook',
+      titleType: 'Webhook',
+      param: 'webhooks',
     },
   };
 

@@ -1,6 +1,6 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Select } from "@inngest/components/Select/Select";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
+import { useNavigate } from '@tanstack/react-router';
+import { Select } from '@inngest/components/Select/Select';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 
 export const StatusMenu = ({
   envSlug,
@@ -10,16 +10,16 @@ export const StatusMenu = ({
   archived: boolean;
 }) => {
   const navigate = useNavigate();
-  const activeOption = { id: "active", name: "Active apps" };
-  const archivedOption = { id: "archived", name: "Archived apps" };
+  const activeOption = { id: 'active', name: 'Active apps' };
+  const archivedOption = { id: 'archived', name: 'Archived apps' };
 
   const handleChange = (
     option: typeof activeOption | typeof archivedOption,
   ) => {
     navigate({
-      to: "/env/$envSlug/apps",
+      to: '/env/$envSlug/apps',
       params: { envSlug },
-      search: { archived: option.id === "archived" ? "true" : undefined },
+      search: { archived: option.id === 'archived' ? 'true' : undefined },
       replace: true,
     });
   };
@@ -35,8 +35,8 @@ export const StatusMenu = ({
     >
       <Select.Button className="w-[132px]">
         <div className="flex flex-row items-center gap-2">
-          <StatusDot status={archived ? "ARCHIVED" : "ACTIVE"} size="small" />
-          {archived ? "Archived" : "Active"}
+          <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
+          {archived ? 'Archived' : 'Active'}
         </div>
       </Select.Button>
       <Select.Options>

@@ -1,46 +1,46 @@
-import FunctionRunRateLimitChart from "@/components/Functions/FunctionRateLimitChart";
-import type { UsageMetrics } from "@/components/Functions/FunctionRunsChart";
-import FunctionRunsChart from "@/components/Functions/FunctionRunsChart";
-import FunctionThroughputChart from "@/components/Functions/FunctionThroughputChart";
-import LatestFailedFunctionRuns from "@/components/Functions/LatestFailedFunctionRuns";
-import SDKRequestThroughputChart from "@/components/Functions/SDKRequestThroughput";
-import StepBacklogChart from "@/components/Functions/StepBacklogChart";
-import StepsRunningChart from "@/components/Functions/StepsRunningChart";
-import LoadingIcon from "@/components/Icons/LoadingIcon";
-import { useFunction, useFunctionUsage } from "@/queries";
-import { pathCreator } from "@/utils/urls";
-import { useAccountFeatures } from "@/utils/useAccountFeatures";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import type { RangeChangeProps } from "@inngest/components/DatePicker/RangePicker";
-import { TimeFilter } from "@inngest/components/Filter/TimeFilter";
-import { useCalculatedStartTime } from "@inngest/components/hooks/useCalculatedStartTime";
-import * as Sentry from "@sentry/tanstackstart-react";
+import FunctionRunRateLimitChart from '@/components/Functions/FunctionRateLimitChart';
+import type { UsageMetrics } from '@/components/Functions/FunctionRunsChart';
+import FunctionRunsChart from '@/components/Functions/FunctionRunsChart';
+import FunctionThroughputChart from '@/components/Functions/FunctionThroughputChart';
+import LatestFailedFunctionRuns from '@/components/Functions/LatestFailedFunctionRuns';
+import SDKRequestThroughputChart from '@/components/Functions/SDKRequestThroughput';
+import StepBacklogChart from '@/components/Functions/StepBacklogChart';
+import StepsRunningChart from '@/components/Functions/StepsRunningChart';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useFunction, useFunctionUsage } from '@/queries';
+import { pathCreator } from '@/utils/urls';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
+import * as Sentry from '@sentry/tanstackstart-react';
 
 import {
   useBatchedSearchParams,
   useSearchParam,
-} from "@inngest/components/hooks/useNewSearchParams";
-import { cn } from "@inngest/components/utils/classNames";
+} from '@inngest/components/hooks/useNewSearchParams';
+import { cn } from '@inngest/components/utils/classNames';
 import {
   durationToString,
   parseDuration,
-} from "@inngest/components/utils/date";
-import { FunctionConfiguration } from "@inngest/components/FunctionConfiguration";
+} from '@inngest/components/utils/date';
+import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 
-const DEFAULT_TIME = "1d";
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useCallback } from "react";
+const DEFAULT_TIME = '1d';
+import { createFileRoute } from '@tanstack/react-router';
+import { useMemo, useCallback } from 'react';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/functions/$slug/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug/')({
   component: RouteComponent,
 });
 
 function RouteComponent() {
   const { slug, envSlug } = Route.useParams();
-  const [lastDays] = useSearchParam("last");
-  const [startTime] = useSearchParam("start");
-  const [endTime] = useSearchParam("end");
+  const [lastDays] = useSearchParam('last');
+  const [startTime] = useSearchParam('start');
+  const [endTime] = useSearchParam('end');
 
   const batchUpdate = useBatchedSearchParams();
 
@@ -56,9 +56,9 @@ function RouteComponent() {
     (range: RangeChangeProps) => {
       batchUpdate({
         last:
-          range.type === "relative" ? durationToString(range.duration) : null,
-        start: range.type === "absolute" ? range.start.toISOString() : null,
-        end: range.type === "absolute" ? range.end.toISOString() : null,
+          range.type === 'relative' ? durationToString(range.duration) : null,
+        start: range.type === 'absolute' ? range.start.toISOString() : null,
+        end: range.type === 'absolute' ? range.end.toISOString() : null,
       });
     },
     [batchUpdate],
@@ -110,7 +110,7 @@ function RouteComponent() {
   );
 
   const failureRate = !usageMetrics?.totalRuns
-    ? "0.00"
+    ? '0.00'
     : (
         ((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) *
         100
@@ -118,8 +118,8 @@ function RouteComponent() {
 
   let appRoute = `/env/${envSlug}/apps/${function_.app.externalID}`;
   let billingUrl = pathCreator.billing({
-    tab: "plans",
-    ref: "concurrency-limit-popover",
+    tab: 'plans',
+    ref: 'concurrency-limit-popover',
   });
 
   return (
@@ -134,8 +134,8 @@ function RouteComponent() {
                 </h3>
                 <span className="text-xl font-medium ">
                   {usageMetrics?.totalRuns.toLocaleString(undefined, {
-                    notation: "compact",
-                    compactDisplay: "short",
+                    notation: 'compact',
+                    compactDisplay: 'short',
                   })}
                 </span>
               </div>
@@ -145,8 +145,8 @@ function RouteComponent() {
                 </h3>
                 <span
                   className={cn(
-                    "text-xl font-medium",
-                    failureRate === "0.00" ? "text-subtle" : "text-error",
+                    'text-xl font-medium',
+                    failureRate === '0.00' ? 'text-subtle' : 'text-error',
                   )}
                 >{`${failureRate}%`}</span>
               </div>
@@ -156,17 +156,17 @@ function RouteComponent() {
                 defaultValue={
                   lastDays
                     ? {
-                        type: "relative",
+                        type: 'relative',
                         duration: parseDuration(lastDays),
                       }
                     : startTime && endTime
                     ? {
-                        type: "absolute",
+                        type: 'absolute',
                         start: new Date(startTime),
                         end: new Date(endTime),
                       }
                     : {
-                        type: "relative",
+                        type: 'relative',
                         duration: parseDuration(DEFAULT_TIME),
                       }
                 }

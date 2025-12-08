@@ -1,14 +1,14 @@
-import { Chart, type ChartProps } from "@inngest/components/Chart/Chart";
-import { Info } from "@inngest/components/Info/Info";
-import { Link } from "@inngest/components/Link/NewLink";
-import { resolveColor } from "@inngest/components/utils/colors";
-import { isDark } from "@inngest/components/utils/theme";
+import { Chart, type ChartProps } from '@inngest/components/Chart/Chart';
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link/NewLink';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 
 import type {
   FunctionStatusMetricsQuery,
   ScopedMetricsResponse,
-} from "@/gql/graphql";
-import { backgroundColor, colors, textColor } from "@/utils/tailwind";
+} from '@/gql/graphql';
+import { backgroundColor, colors, textColor } from '@/utils/tailwind';
 
 export type MetricsData = {
   workspace: {
@@ -18,7 +18,7 @@ export type MetricsData = {
   };
 };
 
-export type FunctionTotals = FunctionStatusMetricsQuery["workspace"]["totals"];
+export type FunctionTotals = FunctionStatusMetricsQuery['workspace']['totals'];
 
 export type PieChartData = Array<{
   value: number;
@@ -31,37 +31,37 @@ const mapMetrics = (totals: FunctionTotals) => {
   return [
     {
       value: totals.completed || 0,
-      name: "Completed",
+      name: 'Completed',
       itemStyle: {
-        color: resolveColor(colors.primary.moderate, dark, "#2c9b63"),
+        color: resolveColor(colors.primary.moderate, dark, '#2c9b63'),
       },
     },
     {
       value: totals.cancelled || 0,
-      name: "Cancelled",
+      name: 'Cancelled',
       itemStyle: {
-        color: resolveColor(backgroundColor.canvasMuted, dark, "#e2e2e2"),
+        color: resolveColor(backgroundColor.canvasMuted, dark, '#e2e2e2'),
       },
     },
     {
       value: totals.failed || 0,
-      name: "Failed",
+      name: 'Failed',
       itemStyle: {
-        color: resolveColor(colors.tertiary.subtle, dark, "#fa8d86"),
+        color: resolveColor(colors.tertiary.subtle, dark, '#fa8d86'),
       },
     },
     {
       value: totals.running,
-      name: "Running",
+      name: 'Running',
       itemStyle: {
-        color: resolveColor(colors.secondary.subtle, dark, "#52b2fd"),
+        color: resolveColor(colors.secondary.subtle, dark, '#52b2fd'),
       },
     },
     {
       value: totals.queued,
-      name: "Queued",
+      name: 'Queued',
       itemStyle: {
-        color: resolveColor(colors.quaternary.coolModerate, dark, "#8b74f9"),
+        color: resolveColor(colors.quaternary.coolModerate, dark, '#8b74f9'),
       },
     },
   ];
@@ -95,19 +95,19 @@ const percent = (sum: number, part: number) =>
 const getChartOptions = (
   data: PieChartData,
   loading: boolean = false,
-): ChartProps["option"] => {
+): ChartProps['option'] => {
   const sum = totalRuns(data);
   const dark = isDark();
 
   return {
     legend: {
-      orient: "vertical",
-      right: "5%",
-      top: "center",
-      icon: "circle",
+      orient: 'vertical',
+      right: '5%',
+      top: 'center',
+      icon: 'circle',
       selectedMode: true,
       textStyle: {
-        fontSize: "12px",
+        fontSize: '12px',
         color: resolveColor(textColor.basis, dark),
       },
       formatter: (name: string) =>
@@ -118,27 +118,27 @@ const getChartOptions = (
             data.find((d: { name: string; value: number }) => d.name === name)
               ?.value || 0,
           ),
-        ].join(" "),
+        ].join(' '),
     },
 
     series: [
       {
-        name: "Function Runs",
-        type: "pie",
-        radius: ["40%", "75%"],
-        center: ["30%", "50%"],
+        name: 'Function Runs',
+        type: 'pie',
+        radius: ['40%', '75%'],
+        center: ['30%', '50%'],
         itemStyle: {
-          borderColor: resolveColor(backgroundColor.canvasBase, dark, "#fff"),
+          borderColor: resolveColor(backgroundColor.canvasBase, dark, '#fff'),
           borderWidth: 2,
         },
         avoidLabelOverlap: true,
         label: {
           show: true,
-          position: "center",
+          position: 'center',
           formatter: (): string => {
             return loading
-              ? [`{name| Loading}`, `{value| ...}`].join("\n")
-              : [`{name| Total runs}`, `{value| ${sum}}`].join("\n");
+              ? [`{name| Loading}`, `{value| ...}`].join('\n')
+              : [`{name| Total runs}`, `{value| ${sum}}`].join('\n');
           },
           ...holeLabel(),
         },
@@ -147,13 +147,13 @@ const getChartOptions = (
             show: true,
             formatter: ({ data }: any): string => {
               return [`{name| ${data?.name}}`, `{value| ${data?.value}}`].join(
-                "\n",
+                '\n',
               );
             },
             backgroundColor: resolveColor(
               backgroundColor.canvasBase,
               dark,
-              "#fff",
+              '#fff',
             ),
             width: 80,
             ...holeLabel(),
@@ -174,7 +174,7 @@ export const FunctionStatus = ({ totals }: { totals?: FunctionTotals }) => {
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full shrink-0 flex-col rounded-md border p-5 md:w-[448px]">
       <div className="text-subtle mb-2 flex flex-row items-center gap-x-2 text-lg">
-        Functions Status{" "}
+        Functions Status{' '}
         <Info
           text="Interact with the chart to see the status and total number of your function runs over a period of time."
           action={

@@ -1,14 +1,14 @@
-import { memo } from "react";
-import { Table } from "@inngest/components/Table";
-import type { ColumnDef } from "@tanstack/react-table";
+import { memo } from 'react';
+import { Table } from '@inngest/components/Table';
+import type { ColumnDef } from '@tanstack/react-table';
 
-import { useInsightsStateMachineContext } from "@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext";
-import type { InsightsFetchResult } from "@/components/Insights/InsightsStateMachineContext/types";
-import { ResultsTableFooter, assertData } from "./ResultsTableFooter";
-import { useColumns } from "./useColumns";
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
+import { ResultsTableFooter, assertData } from './ResultsTableFooter';
+import { useColumns } from './useColumns';
 
-type InsightsEntry = InsightsFetchResult["rows"][number];
-type InsightsColumnValue = InsightsEntry["values"][string];
+type InsightsEntry = InsightsFetchResult['rows'][number];
+type InsightsColumnValue = InsightsEntry['values'][string];
 type InsightsTableProps = {
   cellClassName: string;
   columns: ColumnDef<InsightsEntry, InsightsColumnValue>[];

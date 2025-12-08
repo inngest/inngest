@@ -2,23 +2,23 @@ import type {
   ChartProps,
   LegendComponentOption,
   LineSeriesOption,
-} from "@inngest/components/Chart/Chart";
-import { resolveColor } from "@inngest/components/utils/colors";
+} from '@inngest/components/Chart/Chart';
+import { resolveColor } from '@inngest/components/utils/colors';
 import {
   differenceInMilliseconds,
   lightFormat,
   toDate,
-} from "@inngest/components/utils/date";
-import { isDark } from "@inngest/components/utils/theme";
+} from '@inngest/components/utils/date';
+import { isDark } from '@inngest/components/utils/theme';
 
-import type { MetricsData, MetricsResponse, ScopedMetric } from "@/gql/graphql";
+import type { MetricsData, MetricsResponse, ScopedMetric } from '@/gql/graphql';
 import {
   backgroundColor,
   colors,
   textColor,
   borderColor,
-} from "@/utils/tailwind";
-import type { EntityLookup, EntityType } from "./Dashboard";
+} from '@/utils/tailwind';
+import type { EntityLookup, EntityType } from './Dashboard';
 
 // Type assertion for extended colors that aren't in DefaultColors
 const extendedColors = colors as typeof colors & {
@@ -41,19 +41,19 @@ export type LineChartData = {
 };
 
 export const lineColors = [
-  [extendedColors.accent.subtle, "#ec9923"],
-  [extendedColors.primary.moderate, "#2c9b63"],
-  [extendedColors.secondary.moderate, "#2389f1"],
-  [extendedColors.tertiary.moderate, "#f54a3f"],
-  [extendedColors.quaternary.coolxIntense, "#6222df"],
+  [extendedColors.accent.subtle, '#ec9923'],
+  [extendedColors.primary.moderate, '#2c9b63'],
+  [extendedColors.secondary.moderate, '#2389f1'],
+  [extendedColors.tertiary.moderate, '#f54a3f'],
+  [extendedColors.quaternary.coolxIntense, '#6222df'],
 ];
 
 export const seriesOptions: LineSeriesOption = {
-  type: "line",
+  type: 'line',
   showSymbol: false,
   lineStyle: { width: 1 },
   triggerLineEvent: true,
-  emphasis: { focus: "none" },
+  emphasis: { focus: 'none' },
 };
 
 export const dateFormat = (dateString: string, diff: number) => {
@@ -65,10 +65,10 @@ export const dateFormat = (dateString: string, diff: number) => {
   const d = Math.abs(diff);
 
   return d < 6000 // a minute
-    ? lightFormat(date, "HH:mm:ss:SSS")
+    ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-    ? lightFormat(date, "HH:mm")
-    : lightFormat(date, "MM/dd:HH");
+    ? lightFormat(date, 'HH:mm')
+    : lightFormat(date, 'MM/dd:HH');
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -99,7 +99,7 @@ export const marker = (color: string) =>
 
 export const formatDimension = (param: any) => {
   const color =
-    typeof param.color === "object"
+    typeof param.color === 'object'
       ? param.color?.colorStops[0]?.color
       : param.color;
 
@@ -125,21 +125,21 @@ const tooltipFormatter = (params: any) => {
       }</div>${params
         .sort((a: any, b: any) => b.value - a.value)
         .map((p: any) => formatDimension(p))
-        .join("")}</div>`
-    : "";
+        .join('')}</div>`
+    : '';
 };
 
 export const getLineChartOptions = (
-  data: Partial<ChartProps["option"]>,
-  legendData?: LegendComponentOption["data"],
-): ChartProps["option"] => {
+  data: Partial<ChartProps['option']>,
+  legendData?: LegendComponentOption['data'],
+): ChartProps['option'] => {
   const dark = isDark();
   return {
     tooltip: {
-      trigger: "axis",
-      renderMode: "html",
+      trigger: 'axis',
+      renderMode: 'html',
       enterable: true,
-      position: "top",
+      position: 'top',
       backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
       borderColor: resolveColor(borderColor.subtle, dark),
       textStyle: { color: resolveColor(textColor.basis, dark) },
@@ -151,38 +151,38 @@ export const getLineChartOptions = (
       //
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
-      appendTo: () => document.getElementById("chart-tooltip"),
+      appendTo: () => document.getElementById('chart-tooltip'),
       transitionDuration: 1.5,
       formatter: (params) => tooltipFormatter(params),
       padding: 0,
-      extraCssText: "max-height: 300px; overflow-y: scroll;",
-      className: "no-scrollbar",
+      extraCssText: 'max-height: 300px; overflow-y: scroll;',
+      className: 'no-scrollbar',
     },
     legend: {
-      type: "scroll",
-      bottom: "0%",
-      left: "0%",
-      icon: "circle",
+      type: 'scroll',
+      bottom: '0%',
+      left: '0%',
+      icon: 'circle',
       itemWidth: 10,
       itemHeight: 10,
       textStyle: {
-        fontSize: "12px",
+        fontSize: '12px',
         color: resolveColor(textColor.basis, dark),
       },
       data: legendData,
     },
     grid: {
-      top: "10%",
-      left: "1%",
-      right: "0%",
-      bottom: "15%",
+      top: '10%',
+      left: '1%',
+      right: '0%',
+      bottom: '15%',
       containLabel: true,
     },
     yAxis: {
-      type: "value",
+      type: 'value',
       minInterval: 1,
       splitLine: {
-        lineStyle: { color: resolveColor(borderColor.subtle, dark, "#E2E2E2") },
+        lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
       },
     },
     ...data,
@@ -207,13 +207,13 @@ export const getXAxis = (
   const dataLength = series?.length || 30;
 
   return {
-    type: "category" as const,
+    type: 'category' as const,
     boundaryGap: true,
-    data: series?.map(({ bucket }) => bucket) || ["No Data Found"],
+    data: series?.map(({ bucket }) => bucket) || ['No Data Found'],
     axisPointer: {
       show: true,
       snap: true,
-      type: "line" as const,
+      type: 'line' as const,
       label: {
         show: false,
         borderWidth: 1,

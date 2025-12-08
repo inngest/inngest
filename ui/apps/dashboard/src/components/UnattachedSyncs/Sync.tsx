@@ -1,9 +1,9 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { RiErrorWarningLine } from "@remixicon/react";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { RiErrorWarningLine } from '@remixicon/react';
 
-import { AppGitCard } from "@/components/Apps/AppGitCard/AppGitCard";
-import { AppInfoCard } from "@/components/Apps/AppInfoCard/AppInfoCard";
-import { useSync } from "./useSync";
+import { AppGitCard } from '@/components/Apps/AppGitCard/AppGitCard';
+import { AppInfoCard } from '@/components/Apps/AppInfoCard/AppInfoCard';
+import { useSync } from './useSync';
 
 type Props = {
   syncID: string;
@@ -13,7 +13,7 @@ export const Sync = ({ syncID }: Props) => {
   const syncRes = useSync({ syncID });
 
   if (syncRes.error) {
-    if (syncRes.error.message.includes("no rows")) {
+    if (syncRes.error.message.includes('no rows')) {
       return (
         <div className="h-full w-full overflow-y-auto">
           <div className="mx-auto w-full max-w-[1200px] p-4">

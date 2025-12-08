@@ -1,9 +1,9 @@
-import colors from "tailwindcss/colors";
-import { useQuery } from "urql";
+import colors from 'tailwindcss/colors';
+import { useQuery } from 'urql';
 
-import SimpleLineChart from "@/components/Charts/SimpleLineChart";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import SimpleLineChart from '@/components/Charts/SimpleLineChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const GetStepsRunningDocument = graphql(`
   query GetStepsRunningMetrics(
@@ -72,7 +72,7 @@ export default function StepsRunningChart({
   const maxLength = Math.max(running.length, concurrencyLimit.length);
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name: running[idx]?.bucket || concurrencyLimit[idx]?.bucket || "",
+    name: running[idx]?.bucket || concurrencyLimit[idx]?.bucket || '',
     values: {
       running: running[idx]?.value ?? 0,
       concurrencyLimit: Boolean(concurrencyLimit[idx]?.value),
@@ -86,12 +86,12 @@ export default function StepsRunningChart({
       data={metrics}
       legend={[
         {
-          name: "Concurrency Limit",
-          dataKey: "concurrencyLimit",
-          color: colors.amber["500"],
+          name: 'Concurrency Limit',
+          dataKey: 'concurrencyLimit',
+          color: colors.amber['500'],
           referenceArea: true,
         },
-        { name: "Running", dataKey: "running", color: colors.blue["500"] },
+        { name: 'Running', dataKey: 'running', color: colors.blue['500'] },
       ]}
       isLoading={isFetchingMetrics}
       error={metricsError}

@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { AlertModal } from "@inngest/components/Modal";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { AlertModal } from '@inngest/components/Modal';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const mutation = graphql(`
   mutation DeleteCancellation($envID: UUID!, $cancellationID: ULID!) {
@@ -45,7 +45,7 @@ export function DeleteCancellationModal(props: Props) {
         { cancellationID: pendingDelete.id, envID: pendingDelete.envID },
         {
           // Bust cache
-          additionalTypenames: ["Cancellation"],
+          additionalTypenames: ['Cancellation'],
         },
       );
       if (res.error) {
@@ -55,7 +55,7 @@ export function DeleteCancellationModal(props: Props) {
       onClose();
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError("Unknown error");
+        setError('Unknown error');
         return;
       }
 

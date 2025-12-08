@@ -11,9 +11,9 @@ export function getFormattedJSONObjectOrArrayString(
 }
 
 function mayBeJSONArray(str: string): boolean {
-  return str.startsWith("[") && str.endsWith("]");
+  return str.startsWith('[') && str.endsWith(']');
 }
 
 function mayBeJSONObject(str: string): boolean {
-  return str.startsWith("{") && str.endsWith("}");
+  return str.startsWith('{') && str.endsWith('}');
 }

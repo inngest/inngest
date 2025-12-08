@@ -1,13 +1,13 @@
-import { useCallback, useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { RangePicker } from "@inngest/components/DatePicker";
-import { Input } from "@inngest/components/Forms/Input";
-import { Modal } from "@inngest/components/Modal";
-import { subtractDuration } from "@inngest/components/utils/date";
+import { useCallback, useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { RangePicker } from '@inngest/components/DatePicker';
+import { Input } from '@inngest/components/Forms/Input';
+import { Modal } from '@inngest/components/Modal';
+import { subtractDuration } from '@inngest/components/utils/date';
 
-import { useCreateCancellation } from "./useCreateCancellation";
-import { useRunCount, type RunCountInput } from "./useRunCount";
+import { useCreateCancellation } from './useCreateCancellation';
+import { useRunCount, type RunCountInput } from './useRunCount';
 
 type Props = {
   envID: string;
@@ -52,7 +52,7 @@ export function CancelFunctionModal(props: Props) {
       if (e instanceof Error) {
         setCreationError(e);
       } else {
-        setCreationError(new Error("unknown error"));
+        setCreationError(new Error('unknown error'));
       }
       return;
     } finally {
@@ -115,7 +115,7 @@ export function CancelFunctionModal(props: Props) {
               className="w-full"
               onChange={(range) =>
                 setTimeRange(
-                  range.type === "relative"
+                  range.type === 'relative'
                     ? {
                         start: subtractDuration(new Date(), range.duration),
                         end: new Date(),

@@ -1,4 +1,4 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   NumberCell,
   StatusCell,
@@ -6,50 +6,50 @@ import {
   TableBlankState,
   TextCell,
   TimeCell,
-} from "@inngest/components/Table";
-import { IconReplay } from "@inngest/components/icons/Replay";
-import { ReplayStatus, type Replay } from "@inngest/components/types/replay";
-import { formatMilliseconds } from "@inngest/components/utils/date";
-import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
-import { createColumnHelper } from "@tanstack/react-table";
+} from '@inngest/components/Table';
+import { IconReplay } from '@inngest/components/icons/Replay';
+import { ReplayStatus, type Replay } from '@inngest/components/types/replay';
+import { formatMilliseconds } from '@inngest/components/utils/date';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { createColumnHelper } from '@tanstack/react-table';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useGetReplays } from "@/components/Replay/useGetReplay";
-import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useGetReplays } from '@/components/Replay/useGetReplay';
+import { pathCreator } from '@/utils/urls';
+import { useNavigate } from '@tanstack/react-router';
 
 const columnHelper = createColumnHelper<Replay>();
 
 const columns = [
-  columnHelper.accessor("status", {
-    header: () => "Status",
+  columnHelper.accessor('status', {
+    header: () => 'Status',
     cell: (props) => {
       const status = props.getValue();
       return (
         <StatusCell
           status={status}
           label={
-            status === ReplayStatus.Ended ? "Queuing complete" : "Queuing runs"
+            status === ReplayStatus.Ended ? 'Queuing complete' : 'Queuing runs'
           }
         />
       );
     },
     enableSorting: false,
   }),
-  columnHelper.accessor("name", {
-    header: () => "Replay name",
+  columnHelper.accessor('name', {
+    header: () => 'Replay name',
     cell: (props) => {
       return <TextCell>{props.getValue()}</TextCell>;
     },
     enableSorting: false,
   }),
-  columnHelper.accessor("createdAt", {
-    header: () => "Started queuing",
+  columnHelper.accessor('createdAt', {
+    header: () => 'Started queuing',
     cell: (props) => <TimeCell date={props.getValue()} />,
     enableSorting: false,
   }),
-  columnHelper.accessor("endedAt", {
-    header: () => "Completed queuing",
+  columnHelper.accessor('endedAt', {
+    header: () => 'Completed queuing',
     cell: (props) => {
       const replayEndedAt = props.getValue();
       if (!replayEndedAt) {
@@ -59,29 +59,29 @@ const columns = [
     },
     enableSorting: false,
   }),
-  columnHelper.accessor("runsCount", {
-    header: () => "Queued runs",
+  columnHelper.accessor('runsCount', {
+    header: () => 'Queued runs',
     cell: (props) => (
       <NumberCell
-        term={props.getValue() === 1 ? "run" : "runs"}
+        term={props.getValue() === 1 ? 'run' : 'runs'}
         value={props.getValue()}
       />
     ),
     enableSorting: false,
   }),
-  columnHelper.accessor("runsSkippedCount", {
-    header: () => "Skipped runs",
+  columnHelper.accessor('runsSkippedCount', {
+    header: () => 'Skipped runs',
     cell: (props) => {
       const count = props.getValue();
       if (!count) {
         return <TextCell>-</TextCell>;
       }
-      return <NumberCell term={count === 1 ? "run" : "runs"} value={count} />;
+      return <NumberCell term={count === 1 ? 'run' : 'runs'} value={count} />;
     },
     enableSorting: false,
   }),
-  columnHelper.accessor("duration", {
-    header: () => "Duration",
+  columnHelper.accessor('duration', {
+    header: () => 'Duration',
     cell: (props) => {
       const replayDuration = props.getValue();
       if (!replayDuration) {

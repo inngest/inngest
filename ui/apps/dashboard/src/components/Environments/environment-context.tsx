@@ -1,6 +1,6 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext } from 'react';
 
-import type { Environment } from "@/utils/environments";
+import type { Environment } from '@/utils/environments';
 
 export const EnvironmentContext = createContext<Environment | undefined>(
   undefined,
@@ -27,7 +27,7 @@ export function useEnvironment() {
 
   if (!context) {
     throw new Error(
-      "useEnvironmentContext must be used inside the EnvironmentProvider.",
+      'useEnvironmentContext must be used inside the EnvironmentProvider.',
     );
   }
 

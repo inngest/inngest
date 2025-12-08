@@ -1,9 +1,9 @@
-import { Fragment, type ReactElement } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Skeleton } from "@inngest/components/Skeleton";
+import { Fragment, type ReactElement } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Skeleton } from '@inngest/components/Skeleton';
 
-import type { SchemaEntry } from "./SchemasContext/types";
+import type { SchemaEntry } from './SchemasContext/types';
 
 type Props = {
   entries: SchemaEntry[];

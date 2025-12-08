@@ -1,8 +1,8 @@
 // Shared TypeScript-only types for Insights agents and UI
-import { createToolManifest, type StateData } from "@inngest/agent-kit";
+import { createToolManifest, type StateData } from '@inngest/agent-kit';
 
-import { selectEventsTool } from "./event-matcher";
-import { generateSqlTool } from "./query-writer";
+import { selectEventsTool } from './event-matcher';
+import { generateSqlTool } from './query-writer';
 
 // Consolidated into a single type that extends StateData as required by AgentKit
 export type InsightsAgentState = StateData & {

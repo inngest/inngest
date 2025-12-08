@@ -1,20 +1,20 @@
-import { useMemo, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { InlineCode } from "@inngest/components/Code";
-import { Input } from "@inngest/components/Forms/Input";
-import { Link } from "@inngest/components/Link";
-import { useNavigate } from "@tanstack/react-router";
-import useLocalStorage from "react-use/esm/useLocalStorage";
+import { useMemo, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { InlineCode } from '@inngest/components/Code';
+import { Input } from '@inngest/components/Forms/Input';
+import { Link } from '@inngest/components/Link';
+import { useNavigate } from '@tanstack/react-router';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import type { CodedError } from "@/utils/codedError";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { Secret } from "@/components/Secret";
-import { SyncFailure } from "@/components/SyncFailure";
-import { graphql } from "@/gql";
-import { pathCreator } from "@/utils/urls";
+import type { CodedError } from '@/utils/codedError';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { Secret } from '@/components/Secret';
+import { SyncFailure } from '@/components/SyncFailure';
+import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const SyncNewAppDocument = graphql(`
   mutation SyncNewApp($appURL: String!, $envID: UUID!) {
@@ -37,7 +37,7 @@ type Props = {
 };
 
 export const ManualSync = ({ appsURL }: Props) => {
-  const [input = "", setInput] = useLocalStorage("deploymentUrl", "");
+  const [input = '', setInput] = useLocalStorage('deploymentUrl', '');
   const [failure, setFailure] = useState<CodedError>();
   const [isSyncing, setIsSyncing] = useState(false);
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ export const ManualSync = ({ appsURL }: Props) => {
         throw res.error;
       }
       if (!res.data) {
-        throw new Error("No API response data");
+        throw new Error('No API response data');
       }
 
       if (res.data.syncNewApp.error) {
@@ -69,7 +69,7 @@ export const ManualSync = ({ appsURL }: Props) => {
       }
 
       setFailure(undefined);
-      toast.success("Synced app");
+      toast.success('Synced app');
 
       const { externalID } = res.data.syncNewApp.app ?? {};
       let navURL;
@@ -87,7 +87,7 @@ export const ManualSync = ({ appsURL }: Props) => {
       navigate({ to: navURL });
     } catch (error) {
       setFailure({
-        code: "unknown",
+        code: 'unknown',
       });
     } finally {
       setIsSyncing(false);
@@ -128,12 +128,12 @@ export const ManualSync = ({ appsURL }: Props) => {
       </p>
       <br />
       <p>
-        After you&apos;ve set up the serve API and deployed your code,{" "}
+        After you&apos;ve set up the serve API and deployed your code,{' '}
         <span className="font-semibold">
           enter the URL of your project&apos;s serve endpoint to sync your app
           with Inngest
         </span>
-        . Verify that you assigned the signing key below to the{" "}
+        . Verify that you assigned the signing key below to the{' '}
         <InlineCode>INNGEST_SIGNING_KEY</InlineCode> environment variable:
       </p>
 

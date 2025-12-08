@@ -1,6 +1,6 @@
-import type { TextUIPart } from "@inngest/use-agent";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import type { TextUIPart } from '@inngest/use-agent';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type AssistantMessageProps = {
   part: TextUIPart;
@@ -26,7 +26,7 @@ export const AssistantMessage = ({ part }: AssistantMessageProps) => {
           li: ({ children }) => <li className="my-1">{children}</li>,
           // Customize code styling
           code: ({ children, className, ...props }) => {
-            const isInline = !className || !className.includes("language-");
+            const isInline = !className || !className.includes('language-');
             if (isInline) {
               return (
                 <code

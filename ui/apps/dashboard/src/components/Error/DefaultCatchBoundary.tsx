@@ -1,9 +1,9 @@
-import { Button } from "@inngest/components/Button/NewButton";
-import { Error } from "@inngest/components/Error/Error";
-import type { ErrorComponentProps } from "@tanstack/react-router";
-import { rootRouteId, useMatch, useRouter } from "@tanstack/react-router";
+import { Button } from '@inngest/components/Button/NewButton';
+import { Error } from '@inngest/components/Error/Error';
+import type { ErrorComponentProps } from '@tanstack/react-router';
+import { rootRouteId, useMatch, useRouter } from '@tanstack/react-router';
 
-import * as Sentry from "@sentry/tanstackstart-react";
+import * as Sentry from '@sentry/tanstackstart-react';
 
 function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   const router = useRouter();

@@ -1,12 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { OrganizationList } from "@clerk/tanstack-react-start";
-import SplitView from "@/components/SignIn/SplitView";
+import { createFileRoute } from '@tanstack/react-router';
+import { OrganizationList } from '@clerk/tanstack-react-start';
+import SplitView from '@/components/SignIn/SplitView';
 
 type OrganizationListSearchParams = {
   redirect_url?: string;
 };
 
-export const Route = createFileRoute("/(auth)/organization-list/$")({
+export const Route = createFileRoute('/(auth)/organization-list/$')({
   component: RouteComponent,
   validateSearch: (
     search: Record<string, unknown>,
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/(auth)/organization-list/$")({
 function RouteComponent() {
   const { redirect_url } = Route.useSearch();
   const redirectURL =
-    redirect_url || import.meta.env.VITE_PUBLIC_HOME_PATH || "/";
+    redirect_url || import.meta.env.VITE_PUBLIC_HOME_PATH || '/';
 
   return (
     <SplitView>

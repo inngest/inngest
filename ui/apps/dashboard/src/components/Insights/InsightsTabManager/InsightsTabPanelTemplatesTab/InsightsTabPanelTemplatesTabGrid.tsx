@@ -1,12 +1,12 @@
-import { cn } from "@inngest/components/utils/classNames";
-import { RiAddLine } from "@remixicon/react";
+import { cn } from '@inngest/components/utils/classNames';
+import { RiAddLine } from '@remixicon/react';
 
-import { useTabManagerActions } from "../TabManagerContext";
+import { useTabManagerActions } from '../TabManagerContext';
 import {
   BUTTON_CARD_STYLES,
   InsightsTabPanelTemplatesTabCard,
-} from "./InsightsTabPanelTemplatesTabCard";
-import { TEMPLATES } from "./templates";
+} from './InsightsTabPanelTemplatesTabCard';
+import { TEMPLATES } from './templates';
 
 export function InsightsTabPanelTemplatesTabGrid() {
   const { tabManagerActions } = useTabManagerActions();
@@ -16,7 +16,7 @@ export function InsightsTabPanelTemplatesTabGrid() {
       <button
         className={cn(
           BUTTON_CARD_STYLES,
-          "bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm shadow-none",
+          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm shadow-none',
         )}
         onClick={() => {
           tabManagerActions.createNewTab();

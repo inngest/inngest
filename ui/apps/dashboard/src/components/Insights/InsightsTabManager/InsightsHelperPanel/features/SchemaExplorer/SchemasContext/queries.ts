@@ -1,10 +1,10 @@
-import { transformJSONSchema } from "@inngest/components/SchemaViewer/transform/transform";
-import type { JSONSchema } from "@inngest/components/SchemaViewer/types";
-import type { InfiniteData } from "@tanstack/react-query";
+import { transformJSONSchema } from '@inngest/components/SchemaViewer/transform/transform';
+import type { JSONSchema } from '@inngest/components/SchemaViewer/types';
+import type { InfiniteData } from '@tanstack/react-query';
 
-import { EVENT_SCHEMA_JSON } from "./commonSchemas";
-import type { SchemaEntry, SchemaEventPage } from "./types";
-import { makeTitleOnlyEntry } from "./utils";
+import { EVENT_SCHEMA_JSON } from './commonSchemas';
+import type { SchemaEntry, SchemaEventPage } from './types';
+import { makeTitleOnlyEntry } from './utils';
 
 export function buildSchemaEntriesFromQueryData(
   data: InfiniteData<SchemaEventPage> | undefined,
@@ -12,7 +12,7 @@ export function buildSchemaEntriesFromQueryData(
   const list: SchemaEntry[] = [];
 
   list.push({
-    key: "common:events",
+    key: 'common:events',
     isShared: true,
     node: transformJSONSchema(EVENT_SCHEMA_JSON),
   });
@@ -58,7 +58,7 @@ export function safeParseJSONSchema(
   if (!input) return null;
   try {
     const obj = JSON.parse(input);
-    if (!obj || typeof obj !== "object") return null;
+    if (!obj || typeof obj !== 'object') return null;
 
     // TODO: Consider validating that `obj` conforms to JSONSchema before casting.
     return obj as JSONSchema;
@@ -69,7 +69,7 @@ export function safeParseJSONSchema(
 
 export function extractDataProperty(schema: JSONSchema): JSONSchema | null {
   const dataDefinition = schema.properties?.data;
-  if (!dataDefinition || typeof dataDefinition === "boolean") return null;
+  if (!dataDefinition || typeof dataDefinition === 'boolean') return null;
 
   return dataDefinition;
 }

@@ -1,16 +1,16 @@
-import { Button } from "@inngest/components/Button/NewButton";
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
-import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiInformationLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip/Tooltip';
+import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiInformationLine } from '@remixicon/react';
 
-import EntitlementListItemSelfService from "@/components/Billing/Addons/EntitlementListItemSelfService";
-import { PlanNames } from "@/components/Billing/Plans/utils";
-import { pathCreator } from "@/utils/urls";
+import EntitlementListItemSelfService from '@/components/Billing/Addons/EntitlementListItemSelfService';
+import { PlanNames } from '@/components/Billing/Plans/utils';
+import { pathCreator } from '@/utils/urls';
 
 export default function EntitlementListItem({
   increaseInHigherPlan = true,
@@ -42,9 +42,9 @@ export default function EntitlementListItem({
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
 }) {
-  const [highlight] = useSearchParam("highlight");
+  const [highlight] = useSearchParam('highlight');
 
-  const highlighted = highlight === title.toLowerCase().replace(/ /g, "-");
+  const highlighted = highlight === title.toLowerCase().replace(/ /g, '-');
   const tooltip = tooltipContent ? (
     <Tooltip>
       <TooltipTrigger>
@@ -89,7 +89,7 @@ export default function EntitlementListItem({
   } else {
     // The user cannot increase this entitlement by purchasing an addon.
 
-    const isCustomPlan = planName.toLowerCase().includes("enterprise");
+    const isCustomPlan = planName.toLowerCase().includes('enterprise');
     const isHighestPlan = planName === PlanNames.Pro;
 
     let contactHumanToIncrease = false;
@@ -122,19 +122,19 @@ export default function EntitlementListItem({
         </div>
         <Button
           appearance="ghost"
-          label={contactHumanToIncrease ? "Contact us" : "Upgrade plan"}
+          label={contactHumanToIncrease ? 'Contact us' : 'Upgrade plan'}
           href={
             contactHumanToIncrease
               ? pathCreator.support({
                   ref: `app-billing-page-overview-addon-${title
                     .toLowerCase()
-                    .replace(/ /g, "-")}`,
+                    .replace(/ /g, '-')}`,
                 })
               : pathCreator.billing({
-                  tab: "plans",
+                  tab: 'plans',
                   ref: `app-billing-page-overview-addon-${title
                     .toLowerCase()
-                    .replace(/ /g, "-")}`,
+                    .replace(/ /g, '-')}`,
                 })
           }
         />
@@ -145,9 +145,9 @@ export default function EntitlementListItem({
   return (
     <div
       className={cn(
-        "mb-5 transition-colors duration-300",
+        'mb-5 transition-colors duration-300',
         highlighted &&
-          "bg-primary-subtle/10 border-primary-subtle/20 rounded-md border p-3",
+          'bg-primary-subtle/10 border-primary-subtle/20 rounded-md border p-3',
       )}
     >
       {content}

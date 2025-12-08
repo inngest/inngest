@@ -1,5 +1,5 @@
-import { Listbox } from "@headlessui/react";
-import { MenuItem } from "@inngest/components/Menu/NewMenuItem";
+import { Listbox } from '@headlessui/react';
+import { MenuItem } from '@inngest/components/Menu/NewMenuItem';
 import {
   RiArticleLine,
   RiBookReadLine,
@@ -8,13 +8,13 @@ import {
   RiMailLine,
   RiQuestionLine,
   RiRoadMapLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import useOnboardingStep from "../Onboarding/useOnboardingStep";
-import SystemStatusIcon from "./SystemStatusIcon";
-import { Link } from "@tanstack/react-router";
-import { useSystemStatus } from "../Support/SystemStatus";
+import { pathCreator } from '@/utils/urls';
+import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import SystemStatusIcon from './SystemStatusIcon';
+import { Link } from '@tanstack/react-router';
+import { useSystemStatus } from '../Support/SystemStatus';
 
 export const Help = ({
   collapsed,
@@ -114,7 +114,7 @@ export const Help = ({
           <Link
             to={pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,
-              ref: "app-navbar-help",
+              ref: 'app-navbar-help',
             })}
             onClick={() => showWidget()}
           >

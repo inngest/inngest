@@ -1,15 +1,15 @@
-import { SkeletonCard } from "@inngest/components/Apps/AppCard";
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
 
-import AppCards from "@/components/Apps/AppCards";
-import AppFAQ from "@/components/Apps/AppFAQ";
+import AppCards from '@/components/Apps/AppCards';
+import AppFAQ from '@/components/Apps/AppFAQ';
 import {
   EmptyActiveCard,
   EmptyArchivedCard,
-} from "@/components/Apps/EmptyAppsCard";
-import { UnattachedSyncsCard } from "@/components/Apps/UnattachedSyncsCard";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useApps } from "./useApps";
-import { useLatestUnattachedSync } from "./useUnattachedSyncs";
+} from '@/components/Apps/EmptyAppsCard';
+import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useApps } from './useApps';
+import { useLatestUnattachedSync } from './useUnattachedSyncs';
 
 type Props = {
   isArchived?: boolean;

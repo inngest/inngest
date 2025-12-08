@@ -1,8 +1,8 @@
-import { CancellationTable } from "@/components/Functions/CancellationTable";
-import { createFileRoute } from "@tanstack/react-router";
+import { CancellationTable } from '@/components/Functions/CancellationTable';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/functions/$slug/cancellations/",
+  '/_authed/env/$envSlug/functions/$slug/cancellations/',
 )({
   component: RouteComponent,
 });

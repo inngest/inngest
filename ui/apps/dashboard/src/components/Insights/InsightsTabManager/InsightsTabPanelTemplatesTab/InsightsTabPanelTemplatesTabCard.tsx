@@ -3,26 +3,26 @@ import {
   RiCheckLine,
   RiErrorWarningLine,
   RiTimeLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import type { QueryTemplate } from "@/components/Insights/types";
-import { useTabManagerActions } from "../TabManagerContext";
+import type { QueryTemplate } from '@/components/Insights/types';
+import { useTabManagerActions } from '../TabManagerContext';
 
-const APPEARANCE_CLASSES = "bg-canvasBase border-subtle rounded-[4px] border";
-const CONTENT_LAYOUT_CLASSES = "flex flex-col gap-1";
-const DESCRIPTION_CLASSES = "text-muted text-sm";
-const INTERACTION_CLASSES = "hover:bg-canvasSubtle transition-colors";
-const LAYOUT_CLASSES = "flex flex-col gap-3 h-[152px] items-start w-[256px]";
+const APPEARANCE_CLASSES = 'bg-canvasBase border-subtle rounded-[4px] border';
+const CONTENT_LAYOUT_CLASSES = 'flex flex-col gap-1';
+const DESCRIPTION_CLASSES = 'text-muted text-sm';
+const INTERACTION_CLASSES = 'hover:bg-canvasSubtle transition-colors';
+const LAYOUT_CLASSES = 'flex flex-col gap-3 h-[152px] items-start w-[256px]';
 const SHADOW_CLASSES =
-  "shadow-[0_1px_1px_-0.5px_rgba(42,51,69,0.04),0_6px_6px_-3px_rgba(42,51,69,0.04)]";
-const SPACING_CLASSES = "p-4";
-const TEXT_CLASSES = "text-left";
-const TITLE_CLASSES = "text-basis";
+  'shadow-[0_1px_1px_-0.5px_rgba(42,51,69,0.04),0_6px_6px_-3px_rgba(42,51,69,0.04)]';
+const SPACING_CLASSES = 'p-4';
+const TEXT_CLASSES = 'text-left';
+const TITLE_CLASSES = 'text-basis';
 
 export const BUTTON_CARD_STYLES = `${LAYOUT_CLASSES} ${APPEARANCE_CLASSES} ${INTERACTION_CLASSES} ${SPACING_CLASSES} ${TEXT_CLASSES} ${SHADOW_CLASSES}`;
 
 const TEMPLATE_KIND_CONFIG: Record<
-  QueryTemplate["templateKind"],
+  QueryTemplate['templateKind'],
   {
     backgroundColor: string;
     icon: React.ComponentType<{ className?: string }>;
@@ -30,24 +30,24 @@ const TEMPLATE_KIND_CONFIG: Record<
   }
 > = {
   error: {
-    backgroundColor: "bg-error",
+    backgroundColor: 'bg-error',
     icon: RiErrorWarningLine,
-    textColor: "text-error",
+    textColor: 'text-error',
   },
   time: {
-    backgroundColor: "bg-info",
+    backgroundColor: 'bg-info',
     icon: RiTimeLine,
-    textColor: "text-info",
+    textColor: 'text-info',
   },
   warning: {
-    backgroundColor: "bg-warning",
+    backgroundColor: 'bg-warning',
     icon: RiAlertLine,
-    textColor: "text-warning",
+    textColor: 'text-warning',
   },
   success: {
-    backgroundColor: "bg-success",
+    backgroundColor: 'bg-success',
     icon: RiCheckLine,
-    textColor: "text-success",
+    textColor: 'text-success',
   },
 };
 

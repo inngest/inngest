@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 export const useStickToBottom = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -27,11 +27,11 @@ export const useStickToBottom = () => {
       }
     });
 
-    el.addEventListener("scroll", handleScroll, { passive: true });
+    el.addEventListener('scroll', handleScroll, { passive: true });
     observer.observe(el, { childList: true, subtree: true });
 
     return () => {
-      el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener('scroll', handleScroll);
       observer.disconnect();
     };
   }, [isAtBottom, scrollToBottom]);

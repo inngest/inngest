@@ -1,46 +1,46 @@
-import { useCallback, useMemo } from "react";
-import { availableClickhouseFunctions } from "@inngest/components/SQLEditor/hooks/availableClickhouseFunctions";
-import { useCache } from "@inngest/components/SQLEditor/hooks/useCache";
-import type { SQLCompletionConfig } from "@inngest/components/SQLEditor/types";
+import { useCallback, useMemo } from 'react';
+import { availableClickhouseFunctions } from '@inngest/components/SQLEditor/hooks/availableClickhouseFunctions';
+import { useCache } from '@inngest/components/SQLEditor/hooks/useCache';
+import type { SQLCompletionConfig } from '@inngest/components/SQLEditor/types';
 
-import { useFetchAllEventTypes } from "@/components/EventTypes/useFetchAllEventTypes";
-import { useEventTypeSchemas } from "../../InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/useEventTypeSchemas";
+import { useFetchAllEventTypes } from '@/components/EventTypes/useFetchAllEventTypes';
+import { useEventTypeSchemas } from '../../InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/useEventTypeSchemas';
 
 const KEYWORDS = [
-  "AND",
-  "AS",
-  "ASC",
-  "BETWEEN",
-  "DESC",
-  "DISTINCT",
-  "FALSE",
-  "FROM",
-  "GROUP BY",
-  "IS",
-  "LIKE",
-  "LIMIT",
-  "NOT",
-  "NULL",
-  "OFFSET",
-  "OR",
-  "ORDER BY",
-  "SELECT",
-  "TRUE",
-  "WHERE",
+  'AND',
+  'AS',
+  'ASC',
+  'BETWEEN',
+  'DESC',
+  'DISTINCT',
+  'FALSE',
+  'FROM',
+  'GROUP BY',
+  'IS',
+  'LIKE',
+  'LIMIT',
+  'NOT',
+  'NULL',
+  'OFFSET',
+  'OR',
+  'ORDER BY',
+  'SELECT',
+  'TRUE',
+  'WHERE',
 ] as const;
 
-const TABLES = ["events"] as const;
+const TABLES = ['events'] as const;
 
 // Common columns available on the events table
 const COLUMNS = [
-  "name",
-  "data",
-  "id",
-  "ts",
-  "ts_dt",
-  "received_at",
-  "received_at_dt",
-  "v",
+  'name',
+  'data',
+  'id',
+  'ts',
+  'ts_dt',
+  'received_at',
+  'received_at_dt',
+  'v',
 ] as const;
 
 // Convert ClickHouse functions to the format expected by autocomplete
@@ -56,13 +56,13 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
   // Cache for fetched event names with 5 minute TTL
   const eventNamesCache = useCache<string[]>({
     ttl: 5 * 60 * 1000,
-    name: "eventNames",
+    name: 'eventNames',
   });
 
   // Cache for fetched schemas with 5 minute TTL
   const schemasCache = useCache<Array<{ name: string; type: string }>>({
     ttl: 5 * 60 * 1000,
-    name: "eventSchemas",
+    name: 'eventSchemas',
   });
 
   // Create a function to fetch event names dynamically with nameSearch
@@ -71,7 +71,7 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
   // The cache is checked BEFORE calling this function
   const fetchEventNames = useCallback(
     async (search: string): Promise<string[]> => {
-      const cacheKey = search || "__empty__";
+      const cacheKey = search || '__empty__';
       const allEvents = await fetchAllEventTypes(search);
       const eventNames = allEvents.map((e) => e.name);
 
@@ -109,12 +109,12 @@ export function useSQLCompletionConfig(): SQLCompletionConfig {
             const schema = JSON.parse(event.schema);
             const dataProps = schema?.properties?.data?.properties;
 
-            if (!dataProps || typeof dataProps !== "object") {
+            if (!dataProps || typeof dataProps !== 'object') {
               return;
             }
 
             Object.entries(dataProps).forEach(([key, value]: [string, any]) => {
-              const type = value?.type || "unknown";
+              const type = value?.type || 'unknown';
               if (!propsMap.has(key)) {
                 propsMap.set(key, type);
               }

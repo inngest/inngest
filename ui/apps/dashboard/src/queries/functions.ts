@@ -1,9 +1,9 @@
-import { Client, useQuery, type UseQueryResponse } from "urql";
+import { Client, useQuery, type UseQueryResponse } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import type { GetFunctionQuery } from "@/gql/graphql";
-import { useGraphQLQuery } from "@/utils/useGraphQLQuery";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import type { GetFunctionQuery } from '@/gql/graphql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionsUsageDocument = graphql(`
   query GetFunctionsUsage($environmentID: ID!, $page: Int, $archived: Boolean, $pageSize: Int) {
@@ -291,7 +291,7 @@ export async function getFunctionUsagesPage(args: {
     throw res.error;
   }
   if (!res.data) {
-    throw new Error("no data returned");
+    throw new Error('no data returned');
   }
 
   res.data.workspace;

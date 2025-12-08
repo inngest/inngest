@@ -1,25 +1,25 @@
-import { staticSlugs } from "@/utils/environments";
+import { staticSlugs } from '@/utils/environments';
 
-import { EmptyOnboardingCard } from "@/components/Apps/EmptyAppsCard";
-import { SkeletonCard } from "@inngest/components/Apps/AppCard";
-import { createFileRoute } from "@tanstack/react-router";
+import { EmptyOnboardingCard } from '@/components/Apps/EmptyAppsCard';
+import { SkeletonCard } from '@inngest/components/Apps/AppCard';
+import { createFileRoute } from '@tanstack/react-router';
 
-import AppFAQ from "@/components/Apps/AppFAQ";
-import { Apps } from "@/components/Apps/Apps";
-import { StatusMenu } from "@/components/Apps/StatusMenu";
+import AppFAQ from '@/components/Apps/AppFAQ';
+import { Apps } from '@/components/Apps/Apps';
+import { StatusMenu } from '@/components/Apps/StatusMenu';
 
-import { getProdApps } from "@/queries/server/apps";
-import { pathCreator } from "@/utils/urls";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { RiAddLine } from "@remixicon/react";
-import { AppInfo } from "./route";
+import { getProdApps } from '@/queries/server/apps';
+import { pathCreator } from '@/utils/urls';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { RiAddLine } from '@remixicon/react';
+import { AppInfo } from './route';
 
 export type AppsSearchParams = {
   archived?: string;
 };
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/apps/')({
   component: AppsPage,
   validateSearch: (search: Record<string, unknown>): AppsSearchParams => {
     return {
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/_authed/env/$envSlug/apps/")({
         isLoading: false,
       };
     } catch (error) {
-      console.error("Error fetching production apps", error);
+      console.error('Error fetching production apps', error);
       return { hasProductionApps: false, isLoading: false };
     }
   },
@@ -52,7 +52,7 @@ function AppsPage() {
   const { archived: archivedParam } = Route.useSearch();
   const { envSlug } = Route.useParams();
 
-  const isArchived = archivedParam === "true";
+  const isArchived = archivedParam === 'true';
 
   const displayOnboarding =
     envSlug === staticSlugs.production && !hasProductionApps;
@@ -60,7 +60,7 @@ function AppsPage() {
   return (
     <>
       <Header
-        breadcrumb={[{ text: "Apps" }]}
+        breadcrumb={[{ text: 'Apps' }]}
         backNav
         infoIcon={<AppInfo />}
         action={

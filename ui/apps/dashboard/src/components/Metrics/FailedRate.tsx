@@ -1,19 +1,19 @@
-import React from "react";
-import { Link } from "@inngest/components/Link/NewLink";
-import { OptionalTooltip } from "@inngest/components/Tooltip/OptionalTooltip";
-import { formatDistanceToNow } from "@inngest/components/utils/date";
+import React from 'react';
+import { Link } from '@inngest/components/Link/NewLink';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { formatDistanceToNow } from '@inngest/components/utils/date';
 
-import type { FunctionStatusMetricsQuery } from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
-import { useEnvironment } from "../Environments/environment-context";
-import type { EntityLookup } from "./Dashboard";
-import { sum } from "./utils";
-import type { FileRouteTypes } from "@tanstack/react-router";
+import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { useEnvironment } from '../Environments/environment-context';
+import type { EntityLookup } from './Dashboard';
+import { sum } from './utils';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type CompletedByFunctionType =
-  FunctionStatusMetricsQuery["workspace"]["completedByFunction"];
+  FunctionStatusMetricsQuery['workspace']['completedByFunction'];
 export type CompletedByFunctionMetricsType =
-  FunctionStatusMetricsQuery["workspace"]["completedByFunction"]["metrics"];
+  FunctionStatusMetricsQuery['workspace']['completedByFunction']['metrics'];
 
 export type Rate = {
   slug: string;
@@ -28,7 +28,7 @@ export type RateListData = {
 };
 
 const filter = ({ metrics }: CompletedByFunctionType) =>
-  metrics.filter(({ tagValue }) => tagValue === "Failed");
+  metrics.filter(({ tagValue }) => tagValue === 'Failed');
 
 const sort = (metrics: CompletedByFunctionMetricsType) =>
   metrics.sort(({ data: data1 }, { data: data2 }) => sum(data2) - sum(data1));
@@ -59,7 +59,7 @@ const mapRateList = (
     const totalFailures = sum(failures);
     const lastOccurence = failures.at(-1)?.bucket;
     return {
-      slug: functions[f.id]?.slug || "",
+      slug: functions[f.id]?.slug || '',
       name: functions[f.id]?.name || f.id,
       lastOccurence,
       totalFailures,
@@ -72,7 +72,7 @@ export const FailedRate = ({
   workspace,
   functions,
 }: {
-  workspace?: FunctionStatusMetricsQuery["workspace"];
+  workspace?: FunctionStatusMetricsQuery['workspace'];
   functions: EntityLookup;
 }) => {
   const env = useEnvironment();
@@ -98,7 +98,7 @@ export const FailedRate = ({
                 `${pathCreator.function({
                   envSlug: env.slug,
                   functionSlug: r.slug,
-                })}/runs` as FileRouteTypes["to"]
+                })}/runs` as FileRouteTypes['to']
               }
             >
               <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">
@@ -109,7 +109,7 @@ export const FailedRate = ({
               <div className="justify-self-end">{r.totalFailures}</div>
               <div className="text-tertiary-moderate">
                 {r.failureRate.toLocaleString(undefined, {
-                  style: "percent",
+                  style: 'percent',
                   minimumFractionDigits: 0,
                 })}
               </div>
@@ -119,7 +119,7 @@ export const FailedRate = ({
           <OptionalTooltip tooltip={r.lastOccurence}>
             <div
               className={`text-disabled text-xs leading-none ${
-                r.lastOccurence && "cursor-pointer"
+                r.lastOccurence && 'cursor-pointer'
               }`}
             >
               {r.lastOccurence &&

@@ -1,9 +1,9 @@
-import colors from "tailwindcss/colors";
-import { useQuery } from "urql";
+import colors from 'tailwindcss/colors';
+import { useQuery } from 'urql';
 
-import SimpleLineChart from "@/components/Charts/SimpleLineChart";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import SimpleLineChart from '@/components/Charts/SimpleLineChart';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const GetFnRunMetricsDocument = graphql(`
   query GetFnMetrics($environmentID: ID!, $fnSlug: String!, $startTime: Time!, $endTime: Time!) {
@@ -78,7 +78,7 @@ export default function FunctionThroughputChart({
 
   const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
     name:
-      queued[idx]?.bucket || started[idx]?.bucket || ended[idx]?.bucket || "",
+      queued[idx]?.bucket || started[idx]?.bucket || ended[idx]?.bucket || '',
     values: {
       queued: queued[idx]?.value ?? 0,
       started: started[idx]?.value ?? 0,
@@ -92,9 +92,9 @@ export default function FunctionThroughputChart({
       desc="The number of function runs being processed over time."
       data={metrics}
       legend={[
-        { name: "Queued", dataKey: "queued", color: colors.slate["500"] },
-        { name: "Started", dataKey: "started", color: colors.sky["500"] },
-        { name: "Ended", dataKey: "ended", color: colors.teal["500"] },
+        { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingMetrics}
       error={metricsError}

@@ -3,12 +3,12 @@ import {
   openai,
   type Network,
   type State,
-} from "@inngest/agent-kit";
+} from '@inngest/agent-kit';
 
-import { eventMatcherAgent } from "./event-matcher";
-import { queryWriterAgent } from "./query-writer";
-import { summarizerAgent } from "./summarizer";
-import type { InsightsAgentState as InsightsState } from "./types";
+import { eventMatcherAgent } from './event-matcher';
+import { queryWriterAgent } from './query-writer';
+import { summarizerAgent } from './summarizer';
+import type { InsightsAgentState as InsightsState } from './types';
 
 // Deterministic, code-first router: EventMatcher → QueryWriter → Summarizer
 const sequenceRouter: Network.Router<InsightsState> = async ({ callCount }) => {
@@ -24,11 +24,11 @@ export function createInsightsNetwork(
   historyAdapter?: any,
 ) {
   return createNetwork<InsightsState>({
-    name: "Insights SQL Generation Network",
+    name: 'Insights SQL Generation Network',
     description:
-      "Selects relevant events, proposes a SQL query, and summarizes the result.",
+      'Selects relevant events, proposes a SQL query, and summarizes the result.',
     agents: [eventMatcherAgent, queryWriterAgent, summarizerAgent],
-    defaultModel: openai({ model: "claude-haiku-4-5" }),
+    defaultModel: openai({ model: 'claude-haiku-4-5' }),
     maxIter: 6,
     defaultState: initialState,
     router: sequenceRouter,

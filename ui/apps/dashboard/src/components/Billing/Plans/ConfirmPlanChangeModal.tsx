@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Textarea } from "@inngest/components/Forms/Textarea";
-import { Modal } from "@inngest/components/Modal/Modal";
-import { Select } from "@inngest/components/Select/NewSelect";
-import { capitalCase } from "change-case";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Textarea } from '@inngest/components/Forms/Textarea';
+import { Modal } from '@inngest/components/Modal/Modal';
+import { Select } from '@inngest/components/Select/NewSelect';
+import { capitalCase } from 'change-case';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import { type CheckoutItem } from "./CheckoutModal";
+import { graphql } from '@/gql';
+import { type CheckoutItem } from './CheckoutModal';
 
 type ConfirmPlanChangeModalProps = {
-  action: "upgrade" | "downgrade" | "cancel";
+  action: 'upgrade' | 'downgrade' | 'cancel';
   items: CheckoutItem[];
   onCancel: () => void;
   onSuccess: () => void;
@@ -52,13 +52,13 @@ const SubmitChurnSurveyDocument = graphql(`
 // a subscription. This is also OK as it ensure that we always have a correct
 // and updated Credit Card on file when creating a new subscription.
 const CHURN_REASONS = [
-  { id: "too-expensive", name: "Too expensive" },
-  { id: "missing-features", name: "Missing features" },
-  { id: "too-complex", name: "Too complex to use" },
-  { id: "found-alternative", name: "Found a better alternative" },
-  { id: "no-longer-needed", name: "No longer needed" },
-  { id: "poor-performance", name: "Poor performance / Issues" },
-  { id: "other", name: "Other" },
+  { id: 'too-expensive', name: 'Too expensive' },
+  { id: 'missing-features', name: 'Missing features' },
+  { id: 'too-complex', name: 'Too complex to use' },
+  { id: 'found-alternative', name: 'Found a better alternative' },
+  { id: 'no-longer-needed', name: 'No longer needed' },
+  { id: 'poor-performance', name: 'Poor performance / Issues' },
+  { id: 'other', name: 'Other' },
 ];
 
 export default function ConfirmPlanChangeModal({
@@ -67,13 +67,13 @@ export default function ConfirmPlanChangeModal({
   onCancel,
   onSuccess,
 }: ConfirmPlanChangeModalProps) {
-  const [uiError, setUiError] = useState("");
+  const [uiError, setUiError] = useState('');
   const [showSurvey, setShowSurvey] = useState(false);
   const [churnReason, setChurnReason] = useState<{
     id: string;
     name: string;
   } | null>(null);
-  const [churnFeedback, setChurnFeedback] = useState("");
+  const [churnFeedback, setChurnFeedback] = useState('');
   const [{ error: apiError }, updatePlan] = useMutation(UpdatePlanDocument);
   const [{ error: churnError }, submitChurnSurvey] = useMutation(
     SubmitChurnSurveyDocument,
@@ -83,8 +83,8 @@ export default function ConfirmPlanChangeModal({
   const error = apiError?.message || churnError?.message || uiError;
 
   const handlePlanChange = async () => {
-    const isCancellation = action === "cancel";
-    const isDowngrade = action === "downgrade";
+    const isCancellation = action === 'cancel';
+    const isDowngrade = action === 'downgrade';
     const shouldShowSurvey = isCancellation || isDowngrade;
 
     // For cancellations and downgrades, show survey first
@@ -98,7 +98,7 @@ export default function ConfirmPlanChangeModal({
     const planSlug = items[0]?.planSlug;
     if (!planSlug) {
       return setUiError(
-        "Unable to change your plan - Invalid Plan Slug. Please contact support.",
+        'Unable to change your plan - Invalid Plan Slug. Please contact support.',
       );
     }
 
@@ -107,7 +107,7 @@ export default function ConfirmPlanChangeModal({
       const accountId = organization.publicMetadata.accountID;
       const email = user.primaryEmailAddress?.emailAddress;
 
-      if (typeof accountId === "string" && email) {
+      if (typeof accountId === 'string' && email) {
         try {
           await submitChurnSurvey({
             reason: churnReason.id,
@@ -117,7 +117,7 @@ export default function ConfirmPlanChangeModal({
             clerkUserID: user.id,
           });
         } catch (error) {
-          console.error("Failed to submit churn survey:", error);
+          console.error('Failed to submit churn survey:', error);
           // Continue with cancellation even if survey fails
         }
       }
@@ -129,19 +129,19 @@ export default function ConfirmPlanChangeModal({
 
   const handleSurveySubmit = () => {
     if (!churnReason) {
-      setUiError("Please select a reason for canceling.");
+      setUiError('Please select a reason for canceling.');
       return;
     }
-    setUiError("");
+    setUiError('');
     handlePlanChange();
   };
 
   const amount = items.reduce((total, item) => {
     return total + item.amount * item.quantity;
   }, 0);
-  const planName = items.map((item) => item.name).join(", ");
-  const isCancellation = action === "cancel";
-  const isDowngrade = action === "downgrade";
+  const planName = items.map((item) => item.name).join(', ');
+  const isCancellation = action === 'cancel';
+  const isDowngrade = action === 'downgrade';
   const shouldShowSurvey = isCancellation || isDowngrade;
 
   return (
@@ -175,8 +175,8 @@ export default function ConfirmPlanChangeModal({
                 <div className="w-full">
                   <label className="mb-2 block text-sm font-medium">
                     {isCancellation
-                      ? "Primary reason for canceling"
-                      : "Primary reason for downgrading"}{" "}
+                      ? 'Primary reason for canceling'
+                      : 'Primary reason for downgrading'}{' '}
                     <span className="text-error">*</span>
                   </label>
                   <div className="w-full">
@@ -187,7 +187,7 @@ export default function ConfirmPlanChangeModal({
                       className="bg-canvasBase w-full"
                     >
                       <Select.Button className="bg-canvasBase focus:outline-primary-moderate w-full outline-2 transition-all focus:outline focus:ring-0">
-                        {churnReason ? churnReason.name : "Select a reason..."}
+                        {churnReason ? churnReason.name : 'Select a reason...'}
                       </Select.Button>
                       <Select.Options className="w-full">
                         {CHURN_REASONS.map((reason) => (
@@ -212,8 +212,8 @@ export default function ConfirmPlanChangeModal({
                 </div>
               </div>
               <Alert severity="warning" className="mt-6">
-                <b>Note:</b> After submitting, your{" "}
-                {isCancellation ? "cancellation" : "downgrade"} will be
+                <b>Note:</b> After submitting, your{' '}
+                {isCancellation ? 'cancellation' : 'downgrade'} will be
                 processed immediately and you will lose access to your current
                 plan features.
               </Alert>
@@ -221,13 +221,13 @@ export default function ConfirmPlanChangeModal({
           ) : (
             <>
               <p className="mb-2">
-                <b>This is an immediate action.</b> Please confirm before{" "}
-                {isCancellation ? "canceling" : "downgrading"} your plan.{" "}
+                <b>This is an immediate action.</b> Please confirm before{' '}
+                {isCancellation ? 'canceling' : 'downgrading'} your plan.{' '}
               </p>
               <ul className="list-inside list-disc">
                 <li>
-                  Once {isCancellation ? "canceled" : "downgraded"}, you will
-                  lose access to your current plan and its features{" "}
+                  Once {isCancellation ? 'canceled' : 'downgraded'}, you will
+                  lose access to your current plan and its features{' '}
                   <b>immediately</b>.
                 </li>
                 <li>
@@ -258,17 +258,17 @@ export default function ConfirmPlanChangeModal({
                 onClick={handleSurveySubmit}
                 label={
                   isCancellation
-                    ? "Submit & Cancel Plan"
-                    : "Submit & Downgrade Plan"
+                    ? 'Submit & Cancel Plan'
+                    : 'Submit & Downgrade Plan'
                 }
               />
             </>
           ) : (
             <Button
-              kind={shouldShowSurvey ? "danger" : "primary"}
+              kind={shouldShowSurvey ? 'danger' : 'primary'}
               onClick={handlePlanChange}
               label={
-                shouldShowSurvey ? "Continue" : `Confirm ${capitalCase(action)}`
+                shouldShowSurvey ? 'Continue' : `Confirm ${capitalCase(action)}`
               }
             />
           )}

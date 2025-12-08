@@ -1,11 +1,11 @@
-import useManagePageTerminology from "@/components/Manage/useManagePageTerminology";
-import { EnvironmentType } from "@/utils/environments";
-import { createFileRoute } from "@tanstack/react-router";
-import { Route as OrgActiveRoute } from "@/routes/_authed";
-import { Alert } from "@inngest/components/Alert/NewAlert";
+import useManagePageTerminology from '@/components/Manage/useManagePageTerminology';
+import { EnvironmentType } from '@/utils/environments';
+import { createFileRoute } from '@tanstack/react-router';
+import { Route as OrgActiveRoute } from '@/routes/_authed';
+import { Alert } from '@inngest/components/Alert/NewAlert';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/manage/$ingestKeys/",
+  '/_authed/env/$envSlug/manage/$ingestKeys/',
 )({
   component: KeysComponent,
 });
@@ -15,7 +15,7 @@ function KeysComponent() {
   const { env } = OrgActiveRoute.useLoaderData();
 
   const shouldShowAlert =
-    currentContent?.param === "keys" &&
+    currentContent?.param === 'keys' &&
     env?.type === EnvironmentType.BranchParent;
 
   return (
@@ -30,7 +30,7 @@ function KeysComponent() {
       )}
       <div className="flex flex-1 items-center justify-center">
         <h2 className="text-subtle text-sm font-semibold">
-          {"Select a " + currentContent?.type + " on the left."}
+          {'Select a ' + currentContent?.type + ' on the left.'}
         </h2>
       </div>
     </div>

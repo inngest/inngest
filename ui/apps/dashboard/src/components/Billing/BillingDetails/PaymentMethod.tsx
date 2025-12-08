@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { capitalCase } from "change-case";
+import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { capitalCase } from 'change-case';
 
-import BillingCard from "./BillingCard";
-import UpdateCardModal from "./UpdateCardModal";
+import BillingCard from './BillingCard';
+import UpdateCardModal from './UpdateCardModal';
 
 export default function PaymentMethod({
   paymentMethod,
 }: {
   paymentMethod: {
-    __typename?: "PaymentMethod";
+    __typename?: 'PaymentMethod';
     brand: string;
     last4: string;
     expMonth: string;
@@ -26,7 +26,7 @@ export default function PaymentMethod({
     setIsEditing(false);
     //
     // Refresh the current route to reload data
-    navigate({ to: ".", replace: true });
+    navigate({ to: '.', replace: true });
   };
 
   return (

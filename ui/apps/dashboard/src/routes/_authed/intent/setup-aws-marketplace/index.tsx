@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "@inngest/components/Link/NewLink";
-import { useMutation } from "urql";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from '@inngest/components/Link/NewLink';
+import { useMutation } from 'urql';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
-import { graphql } from "@/gql";
-import { type AwsMarketplaceSetupInput } from "@/gql/graphql";
-import AWSLogo from "@/components/Icons/aws-logo.svg?react";
+import { graphql } from '@/gql';
+import { type AwsMarketplaceSetupInput } from '@/gql/graphql';
+import AWSLogo from '@/components/Icons/aws-logo.svg?react';
 
-import { pathCreator } from "@/utils/urls";
-import ApprovalDialog from "@/components/Intent/ApprovalDialog";
-import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
+import { pathCreator } from '@/utils/urls';
+import ApprovalDialog from '@/components/Intent/ApprovalDialog';
+import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
 
-export const Route = createFileRoute("/_authed/intent/setup-aws-marketplace/")({
+export const Route = createFileRoute('/_authed/intent/setup-aws-marketplace/')({
   component: SetupAWSMarketplacePage,
 });
 
@@ -25,27 +25,27 @@ const CompleteAWSMarketplaceSetup = graphql(`
 
 function SetupAWSMarketplacePage() {
   const navigate = useNavigate();
-  const [customerID] = useSearchParam("customer_id");
-  const [productCode] = useSearchParam("product_code");
-  const [awsAccountID] = useSearchParam("aws_account_id");
+  const [customerID] = useSearchParam('customer_id');
+  const [productCode] = useSearchParam('product_code');
+  const [awsAccountID] = useSearchParam('aws_account_id');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | React.ReactNode>("");
+  const [error, setError] = useState<string | React.ReactNode>('');
   const [, completeSetup] = useMutation(CompleteAWSMarketplaceSetup);
 
   //
   // Params and validation
   const setupParams: AwsMarketplaceSetupInput = useMemo(
     () => ({
-      customerID: customerID || "",
-      productCode: productCode || "",
-      awsAccountID: awsAccountID || "",
+      customerID: customerID || '',
+      productCode: productCode || '',
+      awsAccountID: awsAccountID || '',
     }),
     [customerID, productCode, awsAccountID],
   );
 
   useEffect(() => {
     for (const key in setupParams) {
-      if (setupParams[key as keyof typeof setupParams] === "") {
+      if (setupParams[key as keyof typeof setupParams] === '') {
         setError(`Malformed URL: Missing ${key} parameter`);
         continue;
       }
@@ -60,14 +60,14 @@ function SetupAWSMarketplacePage() {
     }).then((result) => {
       setLoading(false);
       if (result.error) {
-        const cleanError = result.error.message.replace("[GraphQL]", "").trim();
+        const cleanError = result.error.message.replace('[GraphQL]', '').trim();
         setError(
           <>
-            {cleanError}.{" "}
+            {cleanError}.{' '}
             <Link size="medium" className="inline-flex" href="/support">
               Contact support
-            </Link>{" "}
-            or{" "}
+            </Link>{' '}
+            or{' '}
             <Link
               size="medium"
               className="inline-flex"
@@ -78,7 +78,7 @@ function SetupAWSMarketplacePage() {
             .
           </>,
         );
-        console.log("error", result.error);
+        console.log('error', result.error);
       } else {
         navigate({ to: pathCreator.billing() });
       }
@@ -89,7 +89,7 @@ function SetupAWSMarketplacePage() {
     if (window.opener != null || window.history.length == 1) {
       window.close();
     } else {
-      navigate({ to: "/" });
+      navigate({ to: '/' });
     }
   };
 
@@ -104,7 +104,7 @@ function SetupAWSMarketplacePage() {
           </p>
           <p className="my-6">
             Your account billing will be managed within your AWS account. You
-            can always get support from the Inngest team by emailing{" "}
+            can always get support from the Inngest team by emailing{' '}
             <a href="mailto:hello@inngest.com" target="_blank">
               hello@inngest.com
             </a>

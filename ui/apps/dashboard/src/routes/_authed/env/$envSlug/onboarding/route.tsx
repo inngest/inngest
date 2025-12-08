@@ -1,15 +1,15 @@
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { Header } from '@inngest/components/Header/NewHeader';
+import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 
-import { pathCreator } from "@/utils/urls";
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/onboarding")({
+export const Route = createFileRoute('/_authed/env/$envSlug/onboarding')({
   component: OnboardingLayout,
   loader: ({ params }) => {
-    if (!("step" in params)) {
+    if (!('step' in params)) {
       redirect({
-        to: "/env/$envSlug/onboarding/$step",
-        params: { envSlug: params.envSlug, step: "create-app" },
+        to: '/env/$envSlug/onboarding/$step',
+        params: { envSlug: params.envSlug, step: 'create-app' },
         throw: true,
       });
     }
@@ -21,7 +21,7 @@ function OnboardingLayout() {
     <>
       <Header
         breadcrumb={[
-          { text: "Getting started", href: pathCreator.onboarding() },
+          { text: 'Getting started', href: pathCreator.onboarding() },
         ]}
       />
       <Outlet />

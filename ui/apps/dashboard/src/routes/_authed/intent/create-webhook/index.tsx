@@ -1,19 +1,19 @@
-import { Input } from "@inngest/components/Forms/Input";
-import { RiArrowRightLine } from "@remixicon/react";
-import slugify from "@sindresorhus/slugify";
-import { createFileRoute } from "@tanstack/react-router";
-import { capitalCase } from "change-case";
-import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "urql";
+import { Input } from '@inngest/components/Forms/Input';
+import { RiArrowRightLine } from '@remixicon/react';
+import slugify from '@sindresorhus/slugify';
+import { createFileRoute } from '@tanstack/react-router';
+import { capitalCase } from 'change-case';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation } from 'urql';
 
-import WebhookIcon from "@/components/Icons/webhookIcon.svg?react";
-import ApprovalDialog from "@/components/Intent/ApprovalDialog";
-import { createTransform } from "@/components/Manage/transformHelpers";
-import { graphql } from "@/gql";
-import { useDefaultEnvironment } from "@/queries/environments";
-import { useSearchParam } from "@inngest/components/hooks/useNewSearchParams";
+import WebhookIcon from '@/components/Icons/webhookIcon.svg?react';
+import ApprovalDialog from '@/components/Intent/ApprovalDialog';
+import { createTransform } from '@/components/Manage/transformHelpers';
+import { graphql } from '@/gql';
+import { useDefaultEnvironment } from '@/queries/environments';
+import { useSearchParam } from '@inngest/components/hooks/useNewSearchParams';
 
-export const Route = createFileRoute("/_authed/intent/create-webhook/")({
+export const Route = createFileRoute('/_authed/intent/create-webhook/')({
   component: CreateWebhookComponent,
 });
 
@@ -27,12 +27,12 @@ const CreateWebhook = graphql(`
 `);
 
 const getNameFromDomain = (domain: string | null | undefined) => {
-  if (!domain) return "";
+  if (!domain) return '';
   const removeTLD = domain.replace(
     /\.com|\.io|\.org|\.net|\.co\..{2}|\.dev|\.app|\.ai|\.xyz$/,
-    "",
+    '',
   );
-  const removeSubdomains = removeTLD.replace(/.*\./, "");
+  const removeSubdomains = removeTLD.replace(/.*\./, '');
   return removeSubdomains;
 };
 
@@ -40,22 +40,22 @@ function CreateWebhookComponent() {
   const [{ data: defaultEnv }] = useDefaultEnvironment();
   const [loading, setLoading] = useState(false);
   const [isEditing, setEditing] = useState(false);
-  const [customPrefix, setCustomPrefix] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [customPrefix, setCustomPrefix] = useState<string>('');
+  const [error, setError] = useState<string>('');
 
-  const [name] = useSearchParam("name");
-  const [domain] = useSearchParam("domain");
-  const [redirectURI] = useSearchParam("redirect_uri");
+  const [name] = useSearchParam('name');
+  const [domain] = useSearchParam('domain');
+  const [redirectURI] = useSearchParam('redirect_uri');
   const [, createWebhook] = useMutation(CreateWebhook);
 
   //
   // Params and validation
   useEffect(() => {
     if (!name && !domain) {
-      setError("Malformed URL: Missing name or domain parameter");
+      setError('Malformed URL: Missing name or domain parameter');
     }
     if (!redirectURI) {
-      setError("Malformed URL: Missing redirect_uri parameter");
+      setError('Malformed URL: Missing redirect_uri parameter');
     }
   }, [name, domain, redirectURI]);
 
@@ -64,19 +64,19 @@ function CreateWebhookComponent() {
     try {
       return new URL(redirectURI);
     } catch (e) {
-      setError("Malformed URL: redirect_uri is not a valid URL");
+      setError('Malformed URL: redirect_uri is not a valid URL');
     }
     return null;
   }, [redirectURI]);
 
   const displayName = capitalCase(
-    name ?? (domain ? getNameFromDomain(domain) : "Webhook integration"),
+    name ?? (domain ? getNameFromDomain(domain) : 'Webhook integration'),
   );
 
-  const slugifyOptions = { preserveCharacters: ["."] };
+  const slugifyOptions = { preserveCharacters: ['.'] };
   const defaultPrefix = slugify(displayName, slugifyOptions);
   const eventNamePrefix =
-    customPrefix !== "" ? slugify(customPrefix, slugifyOptions) : defaultPrefix;
+    customPrefix !== '' ? slugify(customPrefix, slugifyOptions) : defaultPrefix;
 
   const transform = createTransform({
     //
@@ -85,14 +85,14 @@ function CreateWebhookComponent() {
     eventName: `\`${eventNamePrefix}/\${evt.type || evt.name || evt.event_type || "webhook.received"}\``,
     //
     // Most webhooks have a data field, but not all, so we fallback to the entire event
-    dataParam: "evt.data || evt",
+    dataParam: 'evt.data || evt',
     commentBlock: `// This was created by the ${displayName} integration.
     // Edit this to customize the event name and payload.`,
   });
 
   const approve = async () => {
     if (!defaultEnv) {
-      throw new Error("Failed to fetch production environment ID");
+      throw new Error('Failed to fetch production environment ID');
     }
     setLoading(true);
 
@@ -100,7 +100,7 @@ function CreateWebhookComponent() {
       input: {
         workspaceID: defaultEnv.id,
         name: displayName,
-        source: "webhook",
+        source: 'webhook',
         metadata: {
           transform,
         },
@@ -109,16 +109,16 @@ function CreateWebhookComponent() {
       setLoading(false);
       if (result.error) {
         setError(result.error.message);
-        console.log("error", result.error);
+        console.log('error', result.error);
       } else {
         //
         // NOTE - Locally this URL is just a pathname, but in production it's a full URL
         const webhookURL = result.data?.key.url;
         if (!webhookURL || !redirectURL) {
-          setError("Failed to create webhook");
+          setError('Failed to create webhook');
           return;
         }
-        redirectURL.searchParams.set("url", webhookURL);
+        redirectURL.searchParams.set('url', webhookURL);
         window.location.replace(redirectURL.toString());
       }
     });
@@ -126,9 +126,9 @@ function CreateWebhookComponent() {
 
   const cancel = () => {
     if (!redirectURL) {
-      return setError("Failed to redirect to redirect_uri");
+      return setError('Failed to redirect to redirect_uri');
     }
-    redirectURL.searchParams.set("error", "user_cancelled");
+    redirectURL.searchParams.set('error', 'user_cancelled');
     window.location.replace(redirectURL.toString());
   };
 
@@ -138,13 +138,13 @@ function CreateWebhookComponent() {
       description={
         <>
           <p className="my-6">
-            This will create a new webhook within your <u>Production</u>{" "}
+            This will create a new webhook within your <u>Production</u>{' '}
             environment. It can be modified or deleted at any time from the
             Inngest dashboard.
           </p>
           <p className="my-6">
             Upon creation, the webhook will begin sending events with the
-            following prefix:{" "}
+            following prefix:{' '}
           </p>
           <div className="flex min-h-[32px] items-center justify-center gap-2">
             {isEditing ? (
@@ -158,19 +158,19 @@ function CreateWebhookComponent() {
             ) : (
               <pre>
                 {eventNamePrefix}
-                {"/*"}
+                {'/*'}
               </pre>
             )}
             <button
               className="text-muted text-sm"
               onClick={() => {
                 setEditing(!isEditing);
-                if (customPrefix === "") {
+                if (customPrefix === '') {
                   setCustomPrefix(defaultPrefix);
                 }
               }}
             >
-              {isEditing ? "Save" : "Edit"}
+              {isEditing ? 'Save' : 'Edit'}
             </button>
           </div>
         </>
@@ -189,7 +189,7 @@ function CreateWebhookComponent() {
       error={error}
       secondaryInfo={
         <>
-          By approving this request, the created webhook URL will be shared with{" "}
+          By approving this request, the created webhook URL will be shared with{' '}
           {displayName}. <br />
           No other data from your Inngest account will be shared.
         </>

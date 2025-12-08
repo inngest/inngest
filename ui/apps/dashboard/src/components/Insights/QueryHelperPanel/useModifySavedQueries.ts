@@ -1,14 +1,14 @@
-import { useCallback } from "react";
-import { CombinedError, useMutation } from "urql";
+import { useCallback } from 'react';
+import { CombinedError, useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 import type {
   CreateInsightsQueryMutation,
   InsightsQueryStatement,
   RemoveInsightsQueryMutation,
   ShareInsightsQueryMutation,
   UpdateInsightsQueryMutation,
-} from "@/gql/graphql";
+} from '@/gql/graphql';
 
 const createInsightsQueryDocument = graphql(`
   mutation CreateInsightsQuery($input: NewInsightsQuery!) {
@@ -70,7 +70,7 @@ export type UpdateQueryArgs = { id: string; name: string; query: string };
 
 export type MutationResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: "unique" | "other" };
+  | { ok: false; error: 'unique' | 'other' };
 
 type UseModifySavedQueriesReturn = {
   deleteQuery: (args: DeleteQueryArgs) => Promise<MutationResult<string[]>>;
@@ -111,10 +111,10 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
       const result = await executeMutation<RemoveInsightsQueryMutation>(() =>
         runRemove({ id }),
       );
-      if (!result.ok) return { ok: false, error: "other" };
+      if (!result.ok) return { ok: false, error: 'other' };
 
       const ids = result.data.removeInsightsQuery?.ids;
-      if (ids === undefined) return { ok: false, error: "other" };
+      if (ids === undefined) return { ok: false, error: 'other' };
 
       return { ok: true, data: ids };
     },
@@ -166,9 +166,9 @@ export function useModifySavedQueries(): UseModifySavedQueriesReturn {
   return { deleteQuery, saveQuery, shareQuery, updateQuery };
 }
 
-function mapErrorToTag(error: CombinedError): "unique" | "other" {
+function mapErrorToTag(error: CombinedError): 'unique' | 'other' {
   const isUnique = error.graphQLErrors.some((g) =>
-    g.message.includes("uniq_insights_queries_name"),
+    g.message.includes('uniq_insights_queries_name'),
   );
-  return isUnique ? "unique" : "other";
+  return isUnique ? 'unique' : 'other';
 }

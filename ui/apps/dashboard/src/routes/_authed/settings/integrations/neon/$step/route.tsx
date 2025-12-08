@@ -1,11 +1,11 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { StepsProvider } from "@/components/PostgresIntegration/Context";
-import PageHeader from "@/components/PostgresIntegration/PageHeader";
-import StepsMenu from "@/components/PostgresIntegration/StepsMenu";
+import { StepsProvider } from '@/components/PostgresIntegration/Context';
+import PageHeader from '@/components/PostgresIntegration/PageHeader';
+import StepsMenu from '@/components/PostgresIntegration/StepsMenu';
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/neon/$step",
+  '/_authed/settings/integrations/neon/$step',
 )({
   component: NeonStepLayout,
 });

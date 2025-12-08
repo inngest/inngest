@@ -1,9 +1,9 @@
-import { useCallback } from "react";
-import { getTimestampDaysAgo } from "@inngest/components/utils/date";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { GetFunctionUsageDocument, GetFunctionsDocument } from "@/gql/graphql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { GetFunctionUsageDocument, GetFunctionsDocument } from '@/gql/graphql';
 
 type QueryVariables = {
   archived: boolean;
@@ -26,7 +26,7 @@ export function useFunctions() {
             archived,
             search: nameSearch,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -35,7 +35,7 @@ export function useFunctions() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const { page, data } = result.data.workspace.workflows;
@@ -77,7 +77,7 @@ export function useFunctionVolume() {
             startTime,
             endTime,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -86,13 +86,13 @@ export function useFunctionVolume() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const workflow = result.data.workspace.workflow;
 
       if (!workflow) {
-        throw new Error("function not found");
+        throw new Error('function not found');
       }
 
       // Calculate totals

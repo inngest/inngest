@@ -1,5 +1,5 @@
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { RiCheckLine } from "@remixicon/react";
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { RiCheckLine } from '@remixicon/react';
 
 import {
   isActive,
@@ -7,8 +7,8 @@ import {
   isTrialPlan,
   processPlan,
   type Plan,
-} from "@/components/Billing/Plans/utils";
-import UpgradeButton from "./UpgradeButton";
+} from '@/components/Billing/Plans/utils';
+import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
   plan,
@@ -38,7 +38,7 @@ export function VerticalPlanCard({
       )}
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>
-        {transformedPlan.price !== "Contact us" && (
+        {transformedPlan.price !== 'Contact us' && (
           <>/{transformedPlan.billingPeriod}</>
         )}
       </div>

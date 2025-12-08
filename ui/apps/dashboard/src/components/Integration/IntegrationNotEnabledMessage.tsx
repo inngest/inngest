@@ -1,4 +1,4 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
+import { Alert } from '@inngest/components/Alert/NewAlert';
 
 type Props = {
   integrationName: string;
@@ -11,7 +11,7 @@ export default function IntegrationNotEnabledMessage({
     <Alert severity="warning">
       <p>Your Inngest plan does not support {integrationName} integration.</p>
       <p className="mt-2">
-        To use this feature,{" "}
+        To use this feature,{' '}
         <Alert.Link
           severity="warning"
           href="/billing"

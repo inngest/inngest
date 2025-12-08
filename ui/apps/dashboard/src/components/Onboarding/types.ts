@@ -1,10 +1,10 @@
-import { type MenuStepContent } from "@inngest/components/Steps/StepsMenu";
+import { type MenuStepContent } from '@inngest/components/Steps/StepsMenu';
 
 export enum OnboardingSteps {
-  CreateApp = "create-app",
-  DeployApp = "deploy-app",
-  SyncApp = "sync-app",
-  InvokeFn = "invoke-fn",
+  CreateApp = 'create-app',
+  DeployApp = 'deploy-app',
+  SyncApp = 'sync-app',
+  InvokeFn = 'invoke-fn',
 }
 
 export type OnboardingStep = {
@@ -37,7 +37,7 @@ export const steps: OnboardingStep[] = [
 ];
 
 type ArrayLengthRange<T extends readonly any[]> = Extract<
-  keyof { [K in 0 | T["length"]]: K },
+  keyof { [K in 0 | T['length']]: K },
   number
 >;
 
@@ -57,7 +57,7 @@ type OnboardingWidgetStepContent = {
 
 export type OnboardingWidgetContent = {
   step: {
-    [K in OnboardingSteps | "success"]: OnboardingWidgetStepContent;
+    [K in OnboardingSteps | 'success']: OnboardingWidgetStepContent;
   };
   tooltip: {
     close: string;

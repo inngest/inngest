@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { AlertModal } from "@inngest/components/Modal/AlertModal";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import { useMutation } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { pathCreator } from "@/utils/urls";
-import { useNavigate } from "@tanstack/react-router";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
+import { useNavigate } from '@tanstack/react-router';
 
 const ArchiveEvent = graphql(`
   mutation ArchiveEvent($environmentId: ID!, $name: String!) {
@@ -37,8 +37,8 @@ export default function ArchiveEventModal({
       await archiveEvent({ name: eventName, environmentId: environment.id });
       navigate({ to: pathCreator.eventTypes({ envSlug: environment.slug }) });
     } catch (error) {
-      setError("Failed to archive event, please try again later.");
-      console.error("error achiving event", eventName, error);
+      setError('Failed to archive event, please try again later.');
+      console.error('error achiving event', eventName, error);
     }
   };
 

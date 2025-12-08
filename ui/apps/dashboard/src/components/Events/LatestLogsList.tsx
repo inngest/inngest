@@ -1,12 +1,12 @@
-import { useNavigate, type FileRouteTypes } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { IDCell, TimeCell } from "@inngest/components/Table/Cell";
-import { useQuery } from "urql";
+import { useNavigate, type FileRouteTypes } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
+import { useQuery } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { pathCreator } from "@/utils/urls";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const GetLatestEventLogs = graphql(`
   query GetLatestEventLogs($name: String, $environmentID: ID!) {
@@ -68,7 +68,7 @@ export default function LatestLogsList({
             `${pathCreator.eventType({
               envSlug: environmentSlug,
               eventName: eventName,
-            })}/events` as FileRouteTypes["to"]
+            })}/events` as FileRouteTypes['to']
           }
           label="View all events"
         />

@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Modal } from "@inngest/components/Modal/Modal";
-import { resolveColor } from "@inngest/components/utils/colors";
-import { isDark } from "@inngest/components/utils/theme";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Modal } from '@inngest/components/Modal/Modal';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import {
   CardElement,
   Elements,
   useElements,
   useStripe,
-} from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
+} from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 
-import { useMutation } from "urql";
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import { placeholderColor, textColor } from "@/utils/tailwind";
+import { graphql } from '@/gql';
+import { placeholderColor, textColor } from '@/utils/tailwind';
 
 type CheckoutModalProps = {
   onCancel: () => void;
@@ -25,7 +25,7 @@ type CheckoutModalProps = {
 // Make sure to call `loadStripe` outside of a component’s render to avoid
 // recreating the `Stripe` object on every render.
 const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "",
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
 );
 
 export default function CheckoutModal({
@@ -43,8 +43,8 @@ export default function CheckoutModal({
         <Elements
           stripe={stripePromise}
           options={{
-            mode: "setup",
-            currency: "usd",
+            mode: 'setup',
+            currency: 'usd',
           }}
         >
           <CheckoutForm onSuccess={onSuccess} />
@@ -71,7 +71,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const [, updatePaymentMethod] = useMutation(UpdatePaymentMethodDocument);
 
@@ -79,7 +79,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     // This should not happen since the button is disabled before this
     if (!stripe || !elements) {
-      console.error("Stripe Elements not loaded");
+      console.error('Stripe Elements not loaded');
       return;
     }
 
@@ -90,24 +90,24 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
       setLoading(false);
       return setError(
         submitError.message ||
-          "Sorry, there was an issue saving your payment information",
+          'Sorry, there was an issue saving your payment information',
       );
     }
     let token;
     try {
       const result = await stripe.createToken(
-        elements.getElement("card") as any,
+        elements.getElement('card') as any,
       );
       if (result.error) {
         setLoading(false);
         return setError(
           result.error.message ||
-            "Sorry, there was an issue saving your payment information",
+            'Sorry, there was an issue saving your payment information',
         );
       }
       token = result.token.id;
     } catch (err) {
-      setError("Sorry, there was an issue confirming your payment");
+      setError('Sorry, there was an issue confirming your payment');
       setLoading(false);
       return;
     }
@@ -118,7 +118,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
     if (updateError) {
       setError(
         updateError.message ||
-          "Sorry, there was an issue confirming your payment",
+          'Sorry, there was an issue confirming your payment',
       );
     } else {
       onSuccess();
@@ -134,7 +134,7 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
               base: {
                 color: resolveColor(textColor.basis, isDark()),
                 iconColor: resolveColor(textColor.basis, isDark()),
-                "::placeholder": {
+                '::placeholder': {
                   color: resolveColor(placeholderColor.disabled, isDark()),
                 },
               },

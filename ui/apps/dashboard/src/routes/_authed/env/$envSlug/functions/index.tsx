@@ -1,23 +1,23 @@
-import { useMemo } from "react";
+import { useMemo } from 'react';
 
-import { Button } from "@inngest/components/Button/NewButton";
-import { FunctionsTable } from "@inngest/components/Functions/NewFunctionsTable";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { RiExternalLinkLine, RiRefreshLine } from "@remixicon/react";
+import { Button } from '@inngest/components/Button/NewButton';
+import { FunctionsTable } from '@inngest/components/Functions/NewFunctionsTable';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-import { FunctionInfo } from "@/components/Functions/FunctionInfo";
+import { FunctionInfo } from '@/components/Functions/FunctionInfo';
 import {
   useFunctionVolume,
   useFunctions,
-} from "@/components/Functions/useFunctions";
-import { pathCreator } from "@/utils/urls";
+} from '@/components/Functions/useFunctions';
+import { pathCreator } from '@/utils/urls';
 import {
   useNavigate,
   createFileRoute,
   ClientOnly,
-} from "@tanstack/react-router";
+} from '@tanstack/react-router';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/functions/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/functions/')({
   component: FunctionPage,
 });
 
@@ -51,7 +51,7 @@ function FunctionPage() {
   return (
     <>
       <Header
-        breadcrumb={[{ text: "Functions" }]}
+        breadcrumb={[{ text: 'Functions' }]}
         infoIcon={<FunctionInfo />}
       />
       <ClientOnly>
@@ -64,7 +64,7 @@ function FunctionPage() {
               <Button
                 appearance="outlined"
                 label="Refresh"
-                onClick={() => navigate({ to: "." })}
+                onClick={() => navigate({ to: '.' })}
                 icon={<RiRefreshLine />}
                 iconSide="left"
               />

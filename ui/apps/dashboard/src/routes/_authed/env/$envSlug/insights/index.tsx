@@ -1,25 +1,25 @@
-import { GetAccountEntitlementsDocument } from "@/gql/graphql";
-import { useQuery } from "urql";
+import { GetAccountEntitlementsDocument } from '@/gql/graphql';
+import { useQuery } from 'urql';
 
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
 import {
   useInsightsTabManager,
   type TabManagerActions,
-} from "@/components/Insights/InsightsTabManager/InsightsTabManager";
-import { useDocumentShortcuts } from "@/components/Insights/InsightsSQLEditor/actions/handleShortcuts";
-import { StoredQueriesProvider } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
-import { SaveTabProvider } from "@/components/Insights/InsightsSQLEditor/SaveTabContext";
-import { TabManagerProvider } from "@/components/Insights/InsightsTabManager/TabManagerContext";
-import { SchemasProvider } from "@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext";
-import { QueryHelperPanel } from "@/components/Insights/QueryHelperPanel/QueryHelperPanel";
-import { useDeepLinkHandler } from "@/components/Insights/useDeepLinkHandler";
+} from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import { useDocumentShortcuts } from '@/components/Insights/InsightsSQLEditor/actions/handleShortcuts';
+import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import { SaveTabProvider } from '@/components/Insights/InsightsSQLEditor/SaveTabContext';
+import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
+import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
+import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
+import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
 
 export type InsightsSearchParams = {
   query_id?: string;
 };
 
-export const Route = createFileRoute("/_authed/env/$envSlug/insights/")({
+export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   component: InsightsComponent,
   validateSearch: (search: Record<string, unknown>): InsightsSearchParams => {
     return {
@@ -46,7 +46,7 @@ function InsightsComponent() {
 
   useDocumentShortcuts([
     {
-      combo: { alt: true, code: "KeyT", metaOrCtrl: true },
+      combo: { alt: true, code: 'KeyT', metaOrCtrl: true },
       handler: actions.createNewTab,
     },
   ]);

@@ -1,26 +1,26 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
-import { Button } from "@inngest/components/Button";
-import { InlineCode } from "@inngest/components/Code";
-import { RangePicker } from "@inngest/components/DatePicker";
-import { Input } from "@inngest/components/Forms/Input";
-import { Link } from "@inngest/components/Link";
-import { Modal } from "@inngest/components/Modal";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
-import { IconReplay } from "@inngest/components/icons/Replay";
-import { subtractDuration } from "@inngest/components/utils/date";
-import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { RiInformationLine } from "@remixicon/react";
-import { toast } from "sonner";
-import { ulid } from "ulid";
-import { useMutation, useQuery } from "urql";
+import { Button } from '@inngest/components/Button';
+import { InlineCode } from '@inngest/components/Code';
+import { RangePicker } from '@inngest/components/DatePicker';
+import { Input } from '@inngest/components/Forms/Input';
+import { Link } from '@inngest/components/Link';
+import { Modal } from '@inngest/components/Modal';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { IconReplay } from '@inngest/components/icons/Replay';
+import { subtractDuration } from '@inngest/components/utils/date';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
+import { RiInformationLine } from '@remixicon/react';
+import { toast } from 'sonner';
+import { ulid } from 'ulid';
+import { useMutation, useQuery } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { ReplayRunStatus } from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
-import { useSkippableGraphQLQuery } from "@/utils/useGraphQLQuery";
-import { useNavigate } from "@tanstack/react-router";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { ReplayRunStatus } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useNavigate } from '@tanstack/react-router';
 
 const GetAccountEntitlementsDocument = graphql(`
   query GetAccountEntitlements {
@@ -98,7 +98,7 @@ export default function NewReplayModal({
   onClose,
 }: NewReplayModalProps) {
   const navigate = useNavigate();
-  const [name, setName] = useState<string>("");
+  const [name, setName] = useState<string>('');
   const [timeRange, setTimeRange] = useState<DateRange>();
   const [selectedStatuses, setSelectedStatuses] = useState<
     SelectableStatuses[]
@@ -117,8 +117,8 @@ export default function NewReplayModal({
     variables: {
       environmentID: environment.id,
       functionSlug,
-      from: timeRange?.start ? timeRange.start.toISOString() : "",
-      to: timeRange?.end ? timeRange.end.toISOString() : "",
+      from: timeRange?.start ? timeRange.start.toISOString() : '',
+      to: timeRange?.end ? timeRange.end.toISOString() : '',
     },
     skip: !timeRange || !timeRange.start || !timeRange.end,
   });
@@ -149,13 +149,13 @@ export default function NewReplayModal({
   async function createFunctionReplay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!timeRange?.start || !timeRange.end) {
-      toast.error("Please specify a start and end date.");
+      toast.error('Please specify a start and end date.');
       return;
     }
 
     if (selectedRunsCount === 0) {
       toast.error(
-        "No runs selected. Please specify a filter with at least one run.",
+        'No runs selected. Please specify a filter with at least one run.',
       );
       return;
     }
@@ -163,7 +163,7 @@ export default function NewReplayModal({
     const functionID = data?.environment.function?.id;
 
     if (!functionID) {
-      toast.error("Could not find function. Please try again later.");
+      toast.error('Could not find function. Please try again later.');
       return;
     }
 
@@ -177,7 +177,7 @@ export default function NewReplayModal({
     });
 
     toast.promise(createFunctionReplayPromise, {
-      loading: "Loading...",
+      loading: 'Loading...',
       success: () => {
         onClose();
         navigate({
@@ -187,26 +187,26 @@ export default function NewReplayModal({
           }),
         });
 
-        return "Replay created!";
+        return 'Replay created!';
       },
-      error: "Could not replay function runs. Please try again later.",
+      error: 'Could not replay function runs. Please try again later.',
     });
   }
 
   const statusOptions = [
-    { label: "Failed", value: ReplayRunStatus.Failed, count: failedRunsCount },
+    { label: 'Failed', value: ReplayRunStatus.Failed, count: failedRunsCount },
     {
-      label: "Canceled",
+      label: 'Canceled',
       value: ReplayRunStatus.Cancelled,
       count: cancelledRunsCount,
     },
     {
-      label: "Succeeded",
+      label: 'Succeeded',
       value: ReplayRunStatus.Completed,
       count: succeededRunsCount,
     },
     {
-      label: "Skipped",
+      label: 'Skipped',
       value: ReplayRunStatus.SkippedPaused,
       count: pausedRunsCount,
     },
@@ -263,7 +263,7 @@ export default function NewReplayModal({
                 upgradeCutoff={upgradeCutoff}
                 onChange={(range) =>
                   setTimeRange(
-                    range.type === "relative"
+                    range.type === 'relative'
                       ? {
                           start: subtractDuration(new Date(), range.duration),
                           end: new Date(),
@@ -310,11 +310,11 @@ export default function NewReplayModal({
                         <span>Loading</span>
                       ) : (
                         count.toLocaleString(undefined, {
-                          notation: "compact",
-                          compactDisplay: "short",
+                          notation: 'compact',
+                          compactDisplay: 'short',
                         })
-                      )}{" "}
-                      runs {isLoading ? "..." : undefined}
+                      )}{' '}
+                      runs {isLoading ? '...' : undefined}
                     </p>
                   )}
                 </ToggleGroup.Item>
@@ -343,11 +343,11 @@ export default function NewReplayModal({
           {timeRange && !isLoading && (
             <div className="flex items-center gap-2">
               <p className="text-muted inline-flex items-center gap-1.5 text-sm">
-                <RiInformationLine className="h-5 w-5" />A total of{" "}
+                <RiInformationLine className="h-5 w-5" />A total of{' '}
                 <span className="font-bold">
                   {selectedRunsCount.toLocaleString(undefined, {
-                    notation: "compact",
-                    compactDisplay: "short",
+                    notation: 'compact',
+                    compactDisplay: 'short',
                   })}
                 </span>
                 runs will be replayed.

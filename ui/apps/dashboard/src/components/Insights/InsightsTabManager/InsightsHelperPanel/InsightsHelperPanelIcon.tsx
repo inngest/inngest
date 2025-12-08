@@ -3,7 +3,7 @@ import {
   RiFeedbackLine,
   RiNodeTree,
   RiSparkling2Line,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
 import {
   DOCUMENTATION,
@@ -11,7 +11,7 @@ import {
   SCHEMA_EXPLORER,
   SUPPORT,
   type HelperTitle,
-} from "./constants";
+} from './constants';
 
 type InsightsHelperPanelIconProps = {
   className?: string;

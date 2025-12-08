@@ -1,29 +1,29 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Alert } from "@inngest/components/Alert";
-import { Button } from "@inngest/components/Button";
-import { Textarea } from "@inngest/components/Forms/Textarea";
-import { Pill } from "@inngest/components/Pill/Pill";
-import * as Sentry from "@sentry/tanstackstart-react";
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
+import { Textarea } from '@inngest/components/Forms/Textarea';
+import { Pill } from '@inngest/components/Pill/Pill';
+import * as Sentry from '@sentry/tanstackstart-react';
 
-import { SelectInput } from "./SelectInput";
+import { SelectInput } from './SelectInput';
 import {
   DEFAULT_BUG_SEVERITY_LEVEL,
   formOptions,
   severityOptions,
   type BugSeverity,
   type TicketType,
-} from "./ticketOptions";
-import { useOrganization, useUser } from "@clerk/tanstack-react-start";
-import type { RequestBody } from "@/routes/api/support-tickets";
+} from './ticketOptions';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
+import type { RequestBody } from '@/routes/api/support-tickets';
 
 const instructions: { [K in Exclude<TicketType, null>]: string } = {
-  bug: "Please include any relevant run IDs, function names, event IDs in your message",
-  demo: "Please include relevant info like your use cases, estimated volume or specific needs",
-  billing: "What is your issue?",
+  bug: 'Please include any relevant run IDs, function names, event IDs in your message',
+  demo: 'Please include relevant info like your use cases, estimated volume or specific needs',
+  billing: 'What is your issue?',
   feature: `What's your idea?`,
-  security: "Please detail your concern",
-  question: "What would you like to know?",
+  security: 'Please detail your concern',
+  question: 'What would you like to know?',
 };
 
 type SupportFormProps = {
@@ -40,7 +40,7 @@ export function SupportForm({
   const [ticketType, setTicketType] = useState<TicketType>(
     preselectedTicketType,
   );
-  const [body, setBody] = useState<string>("");
+  const [body, setBody] = useState<string>('');
 
   const [bugSeverity, setBugSeverityLevel] = useState<BugSeverity>(
     DEFAULT_BUG_SEVERITY_LEVEL,
@@ -55,7 +55,7 @@ export function SupportForm({
     ...o,
     label: (
       <>
-        {o.label}{" "}
+        {o.label}{' '}
         {o.enterpriseOnly ? (
           <Pill>Enterprise Plan</Pill>
         ) : o.paidOnly ? (
@@ -72,7 +72,7 @@ export function SupportForm({
 
   function clearForm() {
     setTicketType(null);
-    setBody("");
+    setBody('');
     setBugSeverityLevel(DEFAULT_BUG_SEVERITY_LEVEL);
     setIsFetching(false);
   }
@@ -87,15 +87,15 @@ export function SupportForm({
     try {
       // The following exceptions aren't user errors and should never happen.
       if (!isSignedIn)
-        throw new Error("User must be signed in to create a support ticket.");
+        throw new Error('User must be signed in to create a support ticket.');
       if (!user.primaryEmailAddress)
-        throw new Error("User must have a primary email address.");
-      if (!user.externalId) throw new Error("User must have an external ID.");
+        throw new Error('User must have a primary email address.');
+      if (!user.externalId) throw new Error('User must have an external ID.');
       if (
         !organization?.publicMetadata.accountID ||
-        typeof organization.publicMetadata.accountID !== "string"
+        typeof organization.publicMetadata.accountID !== 'string'
       ) {
-        throw new Error("Organization is missing an account ID.");
+        throw new Error('Organization is missing an account ID.');
       }
 
       const reqBody: RequestBody = {
@@ -112,24 +112,24 @@ export function SupportForm({
         },
       };
 
-      const result = await fetch("/api/support-tickets", {
-        method: "POST",
-        credentials: "include",
-        redirect: "error",
+      const result = await fetch('/api/support-tickets', {
+        method: 'POST',
+        credentials: 'include',
+        redirect: 'error',
         body: JSON.stringify(reqBody),
       });
       if (result.ok) {
         clearForm();
         setResult({
           ok: true,
-          message: "Support ticket created!",
+          message: 'Support ticket created!',
         });
       } else {
         setIsFetching(false);
         setResult({
           ok: false,
           message:
-            "Failed to create support ticket - please email hello@inngest.com if the problem persists",
+            'Failed to create support ticket - please email hello@inngest.com if the problem persists',
         });
       }
     } catch (error) {
@@ -138,7 +138,7 @@ export function SupportForm({
       setResult({
         ok: false,
         message:
-          "Failed to create support ticket - please email hello@inngest.com if the problem persists",
+          'Failed to create support ticket - please email hello@inngest.com if the problem persists',
       });
     }
   }
@@ -165,7 +165,7 @@ export function SupportForm({
           required
         />
       </label>
-      {ticketType === "bug" && (
+      {ticketType === 'bug' && (
         <label className="flex w-full flex-col gap-2 font-medium">
           How severe is your issue?
           <SelectInput
@@ -183,7 +183,7 @@ export function SupportForm({
         kind="primary"
       />
       {result.message && (
-        <Alert severity={result.ok ? "info" : "error"}>{result.message}</Alert>
+        <Alert severity={result.ok ? 'info' : 'error'}>{result.message}</Alert>
       )}
       <p className="mt-4 text-sm">
         {isPaid ? (

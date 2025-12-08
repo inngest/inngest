@@ -1,13 +1,13 @@
-import { useMemo, useRef } from "react";
-import { Link } from "@inngest/components/Link/NewLink";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
-import { Table, TextCell } from "@inngest/components/Table";
-import { formatDayString } from "@inngest/components/utils/date";
-import { createColumnHelper } from "@tanstack/react-table";
-import { useQuery } from "urql";
+import { useMemo, useRef } from 'react';
+import { Link } from '@inngest/components/Link/NewLink';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { Table, TextCell } from '@inngest/components/Table';
+import { formatDayString } from '@inngest/components/utils/date';
+import { createColumnHelper } from '@tanstack/react-table';
+import { useQuery } from 'urql';
 
-import PaymentStatusPill from "@/components/Billing/Payments/PaymentStatusPill";
-import { graphql } from "@/gql";
+import PaymentStatusPill from '@/components/Billing/Payments/PaymentStatusPill';
+import { graphql } from '@/gql';
 
 const GetPaymentIntentsDocument = graphql(`
   query GetPaymentIntents {
@@ -34,22 +34,22 @@ type TableRow = {
 const columnHelper = createColumnHelper<TableRow>();
 
 const columns = [
-  columnHelper.accessor("status", {
+  columnHelper.accessor('status', {
     header: () => <span>Status</span>,
     cell: (props) => <PaymentStatusPill status={props.getValue()} />,
     enableSorting: false,
   }),
-  columnHelper.accessor("description", {
+  columnHelper.accessor('description', {
     header: () => <span>Description</span>,
     cell: (props) => <TextCell>{props.getValue()}</TextCell>,
   }),
-  columnHelper.accessor("amount", {
+  columnHelper.accessor('amount', {
     header: () => <span>Amount</span>,
     cell: (props) => {
-      const isCanceled = props.row.original.status === "canceled";
+      const isCanceled = props.row.original.status === 'canceled';
       return (
         <TextCell>
-          <span className={isCanceled ? "text-muted" : ""}>
+          <span className={isCanceled ? 'text-muted' : ''}>
             {props.getValue()}
           </span>
         </TextCell>
@@ -57,21 +57,21 @@ const columns = [
     },
     enableSorting: false,
   }),
-  columnHelper.accessor("createdAt", {
+  columnHelper.accessor('createdAt', {
     header: () => <span>Created at</span>,
     cell: (props) => <TextCell>{props.getValue()}</TextCell>,
     enableSorting: false,
   }),
-  columnHelper.accessor("url", {
+  columnHelper.accessor('url', {
     header: () => <span />,
     cell: (props) => {
       const url = props.getValue();
       const requiresConfirmation =
-        props.row.original.status === "requires_confirmation";
+        props.row.original.status === 'requires_confirmation';
       if (url) {
         return (
           <Link href={url as string} size="small" target="_blank">
-            {requiresConfirmation ? "Pay invoice" : "View invoice"}
+            {requiresConfirmation ? 'Pay invoice' : 'View invoice'}
           </Link>
         );
       }

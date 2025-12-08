@@ -1,8 +1,8 @@
-import { useQuery, type UseQueryResponse } from "urql";
+import { useQuery, type UseQueryResponse } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
-import { type GetDeployssQuery } from "@/gql/graphql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+import { type GetDeployssQuery } from '@/gql/graphql';
 
 const GetDeploysDocument = graphql(`
   query GetDeployss($environmentID: ID!) {

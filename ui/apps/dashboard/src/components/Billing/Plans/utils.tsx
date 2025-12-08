@@ -1,30 +1,30 @@
-import { getPeriodAbbreviation } from "@inngest/components/utils/date";
+import { getPeriodAbbreviation } from '@inngest/components/utils/date';
 
 import type {
   BillingPlan,
   EntitlementConcurrency,
   EntitlementInt,
   EntitlementRunCount,
-} from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
+} from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 
 export type Plan = Omit<
   BillingPlan,
-  "entitlements" | "features" | "availableAddons" | "addons"
+  'entitlements' | 'features' | 'availableAddons' | 'addons'
 > & {
   entitlements: {
-    concurrency: Pick<EntitlementConcurrency, "limit">;
-    runCount: Pick<EntitlementRunCount, "limit">;
-    history: Pick<EntitlementInt, "limit">;
+    concurrency: Pick<EntitlementConcurrency, 'limit'>;
+    runCount: Pick<EntitlementRunCount, 'limit'>;
+    history: Pick<EntitlementInt, 'limit'>;
   };
 };
 
 export enum PlanNames {
-  Free = "Free Tier",
-  Basic = "Basic",
-  Pro = "Pro",
-  Hobby = "Hobby - Free",
-  Enterprise = "Enterprise",
+  Free = 'Free Tier',
+  Basic = 'Basic',
+  Pro = 'Pro',
+  Hobby = 'Hobby - Free',
+  Enterprise = 'Enterprise',
 }
 
 export function processPlan(plan: Plan) {
@@ -34,10 +34,10 @@ export function processPlan(plan: Plan) {
 
   const priceLabel =
     name === PlanNames.Enterprise || amount === Infinity
-      ? "Contact us"
-      : new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
+      ? 'Contact us'
+      : new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
           maximumFractionDigits: 0,
         }).format(amount / 100);
 
@@ -45,9 +45,9 @@ export function processPlan(plan: Plan) {
     name,
     price: priceLabel,
     billingPeriod:
-      typeof billingPeriod === "string"
+      typeof billingPeriod === 'string'
         ? getPeriodAbbreviation(billingPeriod)
-        : "mo",
+        : 'mo',
     features: featureDescriptions,
     slug,
   };
@@ -55,11 +55,11 @@ export function processPlan(plan: Plan) {
 
 function getFeatureDescriptions(
   planName: string,
-  entitlements: Plan["entitlements"],
+  entitlements: Plan['entitlements'],
 ): (string | React.ReactNode)[] {
-  const numberFormatter = new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    compactDisplay: "short",
+  const numberFormatter = new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
   });
 
   switch (planName) {
@@ -71,10 +71,10 @@ function getFeatureDescriptions(
         `${numberFormatter.format(
           entitlements.concurrency.limit,
         )} concurrent steps`,
-        "Unlimited branch and staging envs",
-        "Logs, traces, and observability",
-        "Basic alerting",
-        "Community support",
+        'Unlimited branch and staging envs',
+        'Logs, traces, and observability',
+        'Basic alerting',
+        'Community support',
       ];
 
     case PlanNames.Basic:
@@ -90,51 +90,51 @@ function getFeatureDescriptions(
           entitlements.concurrency.limit,
         )} concurrent steps`,
         `${entitlements.history.limit} day trace and history retention`,
-        "Unlimited functions and apps",
-        "No event rate limit",
-        "Basic email and ticketing support",
+        'Unlimited functions and apps',
+        'No event rate limit',
+        'Basic email and ticketing support',
       ];
 
     case PlanNames.Pro:
       return [
-        "Starts at 1,000,000+ executions",
-        "100+ concurrent steps",
-        "1,000+ realtime connections",
+        'Starts at 1,000,000+ executions',
+        '100+ concurrent steps',
+        '1,000+ realtime connections',
         <>
           10 users included
           <a
             className="hover:underline"
             href={pathCreator.billing({
-              ref: "app-billing-plans-pro-addons",
-              highlight: "users",
+              ref: 'app-billing-plans-pro-addons',
+              highlight: 'users',
             })}
           >
             (add-ons available)
           </a>
         </>,
-        "Granular metrics",
-        "Higher usage limits",
+        'Granular metrics',
+        'Higher usage limits',
       ];
 
     case PlanNames.Enterprise:
       return [
-        "Custom executions",
-        "500+ concurrent steps",
-        "1,000+ realtime connections",
-        "50+ users",
-        "SAML, RBAC, and audit trails",
-        "Exportable observability",
-        "Dedicated slack channel",
+        'Custom executions',
+        '500+ concurrent steps',
+        '1,000+ realtime connections',
+        '50+ users',
+        'SAML, RBAC, and audit trails',
+        'Exportable observability',
+        'Dedicated slack channel',
       ];
 
     case PlanNames.Hobby:
       return [
-        "100k executions, hard limited",
-        "5 concurrent steps",
-        "3 realtime connections",
-        "3 users",
-        "Basic alerting",
-        "Community support",
+        '100k executions, hard limited',
+        '5 concurrent steps',
+        '3 realtime connections',
+        '3 users',
+        'Basic alerting',
+        'Community support',
       ];
 
     default:
@@ -177,7 +177,7 @@ export function isHobbyFreePlan(
   plan: Plan | (Partial<BillingPlan> & { name: string }),
 ): boolean {
   if (!plan.slug) return false;
-  return plan.slug.startsWith("hobby-free-");
+  return plan.slug.startsWith('hobby-free-');
 }
 
 export function isHobbyPlan(

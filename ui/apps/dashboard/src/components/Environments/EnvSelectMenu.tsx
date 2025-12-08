@@ -1,22 +1,22 @@
-import { useState } from "react";
-import { Listbox } from "@headlessui/react";
+import { useState } from 'react';
+import { Listbox } from '@headlessui/react';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
+} from '@inngest/components/Tooltip/Tooltip';
 import {
   RiCloudLine,
   RiErrorWarningLine,
   RiExpandUpDownLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { useEnvironments } from "@/queries";
+import { useEnvironments } from '@/queries';
 import {
   getDefaultEnvironment,
   getTestEnvironments,
   type Environment,
-} from "@/utils/environments";
+} from '@/utils/environments';
 
 type EnvSelectMenuProps = {
   onSelect?: (env: Environment) => void;
@@ -35,7 +35,7 @@ export default function EnvSelectMenu({
   const [selection, setSelection] = useState<Environment | null>(null);
 
   if (error) {
-    console.error("error fetching envs", error);
+    console.error('error fetching envs', error);
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -71,12 +71,12 @@ export default function EnvSelectMenu({
   }
 
   return (
-    <div className={className || ""}>
+    <div className={className || ''}>
       <Listbox value={selection} onChange={internalOnSelect}>
         {({ open }) => (
           <div className="bg-canvasBase relative flex">
             <Listbox.Button
-              className={`border-muted ${open && "border-primary-intense"}
+              className={`border-muted ${open && 'border-primary-intense'}
               bg-canvasBase text-primary-intense hover:bg-canvasSubtle 
               h-8 w-[258px] overflow-hidden rounded border px-2 text-sm`}
             >
@@ -123,7 +123,7 @@ const SelectedDisplay = ({ env }: { env: Environment | null }) => (
 
 const EnvItem = ({ env }: { env: Environment }) => (
   <Listbox.Option
-    key={"lo-" + env.id}
+    key={'lo-' + env.id}
     value={env}
     className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
   >

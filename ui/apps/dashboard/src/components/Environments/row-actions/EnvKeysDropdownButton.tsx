@@ -1,18 +1,18 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@inngest/components/DropdownMenu";
-import { RiKey2Line } from "@remixicon/react";
+} from '@inngest/components/DropdownMenu';
+import { RiKey2Line } from '@remixicon/react';
 
-import { type Environment } from "@/utils/environments";
-import { pathCreator } from "@/utils/urls";
+import { type Environment } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 type Props = {
-  env: Pick<Environment, "slug">;
+  env: Pick<Environment, 'slug'>;
 };
 
 export function EnvKeysDropdownButton({ env }: Props) {

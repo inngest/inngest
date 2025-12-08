@@ -1,5 +1,5 @@
-import { createContext, useContext, useState } from "react";
-import { IntegrationSteps } from "@inngest/components/PostgresIntegrations/newTypes";
+import { createContext, useContext, useState } from 'react';
+import { IntegrationSteps } from '@inngest/components/PostgresIntegrations/newTypes';
 
 interface StepsContextType {
   stepsCompleted: IntegrationSteps[];
@@ -40,7 +40,7 @@ export function StepsProvider({ children }: React.PropsWithChildren) {
 export function useSteps() {
   const context = useContext(StepsContext);
   if (context === undefined) {
-    throw new Error("useSteps must be used within a StepsProvider");
+    throw new Error('useSteps must be used within a StepsProvider');
   }
   return context;
 }

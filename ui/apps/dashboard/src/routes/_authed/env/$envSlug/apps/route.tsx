@@ -1,6 +1,6 @@
-import { Info } from "@inngest/components/Info/Info";
-import { Link } from "@inngest/components/Link/NewLink";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link/NewLink';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 export const AppInfo = () => (
   <Info
@@ -13,7 +13,7 @@ export const AppInfo = () => (
   />
 );
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps")({
+export const Route = createFileRoute('/_authed/env/$envSlug/apps')({
   component: AppLayout,
 });
 

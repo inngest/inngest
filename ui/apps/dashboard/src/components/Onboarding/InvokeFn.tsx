@@ -1,26 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { CodeBlock } from "@inngest/components/CodeBlock/NewCodeBlock";
-import { parseCode } from "@inngest/components/InvokeButton/utils";
-import { Link } from "@inngest/components/Link/NewLink";
-import { Select, type Option } from "@inngest/components/Select/NewSelect";
-import { RiCheckboxCircleFill } from "@remixicon/react";
-import { toast } from "sonner";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
+import { parseCode } from '@inngest/components/InvokeButton/utils';
+import { Link } from '@inngest/components/Link/NewLink';
+import { Select, type Option } from '@inngest/components/Select/NewSelect';
+import { RiCheckboxCircleFill } from '@remixicon/react';
+import { toast } from 'sonner';
 
-import { FunctionTriggerTypes } from "@/gql/graphql";
-import { pathCreator } from "@/utils/urls";
-import { OnboardingSteps } from "./types";
-import { invokeFunction, prefetchFunctions } from "@/queries/server/functions";
-import useOnboardingStep from "./useOnboardingStep";
-import { useOnboardingTracking } from "./useOnboardingTracking";
-import { useNavigate, ClientOnly } from "@tanstack/react-router";
+import { FunctionTriggerTypes } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
+import { OnboardingSteps } from './types';
+import { invokeFunction, prefetchFunctions } from '@/queries/server/functions';
+import useOnboardingStep from './useOnboardingStep';
+import { useOnboardingTracking } from './useOnboardingTracking';
+import { useNavigate, ClientOnly } from '@tanstack/react-router';
 
 const initialCode = JSON.stringify(
   {
     data: {
-      example: "type a JSON payload here to test your function",
+      example: 'type a JSON payload here to test your function',
     },
   },
   null,
@@ -65,9 +65,9 @@ export default function InvokeFn() {
         setFunctions(fetchedFunctions);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load functions",
+          err instanceof Error ? err.message : 'Failed to load functions',
         );
-        console.error("Failed to load functions: ", err);
+        console.error('Failed to load functions: ', err);
       } finally {
         setLoading(false);
       }
@@ -95,36 +95,36 @@ export default function InvokeFn() {
       if (success) {
         updateCompletedSteps(currentStepName, {
           metadata: {
-            completionSource: "manual",
+            completionSource: 'manual',
             invokedFunction: selectedFunction,
           },
         });
         setError(undefined);
         setIsFnInvoked(true);
         // TO DO: add link to run ID, need to update mutation first to return ID
-        toast.success("Function successfully invoked");
+        toast.success('Function successfully invoked');
       } else {
         setIsFnInvoked(false);
         setError(error);
-        console.error("Failed to invoke: ", error);
+        console.error('Failed to invoke: ', error);
       }
     } catch (err) {
-      setError("An error occurred");
-      console.error("Failed to invoke: ", err);
+      setError('An error occurred');
+      console.error('Failed to invoke: ', err);
     }
   };
 
   const selectDisplay = loading
-    ? "Loading functions..."
+    ? 'Loading functions...'
     : functions.length === 0
-    ? "No functions"
-    : "Select function";
+    ? 'No functions'
+    : 'Select function';
 
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
         You can send a test event and see your function in action. You will be
-        able to access all our monitoring and debugging features.{" "}
+        able to access all our monitoring and debugging features.{' '}
         <Link
           className="inline-block"
           size="small"
@@ -149,7 +149,7 @@ export default function InvokeFn() {
         >
           <Select.Button
             className={
-              functions.length === 0 ? "text-disabled cursor-not-allowed" : ""
+              functions.length === 0 ? 'text-disabled cursor-not-allowed' : ''
             }
           >
             <div className="text-sm font-medium leading-tight">
@@ -179,11 +179,11 @@ export default function InvokeFn() {
           <ClientOnly>
             <CodeBlock.Wrapper>
               <CodeBlock
-                header={{ title: "Invoke function" }}
+                header={{ title: 'Invoke function' }}
                 tab={{
                   content: rawPayload,
                   readOnly: false,
-                  language: "json",
+                  language: 'json',
                   handleChange: setRawPayload,
                 }}
               />
@@ -210,8 +210,8 @@ export default function InvokeFn() {
                 onClick={() => {
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: {
-                      type: "btn-click",
-                      label: "invoke",
+                      type: 'btn-click',
+                      label: 'invoke',
                       invokedFunction: selectedFunction,
                     },
                   });
@@ -224,18 +224,18 @@ export default function InvokeFn() {
                 onClick={() => {
                   updateCompletedSteps(currentStepName, {
                     metadata: {
-                      completionSource: "manual",
+                      completionSource: 'manual',
                       invokedFunction: null,
                     },
                   });
                   tracking?.trackOnboardingAction(currentStepName, {
                     metadata: {
-                      type: "btn-click",
-                      label: "skip",
+                      type: 'btn-click',
+                      label: 'skip',
                       invokedFunction: selectedFunction,
                     },
                   });
-                  navigate({ to: pathCreator.apps({ envSlug: "production" }) });
+                  navigate({ to: pathCreator.apps({ envSlug: 'production' }) });
                 }}
               />
             </div>
@@ -245,12 +245,12 @@ export default function InvokeFn() {
               onClick={() => {
                 tracking?.trackOnboardingAction(currentStepName, {
                   metadata: {
-                    type: "btn-click",
-                    label: "go-to-runs",
+                    type: 'btn-click',
+                    label: 'go-to-runs',
                     invokedFunction: selectedFunction,
                   },
                 });
-                navigate({ to: pathCreator.runs({ envSlug: "production" }) });
+                navigate({ to: pathCreator.runs({ envSlug: 'production' }) });
               }}
             />
           )}

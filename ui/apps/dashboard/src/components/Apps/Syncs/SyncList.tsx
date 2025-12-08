@@ -1,8 +1,8 @@
-import { Skeleton } from "@inngest/components/Skeleton";
-import { Time } from "@inngest/components/Time";
-import { cn } from "@inngest/components/utils/classNames";
+import { Skeleton } from '@inngest/components/Skeleton';
+import { Time } from '@inngest/components/Time';
+import { cn } from '@inngest/components/utils/classNames';
 
-import { SyncStatusPill } from "@/components/Apps/SyncStatusPill";
+import { SyncStatusPill } from '@/components/Apps/SyncStatusPill';
 
 type Props = {
   className?: string;
@@ -37,7 +37,7 @@ export const SyncList = ({
   return (
     <div
       className={cn(
-        "border-muted bg-canvasBase w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r sm:w-1/3",
+        'border-muted bg-canvasBase w-2/5 max-w-2xl flex-shrink-0 overflow-y-auto border-r sm:w-1/3',
         className,
       )}
     >
@@ -49,15 +49,15 @@ export const SyncList = ({
       {!loading && (
         <ul className="w-full">
           {syncs.map((sync) => {
-            let bgColor = "bg-canvasBase";
+            let bgColor = 'bg-canvasBase';
             if (sync.id === selectedSyncID) {
-              bgColor = "bg-canvasSubtle";
+              bgColor = 'bg-canvasSubtle';
             }
 
             return (
               <li
                 className={cn(
-                  "border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-b",
+                  'border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-b',
                   bgColor,
                 )}
                 key={sync.id}
@@ -78,7 +78,7 @@ export const SyncList = ({
                 <div
                   className="hidden items-center gap-1 align-middle md:p-2 lg:p-4 min-[1120px]:flex"
                   title={`${sync.syncedFunctions.length} ${
-                    sync.syncedFunctions.length === 1 ? "function" : "functions"
+                    sync.syncedFunctions.length === 1 ? 'function' : 'functions'
                   }`}
                 ></div>
               </li>

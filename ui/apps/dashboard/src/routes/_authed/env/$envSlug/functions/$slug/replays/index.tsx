@@ -1,10 +1,10 @@
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { ReplayList } from "@/components/Functions/ReplayList";
-import NewReplayButton from "@/components/Replay/NewReplayButton";
-import { graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { ReplayList } from '@/components/Functions/ReplayList';
+import NewReplayButton from '@/components/Replay/NewReplayButton';
+import { graphql } from '@/gql';
 
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "urql";
+import { createFileRoute } from '@tanstack/react-router';
+import { useQuery } from 'urql';
 
 const GetFunctionPauseStateDocument = graphql(`
   query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {
@@ -18,7 +18,7 @@ const GetFunctionPauseStateDocument = graphql(`
 `);
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/functions/$slug/replays/",
+  '/_authed/env/$envSlug/functions/$slug/replays/',
 )({
   component: RouteComponent,
 });

@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Modal } from "@inngest/components/Modal";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Modal } from '@inngest/components/Modal';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const Mutation = graphql(`
   mutation DeleteSigningKey($signingKeyID: UUID!) {
@@ -38,7 +38,7 @@ export function DeleteSigningKeyModal(props: Props) {
         { signingKeyID },
         {
           // Bust cache
-          additionalTypenames: ["SigningKey"],
+          additionalTypenames: ['SigningKey'],
         },
       );
       if (res.error) {
@@ -48,7 +48,7 @@ export function DeleteSigningKeyModal(props: Props) {
       onClose();
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError("Unknown error");
+        setError('Unknown error');
         return;
       }
 

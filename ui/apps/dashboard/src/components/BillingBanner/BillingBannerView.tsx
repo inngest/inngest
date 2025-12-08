@@ -1,11 +1,11 @@
-import { useMemo } from "react";
-import { ContextualBanner } from "@inngest/components/Banner/NewBanner";
-import { Button } from "@inngest/components/Button/NewButton";
-import { useBooleanLocalStorage } from "@inngest/components/hooks/useBooleanLocalStorage";
+import { useMemo } from 'react';
+import { ContextualBanner } from '@inngest/components/Banner/NewBanner';
+import { Button } from '@inngest/components/Button/NewButton';
+import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 
 // import { type EntitlementUsageQuery } from '@/gql/graphql';
-import { pathCreator } from "@/utils/urls";
-import { parseEntitlementUsage } from "./parse";
+import { pathCreator } from '@/utils/urls';
+import { parseEntitlementUsage } from './parse';
 
 export function BillingBannerView({}: // entitlementUsage,
 {
@@ -14,11 +14,11 @@ export function BillingBannerView({}: // entitlementUsage,
   const { bannerMessage, bannerSeverity, items } =
     parseEntitlementUsage(/*entitlementUsage*/);
 
-  const isVisible = useBooleanLocalStorage("BillingBanner:visible", true);
+  const isVisible = useBooleanLocalStorage('BillingBanner:visible', true);
 
   const onDismiss = useMemo(() => {
     // Error banners can't be dismissed.
-    if (bannerSeverity === "error") {
+    if (bannerSeverity === 'error') {
       return;
     }
 
@@ -28,7 +28,7 @@ export function BillingBannerView({}: // entitlementUsage,
   }, [bannerSeverity, isVisible]);
 
   // Error banners are always visible.
-  if (!isVisible.value && bannerSeverity !== "error") {
+  if (!isVisible.value && bannerSeverity !== 'error') {
     return null;
   }
 
@@ -51,8 +51,8 @@ export function BillingBannerView({}: // entitlementUsage,
         <Button
           appearance="outlined"
           href={pathCreator.billing({
-            tab: "plans",
-            ref: "app-billing-banner",
+            tab: 'plans',
+            ref: 'app-billing-banner',
           })}
           kind="secondary"
           label="Upgrade plan"

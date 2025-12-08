@@ -1,17 +1,17 @@
-import { neonMenuStepContent } from "@inngest/components/PostgresIntegrations/Neon/neonContent";
+import { neonMenuStepContent } from '@inngest/components/PostgresIntegrations/Neon/neonContent';
 import {
   IntegrationSteps,
   STEPS_ORDER,
   isValidStep,
-} from "@inngest/components/PostgresIntegrations/types";
-import StepsMenu from "@inngest/components/Steps/NewStepsMenu";
-import { RiExternalLinkLine } from "@remixicon/react";
+} from '@inngest/components/PostgresIntegrations/types';
+import StepsMenu from '@inngest/components/Steps/NewStepsMenu';
+import { RiExternalLinkLine } from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import { useSteps } from "./Context";
+import { pathCreator } from '@/utils/urls';
+import { useSteps } from './Context';
 
-import Menu from "@inngest/components/PostgresIntegrations/NewStepsMenu";
-import { useNavigate } from "@tanstack/react-router";
+import Menu from '@inngest/components/PostgresIntegrations/NewStepsMenu';
+import { useNavigate } from '@tanstack/react-router';
 
 export default function NeonStepsMenu({
   step,
@@ -24,7 +24,7 @@ export default function NeonStepsMenu({
   const { stepsCompleted } = useSteps();
   if (!isValidStep(step)) {
     navigate({
-      to: pathCreator.pgIntegrationStep({ integration: "supabase" }),
+      to: pathCreator.pgIntegrationStep({ integration: 'supabase' }),
     });
     return;
   }
@@ -36,7 +36,7 @@ export default function NeonStepsMenu({
       content={neonMenuStepContent}
       links={links}
       steps={steps}
-      pathname={pathCreator.pgIntegrationStep({ integration: "supabase" })}
+      pathname={pathCreator.pgIntegrationStep({ integration: 'supabase' })}
     />
   );
 }

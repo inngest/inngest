@@ -1,6 +1,6 @@
-import { useClerk } from "@clerk/tanstack-react-start";
-import { RiLogoutCircleLine } from "@remixicon/react";
-import { Link } from "@tanstack/react-router";
+import { useClerk } from '@clerk/tanstack-react-start';
+import { RiLogoutCircleLine } from '@remixicon/react';
+import { Link } from '@tanstack/react-router';
 
 export const SignOutButton = ({
   isMarketplace = false,
@@ -23,7 +23,7 @@ export const SignOutButton = ({
         onClick={async () => {
           await signOut({
             sessionId: session?.id,
-            redirectUrl: "/sign-in/choose",
+            redirectUrl: '/sign-in/choose',
           });
         }}
       >

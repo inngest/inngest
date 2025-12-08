@@ -1,14 +1,14 @@
-import { SQLEditor } from "@inngest/components/SQLEditor/SQLEditor";
+import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
-import { useInsightsStateMachineContext } from "../InsightsStateMachineContext/InsightsStateMachineContext";
-import { hasUnsavedChanges } from "../InsightsTabManager/InsightsTabManager";
-import { useActiveTab } from "../InsightsTabManager/TabManagerContext";
-import { useStoredQueries } from "../QueryHelperPanel/StoredQueriesContext";
-import { SQLEditorContextMenu } from "./SQLEditorContextMenu";
-import { useSQLEditorInstance } from "./SQLEditorInstanceContext";
-import { useSaveTabActions } from "./SaveTabContext";
-import { useInsightsSQLEditorOnMountCallback } from "./hooks/useInsightsSQLEditorOnMountCallback";
-import { useSQLCompletionConfig } from "./hooks/useSQLCompletionConfig";
+import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import { hasUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
+import { useActiveTab } from '../InsightsTabManager/TabManagerContext';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import { SQLEditorContextMenu } from './SQLEditorContextMenu';
+import { useSQLEditorInstance } from './SQLEditorInstanceContext';
+import { useSaveTabActions } from './SaveTabContext';
+import { useInsightsSQLEditorOnMountCallback } from './hooks/useInsightsSQLEditorOnMountCallback';
+import { useSQLCompletionConfig } from './hooks/useSQLCompletionConfig';
 
 export function InsightsSQLEditor() {
   const { onChange, query, runQuery } = useInsightsStateMachineContext();
@@ -41,7 +41,7 @@ export function InsightsSQLEditor() {
         try {
           await navigator.clipboard.writeText(text);
         } catch (err) {
-          console.error("Failed to copy:", err);
+          console.error('Failed to copy:', err);
         }
       }
     }
@@ -57,14 +57,14 @@ export function InsightsSQLEditor() {
       if (text) {
         try {
           await navigator.clipboard.writeText(text);
-          editor.executeEdits("cut", [
+          editor.executeEdits('cut', [
             {
               range: selection,
-              text: "",
+              text: '',
             },
           ]);
         } catch (err) {
-          console.error("Failed to cut:", err);
+          console.error('Failed to cut:', err);
         }
       }
     }
@@ -78,7 +78,7 @@ export function InsightsSQLEditor() {
       const text = await navigator.clipboard.readText();
       const selection = editor.getSelection();
       if (selection) {
-        editor.executeEdits("paste", [
+        editor.executeEdits('paste', [
           {
             range: selection,
             text,
@@ -86,14 +86,14 @@ export function InsightsSQLEditor() {
         ]);
       }
     } catch (err) {
-      console.error("Failed to paste:", err);
+      console.error('Failed to paste:', err);
     }
   };
 
   const handlePrettifySQL = () => {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.getAction("editor.action.formatDocument")?.run();
+    editor.getAction('editor.action.formatDocument')?.run();
   };
 
   const handleRunQuery = () => {

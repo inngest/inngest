@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { useMutation } from "urql";
+import { useEffect } from 'react';
+import { useMutation } from 'urql';
 
-import ConnectingView from "@/components/DatadogIntegration/ConnectingView";
-import { graphql } from "@/gql";
+import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
+import { graphql } from '@/gql';
 
 const FinishDatadogIntegrationDocument = graphql(`
   mutation FinishDatadogIntegrationDocument(
@@ -73,7 +73,7 @@ export default function FinishPage({
 
   useEffect(() => {
     if (data) {
-      window.location.href = "/settings/integrations/datadog";
+      window.location.href = '/settings/integrations/datadog';
     }
   }, [data]);
 

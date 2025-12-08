@@ -1,14 +1,14 @@
-import { useContext, useEffect, useState } from "react";
-import { useLocation, ClientOnly } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Link } from "@inngest/components/Link/NewLink";
-import { toast } from "sonner";
+import { useContext, useEffect, useState } from 'react';
+import { useLocation, ClientOnly } from '@tanstack/react-router';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Link } from '@inngest/components/Link/NewLink';
+import { toast } from 'sonner';
 
-import { CodeBlock } from "@inngest/components/CodeBlock/NewCodeBlock";
-import { getManageKey } from "@/utils/urls";
-import makeVM from "@/utils/vm";
-import { Context } from "./Context";
+import { CodeBlock } from '@inngest/components/CodeBlock/NewCodeBlock';
+import { getManageKey } from '@/utils/urls';
+import makeVM from '@/utils/vm';
+import { Context } from './Context';
 
 type FilterEventsProps = {
   keyID: string;
@@ -29,9 +29,9 @@ const preview = async (transform: string, input: string) => {
     const ok = vm.dump(unwrapped);
     vm.dispose();
     if (ok) {
-      return JSON.stringify(ok, undefined, "  ");
+      return JSON.stringify(ok, undefined, '  ');
     }
-    return ok || "";
+    return ok || '';
   } catch (e) {
     return `Error: ${e}`;
   }
@@ -48,7 +48,7 @@ const defaultCommentBlock = `// Rename this webhook to give the events a unique 
 
 export function createTransform({
   eventName = `"webhook/request.received"`,
-  dataParam = "evt",
+  dataParam = 'evt',
   commentBlock = defaultCommentBlock,
 }): string {
   return `// transform accepts the incoming JSON payload from your
@@ -79,7 +79,7 @@ export default function TransformEvents({
   metadata,
 }: FilterEventsProps) {
   let rawTransform: string | undefined = undefined;
-  if (typeof metadata?.transform === "string") {
+  if (typeof metadata?.transform === 'string') {
     rawTransform = metadata.transform;
   }
 
@@ -102,9 +102,9 @@ export default function TransformEvents({
     }
 
     const result = await preview(transform, incoming);
-    if (result.startsWith("Error: ")) {
+    if (result.startsWith('Error: ')) {
       setTransformWarningOnKey(null);
-      setOutputError(result.replace("Error: ", ""));
+      setOutputError(result.replace('Error: ', ''));
       setOutput(defaultOutput);
     } else {
       setTransformWarningOnKey(null);
@@ -113,14 +113,14 @@ export default function TransformEvents({
 
       try {
         const parsed = JSON.parse(result);
-        if (parsed["name"] === undefined) {
-          setTransformWarningOnKey("name");
-        } else if (parsed["data"] === undefined) {
-          setTransformWarningOnKey("data");
+        if (parsed['name'] === undefined) {
+          setTransformWarningOnKey('name');
+        } else if (parsed['data'] === undefined) {
+          setTransformWarningOnKey('data');
         }
       } catch (e) {
         setTransformWarningOnKey(
-          "The resulting output is not a valid JSON object.",
+          'The resulting output is not a valid JSON object.',
         );
       }
     }
@@ -130,7 +130,7 @@ export default function TransformEvents({
     compute();
   }, [transform, incoming]);
 
-  if (page === "keys") {
+  if (page === 'keys') {
     return null;
   }
 
@@ -150,7 +150,7 @@ export default function TransformEvents({
         if (result.error) {
           toast.error(`Webhook could not be updated: ${result.error.message}`);
         } else {
-          toast.success("Webhook successfully updated");
+          toast.success('Webhook successfully updated');
         }
       },
     );
@@ -158,9 +158,9 @@ export default function TransformEvents({
 
   function handleTransformCodeChange(code: string) {
     const trimmedCode = code.trim();
-    const nextValueEmpty = "";
+    const nextValueEmpty = '';
     const nextValueFull = trimmedCode;
-    if (trimmedCode === "") {
+    if (trimmedCode === '') {
       setTransform(nextValueEmpty);
       validateSubmit(nextValueEmpty);
       return;
@@ -181,7 +181,7 @@ export default function TransformEvents({
           <h2 className="pb-1 text-lg font-semibold">Transform Event</h2>
           <p className="text-subtle mb-6 text-sm">
             An optional JavaScript transform used to alter incoming events into
-            our{" "}
+            our{' '}
             <Link
               className="inline-flex"
               href="https://www.inngest.com/docs/events/event-format-and-structure"
@@ -205,12 +205,12 @@ export default function TransformEvents({
         <ClientOnly fallback={<div>Loading...</div>}>
           <CodeBlock
             header={{
-              title: "Transform Function",
+              title: 'Transform Function',
             }}
             tab={{
               content: rawTransform ?? defaultTransform,
               readOnly: false,
-              language: "javascript",
+              language: 'javascript',
               handleChange: handleTransformCodeChange,
             }}
           />
@@ -230,12 +230,12 @@ export default function TransformEvents({
           <ClientOnly fallback={<div>Loading...</div>}>
             <CodeBlock
               header={{
-                title: "Webhook Payload",
+                title: 'Webhook Payload',
               }}
               tab={{
                 content: incoming,
                 readOnly: false,
-                language: "json",
+                language: 'json',
                 handleChange: handleIncomingCodeChange,
               }}
             />
@@ -249,22 +249,22 @@ export default function TransformEvents({
           <ClientOnly fallback={<div>Loading...</div>}>
             <CodeBlock
               header={{
-                title: "Event Payload",
+                title: 'Event Payload',
               }}
               tab={{
                 content: output,
-                language: "json",
+                language: 'json',
               }}
             />
           </ClientOnly>
           {transformWarningOnKey && (
             <Alert severity="warning" className="mt-4">
-              The resulting output is missing a{" "}
-              <code>{transformWarningOnKey}</code> field and is not{" "}
+              The resulting output is missing a{' '}
+              <code>{transformWarningOnKey}</code> field and is not{' '}
               <a
                 href="https://www.inngest.com/docs/features/events-triggers/event-format"
-                className={"underline"}
-                target={"_blank"}
+                className={'underline'}
+                target={'_blank'}
               >
                 a valid Inngest event
               </a>

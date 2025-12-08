@@ -1,12 +1,12 @@
-import { useCallback } from "react";
+import { useCallback } from 'react';
 import type {
   GetRunPayload,
   GetRunResult,
-} from "@inngest/components/SharedContext/useGetRun";
-import { useClient } from "urql";
+} from '@inngest/components/SharedContext/useGetRun';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { getFragmentData, graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { getFragmentData, graphql } from '@/gql';
 
 const traceDetailsFragment = graphql(`
   fragment TraceDetails on RunTraceSpan {
@@ -101,7 +101,7 @@ export function useGetRun() {
         .query(
           query,
           { envID, runID, preview: preview ?? false },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -116,7 +116,7 @@ export function useGetRun() {
       if (!result.data) {
         return {
           loading: false,
-          error: new Error("no data returned"),
+          error: new Error('no data returned'),
           data: undefined,
         };
       }
@@ -125,7 +125,7 @@ export function useGetRun() {
       if (!run) {
         return {
           loading: false,
-          error: new Error("missing run"),
+          error: new Error('missing run'),
           data: undefined,
         };
       }
@@ -136,7 +136,7 @@ export function useGetRun() {
       if (!trace) {
         return {
           loading: false,
-          error: new Error("missing trace"),
+          error: new Error('missing trace'),
           data: undefined,
         };
       }

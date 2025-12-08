@@ -1,12 +1,12 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 import {
   type GetVercelAppsQuery,
   type InvokeFunctionOnboardingMutation,
   type InvokeFunctionOnboardingMutationVariables,
   type SyncResponse,
-} from "@/gql/graphql";
-import { graphqlAPI } from "@/queries/graphqlAPI";
-import { getProductionEnvironment } from "@/queries/server/getEnvironment";
+} from '@/gql/graphql';
+import { graphqlAPI } from '@/queries/graphqlAPI';
+import { getProductionEnvironment } from '@/queries/server/getEnvironment';
 
 export const SyncOnboardingAppDocument = graphql(`
   mutation SyncOnboardingApp($appURL: String!, $envID: UUID!) {
@@ -48,7 +48,7 @@ export const invokeFn = async ({
   data,
 }: Pick<
   InvokeFunctionOnboardingMutationVariables,
-  "data" | "functionSlug" | "user"
+  'data' | 'functionSlug' | 'user'
 >) => {
   const environment = await getProductionEnvironment();
 

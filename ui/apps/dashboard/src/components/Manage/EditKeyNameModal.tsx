@@ -1,12 +1,12 @@
-import { useContext, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { Modal } from "@inngest/components/Modal";
-import { toast } from "sonner";
+import { useContext, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { Modal } from '@inngest/components/Modal';
+import { toast } from 'sonner';
 
-import useManagePageTerminology from "./useManagePageTerminology";
-import { Context } from "./Context";
-import { useNavigate } from "@tanstack/react-router";
+import useManagePageTerminology from './useManagePageTerminology';
+import { Context } from './Context';
+import { useNavigate } from '@tanstack/react-router';
 
 type EditKeyNameProps = {
   isOpen: boolean;
@@ -21,7 +21,7 @@ export default function EditKeyModal({
   isOpen,
   onClose,
 }: EditKeyNameProps) {
-  const [inputValue, setInputValue] = useState(keyName ?? "");
+  const [inputValue, setInputValue] = useState(keyName ?? '');
   const [isDisabled, setDisabled] = useState(true);
   const { save, fetching } = useContext(Context);
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export default function EditKeyModal({
           toast.error(`${currentContent?.name} has not been updated`);
         } else {
           toast.success(`${currentContent?.name} was successfully updated`);
-          navigate({ to: "." });
+          navigate({ to: '.' });
         }
       });
     }
@@ -53,7 +53,7 @@ export default function EditKeyModal({
   return (
     <Modal
       isOpen={isOpen}
-      className={"w-1/4"}
+      className={'w-1/4'}
       onClose={onClose}
       title={`Edit the ${currentContent?.name} Name`}
       footer={

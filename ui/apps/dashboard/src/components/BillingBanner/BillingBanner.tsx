@@ -1,5 +1,5 @@
-import { entitlementUsage } from "@/queries/server/billing";
-import { BillingBannerView } from "./BillingBannerView";
+import { entitlementUsage } from '@/queries/server/billing';
+import { BillingBannerView } from './BillingBannerView';
 
 export async function BillingBanner() {
   let data;

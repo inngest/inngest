@@ -1,9 +1,9 @@
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute } from "@tanstack/react-router";
+import { Header } from '@inngest/components/Header/NewHeader';
+import { createFileRoute } from '@tanstack/react-router';
 
-import { CreateEnvironment } from "@/components/CreateEnvironment/CreateEnvironment";
+import { CreateEnvironment } from '@/components/CreateEnvironment/CreateEnvironment';
 
-export const Route = createFileRoute("/_authed/create-environment/")({
+export const Route = createFileRoute('/_authed/create-environment/')({
   component: CreateEnvironmentPage,
 });
 
@@ -12,8 +12,8 @@ function CreateEnvironmentPage() {
     <>
       <Header
         breadcrumb={[
-          { text: "Environments", href: "/env" },
-          { text: "Create" },
+          { text: 'Environments', href: '/env' },
+          { text: 'Create' },
         ]}
       />
       <div className="no-scrollbar overflow-y-scroll p-6">

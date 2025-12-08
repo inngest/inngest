@@ -1,4 +1,4 @@
-import { getVercelApps, syncNewApp } from "@/components/Onboarding/data";
+import { getVercelApps, syncNewApp } from '@/components/Onboarding/data';
 import {
   CreateVercelAppDocument,
   UpdateVercelAppDocument,
@@ -6,15 +6,15 @@ import {
   type App,
   type Deploy,
   type VercelApp as GraphQLVercelApp,
-} from "@/gql/graphql";
-import { createServerFn } from "@tanstack/react-start";
-import { getProductionEnvironment } from "@/queries/server/getEnvironment";
-import restAPI from "../../restAPI";
-import graphqlAPI from "../../graphqlAPI";
-import { graphql } from "@/gql";
+} from '@/gql/graphql';
+import { createServerFn } from '@tanstack/react-start';
+import { getProductionEnvironment } from '@/queries/server/getEnvironment';
+import restAPI from '../../restAPI';
+import graphqlAPI from '../../graphqlAPI';
+import { graphql } from '@/gql';
 
-import { ClientError } from "graphql-request";
-import type { VercelIntegration as GraphQLVercelIntegration } from "@/gql/graphql";
+import { ClientError } from 'graphql-request';
+import type { VercelIntegration as GraphQLVercelIntegration } from '@/gql/graphql';
 
 export const GetSavedVercelProjectsDocument = graphql(`
   query GetSavedVercelProjects($environmentID: ID!) {
@@ -38,10 +38,10 @@ export const GetSavedVercelProjectsDocument = graphql(`
 `);
 
 export enum VercelDeploymentProtection {
-  Disabled = "",
-  ProdDeploymentURLsAndAllPreviews = "prod_deployment_urls_and_all_previews",
-  Previews = "preview",
-  All = "all",
+  Disabled = '',
+  ProdDeploymentURLsAndAllPreviews = 'prod_deployment_urls_and_all_previews',
+  Previews = 'preview',
+  All = 'all',
 }
 
 export type VercelProject = {
@@ -58,7 +58,7 @@ export type VercelProject = {
 
 export type VercelProjectViaAPI = Pick<
   VercelProject,
-  "id" | "name" | "ssoProtection"
+  'id' | 'name' | 'ssoProtection'
 >;
 
 export type VercelIntegration = {
@@ -78,43 +78,43 @@ type CreateVercelIntegrationParams = {
   vercelAuthorizationCode: string;
 };
 
-export type VercelApp = Pick<App, "id" | "name" | "externalID"> & {
+export type VercelApp = Pick<App, 'id' | 'name' | 'externalID'> & {
   latestSync: Pick<
     Deploy,
-    | "id"
-    | "error"
-    | "platform"
-    | "vercelDeploymentID"
-    | "vercelProjectID"
-    | "status"
+    | 'id'
+    | 'error'
+    | 'platform'
+    | 'vercelDeploymentID'
+    | 'vercelProjectID'
+    | 'status'
   > | null;
 };
 
 export type UnattachedSync = Pick<
   Deploy,
-  "lastSyncedAt" | "error" | "url" | "vercelDeploymentURL"
+  'lastSyncedAt' | 'error' | 'url' | 'vercelDeploymentURL'
 >;
 
-export const getVercelSyncs = createServerFn({ method: "GET" }).handler(
+export const getVercelSyncs = createServerFn({ method: 'GET' }).handler(
   async () => {
     try {
       const response = await getVercelApps();
       const syncs = response.environment;
       const vercelApps = syncs.apps.filter(
-        (app) => app.latestSync?.platform === "vercel" && !app.isArchived,
+        (app) => app.latestSync?.platform === 'vercel' && !app.isArchived,
       );
       const unattachedSyncs = syncs.unattachedSyncs.filter(
         (sync) => sync.vercelDeploymentURL,
       );
       return { apps: vercelApps, unattachedSyncs: unattachedSyncs };
     } catch (error) {
-      console.error("Error fetching vercel apps:", error);
+      console.error('Error fetching vercel apps:', error);
       return { apps: [], unattachedSyncs: [] };
     }
   },
 );
 
-export const syncAppManually = createServerFn({ method: "POST" })
+export const syncAppManually = createServerFn({ method: 'POST' })
   .inputValidator((data: { appURL: string }) => data)
   .handler(
     async ({
@@ -133,26 +133,26 @@ export const syncAppManually = createServerFn({ method: "POST" })
         return {
           success: true,
           error: null,
-          appName: response.syncNewApp.app?.externalID || "Unknown App",
+          appName: response.syncNewApp.app?.externalID || 'Unknown App',
         };
       } catch (error) {
-        console.error("Error syncing app:", error);
+        console.error('Error syncing app:', error);
         return { success: false, error: null, appName: null };
       }
     },
   );
 
-export const createVercelIntegration = createServerFn({ method: "POST" })
+export const createVercelIntegration = createServerFn({ method: 'POST' })
   .inputValidator((data: CreateVercelIntegrationParams) => data)
   .handler(async ({ data }): Promise<VercelIntegration> => {
     const environment = await getProductionEnvironment();
 
     const url = new URL(
-      "/v1/integrations/vercel/projects",
+      '/v1/integrations/vercel/projects',
       import.meta.env.VITE_API_URL,
     );
-    url.searchParams.set("workspaceID", environment.id);
-    url.searchParams.set("code", data.vercelAuthorizationCode);
+    url.searchParams.set('workspaceID', environment.id);
+    url.searchParams.set('code', data.vercelAuthorizationCode);
 
     const response = await restAPI(url).json<{
       projects: { id: string; name: string }[];
@@ -161,9 +161,9 @@ export const createVercelIntegration = createServerFn({ method: "POST" })
     const projects = await enrichVercelProjectsHelper(response.projects);
 
     return {
-      id: "dummy-placeholder-id",
-      name: "Vercel",
-      slug: "vercel",
+      id: 'dummy-placeholder-id',
+      name: 'Vercel',
+      slug: 'vercel',
       projects,
       enabled: true,
     };
@@ -212,14 +212,14 @@ const enrichVercelProjectsHelper = async (
   return mergeVercelProjectDataHelper(vercelProjects, savedVercelProjects);
 };
 
-export const enrichVercelProjects = createServerFn({ method: "POST" })
+export const enrichVercelProjects = createServerFn({ method: 'POST' })
   .inputValidator((data: { vercelProjects: VercelProjectViaAPI[] }) => data)
   .handler(
     async ({ data }): Promise<VercelProject[]> =>
       enrichVercelProjectsHelper(data.vercelProjects),
   );
 
-export const mergeVercelProjectData = createServerFn({ method: "POST" })
+export const mergeVercelProjectData = createServerFn({ method: 'POST' })
   .inputValidator(
     (data: {
       vercelProjects: VercelProjectViaAPI[];
@@ -231,7 +231,7 @@ export const mergeVercelProjectData = createServerFn({ method: "POST" })
       mergeVercelProjectDataHelper(data.vercelProjects, data.savedProjects),
   );
 
-export const updateVercelIntegration = createServerFn({ method: "POST" })
+export const updateVercelIntegration = createServerFn({ method: 'POST' })
   .inputValidator(
     (data: {
       initialIntegration: VercelIntegration;
@@ -290,7 +290,7 @@ export const updateVercelIntegration = createServerFn({ method: "POST" })
       graphqlAPI.request(UpdateVercelAppDocument, {
         input: {
           projectID: project.id,
-          path: project.servePath ?? "",
+          path: project.servePath ?? '',
         },
       }),
     );
@@ -332,18 +332,18 @@ const vercelIntegrationQuery = graphql(`
 `);
 
 export const getVercelIntegration = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async (): Promise<GraphQLVercelIntegration | null> => {
   try {
     const res = await graphqlAPI.request(vercelIntegrationQuery);
     return res.account.vercelIntegration ?? null;
   } catch (err) {
     if (err instanceof ClientError) {
-      throw new Error(err.response.errors?.[0]?.message ?? "Unknown error");
+      throw new Error(err.response.errors?.[0]?.message ?? 'Unknown error');
     }
     if (err instanceof Error) {
       throw err;
     }
-    throw new Error("Unknown error");
+    throw new Error('Unknown error');
   }
 });

@@ -1,14 +1,14 @@
-import { graphql } from "@/gql";
-import type { CdcConnection } from "@/gql/graphql";
-import graphqlAPI from "@/queries/graphqlAPI";
-import { getProductionEnvironment } from "@/queries/server/getEnvironment";
-import { createServerFn } from "@tanstack/react-start";
+import { graphql } from '@/gql';
+import type { CdcConnection } from '@/gql/graphql';
+import graphqlAPI from '@/queries/graphqlAPI';
+import { getProductionEnvironment } from '@/queries/server/getEnvironment';
+import { createServerFn } from '@tanstack/react-start';
 
 import {
   type CdcConnectionInput,
   type CdcSetupResponse,
   type DeleteResponse,
-} from "@/gql/graphql";
+} from '@/gql/graphql';
 
 const getPostgresIntegrationsDocument = graphql(`
   query getPostgresIntegrations($envID: ID!) {
@@ -25,7 +25,7 @@ const getPostgresIntegrationsDocument = graphql(`
 `);
 
 export const PostgresIntegrations = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   try {
     const environment = await getProductionEnvironment();
@@ -38,7 +38,7 @@ export const PostgresIntegrations = createServerFn({
     return integrations.map((integration) => {
       // The DB name has a prefix, eg "Neon-" or "Supabase-" which is the slug.  This dictates which
       // "integration" (postgres host) was used to set up the connection.
-      const slug = (integration.name.split("-")[0] || "").toLowerCase();
+      const slug = (integration.name.split('-')[0] || '').toLowerCase();
 
       return {
         id: integration.id,
@@ -46,8 +46,8 @@ export const PostgresIntegrations = createServerFn({
         slug,
         projects: [],
         enabled:
-          integration.status === "RUNNING" ||
-          integration.status === "SETUP_COMPLETE",
+          integration.status === 'RUNNING' ||
+          integration.status === 'SETUP_COMPLETE',
       };
     });
   } catch (error) {
@@ -125,7 +125,7 @@ const deleteConnDocument = graphql(`
   }
 `);
 
-export const deleteConn = createServerFn({ method: "POST" })
+export const deleteConn = createServerFn({ method: 'POST' })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     const environment = await getProductionEnvironment();
@@ -139,7 +139,7 @@ export const deleteConn = createServerFn({ method: "POST" })
     );
   });
 
-export const verifyCredentials = createServerFn({ method: "POST" })
+export const verifyCredentials = createServerFn({ method: 'POST' })
   .inputValidator((data: { input: CdcConnectionInput }) => data)
   .handler(async ({ data }) => {
     try {
@@ -150,12 +150,12 @@ export const verifyCredentials = createServerFn({ method: "POST" })
       }
       return { success: true, error: null };
     } catch (error) {
-      console.error("Error verifying credentials:", error);
+      console.error('Error verifying credentials:', error);
       return { success: false, error: null };
     }
   });
 
-export const verifyLogicalReplication = createServerFn({ method: "POST" })
+export const verifyLogicalReplication = createServerFn({ method: 'POST' })
   .inputValidator((data: { input: CdcConnectionInput }) => data)
   .handler(async ({ data }) => {
     try {
@@ -166,7 +166,7 @@ export const verifyLogicalReplication = createServerFn({ method: "POST" })
       }
       return { success: true, error: null };
     } catch (error) {
-      console.error("Error verifying logical replication:", error);
+      console.error('Error verifying logical replication:', error);
       return { success: false, error: null };
     }
   });
@@ -187,7 +187,7 @@ const defaultSteps: AutoSetupSteps = {
   user_created: { complete: false },
 };
 
-export const verifyAutoSetup = createServerFn({ method: "POST" })
+export const verifyAutoSetup = createServerFn({ method: 'POST' })
   .inputValidator((data: { input: CdcConnectionInput }) => data)
   .handler(
     async ({
@@ -218,7 +218,7 @@ export const verifyAutoSetup = createServerFn({ method: "POST" })
           steps,
         };
       } catch (error) {
-        console.error("Error connecting:", error);
+        console.error('Error connecting:', error);
         return {
           success: false,
           error: null,

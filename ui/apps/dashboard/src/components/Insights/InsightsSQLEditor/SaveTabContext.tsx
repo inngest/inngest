@@ -4,13 +4,13 @@ import {
   useContext,
   useMemo,
   useState,
-} from "react";
-import { toast } from "sonner";
+} from 'react';
+import { toast } from 'sonner';
 
-import { getIsSavedQuery } from "../InsightsTabManager/InsightsTabManager";
-import { HOME_TAB, TEMPLATES_TAB } from "../InsightsTabManager/constants";
-import { useStoredQueries } from "../QueryHelperPanel/StoredQueriesContext";
-import type { Tab } from "../types";
+import { getIsSavedQuery } from '../InsightsTabManager/InsightsTabManager';
+import { HOME_TAB, TEMPLATES_TAB } from '../InsightsTabManager/constants';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '../types';
 
 type SaveTabContextValue = {
   saveTab: (tab: Tab) => Promise<void>;
@@ -63,7 +63,7 @@ export function SaveTabProvider({ children }: { children: React.ReactNode }) {
 export function useSaveTabActions(): SaveTabContextValue {
   const ctx = useContext(SaveTabContext);
   if (!ctx)
-    throw new Error("useSaveTabActions must be used within SaveTabProvider");
+    throw new Error('useSaveTabActions must be used within SaveTabProvider');
 
   return ctx;
 }
@@ -83,12 +83,12 @@ export function useSaveTab(tab: Tab) {
 }
 
 function validateTab(tab: Tab): null | string {
-  if (!isQueryTab(tab)) return "Only query tabs can be saved.";
-  if (tab.name === "") return "Unable to save query: name is required.";
-  if (tab.query === "") return "Unable to save query: query is empty.";
+  if (!isQueryTab(tab)) return 'Only query tabs can be saved.';
+  if (tab.name === '') return 'Unable to save query: name is required.';
+  if (tab.query === '') return 'Unable to save query: query is empty.';
   return null;
 }
 
-function isQueryTab(tab: Pick<Tab, "id">): boolean {
+function isQueryTab(tab: Pick<Tab, 'id'>): boolean {
   return tab.id !== HOME_TAB.id && tab.id !== TEMPLATES_TAB.id;
 }

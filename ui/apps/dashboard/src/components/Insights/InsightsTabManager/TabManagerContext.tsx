@@ -1,7 +1,7 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext } from 'react';
 
-import type { Tab } from "../types";
-import type { TabManagerActions } from "./InsightsTabManager";
+import type { Tab } from '../types';
+import type { TabManagerActions } from './InsightsTabManager';
 
 interface TabManagerContextValue {
   actions: TabManagerActions;
@@ -34,7 +34,7 @@ export function useTabManagerActions(): {
   const context = useContext(TabManagerContext);
   if (!context) {
     throw new Error(
-      "useTabManagerActions must be used within a TabManagerProvider",
+      'useTabManagerActions must be used within a TabManagerProvider',
     );
   }
 
@@ -44,7 +44,7 @@ export function useTabManagerActions(): {
 export function useActiveTab(): { activeTab: Tab | undefined } {
   const context = useContext(TabManagerContext);
   if (!context) {
-    throw new Error("useActiveTab must be used within a TabManagerProvider");
+    throw new Error('useActiveTab must be used within a TabManagerProvider');
   }
   return { activeTab: context.activeTab };
 }

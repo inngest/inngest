@@ -1,5 +1,5 @@
-import { useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useLocation } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 type ScrollControlProps = {
   containerId: string;
@@ -19,10 +19,10 @@ export default function ScrollControl({ containerId }: ScrollControlProps) {
     if (!el) return;
 
     el.style.overflowY =
-      pathname === "/env/production/insights" ? "hidden" : "scroll";
+      pathname === '/env/production/insights' ? 'hidden' : 'scroll';
 
     return () => {
-      el.style.overflowY = "";
+      el.style.overflowY = '';
     };
   }, [containerId, pathname]);
 

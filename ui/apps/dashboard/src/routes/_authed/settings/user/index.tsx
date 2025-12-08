@@ -1,7 +1,7 @@
-import { UserProfile } from "@clerk/tanstack-react-start";
-import { createFileRoute } from "@tanstack/react-router";
+import { UserProfile } from '@clerk/tanstack-react-start';
+import { createFileRoute } from '@tanstack/react-router';
 
-export const Route = createFileRoute("/_authed/settings/user/")({
+export const Route = createFileRoute('/_authed/settings/user/')({
   component: UserSettingsPage,
 });
 
@@ -13,12 +13,12 @@ function UserSettingsPage() {
         path="/settings/user"
         appearance={{
           layout: {
-            logoPlacement: "none",
+            logoPlacement: 'none',
           },
           elements: {
-            navbar: "hidden",
-            scrollBox: "bg-canvasBase shadow-none",
-            pageScrollBox: "pt-6 px-2",
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-6 px-2',
           },
         }}
       >
@@ -29,12 +29,12 @@ function UserSettingsPage() {
         path="/settings/security"
         appearance={{
           layout: {
-            logoPlacement: "none",
+            logoPlacement: 'none',
           },
           elements: {
-            navbar: "hidden",
-            scrollBox: "bg-canvasBase shadow-none",
-            pageScrollBox: "pt-0 px-2",
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-0 px-2',
           },
         }}
       >

@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { methodTypes } from "@inngest/components/types/app";
-import { createFileRoute, Outlet, useMatches } from "@tanstack/react-router";
-import type { CombinedError } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { methodTypes } from '@inngest/components/types/app';
+import { createFileRoute, Outlet, useMatches } from '@tanstack/react-router';
+import type { CombinedError } from 'urql';
 
-import { ActionsMenu } from "@/components/Apps/ActionsMenu";
-import { ArchiveModal } from "@/components/Apps/ArchiveModal";
-import { ResyncButton } from "@/components/Apps/ResyncButton";
-import { UnarchiveButton } from "@/components/Apps/UnarchiveButton";
-import { ValidateModal } from "@/components/Apps/ValidateButton/ValidateModal";
-import { useNavData } from "@/components/Apps/useNavData";
-import { ArchivedAppBanner } from "@/components/Apps/ArchivedAppBanner";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { pathCreator } from "@/utils/urls";
+import { ActionsMenu } from '@/components/Apps/ActionsMenu';
+import { ArchiveModal } from '@/components/Apps/ArchiveModal';
+import { ResyncButton } from '@/components/Apps/ResyncButton';
+import { UnarchiveButton } from '@/components/Apps/UnarchiveButton';
+import { ValidateModal } from '@/components/Apps/ValidateButton/ValidateModal';
+import { useNavData } from '@/components/Apps/useNavData';
+import { ArchivedAppBanner } from '@/components/Apps/ArchivedAppBanner';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { pathCreator } from '@/utils/urls';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/apps/$externalID")({
+export const Route = createFileRoute('/_authed/env/$envSlug/apps/$externalID')({
   component: AppLayout,
 });
 
@@ -28,7 +28,7 @@ const NotFound = ({ externalID }: { externalID: string }) => (
 );
 
 const Error = ({ error, externalID }: { error: Error; externalID: string }) => {
-  if (error.message.includes("no rows")) {
+  if (error.message.includes('no rows')) {
     return <NotFound externalID={externalID} />;
   }
 
@@ -39,7 +39,7 @@ function AppLayout() {
   const { externalID, envSlug } = Route.useParams();
   const matches = useMatches();
   const isSyncsRoute = matches.some((match) =>
-    match.pathname.endsWith("/syncs"),
+    match.pathname.endsWith('/syncs'),
   );
 
   const [showArchive, setShowArchive] = useState(false);
@@ -73,19 +73,19 @@ function AppLayout() {
       <Header
         breadcrumb={[
           {
-            text: "Apps",
+            text: 'Apps',
             href: pathCreator.apps({ envSlug }),
           },
           {
-            text: res.data?.name || "",
+            text: res.data?.name || '',
             href: isSyncsRoute
               ? pathCreator.app({
                   envSlug,
                   externalAppID: externalID,
                 })
-              : "",
+              : '',
           },
-          ...(isSyncsRoute ? [{ text: "All syncs" }] : []),
+          ...(isSyncsRoute ? [{ text: 'All syncs' }] : []),
         ]}
         loading={res.isLoading}
         action={

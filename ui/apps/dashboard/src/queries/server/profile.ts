@@ -1,13 +1,13 @@
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 import {
   auth,
   clerkClient,
   type Organization,
   type OrganizationMembership,
   type User,
-} from "@clerk/tanstack-react-start/server";
-import { createServerFn } from "@tanstack/react-start";
-import { graphqlAPI } from "../graphqlAPI";
+} from '@clerk/tanstack-react-start/server';
+import { createServerFn } from '@tanstack/react-start';
+import { graphqlAPI } from '../graphqlAPI';
 
 export type ProfileType = {
   user: User;
@@ -31,7 +31,7 @@ const ProfileQuery = graphql(`
 `);
 
 export const getProfileDisplay = createServerFn({
-  method: "GET",
+  method: 'GET',
 }).handler(async () => {
   let orgName: string | undefined;
   let displayName: string;
@@ -42,15 +42,15 @@ export const getProfileDisplay = createServerFn({
     // Marketplace users are not authed with Clerk.
 
     orgName = res.account.name ?? undefined;
-    displayName = "System";
+    displayName = 'System';
     orgProfilePic = null;
   } else {
     const { user, org } = await getProfile();
     orgName = org?.name;
     displayName =
       user.firstName || user.lastName
-        ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
-        : user.username ?? "";
+        ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
+        : user.username ?? '';
     orgProfilePic = org?.hasImage ? org.imageUrl : null;
   }
 
@@ -66,16 +66,16 @@ export const getProfile = async (): Promise<ProfileType> => {
   const { userId, orgId } = await auth();
 
   if (!userId) {
-    throw new Error("User is not logged in");
+    throw new Error('User is not logged in');
   }
 
   const user = await clerkClient().users.getUser(userId);
   if (!user) {
-    throw new Error("User is not logged in");
+    throw new Error('User is not logged in');
   }
 
   if (!user) {
-    throw new Error("User is not logged in");
+    throw new Error('User is not logged in');
   }
 
   return { user, org: orgId ? await getOrg(orgId) : undefined };

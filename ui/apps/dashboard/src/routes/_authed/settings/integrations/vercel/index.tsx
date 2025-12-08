@@ -1,20 +1,20 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Link } from "@inngest/components/Link/NewLink";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
-import { RiExternalLinkLine } from "@remixicon/react";
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Link } from '@inngest/components/Link/NewLink';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { RiExternalLinkLine } from '@remixicon/react';
 
-import { getVercelIntegration } from "@/queries/server/integrations/vercel";
-import { VercelProjects } from "@/components/Settings/Vercel/VercelProjects";
+import { getVercelIntegration } from '@/queries/server/integrations/vercel';
+import { VercelProjects } from '@/components/Settings/Vercel/VercelProjects';
 
-export const Route = createFileRoute("/_authed/settings/integrations/vercel/")({
+export const Route = createFileRoute('/_authed/settings/integrations/vercel/')({
   component: VercelIntegrationPage,
   loader: async () => {
     const integration = await getVercelIntegration();
     if (!integration) {
-      console.error("Failed to load Vercel integration");
+      console.error('Failed to load Vercel integration');
       throw redirect({
-        to: "/settings/integrations/vercel/connect",
+        to: '/settings/integrations/vercel/connect',
       });
     }
     if (integration instanceof Error) {
@@ -40,7 +40,7 @@ function VercelIntegrationPage() {
               Vercel
             </div>
             <div className="text-muted mb-7 text-base">
-              You can manage all your projects on this page.{" "}
+              You can manage all your projects on this page.{' '}
               <Link
                 size="medium"
                 href="https://www.inngest.com/docs/deploy/vercel"

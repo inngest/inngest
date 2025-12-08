@@ -1,5 +1,5 @@
-import { getProdApps } from "@/queries/server/apps";
-import { useEffect, useState } from "react";
+import { getProdApps } from '@/queries/server/apps';
+import { useEffect, useState } from 'react';
 
 const useOnboardingWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -7,7 +7,7 @@ const useOnboardingWidget = () => {
   useEffect(() => {
     const fetchProductionApps = async () => {
       try {
-        const savedPreference = localStorage.getItem("showOnboardingWidget");
+        const savedPreference = localStorage.getItem('showOnboardingWidget');
         if (savedPreference !== null) {
           // If a preference is saved, use it
           setIsOpen(JSON.parse(savedPreference));
@@ -23,11 +23,11 @@ const useOnboardingWidget = () => {
         const defaultState = !hasAppsOrUnattachedSyncs;
         setIsOpen(defaultState);
         localStorage.setItem(
-          "showOnboardingWidget",
+          'showOnboardingWidget',
           JSON.stringify(defaultState),
         );
       } catch (error) {
-        console.error("Error in useOnboardingWidget:", error);
+        console.error('Error in useOnboardingWidget:', error);
       }
     };
 
@@ -36,11 +36,11 @@ const useOnboardingWidget = () => {
 
   const showWidget = () => {
     setIsOpen(true);
-    localStorage.setItem("showOnboardingWidget", JSON.stringify(true));
+    localStorage.setItem('showOnboardingWidget', JSON.stringify(true));
   };
   const closeWidget = () => {
     setIsOpen(false);
-    localStorage.setItem("showOnboardingWidget", JSON.stringify(false));
+    localStorage.setItem('showOnboardingWidget', JSON.stringify(false));
   };
 
   return {

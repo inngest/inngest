@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   steps,
   type OnboardingStep,
   type OnboardingSteps,
   type TotalStepsCompleted,
-} from "./types";
-import { useOnboardingStepCompletedTracking } from "./useOnboardingTracking";
+} from './types';
+import { useOnboardingStepCompletedTracking } from './useOnboardingTracking';
 
 const getHighestStep = (steps: OnboardingStep[]): OnboardingStep | null => {
   return steps.length > 0
@@ -27,7 +27,7 @@ export default function useOnboardingStep() {
   const tracking = useOnboardingStepCompletedTracking();
 
   useEffect(() => {
-    const storedSteps = localStorage.getItem("onboardingCompletedSteps");
+    const storedSteps = localStorage.getItem('onboardingCompletedSteps');
     if (storedSteps) {
       const parsedSteps: OnboardingStep[] = JSON.parse(storedSteps);
       setCompletedSteps(parsedSteps);
@@ -38,7 +38,7 @@ export default function useOnboardingStep() {
     }
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "onboardingCompletedSteps") {
+      if (event.key === 'onboardingCompletedSteps') {
         const newValue = event.newValue ? JSON.parse(event.newValue) : [];
         setLastCompletedStep(newValue);
 
@@ -49,7 +49,7 @@ export default function useOnboardingStep() {
     };
 
     // Listen for storage events from other components
-    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
 
     // Custom event for same-window updates
     const handleCustomEvent = (event: CustomEvent) => {
@@ -62,14 +62,14 @@ export default function useOnboardingStep() {
     };
 
     window.addEventListener(
-      "onboardingStepUpdate",
+      'onboardingStepUpdate',
       handleCustomEvent as EventListener,
     );
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener(
-        "onboardingStepUpdate",
+        'onboardingStepUpdate',
         handleCustomEvent as EventListener,
       );
     };
@@ -93,7 +93,7 @@ export default function useOnboardingStep() {
     stepName: OnboardingSteps,
     metadata?: Record<string, any>,
   ) => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       const step = steps.find((s) => s.name === stepName);
 
       if (!step) {
@@ -118,13 +118,13 @@ export default function useOnboardingStep() {
 
         // Update localStorage
         localStorage.setItem(
-          "onboardingCompletedSteps",
+          'onboardingCompletedSteps',
           JSON.stringify(newCompletedSteps),
         );
 
         // Dispatch event for other components
         window.dispatchEvent(
-          new CustomEvent("onboardingStepUpdate", {
+          new CustomEvent('onboardingStepUpdate', {
             detail: newCompletedSteps,
           }),
         );
@@ -132,7 +132,7 @@ export default function useOnboardingStep() {
         // Tracking for the previous steps marked with automatic completion
         stepsToAdd.forEach((s) => {
           tracking?.trackOnboardingStepCompleted(s, {
-            metadata: { completionSource: "automatic" },
+            metadata: { completionSource: 'automatic' },
           });
         });
 

@@ -1,9 +1,9 @@
-import { InngestLogo } from "@inngest/components/icons/logos/InngestLogo";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
-import { getProfileDisplay } from "@/queries/server/profile";
+import { getProfileDisplay } from '@/queries/server/profile';
 
-export const Route = createFileRoute("/_authed/intent")({
+export const Route = createFileRoute('/_authed/intent')({
   component: IntenComponent,
   loader: async () => {
     const profile = await getProfileDisplay();
@@ -33,7 +33,7 @@ function IntenComponent() {
                   alt="org-profile-pic"
                 />
               ) : (
-                profile.orgName?.substring(0, 2) || "?"
+                profile.orgName?.substring(0, 2) || '?'
               )}
             </div>
             <p>{profile.orgName}</p>

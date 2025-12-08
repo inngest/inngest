@@ -1,8 +1,8 @@
-import { Connect } from "@/components/Integrations/Vercel/Connect";
-import { createVercelIntegration } from "@/queries/server/integrations/vercel";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
-import { Link } from "@inngest/components/Link/NewLink";
-import { createFileRoute, type FileRouteTypes } from "@tanstack/react-router";
+import { Connect } from '@/components/Integrations/Vercel/Connect';
+import { createVercelIntegration } from '@/queries/server/integrations/vercel';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { Link } from '@inngest/components/Link/NewLink';
+import { createFileRoute, type FileRouteTypes } from '@tanstack/react-router';
 
 export type VercelCallbackProps = {
   // OAuth 2.0 authorization code issued by Vercel’s authorization server. This code is valid for
@@ -19,7 +19,7 @@ export type VercelCallbackProps = {
   source: string;
 };
 
-export const Route = createFileRoute("/_authed/integrations/vercel/callback/")({
+export const Route = createFileRoute('/_authed/integrations/vercel/callback/')({
   component: VercelCallbackComponent,
   validateSearch: (search) => search as VercelCallbackProps,
   loaderDeps: ({
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authed/integrations/vercel/callback/")({
   }),
   loader: async ({ deps: { code } }) => {
     if (!code) {
-      throw new Error("Missing Vercel authorization code");
+      throw new Error('Missing Vercel authorization code');
     }
 
     return await createVercelIntegration({
@@ -46,7 +46,7 @@ async function VercelCallbackComponent() {
   const searchParams = Route.useSearch();
   const vercelIntegration = Route.useLoaderData();
   if (!searchParams.code) {
-    throw new Error("Missing Vercel authorization code");
+    throw new Error('Missing Vercel authorization code');
   }
 
   return (
@@ -59,11 +59,11 @@ async function VercelCallbackComponent() {
       </div>
       <div className="text-muted mb-7 text-base">
         Select the Vercel projects that have Inngest functions. You can
-        optionally specify server route other than the default{" "}
+        optionally specify server route other than the default{' '}
         <span className="font-semibold">(`/api/inngest`)</span>.
         <Link
           size="medium"
-          to={"/create-organization/set-up" as FileRouteTypes["to"]}
+          to={'/create-organization/set-up' as FileRouteTypes['to']}
         >
           Learn more
         </Link>

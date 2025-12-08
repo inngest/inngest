@@ -1,7 +1,7 @@
-import { useLocation } from "@tanstack/react-router";
-import { ProfileMenu } from "./ProfileMenu";
-import { type ProfileDisplayType } from "@/queries/server/profile";
-import { Image } from "@unpic/react";
+import { useLocation } from '@tanstack/react-router';
+import { ProfileMenu } from './ProfileMenu';
+import { type ProfileDisplayType } from '@/queries/server/profile';
+import { Image } from '@unpic/react';
 
 export const Profile = ({
   collapsed,
@@ -13,9 +13,9 @@ export const Profile = ({
   const location = useLocation();
   const pathname = location.pathname;
   const active =
-    pathname.startsWith("/settings/organization") ||
-    pathname.startsWith("/billing") ||
-    pathname.startsWith("/settings/user");
+    pathname.startsWith('/settings/organization') ||
+    pathname.startsWith('/billing') ||
+    pathname.startsWith('/settings/user');
 
   return (
     <ProfileMenu isMarketplace={profile.isMarketplace}>
@@ -24,11 +24,11 @@ export const Profile = ({
       >
         <div
           className={`flex w-full flex-row items-center rounded p-1 ${
-            collapsed ? "justify-center" : "justify-start"
+            collapsed ? 'justify-center' : 'justify-start'
           } ${
             active
-              ? "bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle"
-              : "hover:bg-canvasSubtle text-subtle"
+              ? 'bg-secondary-4xSubtle text-info hover:bg-secondary-3xSubtle'
+              : 'hover:bg-canvasSubtle text-subtle'
           }`}
         >
           <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
@@ -41,7 +41,7 @@ export const Profile = ({
                 alt="org-profile-pic"
               />
             ) : (
-              profile.orgName?.substring(0, 2) || "?"
+              profile.orgName?.substring(0, 2) || '?'
             )}
           </div>
 

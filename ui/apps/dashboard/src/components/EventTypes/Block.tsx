@@ -4,10 +4,10 @@ type BlockProps = {
   children: React.ReactNode;
 };
 
-const Block = ({ title, children, className = "" }: BlockProps) => {
+const Block = ({ title, children, className = '' }: BlockProps) => {
   return (
     <div className={className}>
-      {title ? <h2 className="mb-2 text-base font-medium">{title}</h2> : ""}
+      {title ? <h2 className="mb-2 text-base font-medium">{title}</h2> : ''}
       {children}
     </div>
   );

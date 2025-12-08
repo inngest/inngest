@@ -1,14 +1,14 @@
-import StepsMenu from "@inngest/components/Steps/NewStepsMenu";
+import StepsMenu from '@inngest/components/Steps/NewStepsMenu';
 import {
   RiDiscordLine,
   RiExternalLinkLine,
   RiMailLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { WEBSITE_CONTACT_URL, pathCreator } from "@/utils/urls";
-import { isValidStep, steps } from "./types";
-import { onboardingMenuStepContent } from "./content";
-import useOnboardingStep from "./useOnboardingStep";
+import { WEBSITE_CONTACT_URL, pathCreator } from '@/utils/urls';
+import { isValidStep, steps } from './types';
+import { onboardingMenuStepContent } from './content';
+import useOnboardingStep from './useOnboardingStep';
 
 export default function Menu({
   envSlug,
@@ -25,7 +25,7 @@ export default function Menu({
         const { name, stepNumber } = stepObj;
 
         if (!isValidStep(stepName)) {
-          return "error";
+          return 'error';
         }
 
         const isCompleted = completedSteps.some(
@@ -72,7 +72,7 @@ const links = (
     </StepsMenu.Link>
     <StepsMenu.Link
       iconBefore={<RiMailLine className="h-4 w-4" />}
-      href={WEBSITE_CONTACT_URL + "?ref=app-onboarding-menu"}
+      href={WEBSITE_CONTACT_URL + '?ref=app-onboarding-menu'}
       target="_blank"
     >
       Request a demo

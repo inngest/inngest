@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Button } from "@inngest/components/Button/NewButton";
-import { AlertModal } from "@inngest/components/Modal/AlertModal";
-import { RiAlertFill } from "@remixicon/react";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { Button } from '@inngest/components/Button/NewButton';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import { RiAlertFill } from '@remixicon/react';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import { useNavigate } from "@tanstack/react-router";
+import { graphql } from '@/gql';
+import { useNavigate } from '@tanstack/react-router';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -56,23 +56,23 @@ export default function AdvancedObservabilityComponent({
     : `Add ${title.toLowerCase()} to plan`;
 
   const confirmButtonLabel = isRemoving
-    ? "Remove addon"
+    ? 'Remove addon'
     : addonCost > 0
-    ? "Confirm and pay"
-    : "Confirm";
+    ? 'Confirm and pay'
+    : 'Confirm';
 
   const removingDescription = `Are you sure you want to remove the ${title.toLowerCase()} addon? You will revert back to your current plan's limits.`;
 
   const addingDescription = (
     <>
-      By clicking Confirm and Pay, the amount of{" "}
+      By clicking Confirm and Pay, the amount of{' '}
       <span className="text-basis font-semibold">
         ${(addonCost / 100).toFixed(2)}
-      </span>{" "}
-      will be added to your subscription, and your credit card will be charged{" "}
+      </span>{' '}
+      will be added to your subscription, and your credit card will be charged{' '}
       <span className="text-basis font-semibold">
         ${(addonCost / 100).toFixed(2)} immediately
-      </span>{" "}
+      </span>{' '}
       for the remaining days in your billing cycle.
     </>
   );
@@ -90,14 +90,14 @@ export default function AdvancedObservabilityComponent({
     if (updateResult.error) {
       console.error(updateResult.error.message);
       setErr(updateResult.error.message);
-      toast.error("Failed to update addon. Please try again.");
+      toast.error('Failed to update addon. Please try again.');
     } else {
       setErr(null);
       if (onChange) {
         onChange();
       }
-      navigate({ to: ".", replace: true });
-      toast.success(`Addon ${isRemoving ? "removed" : "updated"} successfully`);
+      navigate({ to: '.', replace: true });
+      toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
     setOpenModal(false);
   };
@@ -106,10 +106,10 @@ export default function AdvancedObservabilityComponent({
     <>
       {err && (
         <p className="text-error mb-2 text-xs">
-          <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{" "}
+          <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
           <a href="/support" className="underline">
             Contact support
-          </a>{" "}
+          </a>{' '}
           if this problem persists.
         </p>
       )}
@@ -148,7 +148,7 @@ export default function AdvancedObservabilityComponent({
           title={modalTitle}
           confirmButtonLabel={confirmButtonLabel}
           cancelButtonLabel="Cancel"
-          confirmButtonKind={isRemoving ? "danger" : "primary"}
+          confirmButtonKind={isRemoving ? 'danger' : 'primary'}
           className="w-full max-w-lg"
         >
           {isRemoving ? (

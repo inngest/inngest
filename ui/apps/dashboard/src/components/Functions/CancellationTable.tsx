@@ -1,24 +1,24 @@
-import { useCallback, useMemo, useState, type UIEventHandler } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useCallback, useMemo, useState, type UIEventHandler } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   IDCell,
   Table,
   TableBlankState,
   TextCell,
   TimeCell,
-} from "@inngest/components/Table";
+} from '@inngest/components/Table';
 import {
   RiCloseCircleLine,
   RiDeleteBinLine,
   RiExternalLinkLine,
   RiRefreshLine,
-} from "@remixicon/react";
-import { createColumnHelper } from "@tanstack/react-table";
+} from '@remixicon/react';
+import { createColumnHelper } from '@tanstack/react-table';
 
-import { DeleteCancellationModal } from "./DeleteCancellationModal";
-import { useCancellations } from "./useCancellations";
-import { pathCreator } from "@/utils/urls";
+import { DeleteCancellationModal } from './DeleteCancellationModal';
+import { useCancellations } from './useCancellations';
+import { pathCreator } from '@/utils/urls';
 
 type Cancellation = {
   createdAt: string;
@@ -127,29 +127,29 @@ function useColumns({
 }) {
   return useMemo(() => {
     return [
-      columnHelper.accessor("name", {
-        header: "Name",
+      columnHelper.accessor('name', {
+        header: 'Name',
         cell: (props) => {
           return <TextCell>{props.getValue()}</TextCell>;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor("createdAt", {
-        header: "Created at",
+      columnHelper.accessor('createdAt', {
+        header: 'Created at',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor("id", {
-        header: "ID",
+      columnHelper.accessor('id', {
+        header: 'ID',
         cell: (props) => {
           return <IDCell>{props.getValue()}</IDCell>;
         },
         enableSorting: false,
       }),
-      columnHelper.accessor("queuedAtMin", {
-        header: "Minimum queued at (filter)",
+      columnHelper.accessor('queuedAtMin', {
+        header: 'Minimum queued at (filter)',
         cell: (props) => {
           const value = props.getValue();
           if (!value) {
@@ -160,15 +160,15 @@ function useColumns({
         },
         enableSorting: false,
       }),
-      columnHelper.accessor("queuedAtMax", {
-        header: "Maximum queued at (filter)",
+      columnHelper.accessor('queuedAtMax', {
+        header: 'Maximum queued at (filter)',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
         enableSorting: false,
       }),
       columnHelper.display({
-        id: "actions",
+        id: 'actions',
         header: undefined, // Needed to enable the iconOnly styles in the table
         cell: (props) => {
           const data = props.row.original;

@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { toast } from "sonner";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
-import BillingCard from "./BillingCard";
+import { graphql } from '@/gql';
+import BillingCard from './BillingCard';
 
 const updateBillingInformationDocument = graphql(`
   mutation UpdateAccount($input: UpdateAccount!) {
@@ -25,8 +25,8 @@ export default function BillingInformation({
   accountName: string | null | undefined;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [email, setEmail] = useState(billingEmail || "");
-  const [name, setName] = useState(accountName || "");
+  const [email, setEmail] = useState(billingEmail || '');
+  const [name, setName] = useState(accountName || '');
   const isSaveDisabled = email === billingEmail && name === accountName;
   const [, updateBillingInformation] = useMutation(
     updateBillingInformationDocument,
@@ -59,7 +59,7 @@ export default function BillingInformation({
           toast.success(`Billing information was successfully updated`);
           //
           // Refresh the current route to reload data
-          navigate({ to: ".", replace: true });
+          navigate({ to: '.', replace: true });
         }
       },
     );

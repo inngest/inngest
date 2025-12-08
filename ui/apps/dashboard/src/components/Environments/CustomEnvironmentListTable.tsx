@@ -1,11 +1,11 @@
-import { usePaginationUI } from "@inngest/components/Pagination";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
+import { usePaginationUI } from '@inngest/components/Pagination';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 
-import type { Environment } from "@/utils/environments";
-import { FilterResultDetails } from "./FilterResultDetails";
-import { EnvArchiveButton } from "./row-actions/EnvArchiveButton/EnvArchiveButton";
-import { EnvKeysDropdownButton } from "./row-actions/EnvKeysDropdownButton";
-import { EnvViewButton } from "./row-actions/EnvViewButton";
+import type { Environment } from '@/utils/environments';
+import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const PER_PAGE = 5;
 
@@ -87,7 +87,7 @@ function TableRow(props: { env: Environment }) {
     <tr>
       <td className="max-w-80 px-4 py-3">
         <h3 className="text-basis flex items-center gap-2 break-words text-sm font-medium">
-          <StatusDot status={isArchived ? "ARCHIVED" : "ACTIVE"} size="small" />
+          <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {name}
         </h3>
       </td>

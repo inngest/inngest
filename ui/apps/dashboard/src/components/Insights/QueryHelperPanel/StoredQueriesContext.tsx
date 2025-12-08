@@ -5,14 +5,14 @@ import {
   useMemo,
   useState,
   type ReactNode,
-} from "react";
-import { toast } from "sonner";
+} from 'react';
+import { toast } from 'sonner';
 
-import type { TabManagerActions } from "@/components/Insights/InsightsTabManager/InsightsTabManager";
-import type { QuerySnapshot, Tab } from "@/components/Insights/types";
-import type { InsightsQueryStatement } from "@/gql/graphql";
-import { getOrderedSavedQueries } from "../queries";
-import { useInsightsSavedQueries } from "./useInsightsSavedQueries";
+import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import type { QuerySnapshot, Tab } from '@/components/Insights/types';
+import type { InsightsQueryStatement } from '@/gql/graphql';
+import { getOrderedSavedQueries } from '../queries';
+import { useInsightsSavedQueries } from './useInsightsSavedQueries';
 
 interface StoredQueriesContextValue {
   deleteQuery: (queryId: string) => void;
@@ -72,10 +72,10 @@ export function StoredQueriesProvider({
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
           refetchSavedQueries();
-          toast.success("Successfully updated query");
+          toast.success('Successfully updated query');
         } else {
           const errorMessage = `Failed to update query${
-            result.error === "unique" ? ": name must be unique" : ""
+            result.error === 'unique' ? ': name must be unique' : ''
           }`;
           toast.error(errorMessage);
           throw new Error(errorMessage);
@@ -88,10 +88,10 @@ export function StoredQueriesProvider({
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
           refetchSavedQueries();
-          toast.success("Successfully saved query");
+          toast.success('Successfully saved query');
         } else {
           const errorMessage = `Failed to save query${
-            result.error === "unique" ? ": name must be unique" : ""
+            result.error === 'unique' ? ': name must be unique' : ''
           }`;
           toast.error(errorMessage);
           throw new Error(errorMessage);
@@ -109,9 +109,9 @@ export function StoredQueriesProvider({
         // This is necessary because the query never returns anything that matches the list by __typename.
         // It returns only a list of deleted IDs.
         refetchSavedQueries();
-        toast.success("Query deleted");
+        toast.success('Query deleted');
       } else {
-        toast.error("Failed to delete query");
+        toast.error('Failed to delete query');
       }
     },
     [beDeleteQuery, refetchSavedQueries, tabManagerActions],
@@ -125,9 +125,9 @@ export function StoredQueriesProvider({
         // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
         // that we have a consistent type name to match on regardless of existing saved queries.
         refetchSavedQueries();
-        toast.success("Query shared with your organization");
+        toast.success('Query shared with your organization');
       } else {
-        toast.error("Failed to share query with your organization");
+        toast.error('Failed to share query with your organization');
       }
     },
     [beShareQuery, refetchSavedQueries],
@@ -176,7 +176,7 @@ export function useStoredQueries(): StoredQueriesContextValue {
   const context = useContext(StoredQueriesContext);
   if (context === undefined) {
     throw new Error(
-      "useStoredQueries must be used within a StoredQueriesProvider",
+      'useStoredQueries must be used within a StoredQueriesProvider',
     );
   }
 

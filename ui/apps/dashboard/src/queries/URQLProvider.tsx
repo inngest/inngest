@@ -1,10 +1,10 @@
-import { useMemo } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { useAuth } from "@clerk/tanstack-react-start";
+import { useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { useAuth } from '@clerk/tanstack-react-start';
 // import * as Sentry from "@sentry/nextjs";
-import { authExchange } from "@urql/exchange-auth";
-import { requestPolicyExchange } from "@urql/exchange-request-policy";
-import { retryExchange } from "@urql/exchange-retry";
+import { authExchange } from '@urql/exchange-auth';
+import { requestPolicyExchange } from '@urql/exchange-request-policy';
+import { retryExchange } from '@urql/exchange-retry';
 import {
   CombinedError,
   Provider,
@@ -12,9 +12,9 @@ import {
   createClient,
   fetchExchange,
   mapExchange,
-} from "urql";
-import SignInRedirectErrors from "@/components/SignIn/Errors";
-import * as Sentry from "@sentry/tanstackstart-react";
+} from 'urql';
+import SignInRedirectErrors from '@/components/SignIn/Errors';
+import * as Sentry from '@sentry/tanstackstart-react';
 
 /**
  * This is used to ensure that the URQL client is re-created (cache reset) whenever the user signs
@@ -43,7 +43,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
       fetchOptions: {
         // Necessary to include HTTP-only cookies. This is used for non-Clerk
         // auth.
-        credentials: "include",
+        credentials: 'include',
       },
       exchanges: [
         requestPolicyExchange({
@@ -51,7 +51,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
           ttl: 30_000, // 30 seconds (same value as Next.js’ Full Route Cache)
           // Only upgrade if the request policy is not `cache-only`
           shouldUpgrade: (operation) =>
-            operation.context.requestPolicy !== "cache-only",
+            operation.context.requestPolicy !== 'cache-only',
         }),
         cacheExchange,
         mapExchange({
@@ -62,7 +62,7 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
               Sentry.captureException(error);
               signOut(() => {
                 navigate({
-                  to: process.env.NEXT_PUBLIC_SIGN_IN_PATH || "/sign-in",
+                  to: process.env.NEXT_PUBLIC_SIGN_IN_PATH || '/sign-in',
                   search: { error: SignInRedirectErrors.Unauthenticated },
                 });
               });
@@ -99,6 +99,6 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
 function isUnauthenticatedError(error: CombinedError): boolean {
   return (
     error.response?.status === 401 ||
-    error.graphQLErrors.some((e) => e.extensions.code === "UNAUTHENTICATED")
+    error.graphQLErrors.some((e) => e.extensions.code === 'UNAUTHENTICATED')
   );
 }

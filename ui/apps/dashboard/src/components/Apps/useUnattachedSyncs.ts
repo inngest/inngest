@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { useClient } from "urql";
+import { useQuery } from '@tanstack/react-query';
+import { useClient } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const query = graphql(`
   query LatestUnattachedSync($envID: ID!) {
@@ -17,7 +17,7 @@ export function useLatestUnattachedSync({ envID }: { envID: string }) {
   const client = useClient();
 
   return useQuery({
-    queryKey: ["latestUnattachedSync", envID],
+    queryKey: ['latestUnattachedSync', envID],
     queryFn: async () => {
       const result = await client.query(query, { envID }).toPromise();
 

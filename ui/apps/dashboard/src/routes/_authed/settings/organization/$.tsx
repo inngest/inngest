@@ -1,7 +1,7 @@
-import { OrganizationProfile } from "@clerk/tanstack-react-start";
-import { createFileRoute, useLocation } from "@tanstack/react-router";
+import { OrganizationProfile } from '@clerk/tanstack-react-start';
+import { createFileRoute, useLocation } from '@tanstack/react-router';
 
-export const Route = createFileRoute("/_authed/settings/organization/$")({
+export const Route = createFileRoute('/_authed/settings/organization/$')({
   component: OrganizationSettingsPage,
 });
 
@@ -16,12 +16,12 @@ function OrganizationSettingsPage() {
         path="/settings/organization"
         appearance={{
           layout: {
-            logoPlacement: "none",
+            logoPlacement: 'none',
           },
           elements: {
-            navbar: "hidden",
-            scrollBox: "bg-canvasBase shadow-none",
-            pageScrollBox: "pt-6 px-2 w-full",
+            navbar: 'hidden',
+            scrollBox: 'bg-canvasBase shadow-none',
+            pageScrollBox: 'pt-6 px-2 w-full',
           },
         }}
       />

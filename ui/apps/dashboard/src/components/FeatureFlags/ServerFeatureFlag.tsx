@@ -1,7 +1,7 @@
-import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
-import * as Sentry from "@sentry/tanstackstart-react";
+import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
+import * as Sentry from '@sentry/tanstackstart-react';
 
-import { getLaunchDarklyClient } from "./ServerLaunchDarkly";
+import { getLaunchDarklyClient } from './ServerLaunchDarkly';
 
 export async function getBooleanFlag(
   flag: string,
@@ -10,14 +10,14 @@ export async function getBooleanFlag(
   const { userId, orgId } = await auth();
 
   if (!userId) {
-    throw new Error("ServerLaunchdarkly init failed: user is not logged in");
+    throw new Error('ServerLaunchdarkly init failed: user is not logged in');
   }
 
   const clerk = await clerkClient();
   const user = await clerk.users.getUser(userId);
 
   if (!user) {
-    throw new Error("ServerLaunchdarkly init failed: user is not logged in");
+    throw new Error('ServerLaunchdarkly init failed: user is not logged in');
   }
 
   let organization:
@@ -35,22 +35,22 @@ export async function getBooleanFlag(
 
     const accountID =
       organization?.publicMetadata?.accountID &&
-      typeof organization.publicMetadata.accountID === "string"
+      typeof organization.publicMetadata.accountID === 'string'
         ? organization.publicMetadata.accountID
-        : "Unknown";
+        : 'Unknown';
 
     const context = {
       account: {
         key: accountID,
-        name: organization?.name ?? "Unknown",
+        name: organization?.name ?? 'Unknown',
       },
-      kind: "multi",
+      kind: 'multi',
       user: {
         anonymous: false,
-        key: user?.externalId ?? "Unknown",
+        key: user?.externalId ?? 'Unknown',
         name:
-          `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||
-          "Unknown",
+          `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() ||
+          'Unknown',
       },
     } as const;
 
@@ -58,7 +58,7 @@ export async function getBooleanFlag(
     return variation;
   } catch (err) {
     Sentry.captureException(err);
-    console.error("Failed to get LaunchDarkly variation", err);
+    console.error('Failed to get LaunchDarkly variation', err);
     return false;
   }
 }

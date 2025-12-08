@@ -1,10 +1,10 @@
-import { useMemo } from "react";
-import { Button } from "@inngest/components/Button/Button";
-import { RiMore2Fill } from "@remixicon/react";
+import { useMemo } from 'react';
+import { Button } from '@inngest/components/Button/Button';
+import { RiMore2Fill } from '@remixicon/react';
 
-import { QueryActionsMenu } from "../QueryActionsMenu";
-import { useStoredQueries } from "../QueryHelperPanel/StoredQueriesContext";
-import type { Tab } from "../types";
+import { QueryActionsMenu } from '../QueryActionsMenu';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '../types';
 
 type InsightsSQLEditorSavedQueryActionsButtonProps = { tab: Tab };
 

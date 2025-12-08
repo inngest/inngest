@@ -1,11 +1,11 @@
-import { useNavigate, useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useNavigate, useLocation } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
-import { pathCreator } from "@/utils/urls";
+import { pathCreator } from '@/utils/urls';
 
 //
 // Whitelist of paths that marketplace users can access
-const marketplaceAllowedPaths = ["/usage"] as const;
+const marketplaceAllowedPaths = ['/usage'] as const;
 
 type Props = {
   isMarketplace: boolean;
@@ -27,7 +27,7 @@ export const MarketplaceAccessControl = ({
       if (!isAllowed) {
         //
         // Redirect to usage page if trying to access non-whitelisted page
-        navigate({ to: pathCreator.billing({ tab: "usage" }) });
+        navigate({ to: pathCreator.billing({ tab: 'usage' }) });
       }
     }
   }, [isMarketplace, location.pathname, navigate]);

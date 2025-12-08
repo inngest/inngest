@@ -1,11 +1,11 @@
-import { useState } from "react";
-import Tabs from "@inngest/components/Tabs/Tabs";
+import { useState } from 'react';
+import Tabs from '@inngest/components/Tabs/Tabs';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@inngest/components/Tooltip";
+} from '@inngest/components/Tooltip';
 import {
   RiAddLine,
   RiBookReadLine,
@@ -14,17 +14,17 @@ import {
   RiContractLeftLine,
   RiExpandRightLine,
   RiHome4Line,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { useSaveTabActions } from "@/components/Insights/InsightsSQLEditor/SaveTabContext";
-import { KeyboardShortcutTooltip } from "@/components/Insights/KeyboardShortcutTooltip";
-import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
-import type { Tab } from "@/components/Insights/types";
-import { hasUnsavedChanges } from "./InsightsTabManager";
-import { TabContextMenu } from "./TabContextMenu";
-import { useTabManagerActions } from "./TabManagerContext";
-import { UnsavedChangesModal } from "./UnsavedChangesModal";
-import { HOME_TAB, TEMPLATES_TAB } from "./constants";
+import { useSaveTabActions } from '@/components/Insights/InsightsSQLEditor/SaveTabContext';
+import { KeyboardShortcutTooltip } from '@/components/Insights/KeyboardShortcutTooltip';
+import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import type { Tab } from '@/components/Insights/types';
+import { hasUnsavedChanges } from './InsightsTabManager';
+import { TabContextMenu } from './TabContextMenu';
+import { useTabManagerActions } from './TabManagerContext';
+import { UnsavedChangesModal } from './UnsavedChangesModal';
+import { HOME_TAB, TEMPLATES_TAB } from './constants';
 
 /**
  * Filters a list of tab IDs to return only tabs with unsaved changes
@@ -32,7 +32,7 @@ import { HOME_TAB, TEMPLATES_TAB } from "./constants";
 function getTabsWithUnsavedChanges(
   tabIds: string[],
   allTabs: Tab[],
-  queriesData: ReturnType<typeof useStoredQueries>["queries"]["data"],
+  queriesData: ReturnType<typeof useStoredQueries>['queries']['data'],
 ): Tab[] {
   return tabIds
     .map((id) => allTabs.find((t) => t.id === id))
@@ -168,7 +168,7 @@ export function InsightsTabsList({
                   icon={<ActionTabIcon size={16} />}
                   onClick={onToggleQueryHelperPanelVisibility}
                   title={`${
-                    isQueryHelperPanelVisible ? "Hide" : "Show"
+                    isQueryHelperPanelVisible ? 'Hide' : 'Show'
                   } sidebar`}
                 />
                 <Tabs.IconTab
@@ -200,7 +200,7 @@ export function InsightsTabsList({
                     <TooltipContent>
                       Add new tab (
                       <KeyboardShortcutTooltip
-                        combo={{ alt: true, key: "T", metaOrCtrl: true }}
+                        combo={{ alt: true, key: 'T', metaOrCtrl: true }}
                       />
                       )
                     </TooltipContent>

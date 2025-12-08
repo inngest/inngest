@@ -1,31 +1,31 @@
-import { Link } from "@inngest/components/Link/NewLink";
+import { Link } from '@inngest/components/Link/NewLink';
 import {
   RiChatPollLine,
   RiExternalLinkLine,
   RiMailLine,
-} from "@remixicon/react";
+} from '@remixicon/react';
 
-import { pathCreator } from "@/utils/urls";
-import { EXTERNAL_FEEDBACK_LINK } from "../constants";
-import { InsightsTabPanelTemplatesTabGrid } from "./InsightsTabPanelTemplatesTabGrid";
+import { pathCreator } from '@/utils/urls';
+import { EXTERNAL_FEEDBACK_LINK } from '../constants';
+import { InsightsTabPanelTemplatesTabGrid } from './InsightsTabPanelTemplatesTabGrid';
 
-const BASE_DOCS_URL = "https://www.inngest.com/docs";
+const BASE_DOCS_URL = 'https://www.inngest.com/docs';
 const INSIGHTS_DOCS_URL = `${BASE_DOCS_URL}/platform/monitor/insights?ref=app-insights`;
 
 const RESOURCES = [
   {
     href: INSIGHTS_DOCS_URL,
-    label: "Insights documentation",
+    label: 'Insights documentation',
     icon: RiExternalLinkLine,
   },
   {
     href: EXTERNAL_FEEDBACK_LINK,
-    label: "Send us feedback",
+    label: 'Send us feedback',
     icon: RiChatPollLine,
   },
   {
-    href: pathCreator.support({ ref: "app-insights" }),
-    label: "Request support",
+    href: pathCreator.support({ ref: 'app-insights' }),
+    label: 'Request support',
     icon: RiMailLine,
   },
 ];

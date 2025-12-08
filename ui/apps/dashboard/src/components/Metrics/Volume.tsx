@@ -1,24 +1,24 @@
-import { useState } from "react";
-import { Error } from "@inngest/components/Error/Error";
-import { RiArrowDownSFill, RiArrowRightSFill } from "@remixicon/react";
+import { useState } from 'react';
+import { Error } from '@inngest/components/Error/Error';
+import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
 
-import { graphql } from "@/gql";
-import { MetricsScope } from "@/gql/graphql";
-import { useSkippableGraphQLQuery } from "@/utils/useGraphQLQuery";
-import { useEnvironment } from "../Environments/environment-context";
-import { useBooleanFlag } from "../FeatureFlags/hooks";
-import { AccountConcurrency } from "./AccountConcurrency";
-import { AUTO_REFRESH_INTERVAL } from "./ActionMenu";
-import { Backlog } from "./Backlog";
-import { Concurrency } from "./Concurrency";
+import { graphql } from '@/gql';
+import { MetricsScope } from '@/gql/graphql';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useEnvironment } from '../Environments/environment-context';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
+import { AccountConcurrency } from './AccountConcurrency';
+import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
+import { Backlog } from './Backlog';
+import { Concurrency } from './Concurrency';
 import {
   ConnectWorkerPercentage,
   ConnectWorkerTotalCapacity,
-} from "./ConnectWorkerMetrics";
-import { type EntityLookup } from "./Dashboard";
-import { RunsThrougput } from "./RunsThroughput";
-import { SdkThroughput } from "./SdkThroughput";
-import { StepsThroughput } from "./StepsThroughput";
+} from './ConnectWorkerMetrics';
+import { type EntityLookup } from './Dashboard';
+import { RunsThrougput } from './RunsThroughput';
+import { SdkThroughput } from './SdkThroughput';
+import { StepsThroughput } from './StepsThroughput';
 
 export type MetricsFilters = {
   from: Date;
@@ -274,7 +274,7 @@ export const MetricsVolume = ({
   const env = useEnvironment();
 
   const { value: connectMetricsEnabled, isReady: connectMetricsReady } =
-    useBooleanFlag("connect-worker-concurrency-metrics");
+    useBooleanFlag('connect-worker-concurrency-metrics');
 
   const variables = {
     workspaceId: env.id,
@@ -292,7 +292,7 @@ export const MetricsVolume = ({
     variables,
   });
 
-  error && console.error("Error fetcthing metrics data for", variables, error);
+  error && console.error('Error fetcthing metrics data for', variables, error);
 
   return (
     <div className="item-start flex h-full w-full flex-col items-start">

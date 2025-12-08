@@ -1,4 +1,4 @@
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 
 export default function UsageMetadata({
   fetching,

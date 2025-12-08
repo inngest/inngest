@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
 
-import DatadogSetupPage from "@/components/Settings/DatadogSetupPage";
-import StartPage from "@/components/DatadogIntegration/StartPage";
-import { MetricsEntitlements } from "@/queries/server/entitlements";
+import DatadogSetupPage from '@/components/Settings/DatadogSetupPage';
+import StartPage from '@/components/DatadogIntegration/StartPage';
+import { MetricsEntitlements } from '@/queries/server/entitlements';
 
 type DatadogStartSearch = {
   site?: string;
@@ -10,7 +10,7 @@ type DatadogStartSearch = {
 };
 
 export const Route = createFileRoute(
-  "/_authed/settings/integrations/datadog/start/",
+  '/_authed/settings/integrations/datadog/start/',
 )({
   component: DatadogStartPage,
   validateSearch: (search: Record<string, unknown>): DatadogStartSearch => ({

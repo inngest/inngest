@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { useMutation } from "urql";
+import { useEffect } from 'react';
+import { useMutation } from 'urql';
 
-import ConnectingView from "@/components/DatadogIntegration/ConnectingView";
-import { graphql } from "@/gql";
+import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
+import { graphql } from '@/gql';
 
 const StartDatadogIntegrationDocument = graphql(`
   mutation StartDatadogIntegration($ddSite: String!, $ddDomain: String!) {

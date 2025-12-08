@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { InlineCode } from "@inngest/components/Code";
-import { AlertModal } from "@inngest/components/Modal";
-import { useMutation } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { InlineCode } from '@inngest/components/Code';
+import { AlertModal } from '@inngest/components/Modal';
+import { useMutation } from 'urql';
 
-import { graphql } from "@/gql";
+import { graphql } from '@/gql';
 
 const Mutation = graphql(`
   mutation RotateSigningKey($envID: UUID!) {
@@ -38,7 +38,7 @@ export function RotateSigningKeyModal(props: Props) {
         { envID },
         {
           // Bust cache
-          additionalTypenames: ["SigningKey"],
+          additionalTypenames: ['SigningKey'],
         },
       );
       if (res.error) {
@@ -49,7 +49,7 @@ export function RotateSigningKeyModal(props: Props) {
       onClose();
     } catch (error) {
       if (!(error instanceof Error)) {
-        setError("Unknown error");
+        setError('Unknown error');
         return;
       }
 
@@ -71,8 +71,8 @@ export function RotateSigningKeyModal(props: Props) {
     >
       <div className="p-6">
         <p className="mb-4">
-          Before rotating, ensure that all of your apps have the correct{" "}
-          <InlineCode>INNGEST_SIGNING_KEY</InlineCode> and{" "}
+          Before rotating, ensure that all of your apps have the correct{' '}
+          <InlineCode>INNGEST_SIGNING_KEY</InlineCode> and{' '}
           <InlineCode>INNGEST_SIGNING_KEY_FALLBACK</InlineCode> environment
           variables.
         </p>

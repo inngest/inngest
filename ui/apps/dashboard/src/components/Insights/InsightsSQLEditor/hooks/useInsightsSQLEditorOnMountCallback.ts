@@ -1,16 +1,16 @@
-import type { SQLEditorMountCallback } from "@inngest/components/SQLEditor/SQLEditor";
+import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
-import { useInsightsStateMachineContext } from "../../InsightsStateMachineContext/InsightsStateMachineContext";
+import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 import {
   useActiveTab,
   useTabManagerActions,
-} from "../../InsightsTabManager/TabManagerContext";
-import { useSQLEditorInstance } from "../SQLEditorInstanceContext";
-import { useSaveTabActions } from "../SaveTabContext";
-import { bindEditorShortcuts } from "../actions/handleShortcuts";
-import { markTemplateVars } from "../actions/markTemplateVars";
-import { getCanRunQuery } from "../utils";
-import { useLatest, useLatestCallback } from "./useLatestCallback";
+} from '../../InsightsTabManager/TabManagerContext';
+import { useSQLEditorInstance } from '../SQLEditorInstanceContext';
+import { useSaveTabActions } from '../SaveTabContext';
+import { bindEditorShortcuts } from '../actions/handleShortcuts';
+import { markTemplateVars } from '../actions/markTemplateVars';
+import { getCanRunQuery } from '../utils';
+import { useLatest, useLatestCallback } from './useLatestCallback';
 
 type UseInsightsSQLEditorOnMountCallbackReturn = {
   onMount: SQLEditorMountCallback;
@@ -24,7 +24,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
   const { editorRef } = useSQLEditorInstance();
 
   const latestQueryRef = useLatest(query);
-  const isRunningRef = useLatest(status === "loading");
+  const isRunningRef = useLatest(status === 'loading');
   const activeTabRef = useLatest(activeTab);
   const saveTabRef = useLatest(saveTab);
 

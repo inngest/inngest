@@ -1,12 +1,12 @@
-import { anthropic, createAgent } from "@inngest/agent-kit";
+import { anthropic, createAgent } from '@inngest/agent-kit';
 
-import type { InsightsAgentState as InsightsState } from "../types";
-import systemPrompt from "./system.md?raw";
+import type { InsightsAgentState as InsightsState } from '../types';
+import systemPrompt from './system.md?raw';
 
 export const summarizerAgent = createAgent<InsightsState>({
-  name: "Insights Summarizer",
+  name: 'Insights Summarizer',
   description:
-    "Writes a concise summary describing what the generated SQL does and why.",
+    'Writes a concise summary describing what the generated SQL does and why.',
   system: async ({ network }) => {
     const events =
       network?.state.data.selectedEvents?.map(
@@ -15,16 +15,16 @@ export const summarizerAgent = createAgent<InsightsState>({
     const sql = network?.state.data.sql;
     return [
       systemPrompt,
-      events.length ? `Selected events: ${events.join(", ")}` : "",
+      events.length ? `Selected events: ${events.join(', ')}` : '',
       sql
-        ? "A SQL statement has been prepared; summarize its intent, not its exact text."
-        : "",
+        ? 'A SQL statement has been prepared; summarize its intent, not its exact text.'
+        : '',
     ]
       .filter(Boolean)
-      .join("\n");
+      .join('\n');
   },
   model: anthropic({
-    model: "claude-haiku-4-5",
+    model: 'claude-haiku-4-5',
     defaultParameters: {
       max_tokens: 4096,
     },

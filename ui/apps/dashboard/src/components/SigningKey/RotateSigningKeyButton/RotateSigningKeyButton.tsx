@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
 
-import { RotateSigningKeyModal } from "./RotateSigningKeyModal";
+import { RotateSigningKeyModal } from './RotateSigningKeyModal';
 
 type Props = {
   disabled?: boolean;

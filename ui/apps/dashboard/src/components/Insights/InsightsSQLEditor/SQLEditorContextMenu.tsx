@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@inngest/components/DropdownMenu/DropdownMenu";
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 
-import { KeyboardShortcut } from "../KeyboardShortcut";
+import { KeyboardShortcut } from '../KeyboardShortcut';
 
 type SQLEditorContextMenuProps = {
   onCopy: () => void;
@@ -38,7 +38,7 @@ export function SQLEditorContextMenu({
     const handleContextMenu = (e: MouseEvent) => {
       // Check if the event target is within the Monaco editor
       const target = e.target as HTMLElement;
-      const editorContainer = target.closest(".monaco-editor");
+      const editorContainer = target.closest('.monaco-editor');
 
       if (editorContainer) {
         e.preventDefault();
@@ -54,12 +54,12 @@ export function SQLEditorContextMenu({
       setContextMenu(null);
     };
 
-    document.addEventListener("contextmenu", handleContextMenu);
-    document.addEventListener("click", handleClick);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('click', handleClick);
 
     return () => {
-      document.removeEventListener("contextmenu", handleContextMenu);
-      document.removeEventListener("click", handleClick);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('click', handleClick);
     };
   }, [hasSelection]);
 
@@ -73,7 +73,7 @@ export function SQLEditorContextMenu({
       <DropdownMenuContent
         align="start"
         style={{
-          position: "fixed",
+          position: 'fixed',
           left: `${contextMenu.x}px`,
           top: `${contextMenu.y}px`,
         }}
@@ -84,7 +84,7 @@ export function SQLEditorContextMenu({
         >
           <span>Format SQL</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={["shift", "alt", "F"]} />
+            <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
           </span>
         </DropdownMenuItem>
         <div className="border-subtle my-1 border-t" />
@@ -95,7 +95,7 @@ export function SQLEditorContextMenu({
         >
           <span>Cut</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={["cmd", "ctrl", "X"]} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'X']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -105,7 +105,7 @@ export function SQLEditorContextMenu({
         >
           <span>Copy</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={["cmd", "ctrl", "C"]} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'C']} />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -114,7 +114,7 @@ export function SQLEditorContextMenu({
         >
           <span>Paste</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={["cmd", "ctrl", "V"]} />
+            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'V']} />
           </span>
         </DropdownMenuItem>
         <div className="border-subtle my-1 border-t" />
@@ -126,7 +126,7 @@ export function SQLEditorContextMenu({
           <span className="ml-auto">
             <KeyboardShortcut
               color="text-muted"
-              keys={["cmd", "ctrl", "enter"]}
+              keys={['cmd', 'ctrl', 'enter']}
             />
           </span>
         </DropdownMenuItem>
@@ -139,7 +139,7 @@ export function SQLEditorContextMenu({
           <span className="ml-auto">
             <KeyboardShortcut
               color="text-muted"
-              keys={["cmd", "ctrl", "alt", "S"]}
+              keys={['cmd', 'ctrl', 'alt', 'S']}
             />
           </span>
         </DropdownMenuItem>

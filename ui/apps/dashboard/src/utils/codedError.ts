@@ -1,47 +1,47 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // This is a TypeScript implementation of the syscode package in Inngest OSS
 
 const codes = [
-  "account_mismatch",
-  "app_mismatch",
-  "app_uninitialized",
-  "batch_size_too_large",
-  "env_archived",
-  "env_mismatch",
-  "env_unspecified",
-  "env_unspecified",
-  "host_private",
-  "http_bad_request",
-  "http_forbidden",
-  "http_internal_server_error",
-  "http_method_not_allowed",
-  "http_not_found",
-  "http_unauthorized",
-  "http_unreachable",
-  "http_unsupported_protocol",
-  "no_functions",
-  "not_sdk",
-  "response_not_signed",
-  "server_kind_mismatch",
-  "sig_verification_failed",
-  "signing_key_invalid",
-  "signing_key_unspecified",
-  "too_many_pings",
-  "unknown",
-  "url_invalid",
+  'account_mismatch',
+  'app_mismatch',
+  'app_uninitialized',
+  'batch_size_too_large',
+  'env_archived',
+  'env_mismatch',
+  'env_unspecified',
+  'env_unspecified',
+  'host_private',
+  'http_bad_request',
+  'http_forbidden',
+  'http_internal_server_error',
+  'http_method_not_allowed',
+  'http_not_found',
+  'http_unauthorized',
+  'http_unreachable',
+  'http_unsupported_protocol',
+  'no_functions',
+  'not_sdk',
+  'response_not_signed',
+  'server_kind_mismatch',
+  'sig_verification_failed',
+  'signing_key_invalid',
+  'signing_key_unspecified',
+  'too_many_pings',
+  'unknown',
+  'url_invalid',
 
   // Deprecated
-  "invalid_function",
-  "missing_signing_key",
-  "invalid_signing_key",
-  "forbidden",
-  "missing_branch_env_name",
-  "internal_server_error",
-  "unauthorized",
-  "unreachable",
-  "unsupported_protocol",
-  "url_not_found",
+  'invalid_function',
+  'missing_signing_key',
+  'invalid_signing_key',
+  'forbidden',
+  'missing_branch_env_name',
+  'internal_server_error',
+  'unauthorized',
+  'unreachable',
+  'unsupported_protocol',
+  'url_not_found',
 ] as const;
 export type ErrorCode = (typeof codes)[number];
 export function isErrorCode(value: unknown): value is ErrorCode {
@@ -72,8 +72,8 @@ export function parseErrorData(
     return null;
   }
 
-  if (typeof data !== "string") {
-    console.error("error data is not a string:", data);
+  if (typeof data !== 'string') {
+    console.error('error data is not a string:', data);
     return null;
   }
 
@@ -81,7 +81,7 @@ export function parseErrorData(
   try {
     obj = JSON.parse(data);
   } catch {
-    console.error("failed to parse error data:", data);
+    console.error('failed to parse error data:', data);
     return null;
   }
 
@@ -95,6 +95,6 @@ export function parseErrorData(
     return multiErr.data;
   }
 
-  console.error("unknown error data format:", data);
+  console.error('unknown error data format:', data);
   return null;
 }

@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { AlertModal } from "@inngest/components/Modal";
-import { StatusDot } from "@inngest/components/Status/StatusDot";
-import { Time } from "@inngest/components/Time";
-import { IconSpinner } from "@inngest/components/icons/Spinner";
-import { RiOrganizationChart } from "@remixicon/react";
-import { toast } from "sonner";
-import { useMutation, useQuery } from "urql";
+import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { AlertModal } from '@inngest/components/Modal';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
+import { Time } from '@inngest/components/Time';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { RiOrganizationChart } from '@remixicon/react';
+import { toast } from 'sonner';
+import { useMutation, useQuery } from 'urql';
 
-import { graphql } from "@/gql";
-import type { DatadogConnectionStatus } from "@/gql/graphql";
+import { graphql } from '@/gql';
+import type { DatadogConnectionStatus } from '@/gql/graphql';
 
 export const ddIntegrationHref =
-  "https://app.datadoghq.com/integrations/inngest";
+  'https://app.datadoghq.com/integrations/inngest';
 
 export const GetDatadogSetupDataDocument = graphql(`
   query GetDatadogSetupData {
@@ -62,9 +62,9 @@ type OrganizationToRemove = {
 
 function dotStatusForConnection(conn: DatadogConnectionStatus) {
   if (conn.healthy) {
-    return "ACTIVE";
+    return 'ACTIVE';
   } else {
-    return "FAILED";
+    return 'FAILED';
   }
 }
 
@@ -73,25 +73,25 @@ function alertTextBeforeRemovingOrg(
   allConnections: DatadogConnectionStatus[],
 ): string {
   if (!org) {
-    return "";
+    return '';
   }
   const affectedConns = allConnections.filter(
     (conn) => conn.orgID == org.organizationID,
   );
   let text =
-    "Are you certain you want to disconnect Inngest from the “" +
+    'Are you certain you want to disconnect Inngest from the “' +
     org.orgName +
-    "” Datadog organization?";
+    '” Datadog organization?';
   if (affectedConns.length == 1) {
     text +=
-      " This will disable sending metrics from your “" +
+      ' This will disable sending metrics from your “' +
       affectedConns[0]?.envName +
-      "” environment.";
+      '” environment.';
   } else if (affectedConns.length > 1) {
     text +=
-      " This will disable sending metrics from " +
+      ' This will disable sending metrics from ' +
       affectedConns.length +
-      " environments.";
+      ' environments.';
   }
   return text;
 }
@@ -117,7 +117,7 @@ export default function SetupPage({}) {
     const result = await removeOrganization(
       { organizationID: selectedOrgToRemove.organizationID },
       {
-        additionalTypenames: ["DatadogOrganization", "DatadogConnectionStatus"],
+        additionalTypenames: ['DatadogOrganization', 'DatadogConnectionStatus'],
       },
     );
     setSelectedOrgToRemove(null);
@@ -137,7 +137,7 @@ export default function SetupPage({}) {
 
     const result = await disableConnection(
       { connectionID: selectedConnToDisable.connectionID },
-      { additionalTypenames: ["DatadogConnectionStatus"] },
+      { additionalTypenames: ['DatadogConnectionStatus'] },
     );
     setSelectedConnToDisable(null);
     refetchDdSetupData();
@@ -153,7 +153,7 @@ export default function SetupPage({}) {
     console.error(ddSetupFetchError);
   }
 
-  const connectEnvHref = "/settings/integrations/datadog/connect-env";
+  const connectEnvHref = '/settings/integrations/datadog/connect-env';
 
   return (
     <>
@@ -161,18 +161,18 @@ export default function SetupPage({}) {
         isOpen={selectedConnToDisable !== null}
         onClose={() => setSelectedConnToDisable(null)}
         title={
-          "Disable sending metrics from “" +
+          'Disable sending metrics from “' +
           selectedConnToDisable?.envName +
-          "” to “" +
+          '” to “' +
           selectedConnToDisable?.orgName +
-          "”"
+          '”'
         }
         description={
-          "Are you sure you want to disable sending metrics to the “" +
+          'Are you sure you want to disable sending metrics to the “' +
           selectedConnToDisable?.orgName +
-          "” Datadog organization for the “" +
+          '” Datadog organization for the “' +
           selectedConnToDisable?.envName +
-          "” environment?"
+          '” environment?'
         }
         confirmButtonLabel="Remove"
         onSubmit={commitDisableSelectedConnection}
@@ -181,7 +181,7 @@ export default function SetupPage({}) {
       <AlertModal
         isOpen={selectedOrgToRemove !== null}
         onClose={() => setSelectedOrgToRemove(null)}
-        title={"Remove “" + selectedOrgToRemove?.orgName + "”"}
+        title={'Remove “' + selectedOrgToRemove?.orgName + '”'}
         description={alertTextBeforeRemovingOrg(
           selectedOrgToRemove,
           ddSetupData?.account.datadogConnections || [],
@@ -225,8 +225,8 @@ export default function SetupPage({}) {
               <div
                 className={`text-basis flex flex-row justify-start gap-3 border-t px-2 pb-2 pt-3 ${
                   i === ddSetupData.account.datadogConnections.length - 1
-                    ? "border-b"
-                    : ""
+                    ? 'border-b'
+                    : ''
                 }`}
                 key={i}
               >
@@ -237,12 +237,12 @@ export default function SetupPage({}) {
                   </div>
                   {ddConn.lastErrorMessage ? (
                     <div className="font-normal">
-                      <span className="text-error font-bold">Error:</span>{" "}
+                      <span className="text-error font-bold">Error:</span>{' '}
                       <code>{ddConn.lastErrorMessage}</code>
                     </div>
                   ) : ddConn.lastSentAt ? (
                     <div className="text-muted">
-                      <span className="italic">Metrics last sent:</span>{" "}
+                      <span className="italic">Metrics last sent:</span>{' '}
                       <Time value={ddConn.lastSentAt} />
                     </div>
                   ) : ddConn.healthy ? (
@@ -251,14 +251,14 @@ export default function SetupPage({}) {
                     </div>
                   ) : (
                     <div className="font-normal">
-                      <span className="text-error font-bold">Error:</span>{" "}
+                      <span className="text-error font-bold">Error:</span>{' '}
                       <code>Please contact Inngest Support.</code>
                     </div>
                   )}
                 </div>
                 {ddSetupData.account.datadogOrganizations.length > 1 && (
                   <div className="mr-1 mt-1">
-                    <span className="text-muted italic">connected to</span>{" "}
+                    <span className="text-muted italic">connected to</span>{' '}
                     <span className="font-medium">{ddConn.orgName}</span>
                   </div>
                 )}
@@ -286,8 +286,8 @@ export default function SetupPage({}) {
           <div className="text-basis flex-1 text-xl font-medium">
             {!ddSetupData ||
             ddSetupData.account.datadogOrganizations.length === 0
-              ? "Datadog Connections"
-              : "Connected Datadog Organizations"}
+              ? 'Datadog Connections'
+              : 'Connected Datadog Organizations'}
           </div>
           {ddSetupData &&
             ddSetupData.account.datadogOrganizations.length > 0 && (
@@ -334,8 +334,8 @@ export default function SetupPage({}) {
             <div
               className={`text-basis flex flex-row justify-start gap-2 border-t px-2 pb-2 pt-3 ${
                 i === ddSetupData.account.datadogOrganizations.length - 1
-                  ? "border-b"
-                  : ""
+                  ? 'border-b'
+                  : ''
               }`}
               key={i}
             >

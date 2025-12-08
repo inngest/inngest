@@ -1,8 +1,8 @@
-import { useCallback } from "react";
-import { useClient } from "urql";
+import { useCallback } from 'react';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 export const eventsQuery = graphql(`
   query GetEventsV2(
@@ -93,7 +93,7 @@ export function useEvents() {
             eventNames,
             includeInternalEvents,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -102,7 +102,7 @@ export function useEvents() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventsData = result.data.environment.eventsV2;
@@ -160,7 +160,7 @@ export function useEventDetails() {
             envID,
             eventID,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -169,7 +169,7 @@ export function useEventDetails() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventData = result.data.environment.eventV2;
@@ -208,7 +208,7 @@ export function useEventPayload() {
             envID,
             eventID,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -217,7 +217,7 @@ export function useEventPayload() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventData = result.data.environment.eventV2.raw;
@@ -260,7 +260,7 @@ export function useEventRuns() {
             envID,
             eventID,
           },
-          { requestPolicy: "network-only" },
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -269,7 +269,7 @@ export function useEventRuns() {
       }
 
       if (!result.data) {
-        throw new Error("no data returned");
+        throw new Error('no data returned');
       }
 
       const eventData = result.data.environment.eventV2;

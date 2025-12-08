@@ -1,11 +1,11 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
-import { Link } from "@inngest/components/Link/NewLink";
-import { createFileRoute } from "@tanstack/react-router";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { Link } from '@inngest/components/Link/NewLink';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute(
-  "/_authed/integrations/vercel/callback/success/",
+  '/_authed/integrations/vercel/callback/success/',
 )({
   component: SuccessComponent,
 });
@@ -21,7 +21,7 @@ function SuccessComponent() {
       </div>
       <div className="text-muted mb-7 w-full text-base font-normal">
         This integration enables you to host your Inngest functions on the
-        Vercel platform and automatically sync them every time you deploy code.{" "}
+        Vercel platform and automatically sync them every time you deploy code.{' '}
         <Link
           target="_blank"
           size="medium"

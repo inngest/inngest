@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
-import type { TabManagerActions } from "@/components/Insights/InsightsTabManager/InsightsTabManager";
-import { useStoredQueries } from "@/components/Insights/QueryHelperPanel/StoredQueriesContext";
+import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 
 interface UseDeepLinkHandlerParams {
   actions: TabManagerActions;
@@ -28,7 +28,7 @@ export function useDeepLinkHandler({
     if (hasProcessedInitialQueryId.current) return;
 
     const queryIdFromUrl =
-      typeof search.query_id === "string" ? search.query_id : undefined;
+      typeof search.query_id === 'string' ? search.query_id : undefined;
     if (!queryIdFromUrl) {
       hasProcessedInitialQueryId.current = true;
       return;
@@ -49,7 +49,7 @@ export function useDeepLinkHandler({
     } else {
       // Show error toast if query not found
       toast.error(
-        "Unable to load query; please ensure that you have access to it",
+        'Unable to load query; please ensure that you have access to it',
       );
     }
   }, [search, queries.data, isSavedQueriesFetching, actions]);
@@ -60,7 +60,7 @@ export function useDeepLinkHandler({
     if (!hasProcessedInitialQueryId.current) return;
 
     const currentQueryId =
-      typeof search.query_id === "string" ? search.query_id : undefined;
+      typeof search.query_id === 'string' ? search.query_id : undefined;
     const newQueryId = activeSavedQueryId;
 
     // Don't update if URL already has the correct query_id

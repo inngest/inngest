@@ -3,15 +3,15 @@ import {
   Outlet,
   redirect,
   useNavigate,
-} from "@tanstack/react-router";
+} from '@tanstack/react-router';
 
-import PageHeader from "@/components/Onboarding/PageHeader";
-import { isValidStep } from "@/components/Onboarding/types";
-import { pathCreator } from "@/utils/urls";
+import PageHeader from '@/components/Onboarding/PageHeader';
+import { isValidStep } from '@/components/Onboarding/types';
+import { pathCreator } from '@/utils/urls';
 
-import Menu from "@/components/Onboarding/Menu";
+import Menu from '@/components/Onboarding/Menu';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/onboarding/$step")({
+export const Route = createFileRoute('/_authed/env/$envSlug/onboarding/$step')({
   component: OnboardingStepLayout,
 });
 

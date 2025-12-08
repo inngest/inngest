@@ -1,8 +1,8 @@
-import { Header } from "@inngest/components/Header/NewHeader";
-import { createFileRoute } from "@tanstack/react-router";
+import { Header } from '@inngest/components/Header/NewHeader';
+import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute(
-  "/_authed/env/$envSlug/debugger/$functionSlug/",
+  '/_authed/env/$envSlug/debugger/$functionSlug/',
 )({
   component: DebuggerFunctionPage,
 });
@@ -14,9 +14,9 @@ function DebuggerFunctionPage() {
     <>
       <Header
         breadcrumb={[
-          { text: "Runs" },
+          { text: 'Runs' },
           { text: functionSlug },
-          { text: "Debug" },
+          { text: 'Debug' },
         ]}
         action={<div className="flex flex-row items-center gap-x-1"></div>}
       />

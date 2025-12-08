@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
-import { AccordionList } from "@inngest/components/AccordionCard/AccordionList";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Input } from "@inngest/components/Forms/Input";
-import { Modal } from "@inngest/components/Modal";
+import { useCallback, useEffect, useState } from 'react';
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Input } from '@inngest/components/Forms/Input';
+import { Modal } from '@inngest/components/Modal';
 
-import { type AppCheckResult } from "@/gql/graphql";
-import { Checks } from "./Checks";
-import { ConfigDetail } from "./ConfigDetail";
-import { HTTPInfo } from "./HTTPInfo";
-import { useGetAppInfo } from "./getAppInfo";
+import { type AppCheckResult } from '@/gql/graphql';
+import { Checks } from './Checks';
+import { ConfigDetail } from './ConfigDetail';
+import { HTTPInfo } from './HTTPInfo';
+import { useGetAppInfo } from './getAppInfo';
 
 type Props = {
   isOpen: boolean;
@@ -52,7 +52,7 @@ export function ValidateModal(props: Props) {
         if (error instanceof Error) {
           setError(error);
         } else {
-          setError(new Error("unknown error"));
+          setError(new Error('unknown error'));
         }
       } finally {
         setIsLoading(false);
@@ -78,7 +78,7 @@ export function ValidateModal(props: Props) {
         </p>
 
         <p className="text-muted text-sm">
-          Note: The app will only return privileged information if {"it's"}{" "}
+          Note: The app will only return privileged information if {"it's"}{' '}
           using this {"environment's"} signing key.
         </p>
 

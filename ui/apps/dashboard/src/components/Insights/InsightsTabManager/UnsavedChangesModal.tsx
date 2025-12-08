@@ -1,8 +1,8 @@
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Modal } from "@inngest/components/Modal/Modal";
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Modal } from '@inngest/components/Modal/Modal';
 
-import type { Tab } from "@/components/Insights/types";
+import type { Tab } from '@/components/Insights/types';
 
 interface UnsavedChangesModalProps {
   isOpen: boolean;
@@ -20,8 +20,8 @@ export function UnsavedChangesModal({
   onSaveAll,
 }: UnsavedChangesModalProps) {
   const isSingleTab = unsavedTabs.length === 1;
-  const discardLabel = isSingleTab ? "Discard" : "Discard All";
-  const saveLabel = isSingleTab ? "Save" : "Save All";
+  const discardLabel = isSingleTab ? 'Discard' : 'Discard All';
+  const saveLabel = isSingleTab ? 'Save' : 'Save All';
 
   return (
     <Modal className="w-[656px]" isOpen={isOpen} onClose={onCancel}>

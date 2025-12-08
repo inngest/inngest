@@ -1,15 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "@clerk/tanstack-react-start/server";
-import { getSubscriptionToken } from "@inngest/realtime";
-import { inngest } from "@/lib/inngest/client";
-import { createChannel } from "@/lib/inngest/realtime";
+import { createFileRoute } from '@tanstack/react-router';
+import { auth } from '@clerk/tanstack-react-start/server';
+import { getSubscriptionToken } from '@inngest/realtime';
+import { inngest } from '@/lib/inngest/client';
+import { createChannel } from '@/lib/inngest/realtime';
 
 export type RequestBody = {
   userId?: string;
   channelKey?: string;
 };
 
-export const Route = createFileRoute("/api/realtime/token")({
+export const Route = createFileRoute('/api/realtime/token')({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -18,10 +18,10 @@ export const Route = createFileRoute("/api/realtime/token")({
         const { userId } = await auth();
         if (!userId) {
           return new Response(
-            JSON.stringify({ error: "Please sign in to create a token" }),
+            JSON.stringify({ error: 'Please sign in to create a token' }),
             {
               status: 401,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }
@@ -32,10 +32,10 @@ export const Route = createFileRoute("/api/realtime/token")({
           const { channelKey } = (await request.json()) as RequestBody;
           if (!channelKey) {
             return new Response(
-              JSON.stringify({ error: "channelKey is required" }),
+              JSON.stringify({ error: 'channelKey is required' }),
               {
                 status: 400,
-                headers: { "Content-Type": "application/json" },
+                headers: { 'Content-Type': 'application/json' },
               },
             );
           }
@@ -45,12 +45,12 @@ export const Route = createFileRoute("/api/realtime/token")({
           // Match publisher semantics: when channelKey is provided, we publish to that key directly.
           const token = await getSubscriptionToken(inngest, {
             channel: createChannel(channelKey),
-            topics: ["agent_stream"],
+            topics: ['agent_stream'],
           });
 
           return new Response(JSON.stringify(token), {
             status: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
           });
         } catch (error) {
           return new Response(
@@ -58,11 +58,11 @@ export const Route = createFileRoute("/api/realtime/token")({
               error:
                 error instanceof Error
                   ? error.message
-                  : "Failed to create subscription token",
+                  : 'Failed to create subscription token',
             }),
             {
               status: 500,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }

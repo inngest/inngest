@@ -1,6 +1,6 @@
-import { TextCell } from "@inngest/components/Table";
+import { TextCell } from '@inngest/components/Table';
 
-import { getFormattedJSONObjectOrArrayString } from "./json";
+import { getFormattedJSONObjectOrArrayString } from './json';
 
 interface JSONAwareTextCellProps {
   children: string;

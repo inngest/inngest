@@ -1,4 +1,4 @@
-import { RiErrorWarningLine } from "@remixicon/react";
+import { RiErrorWarningLine } from '@remixicon/react';
 
 export default function NotFound() {
   return (

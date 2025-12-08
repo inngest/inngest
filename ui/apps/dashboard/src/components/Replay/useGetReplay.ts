@@ -1,11 +1,11 @@
-import { ReplayStatus } from "@inngest/components/types/replay";
-import { differenceInMilliseconds } from "@inngest/components/utils/date";
-import { useQuery } from "@tanstack/react-query";
-import { decodeTime } from "ulid";
-import { useClient } from "urql";
+import { ReplayStatus } from '@inngest/components/types/replay';
+import { differenceInMilliseconds } from '@inngest/components/utils/date';
+import { useQuery } from '@tanstack/react-query';
+import { decodeTime } from 'ulid';
+import { useClient } from 'urql';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { graphql } from "@/gql";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 
 const getReplayQuery = graphql(`
   query GetReplay($envID: ID!, $replayID: ID!) {
@@ -31,7 +31,7 @@ export function useGetReplay(replayID: string) {
   const envID = useEnvironment().id;
   const client = useClient();
   return useQuery({
-    queryKey: ["replay", envID, replayID],
+    queryKey: ['replay', envID, replayID],
     queryFn: async () => {
       const result = await client
         .query(getReplayQuery, { envID, replayID })
@@ -41,7 +41,7 @@ export function useGetReplay(replayID: string) {
         throw result.error;
       }
       if (!result.data?.environment.replay) {
-        throw new Error("Replay not found");
+        throw new Error('Replay not found');
       }
 
       const replay = result.data.environment.replay;
@@ -107,7 +107,7 @@ export function useGetReplays(functionSlug: string) {
   const envID = useEnvironment().id;
   const client = useClient();
   return useQuery({
-    queryKey: ["replays", envID, functionSlug],
+    queryKey: ['replays', envID, functionSlug],
     queryFn: async () => {
       const result = await client
         .query(GetReplaysDocument, { environmentID: envID, functionSlug })

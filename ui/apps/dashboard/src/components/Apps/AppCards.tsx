@@ -1,21 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState } from 'react';
 
-import { AppCard } from "@inngest/components/Apps/AppCard";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import WorkerCounter from "@inngest/components/Workers/ConnectedWorkersDescription";
-import { methodTypes } from "@inngest/components/types/app";
+import { AppCard } from '@inngest/components/Apps/AppCard';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
+import { methodTypes } from '@inngest/components/types/app';
 
-import { ActionsMenu } from "@/components/Apps/ActionsMenu";
-import getAppCardContent from "@/components/Apps/AppCardContent";
-import { pathCreator } from "@/utils/urls";
-import { isSyncStatusHiddenOnAppCard } from "./SyncStatusPill";
-import { useWorkersCount } from "../Workers/useWorker";
-import { type FlattenedApp } from "./useApps";
-import { ValidateModal } from "./ValidateButton/ValidateModal";
-import { useNavigate } from "@tanstack/react-router";
-import { ArchiveModal } from "./ArchiveModal";
-import ResyncModal from "./ResyncModal";
+import { ActionsMenu } from '@/components/Apps/ActionsMenu';
+import getAppCardContent from '@/components/Apps/AppCardContent';
+import { pathCreator } from '@/utils/urls';
+import { isSyncStatusHiddenOnAppCard } from './SyncStatusPill';
+import { useWorkersCount } from '../Workers/useWorker';
+import { type FlattenedApp } from './useApps';
+import { ValidateModal } from './ValidateButton/ValidateModal';
+import { useNavigate } from '@tanstack/react-router';
+import { ArchiveModal } from './ArchiveModal';
+import ResyncModal from './ResyncModal';
 
 export default function AppCards({
   apps,
@@ -29,12 +29,12 @@ export default function AppCards({
 
   const [selectedApp, setSelectedApp] = useState<FlattenedApp | null>(null);
   const [modalType, setModalType] = useState<
-    "archive" | "validate" | "resync" | null
+    'archive' | 'validate' | 'resync' | null
   >(null);
 
   const handleShowModal = (
     app: FlattenedApp,
-    type: "archive" | "validate" | "resync",
+    type: 'archive' | 'validate' | 'resync',
   ) => {
     setSelectedApp(app);
     setModalType(type);
@@ -101,14 +101,14 @@ export default function AppCards({
                     />
                     <ActionsMenu
                       isArchived={app.isArchived}
-                      showArchive={() => handleShowModal(app, "archive")}
+                      showArchive={() => handleShowModal(app, 'archive')}
                       disableArchive={!app.url}
-                      showValidate={() => handleShowModal(app, "validate")}
+                      showValidate={() => handleShowModal(app, 'validate')}
                       disableValidate={
                         app.isParentArchived ||
                         app.method === methodTypes.Connect
                       }
-                      showResync={() => handleShowModal(app, "resync")}
+                      showResync={() => handleShowModal(app, 'resync')}
                     />
                   </div>
                 }
@@ -130,14 +130,14 @@ export default function AppCards({
         );
       })}
 
-      {selectedApp?.url && modalType === "validate" && (
+      {selectedApp?.url && modalType === 'validate' && (
         <ValidateModal
           isOpen={true}
           onClose={handleCloseModal}
           initialURL={selectedApp.url}
         />
       )}
-      {selectedApp && modalType === "archive" && (
+      {selectedApp && modalType === 'archive' && (
         <ArchiveModal
           appID={selectedApp.id}
           isArchived={selectedApp.isArchived}
@@ -145,7 +145,7 @@ export default function AppCards({
           onClose={handleCloseModal}
         />
       )}
-      {selectedApp?.url && modalType === "resync" && (
+      {selectedApp?.url && modalType === 'resync' && (
         <ResyncModal
           appExternalID={selectedApp.externalID}
           appMethod={selectedApp.method}

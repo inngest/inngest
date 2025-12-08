@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { Modal } from "@inngest/components/Modal";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { Skeleton } from "@inngest/components/Skeleton/Skeleton";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiSearchLine } from "@remixicon/react";
-import { Command } from "cmdk";
+import { useState } from 'react';
+import { Modal } from '@inngest/components/Modal';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiSearchLine } from '@remixicon/react';
+import { Command } from 'cmdk';
 
-import { pathCreator } from "@/utils/urls";
-import { ResultItem } from "./ResultItem";
-import Shortcuts from "./Shortcuts";
-import { useQuickSearch } from "./data";
-import { useDebounce } from "./hooks";
+import { pathCreator } from '@/utils/urls';
+import { ResultItem } from './ResultItem';
+import Shortcuts from './Shortcuts';
+import { useQuickSearch } from './data';
+import { useDebounce } from './hooks';
 
 type Props = {
   envSlug: string;
@@ -20,7 +20,7 @@ type Props = {
 };
 
 export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
-  const [term, setTerm] = useState("");
+  const [term, setTerm] = useState('');
   const debouncedTerm = useDebounce(term, 200);
   const isTyping = term !== debouncedTerm;
 
@@ -46,7 +46,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             value={term}
             onValueChange={setTerm}
             className={cn(
-              "placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0",
+              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0',
             )}
           />
         </div>
@@ -173,8 +173,8 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
 
           <Command.Empty
             className={cn(
-              "text-muted flex h-10 items-center gap-2 px-2 text-sm",
-              !res.error && "hidden",
+              'text-muted flex h-10 items-center gap-2 px-2 text-sm',
+              !res.error && 'hidden',
             )}
           >
             <RiSearchLine className="text-light h-4 w-4" />
@@ -183,12 +183,12 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
 
           <Command.Empty
             className={cn(
-              "text-muted flex h-10 items-center gap-2 px-2 text-sm",
-              (isTyping || res.isPending || res.error) && "hidden",
+              'text-muted flex h-10 items-center gap-2 px-2 text-sm',
+              (isTyping || res.isPending || res.error) && 'hidden',
             )}
           >
             <RiSearchLine className="text-light h-4 w-4" />
-            No results found for{" "}
+            No results found for{' '}
             <span className="text-basis">&quot;{debouncedTerm}&quot;</span>
           </Command.Empty>
         </Command.List>
@@ -198,7 +198,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
 }
 
 function coerceEnvSlug(envSlug: string): string {
-  if (envSlug && envSlug.startsWith("production")) {
+  if (envSlug && envSlug.startsWith('production')) {
     // This is hacky and flawed. The production env has a pseudo slug in the URL
     // ("production") which will never match its real slug in the DB. So we'll
     // coerce the real slug to the pseudo slug.
@@ -206,7 +206,7 @@ function coerceEnvSlug(envSlug: string): string {
     // This doesn't work if the user created a non-production env that starts
     // with "production", but should otherwise be fine. This also won't work
     // when we add support for multiple production environments.
-    return "production";
+    return 'production';
   }
 
   return envSlug;

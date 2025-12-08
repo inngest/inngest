@@ -1,10 +1,10 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import { Time } from "@inngest/components/Time";
-import { cn } from "@inngest/components/utils/classNames";
-import { RiTimeLine } from "@remixicon/react";
+import { Link, useLocation } from '@tanstack/react-router';
+import { Time } from '@inngest/components/Time';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiTimeLine } from '@remixicon/react';
 
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { getManageKey } from "@/utils/urls";
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { getManageKey } from '@/utils/urls';
 
 type KeysListItemProps = {
   list: {
@@ -16,8 +16,8 @@ type KeysListItemProps = {
 };
 
 const pageFilters: { [key: string]: string[] } = {
-  keys: ["key", "integration"],
-  webhooks: ["webhook"],
+  keys: ['key', 'integration'],
+  webhooks: ['webhook'],
 };
 
 export default function KeysListItem({ list }: KeysListItemProps) {
@@ -35,7 +35,7 @@ export default function KeysListItem({ list }: KeysListItemProps) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <h2 className="text-basis text-sm font-semibold">
-          {"No " + page + " yet."}
+          {'No ' + page + ' yet.'}
         </h2>
       </div>
     );
@@ -52,8 +52,8 @@ export default function KeysListItem({ list }: KeysListItemProps) {
             <Link
               to={eventPathname}
               className={cn(
-                "hover:bg-canvasMuted block px-4 py-3",
-                isActive && "bg-canvasSubtle",
+                'hover:bg-canvasMuted block px-4 py-3',
+                isActive && 'bg-canvasSubtle',
               )}
             >
               <p className="mb-1 text-sm font-semibold">{key.name}</p>

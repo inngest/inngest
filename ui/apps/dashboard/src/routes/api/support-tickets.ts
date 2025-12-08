@@ -1,24 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
-import { getTimestampDaysAgo } from "@inngest/components/utils/date";
+import { createFileRoute } from '@tanstack/react-router';
+import { auth, clerkClient } from '@clerk/tanstack-react-start/server';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import {
   PlainClient,
   type CreateThreadInput,
   type ThreadPartsFragment,
   type UpsertCustomTimelineEntryInput,
-} from "@team-plain/typescript-sdk";
+} from '@team-plain/typescript-sdk';
 
 import {
   labelTypeIDs,
   ticketTypeTitles,
   type BugSeverity,
   type TicketType,
-} from "@/components/Support/ticketOptions";
+} from '@/components/Support/ticketOptions';
 
 const apiKey = process.env.PLAIN_API_KEY;
 
 if (!apiKey) {
-  throw new Error("PLAIN_API_KEY environment variable is not set");
+  throw new Error('PLAIN_API_KEY environment variable is not set');
 }
 
 const client = new PlainClient({
@@ -40,8 +40,8 @@ export type RequestBody = {
 };
 
 const createComponents = (
-  ticket: RequestBody["ticket"],
-): UpsertCustomTimelineEntryInput["components"] => {
+  ticket: RequestBody['ticket'],
+): UpsertCustomTimelineEntryInput['components'] => {
   return [
     {
       componentText: {
@@ -87,17 +87,17 @@ const getCustomerId = async (email: string, name?: string) => {
   return upserted.data?.customer.id;
 };
 
-export const Route = createFileRoute("/api/support-tickets")({
+export const Route = createFileRoute('/api/support-tickets')({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const { userId } = await auth();
         if (!userId) {
           return new Response(
-            JSON.stringify({ error: "Please sign in to create a ticket" }),
+            JSON.stringify({ error: 'Please sign in to create a ticket' }),
             {
               status: 401,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }
@@ -154,14 +154,14 @@ export const Route = createFileRoute("/api/support-tickets")({
 
         if (threadRes.error) {
           console.error(
-            "error creating ticket via support API",
+            'error creating ticket via support API',
             JSON.stringify(threadRes.error),
           );
           return new Response(
             JSON.stringify({ error: threadRes.error.message }),
             {
               status: 500,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }
@@ -173,7 +173,7 @@ export const Route = createFileRoute("/api/support-tickets")({
           }),
           {
             status: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
           },
         );
       },
@@ -183,19 +183,19 @@ export const Route = createFileRoute("/api/support-tickets")({
 
         if (!userId) {
           return new Response(
-            JSON.stringify({ error: "Please sign in to view your tickets" }),
+            JSON.stringify({ error: 'Please sign in to view your tickets' }),
             {
               status: 401,
-              headers: { "Content-Type": "application/json" },
+              headers: { 'Content-Type': 'application/json' },
             },
           );
         }
 
         const user = await clerkClient().users.getUser(userId);
         if (!user) {
-          return new Response(JSON.stringify({ error: "User not found" }), {
+          return new Response(JSON.stringify({ error: 'User not found' }), {
             status: 404,
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
           });
         }
 
@@ -240,7 +240,7 @@ export const Route = createFileRoute("/api/support-tickets")({
           }),
           {
             status: 200,
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
           },
         );
       },

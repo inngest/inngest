@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
+import { useEffect, useState } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@inngest/components/Tooltip/Tooltip";
-import { RiSearchLine } from "@remixicon/react";
+} from '@inngest/components/Tooltip/Tooltip';
+import { RiSearchLine } from '@remixicon/react';
 
-import { QuickSearchModal } from "./QuickSearchModal";
+import { QuickSearchModal } from './QuickSearchModal';
 
 type Props = {
   collapsed: boolean;
@@ -20,16 +20,16 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setIsOpen((open) => !open);
       }
     }
 
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
 
     return () => {
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, []);
 
@@ -58,7 +58,7 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
             side="bottom"
             sideOffset={2}
           >
-            You can also use <span className="font-bold">⌘ K</span> or{" "}
+            You can also use <span className="font-bold">⌘ K</span> or{' '}
             <span className="font-bold">Ctrl K</span> to search
           </TooltipContent>
         </Tooltip>

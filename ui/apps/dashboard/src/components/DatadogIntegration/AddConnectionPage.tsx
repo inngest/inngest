@@ -1,17 +1,17 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Alert } from "@inngest/components/Alert/NewAlert";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card";
-import { IconSpinner } from "@inngest/components/icons/Spinner";
-import { toast } from "sonner";
-import { useMutation, useQuery } from "urql";
+import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { toast } from 'sonner';
+import { useMutation, useQuery } from 'urql';
 
-import EnvSelectMenu from "@/components/Environments/EnvSelectMenu";
-import { graphql } from "@/gql";
-import { useEnvironments } from "@/queries";
-import type { Environment } from "@/utils/environments";
-import { GetDatadogSetupDataDocument, ddIntegrationHref } from "./SetupPage";
+import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
+import { graphql } from '@/gql';
+import { useEnvironments } from '@/queries';
+import type { Environment } from '@/utils/environments';
+import { GetDatadogSetupDataDocument, ddIntegrationHref } from './SetupPage';
 
 const EnableDatadogConnectionDocument = graphql(`
   mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {
@@ -60,7 +60,7 @@ export default function AddConnectionPage({}) {
     event.preventDefault();
 
     const form = new FormData(event.currentTarget);
-    const orgID = form.get("selectedOrg") as string | null;
+    const orgID = form.get('selectedOrg') as string | null;
     if (!orgID || !selectedEnv) {
       return;
     }
@@ -71,7 +71,7 @@ export default function AddConnectionPage({}) {
         organizationID: orgID,
         envID: selectedEnv.id,
       },
-      { additionalTypenames: ["DatadogConnectionStatus"] },
+      { additionalTypenames: ['DatadogConnectionStatus'] },
     );
 
     if (result.error) {
@@ -83,7 +83,7 @@ export default function AddConnectionPage({}) {
     }
 
     toast.success(`Datadog integration configured for ${selectedEnv.name}`);
-    navigate({ to: "/settings/integrations/datadog" });
+    navigate({ to: '/settings/integrations/datadog' });
   }
 
   const extantConnectionsForEnv = ddSetupData.account.datadogConnections.filter(
@@ -98,9 +98,9 @@ export default function AddConnectionPage({}) {
       });
     });
 
-  let cardAccentColor = "bg-surfaceMuted";
+  let cardAccentColor = 'bg-surfaceMuted';
   if (formError) {
-    cardAccentColor = "bg-errorContrast";
+    cardAccentColor = 'bg-errorContrast';
   }
 
   return (
@@ -130,7 +130,7 @@ export default function AddConnectionPage({}) {
               already connected to all available Datadog organizations.
             </p>
             <p>
-              To connect a new Datadog organization, please{" "}
+              To connect a new Datadog organization, please{' '}
               <a
                 href={ddIntegrationHref}
                 className="underline"
@@ -139,7 +139,7 @@ export default function AddConnectionPage({}) {
               >
                 navigate to the Inngest integration from your Datadog
                 organization
-              </a>{" "}
+              </a>{' '}
               and start the connection process from there.
             </p>
           </Alert>

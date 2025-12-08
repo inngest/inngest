@@ -1,4 +1,4 @@
-import { isRecord } from "@inngest/components/utils/object";
+import { isRecord } from '@inngest/components/utils/object';
 
 import {
   SdkMode,
@@ -6,7 +6,7 @@ import {
   type AppCheckFieldBoolean,
   type AppCheckFieldString,
   type AppCheckResult,
-} from "@/gql/graphql";
+} from '@/gql/graphql';
 
 type Props = {
   data: AppCheckResult;
@@ -50,20 +50,20 @@ function ConfigRow({
     | boolean
     | null;
 }) {
-  let text: React.ReactNode = "";
+  let text: React.ReactNode = '';
   if (value === null) {
-    text = "UNKNOWN";
-  } else if (typeof value === "boolean") {
-    text = value ? "Yes" : "No";
+    text = 'UNKNOWN';
+  } else if (typeof value === 'boolean') {
+    text = value ? 'Yes' : 'No';
   } else if (isAppCheckFieldBoolean(value)) {
     if (value.value === null) {
-      text = "";
+      text = '';
     } else {
-      text = value.value ? "Yes" : "No";
+      text = value.value ? 'Yes' : 'No';
     }
   } else if (isAppCheckFieldString(value)) {
     if (value.value === null) {
-      text = "";
+      text = '';
     } else {
       text = value.value;
     }
@@ -87,19 +87,19 @@ function ConfigRow({
 
 function isAppCheckFieldBoolean(value: unknown): value is AppCheckFieldBoolean {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    "__typename" in value &&
-    value.__typename === "AppCheckFieldBoolean"
+    '__typename' in value &&
+    value.__typename === 'AppCheckFieldBoolean'
   );
 }
 
 function isAppCheckFieldString(value: unknown): value is AppCheckFieldString {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    "__typename" in value &&
-    value.__typename === "AppCheckFieldString"
+    '__typename' in value &&
+    value.__typename === 'AppCheckFieldString'
   );
 }
 

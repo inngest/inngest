@@ -1,25 +1,25 @@
-import { CancelFunctionModal } from "@/components/Functions/CancelFunction/CancelFunctionModal";
-import { PauseFunctionModal } from "@/components/Functions/PauseFunction/PauseModal";
+import { CancelFunctionModal } from '@/components/Functions/CancelFunction/CancelFunctionModal';
+import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
 import {
   InvokeFunctionOnboardingDocument,
   FunctionTriggerTypes,
-} from "@/gql/graphql";
-import { useEnvironment } from "@/components/Environments/environment-context";
-import { useFunction } from "@/queries/functions";
-import { Header } from "@inngest/components/Header/NewHeader";
-import { InvokeModal } from "@inngest/components/InvokeButton";
-import { Pill } from "@inngest/components/Pill/NewPill";
-import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import { RiPauseCircleLine } from "@remixicon/react";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
-import { useMutation } from "urql";
-import { ArchivedAppBanner } from "@/components/Apps/ArchivedAppBanner";
-import { ArchivedFuncBanner } from "@/components/Functions/ArchivedFuncBanner";
-import NewReplayModal from "@/components/Replay/NewReplayModal";
-import { ActionsMenu } from "@/components/Functions/ActionMenu";
+} from '@/gql/graphql';
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { useFunction } from '@/queries/functions';
+import { Header } from '@inngest/components/Header/NewHeader';
+import { InvokeModal } from '@inngest/components/InvokeButton';
+import { Pill } from '@inngest/components/Pill/NewPill';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { RiPauseCircleLine } from '@remixicon/react';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { useCallback, useState } from 'react';
+import { useMutation } from 'urql';
+import { ArchivedAppBanner } from '@/components/Apps/ArchivedAppBanner';
+import { ArchivedFuncBanner } from '@/components/Functions/ArchivedFuncBanner';
+import NewReplayModal from '@/components/Replay/NewReplayModal';
+import { ActionsMenu } from '@/components/Functions/ActionMenu';
 
-export const Route = createFileRoute("/_authed/env/$envSlug/functions/$slug")({
+export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug')({
   component: FunctionComponent,
 });
 
@@ -35,7 +35,7 @@ function FunctionComponent() {
   const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
   const env = useEnvironment();
 
-  const isBulkCancellationEnabled = useBooleanFlag("bulk-cancellation-ui");
+  const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -108,8 +108,8 @@ function FunctionComponent() {
       )}
       <Header
         breadcrumb={[
-          { text: "Functions", href: `/env/${envSlug}/functions` },
-          { text: fn?.name || "Function" },
+          { text: 'Functions', href: `/env/${envSlug}/functions` },
+          { text: fn?.name || 'Function' },
         ]}
         infoIcon={
           isPaused && (
@@ -137,23 +137,23 @@ function FunctionComponent() {
         }
         tabs={[
           {
-            children: "Dashboard",
+            children: 'Dashboard',
             href: `/env/${envSlug}/functions/${slug}`,
             exactRouteMatch: true,
           },
           {
-            children: "Runs",
+            children: 'Runs',
             href: `/env/${envSlug}/functions/${slug}/runs`,
           },
           {
-            children: "Replays",
+            children: 'Replays',
             href: `/env/${envSlug}/functions/${slug}/replays`,
           },
           ...(isBulkCancellationEnabled.isReady &&
           isBulkCancellationEnabled.value
             ? [
                 {
-                  children: "Cancellations",
+                  children: 'Cancellations',
                   href: `/env/${envSlug}/functions/${slug}/cancellations`,
                 },
               ]

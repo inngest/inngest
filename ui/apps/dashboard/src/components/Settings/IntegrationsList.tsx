@@ -1,16 +1,16 @@
-import type { ReactNode } from "react";
-import { Button } from "@inngest/components/Button/NewButton";
-import { Card } from "@inngest/components/Card/Card";
-import { IconDatadog } from "@inngest/components/icons/platforms/Datadog";
-import { IconNeon } from "@inngest/components/icons/platforms/Neon";
-import { IconNetlify } from "@inngest/components/icons/platforms/Netlify";
-import { IconPrometheus } from "@inngest/components/icons/platforms/Prometheus";
-import { IconSupabase } from "@inngest/components/icons/platforms/Supabase";
-import { IconVercel } from "@inngest/components/icons/platforms/Vercel";
-import { RiExternalLinkLine } from "@remixicon/react";
+import type { ReactNode } from 'react';
+import { Button } from '@inngest/components/Button/NewButton';
+import { Card } from '@inngest/components/Card/Card';
+import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
+import { IconNeon } from '@inngest/components/icons/platforms/Neon';
+import { IconNetlify } from '@inngest/components/icons/platforms/Netlify';
+import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
+import { IconSupabase } from '@inngest/components/icons/platforms/Supabase';
+import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
+import { RiExternalLinkLine } from '@remixicon/react';
 
-import { useBooleanFlag } from "@/components/FeatureFlags/hooks";
-import type { FileRouteTypes } from "@tanstack/react-router";
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
 type Integration = {
   title: string;
@@ -27,83 +27,83 @@ type Integration = {
 
 const INTEGRATIONS: Integration[] = [
   {
-    title: "Vercel",
-    slug: "vercel",
+    title: 'Vercel',
+    slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
     actionButton: ({ enabled, hasError }) => {
       let label: string;
       let target = undefined;
       let url: string;
       if (enabled) {
-        label = "Manage";
-        url = "/settings/integrations/vercel";
+        label = 'Manage';
+        url = '/settings/integrations/vercel';
       } else {
         //
         // Integration not installed.
-        label = "Connect";
-        url = "/settings/integrations/vercel/connect";
+        label = 'Connect';
+        url = '/settings/integrations/vercel/connect';
       }
 
       return (
         <Button
           disabled={hasError}
           kind="primary"
-          appearance={enabled ? "outlined" : "solid"}
+          appearance={enabled ? 'outlined' : 'solid'}
           size="medium"
-          to={url as FileRouteTypes["to"]}
+          to={url as FileRouteTypes['to']}
           label={label}
           target={target}
         />
       );
     },
     description:
-      "Host your Inngest functions on Vercel and automatically sync them every time you deploy code.",
+      'Host your Inngest functions on Vercel and automatically sync them every time you deploy code.',
   },
   {
-    title: "Neon",
-    slug: "neon",
+    title: 'Neon',
+    slug: 'neon',
     Icon: <IconNeon className="text-onContrast h-6 w-6" />,
     actionButton: ({ enabled, hasError }) => (
       <Button
         disabled={hasError}
         kind="primary"
-        appearance={enabled ? "outlined" : "solid"}
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         to={
           enabled
-            ? "/settings/integrations/neon"
-            : "/settings/integrations/neon/connect"
+            ? '/settings/integrations/neon'
+            : '/settings/integrations/neon/connect'
         }
-        label={enabled ? "Manage" : "Connect"}
+        label={enabled ? 'Manage' : 'Connect'}
       />
     ),
     description:
-      "Connect to send events directly from changes in your Neon database.",
+      'Connect to send events directly from changes in your Neon database.',
   },
   {
-    title: "Supabase",
-    slug: "supabase",
+    title: 'Supabase',
+    slug: 'supabase',
     Icon: <IconSupabase className="text-onContrast h-6 w-6" />,
     actionButton: ({ enabled, hasError }) => (
       <Button
         disabled={hasError}
         kind="primary"
-        appearance={enabled ? "outlined" : "solid"}
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         to={
           enabled
-            ? "/settings/integrations/supabase"
-            : "/settings/integrations/supabase/connect"
+            ? '/settings/integrations/supabase'
+            : '/settings/integrations/supabase/connect'
         }
-        label={enabled ? "Manage" : "Connect"}
+        label={enabled ? 'Manage' : 'Connect'}
       />
     ),
     description:
-      "Connect to send events directly from changes in your Subapase database.",
+      'Connect to send events directly from changes in your Subapase database.',
   },
   {
-    title: "Netlify",
-    slug: "netlify",
+    title: 'Netlify',
+    slug: 'netlify',
     Icon: <IconNetlify className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <Button
@@ -117,11 +117,11 @@ const INTEGRATIONS: Integration[] = [
       />
     ),
     description:
-      "Check out our docs to see how you can use Inngest with your applications deployed to Netlify.",
+      'Check out our docs to see how you can use Inngest with your applications deployed to Netlify.',
   },
   {
-    title: "Prometheus",
-    slug: "prometheus",
+    title: 'Prometheus',
+    slug: 'prometheus',
     Icon: <IconPrometheus className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <Button
@@ -133,11 +133,11 @@ const INTEGRATIONS: Integration[] = [
       />
     ),
     description:
-      "Configure your Prometheus instance to scrape metrics directly from Inngest.",
+      'Configure your Prometheus instance to scrape metrics directly from Inngest.',
   },
   {
-    title: "Datadog",
-    slug: "datadog",
+    title: 'Datadog',
+    slug: 'datadog',
     Icon: <IconDatadog className="text-onContrast h-6 w-6" />,
     actionButton: () => (
       <Button
@@ -148,7 +148,7 @@ const INTEGRATIONS: Integration[] = [
         to="/settings/integrations/datadog"
       />
     ),
-    description: "Send metrics from Inngest directly to Datadog",
+    description: 'Send metrics from Inngest directly to Datadog',
   },
 ];
 
@@ -163,7 +163,7 @@ type Props = {
 };
 
 export const IntegrationsList = ({ integrations }: Props) => {
-  const { value: supabaseIntegration } = useBooleanFlag("supabase-integration");
+  const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
 
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
@@ -173,7 +173,7 @@ export const IntegrationsList = ({ integrations }: Props) => {
       <div className="mb-7 w-full text-2xl font-medium">All integrations</div>
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
-          if (i.title === "Supabase" && !supabaseIntegration) return;
+          if (i.title === 'Supabase' && !supabaseIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
           const isEnabled = Boolean(integrationData?.enabled);

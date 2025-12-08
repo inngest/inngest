@@ -1,4 +1,4 @@
-import { entitlementSecondsToStr } from "@/utils/entitlementTimeFmt";
+import { entitlementSecondsToStr } from '@/utils/entitlementTimeFmt';
 
 type Props = {
   metricsExportEnabled: boolean;
@@ -12,7 +12,7 @@ export default function MetricsExportEntitlementValue({
   freshnessSeconds,
 }: Props) {
   if (!metricsExportEnabled) {
-    return "Not enabled";
+    return 'Not enabled';
   }
 
   return (

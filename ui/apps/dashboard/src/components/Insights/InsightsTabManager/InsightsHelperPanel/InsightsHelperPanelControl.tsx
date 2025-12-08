@@ -1,6 +1,6 @@
-import { type ReactElement } from "react";
-import { Link } from "@inngest/components/Link/NewLink";
-import { cn } from "@inngest/components/utils/classNames";
+import { type ReactElement } from 'react';
+import { Link } from '@inngest/components/Link/NewLink';
+import { cn } from '@inngest/components/utils/classNames';
 
 export interface HelperItem {
   action: () => void;
@@ -22,12 +22,12 @@ export function InsightsHelperPanelControl({
     <div className="border-subtle flex h-full w-[56px] flex-col items-center gap-2 border-l px-3 py-2">
       {items.map((item) => {
         const sharedProps = {
-          "aria-label": item.title,
+          'aria-label': item.title,
           className: cn(
-            "flex h-8 items-center justify-center rounded-md text-subtle transition-colors w-8",
-            activeTitle !== item.title && "hover:bg-canvasSubtle",
+            'flex h-8 items-center justify-center rounded-md text-subtle transition-colors w-8',
+            activeTitle !== item.title && 'hover:bg-canvasSubtle',
             activeTitle === item.title &&
-              "bg-secondary-4xSubtle hover:bg-secondary-3xSubtle text-info",
+              'bg-secondary-4xSubtle hover:bg-secondary-3xSubtle text-info',
           ),
           title: item.title,
         } as const;

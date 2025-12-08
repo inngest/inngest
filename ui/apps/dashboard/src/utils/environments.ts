@@ -1,7 +1,7 @@
-import slugify from "@sindresorhus/slugify";
+import slugify from '@sindresorhus/slugify';
 
-import { EnvironmentType, type Workspace } from "@/gql/graphql";
-import { type NonEmptyArray } from "@/utils/isNonEmptyArray";
+import { EnvironmentType, type Workspace } from '@/gql/graphql';
+import { type NonEmptyArray } from '@/utils/isNonEmptyArray';
 
 export { EnvironmentType };
 
@@ -54,8 +54,8 @@ export function getDefaultEnvironment(
   if (env) {
     return {
       ...env,
-      slug: "production",
-      name: "Production",
+      slug: 'production',
+      name: 'Production',
     };
   }
   return null;
@@ -135,17 +135,17 @@ export function getTestEnvironments(
 export function workspaceToEnvironment(
   workspace: Pick<
     Workspace,
-    | "id"
-    | "name"
-    | "slug"
-    | "parentID"
-    | "test"
-    | "type"
-    | "webhookSigningKey"
-    | "createdAt"
-    | "isArchived"
-    | "isAutoArchiveEnabled"
-    | "lastDeployedAt"
+    | 'id'
+    | 'name'
+    | 'slug'
+    | 'parentID'
+    | 'test'
+    | 'type'
+    | 'webhookSigningKey'
+    | 'createdAt'
+    | 'isArchived'
+    | 'isAutoArchiveEnabled'
+    | 'lastDeployedAt'
   >,
 ): Environment {
   const slug = getEnvironmentSlug({
@@ -170,8 +170,8 @@ export function workspaceToEnvironment(
 }
 
 export const staticSlugs = {
-  production: "production",
-  branch: "branch",
+  production: 'production',
+  branch: 'branch',
 } as const;
 
 type getEnvironmentSlugProps = {
@@ -187,11 +187,11 @@ export function getEnvironmentSlug({
   environmentSlug,
   environmentType,
 }: getEnvironmentSlugProps): string {
-  let slug = environmentSlug || "";
+  let slug = environmentSlug || '';
   if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
   } else if (!slug) {
-    slug = `${slugify(environmentName)}-${environmentID.split("-")[0]}`;
+    slug = `${slugify(environmentName)}-${environmentID.split('-')[0]}`;
   }
 
   return slug;
@@ -202,17 +202,17 @@ export function getEnvironmentSlug({
 export function workspacesToEnvironments(
   workspaces: Pick<
     Workspace,
-    | "id"
-    | "name"
-    | "slug"
-    | "parentID"
-    | "test"
-    | "type"
-    | "webhookSigningKey"
-    | "createdAt"
-    | "isArchived"
-    | "isAutoArchiveEnabled"
-    | "lastDeployedAt"
+    | 'id'
+    | 'name'
+    | 'slug'
+    | 'parentID'
+    | 'test'
+    | 'type'
+    | 'webhookSigningKey'
+    | 'createdAt'
+    | 'isArchived'
+    | 'isAutoArchiveEnabled'
+    | 'lastDeployedAt'
   >[],
 ): Environment[] {
   return workspaces.map(workspaceToEnvironment).sort((a, b) => {
