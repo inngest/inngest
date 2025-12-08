@@ -45,10 +45,18 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
   end
 
   -- calculate next theoretical arrival time
-  local new_tat = tat + (math.max(capacity, 1) * emission)
+  local new_tat
+  if now_ms > tat then
+    new_tat = now_ms + (math.max(capacity, 1) * emission)
+  else
+    new_tat = tat + (math.max(capacity, 1) * emission)
+  end
 
   if capacity > 0 then
     local expiry = string.format("%d", period_ms / 1000)
+    if expiry == "0" then
+      expiry = "1"
+    end
     redis.call("SET", key, new_tat, "EX", expiry)
   end
 end
@@ -77,14 +85,12 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   -- The capacity cannot exceed the defined limit + burst.
   local final_capacity = math.min(capacity, limit + burst)
 
-  if final_capacity < 1 then
-    -- We are throttled. Calculate the time when the capacity will be >= 1.
-    -- This is the point where enough time has passed to "earn" one token.
-    -- The formula is derived from solving for the future time `t` where capacity becomes 1.
-    local next_available_at_ms = tat - total_capacity_time + emission
-    return { final_capacity, math.ceil(next_available_at_ms) }
-  else
-    -- Not throttled, so there is no "next available time" to report.
-    return { final_capacity, 0 }
-  end
+  -- Calculate when the next unit will be available after consuming all remaining capacity.
+  -- The current TAT represents when the bucket becomes "full" if no requests are made.
+  -- If we consume final_capacity tokens now, we need to advance TAT by final_capacity * emission.
+  -- The next token after consumption will be available when: new_tat + emission - total_capacity_time
+  local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
+  local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
+
+  return { final_capacity, next_available_at_ms }
 end

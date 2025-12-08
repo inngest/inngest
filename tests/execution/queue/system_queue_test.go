@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -17,12 +20,9 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestSystemQueueConfigs(t *testing.T) {
-
 	mapping := map[string]string{
 		osqueue.KindScheduleBatch: osqueue.KindScheduleBatch,
 		"pause-event":             "pause-event",
@@ -51,9 +51,6 @@ func TestSystemQueueConfigs(t *testing.T) {
 		redis_state.WithClock(clock),
 		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
-		}),
-		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
 		}),
 		redis_state.WithKindToQueueMapping(mapping),
 		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
@@ -162,7 +159,6 @@ func TestSystemQueueConfigs(t *testing.T) {
 		require.False(t, r.Exists(kg.GlobalAccountIndex()))
 		require.False(t, hasMember(t, r, kg.GlobalAccountIndex(), accountId.String()))
 	})
-
 }
 
 func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) bool {

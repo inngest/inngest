@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -31,7 +30,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	l := logger.StdlibLogger(ctx)
 
 	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    time.Now(),
+		EndTime:    e.now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:   &opts.Metadata,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&opts.Metadata),
@@ -176,7 +175,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	}
 
 	// Prepare events that we must send
-	now := time.Now()
+	now := e.now()
 	base := &functionFinishedData{
 		FunctionID: fnSlug,
 		RunID:      opts.Metadata.ID.RunID,

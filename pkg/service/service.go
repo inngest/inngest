@@ -27,6 +27,10 @@ func Go(f func()) {
 	wg.Go(f)
 }
 
+func Wait() {
+	wg.Wait()
+}
+
 // Service represents a basic interface for a long-running service.  By invoking
 // the Start function with a service, we automatically call Pre to initialize
 // the service prior to starting (with a timeout), run the service via Run and listen
