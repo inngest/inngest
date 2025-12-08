@@ -40,6 +40,7 @@ export type SpanMetadata =
 export type SpanMetadataInngestAI = {
   scope: 'step_attempt' | 'extended_trace';
   kind: 'inngest.ai';
+  updated_at: string;
   values: {
     input_tokens?: number;
     output_tokens?: number;
@@ -52,6 +53,7 @@ export type SpanMetadataInngestAI = {
 export type SpanMetadataInngestHTTP = {
   scope: 'extended_trace';
   kind: 'inngest.http';
+  updated_at: string;
   values: {
     method: string;
     domain: string;
@@ -67,18 +69,21 @@ export type SpanMetadataInngestHTTP = {
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
   kind: 'inngest.warnings';
+  updated_at: string;
   values: Record<string, string>;
 };
 
 export type SpanMetadataUserland = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindUserland;
+  updated_at: string;
   values: Record<string, unknown>;
 };
 
 export type SpanMetadataUnknown = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKind;
+  updated_at: string;
   values: Record<string, unknown>;
 };
 

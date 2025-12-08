@@ -344,6 +344,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       scope
       kind
       values
+      updated_at
     }
     outputID
     debugRunID

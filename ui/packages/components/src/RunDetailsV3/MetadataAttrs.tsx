@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { ElementWrapper, TextElement } from '../DetailsCard/NewElement';
+import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/NewElement';
 import type { SpanMetadata } from './types';
 
-const MetadataAttrRow = ({ kind, scope, values }: SpanMetadata) => {
+const MetadataAttrRow = ({ kind, scope, values, updated_at }: SpanMetadata) => {
   const [expanded, setExpanded] = useState(true);
+  const updatedAt = new Date(updated_at);
   return (
     <div className="flex flex-col justify-start gap-2 overflow-hidden">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
@@ -30,7 +31,9 @@ const MetadataAttrRow = ({ kind, scope, values }: SpanMetadata) => {
             <ElementWrapper label="Kind">
               <TextElement>{kind}</TextElement>
             </ElementWrapper>
-            {/* TODO: updated timestamp */}
+            <ElementWrapper label="Updated at">
+              <TimeElement date={updatedAt} />
+            </ElementWrapper>
           </div>
           <div className="mb-4 mt-2 flex max-h-full flex-col gap-2">
             <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-sm font-medium leading-tight">
@@ -66,6 +69,7 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
           kind={md.kind}
           scope={md.scope}
           values={md.values}
+          updated_at={md.updated_at}
         />
       ))}
     </div>
