@@ -20,7 +20,7 @@
     "preview": "vite preview",
     "start": "vite start",
     "format": "prettier --write src",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "preinstall": "npx only-allow pnpm"
