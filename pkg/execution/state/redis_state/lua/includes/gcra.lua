@@ -34,9 +34,7 @@ local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
 	local expiry = string.format("%d", period_ms / 1000)
 	redis.call("SET", key, new_tat, "EX", expiry)
 
-  local new_tat_no_burst = tat + emission
-  local allow_at_no_burst = new_tat_no_burst - variance
-  local used_burst = (now_ms - allow_at_no_burst) < 0
+  local used_burst = tat > now_ms
 
 	return {true, used_burst}
 end
