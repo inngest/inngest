@@ -552,7 +552,7 @@ func (q *queue) processShadowPartitionBacklog(
 			return nil, false, fmt.Errorf("could not refill backlog: %w", err)
 		}
 	} else {
-		l.Debug("no items to refill after capacity check", "limiting", res.Constraint)
+		l.Trace("no items to refill after capacity check", "limiting", res.Constraint)
 	}
 
 	// Report limiting constraint
