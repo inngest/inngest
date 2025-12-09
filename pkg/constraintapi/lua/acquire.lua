@@ -261,39 +261,59 @@ end
 ---@param burst integer
 ---@return integer[]
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
-	-- TODO: Reuse shared script
-
 	-- calculate emission interval (tau) - time between each token
 	local emission = period_ms / math.max(limit, 1)
 
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
+	-- delay variation tolerance: total time budget (burst + 1 tokens worth)
+	local dvt = emission * (burst + 1)
+
+	-- total limit: maximum instantaneous capacity
+	local total_limit = burst + 1
 
 	-- retrieve theoretical arrival time
-	local tat = call("GET", key)
+	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
 		tat = tonumber(tat)
 	end
 
-	-- remaining capacity in time units
-	local time_capacity_remain = now_ms + total_capacity_time - tat
+	-- Calculate TTL (time until TAT)
+	local ttl
+	if now_ms > tat then
+		ttl = 0
+	else
+		ttl = tat - now_ms
+	end
 
-	-- Convert the remaining time budget back into a number of tokens.
-	local capacity = math.floor(time_capacity_remain / emission)
+	-- Remaining capacity calculation (matches Go: (dvt - ttl) / emission)
+	local next = dvt - ttl
+	local remaining = 0
+	if next > -emission then
+		remaining = math.floor(next / emission)
+	end
 
-	-- The capacity cannot exceed the defined limit + burst.
-	local final_capacity = math.min(capacity, limit + burst)
+	-- Cap at total limit
+	remaining = math.min(remaining, total_limit)
 
-	-- Calculate when the next unit will be available after consuming all remaining capacity.
-	-- The current TAT represents when the bucket becomes "full" if no requests are made.
-	-- If we consume final_capacity tokens now, we need to advance TAT by final_capacity * emission.
-	-- The next token after consumption will be available when: new_tat + emission - total_capacity_time
-	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
-	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
+	-- Calculate retry_after: time until a request of quantity=1 would be allowed
+	-- Simulates what would happen if we tried to make a request now
+	local simulated_new_tat
+	if now_ms > tat then
+		simulated_new_tat = now_ms + emission
+	else
+		simulated_new_tat = tat + emission
+	end
+	local allow_at = simulated_new_tat - dvt
+	local retry_after = -1
+	if now_ms < allow_at then
+		retry_after = math.ceil(allow_at - now_ms)
+	end
 
-	return { final_capacity, next_available_at_ms }
+	-- Reset after: time until bucket is fully replenished
+	local reset_after = ttl
+
+	return { remaining, retry_after, reset_after, total_limit }
 end
 
 ---@param key string
@@ -304,6 +324,9 @@ end
 local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	-- calculate emission interval (tau) - time between each token
 	local emission = period_ms / math.max(limit, 1)
+
+	-- delay variation tolerance: total time budget (burst + 1 tokens worth)
+	local dvt = emission * (burst + 1)
 
 	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
@@ -321,13 +344,24 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 		new_tat = tat + (math.max(capacity, 1) * emission)
 	end
 
-	if capacity > 0 then
-		local expiry = string.format("%d", period_ms / 1000)
-		if expiry == "0" then
-			expiry = "1"
-		end
-		call("SET", key, new_tat, "EX", expiry)
+	-- check if request should be blocked
+	local allow_at = new_tat - dvt
+	if now_ms < allow_at then
+		-- request would exceed rate limit, don't update
+		return false
 	end
+
+	if capacity > 0 then
+		-- TTL is time from now until the new TAT
+		local ttl_ms = new_tat - now_ms
+		local ttl_sec = math.ceil(ttl_ms / 1000)
+		if ttl_sec < 1 then
+			ttl_sec = 1
+		end
+		redis.call("SET", key, string.format("%.0f", new_tat), "EX", ttl_sec)
+	end
+
+	return true
 end
 
 ---@type integer

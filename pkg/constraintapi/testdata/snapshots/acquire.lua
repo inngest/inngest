@@ -147,22 +147,43 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 end
 local function throttleCapacity(key, now_ms, period_ms, limit, burst)
 	local emission = period_ms / math.max(limit, 1)
-	local total_capacity_time = emission * (limit + burst)
-	local tat = call("GET", key)
+	local dvt = emission * (burst + 1)
+	local total_limit = burst + 1
+	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
 		tat = tonumber(tat)
 	end
-	local time_capacity_remain = now_ms + total_capacity_time - tat
-	local capacity = math.floor(time_capacity_remain / emission)
-	local final_capacity = math.min(capacity, limit + burst)
-	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
-	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
-	return { final_capacity, next_available_at_ms }
+	local ttl
+	if now_ms > tat then
+		ttl = 0
+	else
+		ttl = tat - now_ms
+	end
+	local next = dvt - ttl
+	local remaining = 0
+	if next > -emission then
+		remaining = math.floor(next / emission)
+	end
+	remaining = math.min(remaining, total_limit)
+	local simulated_new_tat
+	if now_ms > tat then
+		simulated_new_tat = now_ms + emission
+	else
+		simulated_new_tat = tat + emission
+	end
+	local allow_at = simulated_new_tat - dvt
+	local retry_after = -1
+	if now_ms < allow_at then
+		retry_after = math.ceil(allow_at - now_ms)
+	end
+	local reset_after = ttl
+	return { remaining, retry_after, reset_after, total_limit }
 end
 local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	local emission = period_ms / math.max(limit, 1)
+	local dvt = emission * (burst + 1)
 	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
@@ -175,13 +196,19 @@ local function throttleUpdate(key, now_ms, period_ms, limit, capacity)
 	else
 		new_tat = tat + (math.max(capacity, 1) * emission)
 	end
-	if capacity > 0 then
-		local expiry = string.format("%d", period_ms / 1000)
-		if expiry == "0" then
-			expiry = "1"
-		end
-		call("SET", key, new_tat, "EX", expiry)
+	local allow_at = new_tat - dvt
+	if now_ms < allow_at then
+		return false
 	end
+	if capacity > 0 then
+		local ttl_ms = new_tat - now_ms
+		local ttl_sec = math.ceil(ttl_ms / 1000)
+		if ttl_sec < 1 then
+			ttl_sec = 1
+		end
+		redis.call("SET", key, string.format("%.0f", new_tat), "EX", ttl_sec)
+	end
+	return true
 end
 local requested = requestDetails.r
 local configVersion = requestDetails.cv

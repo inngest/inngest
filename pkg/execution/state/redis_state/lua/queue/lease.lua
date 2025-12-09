@@ -68,6 +68,8 @@ local refilledFromBacklog = tonumber(ARGV[12])
 
 local checkConstraints = tonumber(ARGV[13])
 
+local enableThrottleFix = tonumber(ARGV[14]) == 1
+
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
 -- $include(check_concurrency.lua)
@@ -121,7 +123,8 @@ if checkConstraints == 1 then
 	end
 
 	if checkThrottle then
-		local throttleResult = gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b)
+		local throttleResult =
+			gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b, enableThrottleFix)
 		if throttleResult == false then
 			return -7
 		end
@@ -228,31 +231,36 @@ redis.call("ZADD", keyPartitionScavengerIndex, nextTime, item.id)
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
 -- scavenger index such that we get a previously lost job if possible.
 -- TODO: Remove check on keyInProgressPartition once all new executors have rolled out and no more old items are in progress
-local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local concurrencyScores =
+	redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local scavengerIndexScores =
+	redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if scavengerIndexScores ~= false or concurrencyScores ~= false then
-  -- Either scavenger index or partition in progress set includes more items
+	-- Either scavenger index or partition in progress set includes more items
 
-  local earliestLease = nil
-  if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
-    earliestLease = tonumber(scavengerIndexScores[2])
-  end
+	local earliestLease = nil
+	if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
+		earliestLease = tonumber(scavengerIndexScores[2])
+	end
 
-  -- Fall back to in progress set
-  -- TODO: Remove this check once all items are tracked in scavenger index
-  if earliestLease == nil or (
-    concurrencyScores ~= false and
-    concurrencyScores ~= nil and
-    #concurrencyScores > 0 and
-    tonumber(concurrencyScores[2]
-  ) < earliestLease) then
-    earliestLease = tonumber(concurrencyScores[2])
-  end
+	-- Fall back to in progress set
+	-- TODO: Remove this check once all items are tracked in scavenger index
+	if
+		earliestLease == nil
+		or (
+			concurrencyScores ~= false
+			and concurrencyScores ~= nil
+			and #concurrencyScores > 0
+			and tonumber(concurrencyScores[2]) < earliestLease
+		)
+	then
+		earliestLease = tonumber(concurrencyScores[2])
+	end
 
-  if earliestLease ~= nil then
-    -- Ensure that we update the score with the earliest lease
-    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-  end
+	if earliestLease ~= nil then
+		-- Ensure that we update the score with the earliest lease
+		redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+	end
 end
 
 return 0

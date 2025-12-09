@@ -771,6 +771,14 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	}
 }
 
+type EnableThrottleFixFn func(ctx context.Context, accountID uuid.UUID) bool
+
+func WithEnableThrottleFix(fn EnableThrottleFixFn) QueueOpt {
+	return func(q *queue) {
+		q.enableThrottleFix = fn
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -929,6 +937,8 @@ type queue struct {
 	capacityManager             constraintapi.RolloutManager
 	useConstraintAPI            constraintapi.UseConstraintAPIFn
 	capacityLeaseExtendInterval time.Duration
+
+	enableThrottleFix EnableThrottleFixFn
 }
 
 type QueueRunMode struct {
@@ -2278,6 +2288,11 @@ func (q *queue) Lease(
 		checkConstraintsVal = "1"
 	}
 
+	enableThrottleFix := "0"
+	if checkConstraints && o.sp.AccountID != nil && q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *o.sp.AccountID) {
+		enableThrottleFix = "1"
+	}
+
 	// Check if throttle is outdated
 	if outdatedThrottleReason := o.constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
 		// TODO: Re-evaluate throttle with event data
@@ -2357,6 +2372,8 @@ func (q *queue) Lease(
 		refilledFromBacklogVal,
 
 		checkConstraintsVal,
+
+		enableThrottleFix,
 	})
 	if err != nil {
 		return nil, err
