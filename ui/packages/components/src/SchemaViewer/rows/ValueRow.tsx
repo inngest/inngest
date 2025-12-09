@@ -1,4 +1,5 @@
 import { Pill } from '@inngest/components/Pill/Pill';
+import { STANDARD_EVENT_FIELDS } from '@inngest/components/constants';
 import { RiFileCopyLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
@@ -30,8 +31,24 @@ export function ValueRow({
   const handleCopyValue = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(node.name);
-      toast.success('Value copied to clipboard');
+      // The path is formatted as "eventName.field.subfield..."
+      // We need to remove the event name prefix (which can contain dots)
+      // We do this by finding the first occurrence of a standard field after the event name
+      // Strategy: The path after the event name will always start with a dot followed by a field
+      let relativePath = node.path;
+
+      for (const field of STANDARD_EVENT_FIELDS) {
+        const pattern = `.${field}`;
+        const index = node.path.indexOf(pattern);
+        if (index !== -1) {
+          // Found a standard field, extract from this point (excluding the leading dot)
+          relativePath = node.path.substring(index + 1);
+          break;
+        }
+      }
+
+      await navigator.clipboard.writeText(relativePath);
+      toast.success('Path copied to clipboard');
     } catch (err) {
       console.error('Failed to copy:', err);
       toast.error('Failed to copy to clipboard');
