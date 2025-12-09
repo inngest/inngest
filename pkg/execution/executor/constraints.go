@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -26,6 +27,7 @@ const (
 
 func WithConstraints[T any](
 	ctx context.Context,
+	now time.Time,
 	capacityManager constraintapi.RolloutManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
@@ -35,9 +37,6 @@ func WithConstraints[T any](
 		// performChecks determines whether constraint checks must be performed
 		// This may be false when the Constraint API was used to enforce constraints.
 		performChecks bool,
-		// fallbackIdempotencyKey may be defined when the Constraint API Acquire request
-		// failed (and we don't know if it succeeded on the API)
-		fallbackIdempotencyKey string,
 	) (T, error),
 ) (T, error) {
 	l := logger.StdlibLogger(ctx)
@@ -50,7 +49,7 @@ func WithConstraints[T any](
 	// If capacity manager / feature flag are not passed, execute Schedule code
 	// with existing constraint checks
 	if capacityManager == nil || useConstraintAPI == nil {
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// Read feature flag
@@ -58,24 +57,25 @@ func WithConstraints[T any](
 	if !enable {
 		// If feature flag is disabled, execute Schedule code with existing constraint checks
 
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	constraints, err := getScheduleConstraints(ctx, req)
 	if err != nil {
 		l.Error("failed to get schedule constraints", "err", err)
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// If no rate limits are configured, simply run the function
 	if len(constraints) == 0 {
 		// TODO: Should we skip constraint checks in this case?
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// Perform constraint check to acquire lease
 	checkResult, err := CheckConstraints(
 		ctx,
+		now,
 		capacityManager,
 		useConstraintAPI,
 		req,
@@ -85,12 +85,12 @@ func WithConstraints[T any](
 	)
 	if err != nil {
 		l.Error("failed to check constraints", "err", err)
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	// If the Constraint API didn't successfully return, call the user function and indicate checks should run
 	if checkResult.mustCheck {
-		return fn(ctx, true, checkResult.fallbackIdempotencyKey)
+		return fn(ctx, true)
 	}
 
 	// If the current action is not allowed, return
@@ -111,7 +111,7 @@ func WithConstraints[T any](
 		l.Warn("acquire request did not return lease ID")
 
 		// Pretend the API request failed
-		return fn(ctx, true, "")
+		return fn(ctx, true)
 	}
 
 	leaseID := checkResult.leaseID
@@ -182,7 +182,7 @@ func WithConstraints[T any](
 			// Use previous lease as idempotency key
 			operationIdempotencyKey := lID.String()
 
-			go func() {
+			service.Go(func() {
 				_, internalErr := capacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 					AccountID:      req.AccountID,
 					LeaseID:        lID,
@@ -192,15 +192,18 @@ func WithConstraints[T any](
 					},
 				})
 				if internalErr != nil {
-					l.Error("failed to release capacity", "err", internalErr)
+					l.ReportError(internalErr, "failed to release capacity after schedule", logger.WithErrorReportTags(map[string]string{
+						"account_id": req.AccountID.String(),
+						"lease_id":   lID.String(),
+					}))
 				}
-			}()
+			})
 		}
 	}()
 
 	// Run user code with lease guarantee
 	// NOTE: The passed context will be canceled if the lease expires.
-	return fn(userCtx, false, "")
+	return fn(userCtx, false)
 }
 
 type checkResult struct {
@@ -212,9 +215,6 @@ type checkResult struct {
 
 	// mustCheck instructs the caller to perform constraint checks (rate limit)
 	mustCheck bool
-
-	// fallbackIdempotencyKey is the idempotency key that MUST be provided to further constraint checks in case of fallbacks
-	fallbackIdempotencyKey string
 }
 
 func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) ([]constraintapi.ConstraintItem, error) {
@@ -223,15 +223,14 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 	// The only constraint we care about in run scheduling is rate limiting.
 	// Throttle + concurrency constraints are checked in the queue.
 	if req.Function.RateLimit != nil {
+		rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
+		if err != nil {
+			return nil, fmt.Errorf("could not get rate limit key: %w", err)
+		}
+
 		var rateLimitKeyExpr string
-		var rateLimitKey string
 		if req.Function.RateLimit.Key != nil {
 			rateLimitKeyExpr = *req.Function.RateLimit.Key
-			key, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
-			if err != nil {
-				return nil, fmt.Errorf("could not get rate limit key: %w", err)
-			}
-			rateLimitKey = key
 		}
 
 		requests = append(requests, constraintapi.ConstraintItem{
@@ -249,6 +248,7 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 
 func CheckConstraints(
 	ctx context.Context,
+	now time.Time,
 	capacityManager constraintapi.CapacityManager,
 	useConstraintAPI constraintapi.UseConstraintAPIFn,
 	req execution.ScheduleRequest,
@@ -264,12 +264,12 @@ func CheckConstraints(
 	source := constraintapi.LeaseSource{
 		Service:           constraintapi.ServiceExecutor,
 		RunProcessingMode: constraintapi.RunProcessingModeBackground,
-		Location:          constraintapi.LeaseLocationScheduleRun,
+		Location:          constraintapi.CallerLocationSchedule,
 	}
 	if req.RunMode == enums.RunModeSync {
 		source.Service = constraintapi.ServiceAPI
-		source.RunProcessingMode = constraintapi.RunProcessingModeSync
-		source.Location = constraintapi.LeaseLocationCheckpoint
+		source.RunProcessingMode = constraintapi.RunProcessingModeDurableEndpoint
+		source.Location = constraintapi.CallerLocationCheckpoint
 	}
 
 	// TODO: Fetch account concurrency
@@ -294,7 +294,7 @@ func CheckConstraints(
 		Configuration:     configuration,
 		Constraints:       constraints,
 		Amount:            1,
-		CurrentTime:       time.Now(),
+		CurrentTime:       now,
 		Duration:          ScheduleLeaseDuration,
 		MaximumLifetime:   5 * time.Minute, // This lease should be short!
 		Source:            source,
@@ -308,8 +308,7 @@ func CheckConstraints(
 
 		if fallback {
 			return checkResult{
-				mustCheck:              true,
-				fallbackIdempotencyKey: idempotencyKey,
+				mustCheck: true,
 			}, nil
 		}
 		return checkResult{}, fmt.Errorf("could not enforce constraints: %w", internalErr)
@@ -329,8 +328,7 @@ func CheckConstraints(
 	return checkResult{
 		allowed: true,
 
-		leaseID:                &lease.LeaseID,
-		fallbackIdempotencyKey: lease.IdempotencyKey,
+		leaseID: &lease.LeaseID,
 
 		// We already checked constraints
 		mustCheck: false,

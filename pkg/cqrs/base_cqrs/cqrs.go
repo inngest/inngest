@@ -1,6 +1,7 @@
 package base_cqrs
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -377,7 +379,7 @@ fragmentLoop:
 	}
 
 	if info != nil && isMetadata && parentSpanIDPtr != nil {
-		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments)
+		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
 		} else {
@@ -529,9 +531,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any) (*cqrs.SpanMetadata, error) {
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
 	ret := &cqrs.SpanMetadata{
-		Values: metadata.Values{},
+		Values:    metadata.Values{},
+		UpdatedAt: updatedAt,
 	}
 
 	for _, fragment := range fragments {
@@ -663,6 +666,12 @@ func sorter(span *cqrs.OtelSpan) {
 
 		// sort based on SpanID if two spans have equal timestamps
 		return span.Children[i].SpanID < span.Children[j].SpanID
+	})
+
+	slices.SortFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
+		return cmp.Or(
+			cmp.Compare(a.Scope, b.Scope),
+			cmp.Compare(a.Kind, b.Kind))
 	})
 
 	for _, child := range span.Children {

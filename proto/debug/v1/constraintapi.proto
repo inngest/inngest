@@ -1,0 +1,11 @@
+syntax = "proto3";
+package debug.v1;
+
+import "constraintapi/v1/service.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+message CheckConstraintsResponse {
+  constraintapi.v1.CapacityCheckRequest request = 1;
+  constraintapi.v1.CapacityCheckResponse response = 2;
+}

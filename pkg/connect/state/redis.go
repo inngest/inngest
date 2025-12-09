@@ -190,6 +190,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 	for _, meta := range res {
 		var conn connpb.ConnMetadata
 		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
+			r.logger.Error("error deserializing connection metadata from json", "error", err, "conn_metadata", meta)
 			return nil, err
 		}
 		conns = append(conns, &conn)

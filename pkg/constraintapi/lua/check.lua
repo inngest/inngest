@@ -4,7 +4,7 @@ local cjson = cjson
 ---@param command string
 ---@param ... string
 local function call(command, ...)
-	return redis.call(command, unpack(arg))
+	return redis.call(command, ...)
 end
 
 ---@type string[]
@@ -18,6 +18,9 @@ local keyOperationIdempotency = KEYS[2]
 
 ---@type { e: string, f: string, s: {}[], cv: integer? }
 local requestDetails = cjson.decode(ARGV[1])
+if not requestDetails then
+	return redis.error_reply("ERR requestDetails is nil after JSON decode")
+end
 local keyPrefix = ARGV[2]
 local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) --[[@as integer]]
@@ -27,10 +30,11 @@ local enableDebugLogs = tonumber(ARGV[7]) == 1
 
 ---@type string[]
 local debugLogs = {}
----@param message string
+---@param ... string
 local function debug(...)
 	if enableDebugLogs then
-		table.insert(debugLogs, table.concat(arg, " "))
+		local args = { ... }
+		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
 
@@ -101,11 +105,11 @@ end
 ---@param period_ns integer
 ---@param limit integer
 ---@param burst integer
----@return integer[] returns a 2-tuple of remaining capacity and retry at
+---@return integer[] returns a 3-tuple of remaining capacity, retry at, and current usage
 local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	-- Handle zero limit case - immediately rate limit
 	if limit == 0 then
-		return { 0, now_ns + period_ns }
+		return { 0, now_ns + period_ns, 0 }
 	end
 
 	-- Match throttled library calculations exactly
@@ -119,6 +123,13 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 
 	-- retrieve and normalize theoretical arrival time
 	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+
+	-- Calculate current usage (consumed tokens) independently of burst capacity
+	local used_tokens = 0
+	if tat > now_ns then
+		local consumed_time = tat - now_ns
+		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
+	end
 
 	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
 	local increment = 1 * emission_interval
@@ -137,17 +148,23 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 	if diff < 0 then
 		-- We are rate limited - calculate retry time
 		-- RetryAfter = -diff (when diff is negative)
-		return { 0, allow_at }
+		return { 0, allow_at, used_tokens }
 	else
 		-- Not rate limited - calculate remaining capacity
-		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		-- Use current TAT instead of new_tat since we haven't consumed the token yet
+		-- next = delayVariationTolerance - ttl, where ttl = currentTat.Sub(now)
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-		return { remaining, 0 }
+
+		-- Calculate when the next unit will be available after consuming all remaining capacity
+		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
+		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+
+		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
 
@@ -183,16 +200,14 @@ local function throttleCapacity(key, now_ms, period_ms, limit, burst)
 	-- The capacity cannot exceed the defined limit + burst.
 	local final_capacity = math.min(capacity, limit + burst)
 
-	if final_capacity < 1 then
-		-- We are throttled. Calculate the time when the capacity will be >= 1.
-		-- This is the point where enough time has passed to "earn" one token.
-		-- The formula is derived from solving for the future time `t` where capacity becomes 1.
-		local next_available_at_ms = tat - total_capacity_time + emission
-		return { final_capacity, math.ceil(next_available_at_ms) }
-	else
-		-- Not throttled, so there is no "next available time" to report.
-		return { final_capacity, 0 }
-	end
+	-- Calculate when the next unit will be available after consuming all remaining capacity.
+	-- The current TAT represents when the bucket becomes "full" if no requests are made.
+	-- If we consume final_capacity tokens now, we need to advance TAT by final_capacity * emission.
+	-- The next token after consumption will be available when: new_tat + emission - total_capacity_time
+	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
+	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
+
+	return { final_capacity, next_available_at_ms }
 end
 
 ---@type integer
@@ -200,6 +215,9 @@ local configVersion = requestDetails.cv
 
 ---@type { k: integer, c: { m: integer?, s: integer?, h: string?, eh: string?, l: integer?, ilk: string?, iik: string? }?, t: { s: integer?, h: string?, k: string, eh: string?, l: integer?, b: integer?, p: integer? }?, r: { s: integer?, h: string, eh: string, l: integer, p: integer, k: string, b: integer }? }[]
 local constraints = requestDetails.s
+if not constraints then
+	return redis.error_reply("ERR constraints array is nil")
+end
 
 -- Compute constraint capacity
 ---@type integer?
@@ -227,11 +245,11 @@ for index, value in ipairs(constraints) do
 		local burst = math.floor(value.r.l / 10) -- align with burst in ratelimit
 		local rlRes = rateLimitCapacity(value.r.k, nowNS, value.r.p, value.r.l, burst)
 		constraintCapacity = rlRes[1]
-		constraintRetryAfter = rlRes[2] / 1000000 -- convert from ns to ms
+		constraintRetryAfter = toInteger(rlRes[2] / 1000000) -- convert from ns to ms
 
 		local usage = {}
 		usage["l"] = value.r.l
-		usage["u"] = math.max(math.min(value.r.l - constraintCapacity, value.r.l), 0)
+		usage["u"] = rlRes[3] -- use the calculated usage from rateLimitCapacity
 		table.insert(constraintUsage, usage)
 	elseif value.k == 2 then
 		-- concurrency
@@ -262,7 +280,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
 		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = throttleRes[2] -- already in ms
+		constraintRetryAfter = toInteger(throttleRes[2]) -- already in ms
 
 		local usage = {}
 		usage["l"] = value.t.l
@@ -310,6 +328,8 @@ res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 
 -- Set operation idempotency TTL
-call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+if operationIdempotencyTTL > 0 then
+	call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
+end
 
 return encoded

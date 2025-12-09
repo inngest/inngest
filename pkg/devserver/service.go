@@ -748,7 +748,7 @@ func upsertErroredApp(
 				String: pingError.Error(),
 				Valid:  true,
 			},
-			ID:  app.ID,
+			ID:  inngest.DeterministicAppUUID(appURL),
 			Url: appURL,
 		})
 		if err != nil {

@@ -67,7 +67,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 						Constraints:          constraints,
 						Source: LeaseSource{
 							Service:  ServiceExecutor,
-							Location: LeaseLocationItemLease,
+							Location: CallerLocationItemLease,
 						},
 						Migration: MigrationIdentifier{QueueShard: "test"},
 					})
@@ -150,7 +150,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -205,7 +205,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					Constraints:          constraints,
 					Source: LeaseSource{
 						Service:  ServiceExecutor,
-						Location: LeaseLocationItemLease,
+						Location: CallerLocationItemLease,
 					},
 					Migration: MigrationIdentifier{QueueShard: "test"},
 				})
@@ -278,7 +278,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -382,7 +382,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 				Constraints:          constraints,
 				Source: LeaseSource{
 					Service:  ServiceExecutor,
-					Location: LeaseLocationItemLease,
+					Location: CallerLocationItemLease,
 				},
 				Migration: MigrationIdentifier{QueueShard: "test"},
 			})
@@ -436,7 +436,7 @@ func TestConcurrencyAndRaces_ParallelOperations(t *testing.T) {
 					Constraints:          constraints,
 					Source: LeaseSource{
 						Service:  ServiceExecutor,
-						Location: LeaseLocationItemLease,
+						Location: CallerLocationItemLease,
 					},
 					Migration: MigrationIdentifier{QueueShard: "test"},
 				})
@@ -525,7 +525,7 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 					Constraints:          constraints,
 					Source: LeaseSource{
 						Service:  ServiceExecutor,
-						Location: LeaseLocationItemLease,
+						Location: CallerLocationItemLease,
 					},
 					Migration: MigrationIdentifier{QueueShard: "test"},
 				})
@@ -604,7 +604,7 @@ func TestConcurrencyAndRaces_IdempotencyRaces(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -745,7 +745,7 @@ func TestConcurrencyAndRaces_ClockSkew(t *testing.T) {
 					Constraints:          constraints,
 					Source: LeaseSource{
 						Service:  ServiceExecutor,
-						Location: LeaseLocationItemLease,
+						Location: CallerLocationItemLease,
 					},
 					Migration: MigrationIdentifier{QueueShard: "test"},
 				})
@@ -834,7 +834,7 @@ func TestConcurrencyAndRaces_NetworkPartitions(t *testing.T) {
 					Constraints:          constraints,
 					Source: LeaseSource{
 						Service:  ServiceExecutor,
-						Location: LeaseLocationItemLease,
+						Location: CallerLocationItemLease,
 					},
 					Migration: MigrationIdentifier{QueueShard: "test"},
 				})
