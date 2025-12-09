@@ -24,6 +24,12 @@ const traceDetailsFragment = graphql(`
       spanAttrs
       resourceAttrs
     }
+    metadata {
+      kind
+      scope
+      values
+      updatedAt
+    }
     outputID
     stepID
     spanID

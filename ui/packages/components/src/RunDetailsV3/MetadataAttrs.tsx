@@ -1,12 +1,11 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/NewElement';
 import type { SpanMetadata } from './types';
 
-const MetadataAttrRow = ({ kind, scope, values, updated_at }: SpanMetadata) => {
+const MetadataAttrRow = ({ kind, scope, values, updatedAt }: SpanMetadata) => {
   const [expanded, setExpanded] = useState(true);
-  const updatedAt = new Date(updated_at);
   return (
     <div className="flex flex-col justify-start gap-2 overflow-hidden">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
@@ -32,7 +31,7 @@ const MetadataAttrRow = ({ kind, scope, values, updated_at }: SpanMetadata) => {
               <TextElement>{kind}</TextElement>
             </ElementWrapper>
             <ElementWrapper label="Updated at">
-              <TimeElement date={updatedAt} />
+              <TimeElement date={new Date(updatedAt)} />
             </ElementWrapper>
           </div>
           <div className="mb-4 mt-2 flex max-h-full flex-col gap-2">
@@ -69,7 +68,7 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
           kind={md.kind}
           scope={md.scope}
           values={md.values}
-          updated_at={md.updated_at}
+          updatedAt={md.updatedAt}
         />
       ))}
     </div>

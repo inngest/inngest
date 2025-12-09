@@ -40,7 +40,7 @@ export type SpanMetadata =
 export type SpanMetadataInngestAI = {
   scope: 'step_attempt' | 'extended_trace';
   kind: 'inngest.ai';
-  updated_at: string;
+  updatedAt: string;
   values: {
     input_tokens?: number;
     output_tokens?: number;
@@ -83,7 +83,7 @@ export type SpanMetadataUserland = {
 export type SpanMetadataUnknown = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKind;
-  updated_at: string;
+  updatedAt: string;
   values: Record<string, unknown>;
 };
 

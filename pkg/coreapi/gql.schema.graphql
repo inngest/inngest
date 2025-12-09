@@ -607,7 +607,7 @@ type SpanMetadata {
   scope: SpanMetadataScope!
   kind: SpanMetadataKind!
   values: SpanMetadataValues!
-  updated_at: Time!
+  updatedAt: Time!
 }
 
 type UserlandSpan {
