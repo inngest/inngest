@@ -2,7 +2,7 @@ import { transformJSONSchema } from '@inngest/components/SchemaViewer/transform/
 import type { JSONSchema } from '@inngest/components/SchemaViewer/types';
 import type { InfiniteData } from '@tanstack/react-query';
 
-import { EVENT_SCHEMA_JSON, STANDARD_EVENT_FIELDS } from './commonSchemas';
+import { STANDARD_EVENT_FIELDS } from './commonSchemas';
 import type { SchemaEntry, SchemaEventPage } from './types';
 import { makeTitleOnlyEntry } from './utils';
 
@@ -11,11 +11,7 @@ export function buildSchemaEntriesFromQueryData(
 ): SchemaEntry[] {
   const list: SchemaEntry[] = [];
 
-  list.push({
-    key: 'common:events',
-    isShared: true,
-    node: transformJSONSchema(EVENT_SCHEMA_JSON),
-  });
+  // Removed shared schema entry - it's redundant since all events now show the same standard fields
 
   const pages = data?.pages ?? [];
   const items = pages.flatMap((p) => p.events);
@@ -44,7 +40,6 @@ export function buildEntryFromLatestSchema(
 
     return {
       key: `fetched:${eventName}`,
-      isShared: false,
       node: transformJSONSchema({ ...normalizedSchema, title: eventName }),
     };
   } catch {

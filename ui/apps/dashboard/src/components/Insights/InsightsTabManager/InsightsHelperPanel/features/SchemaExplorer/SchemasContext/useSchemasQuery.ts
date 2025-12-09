@@ -45,11 +45,7 @@ export function useSchemasQuery(search: string) {
     [query.data],
   );
 
-  const remoteCount = useMemo(
-    () => entries.filter((e) => !e.isShared).length,
-    [entries],
-  );
-  const hasFetchedMax = remoteCount >= MAX_SCHEMA_ITEMS;
+  const hasFetchedMax = entries.length >= MAX_SCHEMA_ITEMS;
 
   const guardedFetchNextPage = useCallback(() => {
     if (hasFetchedMax) {
