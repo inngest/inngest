@@ -48,6 +48,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngestgo"
@@ -3643,7 +3644,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
-	metadata := runCtx.Metadata()
+	runMetadata := runCtx.Metadata()
 
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
@@ -3660,6 +3661,26 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	runCtx.SetStatusCode(resp.StatusCode)
+
+	if e.allowStepMetadata.Enabled(ctx, runMetadata.ID.Tenant.AccountID) {
+		md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
+			input,
+			resp.StatusCode,
+			resp.Body,
+		))
+		for _, m := range md {
+			_, err := e.createMetadataSpan(
+				ctx,
+				runCtx,
+				"executor.handleGeneratorAIGateway",
+				m,
+				enums.MetadataScopeStepAttempt,
+			)
+			if err != nil {
+				e.log.Warn("error creating metadata span", "error", err)
+			}
+		}
+	}
 
 	// Handle errors individually, here.
 	if failure {
@@ -3684,7 +3705,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Metadata:   metadata,
+			Metadata:   runMetadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: runCtx.ExecutionSpan(),
 		}); spanErr != nil {
@@ -3749,7 +3770,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, rawBody),
 			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Metadata:   metadata,
+			Metadata:   runMetadata,
 			QueueItem:  &lifecycleItem,
 			TargetSpan: runCtx.ExecutionSpan(),
 		}); spanErr != nil {

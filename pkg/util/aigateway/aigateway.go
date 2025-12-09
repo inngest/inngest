@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 
 	"github.com/liushuangls/go-anthropic/v2"
 	"github.com/sashabaranov/go-openai"
@@ -15,7 +14,7 @@ import (
 // Note that this is not stored, and instead is computed just in time for each input
 // depending on the UI.
 type ParsedInferenceRequest struct {
-	URL                 url.URL  `json:"url"`
+	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
 	Temprature          float32  `json:"temperature,omitempty"`
@@ -125,6 +124,7 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 		}
 
 		return ParsedInferenceRequest{
+			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
 			Temprature:          rf.Temperature,

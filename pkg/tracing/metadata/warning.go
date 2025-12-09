@@ -67,3 +67,12 @@ func extractWarnings(err error) []*WarningError {
 		return nil
 	}
 }
+
+func WithWarnings(md []Structured, err error) []Structured {
+	warnings := ExtractWarnings(err)
+	if len(warnings) != 0 {
+		md = append(md, warnings)
+	}
+
+	return md
+}
