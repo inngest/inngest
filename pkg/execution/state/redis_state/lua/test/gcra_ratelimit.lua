@@ -10,7 +10,7 @@ local enableFix = tonumber(ARGV[6]) == 1
 local throttleResult = gcra(throttleKey, currentTime, period_ms, limit, burst, enableFix)
 
 -- not allowed
-if throttleResult[1] == 0 then
+if throttleResult[1] == false then
 	return 0
 end
 
