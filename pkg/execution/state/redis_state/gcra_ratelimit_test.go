@@ -12,33 +12,109 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func oldLuaGCRARateLimit(ctx context.Context, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst int) (bool, error) {
+func oldLuaGCRARateLimit(ctx context.Context, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst int, enableFix bool) (bool, bool, error) {
 	nowMS := now.UnixMilli()
+	enableFixVal := "0"
+	if enableFix {
+		enableFixVal = "1"
+	}
 	args, err := StrSlice([]any{
 		key,
 		nowMS,
 		period.Milliseconds(),
 		limit,
 		burst,
+		enableFixVal,
 	})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
+
+	// lua gcra() returns 1 on success (allowed), 2 on success with burst used (allowed), and 0 if rate limited
 	res, err := scripts["test/gcra_ratelimit"].Exec(ctx, rc, []string{}, args).AsInt64()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	// lua gcra() returns 1 on success (allowed), 0 if rate limited
+
+	usedBurst := res == 2
+
 	// we return true if limited, false if allowed (to match throttled interface)
-	return res == 0, nil
+	return res == 0, usedBurst, nil
+}
+
+func TestBurstUsage(t *testing.T) {
+	getThrottleState := func(t *testing.T, r *miniredis.Miniredis, key string) time.Time {
+		value, err := r.Get(key)
+		require.NoError(t, err)
+
+		parsed, err := strconv.Atoi(value)
+		require.NoError(t, err)
+
+		return time.UnixMilli(int64(parsed))
+	}
+
+	ctx := context.Background()
+
+	matrix := []struct {
+		name       string
+		fixEnabled bool
+	}{
+		{
+			name:       "with fix",
+			fixEnabled: true,
+		},
+		{
+			name:       "without fix",
+			fixEnabled: false,
+		},
+	}
+
+	for _, tc := range matrix {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("should not use burst when not needed", func(t *testing.T) {
+				clock := clockwork.NewFakeClock()
+				r, rc := initRedis(t)
+				defer rc.Close()
+				key := "test:throttle:1"
+				period := 1 * time.Hour
+				limit := 10
+				burst := 0
+				// First request should succeed (not be limited)
+				limited, usedBurst, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, tc.fixEnabled)
+				require.NoError(t, err)
+				require.False(t, limited, "first request should not be limited")
+				require.False(t, usedBurst)
+
+				require.WithinDuration(t, clock.Now().Add(6*time.Minute), getThrottleState(t, r, key), time.Second)
+			})
+
+			t.Run("should use burst capacity", func(t *testing.T) {
+				clock := clockwork.NewFakeClock()
+				r, rc := initRedis(t)
+				defer rc.Close()
+				key := "test:throttle:1"
+				period := time.Minute
+				limit := 10
+				burst := 5
+
+				// First request should succeed (not be limited)
+				limited, usedBurst, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, tc.fixEnabled)
+				require.NoError(t, err)
+				require.False(t, limited)
+				require.False(t, usedBurst)
+
+				require.WithinDuration(t, clock.Now().Add(6*time.Second), getThrottleState(t, r, key), time.Second)
+
+				limited, usedBurst, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, tc.fixEnabled)
+				require.NoError(t, err)
+				require.False(t, limited)
+				require.True(t, usedBurst)
+			})
+		})
+	}
 }
 
 func TestOldLuaGCRA(t *testing.T) {
-	// NOTE: This test verifies the old gcra() implementation is broken in a couple ways.
-	// Until we swap period_ms for emission in the variance, we will skip this test.
-	// For more details, see https://github.com/inngest/inngest/pull/3356
-	t.Skip("skipped until gcra() is fixed again")
-
 	getThrottleState := func(t *testing.T, r *miniredis.Miniredis, key string) time.Time {
 		value, err := r.Get(key)
 		require.NoError(t, err)
@@ -60,7 +136,7 @@ func TestOldLuaGCRA(t *testing.T) {
 		limit := 10
 		burst := 0
 		// First request should succeed (not be limited)
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "first request should not be limited")
 
@@ -76,14 +152,14 @@ func TestOldLuaGCRA(t *testing.T) {
 		limit := 5
 		burst := 0 // Due to math.max(burst, 1), this behaves as burst=1
 		// First request should succeed (not be limited)
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "first request should not be limited")
 
 		require.WithinDuration(t, clock.Now().Add(time.Hour/5), getThrottleState(t, r, key), time.Second)
 
 		// Second immediate request should be rate limited (burst=1 allows only 1 request)
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "second immediate request should be rate limited with burst=0")
 	})
@@ -97,14 +173,14 @@ func TestOldLuaGCRA(t *testing.T) {
 		limit := 1
 		burst := 0
 		// Make first request
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "first request should not be limited")
 
 		require.WithinDuration(t, clock.Now().Add(time.Second), getThrottleState(t, r, key), 10*time.Millisecond)
 
 		// Immediate second request should be rate limited
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "immediate second request should be rate limited")
 
@@ -112,7 +188,7 @@ func TestOldLuaGCRA(t *testing.T) {
 		clock.Advance(2 * time.Second)
 		r.FastForward(2 * time.Second)
 		// Request should be allowed again
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "request after period should not be limited")
 	})
@@ -128,12 +204,12 @@ func TestOldLuaGCRA(t *testing.T) {
 		// With burst=3, we can make approximately 3 immediate requests
 		// (the exact behavior depends on GCRA variance calculation)
 		for i := 0; i < 3; i++ {
-			limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+			limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 			require.NoError(t, err)
 			require.False(t, limited, "request %d should not be limited (within burst)", i+1)
 		}
 		// Next immediate request should be rate limited
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "request exceeding burst should be rate limited")
 	})
@@ -147,15 +223,15 @@ func TestOldLuaGCRA(t *testing.T) {
 		limit := 5
 		burst := 0
 		// Make one request on key1 (should succeed)
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key1, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key1, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "key1 first request should not be limited")
 		// Second immediate request on key1 should be rate limited (burst=1)
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key1, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key1, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "key1 should be rate limited")
 		// key2 should still work independently
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key2, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key2, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "key2 should not be limited")
 	})
@@ -168,11 +244,11 @@ func TestOldLuaGCRA(t *testing.T) {
 		limit := 10
 		burst := 0
 		// First request should be allowed
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "first request should not be limited")
 		// Immediate second request should be rate limited
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "immediate second request should be rate limited")
 		// Advance time by emission interval (period/limit)
@@ -180,7 +256,7 @@ func TestOldLuaGCRA(t *testing.T) {
 		clock.Advance(emissionInterval)
 		r.FastForward(emissionInterval)
 		// Request should be allowed after emission interval
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "request after emission interval should not be limited")
 	})
@@ -194,18 +270,18 @@ func TestOldLuaGCRA(t *testing.T) {
 		burst := 10
 		// With burst=10, we should be able to make 10 immediate requests
 		for i := 0; i < 10; i++ {
-			limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+			limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 			require.NoError(t, err)
 			require.False(t, limited, "request %d should not be limited within burst", i+1)
 		}
 		// 11th immediate request should be denied
-		limited, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err := oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.True(t, limited, "request beyond burst should be limited")
 		// After waiting the full period, should be able to make requests again
 		clock.Advance(period)
 		r.FastForward(period)
-		limited, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst)
+		limited, _, err = oldLuaGCRARateLimit(ctx, rc, key, clock.Now(), period, limit, burst, true)
 		require.NoError(t, err)
 		require.False(t, limited, "request after full period should not be limited")
 	})

@@ -771,6 +771,22 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	}
 }
 
+type EnableThrottleFixFn func(ctx context.Context, accountID uuid.UUID) bool
+
+func WithEnableThrottleFix(fn EnableThrottleFixFn) QueueOpt {
+	return func(q *queue) {
+		q.enableThrottleFix = fn
+	}
+}
+
+type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
+
+func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
+	return func(q *queue) {
+		q.enableThrottleInstrumentation = fn
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -929,6 +945,9 @@ type queue struct {
 	capacityManager             constraintapi.RolloutManager
 	useConstraintAPI            constraintapi.UseConstraintAPIFn
 	capacityLeaseExtendInterval time.Duration
+
+	enableThrottleFix             EnableThrottleFixFn
+	enableThrottleInstrumentation EnableThrottleInstrumentationFn
 }
 
 type QueueRunMode struct {
@@ -2278,6 +2297,19 @@ func (q *queue) Lease(
 		checkConstraintsVal = "1"
 	}
 
+	checkThrottle := checkConstraints && o.constraints.Throttle != nil && item.Data.Throttle != nil
+
+	enableThrottleFix := "0"
+	if checkThrottle && o.sp.AccountID != nil && q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *o.sp.AccountID) {
+		enableThrottleFix = "1"
+	}
+
+	enableThrottleInstrumentation := checkThrottle &&
+		o.sp.AccountID != nil &&
+		o.sp.FunctionID != nil &&
+		q.enableThrottleInstrumentation != nil &&
+		q.enableThrottleInstrumentation(ctx, *o.sp.AccountID, *o.sp.FunctionID)
+
 	// Check if throttle is outdated
 	if outdatedThrottleReason := o.constraints.HasOutdatedThrottle(item); outdatedThrottleReason != enums.OutdatedThrottleReasonNone {
 		// TODO: Re-evaluate throttle with event data
@@ -2357,6 +2389,8 @@ func (q *queue) Lease(
 		refilledFromBacklogVal,
 
 		checkConstraintsVal,
+
+		enableThrottleFix,
 	})
 	if err != nil {
 		return nil, err
@@ -2419,7 +2453,22 @@ func (q *queue) Lease(
 	)
 
 	switch status {
-	case 0:
+	case 0, 1:
+		if enableThrottleInstrumentation {
+			statusStr := "allowed"
+			if status == 1 {
+				statusStr = "burst"
+			}
+			metrics.IncrQueueThrottleStatus(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id":  *o.sp.AccountID,
+					"function_id": *o.sp.FunctionID,
+					"status":      statusStr,
+				},
+			})
+		}
+
 		return &leaseID, nil
 	case -1:
 		return nil, ErrQueueItemNotFound
@@ -2442,6 +2491,18 @@ func (q *queue) Lease(
 	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case -7:
+		if enableThrottleInstrumentation {
+			status := "throttled"
+			metrics.IncrQueueThrottleStatus(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id":  *o.sp.AccountID,
+					"function_id": *o.sp.FunctionID,
+					"status":      status,
+				},
+			})
+		}
+
 		if o.constraints.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
 			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)

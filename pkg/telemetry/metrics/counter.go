@@ -761,3 +761,12 @@ func IncrQueueScavengerRequeuedItemsCounter(ctx context.Context, count int64, op
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueThrottleStatus(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_fn_throttle_status",
+		Description: "Total number of throttled items",
+		Tags:        opts.Tags,
+	})
+}

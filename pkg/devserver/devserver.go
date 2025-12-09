@@ -342,6 +342,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			}
 			return redis_state.PartitionPausedInfo{}
 		}),
+		redis_state.WithEnableThrottleFix(func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		}),
 	}
 
 	const rateLimitPrefix = "ratelimit"
