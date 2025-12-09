@@ -13,8 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -40,6 +42,52 @@ type TraceParent struct {
 }
 
 type TraceRoot struct{}
+
+type spanCache struct {
+	runs map[ulid.ULID]*cqrs.FunctionRun
+	fns  map[uuid.UUID]*cqrs.Function
+	mu   sync.RWMutex
+}
+
+func (c *spanCache) getRun(ctx context.Context, runID ulid.ULID, reader cqrs.TraceReader, accountID, workspaceID uuid.UUID) (*cqrs.FunctionRun, error) {
+	c.mu.RLock()
+	if run, ok := c.runs[runID]; ok {
+		c.mu.RUnlock()
+		return run, nil
+	}
+	c.mu.RUnlock()
+
+	run, err := reader.GetRun(ctx, runID, accountID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	c.runs[runID] = run
+	c.mu.Unlock()
+
+	return run, nil
+}
+
+func (c *spanCache) getFunction(ctx context.Context, functionID uuid.UUID, reader cqrs.FunctionReader) (*cqrs.Function, error) {
+	c.mu.RLock()
+	if fn, ok := c.fns[functionID]; ok {
+		c.mu.RUnlock()
+		return fn, nil
+	}
+	c.mu.RUnlock()
+
+	fn, err := reader.GetFunctionByInternalUUID(ctx, functionID)
+	if err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	c.fns[functionID] = fn
+	c.mu.Unlock()
+
+	return fn, nil
+}
 
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
@@ -131,6 +179,11 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 		wg   sync.WaitGroup
 	)
 
+	cache := &spanCache{
+		runs: make(map[ulid.ULID]*cqrs.FunctionRun),
+		fns:  make(map[uuid.UUID]*cqrs.Function),
+	}
+
 	l := logger.StdlibLogger(ctx).With(
 		"account_id", auth.AccountID(),
 		"workspace_id", auth.WorkspaceID(),
@@ -153,7 +206,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 						}
 					}()
 
-					err := a.commitSpan(ctx, l, auth, res, ss.Scope, s)
+					err := a.commitSpan(ctx, l, auth, res, ss.Scope, s, cache)
 					if err != nil {
 						l.Error("failed to commit span with", "error", err)
 						errs.Add(1)
@@ -169,7 +222,7 @@ func (a router) convertOTLPAndSend(ctx context.Context, auth apiv1auth.V1Auth, r
 	return errs.Load()
 }
 
-func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span) error {
+func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.V1Auth, res *resource.Resource, scope *commonv1.InstrumentationScope, s *tracev1.Span, cache *spanCache) error {
 	// To be valid, each span must have an "inngest.traceref" attribute
 	tr, err := getInngestTraceRef(s)
 	if err != nil {
@@ -190,8 +243,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		}
 	}
 
-	// Legacy, but try to pull the run ID out from the attributes using the
-	// legacy key.
+	// Legacy, but try to pull the run ID out from the attributes using the legacy key.
 	var runID ulid.ULID
 	for _, kv := range attrs {
 		if kv.Key == consts.OtelAttrSDKRunID {
@@ -209,24 +261,24 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
 
-	run, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+	run, err := cache.getRun(ctx, runID, a.opts.TraceReader, auth.AccountID(), auth.WorkspaceID())
 	if err != nil {
 		return fmt.Errorf("function run not found: %w", err)
 	}
-	functionID := run.FunctionID
 
-	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
+	fn, err := cache.getFunction(ctx, run.FunctionID, a.opts.FunctionReader)
 	if err != nil {
 		return fmt.Errorf("function not found: %w", err)
 	}
+
 	if fn.IsArchived() {
-		return fmt.Errorf("function is archived: %s", functionID)
+		return fmt.Errorf("function is archived: %s", run.FunctionID)
 	}
 
 	tenantAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.RunID, &runID),
 		meta.Attr(meta.Attrs.AppID, &fn.AppID),
-		meta.Attr(meta.Attrs.FunctionID, &functionID),
+		meta.Attr(meta.Attrs.FunctionID, &run.FunctionID),
 		meta.Attr(meta.Attrs.AccountID, util.ToPtr(auth.AccountID())),
 		meta.Attr(meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID())),
 	)
