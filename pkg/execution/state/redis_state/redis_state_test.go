@@ -714,10 +714,23 @@ func TestDeletePauseWithBlockIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	keysAfter, _ := rc.Do(ctx, rc.B().Keys().Pattern("*").Build()).AsStrSlice()
-	// WithWriteBlockIndex should leave the block index key
-	assert.Equal(t, 1, len(keysAfter))
 
-	blockIndexKey := keysAfter[0]
+	// WithWriteBlockIndex should leave the block index key and run pause key
+	// (run pause key is cleared on state deletion)
+	assert.Equal(t, 2, len(keysAfter))
+
+	// Expect the block index key and run pause key
+	var blockIndexKey, runPauseKey string
+	for _, key := range keysAfter {
+		if strings.Contains(key, "pause-block") {
+			blockIndexKey = key
+		} else if strings.Contains(key, ":pr:") {
+			runPauseKey = key
+		}
+	}
+	require.NotEmpty(t, blockIndexKey, "Should have a pause-block key")
+	require.NotEmpty(t, runPauseKey, "Should have a run pause key")
+
 	val, err := rc.Do(ctx, rc.B().Get().Key(blockIndexKey).Build()).ToString()
 	require.NoError(t, err)
 
@@ -835,7 +848,7 @@ func TestDeleteCleansUpAllKeysWithPauseManager(t *testing.T) {
 	pauseManagerClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
 	pauseMgr, err := New(ctx, WithUnshardedClient(pauseManagerClient))
 	require.NoError(t, err)
-	
+
 	// Set the pause deleter
 	mgr.SetPauseDeleter(pauseMgr)
 
