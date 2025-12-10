@@ -54,10 +54,6 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
 
-	-- this is an altered version of the dvt to calculate remaining capacity
-	-- assuming we can spend the entire limit + burst "at once" (for the period)
-	local dvt_instant = emission * (limit + burst)
-
 	-- use existing tat or start at now_ms
 	local tat = redis.call("GET", key)
 	if not tat then
@@ -109,7 +105,7 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 			local next = dvt - ttl
 			result["next"] = next
 			if next > -emission then
-				result["remaining"] = math.floor((dvt_instant - ttl) / emission)
+				result["remaining"] = math.floor((dvt - ttl) / emission)
 			end
 			result["reset_after"] = ttl
 
@@ -130,7 +126,7 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 
 	local next = dvt - ttl
 	if next > -emission then
-		result["remaining"] = math.floor((dvt_instant - ttl) / emission)
+		result["remaining"] = math.floor((dvt - ttl) / emission)
 	end
 	result["reset_after"] = ttl
 	result["next"] = next
