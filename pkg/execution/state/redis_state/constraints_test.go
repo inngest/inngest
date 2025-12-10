@@ -134,7 +134,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		// No lease acquired
-		require.Nil(t, res.leaseID)
+		require.Nil(t, res.capacityLease)
 		require.True(t, res.skipConstraintChecks)
 
 		// Do not expect a call for the system queue
@@ -184,7 +184,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		// No lease acquired
-		require.Nil(t, res.leaseID)
+		require.Nil(t, res.capacityLease)
 		require.False(t, res.skipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing identifiers
@@ -233,7 +233,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		// No lease acquired
-		require.Nil(t, res.leaseID)
+		require.Nil(t, res.capacityLease)
 		require.False(t, res.skipConstraintChecks)
 
 		// Do not expect a ConstraintAPI call for missing capacity manager
@@ -283,7 +283,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		// No lease acquired
-		require.Nil(t, res.leaseID)
+		require.Nil(t, res.capacityLease)
 		require.False(t, res.skipConstraintChecks) // Require checks
 
 		// Do not expect a ConstraintAPI call for disabled feature flag
@@ -319,7 +319,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		// Simulate valid lease
 		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(10*time.Second)), rand.Reader)
 
-		qi.CapacityLeaseID = &capacityLeaseID
+		qi.CapacityLease = &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		}
 
 		sp := q.ItemShadowPartition(ctx, qi)
 		backlog := q.ItemBacklog(ctx, qi)
@@ -327,7 +329,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
 		require.NoError(t, err)
 
-		require.NotNil(t, res.leaseID)
+		require.NotNil(t, res.capacityLease)
 		require.True(t, res.skipConstraintChecks)
 
 		// This time, we do not expect a call to the Constraint API, simply use the valid lease
@@ -363,7 +365,9 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		// Simulate expired lease
 		capacityLeaseID := ulid.MustNew(ulid.Timestamp(clock.Now().Add(-10*time.Second)), rand.Reader)
 
-		qi.CapacityLeaseID = &capacityLeaseID
+		qi.CapacityLease = &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		}
 
 		sp := q.ItemShadowPartition(ctx, qi)
 		backlog := q.ItemBacklog(ctx, qi)
@@ -371,7 +375,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
 		require.NoError(t, err)
 
-		require.NotNil(t, res.leaseID)
+		require.NotNil(t, res.capacityLease)
 		require.True(t, res.skipConstraintChecks)
 
 		// Expect call because lease expired
@@ -410,7 +414,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		res, err := q.itemLeaseConstraintCheck(ctx, &sp, &backlog, constraints, &qi, clock.Now(), kg)
 		require.NoError(t, err)
 
-		require.NotNil(t, res.leaseID)
+		require.NotNil(t, res.capacityLease)
 		require.True(t, res.skipConstraintChecks)
 
 		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
@@ -458,7 +462,7 @@ func TestItemLeaseConstraintCheck(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.limitingConstraint)
-		require.Nil(t, res.leaseID)
+		require.Nil(t, res.capacityLease)
 		require.False(t, res.skipConstraintChecks)
 
 		require.Equal(t, 1, len(cmLifecycles.acquireCalls))
