@@ -231,7 +231,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
+		instanceId := ""
+		if conn.Data != nil {
+			instanceId = conn.Data.InstanceId
+		}
+		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId, "instance_id", instanceId, "worker_ip", conn.WorkerIP)
 
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
 		defer notifyWorkerDrained()
@@ -1163,7 +1167,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID)
+	log := c.log.With("account_id", authResp.AccountID, "env_id", authResp.EnvID, "conn_id", connectionId.String(), "instance_id", initialMessageData.InstanceId, "worker_ip", c.remoteAddr)
 
 	workerGroups := make(map[string]*state.WorkerGroup)
 	{
