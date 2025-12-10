@@ -1404,7 +1404,7 @@ func initSQLiteCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()
 		apply(&opt)
 	}
 
-	db, err := New(BaseCQRSOptions{InMemory: true, ForTest: true})
+	db, err := New(BaseCQRSOptions{Persist: false, ForTest: true})
 	require.NoError(t, err)
 
 	cm := NewCQRS(db, "sqlite", sqlc_psql.NewNormalizedOpts{})

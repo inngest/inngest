@@ -134,9 +134,9 @@ type StartOpts struct {
 
 	NoUI bool
 
-	// InMemory controls whether to only use in-memory databases (as opposed to
-	// filesystem)
-	InMemory bool
+	// Persist controls whether to persist data in between restarts.  If false,
+	// the dev server will use in-memory databases.
+	Persist bool `json:"persist"`
 
 	// RedisURI allows connecting to external Redis instead of in-memory Redis
 	RedisURI string `json:"redis_uri"`
@@ -180,7 +180,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	services := []service.Service{}
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
-		InMemory:    opts.InMemory,
+		Persist:     opts.Persist,
 		PostgresURI: opts.PostgresURI,
 		Directory:   opts.SQLiteDir,
 	})
@@ -341,6 +341,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				}
 			}
 			return redis_state.PartitionPausedInfo{}
+		}),
+		redis_state.WithEnableThrottleFix(func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
 		}),
 	}
 

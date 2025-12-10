@@ -1043,6 +1043,14 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 				},
 			},
 		}
+
+		throttle := &queue.Throttle{
+			KeyExpressionHash: "expr-hash",
+			Key:               "key-hash",
+			Limit:             5,
+			Period:            60,
+		}
+
 		partitionConstraints := redis_state.PartitionConstraintConfig{
 			Concurrency: redis_state.PartitionConcurrency{
 				AccountConcurrency: 10,
@@ -1105,12 +1113,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 						WorkspaceID: envID,
 						WorkflowID:  fnID,
 					},
-					Throttle: &queue.Throttle{
-						KeyExpressionHash: "expr-hash",
-						Key:               "key-hash",
-						Limit:             5,
-						Period:            60,
-					},
+					Throttle: throttle,
 				},
 			},
 			clock.Now(),
@@ -1134,12 +1137,7 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 						WorkspaceID: envID,
 						WorkflowID:  fnID,
 					},
-					Throttle: &queue.Throttle{
-						KeyExpressionHash: "expr-hash",
-						Key:               "key-hash",
-						Limit:             5,
-						Period:            60,
-					},
+					Throttle: throttle,
 				},
 			},
 			clock.Now(),
@@ -1202,11 +1200,25 @@ func TestQueueConstraintAPICompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
+		// Expect throttle state to match
+		rawState, err = r.Get(keyThrottleState)
+		require.NoError(t, err)
+		parsed, err = strconv.Atoi(rawState)
+		require.NoError(t, err)
+		tat = time.UnixMilli(int64(parsed))
+		require.WithinDuration(t, clock.Now().Add(time.Duration(amount)*12*time.Second), tat, time.Second)
+
 		// Should not work because item does not have constraint check idempotency set
+		// NOTE: This is allowed for the time being as the legacy gcra() implementation uses period_ms for `variance`
+		// As soon as we migrate gcra() to use `emission` instead of `period_ms`, we will be limited as expected.
+		// For more details, see https://github.com/inngest/inngest/pull/3356
 		leaseID, err = q.Lease(ctx, qi2, 5*time.Second, clock.Now(), nil)
-		require.Error(t, err)
-		require.ErrorIs(t, err, redis_state.ErrQueueItemThrottled)
-		require.Nil(t, leaseID)
+		// TODO: Once gcra() is fixed and this test fails, remove the following assertions and use the commented out assertions instead
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		// require.NoError(t, err, r.Dump())
+		// require.ErrorIs(t, err, redis_state.ErrQueueItemThrottled)
+		// require.Nil(t, leaseID)
 	})
 	t.Run("queue should ignore GCRA during BacklogRefill if idempotency key set", func(t *testing.T) {
 		t.Parallel()

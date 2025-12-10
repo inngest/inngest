@@ -143,7 +143,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
@@ -311,7 +311,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
@@ -485,7 +485,7 @@ func TestFinalize(t *testing.T) {
 	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	// Initialize the devserver
@@ -737,7 +737,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up database and function loader
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	dbDriver := "sqlite"
@@ -945,7 +945,7 @@ func TestInvokeRetrySucceedsIfPauseAlreadyCreated(t *testing.T) {
 func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	dbDriver := "sqlite"
@@ -1127,7 +1127,7 @@ func TestExecutorReturnsResponseWhenNonRetriableError(t *testing.T) {
 func TestExecutorScheduleRateLimit(t *testing.T) {
 	ctx := context.Background()
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{Persist: false})
 	require.NoError(t, err)
 
 	dbDriver := "sqlite"
