@@ -1274,11 +1274,6 @@ func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.
 	return pause, err
 }
 
-func (m unshardedMgr) GetRunPauseIDs(ctx context.Context, runID ulid.ULID) ([]string, error) {
-	pause := m.u.Pauses()
-	return pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, runID)).Build()).AsStrSlice()
-}
-
 func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByInvokeCorrelationID"), redis_telemetry.ScopePauses)
 
@@ -1617,13 +1612,13 @@ func (i *scanIter) Index() int64 {
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
-	// Reset the index.
-	i.i = -1
-
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
 		return errScanDone
 	}
+
+	// Reset the index.
+	i.i = -1
 
 	// Scan 100 times up until there are values
 	for scans := 0; scans < 100; scans++ {
