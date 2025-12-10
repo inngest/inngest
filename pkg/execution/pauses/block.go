@@ -572,7 +572,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 			// Trigger a new compaction.
 			if maxDeletes >= int64(float64(b.blocksize)*b.compactionGarbageRatio) {
 				logger.StdlibLogger(ctx).Debug("compacting block deletes", "max_deletes", maxDeletes, "index", index)
-				b.Compact(ctx, index)
+				_ = b.Compact(ctx, index)
 			}
 		}()
 	}
