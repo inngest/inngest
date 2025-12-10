@@ -354,6 +354,14 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
 	})
 
+	// NOTE: Key queues are not immediately supported by gcra. This is because we apply smoothing: We do not want
+	// callers to be able to exhaust the complete capacity for a period within a single request.
+	// This is why we break down the period into smaller chunks (the emission interval).
+	//
+	// For key queues, we should do the following: Instead of rewriting gcra to fit
+	// the case where we need to consume multiple items at once while respecting the period limit,
+	// we should make this a burst. This way, it naturally works. We just have to make sure burst = limit - 1
+	// as we apply + 1 by default
 	t.Run("capacity calculation should work", func(t *testing.T) {
 		t.Parallel()
 
@@ -366,12 +374,31 @@ func TestNewGCRAScript(t *testing.T) {
 
 		period := time.Minute
 		limit := 20
-		burst := 0
+		burst := limit - 1 // assume we can spend entire limit at once!
 
 		// Read initial capacity
 		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
-		require.Equal(t, 1, res.Limit)
+		require.False(t, res.Limited)
+		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 20, res.Remaining)
+
+		// use half the capacity at once
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		require.False(t, res.Limited)
+		require.Equal(t, 20, res.Limit)
+		require.Equal(t, 10, res.Remaining)
+
+		// use remaining half
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		require.False(t, res.Limited)
+		require.Equal(t, 20, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+
+		// no more
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		require.True(t, res.Limited)
+		require.Equal(t, 20, res.Limit)
+		require.Equal(t, 0, res.Remaining)
 	})
 }
 
