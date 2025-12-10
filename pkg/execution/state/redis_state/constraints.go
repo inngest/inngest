@@ -16,7 +16,7 @@ import (
 
 type backlogRefillConstraintCheckResult struct {
 	itemsToRefill        []string
-	itemCapacityLeases   []ulid.ULID
+	itemCapacityLeases   []osqueue.CapacityLease
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
@@ -157,11 +157,13 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	itemsToRefill := make([]string, len(res.Leases))
-	itemCapacityLeases := make([]ulid.ULID, len(res.Leases))
+	itemCapacityLeases := make([]osqueue.CapacityLease, len(res.Leases))
 	for i, l := range res.Leases {
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
-		itemCapacityLeases[i] = l.LeaseID
+		itemCapacityLeases[i] = osqueue.CapacityLease{
+			LeaseID: l.LeaseID,
+		}
 	}
 
 	return &backlogRefillConstraintCheckResult{
@@ -174,10 +176,10 @@ func (q *queue) backlogRefillConstraintCheck(
 }
 
 type itemLeaseConstraintCheckResult struct {
-	// leaseID optionally returns a capacity lease ID which
+	// capacityLease optionally returns a capacity lease ID which
 	// must be passed to the processing function to be extended
 	// while processing the item.
-	leaseID *ulid.ULID
+	capacityLease *osqueue.CapacityLease
 
 	// limitingConstraint returns the most limiting constraint in case
 	// no capacity was available.
@@ -242,10 +244,10 @@ func (q *queue) itemLeaseConstraintCheck(
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
-	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().After(now.Add(2*time.Second))
+	hasValidCapacityLease := item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
 	if hasValidCapacityLease {
 		return itemLeaseConstraintCheckResult{
-			leaseID: item.CapacityLeaseID,
+			capacityLease: item.CapacityLease,
 			// Skip any constraint checks and subsequent updates,
 			// as constraint state is maintained in the Constraint API.
 			skipConstraintChecks: true,
@@ -308,7 +310,9 @@ func (q *queue) itemLeaseConstraintCheck(
 	capacityLeaseID := res.Leases[0].LeaseID
 
 	return itemLeaseConstraintCheckResult{
-		leaseID: &capacityLeaseID,
+		capacityLease: &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		},
 		// Skip any constraint checks and subsequent updates,
 		// as constraint state is maintained in the Constraint API.
 		skipConstraintChecks: true,

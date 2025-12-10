@@ -1106,7 +1106,7 @@ func (q *queue) process(
 	p := i.P
 	continuationCtr := i.PCtr
 
-	capacityLeaseID := newCapacityLease(i.capacityLeaseID)
+	capacityLeaseID := newCapacityLease(i.capacityLease)
 
 	disableConstraintUpdates := i.disableConstraintUpdates
 
@@ -1177,7 +1177,7 @@ func (q *queue) process(
 				// - the item is enqueued to a system queue
 				// - the Constraint API is disabled or the current account is not enrolled
 				// - the Constraint API provided a lease which expired at the time of leasing the queue item
-				if i.capacityLeaseID == nil {
+				if i.capacityLease == nil {
 					q.log.Trace("item has no capacity lease, skipping lease extension")
 					continue
 				}
@@ -1336,6 +1336,7 @@ func (q *queue) process(
 			QueueShardName:      q.primaryQueueShard.Name,
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
+			CapacityLease:       i.capacityLease,
 		}
 
 		// Call the run func.
@@ -2136,7 +2137,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		I:    *item,
 		PCtr: p.partitionContinueCtr,
 
-		capacityLeaseID: constraintRes.leaseID,
+		capacityLease: constraintRes.capacityLease,
 		// Disable constraint updates in case we skipped constraint checks.
 		// This should always be linked, as we want consistent behavior while
 		// processing a queue item.

@@ -2562,7 +2562,13 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	capacityLeaseID3 := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
 
 	refillItemIDs := []string{item1.ID, item3.ID, item2.ID} // intentionally out of order
-	capacityLeaseIDs := []ulid.ULID{capacityLeaseID, capacityLeaseID3, capacityLeaseID2}
+	capacityLeaseIDs := []osqueue.CapacityLease{{
+		LeaseID: capacityLeaseID,
+	}, {
+		LeaseID: capacityLeaseID3,
+	}, {
+		LeaseID: capacityLeaseID2,
+	}}
 
 	// Refill once, should work
 	res, err := q.BacklogRefill(
@@ -2572,7 +2578,7 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 		clock.Now().Add(time.Minute),
 		refillItemIDs,
 		constraints,
-		WithBacklogRefillItemCapacityLeaseIDs(capacityLeaseIDs),
+		WithBacklogRefillItemCapacityLeases(capacityLeaseIDs),
 	)
 	require.NoError(t, err)
 	require.Equal(t, 3, res.Refill) // refill gets adjusted to constraint
@@ -2583,18 +2589,18 @@ func TestBacklogRefillSetCapacityLease(t *testing.T) {
 	loaded, err := q.ItemByID(ctx, item1.ID, WithQueueOpShard(shard))
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item1.ID)
-	require.NotNil(t, loaded.CapacityLeaseID)
-	require.Equal(t, capacityLeaseID, *loaded.CapacityLeaseID)
+	require.NotNil(t, loaded.CapacityLease)
+	require.Equal(t, capacityLeaseID, loaded.CapacityLease.LeaseID)
 
 	loaded, err = q.ItemByID(ctx, item2.ID, WithQueueOpShard(shard))
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item2.ID)
-	require.NotNil(t, loaded.CapacityLeaseID)
-	require.Equal(t, capacityLeaseID2, *loaded.CapacityLeaseID)
+	require.NotNil(t, loaded.CapacityLease)
+	require.Equal(t, capacityLeaseID2, loaded.CapacityLease.LeaseID)
 
 	loaded, err = q.ItemByID(ctx, item3.ID, WithQueueOpShard(shard))
 	require.NoError(t, err)
 	require.Equal(t, loaded.ID, item3.ID)
-	require.NotNil(t, loaded.CapacityLeaseID)
-	require.Equal(t, capacityLeaseID3, *loaded.CapacityLeaseID)
+	require.NotNil(t, loaded.CapacityLease)
+	require.Equal(t, capacityLeaseID3, loaded.CapacityLease.LeaseID)
 }

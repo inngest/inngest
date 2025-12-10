@@ -149,7 +149,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			I:                        qi,
 			P:                        p,
 			disableConstraintUpdates: false,
-			capacityLeaseID:          nil,
+			capacityLease:            nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			atomic.AddInt64(&counter, 1)
 			return osqueue.RunResult{}, nil
@@ -187,7 +187,7 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			I:                        qi,
 			P:                        p,
 			disableConstraintUpdates: false,
-			capacityLeaseID:          nil,
+			capacityLease:            nil,
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			<-time.After(3 * time.Second)
 			atomic.AddInt64(&counter, 1)
@@ -277,7 +277,9 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			I:                        qi,
 			P:                        p,
 			disableConstraintUpdates: true,
-			capacityLeaseID:          &resp.Leases[0].LeaseID,
+			capacityLease: &osqueue.CapacityLease{
+				LeaseID: resp.Leases[0].LeaseID,
+			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			go func() {
 				for {
@@ -534,7 +536,9 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		cmLifecycles.reset()
 
 		// Set capacity lease ID
-		qi.CapacityLeaseID = &resp.Leases[0].LeaseID
+		qi.CapacityLease = &osqueue.CapacityLease{
+			LeaseID: resp.Leases[0].LeaseID,
+		}
 
 		p := q.ItemPartition(ctx, shard, qi)
 
@@ -559,7 +563,7 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 		// Expect item to be sent to worker with capacity lease + request to disable constraint updates
 		item := <-q.workers
 		require.Equal(t, qi, item.I)
-		require.Equal(t, qi.CapacityLeaseID, item.capacityLeaseID)
+		require.Equal(t, qi.CapacityLease, item.capacityLease)
 		require.True(t, item.disableConstraintUpdates)
 	})
 }

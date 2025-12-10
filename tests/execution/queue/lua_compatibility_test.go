@@ -368,7 +368,9 @@ func TestLuaCompatibility(t *testing.T) {
 					constraints,
 					redis_state.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
 					redis_state.WithBacklogRefillDisableConstraintChecks(true),
-					redis_state.WithBacklogRefillItemCapacityLeaseIDs([]ulid.ULID{capacityLeaseID}),
+					redis_state.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
+						LeaseID: capacityLeaseID,
+					}}),
 				)
 				require.NoError(t, err)
 				require.NotNil(t, res)
@@ -377,7 +379,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				refilled, err := q.ItemByID(ctx, qi2.ID)
 				require.NoError(t, err)
-				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLeaseID.String())
+				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
 
 			t.Run("current time is returned for rate limiting", func(t *testing.T) {

@@ -628,7 +628,7 @@ type BacklogRefillResult struct {
 type backlogRefillOptions struct {
 	constraintCheckIdempotencyKey string
 	disableConstraintChecks       bool
-	capacityLeaseIDs              []ulid.ULID
+	capacityLeases                []osqueue.CapacityLease
 }
 
 type backlogRefillOptionFn func(o *backlogRefillOptions)
@@ -645,9 +645,9 @@ func WithBacklogRefillDisableConstraintChecks(disableConstraintChecks bool) back
 	}
 }
 
-func WithBacklogRefillItemCapacityLeaseIDs(itemCapacityLeaseIDs []ulid.ULID) backlogRefillOptionFn {
+func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []osqueue.CapacityLease) backlogRefillOptionFn {
 	return func(o *backlogRefillOptions) {
-		o.capacityLeaseIDs = itemCapacityLeaseIDs
+		o.capacityLeases = itemCapacityLeases
 	}
 }
 
@@ -750,9 +750,9 @@ func (q *queue) BacklogRefill(
 	shouldSpotCheckActiveSet := checkConstraints && rand.Intn(100) <= refillProbability
 
 	// Ensure capacityLeaseIDs is never nil to avoid JSON marshaling to "null"
-	capacityLeaseIDs := o.capacityLeaseIDs
+	capacityLeaseIDs := o.capacityLeases
 	if capacityLeaseIDs == nil {
-		capacityLeaseIDs = []ulid.ULID{}
+		capacityLeaseIDs = []osqueue.CapacityLease{}
 	}
 
 	args, err := StrSlice([]any{

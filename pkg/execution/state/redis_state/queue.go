@@ -1019,7 +1019,7 @@ type processItem struct {
 	// PCtr represents the number of times the partition has been continued.
 	PCtr uint
 
-	capacityLeaseID *ulid.ULID
+	capacityLease *osqueue.CapacityLease
 
 	// disableConstraintUpdates determines whether ExtendLease, Requeue,
 	// and Dequeue should update constraint state.
@@ -1043,11 +1043,15 @@ type capacityLease struct {
 	capacityLeaseLock      sync.Mutex
 }
 
-func newCapacityLease(initialLeaseID *ulid.ULID) *capacityLease {
-	return &capacityLease{
-		currentCapacityLeaseID: initialLeaseID,
-		capacityLeaseLock:      sync.Mutex{},
+func newCapacityLease(initialLease *osqueue.CapacityLease) *capacityLease {
+	cl := &capacityLease{
+		capacityLeaseLock: sync.Mutex{},
 	}
+	if initialLease != nil {
+		cl.currentCapacityLeaseID = &initialLease.LeaseID
+	}
+
+	return cl
 }
 
 func (p *capacityLease) set(leaseID *ulid.ULID) {

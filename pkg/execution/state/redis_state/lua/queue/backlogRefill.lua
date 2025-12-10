@@ -88,11 +88,11 @@ local checkConstraints = tonumber(ARGV[16])
 local shouldSpotCheckActiveSet = tonumber(ARGV[17])
 
 -- Constraint API rollout
-local itemCapacityLeaseIDs = {}
+local itemCapacityLeases = {}
 if ARGV[18] ~= nil and ARGV[18] ~= "" and ARGV[18] ~= "null" then
   local success, result = pcall(cjson.decode, ARGV[18])
   if success and type(result) == "table" then
-    itemCapacityLeaseIDs = result
+    itemCapacityLeases = result
   end
 end
 
@@ -301,9 +301,9 @@ if refill > 0 then
       updatedData.rf = backlogID
       updatedData.rat = nowMS
 
-      -- Update item with Capacity Lease ID if lease acquired
-      if itemCapacityLeaseIDs ~= nil and #itemCapacityLeaseIDs > 0 then
-        updatedData.clid = itemCapacityLeaseIDs[i]
+      -- Update item with Capacity Lease if lease acquired
+      if itemCapacityLeases ~= nil and #itemCapacityLeases > 0 then
+        updatedData.cl = itemCapacityLeases[i]
       end
 
       if checkConstraints == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then

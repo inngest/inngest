@@ -111,9 +111,13 @@ type QueueItem struct {
 	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
 
-	// CapacityLeaseID is the optional capacity lease for this queue item.
+	// CapacityLease is the optional capacity lease for this queue item.
 	// This is set when the Constraint API feature flag is enabled and the item was refilled.
-	CapacityLeaseID *ulid.ULID `json:"clid,omitempty"`
+	CapacityLease *CapacityLease `json:"cl,omitempty"`
+}
+
+type CapacityLease struct {
+	LeaseID ulid.ULID `json:"l,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
