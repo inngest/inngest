@@ -109,6 +109,8 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 			end
 			result["reset_after"] = ttl
 
+			result["limited"] = true
+
 			return result
 		end
 	end

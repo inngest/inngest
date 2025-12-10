@@ -19,6 +19,8 @@ import (
 
 func TestNewGCRAScript(t *testing.T) {
 	type rateLimitResult struct {
+		Limited bool `json:"limited"`
+
 		// Limit is the maximum number of requests that could be permitted
 		// instantaneously for this key starting from an empty state. For
 		// example, if a rate limiter allows 10 requests per second per
@@ -213,6 +215,143 @@ func TestNewGCRAScript(t *testing.T) {
 		// Accounts for burst
 		require.Equal(t, 6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, 6*time.Second, time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+
+	t.Run("1 request every 24h should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 24 * time.Hour
+		limit := 1
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixMilli())
+
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+
+		require.Equal(t, (24 * time.Hour).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().Add(24*time.Hour).UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(2*24*time.Hour).UnixMilli())
+		require.Equal(t, (24 * time.Hour * 1).Milliseconds(), res.DVT)
+		require.Equal(t, (1 * 24 * time.Hour).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().Add(24*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixMilli(), res.AllowAt)
+		require.Equal(t, -(24 * time.Hour).Milliseconds(), res.Diff)
+
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, 24*time.Hour, time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, 24*time.Hour, time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+
+	t.Run("3000 requests every minute should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := time.Minute
+		limit := 3000
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Millisecond).UnixMilli())
+		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.DVT)
+		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.Increment)
+		// allow initial request
+		require.Equal(t, clock.Now().Add(20*time.Millisecond).Add(-20*time.Millisecond).UnixMilli(), res.AllowAt)
+		require.Equal(t, time.Duration(0).Milliseconds(), res.Diff)
+
+		// Since we don't have a burst, only one request will be allowed every 20ms
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+
+		require.Equal(t, 20*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+
+	t.Run("3000 requests every minute with burst should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		r, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := time.Minute
+		limit := 3000
+		burst := 1
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 2)
+		require.False(t, res.Limited)
+
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(2*20*time.Millisecond).UnixMilli())
+		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, (2 * 20 * time.Millisecond).Milliseconds(), res.DVT)
+		require.Equal(t, (2 * 20 * time.Millisecond).Milliseconds(), res.Increment)
+		// allow initial request
+		require.Equal(t, clock.Now().Add(2*20*time.Millisecond).Add(-2*20*time.Millisecond).UnixMilli(), res.AllowAt)
+		require.Equal(t, time.Duration(0).Milliseconds(), res.Diff)
+
+		// Since we don't have a burst, only one request will be allowed every 20ms
+		require.Equal(t, 2, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+
+		// burst was applied
+		require.Equal(t, 2*20*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
+
+		// request was allowed
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+
+		// second request should be blocked
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		require.True(t, res.Limited)
+		require.Equal(t, 20*time.Millisecond, time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(2*20*time.Millisecond).UnixMilli(), res.TAT)
+
+		// waiting for 20ms should unblock 1 request
+		clock.Advance(20 * time.Millisecond)
+		r.FastForward(20 * time.Millisecond)
+		r.SetTime(clock.Now())
+
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		require.False(t, res.Limited)
+		require.Equal(t, 1, res.Remaining)
+		require.Equal(t, 20*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
+
+		// waiting for 20ms should unblock the burst request
+		clock.Advance(20 * time.Millisecond)
+		r.FastForward(20 * time.Millisecond)
+		r.SetTime(clock.Now())
+
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		require.False(t, res.Limited)
+		require.Equal(t, 2, res.Remaining)
+		require.Equal(t, 0*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
 	})
 }
 
