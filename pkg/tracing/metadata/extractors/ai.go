@@ -2,9 +2,13 @@ package extractors
 
 import (
 	"context"
+	"net/http"
+	"net/url"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -89,4 +93,52 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) AIMetadata {
 	}
 
 	return md
+}
+
+func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte) ([]metadata.Structured, error) {
+	parsedInput, err := aigateway.ParseInput(req)
+	if err != nil {
+		return nil, &metadata.WarningError{
+			Key: "inngest.ai.request.parsing.failed",
+			Err: err,
+		}
+	}
+
+	u, err := url.Parse(parsedInput.URL)
+	if err != nil {
+		return nil, &metadata.WarningError{
+			Key: "inngest.ai.request.parsing.failed",
+			Err: err,
+		}
+	}
+
+	parsedOutput, err := aigateway.ParseOutput(req.Format, resp)
+	if err != nil {
+		return nil, &metadata.WarningError{
+			Key: "inngest.ai.response.parsing.failed",
+			Err: err,
+		}
+	}
+
+	return []metadata.Structured{
+		&AIMetadata{
+			Model:         parsedInput.Model,
+			System:        req.Format, // TODO: make sure this is reasonable
+			OperationName: "",         // TODO: figure this out
+
+			InputTokens:  int64(parsedOutput.TokensIn),
+			OutputTokens: int64(parsedOutput.TokensOut),
+		},
+		&HTTPMetadata{
+			Method:             http.MethodPost,
+			Domain:             util.ToPtr(u.Host),
+			Path:               util.ToPtr(u.Path),
+			RequestContentType: util.ToPtr("application/json"),
+			RequestSize:        util.ToPtr(int64(len(req.Body))),
+
+			ResponseContentType: util.ToPtr("application/json"),
+			ResponseSize:        util.ToPtr(int64(len(resp))),
+			ResponseStatus:      int64(respStatus),
+		},
+	}, nil
 }
