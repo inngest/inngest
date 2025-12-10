@@ -420,7 +420,7 @@ type SpanMetadata struct {
 	Scope     enums.MetadataScope `json:"scope"`
 	Kind      metadata.Kind       `json:"kind"`
 	Values    metadata.Values     `json:"values"`
-	UpdatedAt time.Time           `json:"updated_at"`
+	UpdatedAt time.Time           `json:"updatedAt"`
 }
 
 type StepError struct {

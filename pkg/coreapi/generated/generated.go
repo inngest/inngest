@@ -2965,7 +2965,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SpanMetadata.Scope(childComplexity), true
 
-	case "SpanMetadata.updated_at":
+	case "SpanMetadata.updatedAt":
 		if e.complexity.SpanMetadata.UpdatedAt == nil {
 			break
 		}
@@ -4136,7 +4136,7 @@ type SpanMetadata {
   scope: SpanMetadataScope!
   kind: SpanMetadataKind!
   values: SpanMetadataValues!
-  updated_at: Time!
+  updatedAt: Time!
 }
 
 type UserlandSpan {
@@ -19080,8 +19080,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Conte
 				return ec.fieldContext_SpanMetadata_kind(ctx, field)
 			case "values":
 				return ec.fieldContext_SpanMetadata_values(ctx, field)
-			case "updated_at":
-				return ec.fieldContext_SpanMetadata_updated_at(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SpanMetadata", field.Name)
 		},
@@ -19941,8 +19941,8 @@ func (ec *executionContext) fieldContext_SpanMetadata_values(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _SpanMetadata_updated_at(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SpanMetadata_updated_at(ctx, field)
+func (ec *executionContext) _SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField, obj *models.SpanMetadata) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -19972,7 +19972,7 @@ func (ec *executionContext) _SpanMetadata_updated_at(ctx context.Context, field 
 	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_SpanMetadata_updated_at(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SpanMetadata",
 		Field:      field,
@@ -28012,9 +28012,9 @@ func (ec *executionContext) _SpanMetadata(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "updated_at":
+		case "updatedAt":
 
-			out.Values[i] = ec._SpanMetadata_updated_at(ctx, field, obj)
+			out.Values[i] = ec._SpanMetadata_updatedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
