@@ -122,34 +122,14 @@ redis.call("ZREM", keyPartitionScavengerIndex, queueID)
 --
 -- This ensures that scavengeres have updated pointer queues without the currently
 -- leased job, if exists.
-local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 local scavengerIndexScores = redis.call("ZRANGE", keyPartitionScavengerIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-if scavengerIndexScores == false and concurrencyScores == false then
+if scavengerIndexScores == false or scavengerIndexScores == nil or #scavengerIndexScores == 0 then
   redis.call("ZREM", concurrencyPointer, partitionID)
 else
-  -- Either scavenger index or partition in progress set includes more items
+  local earliestLease = tonumber(scavengerIndexScores[2])
 
-  local earliestLease = nil
-  if scavengerIndexScores ~= false and scavengerIndexScores ~= nil then
-    earliestLease = tonumber(scavengerIndexScores[2])
-  end
-
-  -- Fall back to in progress set
-  if earliestLease == nil or (
-    concurrencyScores ~= false and
-    concurrencyScores ~= nil and
-    #concurrencyScores > 0 and
-    tonumber(concurrencyScores[2]
-  ) < earliestLease) then
-    earliestLease = tonumber(concurrencyScores[2])
-  end
-
-  if earliestLease == nil then
-    redis.call("ZREM", concurrencyPointer, partitionID)
-  else
-    -- Ensure that we update the score with the earliest lease
-    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-  end
+  -- Ensure that we update the score with the earliest lease
+  redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
 end
 
 -- For each partition, we now have an extra available capacity.  Check the partition's
