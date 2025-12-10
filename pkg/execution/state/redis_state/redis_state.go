@@ -1617,13 +1617,13 @@ func (i *scanIter) Index() int64 {
 }
 
 func (i *scanIter) fetch(ctx context.Context) error {
-	// Reset the index.
-	i.i = -1
-
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
 		return errScanDone
 	}
+
+	// Reset the index.
+	i.i = -1
 
 	// Scan 100 times up until there are values
 	for scans := 0; scans < 100; scans++ {
