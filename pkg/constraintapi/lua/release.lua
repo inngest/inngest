@@ -18,7 +18,7 @@ local keyScavengerShard = KEYS[2]
 local keyAccountLeases = KEYS[3]
 local keyLeaseDetails = KEYS[4]
 
-local keyPrefix = ARGV[1]
+local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
@@ -53,7 +53,7 @@ if requestID == false or requestID == nil or requestID == "" then
 end
 
 -- Request state must still exist
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, requestID)
+local keyRequestState = string.format("%s:rs:%s", scopedKeyPrefix, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	local res = {}

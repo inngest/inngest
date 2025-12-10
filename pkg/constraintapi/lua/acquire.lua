@@ -32,7 +32,7 @@ local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) --[[@as integer]]
 local nowNS = tonumber(ARGV[5]) --[[@as integer]]
 local leaseExpiryMS = tonumber(ARGV[6])
-local keyPrefix = ARGV[7]
+local scopedKeyPrefix = ARGV[7]
 ---@type string[]
 local initialLeaseIDs = cjson.decode(ARGV[8])
 if not initialLeaseIDs then
@@ -495,7 +495,7 @@ for i = 1, granted, 1 do
 		end
 	end
 
-	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
+	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
 
 	-- Store lease details (hashed lease idempotency key, associated run ID, operation idempotency key for request details)
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
@@ -504,8 +504,7 @@ for i = 1, granted, 1 do
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
 
 	-- Add constraint check idempotency for each lease (for graceful handling in rate limit, Lease, BacklogRefill, as well as Acquire in case lease expired)
-	local keyLeaseConstraintCheckIdempotency =
-		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
 	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 
 	---@type { lid: string, lik: string }

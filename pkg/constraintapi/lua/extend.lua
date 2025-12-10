@@ -71,7 +71,7 @@ local keyAccountLeases = KEYS[3]
 local keyOldLeaseDetails = KEYS[4]
 local keyNewLeaseDetails = KEYS[5]
 
-local keyPrefix = ARGV[1]
+local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
 local newLeaseID = ARGV[4]
@@ -121,7 +121,7 @@ local requestID = leaseDetails[2]
 local leaseRunID = leaseDetails[3]
 
 -- Request state must still exist
-local keyRequestState = string.format("{%s}:%s:rs:%s", keyPrefix, accountID, requestID)
+local keyRequestState = string.format("%s:rs:%s", scopedKeyPrefix, requestID)
 local requestStateStr = call("GET", keyRequestState)
 if requestStateStr == nil or requestStateStr == false or requestStateStr == "" then
 	debug(keyRequestState)
