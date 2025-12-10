@@ -127,11 +127,13 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	now := r.clock.Now()
 
 	args, err := strSlice([]any{
 		rueidis.BinaryString(data),
-		keyPrefix,
+		scopedKeyPrefix,
 		req.AccountID,
 		now.UnixMilli(),
 		now.UnixNano(),

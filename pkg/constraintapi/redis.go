@@ -154,6 +154,10 @@ func NewRedisCapacityManager(
 	return manager, nil
 }
 
+func accountScope(accountID uuid.UUID) string {
+	return fmt.Sprintf("a:%s", accountID)
+}
+
 // keyScavengerShard represents the top-level sharded sorted set containing individual accounts
 func (r *redisCapacityManager) keyScavengerShard(prefix string, shard int) string {
 	return fmt.Sprintf("{%s}:css:%d", prefix, shard)
@@ -161,21 +165,21 @@ func (r *redisCapacityManager) keyScavengerShard(prefix string, shard int) strin
 
 // keyAccountLeases represents active leases for the account
 func (r *redisCapacityManager) keyAccountLeases(prefix string, accountID uuid.UUID) string {
-	return fmt.Sprintf("{%s}:%s:leaseq", prefix, accountID)
+	return fmt.Sprintf("{%s}:%s:leaseq", prefix, accountScope(accountID))
 }
 
 // keyRequestState returns the key storing per-operation request details
 func (r *redisCapacityManager) keyRequestState(prefix string, accountID uuid.UUID, requestID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountID, requestID)
+	return fmt.Sprintf("{%s}:%s:rs:%s", prefix, accountScope(accountID), requestID)
 }
 
 // keyOperationIdempotency returns the operation idempotency key for operation retries
 func (r *redisCapacityManager) keyOperationIdempotency(prefix string, accountID uuid.UUID, operation, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountID, operation, util.XXHash(idempotencyKey))
+	return fmt.Sprintf("{%s}:%s:ik:op:%s:%s", prefix, accountScope(accountID), operation, util.XXHash(idempotencyKey))
 }
 
 func keyConstraintCheckIdempotency(prefix string, accountID uuid.UUID, idempotencyKey string) string {
-	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountID, util.XXHash(idempotencyKey))
+	return fmt.Sprintf("{%s}:%s:ik:cc:%s", prefix, accountScope(accountID), util.XXHash(idempotencyKey))
 }
 
 // keyConstraintCheckIdempotency returns the operation idempotency key for constraint check retries
@@ -185,7 +189,7 @@ func (r *redisCapacityManager) keyConstraintCheckIdempotency(prefix string, acco
 
 // keyLeaseDetails returns the key to the hash including the lease idempotency key, lease run ID, and operation idempotency key
 func (r *redisCapacityManager) keyLeaseDetails(prefix string, accountID uuid.UUID, leaseID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountID, leaseID)
+	return fmt.Sprintf("{%s}:%s:ld:%s", prefix, accountScope(accountID), leaseID)
 }
 
 type keyGenerator struct {

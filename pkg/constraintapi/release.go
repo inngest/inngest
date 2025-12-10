@@ -3,6 +3,7 @@ package constraintapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
@@ -53,8 +54,10 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
-		keyPrefix,
+		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
 		int(r.operationIdempotencyTTL.Seconds()),

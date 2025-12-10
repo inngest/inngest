@@ -15,7 +15,7 @@ local accountID = ARGV[3]
 local nowMS = tonumber(ARGV[4]) 
 local nowNS = tonumber(ARGV[5]) 
 local leaseExpiryMS = tonumber(ARGV[6])
-local keyPrefix = ARGV[7]
+local scopedKeyPrefix = ARGV[7]
 local initialLeaseIDs = cjson.decode(ARGV[8])
 if not initialLeaseIDs then
 	return redis.error_reply("ERR initialLeaseIDs is nil after JSON decode")
@@ -291,11 +291,10 @@ for i = 1, granted, 1 do
 			throttleUpdate(value.t.k, nowMS, value.t.p, value.t.l, 1)
 		end
 	end
-	local keyLeaseDetails = string.format("{%s}:%s:ld:%s", keyPrefix, accountID, initialLeaseID)
+	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
 	call("HSET", keyLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
 	call("ZADD", keyAccountLeases, tostring(leaseExpiryMS), initialLeaseID)
-	local keyLeaseConstraintCheckIdempotency =
-		string.format("{%s}:%s:ik:cc:%s", keyPrefix, accountID, hashedLeaseIdempotencyKey)
+	local keyLeaseConstraintCheckIdempotency = string.format("%s:ik:cc:%s", scopedKeyPrefix, hashedLeaseIdempotencyKey)
 	call("SET", keyLeaseConstraintCheckIdempotency, tostring(nowMS), "EX", tostring(constraintCheckIdempotencyTTL))
 	local leaseObject = {}
 	leaseObject["lid"] = initialLeaseID

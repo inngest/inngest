@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
@@ -61,8 +62,10 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
-		keyPrefix,
+		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
 		newLeaseID.String(),

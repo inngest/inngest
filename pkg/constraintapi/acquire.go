@@ -247,6 +247,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
 		// This will be marshaled
 		rueidis.BinaryString(requestState),
@@ -257,7 +259,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		now.UnixNano(),  // current time in nanoseconds for rate limiting
 
 		leaseExpiry.UnixMilli(),
-		keyPrefix,
+		scopedKeyPrefix,
 		initialLeaseIDs,
 
 		int(operationIdempotencyPeriod.Seconds()),
