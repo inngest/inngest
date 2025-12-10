@@ -82,6 +82,8 @@ func TestNewGCRAScript(t *testing.T) {
 	}
 
 	t.Run("should return gcra result struct", func(t *testing.T) {
+		t.Parallel()
+
 		clock := clockwork.NewFakeClock()
 
 		_, rc := initRedis(t)
@@ -107,6 +109,69 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 1, res.Remaining)
 		require.Equal(t, time.Duration(0), time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+
+	t.Run("consume 1 should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixMilli())
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.DVT)
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().UnixMilli(), res.AllowAt)
+		require.Equal(t, int64(0), res.Diff)
+
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, 6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+
+	t.Run("consume 1 with burst 1 should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 1
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 2)
+
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
+		require.Equal(t, (12 * time.Second).Milliseconds(), res.DVT)
+		require.Equal(t, (2 * 6 * time.Second).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixMilli(), res.AllowAt)
+		require.Equal(t, (0 * time.Second).Milliseconds(), res.Diff)
+
+		require.Equal(t, 2, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		// Accounts for burst
+		require.Equal(t, 2*6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
 	})
 }
