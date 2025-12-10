@@ -191,6 +191,7 @@ func (r *redisConnectionStateManager) GetConnectionsByAppID(ctx context.Context,
 		var conn connpb.ConnMetadata
 		// ignore zombie Connection IDs (where metadata doesn't exist)
 		if len(meta) == 0 {
+			r.logger.Info("ignoring zombie connection metadata", "env_id", envId, "app_id", appID, "connections", res)
 			continue
 		}
 		if err := json.Unmarshal([]byte(meta), &conn); err != nil {
