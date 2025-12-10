@@ -118,7 +118,7 @@ func TestIsConnectWorkerAtCapacityError_EdgeCases(t *testing.T) {
 
 	t.Run("custom error type that wraps ErrConnectWorkerCapacity", func(t *testing.T) {
 		customErr := &customError{inner: ErrConnectWorkerCapacity}
-		
+
 		// This should return false because errors.Is only works if Unwrap is implemented
 		// Since customError doesn't implement Unwrap(), errors.Is() will return false
 		require.False(t, IsConnectWorkerAtCapacityError(customErr))
