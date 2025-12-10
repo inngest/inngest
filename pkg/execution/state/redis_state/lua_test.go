@@ -1,6 +1,7 @@
 package redis_state
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -15,6 +16,100 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewGCRAScript(t *testing.T) {
+	type rateLimitResult struct {
+		// Limit is the maximum number of requests that could be permitted
+		// instantaneously for this key starting from an empty state. For
+		// example, if a rate limiter allows 10 requests per second per
+		// key, Limit would always be 10.
+		Limit int `json:"limit"`
+
+		// Remaining is the maximum number of requests that could be
+		// permitted instantaneously for this key given the current
+		// state. For example, if a rate limiter allows 10 requests per
+		// second and has already received 6 requests for this key this
+		// second, Remaining would be 4.
+		Remaining int `json:"remaining"`
+
+		// ResetAfter is the time until the RateLimiter returns to its
+		// initial state for a given key. For example, if a rate limiter
+		// manages requests per second and received one request 200ms ago,
+		// Reset would return 800ms. You can also think of this as the time
+		// until Limit and Remaining will be equal.
+		ResetAfterMS int64 `json:"reset_after"`
+
+		// RetryAfter is the time until the next request will be permitted.
+		// It should be -1 unless the rate limit has been exceeded.
+		RetryAfterMS int64 `json:"retry_after"`
+
+		EmissionInterval int64 `json:"ei"`
+		DVT              int64 `json:"dvt"`
+
+		TAT    int64 `json:"tat"`
+		NewTAT int64 `json:"ntat"`
+
+		Increment int64 `json:"inc"`
+		AllowAt   int64 `json:"aat"`
+
+		Diff int64 `json:"diff"`
+
+		TTL int64 `json:"ttl"`
+
+		Next int64 `json:"next"`
+	}
+
+	runScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) rateLimitResult {
+		nowMS := now.UnixMilli()
+		args, err := StrSlice([]any{
+			key,
+			nowMS,
+			limit,
+			burst,
+			period.Milliseconds(),
+			capacity,
+		})
+		require.NoError(t, err)
+
+		rawRes, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToString()
+		require.NoError(t, err)
+
+		var res rateLimitResult
+		err = json.Unmarshal([]byte(rawRes), &res)
+		require.NoError(t, err)
+
+		return res
+	}
+
+	t.Run("should return gcra result struct", func(t *testing.T) {
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := 1 * time.Minute
+		limit := 10
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixMilli())
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.DVT)
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().UnixMilli(), res.AllowAt)
+		require.Equal(t, int64(0), res.Diff)
+
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 1, res.Remaining)
+		require.Equal(t, time.Duration(0), time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+	})
+}
 
 func TestLuaGCRA(t *testing.T) {
 	runScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) (int, time.Time) {
