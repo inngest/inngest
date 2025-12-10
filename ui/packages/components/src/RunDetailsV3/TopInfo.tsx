@@ -22,9 +22,7 @@ import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
-import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import type { Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -32,7 +30,6 @@ type TopInfoProps = {
   result?: TraceResult;
   runID: string;
   resultLoading?: boolean;
-  trace?: Trace;
 };
 
 export type Trigger = {
@@ -83,14 +80,7 @@ export const actionConfigs = (
   };
 };
 
-export const TopInfo = ({
-  slug,
-  getTrigger,
-  runID,
-  result,
-  resultLoading,
-  trace,
-}: TopInfoProps) => {
+export const TopInfo = ({ slug, getTrigger, runID, result, resultLoading }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
   const { invoke, loading: invokeLoading, error: invokeError } = useInvokeRun();
@@ -296,15 +286,6 @@ export const TopInfo = ({
                         loading={isPending || resultLoading}
                       />
                     ),
-                  },
-                ]
-              : []),
-            ...(trace?.metadata?.length
-              ? [
-                  {
-                    label: 'Metadata',
-                    id: 'metadata',
-                    node: <MetadataAttrs metadata={trace.metadata} />,
                   },
                 ]
               : []),
