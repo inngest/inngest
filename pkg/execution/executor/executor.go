@@ -1882,7 +1882,7 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 			}
 
 			// check for connect worker capacity errors after updating the UI response
-			if serr.Code == syscode.CodeConnectAllWorkersAtCapacity || serr.Code == syscode.CodeConnectRequestAssignWorkerReachedCapacity {
+			if state.IsConnectWorkerAtCapacityCode(serr.Code) {
 				err = queue.AlwaysRetryError(state.ErrConnectWorkerCapacity)
 				gracefulErr.Message = "All workers are at capacity"
 				gracefulErr.Stack = fmt.Sprintf("%s\n%s\n%s", serr.Message, "This is a retryable error", "The executor will retry again")
