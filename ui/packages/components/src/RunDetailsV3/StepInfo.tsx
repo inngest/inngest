@@ -22,7 +22,6 @@ import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
-import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
@@ -271,27 +270,7 @@ export const StepInfo = ({
       )}
 
       {trace.isUserland && trace.userlandSpan ? (
-        <div className="flex-1">
-          <Tabs
-            defaultActive={'attributes'}
-            tabs={[
-              {
-                label: 'Attributes',
-                id: 'attributes',
-                node: <UserlandAttrs userlandSpan={trace.userlandSpan} />,
-              },
-              ...(trace.metadata?.length
-                ? [
-                    {
-                      label: 'Metadata',
-                      id: 'metadata',
-                      node: <MetadataAttrs metadata={trace.metadata} />,
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </div>
+        <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
         <>
           {result?.error && <ErrorInfo error={prettyShortError} />}
@@ -330,15 +309,6 @@ export const StepInfo = ({
                             loading={loading}
                           />
                         ),
-                      },
-                    ]
-                  : []),
-                ...(trace.metadata?.length
-                  ? [
-                      {
-                        label: 'Metadata',
-                        id: 'metadata',
-                        node: <MetadataAttrs metadata={trace.metadata} />,
                       },
                     ]
                   : []),
