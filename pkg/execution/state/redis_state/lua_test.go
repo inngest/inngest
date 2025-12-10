@@ -353,6 +353,26 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 2, res.Remaining)
 		require.Equal(t, 0*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
 	})
+
+	t.Run("capacity calculation should work", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := time.Minute
+		limit := 20
+		burst := 0
+
+		// Read initial capacity
+		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 20, res.Remaining)
+	})
 }
 
 func TestLuaGCRA(t *testing.T) {
