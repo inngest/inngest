@@ -7,8 +7,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
-import { isHobbyFreePlan } from '@/components/Billing/Plans/utils';
+import { LimitBar, type Data } from '@/components/Billing/LimitBar';
+import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -20,6 +22,13 @@ export const Route = createFileRoute('/_authed/billing/')({
   component: BillingComponent,
   ssr: true,
   loader: async () => {
+    const usageMetricsCacheEnabled = await getBooleanFlag(
+      'usage-metrics-db-cache',
+      {
+        defaultValue: false,
+      },
+    );
+
     const { addons, entitlements } = await getEntitlementUsage();
 
     const { plan: currentPlan, subscription: currentSubscription } =
@@ -30,12 +39,82 @@ export const Route = createFileRoute('/_authed/billing/')({
       throw new Error('Failed to fetch current plan');
     }
 
+    let runs: Data | null = null;
+    let steps: Data | null = null;
+    let executions: Data | null = null;
+    let isCurrentHobbyPlan = false;
+    let legacyNoRunsPlan = false;
+
+    if (usageMetricsCacheEnabled) {
+      isCurrentHobbyPlan = isHobbyPlan(currentPlan);
+      legacyNoRunsPlan = entitlements.runCount.limit === null;
+
+      const stepUsage = (entitlements.stepCount as any).usage || 0;
+      const stepLimit = entitlements.stepCount.limit;
+      const runUsage = (entitlements.runCount as any).usage || 0;
+      const runLimit = entitlements.runCount.limit;
+      const executionUsage = (entitlements as any).executions?.usage || 0;
+      const executionLimit = (entitlements as any).executions?.limit;
+
+      runs = {
+        title: 'Runs',
+        description: `${
+          entitlements.runCount.overageAllowed
+            ? 'Additional usage incurred at additional charge.'
+            : ''
+        }`,
+        current: runUsage,
+        limit: runLimit,
+        overageAllowed: entitlements.runCount.overageAllowed,
+        tooltipContent: 'A single durable function execution.',
+      };
+
+      const isExecutionBasedPlan =
+        currentPlan.slug === 'pro-2025-08-08' ||
+        currentPlan.slug === 'pro-2025-06-04';
+
+      steps = {
+        title: isExecutionBasedPlan ? 'Executions' : 'Steps',
+        description: `${
+          entitlements.runCount.overageAllowed && !legacyNoRunsPlan
+            ? 'Additional usage incurred at additional charge. Additional runs include 5 steps per run.'
+            : entitlements.runCount.overageAllowed
+            ? 'Additional usage incurred at additional charge.'
+            : ''
+        }`,
+        current: stepUsage,
+        limit: stepLimit,
+        overageAllowed: entitlements.stepCount.overageAllowed,
+        tooltipContent: isExecutionBasedPlan
+          ? 'Combined total of runs and steps executed.'
+          : 'An individual step in durable functions.',
+      };
+
+      executions = {
+        title: 'Executions',
+        description: isCurrentHobbyPlan
+          ? 'The maximum number of executions per month'
+          : 'Additional usage billed at the start of the next billing cycle.',
+        current: executionUsage,
+        limit: executionLimit,
+        overageAllowed:
+          (entitlements as any).executions?.overageAllowed || false,
+        tooltipContent: 'Combined total of runs and steps executed.',
+      };
+    }
+
     return {
       addons,
       entitlements,
       currentPlan,
       currentSubscription,
       billing,
+      usageMetricsCacheEnabled,
+      runs,
+      steps,
+      executions,
+      isCurrentHobbyPlan,
+      legacyNoRunsPlan,
     };
   },
 });
@@ -48,8 +127,19 @@ const kbyteDisplayValue = (kibibytes: number): string => {
 };
 
 function BillingComponent() {
-  const { addons, entitlements, currentPlan, currentSubscription, billing } =
-    Route.useLoaderData();
+  const {
+    addons,
+    entitlements,
+    currentPlan,
+    currentSubscription,
+    billing,
+    usageMetricsCacheEnabled,
+    runs,
+    steps,
+    executions,
+    isCurrentHobbyPlan,
+    legacyNoRunsPlan,
+  } = Route.useLoaderData();
 
   const refetch = async () => {
     await getCurrentPlan();
@@ -137,6 +227,19 @@ function BillingComponent() {
             />
           </div>
           <div className="border-subtle mb-6 border" />
+          {usageMetricsCacheEnabled && (
+            <>
+              {runs && !legacyNoRunsPlan && !isCurrentHobbyPlan && (
+                <LimitBar data={runs} className="my-4" />
+              )}
+              {steps && !isCurrentHobbyPlan && (
+                <LimitBar data={steps} className="mb-6" />
+              )}
+              {executions && isCurrentHobbyPlan && (
+                <LimitBar data={executions} className="mb-6" />
+              )}
+            </>
+          )}
           <EntitlementListItem
             planName={currentPlan.name}
             title="Concurrency"

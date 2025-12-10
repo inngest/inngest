@@ -16,7 +16,7 @@ export type Data = {
   tooltipContent?: string | React.ReactNode;
 };
 
-export async function LimitBar({
+export function LimitBar({
   data,
   className,
 }: {
