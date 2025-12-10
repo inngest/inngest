@@ -3,16 +3,16 @@
 -- Returns true on success, false if the key has been rate limited.
 local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
 	-- Calculate the basic variables for GCRA.
-	local cost = 1                            -- everything counts as a single rqeuest
+	local cost = 1 -- everything counts as a single rqeuest
 
-	local emission  = period_ms / math.max(limit, 1)   -- how frequently we can admit new requests
-	local increment = emission * cost         -- this request's time delta
-  -- BUG: The variance is calculated incorrectly. We should use emission instead of period_ms.
-	local variance  = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
-  if enableThrottleFix then
-    -- NOTE: This fixes the delay variation tolerance calculation
-    variance = emission * (math.max(burst, 1))
-  end
+	local emission = period_ms / math.max(limit, 1) -- how frequently we can admit new requests
+	local increment = emission * cost -- this request's time delta
+	-- BUG: The variance is calculated incorrectly. We should use emission instead of period_ms.
+	local variance = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
+	if enableThrottleFix then
+		-- NOTE: This fixes the delay variation tolerance calculation
+		variance = emission * (math.max(burst, 1))
+	end
 
 	-- fetch the theoretical arrival time for equally spaced requests
 	-- at exactly the rate limit
@@ -24,80 +24,114 @@ local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
 	end
 
 	local new_tat = math.max(tat, now_ms) + increment -- add the request's cost to the theoretical arrival time.
-	local allow_at_ms = new_tat - variance            -- handle bursts.
+	local allow_at_ms = new_tat - variance -- handle bursts.
 	local diff_ms = now_ms - allow_at_ms
 
 	if diff_ms < 0 then
-		return {false, false}
+		return { false, false }
 	end
 
 	local expiry = string.format("%d", period_ms / 1000)
 	redis.call("SET", key, new_tat, "EX", expiry)
 
-  local used_burst = tat > now_ms
+	local used_burst = tat > now_ms
 
-	return {true, used_burst}
+	return { true, used_burst }
 end
 
-local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
-  -- calculate emission interval (tau) - time between each token
-  local emission = period_ms / math.max(limit, 1)
+local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
+	---@type { allowed: boolean, limit: integer?, retry_after: integer?, reset_after: integer?, remaining: integer? }
+	local result = {}
 
-  -- retrieve theoretical arrival time
-  local tat = redis.call("GET", key)
-  if not tat then
-    tat = now_ms
-  else
-    tat = tonumber(tat)
-  end
+	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
+	result["limit"] = burst + 1
 
-  -- calculate next theoretical arrival time
-  local new_tat
-  if now_ms > tat then
-    new_tat = now_ms + (math.max(capacity, 1) * emission)
-  else
-    new_tat = tat + (math.max(capacity, 1) * emission)
-  end
+	-- emission defines the window size
+	local emission = period_ms / math.max(limit, 1)
+	result["ei"] = emission
 
-  if capacity > 0 then
-    local expiry = string.format("%d", period_ms / 1000)
-    if expiry == "0" then
-      expiry = "1"
-    end
-    redis.call("SET", key, new_tat, "EX", expiry)
-  end
+	-- dvt defines how much burst to apply
+	local dvt = emission * (burst + 1)
+	result["dvt"] = dvt
+
+	-- use existing tat or start at now_ms
+	local tat = redis.call("GET", key)
+	if not tat then
+		tat = now_ms
+	else
+		tat = tonumber(tat)
+	end
+
+	result["tat"] = tat
+
+	local origQuantity = quantity
+	if quantity == 0 then
+		quantity = 1
+	end
+
+	-- increment based on quantity
+	local increment = quantity * emission
+	result["inc"] = increment
+
+	-- if existing tat is in the past, increment from now_ms
+	local new_tat = tat + increment
+	if now_ms > tat then
+		new_tat = now_ms + increment
+	end
+	result["ntat"] = new_tat
+
+	-- requests should be allowed from the new_tat on, burst
+	-- decreases the time to allowing a new request even if the original period received the maximum number of requests
+	local allow_at = new_tat - dvt
+	result["aat"] = allow_at
+
+	-- allow_at must be in the past to allow the request (diff >= 0)
+	local diff = now_ms - allow_at
+	result["diff"] = diff
+
+	local ttl = 0
+
+	if diff < 0 then
+		if increment <= dvt then
+			-- retry_after outlines when the next request would be accepted
+			result["retry_after"] = -diff
+			-- ttl represents the current time until the full "limit" is allowed again
+			ttl = tat - now_ms
+			result["ttl"] = ttl
+		end
+
+		if origQuantity > 0 then
+			-- if we did want to update, we got limited
+			local next = dvt - ttl
+			result["next"] = next
+			if next > -emission then
+				result["remaining"] = math.floor(next / emission)
+			end
+			result["reset_after"] = ttl
+
+			return result
+		end
+	end
+
+	ttl = tat - now_ms
+	if origQuantity > 0 then
+		-- update state to new_tat
+		ttl = new_tat - now_ms
+		local expiry = string.format("%d", math.max(ttl / 1000, 1))
+		redis.call("SET", key, new_tat, "EX", expiry)
+	end
+	result["ttl"] = ttl
+
+	local next = dvt - ttl
+	if next > -emission then
+		result["remaining"] = math.floor(next / emission)
+	end
+	result["reset_after"] = ttl
+	result["next"] = next
+
+	return result
 end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-  -- calculate emission interval (tau) - time between each token
-  local emission = period_ms / math.max(limit, 1)
-
-  -- calculate total capacity in time units
-  local total_capacity_time = emission * (limit + burst)
-
-  -- retrieve theoretical arrival time
-  local tat = redis.call("GET", key)
-  if not tat then
-    tat = now_ms
-  else
-    tat = tonumber(tat)
-  end
-
-  -- remaining capacity in time units
-  local time_capacity_remain = now_ms + total_capacity_time - tat
-
-  -- Convert the remaining time budget back into a number of tokens.
-  local capacity = math.floor(time_capacity_remain / emission)
-
-  -- The capacity cannot exceed the defined limit + burst.
-  local final_capacity = math.min(capacity, limit + burst)
-
-  -- Calculate when the next unit will be available after consuming all remaining capacity.
-  -- The current TAT represents when the bucket becomes "full" if no requests are made.
-  -- If we consume final_capacity tokens now, we need to advance TAT by final_capacity * emission.
-  -- The next token after consumption will be available when: new_tat + emission - total_capacity_time
-  local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
-  local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
-
-  return { final_capacity, next_available_at_ms }
+	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0)
 end
