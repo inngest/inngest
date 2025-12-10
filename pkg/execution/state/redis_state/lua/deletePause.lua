@@ -25,8 +25,6 @@ local blockIdxValue = ARGV[4]
 
 redis.call("HDEL", pauseEventKey, pauseID)
 local deleted = redis.call("DEL", pauseKey)
--- SREM to remove the pause for this run
-redis.call("SREM", keyRunPauses, pauseID)
 
 -- Clean up global index
 redis.call("SREM", keyPausesIdx, pauseID)
@@ -50,6 +48,8 @@ redis.call("ZREM", keyPauseExpIdx, pauseID)
 
 
 if blockIdxValue ~= "" then
+  -- Special deletion case, we are deleting this pause because it's
+  -- part of a block now.
   if deleted > 0 then
     redis.call("SET", keyPausesBlockIdx, blockIdxValue, "KEEPTTL")
   else
@@ -58,7 +58,10 @@ if blockIdxValue ~= "" then
     return 1
   end
 else
+  -- Normal delete so we can delete all the keys
   redis.call("DEL", keyPausesBlockIdx)
+  -- Remove the pause for this run
+  redis.call("SREM", keyRunPauses, pauseID)
 end
 
 return 0
