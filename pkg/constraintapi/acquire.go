@@ -249,8 +249,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
 
-	// TODO: Pass through flag
-	enableThrottleCompatibilityModeVal := "0"
+	// NOTE: This flag is temporary and will be removed once we have fully rolled out the fixed gcra implementation
+	// across all accounts
+	enableThrottleCompatibilityModeVal := req.EnableThrottleCompatibilityMode
 
 	args, err := strSlice([]any{
 		// This will be marshaled

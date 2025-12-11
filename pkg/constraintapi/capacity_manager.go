@@ -186,6 +186,9 @@ type CapacityAcquireRequest struct {
 	Source LeaseSource
 
 	Migration MigrationIdentifier
+
+	// EnableThrottleCompatibilityMode is a temporary flag to enable legacy gcra behavior until we have fully rolled out the GCRA fixes to all accounts.
+	EnableThrottleCompatibilityMode bool
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).

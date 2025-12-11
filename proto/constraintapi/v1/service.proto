@@ -188,6 +188,7 @@ message CapacityAcquireRequest {
   google.protobuf.Duration blocking_threshold = 13;
   LeaseSource source = 14;
   MigrationIdentifier migration = 15;
+  bool enable_throttle_compatibility_mode = 16;
 }
 
 message CapacityAcquireResponse {

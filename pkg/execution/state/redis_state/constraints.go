@@ -131,6 +131,7 @@ func (q *queue) backlogRefillConstraintCheck(
 			IsRateLimit: false,
 			QueueShard:  q.primaryQueueShard.Name,
 		},
+		EnableThrottleCompatibilityMode: q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *shadowPart.AccountID),
 	})
 	if err != nil {
 		if !fallback {
@@ -283,6 +284,7 @@ func (q *queue) itemLeaseConstraintCheck(
 			IsRateLimit: false,
 			QueueShard:  q.primaryQueueShard.Name,
 		},
+		EnableThrottleCompatibilityMode: q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *shadowPart.AccountID),
 	})
 	if err != nil {
 		l.Error("could not acquire capacity lease", "err", err)
