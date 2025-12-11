@@ -7,9 +7,4 @@ local capacity = tonumber(ARGV[6])
 
 -- $include(gcra.lua)
 
-if capacity > 0 then
-	gcraUpdate(gcraKey, nowMS, period, limit, burst, capacity)
-	return { -1, 0 }
-end
-
-return gcraCapacity(gcraKey, nowMS, period, limit, burst)
+return cjson.encode(applyGCRA(gcraKey, nowMS, period, limit, burst, capacity))
