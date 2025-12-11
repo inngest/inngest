@@ -62,12 +62,6 @@ function TicketDetail() {
             {formatTimestamp(ticket.updatedAt)}
           </div>
         </div>
-
-        {ticket.description && (
-          <div className="bg-canvasSubtle mt-4 rounded-lg p-4">
-            <p className="text-basis text-sm">{ticket.description}</p>
-          </div>
-        )}
       </div>
 
       {/* Conversation timeline */}
@@ -108,6 +102,15 @@ function TicketDetail() {
                 {entry.node.entry.__typename === "EmailEntry" && (
                   <div className="mt-4">
                     <Markdown content={entry.node.entry.markdownContent} />
+                  </div>
+                )}
+                {entry.node.entry.__typename === "CustomEntry" && (
+                  <div className="mt-4">
+                    <Markdown
+                      content={entry.node.entry.components
+                        .map((component) => component.text)
+                        .join("\n")}
+                    />
                   </div>
                 )}
               </div>
