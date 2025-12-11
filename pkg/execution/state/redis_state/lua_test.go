@@ -73,7 +73,7 @@ func TestNewGCRAScript(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		rawRes, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToString()
+		rawRes, err := scripts["test/gcra"].Exec(t.Context(), rc, []string{}, args).ToString()
 		require.NoError(t, err)
 
 		var res rateLimitResult
