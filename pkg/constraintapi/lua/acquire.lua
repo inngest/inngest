@@ -536,8 +536,9 @@ for i = 1, granted, 1 do
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
 			-- update throttle: consume 1 unit
-			-- we simply pass the original burst here, as we are just planning to consume 1 unit
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, value.t.b, 1, enableThrottleCompatibilityMode)
+			-- allow consuming all capacity in one request (for generating multiple leases)
+			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1, enableThrottleCompatibilityMode)
 		end
 	end
 

@@ -324,7 +324,8 @@ for i = 1, granted, 1 do
 		elseif value.k == 2 then
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, value.t.b, 1, enableThrottleCompatibilityMode)
+			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1, enableThrottleCompatibilityMode)
 		end
 	end
 	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)
