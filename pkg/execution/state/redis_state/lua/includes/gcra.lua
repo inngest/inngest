@@ -75,6 +75,8 @@ local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity, compati
 
 			result["limited"] = true
 
+			result["retry_at"] = now_ms + (result["retry_after"] or 0)
+
 			return result
 		end
 	end
@@ -88,9 +90,17 @@ local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity, compati
 	end
 	result["ttl"] = ttl
 
+	-- if we allowed the request, allow an immediate retry
+	result["retry_at"] = now_ms
+
 	local next = dvt - ttl
 	if next > -emission then
-		result["remaining"] = math.floor(next / emission)
+		local remaining = math.floor(next / emission)
+		result["remaining"] = remaining
+
+		if remaining == 0 then
+			result["retry_at"] = now_ms + emission
+		end
 	end
 	result["reset_after"] = ttl
 	result["next"] = next
@@ -111,12 +121,11 @@ end
 
 local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 	local allowRefillingAll = limit + burst
-	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll, quantity, false)
+	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll - 1, quantity, false)
 
-	return { res["remaining"], res["ttl"] }
+	return { res["remaining"], res["retry_at"] }
 end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	local allowRefillingAll = limit + burst
-	return gcraUpdate(key, now_ms, period_ms, limit, allowRefillingAll - 1, 0)
+	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0)
 end
