@@ -105,7 +105,7 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 			local next = dvt - ttl
 			result["next"] = next
 			if next > -emission then
-				result["remaining"] = math.floor((dvt - ttl) / emission)
+				result["remaining"] = math.floor(next / emission)
 			end
 			result["reset_after"] = ttl
 
@@ -126,7 +126,7 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 
 	local next = dvt - ttl
 	if next > -emission then
-		result["remaining"] = math.floor((dvt - ttl) / emission)
+		result["remaining"] = math.floor(next / emission)
 	end
 	result["reset_after"] = ttl
 	result["next"] = next
