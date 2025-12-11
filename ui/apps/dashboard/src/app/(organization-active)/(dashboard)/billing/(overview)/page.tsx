@@ -58,6 +58,18 @@ export default async function Page() {
     isCurrentHobbyPlan = isHobbyPlan(currentPlan);
     legacyNoRunsPlan = entitlements.runCount.limit === null;
 
+    const getBillingModel = (
+      entitlements: EntitlementUsageWithMetricsQuery['account']['entitlements']
+    ) => {
+      if (entitlements.executions.limit !== null) return 'executions';
+      return 'steps-runs';
+    };
+
+    const billingModel = getBillingModel(
+      entitlements as EntitlementUsageWithMetricsQuery['account']['entitlements']
+    );
+    const isExecutionBasedPlan = billingModel === 'executions';
+
     runs = {
       title: 'Runs',
       description: `${
@@ -71,8 +83,6 @@ export default async function Page() {
       tooltipContent: 'A single durable function execution.',
     };
 
-    const isExecutionBasedPlan =
-      currentPlan.slug === 'pro-2025-08-08' || currentPlan.slug === 'pro-2025-06-04';
     steps = {
       title: isExecutionBasedPlan ? 'Executions' : 'Steps',
       description: `${
