@@ -1,45 +1,5 @@
--- performs gcra rate limiting for a given key.
---
--- Returns true on success, false if the key has been rate limited.
-local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
-	-- Calculate the basic variables for GCRA.
-	local cost = 1 -- everything counts as a single rqeuest
-
-	local emission = period_ms / math.max(limit, 1) -- how frequently we can admit new requests
-	local increment = emission * cost -- this request's time delta
-	-- BUG: The variance is calculated incorrectly. We should use emission instead of period_ms.
-	local variance = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
-	if enableThrottleFix then
-		-- NOTE: This fixes the delay variation tolerance calculation
-		variance = emission * (math.max(burst, 1))
-	end
-
-	-- fetch the theoretical arrival time for equally spaced requests
-	-- at exactly the rate limit
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
-
-	local new_tat = math.max(tat, now_ms) + increment -- add the request's cost to the theoretical arrival time.
-	local allow_at_ms = new_tat - variance -- handle bursts.
-	local diff_ms = now_ms - allow_at_ms
-
-	if diff_ms < 0 then
-		return { false, false }
-	end
-
-	local expiry = string.format("%d", period_ms / 1000)
-	redis.call("SET", key, new_tat, "EX", expiry)
-
-	local used_burst = tat > now_ms
-
-	return { true, used_burst }
-end
-
-local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
+-- applyGCRA runs GCRA
+local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity, compatibility_mode)
 	---@type { allowed: boolean, limit: integer?, retry_after: integer?, reset_after: integer?, remaining: integer? }
 	local result = {}
 
@@ -50,8 +10,12 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 	local emission = period_ms / math.max(limit, 1)
 	result["ei"] = emission
 
-	-- dvt defines how much burst to apply
+	-- dvt determines how many requests can be admitted
 	local dvt = emission * (burst + 1)
+	if compatibility_mode then
+		-- compatibility mode is used to ensure we perform the legacy gcra() implementation
+		dvt = period_ms * (burst + 1)
+	end
 	result["dvt"] = dvt
 
 	-- use existing tat or start at now_ms
@@ -134,6 +98,25 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
 	return result
 end
 
+-- performs gcra rate limiting for a given key.
+--
+-- Returns true on success, false if the key has been rate limited.
+local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
+	local res = applyGCRA(key, now_ms, period_ms, limit, burst, 1, not enableThrottleFix)
+
+	local used_burst = res["tat"] > now_ms
+
+	return { res["allowed"], used_burst }
+end
+
+local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
+	local allowRefillingAll = limit + burst
+	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll, quantity, false)
+
+	return { res["remaining"], res["ttl"] }
+end
+
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0)
+	local allowRefillingAll = limit + burst
+	return gcraUpdate(key, now_ms, period_ms, limit, allowRefillingAll - 1, 0)
 end
