@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -193,35 +194,37 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 	// Legacy, but try to pull the run ID out from the attributes using the
 	// legacy key.
 	var runID ulid.ULID
+	var functionID uuid.UUID
 	for _, kv := range attrs {
-		if kv.Key == consts.OtelAttrSDKRunID {
+		switch kv.Key {
+		case consts.OtelAttrSDKRunID:
 			runID, err = ulid.Parse(kv.Value.AsString())
 			if err != nil {
 				return fmt.Errorf("failed to parse run ID from attributes: %w", err)
 			}
-
-			break
+		case consts.OtelSysFunctionID:
+			functionID, err = uuid.Parse(kv.Value.AsString())
+			if err != nil {
+				return fmt.Errorf("failed to parse function ID from attributes: %w", err)
+			}
 		}
+	}
+
+	// NOTE: We can't use the external ID/slug because that is not included in the extended trace spans so
+	// instead we fetch the function anyways and then validate that the workspace IDs match.
+	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
+	if err != nil {
+		return fmt.Errorf("function not found: %w", err)
+	} else if fn.EnvID != uuid.Nil && fn.EnvID != auth.WorkspaceID() {
+		return fmt.Errorf("mismatched workspace ID")
+	} else if fn.IsArchived() {
+		return fmt.Errorf("function is archived: %s", functionID)
 	}
 
 	spanID := trace.SpanID(s.SpanId).String()
 	spanKind := trace.SpanKind(s.Kind).String()
 	resourceServiceName := resourceServiceName(res)
 	isUserland := true
-
-	run, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
-	if err != nil {
-		return fmt.Errorf("function run not found: %w", err)
-	}
-	functionID := run.FunctionID
-
-	fn, err := a.opts.FunctionReader.GetFunctionByInternalUUID(ctx, functionID)
-	if err != nil {
-		return fmt.Errorf("function not found: %w", err)
-	}
-	if fn.IsArchived() {
-		return fmt.Errorf("function is archived: %s", functionID)
-	}
 
 	tenantAttrs := meta.NewAttrSet(
 		meta.Attr(meta.Attrs.RunID, &runID),
