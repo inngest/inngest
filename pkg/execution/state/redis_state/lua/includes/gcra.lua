@@ -119,13 +119,13 @@ local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
 	return { res["allowed"], used_burst }
 end
 
-local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
+local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity, enableThrottleFix)
 	local allowRefillingAll = limit + burst
-	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll - 1, quantity, false)
+	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll - 1, quantity, not enableThrottleFix)
 
 	return { res["remaining"], res["retry_at"] }
 end
 
-local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0)
+local function gcraCapacity(key, now_ms, period_ms, limit, burst, enableThrottleFix)
+	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0, enableThrottleFix)
 end

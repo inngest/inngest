@@ -755,6 +755,12 @@ func (q *queue) BacklogRefill(
 		capacityLeaseIDs = []osqueue.CapacityLease{}
 	}
 
+	checkThrottle := checkConstraints && b.Throttle != nil 
+	enableThrottleFix := "0"
+	if  checkThrottle && sp.AccountID != nil && q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *sp.AccountID) {
+		enableThrottleFix = "1"
+	}
+
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,
@@ -778,6 +784,7 @@ func (q *queue) BacklogRefill(
 		shouldSpotCheckActiveSet,
 
 		capacityLeaseIDs,
+		enableThrottleFix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
