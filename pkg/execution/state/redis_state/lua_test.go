@@ -18,6 +18,16 @@ import (
 )
 
 func TestNewGCRAScript(t *testing.T) {
+	type gcraScriptOptions struct {
+		key                     string
+		now                     time.Time
+		period                  time.Duration
+		limit                   int
+		burst                   int
+		quantity                int
+		enableCompatibilityMode bool
+	}
+
 	type rateLimitResult struct {
 		Limited bool `json:"limited"`
 
@@ -65,15 +75,20 @@ func TestNewGCRAScript(t *testing.T) {
 		Next int64 `json:"next"`
 	}
 
-	runScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) rateLimitResult {
-		nowMS := now.UnixMilli()
+	runScript := func(t *testing.T, rc rueidis.Client, opts gcraScriptOptions) rateLimitResult {
+		compatibilityMode := "0"
+		if opts.enableCompatibilityMode {
+			compatibilityMode = "1"
+		}
+		nowMS := opts.now.UnixMilli()
 		args, err := StrSlice([]any{
-			key,
+			opts.key,
 			nowMS,
-			limit,
-			burst,
-			period.Milliseconds(),
-			capacity,
+			opts.limit,
+			opts.burst,
+			opts.period.Milliseconds(),
+			opts.quantity,
+			compatibilityMode,
 		})
 		require.NoError(t, err)
 
@@ -102,7 +117,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 0
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
@@ -134,7 +156,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 0
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
@@ -166,7 +195,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 1
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 2)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 2,
+		})
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
@@ -199,7 +235,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 0
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(1*6*time.Second).UnixMilli())
@@ -208,7 +251,14 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(6*time.Second).UnixMilli())
@@ -241,7 +291,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 0
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixMilli())
@@ -250,7 +307,14 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, clock.Now().Add(24*time.Hour).UnixMilli(), res.RetryAtMS)
 
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, (24 * time.Hour).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().Add(24*time.Hour).UnixMilli())
@@ -282,7 +346,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 0
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Millisecond).UnixMilli())
@@ -318,7 +389,14 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := 1
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 2)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 2,
+		})
 		require.False(t, res.Limited)
 
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
@@ -341,7 +419,14 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
 
 		// second request should be blocked
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
 		require.True(t, res.Limited)
 		require.Equal(t, 20*time.Millisecond, time.Duration(res.RetryAfterMS)*time.Millisecond)
 		require.Equal(t, clock.Now().Add(2*20*time.Millisecond).UnixMilli(), res.TAT)
@@ -351,7 +436,14 @@ func TestNewGCRAScript(t *testing.T) {
 		r.FastForward(20 * time.Millisecond)
 		r.SetTime(clock.Now())
 
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 1, res.Remaining)
 		require.Equal(t, 20*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
@@ -361,7 +453,14 @@ func TestNewGCRAScript(t *testing.T) {
 		r.FastForward(20 * time.Millisecond)
 		r.SetTime(clock.Now())
 
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 2, res.Remaining)
 		require.Equal(t, 0*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
@@ -390,28 +489,56 @@ func TestNewGCRAScript(t *testing.T) {
 		burst := limit - 1 // assume we can spend entire limit at once!
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 20, res.Remaining)
 		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
 		// use half the capacity at once
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 10,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 10, res.Remaining)
 		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
 		// use remaining half
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 10,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
 		// no more capacity
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, 3*time.Second, time.Duration(res.EmissionInterval)*time.Millisecond)
@@ -423,7 +550,14 @@ func TestNewGCRAScript(t *testing.T) {
 		require.WithinDuration(t, clock.Now().Add(3*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
 
 		// using for multiple items is impossible now
-		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 10,
+		})
 		require.True(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 0, res.Remaining)
@@ -455,7 +589,14 @@ func TestNewGCRAScript(t *testing.T) {
 		maxBurst := limit + burst - 1
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, maxBurst, 0)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    maxBurst,
+			quantity: 0,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 110, res.Limit)
 		require.Equal(t, 110, res.Remaining)
@@ -479,13 +620,27 @@ func TestNewGCRAScript(t *testing.T) {
 		maxBurst := limit + burst - 1
 
 		// Read initial capacity
-		res := runScript(t, rc, key, clock.Now(), period, limit, maxBurst, 0)
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    maxBurst,
+			quantity: 0,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 5, res.Limit)
 		require.Equal(t, 5, res.Remaining)
 
 		// Consume all
-		res = runScript(t, rc, key, clock.Now(), period, limit, maxBurst, 5)
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    maxBurst,
+			quantity: 5,
+		})
 		require.False(t, res.Limited)
 		require.Equal(t, 5, res.Limit)
 		require.Equal(t, 0, res.Remaining)
