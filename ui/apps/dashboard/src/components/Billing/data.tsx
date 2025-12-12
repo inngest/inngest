@@ -274,6 +274,7 @@ export const entitlementUsage = async () => {
 export const currentPlanDocument = graphql(`
   query GetCurrentPlan {
     account {
+      marketplace
       plan {
         id
         slug
