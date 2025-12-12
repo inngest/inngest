@@ -340,6 +340,12 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       spanAttrs
       resourceAttrs
     }
+    metadata {
+      scope
+      kind
+      values
+      updatedAt
+    }
     outputID
     debugRunID
     debugSessionID
