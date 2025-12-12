@@ -18,7 +18,9 @@ export const Route = createFileRoute('/_authed')({
     }
 
     const { userId, token } = await fetchClerkAuth({
-      data: { redirectUrl: location.href },
+      data: {
+        redirectUrl: location.href,
+      },
     });
 
     return {

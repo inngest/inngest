@@ -11,7 +11,10 @@ export const fetchClerkAuth = createServerFn({ method: 'GET' })
     if (!isAuthenticated) {
       throw redirect({
         to: '/sign-in/$',
-        search: { redirect_url: redirectUrl },
+        params: { _splat: '' },
+        search: {
+          redirect_url: redirectUrl?.startsWith('/') ? redirectUrl : undefined,
+        },
       });
     }
 
