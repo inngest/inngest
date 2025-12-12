@@ -649,6 +649,96 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, time.Hour.Milliseconds(), res.TTL)
 		require.Equal(t, time.Hour.Milliseconds(), res.ResetAfterMS)
 	})
+
+	t.Run("compatibility mode should have incorrectly large dvt", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		_, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		period := time.Minute
+		limit := 3000
+		// simulate legacy gcra() beheavior
+		burst := 0
+
+		// Incorrect reading - legacy behavior
+		{
+			res := runScript(t, rc, gcraScriptOptions{
+				key:                     key,
+				now:                     clock.Now(),
+				period:                  period,
+				limit:                   limit,
+				burst:                   burst,
+				quantity:                0,
+				enableCompatibilityMode: true,
+			})
+			require.False(t, res.Limited)
+			require.Equal(t, 1, res.Limit)
+			// NOTE: This is wrongly calculated as the dvt is much higher
+			// While it does lead to allowing the correct number of requests per minute,
+			// we need to adjust the default burst to ensure throughput does not drop
+			// if the arrival rate is not perfectly spaced out (which is the case for the queue)
+			require.Equal(t, 3000, res.Remaining)
+
+			correctDVT := int(res.EmissionInterval) * (burst + 1)
+			require.NotEqual(t, int64(correctDVT), res.DVT)
+			incorrectDVT := int(period.Milliseconds()) * (burst + 1)
+			require.Equal(t, int64(incorrectDVT), res.DVT)
+
+			// allow_at is significantly larger than expected. It should be 20ms
+			require.WithinDuration(t, clock.Now().Add(-time.Minute), time.UnixMilli(res.AllowAt), time.Second)
+		}
+
+		// Correct reading without adjusting for rate smoothing
+		{
+			res := runScript(t, rc, gcraScriptOptions{
+				key:      key,
+				now:      clock.Now(),
+				period:   period,
+				limit:    limit,
+				burst:    burst,
+				quantity: 0,
+			})
+			require.False(t, res.Limited)
+			require.Equal(t, 1, res.Limit)
+			// NOTE: Without admitting a higher burst, we will smooth the rate to allow just one request
+			require.Equal(t, 1, res.Remaining)
+
+			correctDVT := int(res.EmissionInterval) * (burst + 1)
+			require.Equal(t, int64(correctDVT), res.DVT)
+
+			// Expect allow_at to be 20ms in the past (one emission interval since burst is minimum of 1)
+			require.WithinDuration(t, clock.Now().Add(-20*time.Millisecond), time.UnixMilli(res.AllowAt), time.Second)
+		}
+
+		// Correct reading adjusted for non-uniform arrival rate
+		{
+			maxBurst := limit + burst - 1
+			res := runScript(t, rc, gcraScriptOptions{
+				key:      key,
+				now:      clock.Now(),
+				period:   period,
+				limit:    limit,
+				burst:    maxBurst,
+				quantity: 0,
+			})
+			require.False(t, res.Limited)
+			require.Equal(t, 3000, res.Limit)
+			// NOTE: This is now adjusted to allow as many requests as possible within the period and limit constraints
+			require.Equal(t, 3000, res.Remaining)
+
+			correctDVT := int(res.EmissionInterval) * (maxBurst + 1)
+			require.Equal(t, int64(correctDVT), res.DVT)
+
+			// allow_at is now 1 minute in the past since we can admit 3000 requests * 20ms = 60s at once = period
+			require.WithinDuration(t, clock.Now().Add(-time.Minute), time.UnixMilli(res.AllowAt), time.Second)
+
+		}
+	})
 }
 
 func TestLuaGCRA(t *testing.T) {
