@@ -19,12 +19,12 @@ import (
 
 func TestNewGCRAScript(t *testing.T) {
 	type gcraScriptOptions struct {
-		key                     string
-		now                     time.Time
-		period                  time.Duration
-		limit                   int
-		burst                   int
-		quantity                int
+		key      string
+		now      time.Time
+		period   time.Duration
+		limit    int
+		burst    int
+		quantity int
 	}
 
 	type rateLimitResult struct {
@@ -663,12 +663,12 @@ func TestNewGCRAScript(t *testing.T) {
 		// Incorrect reading - legacy behavior
 		{
 			res := runScript(t, rc, gcraScriptOptions{
-				key:                     key,
-				now:                     clock.Now(),
-				period:                  period,
-				limit:                   limit,
-				burst:                   burst,
-				quantity:                0,
+				key:      key,
+				now:      clock.Now(),
+				period:   period,
+				limit:    limit,
+				burst:    burst,
+				quantity: 0,
 			})
 			require.False(t, res.Limited)
 			require.Equal(t, 1, res.Limit)
@@ -919,65 +919,67 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  100,
 					consumeCapacity: 0,
 					capacityAfter:   100,
-					retryAt:         6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           0,
 					capacityBefore:  100,
 					consumeCapacity: 20,
 					capacityAfter:   80,
-					retryAt:         6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           1 * time.Hour,
 					capacityBefore:  90, // assume 10 items got refilled since 1 hour passed
 					consumeCapacity: 90,
 					capacityAfter:   0,
-					retryAt:        6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           1 * time.Hour,
 					capacityBefore:  10, // assume 10 items got refilled again
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:         6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 			},
 		},
 		{
-			name:   "with burst",
+			name: "with burst",
+			// 10 every 60 minutes = 1 every 6 minutes
+			// with burst, we can allow up to limit + burst requests, so 12 at once, if need be
 			period: 1 * time.Hour,
 			limit:  10,
-			// 10 are refilled per hour, or 1 every 10 minutes
-			burst: 2,
+			burst:  2,
 			actions: []action{
 				{
 					delay:           0,
 					capacityBefore:  12,
 					consumeCapacity: 0,
 					capacityAfter:   12,
-					retryAt:         6*time.Minute,
+					// when calculating retryAt, the assumption is that we consume all capacity
+					retryAt: 6 * time.Minute,
 				},
 				{
 					delay:           0,
 					capacityBefore:  12,
 					consumeCapacity: 5,
 					capacityAfter:   7,
-					retryAt:        6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           10 * time.Minute,
 					capacityBefore:  8, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   8,
-					retryAt:          6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           5 * time.Minute,
 					capacityBefore:  9, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   9,
-					retryAt:       6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           0,
@@ -991,7 +993,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:          6*time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 			},
 		},
@@ -1005,7 +1007,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
-					retryAt:       5*time.Second, 
+					retryAt:         5 * time.Second,
 				},
 				{
 					delay:           time.Second,
@@ -1019,7 +1021,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
-					retryAt:         5*time.Second, 
+					retryAt:         5 * time.Second,
 				},
 			},
 		},
