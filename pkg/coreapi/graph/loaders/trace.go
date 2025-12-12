@@ -527,10 +527,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	for _, md := range span.Metadata {
 		gqlSpan.Metadata = append(gqlSpan.Metadata, &models.SpanMetadata{
-			Kind:   md.Kind,
-			Scope:  md.Scope,
-			Values: md.Values,
-			// UpdatedAt: md.UpdatedAt, // after TanStack stuff is merged so UI can be updated
+			Kind:      md.Kind,
+			Scope:     md.Scope,
+			Values:    md.Values,
+			UpdatedAt: md.UpdatedAt,
 		})
 	}
 
