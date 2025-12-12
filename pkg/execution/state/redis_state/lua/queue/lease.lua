@@ -68,8 +68,6 @@ local refilledFromBacklog = tonumber(ARGV[12])
 
 local checkConstraints = tonumber(ARGV[13])
 
-local enableThrottleFix = tonumber(ARGV[14]) == 1
-
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
 -- $include(check_concurrency.lua)
@@ -126,7 +124,7 @@ if checkConstraints == 1 then
 
 	if checkThrottle then
 		local throttleResult =
-			gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b, enableThrottleFix)
+			gcra(throttleKey, currentTime, constraints.t.p * 1000, constraints.t.l, constraints.t.b)
 		if throttleResult[1] == false then
 			return -7
 		end

@@ -95,15 +95,12 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
-local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatibility_mode)
+local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	local result = {}
 	result["limit"] = burst + 1
 	local emission = period_ms / math.max(limit, 1)
 	result["ei"] = emission
 	local dvt = emission * (burst + 1)
-	if compatibility_mode then
-		dvt = period_ms * (burst + 1)
-	end
 	result["dvt"] = dvt
 	local tat = redis.call("GET", key)
 	if not tat then
@@ -213,7 +210,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 3 then
 		debug("evaluating throttle")
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0, false)
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 		local usage = {}

@@ -23,7 +23,6 @@ end
 local operationIdempotencyTTL = tonumber(ARGV[9])
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])
 local enableDebugLogs = tonumber(ARGV[11]) == 1
-local enableThrottleCompatibilityMode = tonumber(ARGV[12]) == 1
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
@@ -146,15 +145,12 @@ local function rateLimitUpdate(key, now_ns, period_ns, limit, capacity, burst)
 		call("SET", key, clamped_tat, "EX", ttl_seconds)
 	end
 end
-local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatibility_mode)
+local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	local result = {}
 	result["limit"] = burst + 1
 	local emission = period_ms / math.max(limit, 1)
 	result["ei"] = emission
 	local dvt = emission * (burst + 1)
-	if compatibility_mode then
-		dvt = period_ms * (burst + 1)
-	end
 	result["dvt"] = dvt
 	local tat = redis.call("GET", key)
 	if not tat then
@@ -264,7 +260,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes =
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0, enableThrottleCompatibilityMode)
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 	end
@@ -322,7 +318,7 @@ for i = 1, granted, 1 do
 			call("ZADD", value.c.ilk, tostring(leaseExpiryMS), initialLeaseID)
 		elseif value.k == 3 then
 			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1, enableThrottleCompatibilityMode)
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
 		end
 	end
 	local keyLeaseDetails = string.format("%s:ld:%s", scopedKeyPrefix, initialLeaseID)

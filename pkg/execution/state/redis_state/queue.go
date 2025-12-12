@@ -771,14 +771,6 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	}
 }
 
-type EnableThrottleFixFn func(ctx context.Context, accountID uuid.UUID) bool
-
-func WithEnableThrottleFix(fn EnableThrottleFixFn) QueueOpt {
-	return func(q *queue) {
-		q.enableThrottleFix = fn
-	}
-}
-
 type EnableThrottleInstrumentationFn func(ctx context.Context, accountID, fnID uuid.UUID) bool
 
 func WithEnableThrottleInstrumentation(fn EnableThrottleInstrumentationFn) QueueOpt {
@@ -946,7 +938,6 @@ type queue struct {
 	useConstraintAPI            constraintapi.UseConstraintAPIFn
 	capacityLeaseExtendInterval time.Duration
 
-	enableThrottleFix             EnableThrottleFixFn
 	enableThrottleInstrumentation EnableThrottleInstrumentationFn
 }
 
@@ -2303,10 +2294,6 @@ func (q *queue) Lease(
 
 	checkThrottle := checkConstraints && o.constraints.Throttle != nil && item.Data.Throttle != nil
 
-	enableThrottleFix := "0"
-	if checkThrottle && o.sp.AccountID != nil && q.enableThrottleFix != nil && q.enableThrottleFix(ctx, *o.sp.AccountID) {
-		enableThrottleFix = "1"
-	}
 
 	enableThrottleInstrumentation := checkThrottle &&
 		o.sp.AccountID != nil &&
@@ -2393,8 +2380,6 @@ func (q *queue) Lease(
 		refilledFromBacklogVal,
 
 		checkConstraintsVal,
-
-		enableThrottleFix,
 	})
 	if err != nil {
 		return nil, err

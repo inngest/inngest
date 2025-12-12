@@ -1449,25 +1449,24 @@ func (x *CapacityCheckResponse) GetRetryAfter() *timestamppb.Timestamp {
 }
 
 type CapacityAcquireRequest struct {
-	state                           protoimpl.MessageState `protogen:"open.v1"`
-	IdempotencyKey                  string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	AccountId                       string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	EnvId                           string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
-	FunctionId                      string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
-	Configuration                   *ConstraintConfig      `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	Constraints                     []*ConstraintItem      `protobuf:"bytes,6,rep,name=constraints,proto3" json:"constraints,omitempty"`
-	Amount                          int32                  `protobuf:"varint,7,opt,name=amount,proto3" json:"amount,omitempty"`
-	LeaseIdempotencyKeys            []string               `protobuf:"bytes,8,rep,name=lease_idempotency_keys,json=leaseIdempotencyKeys,proto3" json:"lease_idempotency_keys,omitempty"`
-	LeaseRunIds                     map[string]string      `protobuf:"bytes,9,rep,name=lease_run_ids,json=leaseRunIds,proto3" json:"lease_run_ids,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	CurrentTime                     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=current_time,json=currentTime,proto3" json:"current_time,omitempty"`
-	Duration                        *durationpb.Duration   `protobuf:"bytes,11,opt,name=duration,proto3" json:"duration,omitempty"`
-	MaximumLifetime                 *durationpb.Duration   `protobuf:"bytes,12,opt,name=maximum_lifetime,json=maximumLifetime,proto3" json:"maximum_lifetime,omitempty"`
-	BlockingThreshold               *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
-	Source                          *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
-	Migration                       *MigrationIdentifier   `protobuf:"bytes,15,opt,name=migration,proto3" json:"migration,omitempty"`
-	EnableThrottleCompatibilityMode bool                   `protobuf:"varint,16,opt,name=enable_throttle_compatibility_mode,json=enableThrottleCompatibilityMode,proto3" json:"enable_throttle_compatibility_mode,omitempty"`
-	unknownFields                   protoimpl.UnknownFields
-	sizeCache                       protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey       string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	AccountId            string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EnvId                string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	FunctionId           string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Configuration        *ConstraintConfig      `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Constraints          []*ConstraintItem      `protobuf:"bytes,6,rep,name=constraints,proto3" json:"constraints,omitempty"`
+	Amount               int32                  `protobuf:"varint,7,opt,name=amount,proto3" json:"amount,omitempty"`
+	LeaseIdempotencyKeys []string               `protobuf:"bytes,8,rep,name=lease_idempotency_keys,json=leaseIdempotencyKeys,proto3" json:"lease_idempotency_keys,omitempty"`
+	LeaseRunIds          map[string]string      `protobuf:"bytes,9,rep,name=lease_run_ids,json=leaseRunIds,proto3" json:"lease_run_ids,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CurrentTime          *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=current_time,json=currentTime,proto3" json:"current_time,omitempty"`
+	Duration             *durationpb.Duration   `protobuf:"bytes,11,opt,name=duration,proto3" json:"duration,omitempty"`
+	MaximumLifetime      *durationpb.Duration   `protobuf:"bytes,12,opt,name=maximum_lifetime,json=maximumLifetime,proto3" json:"maximum_lifetime,omitempty"`
+	BlockingThreshold    *durationpb.Duration   `protobuf:"bytes,13,opt,name=blocking_threshold,json=blockingThreshold,proto3" json:"blocking_threshold,omitempty"`
+	Source               *LeaseSource           `protobuf:"bytes,14,opt,name=source,proto3" json:"source,omitempty"`
+	Migration            *MigrationIdentifier   `protobuf:"bytes,15,opt,name=migration,proto3" json:"migration,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CapacityAcquireRequest) Reset() {
@@ -1603,13 +1602,6 @@ func (x *CapacityAcquireRequest) GetMigration() *MigrationIdentifier {
 		return x.Migration
 	}
 	return nil
-}
-
-func (x *CapacityAcquireRequest) GetEnableThrottleCompatibilityMode() bool {
-	if x != nil {
-		return x.EnableThrottleCompatibilityMode
-	}
-	return false
 }
 
 type CapacityAcquireResponse struct {
@@ -1992,7 +1984,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x05usage\x18\x03 \x03(\v2!.constraintapi.v1.ConstraintUsageR\x05usage\x12-\n" +
 	"\x12fairness_reduction\x18\x04 \x01(\x05R\x11fairnessReduction\x12;\n" +
 	"\vretry_after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"retryAfter\"\xe2\a\n" +
+	"retryAfter\"\x95\a\n" +
 	"\x16CapacityAcquireRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2011,8 +2003,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\x10maximum_lifetime\x18\f \x01(\v2\x19.google.protobuf.DurationR\x0fmaximumLifetime\x12H\n" +
 	"\x12blocking_threshold\x18\r \x01(\v2\x19.google.protobuf.DurationR\x11blockingThreshold\x125\n" +
 	"\x06source\x18\x0e \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12C\n" +
-	"\tmigration\x18\x0f \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x12K\n" +
-	"\"enable_throttle_compatibility_mode\x18\x10 \x01(\bR\x1fenableThrottleCompatibilityMode\x1a>\n" +
+	"\tmigration\x18\x0f \x01(\v2%.constraintapi.v1.MigrationIdentifierR\tmigration\x1a>\n" +
 	"\x10LeaseRunIdsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x93\x02\n" +
