@@ -1,30 +1,57 @@
-import { type Metadata } from 'next';
-import { SignIn } from '@clerk/nextjs';
+'use client';
+
+import { useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { SignIn, useAuth } from '@clerk/nextjs';
 import { Alert } from '@inngest/components/Alert';
 
 import SplitView from '@/app/(auth)/SplitView';
+import LoadingIcon from '@/icons/LoadingIcon';
 import signInRedirectErrors from './SignInRedirectErrors';
 
-export const metadata: Metadata = {
-  title: 'Sign in - Inngest Cloud',
-  description: 'Sign into your account',
-  alternates: {
-    canonical: new URL(
-      '/sign-in',
-      process.env.NEXT_PUBLIC_APP_URL || 'https://app.inngest.com'
-    ).toString(),
-  },
+//
+// with poor man's arbitrary redirect protection
+const resolveRedirect = (redirectUrl: string | null) => {
+  const redirect = process.env.NEXT_PUBLIC_HOME_PATH ?? '/';
+
+  if (typeof window === 'undefined' || !redirectUrl) {
+    return redirect;
+  }
+
+  try {
+    const url = new URL(redirectUrl, window.location.origin);
+    return url.origin === window.location.origin
+      ? `${url.pathname}${url.search}${url.hash}`
+      : redirect;
+  } catch {
+    return redirect;
+  }
 };
 
 const signInRedirectErrorMessages = {
   [signInRedirectErrors.Unauthenticated]: 'Could not resume your session. Please sign in again.',
 } as const;
 
-type SignInPageProps = {
-  searchParams: { [key: string]: string | string[] | undefined };
-};
+export default function SignInPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const redirectTo = resolveRedirect(searchParams?.get('redirect_url'));
 
-export default function SignInPage({ searchParams }: SignInPageProps) {
+  const error = searchParams?.get('error');
+  const nestedRoute = pathname !== '/sign-in';
+
+  useEffect(() => {
+    //
+    // Clerk redirects are not reliable. Do it ourselves.
+    if (!isLoaded || !isSignedIn || nestedRoute) {
+      return;
+    }
+
+    router.replace(redirectTo);
+  }, [isLoaded, isSignedIn, router, redirectTo, nestedRoute]);
+
   function hasErrorMessage(error: string): error is keyof typeof signInRedirectErrorMessages {
     return error in signInRedirectErrorMessages;
   }
@@ -32,19 +59,23 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        <SignIn
-          appearance={{
-            elements: {
-              footer: 'bg-none',
-            },
-          }}
-        />
-        {typeof searchParams.error === 'string' && (
+        {isLoaded && isSignedIn && !nestedRoute ? (
+          <div className="flex items-center justify-center">
+            <LoadingIcon />
+          </div>
+        ) : (
+          <SignIn
+            appearance={{
+              elements: {
+                footer: 'bg-none',
+              },
+            }}
+          />
+        )}
+        {typeof error === 'string' && (
           <Alert severity="error" className="mx-auto max-w-xs">
             <p className="text-balance">
-              {hasErrorMessage(searchParams.error)
-                ? signInRedirectErrorMessages[searchParams.error]
-                : searchParams.error}
+              {hasErrorMessage(error) ? signInRedirectErrorMessages[error] : error}
             </p>
             <p className="mt-2">
               <Alert.Link
