@@ -150,6 +150,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	result["limit"] = burst + 1
 	local emission = period_ms / math.max(limit, 1)
 	result["ei"] = emission
+	result["retry_at"] = now_ms + emission
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
 	local tat = redis.call("GET", key)
@@ -178,6 +179,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	if diff < 0 then
 		if increment <= dvt then
 			result["retry_after"] = -diff
+			result["retry_at"] = now_ms - diff
 			ttl = tat - now_ms
 			result["ttl"] = ttl
 		end
@@ -189,7 +191,6 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 			end
 			result["reset_after"] = ttl
 			result["limited"] = true
-			result["retry_at"] = now_ms + (result["retry_after"] or 0)
 			return result
 		end
 	end
@@ -200,7 +201,6 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		redis.call("SET", key, new_tat, "EX", expiry)
 	end
 	result["ttl"] = ttl
-	result["retry_at"] = now_ms + emission
 	local next = dvt - ttl
 	if next > -emission then
 		local remaining = math.floor(next / emission)
@@ -259,8 +259,7 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 3 then
 		debug("evaluating throttle")
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-		local throttleRes =
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 	end
