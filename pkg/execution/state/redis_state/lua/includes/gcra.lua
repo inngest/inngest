@@ -109,9 +109,15 @@ end
 --
 -- Returns true on success, false if the key has been rate limited.
 local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
-	local allowConsumingMultiple = limit + burst
+	local maxBurst = burst
+	if enableThrottleFix then
+		-- NOTE: we need to admit more than a single item every emission interval, as the queue
+		-- does not follow a uniform arrival rate and we would throttle the majority of queue items,
+		-- leading to significantly lower queue throughput
+		maxBurst = limit + burst - 1
+	end
 
-	local res = applyGCRA(key, now_ms, period_ms, limit, allowConsumingMultiple - 1, 1, not enableThrottleFix)
+	local res = applyGCRA(key, now_ms, period_ms, limit, maxBurst, 1, not enableThrottleFix)
 
 	local used_burst = res["tat"] > now_ms
 
