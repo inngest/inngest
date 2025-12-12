@@ -13,10 +13,10 @@ export type Data = {
   current: number;
   limit: number | null;
   overageAllowed?: boolean;
-  tooltipContent?: string | React.ReactNode;
+  tooltipContent?: string;
 };
 
-export async function LimitBar({
+export function LimitBar({
   data,
   className,
 }: {
