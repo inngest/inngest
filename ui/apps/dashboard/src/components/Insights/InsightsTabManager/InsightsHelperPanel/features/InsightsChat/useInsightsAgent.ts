@@ -22,7 +22,7 @@ export type InsightsAgentConfig = { tools: ToolManifest; state: ClientState };
 export type InsightsAgentEvent = AgentKitEvent<ToolManifest>;
 
 export function useInsightsAgent(
-  config: UseAgentsConfig<ToolManifest, ClientState>
+  config: UseAgentsConfig<ToolManifest, ClientState>,
 ): UseAgentsReturn<ToolManifest, ClientState> {
   return useAgents<{ tools: ToolManifest; state: ClientState }>(config);
 }

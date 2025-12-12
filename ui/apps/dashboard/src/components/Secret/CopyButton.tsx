@@ -1,6 +1,8 @@
-'use client';
-
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
 import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 

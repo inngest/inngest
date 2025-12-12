@@ -1,5 +1,3 @@
-'use client';
-
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -21,6 +19,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         standalone={standalone}
         getTrigger={getTrigger}
         runID={runID}
+        newStack={true}
         pollInterval={DEFAULT_POLL_INTERVAL}
       />
     </div>

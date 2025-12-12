@@ -1,14 +1,15 @@
-'use client';
-
 import { type ComponentProps } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowDownLine } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { useStickToBottom } from './hooks/use-stick-to-bottom';
 
-export const Conversation = ({ className, ...props }: ComponentProps<'div'>) => {
+export const Conversation = ({
+  className,
+  ...props
+}: ComponentProps<'div'>) => {
   const { scrollRef, isAtBottom, scrollToBottom } = useStickToBottom();
 
   return (
@@ -33,8 +34,14 @@ export const Conversation = ({ className, ...props }: ComponentProps<'div'>) => 
   );
 };
 
-export const ConversationContent = ({ className, ...props }: ComponentProps<'div'>) => (
-  <div className={cn('mx-4 flex h-full flex-col pb-1 pt-4', className)} {...props} />
+export const ConversationContent = ({
+  className,
+  ...props
+}: ComponentProps<'div'>) => (
+  <div
+    className={cn('mx-4 flex h-full flex-col pb-1 pt-4', className)}
+    {...props}
+  />
 );
 
 export const ConversationScrollButton = ({

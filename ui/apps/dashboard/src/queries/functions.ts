@@ -377,7 +377,9 @@ export const useFunctionUsage = ({
     usage = completed.data.map((d, idx) => {
       const failureCount = failed.data[idx]?.count || 0;
       const finishedCount =
-        (completed.data[idx]?.count || 0) + (cancelled.data[idx]?.count || 0) + failureCount;
+        (completed.data[idx]?.count || 0) +
+        (cancelled.data[idx]?.count || 0) +
+        failureCount;
 
       return {
         name: d.slot,

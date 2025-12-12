@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 import type { SQLEditorMountCallback } from '@inngest/components/SQLEditor/SQLEditor';
 
@@ -42,8 +40,8 @@ export type ShortcutBinding = {
 };
 
 type ModifiableEvent = {
-  preventDefault(): void;
-  stopPropagation(): void;
+  preventDefault: () => void;
+  stopPropagation: () => void;
 };
 
 function doAction(e: ModifiableEvent, handler: () => void) {
@@ -61,7 +59,7 @@ function modsMatch(e: ModKeyState, c: KeyCombo): boolean {
 
 function findMatchingHandler(
   bindings: ReadonlyArray<ShortcutBinding>,
-  ev: NormalizedKeyEvent
+  ev: NormalizedKeyEvent,
 ): (() => void) | undefined {
   for (const { combo, handler } of bindings) {
     if (!modsMatch(ev, combo)) continue;
@@ -82,7 +80,7 @@ function findMatchingHandler(
 
 export function bindEditorShortcuts(
   editor: EditorInstance,
-  bindings: ReadonlyArray<ShortcutBinding>
+  bindings: ReadonlyArray<ShortcutBinding>,
 ) {
   return editor.onKeyDown((e: MonacoKeyEvent) => {
     const handler = findMatchingHandler(bindings, e);

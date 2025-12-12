@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 import { Button } from '@inngest/components/Button/Button';
 import { RiMore2Fill } from '@remixicon/react';
@@ -26,7 +24,12 @@ export function InsightsSQLEditorSavedQueryActionsButton({
       onSelectDelete={(q) => deleteQuery(q.id)}
       query={savedQuery}
       trigger={
-        <Button appearance="outlined" icon={<RiMore2Fill />} kind="secondary" size="medium" />
+        <Button
+          appearance="outlined"
+          icon={<RiMore2Fill />}
+          kind="secondary"
+          size="medium"
+        />
       }
     />
   );

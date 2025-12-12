@@ -36,6 +36,9 @@ export type GenerateSqlResult = {
 };
 
 // Build a strongly-typed tool manifest from tool definitions - used in the UI to render tool calls
-const manifest = createToolManifest([generateSqlTool, selectEventsTool] as const);
+const manifest = createToolManifest([
+  generateSqlTool,
+  selectEventsTool,
+] as const);
 
 export type ToolManifest = typeof manifest;

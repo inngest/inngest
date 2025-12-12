@@ -1,14 +1,12 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert';
+import { Alert } from '@inngest/components/Alert/NewAlert';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
+import { useNavigate } from '@tanstack/react-router';
 
 const ArchiveEvent = graphql(`
   mutation ArchiveEvent($environmentId: ID!, $name: String!) {
@@ -24,16 +22,20 @@ type ArchiveEventModalProps = {
   onClose: () => void;
 };
 
-export default function ArchiveEventModal({ eventName, isOpen, onClose }: ArchiveEventModalProps) {
+export default function ArchiveEventModal({
+  eventName,
+  isOpen,
+  onClose,
+}: ArchiveEventModalProps) {
   const environment = useEnvironment();
   const [error, setError] = useState<string>();
   const [{ fetching }, archiveEvent] = useMutation(ArchiveEvent);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const handleSubmit = async () => {
     try {
       await archiveEvent({ name: eventName, environmentId: environment.id });
-      router.push(pathCreator.eventTypes({ envSlug: environment.slug }));
+      navigate({ to: pathCreator.eventTypes({ envSlug: environment.slug }) });
     } catch (error) {
       setError('Failed to archive event, please try again later.');
       console.error('error achiving event', eventName, error);
@@ -50,7 +52,8 @@ export default function ArchiveEventModal({ eventName, isOpen, onClose }: Archiv
       title="Archive Event"
     >
       <p className="px-6 pt-4">
-        Are you sure you want to archive this event? This action cannot be undone.
+        Are you sure you want to archive this event? This action cannot be
+        undone.
       </p>
 
       {error && (

@@ -1,6 +1,6 @@
 import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 
-type Disposable = { readonly alive: boolean; dispose(): void };
+type Disposable = { readonly alive: boolean; dispose: () => void };
 
 class DisposableComposer {
   storage: Array<Disposable> = [];
@@ -93,7 +93,6 @@ export default async function makeVM(timeout: number = -1) {
           target.forEach((item) => {
             const marshaledItem = marshal(item);
 
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
             if (!marshaledItem) {
               return vm.undefined;
             }
@@ -141,7 +140,6 @@ export default async function makeVM(timeout: number = -1) {
             });
           })();
 
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
           if (!marshaledKey || !marshaledValue) {
             continue;
           }
@@ -152,23 +150,32 @@ export default async function makeVM(timeout: number = -1) {
         return obj;
       }
       case 'function': {
-        const handle = vm.newFunction(target.name || '<anonymous function>', (...handles) => {
-          const unmarshaledArgs = handles.map((handle) => vm.dump(handle));
-          let result = undefined;
-          try {
-            result = target(unmarshaledArgs);
-          } catch (err: any) {
-            const errResult = vm.callFunction(errorHandle, vm.undefined, marshal(err.message));
-            if (errResult.error) {
-              const context = vm.dump(errResult.error);
-              throw new Error('Failed to create error: ' + JSON.stringify(context));
-            } else {
-              // @ts-ignore
-              throw errResult.value;
+        const handle = vm.newFunction(
+          target.name || '<anonymous function>',
+          (...handles) => {
+            const unmarshaledArgs = handles.map((handle) => vm.dump(handle));
+            let result = undefined;
+            try {
+              result = target(unmarshaledArgs);
+            } catch (err: any) {
+              const errResult = vm.callFunction(
+                errorHandle,
+                vm.undefined,
+                marshal(err.message),
+              );
+              if (errResult.error) {
+                const context = vm.dump(errResult.error);
+                throw new Error(
+                  'Failed to create error: ' + JSON.stringify(context),
+                );
+              } else {
+                // @ts-ignore
+                throw errResult.value;
+              }
             }
-          }
-          return marshal(result);
-        });
+            return marshal(result);
+          },
+        );
         disposables.add(handle);
         return handle;
       }
@@ -208,6 +215,7 @@ export default async function makeVM(timeout: number = -1) {
     return handle;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- not sure added as part of tanstack conversoin
   function typedBind<T extends Function>(func: T, target: any): T {
     return func.bind(target);
   }
@@ -228,7 +236,6 @@ export default async function makeVM(timeout: number = -1) {
     vm.global,
     'fetch',
     newFunction('fetch', function (url: any, options: any) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- The type isn't falsy but it's unclear whether it can be falsy at run time.
       if (!vm) {
         return;
       }
@@ -237,10 +244,10 @@ export default async function makeVM(timeout: number = -1) {
         vm.getString(url),
         // NEVER include credentials, else the eval()ed JS may be able to request
         // any data from GQL as the current user.
-        Object.assign({}, opts, { credentials: 'omit' })
+        Object.assign({}, opts, { credentials: 'omit' }),
       );
       return marshal(result);
-    })
+    }),
   );
 
   return {
@@ -367,7 +374,7 @@ export default async function makeVM(timeout: number = -1) {
       if (result.value) {
         disposables.add(
           // @ts-ignore
-          result.value
+          result.value,
         );
       } else {
         result.error && disposables.add(result.error);

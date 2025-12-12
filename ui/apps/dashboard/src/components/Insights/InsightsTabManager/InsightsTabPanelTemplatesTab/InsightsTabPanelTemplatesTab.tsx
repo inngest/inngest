@@ -1,7 +1,9 @@
-'use client';
-
-import { Link } from '@inngest/components/Link/Link';
-import { RiChatPollLine, RiExternalLinkLine, RiMailLine } from '@remixicon/react';
+import { Link } from '@inngest/components/Link/NewLink';
+import {
+  RiChatPollLine,
+  RiExternalLinkLine,
+  RiMailLine,
+} from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
 import { EXTERNAL_FEEDBACK_LINK } from '../constants';

@@ -8,9 +8,9 @@
  * @param enumValues - The enum values in the order you want them returned
  * @returns The enum values in the order you passed them in
  */
-export default function getOrderedEnumValues<U extends string, T extends { [K in keyof T]: U }>(
-  _enumType: T,
-  enumValues: [...U[]]
-): U[] {
+export default function getOrderedEnumValues<
+  U extends string,
+  T extends { [K in keyof T]: U },
+>(_enumType: T, enumValues: [...U[]]): U[] {
   return enumValues;
 }

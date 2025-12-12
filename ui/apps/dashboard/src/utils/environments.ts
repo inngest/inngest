@@ -21,9 +21,11 @@ export type Environment = {
 
 export function getActiveEnvironment(
   environments: NonEmptyArray<Environment>,
-  environmentSlug: string
+  environmentSlug: string,
 ): Environment | null {
-  const activeEnvironment = environments.find((e) => e.slug === environmentSlug);
+  const activeEnvironment = environments.find(
+    (e) => e.slug === environmentSlug,
+  );
   if (activeEnvironment) {
     return activeEnvironment;
   }
@@ -31,7 +33,7 @@ export function getActiveEnvironment(
 }
 
 export function getDefaultEnvironment(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment | null {
   let isMultiProd = false;
   let prodCount = 0;
@@ -65,7 +67,7 @@ function getRecentCutOffDate(): Date {
 
 export function getSortedBranchEnvironments(
   environments: NonEmptyArray<Environment>,
-  includeArchived = true
+  includeArchived = true,
 ): Environment[] {
   return environments
     .filter((env) => {
@@ -101,26 +103,26 @@ export function getSortedBranchEnvironments(
 }
 
 export function getRecentBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
   return getSortedBranchEnvironments(environments).filter(
-    (env) => new Date(env.createdAt) > cutOffDate
+    (env) => new Date(env.createdAt) > cutOffDate,
   );
 }
 export function getNonRecentBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
   return getSortedBranchEnvironments(environments).filter(
-    (env) => new Date(env.createdAt) < cutOffDate
+    (env) => new Date(env.createdAt) < cutOffDate,
   );
 }
 
 // Get parent test environments created by the user, not branch envs or legacy test mode
 export function getTestEnvironments(
   environments: NonEmptyArray<Environment>,
-  includeArchived = true
+  includeArchived = true,
 ): Environment[] {
   return environments.filter((env) => {
     if (!includeArchived && env.isArchived) {
@@ -144,7 +146,7 @@ export function workspaceToEnvironment(
     | 'isArchived'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
-  >
+  >,
 ): Environment {
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
@@ -211,7 +213,7 @@ export function workspacesToEnvironments(
     | 'isArchived'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
-  >[]
+  >[],
 ): Environment[] {
   return workspaces.map(workspaceToEnvironment).sort((a, b) => {
     // Sort production environments first.

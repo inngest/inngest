@@ -1,8 +1,6 @@
-'use client';
-
 import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Time } from '@inngest/components/Time';
@@ -14,7 +12,8 @@ import { useMutation, useQuery } from 'urql';
 import { graphql } from '@/gql';
 import type { DatadogConnectionStatus } from '@/gql/graphql';
 
-export const ddIntegrationHref = 'https://app.datadoghq.com/integrations/inngest';
+export const ddIntegrationHref =
+  'https://app.datadoghq.com/integrations/inngest';
 
 export const GetDatadogSetupDataDocument = graphql(`
   query GetDatadogSetupData {
@@ -71,12 +70,14 @@ function dotStatusForConnection(conn: DatadogConnectionStatus) {
 
 function alertTextBeforeRemovingOrg(
   org: OrganizationToRemove | null,
-  allConnections: DatadogConnectionStatus[]
+  allConnections: DatadogConnectionStatus[],
 ): string {
   if (!org) {
     return '';
   }
-  const affectedConns = allConnections.filter((conn) => conn.orgID == org.organizationID);
+  const affectedConns = allConnections.filter(
+    (conn) => conn.orgID == org.organizationID,
+  );
   let text =
     'Are you certain you want to disconnect Inngest from the “' +
     org.orgName +
@@ -87,22 +88,26 @@ function alertTextBeforeRemovingOrg(
       affectedConns[0]?.envName +
       '” environment.';
   } else if (affectedConns.length > 1) {
-    text += ' This will disable sending metrics from ' + affectedConns.length + ' environments.';
+    text +=
+      ' This will disable sending metrics from ' +
+      affectedConns.length +
+      ' environments.';
   }
   return text;
 }
 
 export default function SetupPage({}) {
-  const [{ data: ddSetupData, error: ddSetupFetchError }, refetchDdSetupData] = useQuery({
-    query: GetDatadogSetupDataDocument,
-  });
+  const [{ data: ddSetupData, error: ddSetupFetchError }, refetchDdSetupData] =
+    useQuery({
+      query: GetDatadogSetupDataDocument,
+    });
   const [, disableConnection] = useMutation(DisableDatadogConnectionDocument);
   const [, removeOrganization] = useMutation(RemoveDatadogOrganizationDocument);
 
-  const [selectedConnToDisable, setSelectedConnToDisable] = useState<ConnectionToDisable | null>(
-    null
-  );
-  const [selectedOrgToRemove, setSelectedOrgToRemove] = useState<OrganizationToRemove | null>(null);
+  const [selectedConnToDisable, setSelectedConnToDisable] =
+    useState<ConnectionToDisable | null>(null);
+  const [selectedOrgToRemove, setSelectedOrgToRemove] =
+    useState<OrganizationToRemove | null>(null);
 
   const commitRemoveSelectedOrganization = async () => {
     if (!selectedOrgToRemove) {
@@ -111,7 +116,9 @@ export default function SetupPage({}) {
 
     const result = await removeOrganization(
       { organizationID: selectedOrgToRemove.organizationID },
-      { additionalTypenames: ['DatadogOrganization', 'DatadogConnectionStatus'] }
+      {
+        additionalTypenames: ['DatadogOrganization', 'DatadogConnectionStatus'],
+      },
     );
     setSelectedOrgToRemove(null);
     refetchDdSetupData();
@@ -130,7 +137,7 @@ export default function SetupPage({}) {
 
     const result = await disableConnection(
       { connectionID: selectedConnToDisable.connectionID },
-      { additionalTypenames: ['DatadogConnectionStatus'] }
+      { additionalTypenames: ['DatadogConnectionStatus'] },
     );
     setSelectedConnToDisable(null);
     refetchDdSetupData();
@@ -177,7 +184,7 @@ export default function SetupPage({}) {
         title={'Remove “' + selectedOrgToRemove?.orgName + '”'}
         description={alertTextBeforeRemovingOrg(
           selectedOrgToRemove,
-          ddSetupData?.account.datadogConnections || []
+          ddSetupData?.account.datadogConnections || [],
         )}
         confirmButtonLabel="Remove"
         onSubmit={commitRemoveSelectedOrganization}
@@ -186,7 +193,9 @@ export default function SetupPage({}) {
       {ddSetupData && ddSetupData.account.datadogOrganizations.length > 0 && (
         <div className="mb-12">
           <div className="mb-2 flex flex-row justify-start">
-            <div className="text-basis flex-1 text-xl font-medium">Environments</div>
+            <div className="text-basis flex-1 text-xl font-medium">
+              Environments
+            </div>
             {ddSetupData.account.datadogConnections.length > 0 && (
               <Button
                 appearance="outlined"
@@ -215,7 +224,9 @@ export default function SetupPage({}) {
             ddSetupData.account.datadogConnections.map((ddConn, i) => (
               <div
                 className={`text-basis flex flex-row justify-start gap-3 border-t px-2 pb-2 pt-3 ${
-                  i === ddSetupData.account.datadogConnections.length - 1 ? 'border-b' : ''
+                  i === ddSetupData.account.datadogConnections.length - 1
+                    ? 'border-b'
+                    : ''
                 }`}
                 key={i}
               >
@@ -273,25 +284,28 @@ export default function SetupPage({}) {
       <div className="mb-12">
         <div className="mb-2 flex flex-row justify-start">
           <div className="text-basis flex-1 text-xl font-medium">
-            {!ddSetupData || ddSetupData.account.datadogOrganizations.length === 0
+            {!ddSetupData ||
+            ddSetupData.account.datadogOrganizations.length === 0
               ? 'Datadog Connections'
               : 'Connected Datadog Organizations'}
           </div>
-          {ddSetupData && ddSetupData.account.datadogOrganizations.length > 0 && (
-            <Button
-              appearance="outlined"
-              kind="primary"
-              label="Add Organization"
-              href={ddIntegrationHref}
-              className="mr-2"
-            />
-          )}
+          {ddSetupData &&
+            ddSetupData.account.datadogOrganizations.length > 0 && (
+              <Button
+                appearance="outlined"
+                kind="primary"
+                label="Add Organization"
+                href={ddIntegrationHref}
+                className="mr-2"
+              />
+            )}
         </div>
 
         {ddSetupFetchError && (
           <Alert severity="error" className="mx-auto mb-3 mt-3">
             <p className="text-balance">
-              An error occurred when communicating with Inngest; please refresh this page.
+              An error occurred when communicating with Inngest; please refresh
+              this page.
             </p>
           </Alert>
         )}
@@ -300,25 +314,28 @@ export default function SetupPage({}) {
           <IconSpinner className="fill-link h-8 w-8 text-center" />
         )}
 
-        {ddSetupData && ddSetupData.account.datadogOrganizations.length === 0 && (
-          <div className="border-subtle flex flex-col items-center gap-4 rounded border p-8 text-center">
-            Inngest isn’t connected to Datadog yet.
-            <Button
-              appearance="solid"
-              kind="primary"
-              label="Connect to Datadog"
-              href={ddIntegrationHref}
-              className="text-sm"
-            />
-          </div>
-        )}
+        {ddSetupData &&
+          ddSetupData.account.datadogOrganizations.length === 0 && (
+            <div className="border-subtle flex flex-col items-center gap-4 rounded border p-8 text-center">
+              Inngest isn’t connected to Datadog yet.
+              <Button
+                appearance="solid"
+                kind="primary"
+                label="Connect to Datadog"
+                href={ddIntegrationHref}
+                className="text-sm"
+              />
+            </div>
+          )}
 
         {ddSetupData &&
           ddSetupData.account.datadogOrganizations.length > 0 &&
           ddSetupData.account.datadogOrganizations.map((ddOrg, i) => (
             <div
               className={`text-basis flex flex-row justify-start gap-2 border-t px-2 pb-2 pt-3 ${
-                i === ddSetupData.account.datadogOrganizations.length - 1 ? 'border-b' : ''
+                i === ddSetupData.account.datadogOrganizations.length - 1
+                  ? 'border-b'
+                  : ''
               }`}
               key={i}
             >

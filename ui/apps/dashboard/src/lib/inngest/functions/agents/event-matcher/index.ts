@@ -1,8 +1,13 @@
-import { anthropic, createAgent, createTool, type AnyZodType } from '@inngest/agent-kit';
+import {
+  anthropic,
+  createAgent,
+  createTool,
+  type AnyZodType,
+} from '@inngest/agent-kit';
 import { z } from 'zod';
 
 import type { InsightsAgentState } from '../types';
-import systemPrompt from './system.md';
+import systemPrompt from './system.md?raw';
 
 const SelectEventsParams = z.object({
   events: z
@@ -10,12 +15,12 @@ const SelectEventsParams = z.object({
       z.object({
         event_name: z.string(),
         reason: z.string(),
-      })
+      }),
     )
     .min(1)
     .max(6)
     .describe(
-      "An array of 1-6 event names selected from the list of available events that best match the user's intent."
+      "An array of 1-6 event names selected from the list of available events that best match the user's intent.",
     ),
 });
 
@@ -58,13 +63,16 @@ export const selectEventsTool = createTool({
 
 export const eventMatcherAgent = createAgent<InsightsAgentState>({
   name: 'Insights Event Matcher',
-  description: "Analyzes available events and selects 1-5 that best match the user's intent.",
+  description:
+    "Analyzes available events and selects 1-5 that best match the user's intent.",
   system: async ({ network }): Promise<string> => {
     const events = network?.state.data.eventTypes || [];
     const sample = events.slice(0, 500); // avoid overly long prompts
 
     const eventsList = sample.length
-      ? `Available events (${events.length} total, showing up to 500):\n${sample.join('\n')}`
+      ? `Available events (${
+          events.length
+        } total, showing up to 500):\n${sample.join('\n')}`
       : 'No event list is available. Ask the user to clarify which events they are interested in.';
 
     return `${systemPrompt}\n\n${eventsList}`;

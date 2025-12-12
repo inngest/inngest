@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
 import { usePaginationUI } from '@inngest/components/Pagination';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
@@ -46,14 +44,18 @@ export default function BranchEnvironmentListTable({
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
-      new Date(a.lastDeployedAt || a.createdAt).valueOf()
+      new Date(a.lastDeployedAt || a.createdAt).valueOf(),
   );
 
   const {
     BoundPagination: BranchEnvsPagination,
     currentPageData: visibleBranchEnvs,
     totalPages: totalBranchEnvsPages,
-  } = usePaginationUI({ data: sortedEnvs, id: paginationKey, pageSize: PER_PAGE });
+  } = usePaginationUI({
+    data: sortedEnvs,
+    id: paginationKey,
+    pageSize: PER_PAGE,
+  });
 
   return (
     <div className="w-full">
@@ -61,7 +63,10 @@ export default function BranchEnvironmentListTable({
         <table className="w-full">
           <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
+              <th
+                scope="col"
+                className="text-muted min-w-48 px-4 py-3 text-xs font-medium"
+              >
                 Name
               </th>
 
@@ -78,18 +83,26 @@ export default function BranchEnvironmentListTable({
           <tbody className="divide-subtle divide-y px-4 py-3">
             {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={4}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No branch environments exist
                 </td>
               </tr>
             ) : visibleBranchEnvs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={4}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No results found
                 </td>
               </tr>
             ) : (
-              visibleBranchEnvs.map((env) => <TableRow env={env} key={env.id} />)
+              visibleBranchEnvs.map((env) => (
+                <TableRow env={env} key={env.id} />
+              ))
             )}
           </tbody>
         </table>
@@ -114,8 +127,12 @@ function TableRow(props: { env: Environment }) {
   }, [props.env]);
 
   const [isModifying, setIsModifying] = useState(false);
-  const [, disableAutoArchive] = useMutation(DisableEnvironmentAutoArchiveDocument);
-  const [, enableAutoArchive] = useMutation(EnableEnvironmentAutoArchiveDocument);
+  const [, disableAutoArchive] = useMutation(
+    DisableEnvironmentAutoArchiveDocument,
+  );
+  const [, enableAutoArchive] = useMutation(
+    EnableEnvironmentAutoArchiveDocument,
+  );
 
   const onClickAutoArchive = useCallback(
     async (id: string, newValue: boolean) => {
@@ -135,7 +152,7 @@ function TableRow(props: { env: Environment }) {
         } else {
           res = await disableAutoArchive({ id });
         }
-        success = !Boolean(res.error);
+        success = !res.error;
       } catch (err) {
         rollback();
         throw err;
@@ -157,7 +174,7 @@ function TableRow(props: { env: Environment }) {
         }
       }
     },
-    [disableAutoArchive, enableAutoArchive, env]
+    [disableAutoArchive, enableAutoArchive, env],
   );
 
   const { id, isArchived, isAutoArchiveEnabled, name, lastDeployedAt } = env;
@@ -167,7 +184,9 @@ function TableRow(props: { env: Environment }) {
       <td className="max-w-80 px-4 py-3">
         <h3
           className="text-basis flex items-center gap-2 break-words text-sm font-medium"
-          title={Boolean(lastDeployedAt) ? `Last synced at ${lastDeployedAt}` : undefined}
+          title={
+            lastDeployedAt ? `Last synced at ${lastDeployedAt}` : undefined
+          }
         >
           <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {name}

@@ -4,7 +4,10 @@ import { useFlags } from 'launchdarkly-react-client-sdk';
 
 import { IdentificationContext } from './ClientFeatureFlagProvider';
 
-export function useBooleanFlag(flag: string, defaultValue: boolean = false): BooleanFlag {
+export function useBooleanFlag(
+  flag: string,
+  defaultValue: boolean = false,
+): BooleanFlag {
   const value: unknown = useFlags()[flag];
   const isIdentified = useIsIdentified();
 

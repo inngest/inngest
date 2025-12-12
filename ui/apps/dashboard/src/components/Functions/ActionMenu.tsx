@@ -1,6 +1,4 @@
-'use client';
-
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +55,9 @@ export const ActionsMenu = ({
         <OptionalTooltip
           tooltip={
             (archived || paused) &&
-            `Invoke not available, function is ${archived ? 'archived' : 'paused'}.`
+            `Invoke not available, function is ${
+              archived ? 'archived' : 'paused'
+            }.`
           }
         >
           <DropdownMenuItem onSelect={showInvoke} disabled={archived || paused}>
@@ -65,7 +65,9 @@ export const ActionsMenu = ({
             Invoke
           </DropdownMenuItem>
         </OptionalTooltip>
-        <OptionalTooltip tooltip={archived && 'Pause not available, function is archived.'}>
+        <OptionalTooltip
+          tooltip={archived && 'Pause not available, function is archived.'}
+        >
           <DropdownMenuItem onSelect={showPause} disabled={archived}>
             {paused ? (
               <RiPlayCircleLine className="h-4 w-4" />
@@ -78,7 +80,9 @@ export const ActionsMenu = ({
         <OptionalTooltip
           tooltip={
             (archived || paused) &&
-            `Replay not available, function is ${archived ? 'archived' : 'paused'}.`
+            `Replay not available, function is ${
+              archived ? 'archived' : 'paused'
+            }.`
           }
         >
           <DropdownMenuItem onSelect={showReplay} disabled={archived || paused}>

@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@inngest/components/Forms/Input';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
@@ -12,7 +10,9 @@ type InsightsSQLEditorQueryTitleProps = {
   tab: Tab;
 };
 
-export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitleProps) {
+export function InsightsSQLEditorQueryTitle({
+  tab,
+}: InsightsSQLEditorQueryTitleProps) {
   const { onNameChange, queryName } = useInsightsStateMachineContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -64,7 +64,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
           'text-basis mr-2 flex h-8 w-[314px] cursor-pointer items-center rounded px-2 py-2 text-sm normal-case leading-normal transition-all duration-150',
           isHovered
             ? 'bg-canvasSubtle border-muted border'
-            : 'bg-canvasBase border-muted border-transparent'
+            : 'bg-canvasBase border-muted border-transparent',
         )}
         onClick={() => {
           setIsEditing(true);

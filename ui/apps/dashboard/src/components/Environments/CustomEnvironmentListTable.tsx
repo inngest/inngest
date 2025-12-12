@@ -1,5 +1,3 @@
-'use client';
-
 import { usePaginationUI } from '@inngest/components/Pagination';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 
@@ -34,7 +32,10 @@ export function CustomEnvironmentListTable({
         <table className="w-full">
           <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
+              <th
+                scope="col"
+                className="text-muted min-w-48 px-4 py-3 text-xs font-medium"
+              >
                 Name
               </th>
               <th scope="col" className="w-24 pr-4 text-right"></th>
@@ -43,18 +44,26 @@ export function CustomEnvironmentListTable({
           <tbody className="divide-subtle divide-y px-4 py-3">
             {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={3}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No custom environments exist
                 </td>
               </tr>
             ) : visibleCustomEnvs.length === 0 ? (
               <tr>
-                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                <td
+                  colSpan={3}
+                  className="text-muted px-4 py-3 text-center text-sm"
+                >
                   No results found
                 </td>
               </tr>
             ) : (
-              visibleCustomEnvs.map((env) => <TableRow env={env} key={env.id} />)
+              visibleCustomEnvs.map((env) => (
+                <TableRow env={env} key={env.id} />
+              ))
             )}
           </tbody>
         </table>

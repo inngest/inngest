@@ -1,7 +1,5 @@
-'use client';
-
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@clerk/tanstack-react-start';
 import {
   baseFetchSkipped,
   baseFetchSucceeded,
@@ -75,7 +73,7 @@ export function useRestAPIRequest<T>({
     };
   }
 
-  if (!!pause) {
+  if (pause) {
     return {
       ...baseFetchSkipped,
     };

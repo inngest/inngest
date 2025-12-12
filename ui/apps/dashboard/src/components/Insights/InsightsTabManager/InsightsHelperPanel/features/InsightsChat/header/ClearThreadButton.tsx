@@ -7,7 +7,10 @@ type ClearThreadButtonProps = {
   className?: string;
 };
 
-export default function ClearThreadButton({ onClick, className }: ClearThreadButtonProps) {
+export default function ClearThreadButton({
+  onClick,
+  className,
+}: ClearThreadButtonProps) {
   return (
     <OptionalTooltip tooltip="Clear chat" side="bottom">
       <Button

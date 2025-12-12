@@ -1,6 +1,4 @@
-'use client';
-
-import { Link } from '@inngest/components/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 import { IconPrometheus } from '@inngest/components/icons/platforms/Prometheus';
 
 import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
@@ -28,8 +26,8 @@ export default function SetupPage({
       </div>
 
       <div className="text-muted mb-6 w-full text-base font-normal">
-        This integration allows your Prometheus server to scrape metrics about your Inngest
-        environment.{' '}
+        This integration allows your Prometheus server to scrape metrics about
+        your Inngest environment.{' '}
         <Link
           target="_blank"
           size="medium"

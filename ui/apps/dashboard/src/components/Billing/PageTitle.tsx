@@ -1,12 +1,11 @@
-'use client';
-
-import { usePathname } from 'next/navigation';
-import { Link } from '@inngest/components/Link/Link';
+import { useLocation } from '@tanstack/react-router';
+import { Link } from '@inngest/components/Link/NewLink';
 
 import { WEBSITE_PRICING_URL, pathCreator } from '@/utils/urls';
 
 export default function PageTitle() {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
 
   const routeTitles: { [key: string]: string } = {
     [pathCreator.billing()]: 'Overview',
@@ -17,7 +16,11 @@ export default function PageTitle() {
   const pageTitle = routeTitles[pathname] || '';
   const cta =
     pathname === pathCreator.billing({ tab: 'plans' }) ? (
-      <Link target="_blank" size="small" href={WEBSITE_PRICING_URL + '?ref=app-billing-page-plans'}>
+      <Link
+        target="_blank"
+        size="small"
+        href={WEBSITE_PRICING_URL + '?ref=app-billing-page-plans'}
+      >
         View pricing page
       </Link>
     ) : null;

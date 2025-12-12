@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '@inngest/components/utils/classNames';
 import { RiAddLine } from '@remixicon/react';
 
@@ -18,7 +16,7 @@ export function InsightsTabPanelTemplatesTabGrid() {
       <button
         className={cn(
           BUTTON_CARD_STYLES,
-          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm shadow-none'
+          'bg-canvasSubtle text-muted flex flex-col justify-center gap-3 border-none text-sm shadow-none',
         )}
         onClick={() => {
           tabManagerActions.createNewTab();
@@ -30,7 +28,10 @@ export function InsightsTabPanelTemplatesTabGrid() {
         <p className="text-basis self-center text-sm">Start from scratch</p>
       </button>
       {TEMPLATES.map((template) => (
-        <InsightsTabPanelTemplatesTabCard key={template.id} template={template} />
+        <InsightsTabPanelTemplatesTabCard
+          key={template.id}
+          template={template}
+        />
       ))}
     </div>
   );

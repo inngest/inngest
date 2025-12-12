@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useCallback, useContext, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -19,7 +17,8 @@ interface InsightsStateMachineContextValue {
   status: InsightsStatus;
 }
 
-const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
+const InsightsStateMachineContext =
+  createContext<InsightsStateMachineContextValue | null>(null);
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
@@ -82,7 +81,7 @@ export function useInsightsStateMachineContext() {
   const context = useContext(InsightsStateMachineContext);
   if (!context) {
     throw new Error(
-      'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider'
+      'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider',
     );
   }
 

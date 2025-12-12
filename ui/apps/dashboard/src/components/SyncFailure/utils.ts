@@ -1,8 +1,14 @@
-import { isErrorCode, parseErrorData, type CodedError, type ErrorCode } from '@/codedError';
+import {
+  isErrorCode,
+  parseErrorData,
+  type CodedError,
+  type ErrorCode,
+} from '@/utils/codedError';
 
 const messages = {
   account_mismatch: "The app's signing key is for the wrong account.",
-  app_mismatch: 'The app at the provided URL does not match the app you are trying to sync.',
+  app_mismatch:
+    'The app at the provided URL does not match the app you are trying to sync.',
   app_uninitialized: 'Do an initial sync before resyncing.',
   batch_size_too_large: 'Configured batch size is too large',
   env_archived: 'Cannot sync an app to an archived environment.',

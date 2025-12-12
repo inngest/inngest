@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
@@ -31,7 +29,11 @@ export function SchemaExplorer() {
   const renderSharedAdornment = useCallback((node: ValueNode) => {
     if (node.path !== 'events') return null;
     return (
-      <Pill appearance="outlined" className="border-subtle text-subtle" kind="secondary">
+      <Pill
+        appearance="outlined"
+        className="border-subtle text-subtle"
+        kind="secondary"
+      >
         Shared schema
       </Pill>
     );
@@ -44,30 +46,45 @@ export function SchemaExplorer() {
       return (
         <SchemaViewer
           key={entry.key}
-          computeType={isCommonEventSchema ? computeSharedEventSchemaType : undefined}
+          computeType={
+            isCommonEventSchema ? computeSharedEventSchemaType : undefined
+          }
           defaultExpandedPaths={
-            preventExpand ? undefined : isCommonEventSchema ? ['events'] : undefined
+            preventExpand
+              ? undefined
+              : isCommonEventSchema
+              ? ['events']
+              : undefined
           }
           node={entry.node}
-          renderAdornment={isCommonEventSchema ? renderSharedAdornment : undefined}
+          renderAdornment={
+            isCommonEventSchema ? renderSharedAdornment : undefined
+          }
         />
       );
     },
-    [renderSharedAdornment]
+    [renderSharedAdornment],
   );
 
   return (
-    <div className="flex h-full w-full flex-col gap-3 overflow-auto p-4" ref={containerRef}>
+    <div
+      className="flex h-full w-full flex-col gap-3 overflow-auto p-4"
+      ref={containerRef}
+    >
       <>
         {schemasInUse.length > 0 && (
           <div className="mb-3 flex flex-col gap-2">
-            <div className="text-light text-xs font-medium uppercase">Schemas in Use</div>
+            <div className="text-light text-xs font-medium uppercase">
+              Schemas in Use
+            </div>
             <div className="flex flex-col gap-1">
               {schemasInUse.map((schema) => renderEntry(schema, true))}
             </div>
           </div>
         )}
-        <div className="text-light text-xs font-medium uppercase">All Schemas</div>
+        <div className="text-light text-xs font-medium uppercase">
+          All Schemas
+        </div>
         <Search
           inngestSize="base"
           onUpdate={setSearch}
@@ -98,7 +115,10 @@ export function SchemaExplorer() {
   );
 }
 
-function computeSharedEventSchemaType(node: ValueNode, baseLabel: string): string {
+function computeSharedEventSchemaType(
+  node: ValueNode,
+  baseLabel: string,
+): string {
   if (node.path === 'events.data' && baseLabel === 'string') return 'JSON';
   return baseLabel;
 }

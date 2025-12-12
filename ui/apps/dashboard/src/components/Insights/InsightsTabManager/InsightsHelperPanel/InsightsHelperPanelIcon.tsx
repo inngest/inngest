@@ -1,6 +1,9 @@
-'use client';
-
-import { RiBookOpenLine, RiFeedbackLine, RiNodeTree, RiSparkling2Line } from '@remixicon/react';
+import {
+  RiBookOpenLine,
+  RiFeedbackLine,
+  RiNodeTree,
+  RiSparkling2Line,
+} from '@remixicon/react';
 
 import {
   DOCUMENTATION,

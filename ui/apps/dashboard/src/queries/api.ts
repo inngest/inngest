@@ -1,5 +1,5 @@
 export async function get(pathname: string): Promise<Response> {
-  const url = new URL(pathname, process.env.NEXT_PUBLIC_API_URL);
+  const url = new URL(pathname, import.meta.env.VITE_API_URL);
   return await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
@@ -9,7 +9,7 @@ export async function get(pathname: string): Promise<Response> {
 }
 
 export async function put(pathname: string, body: any): Promise<Response> {
-  const url = new URL(pathname, process.env.NEXT_PUBLIC_API_URL);
+  const url = new URL(pathname, import.meta.env.VITE_API_URL);
   return await fetch(url, {
     method: 'PUT',
     headers: {

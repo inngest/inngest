@@ -7,7 +7,7 @@ import type { SchemaEntry, SchemaEventPage } from './types';
 import { makeTitleOnlyEntry } from './utils';
 
 export function buildSchemaEntriesFromQueryData(
-  data: InfiniteData<SchemaEventPage> | undefined
+  data: InfiniteData<SchemaEventPage> | undefined,
 ): SchemaEntry[] {
   const list: SchemaEntry[] = [];
 
@@ -33,7 +33,7 @@ export function buildSchemaEntriesFromQueryData(
 
 export function buildEntryFromLatestSchema(
   latestSchema: string | undefined | null,
-  eventName: string
+  eventName: string,
 ): SchemaEntry | null {
   try {
     const parsed = safeParseJSONSchema(latestSchema);
@@ -52,7 +52,9 @@ export function buildEntryFromLatestSchema(
   }
 }
 
-export function safeParseJSONSchema(input: string | undefined | null): JSONSchema | null {
+export function safeParseJSONSchema(
+  input: string | undefined | null,
+): JSONSchema | null {
   if (!input) return null;
   try {
     const obj = JSON.parse(input);

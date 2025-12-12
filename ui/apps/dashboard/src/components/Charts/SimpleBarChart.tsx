@@ -1,10 +1,16 @@
-'use client';
-
 import { useMemo } from 'react';
-import { Pill } from '@inngest/components/Pill/Pill';
+import { Pill } from '@inngest/components/Pill/NewPill';
 import { cn } from '@inngest/components/utils/classNames';
 import { minuteTime } from '@inngest/components/utils/date';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 type BarChartProps = {
   className?: string;
@@ -42,7 +48,14 @@ type AxisProps = {
 
 function CustomizedXAxisTick(props: AxisProps) {
   return (
-    <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
+    <text
+      x={props.x}
+      y={props.y}
+      dy={16}
+      fontSize={12}
+      className="fill-muted"
+      textAnchor="middle"
+    >
       {minuteTime(new Date(props.payload.value))}
     </text>
   );
@@ -67,13 +80,23 @@ export default function SimpleBarChart({
   data = [],
   legend = [],
 }: BarChartProps) {
-  const flattenedData = useMemo(() => data.map((d) => ({ ...d.values, name: d.name })), [data]);
+  const flattenedData = useMemo(
+    () => data.map((d) => ({ ...d.values, name: d.name })),
+    [data],
+  );
 
   return (
-    <div className={cn('border-subtle bg-canvasBase border-b px-6 py-4', className)}>
+    <div
+      className={cn(
+        'border-subtle bg-canvasBase border-b px-6 py-4',
+        className,
+      )}
+    >
       <header className="mb-2 flex items-center justify-between">
         <div className="flex">
-          <h3 className="mr-4 flex flex-row items-center gap-2 text-base">{title}</h3>
+          <h3 className="mr-4 flex flex-row items-center gap-2 text-base">
+            {title}
+          </h3>
           <Pill>{period}</Pill>
         </div>
         <div>
@@ -94,7 +117,11 @@ export default function SimpleBarChart({
               }}
               barCategoryGap={8}
             >
-              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
+              <CartesianGrid
+                strokeDasharray="0"
+                vertical={false}
+                className="stroke-disabled"
+              />
               <XAxis
                 allowDecimals={false}
                 dataKey="name"
@@ -122,11 +149,16 @@ export default function SimpleBarChart({
                   const { label, payload } = props;
                   return (
                     <div className="bg-canvasBase shadow-tooltip rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
-                      <div className="text-muted pb-2">{new Date(label).toLocaleString()}</div>
+                      <div className="text-muted pb-2">
+                        {new Date(label).toLocaleString()}
+                      </div>
                       {payload?.map((p, idx) => {
                         const l = legend.find((l) => l.dataKey == p.name);
                         return (
-                          <div key={idx} className="flex items-center font-medium">
+                          <div
+                            key={idx}
+                            className="flex items-center font-medium"
+                          >
                             <span
                               className="mr-2 inline-flex h-3 w-3 rounded"
                               style={{ backgroundColor: l?.color || p.color }}
@@ -156,7 +188,11 @@ export default function SimpleBarChart({
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          loading && <p className="text-basis text-center text-sm leading-[200px]">Loading...</p>
+          loading && (
+            <p className="text-basis text-center text-sm leading-[200px]">
+              Loading...
+            </p>
+          )
         )}
       </div>
     </div>

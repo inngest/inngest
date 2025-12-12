@@ -1,5 +1,3 @@
-'use client';
-
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
 
@@ -18,7 +16,10 @@ export function ResultsTableFooter() {
   );
 }
 
-export function assertData(data: undefined | InsightsFetchResult): data is InsightsFetchResult {
-  if (!data?.rows.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
+export function assertData(
+  data: undefined | InsightsFetchResult,
+): data is InsightsFetchResult {
+  if (!data?.rows.length)
+    throw new Error('Unexpectedly received empty data in ResultsTable.');
   return true;
 }

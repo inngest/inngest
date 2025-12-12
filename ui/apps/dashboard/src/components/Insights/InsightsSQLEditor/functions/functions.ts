@@ -18,5 +18,7 @@ export const SUPPORTED_FUNCTIONS = sortByName([
 ]);
 
 function sortByName(fns: FunctionDescriptor[]): FunctionDescriptor[] {
-  return fns.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  return fns.sort((a, b) =>
+    a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+  );
 }

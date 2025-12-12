@@ -1,21 +1,18 @@
-'use client';
-
-import type { Route } from 'next';
-import { useRouter } from 'next/navigation';
-import { Pill } from '@inngest/components/Pill/Pill';
+import { Pill } from '@inngest/components/Pill/NewPill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 import { RiQuestionMark } from '@remixicon/react';
+import { useNavigate } from '@tanstack/react-router';
 import { Command } from 'cmdk';
 
 type Props = {
   isDifferentEnv?: boolean;
   kind?: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
-  path?: Route;
+  path?: string;
   text: string;
   value: string;
   icon?: React.ReactNode;
@@ -30,14 +27,14 @@ export function ResultItem({
   value,
   icon,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <Command.Item
       className="data-[selected=true]:bg-canvasSubtle/50 text-basis group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2 text-sm"
       onSelect={() => {
         if (path) {
-          router.push(path);
+          navigate({ to: path });
         }
         onClick();
       }}

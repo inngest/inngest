@@ -15,7 +15,13 @@ import { useTheme } from 'next-themes';
 import { DISCORD_URL, pathCreator } from '@/utils/urls';
 import { ResultItem } from './ResultItem';
 
-export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; envSlug: string }) {
+export default function Shortcuts({
+  onClose,
+  envSlug,
+}: {
+  onClose: () => void;
+  envSlug: string;
+}) {
   const { theme, setTheme } = useTheme();
   return (
     <>
@@ -97,7 +103,10 @@ export default function Shortcuts({ onClose, envSlug }: { onClose: () => void; e
           />
         )}
       </Command.Group>
-      <Command.Group heading="Help" className="text-muted text-xs [&_[cmdk-group-heading]]:mb-1">
+      <Command.Group
+        heading="Help"
+        className="text-muted text-xs [&_[cmdk-group-heading]]:mb-1"
+      >
         <ResultItem
           onClick={onClose}
           path={'https://www.inngest.com/docs?ref=app-cmdk'}

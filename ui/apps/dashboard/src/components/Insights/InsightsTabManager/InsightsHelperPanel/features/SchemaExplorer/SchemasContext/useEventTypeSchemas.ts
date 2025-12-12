@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback } from 'react';
 import type { PageInfo } from '@inngest/components/types/eventType';
 import { useClient } from 'urql';
@@ -53,7 +51,7 @@ export function useEventTypeSchemas() {
         .query(
           GET_EVENT_TYPE_SCHEMAS_QUERY,
           { archived: false, cursor, envID, nameSearch },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -68,6 +66,6 @@ export function useEventTypeSchemas() {
 
       return { events, pageInfo: eventTypesData.pageInfo };
     },
-    [client, envID]
+    [client, envID],
   );
 }

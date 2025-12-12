@@ -1,8 +1,7 @@
-'use client';
-
 import { createContext, useEffect, useState } from 'react';
-import { useOrganization, useUser } from '@clerk/nextjs';
+
 import { useLDClient, withLDProvider } from 'launchdarkly-react-client-sdk';
+import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
 export const IdentificationContext = createContext({ isIdentified: false });
 
@@ -50,10 +49,10 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
 }
 
 let clientSideID: string;
-if (process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID) {
-  clientSideID = process.env.NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID;
+if (import.meta.env.VITE_LAUNCH_DARKLY_CLIENT_ID) {
+  clientSideID = import.meta.env.VITE_LAUNCH_DARKLY_CLIENT_ID;
 } else {
-  console.error('missing NEXT_PUBLIC_LAUNCH_DARKLY_CLIENT_ID');
+  console.error('missing VITE_LAUNCH_DARKLY_CLIENT_ID');
   clientSideID = 'missing';
 }
 

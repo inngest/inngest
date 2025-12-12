@@ -80,7 +80,7 @@ export function useEvents() {
       includeInternalEvents,
     }: EventsQueryVariables) => {
       // TODO: use params when available in the API
-      console.log(source);
+
       const result = await client
         .query(
           eventsQuery,
@@ -93,7 +93,7 @@ export function useEvents() {
             eventNames,
             includeInternalEvents,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -125,7 +125,7 @@ export function useEvents() {
         totalCount: eventsData.totalCount,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -160,7 +160,7 @@ export function useEventDetails() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -176,10 +176,12 @@ export function useEventDetails() {
       return {
         ...eventData,
         receivedAt: new Date(eventData.receivedAt),
-        occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+        occurredAt: eventData.occurredAt
+          ? new Date(eventData.occurredAt)
+          : undefined,
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -206,7 +208,7 @@ export function useEventPayload() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -221,7 +223,7 @@ export function useEventPayload() {
       const eventData = result.data.environment.eventV2.raw;
       return { payload: eventData };
     },
-    [client, envID]
+    [client, envID],
   );
 }
 
@@ -258,7 +260,7 @@ export function useEventRuns() {
             envID,
             eventID,
           },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -283,6 +285,6 @@ export function useEventRuns() {
         })),
       };
     },
-    [client, envID]
+    [client, envID],
   );
 }

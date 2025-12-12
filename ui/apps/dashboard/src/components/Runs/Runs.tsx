@@ -1,14 +1,12 @@
-'use client';
-
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
-import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { RunsPage } from '@inngest/components/RunsPage/NewRunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useSearchParam,
   useStringArraySearchParam,
-} from '@inngest/components/hooks/useSearchParam';
+} from '@inngest/components/hooks/useNewSearchParams';
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -39,13 +37,13 @@ type Props = FnProps | EnvProps;
 
 const parseCelSearchError = (combinedError: CombinedError | undefined) => {
   return combinedError?.graphQLErrors.find(
-    (error) => error.extensions.code == 'expression_invalid'
+    (error) => error.extensions.code == 'expression_invalid',
   );
 };
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   { functionSlug, scope }: Props,
-  ref
+  ref,
 ) {
   const env = useEnvironment();
 
@@ -66,11 +64,16 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const { booleanFlag } = useBooleanFlag();
 
-  const { value: tracePreviewEnabled } = booleanFlag('traces-preview', true, true);
+  const { value: tracePreviewEnabled } = booleanFlag(
+    'traces-preview',
+    true,
+    true,
+  );
 
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
-  const [rawTimeField = RunsOrderByField.QueuedAt] = useSearchParam('timeField');
+  const [rawTimeField = RunsOrderByField.QueuedAt] =
+    useSearchParam('timeField');
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -110,7 +113,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       filteredStatus,
       timeField,
       search,
-    ]
+    ],
   );
 
   // Use the new hook to manage pagination

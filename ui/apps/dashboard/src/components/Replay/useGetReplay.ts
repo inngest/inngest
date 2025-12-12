@@ -33,7 +33,9 @@ export function useGetReplay(replayID: string) {
   return useQuery({
     queryKey: ['replay', envID, replayID],
     queryFn: async () => {
-      const result = await client.query(getReplayQuery, { envID, replayID }).toPromise();
+      const result = await client
+        .query(getReplayQuery, { envID, replayID })
+        .toPromise();
 
       if (result.error) {
         throw result.error;
@@ -48,9 +50,14 @@ export function useGetReplay(replayID: string) {
         ...replay,
         createdAt: new Date(replay.createdAt),
         runsCount: replay.functionRunsScheduledCount,
-        runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
-        fromRange: replay.fromRange ? new Date(decodeTime(replay.fromRange)) : undefined,
-        toRange: replay.toRange ? new Date(decodeTime(replay.toRange)) : undefined,
+        runsSkippedCount:
+          replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
+        fromRange: replay.fromRange
+          ? new Date(decodeTime(replay.fromRange))
+          : undefined,
+        toRange: replay.toRange
+          ? new Date(decodeTime(replay.toRange))
+          : undefined,
         filters: replay.filtersV2,
       };
 
@@ -59,7 +66,10 @@ export function useGetReplay(replayID: string) {
           ...baseReplay,
           status: ReplayStatus.Ended,
           endedAt: new Date(replay.endedAt),
-          duration: differenceInMilliseconds(new Date(replay.endedAt), new Date(replay.createdAt)),
+          duration: differenceInMilliseconds(
+            new Date(replay.endedAt),
+            new Date(replay.createdAt),
+          ),
         };
       }
 
@@ -113,7 +123,9 @@ export function useGetReplays(functionSlug: string) {
             ...replay,
             createdAt: new Date(replay.createdAt),
             runsCount: replay.functionRunsScheduledCount,
-            runsSkippedCount: replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
+            runsSkippedCount:
+              replay.functionRunsScheduledCount -
+              replay.functionRunsProcessedCount,
           };
 
           if (replay.endedAt) {
@@ -123,7 +135,7 @@ export function useGetReplays(functionSlug: string) {
               endedAt: new Date(replay.endedAt),
               duration: differenceInMilliseconds(
                 new Date(replay.endedAt),
-                new Date(replay.createdAt)
+                new Date(replay.createdAt),
               ),
             };
           }

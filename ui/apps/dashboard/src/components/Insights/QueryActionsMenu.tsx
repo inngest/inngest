@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactElement } from 'react';
 import {
   DropdownMenu,
@@ -55,7 +53,10 @@ export function QueryActionsMenu({
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {editorRef && (
-          <DropdownMenuItem className="text-basis px-4 outline-none" onSelect={handleFormatSQL}>
+          <DropdownMenuItem
+            className="text-basis px-4 outline-none"
+            onSelect={handleFormatSQL}
+          >
             <RiAlignLeft className="size-4" />
             <span>Format SQL</span>
           </DropdownMenuItem>
@@ -88,6 +89,8 @@ export function QueryActionsMenu({
   );
 }
 
-function isActualQueryAndUnshared(query: InsightsQueryStatement | QuerySnapshot | undefined) {
+function isActualQueryAndUnshared(
+  query: InsightsQueryStatement | QuerySnapshot | undefined,
+) {
   return query !== undefined && !isQuerySnapshot(query) && !query.shared;
 }

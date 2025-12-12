@@ -1,6 +1,6 @@
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
 import type { EntityLookup } from './Dashboard';
@@ -16,7 +16,8 @@ export const RunsThrougput = ({
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
 }) => {
-  const metrics = workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
+  const metrics =
+    workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">

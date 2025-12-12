@@ -1,10 +1,7 @@
-'use client';
-
 import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
+import { useNavigate } from '@tanstack/react-router';
+import { Alert } from '@inngest/components/Alert/NewAlert';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Card } from '@inngest/components/Card';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { toast } from 'sonner';
@@ -25,7 +22,7 @@ const EnableDatadogConnectionDocument = graphql(`
 `);
 
 export default function AddConnectionPage({}) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [{ data: envs = [], error: envsErr }] = useEnvironments();
   const [{ data: ddSetupData, error: ddSetupErr }] = useQuery({
@@ -36,7 +33,9 @@ export default function AddConnectionPage({}) {
   const [isFormDisabled, setFormDisabled] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [, enableDatadogConnection] = useMutation(EnableDatadogConnectionDocument);
+  const [, enableDatadogConnection] = useMutation(
+    EnableDatadogConnectionDocument,
+  );
 
   const onEnvSelect = (env: Environment) => {
     setSelectedEnv(env);
@@ -72,7 +71,7 @@ export default function AddConnectionPage({}) {
         organizationID: orgID,
         envID: selectedEnv.id,
       },
-      { additionalTypenames: ['DatadogConnectionStatus'] }
+      { additionalTypenames: ['DatadogConnectionStatus'] },
     );
 
     if (result.error) {
@@ -84,17 +83,20 @@ export default function AddConnectionPage({}) {
     }
 
     toast.success(`Datadog integration configured for ${selectedEnv.name}`);
-    router.push('/settings/integrations/datadog');
+    navigate({ to: '/settings/integrations/datadog' });
   }
 
-  const extantConnectionsForEnv = ddSetupData.account.datadogConnections.filter((connection) => {
-    return connection.envID === selectedEnv?.id;
-  });
-  const availableDatadogOrgsForEnv = ddSetupData.account.datadogOrganizations.filter((org) => {
-    return !extantConnectionsForEnv.some((connection) => {
-      return connection.orgID === org.id;
+  const extantConnectionsForEnv = ddSetupData.account.datadogConnections.filter(
+    (connection) => {
+      return connection.envID === selectedEnv?.id;
+    },
+  );
+  const availableDatadogOrgsForEnv =
+    ddSetupData.account.datadogOrganizations.filter((org) => {
+      return !extantConnectionsForEnv.some((connection) => {
+        return connection.orgID === org.id;
+      });
     });
-  });
 
   let cardAccentColor = 'bg-surfaceMuted';
   if (formError) {
@@ -109,7 +111,9 @@ export default function AddConnectionPage({}) {
       contentClassName="overflow-visible"
     >
       <Card.Header>
-        <div className="text-basis mb-1 text-sm">Choose an environment to connect to Datadog:</div>
+        <div className="text-basis mb-1 text-sm">
+          Choose an environment to connect to Datadog:
+        </div>
         <EnvSelectMenu onSelect={onEnvSelect} className="mb-2" />
       </Card.Header>
       <Card.Content>
@@ -122,21 +126,30 @@ export default function AddConnectionPage({}) {
         {availableDatadogOrgsForEnv.length === 0 && (
           <Alert severity="info" className="mx-auto mb-3 mt-3">
             <p className="text-balance">
-              <span className="font-semibold">{selectedEnv?.name}</span> is already connected to all
-              available Datadog organizations.
+              <span className="font-semibold">{selectedEnv?.name}</span> is
+              already connected to all available Datadog organizations.
             </p>
             <p>
               To connect a new Datadog organization, please{' '}
-              <Link href={ddIntegrationHref} className="underline">
-                navigate to the Inngest integration from your Datadog organization
-              </Link>{' '}
+              <a
+                href={ddIntegrationHref}
+                className="underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                navigate to the Inngest integration from your Datadog
+                organization
+              </a>{' '}
               and start the connection process from there.
             </p>
           </Alert>
         )}
 
         {availableDatadogOrgsForEnv.length > 0 && (
-          <form onSubmit={handleSubmit} className="flex flex-col items-start gap-4">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col items-start gap-4"
+          >
             <div>Choose the Datadog organization to send metrics to:</div>
             {availableDatadogOrgsForEnv.map((org, i) => (
               <div className="flex flex-row gap-2" key={org.id}>

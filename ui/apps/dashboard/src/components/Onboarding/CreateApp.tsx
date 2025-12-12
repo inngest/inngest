@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
+
+import { ClientOnly, useNavigate } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Card } from '@inngest/components/Card/Card';
 import { InlineCode } from '@inngest/components/Code';
-import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
-import { Link } from '@inngest/components/Link';
+import CommandBlock from '@inngest/components/CodeBlock/NewCommandBlock';
+import { Link } from '@inngest/components/Link/NewLink';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiCheckboxCircleFill, RiExternalLinkLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
-import { OnboardingSteps } from '../Onboarding/types';
+import { OnboardingSteps } from './types';
 import useOnboardingStep from './useOnboardingStep';
 import { useOnboardingTracking } from './useOnboardingTracking';
 import { getNextStepName } from './utils';
@@ -38,21 +39,22 @@ export default function CreateApp() {
   const nextStepName = getNextStepName(currentStepName);
   const { updateCompletedSteps } = useOnboardingStep();
   const [activeTab, setActiveTab] = useState(tabs[0]?.title || '');
-  const currentTabContent = tabs.find((tab) => tab.title === activeTab) || tabs[0];
-  const router = useRouter();
+  const currentTabContent =
+    tabs.find((tab) => tab.title === activeTab) || tabs[0];
+  const navigate = useNavigate();
   const { isRunning: devServerIsRunning } = useDevServer(2500);
   const tracking = useOnboardingTracking();
 
   return (
     <div className="text-subtle">
       <p className="mb-6 text-sm">
-        An Inngest &quot;App&quot; is a group of functions served on a single endpoint or server.
-        The first step is to create your app and functions, serve it, and test it locally with the
-        Inngest Dev Server.
+        An Inngest &quot;App&quot; is a group of functions served on a single
+        endpoint or server. The first step is to create your app and functions,
+        serve it, and test it locally with the Inngest Dev Server.
       </p>
       <p className="mb-6 text-sm">
-        The Dev Server will guide you through setup and help you build and test functions end to
-        end.{' '}
+        The Dev Server will guide you through setup and help you build and test
+        functions end to end.{' '}
         <Link
           className="inline-block"
           size="small"
@@ -63,15 +65,22 @@ export default function CreateApp() {
         </Link>
       </p>
       <p className="mb-2 text-sm">
-        Run the following CLI command on your machine to get the Inngest Dev Server started locally:
+        Run the following CLI command on your machine to get the Inngest Dev
+        Server started locally:
       </p>
-      <CommandBlock.Wrapper>
-        <CommandBlock.Header className="flex items-center justify-between pr-4">
-          <CommandBlock.Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
-          <CommandBlock.CopyButton content={currentTabContent?.content} />
-        </CommandBlock.Header>
-        <CommandBlock currentTabContent={currentTabContent} />
-      </CommandBlock.Wrapper>
+      <ClientOnly fallback={<div>Loading...</div>}>
+        <CommandBlock.Wrapper>
+          <CommandBlock.Header className="flex items-center justify-between pr-4">
+            <CommandBlock.Tabs
+              tabs={tabs}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+            <CommandBlock.CopyButton content={currentTabContent?.content} />
+          </CommandBlock.Header>
+          <CommandBlock currentTabContent={currentTabContent} />
+        </CommandBlock.Wrapper>
+      </ClientOnly>
       <Card className="my-6">
         <div className="flex items-center justify-between gap-2 p-4">
           <div>
@@ -85,7 +94,8 @@ export default function CreateApp() {
               )}
             </div>
             <p className="text-sm">
-              Open the Dev Server at <InlineCode>http://localhost:8288</InlineCode> and follow the
+              Open the Dev Server at{' '}
+              <InlineCode>http://localhost:8288</InlineCode> and follow the
               guide to create your app.
             </p>
           </div>
@@ -125,7 +135,9 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: 'btn-click', label: 'next' },
             });
-            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+            navigate({
+              to: pathCreator.onboardingSteps({ step: nextStepName }),
+            });
           }}
         />
         <Button
@@ -140,7 +152,9 @@ export default function CreateApp() {
             tracking?.trackOnboardingAction(currentStepName, {
               metadata: { type: 'btn-click', label: 'skip' },
             });
-            router.push(pathCreator.onboardingSteps({ step: nextStepName }));
+            navigate({
+              to: pathCreator.onboardingSteps({ step: nextStepName }),
+            });
           }}
         />
       </div>

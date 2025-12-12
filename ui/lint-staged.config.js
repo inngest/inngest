@@ -8,6 +8,7 @@ const ESLintTask = (fileNames) =>
 module.exports = {
   // Run ESLint and Prettier consecutively for TypeScript files
   './{src,test}/**/*.{tsx,ts}': [ESLintTask, 'prettier --write'],
-  // Run Prettier for non-TypeScript files
-  '!(./{src,test}/**/*.{tsx,ts})': 'prettier --ignore-unknown --write',
+  // Run Prettier for non-TypeScript files, excluding config files
+  '!(./{src,test}/**/*.{tsx,ts}|**/.prettierrc*|**/.eslintrc*|**/eslint.config.*|**/.prettierignore)':
+    'prettier --ignore-unknown --write',
 };

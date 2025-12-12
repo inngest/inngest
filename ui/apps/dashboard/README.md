@@ -1,6 +1,6 @@
 # Inngest Dashboard
 
-This is the web application for Inngest Cloud. It’s a Next.js app that uses GraphQL to communicate
+This is the web application for Inngest Cloud. It’s a Tanstack Start app that uses GraphQL to communicate
 with the [Inngest Cloud "App API"](https://github.com/inngest/monorepo). The app is hosted on Vercel and is the
 primary way to interact with Inngest Cloud.
 
@@ -11,7 +11,7 @@ Before being able to run the app for the first time, you need to follow the step
 ### Prerequisites
 
 - Set up the [Cloud monorepo](https://github.com/inngest/monorepo) and have all backend services running locally
-- [Node.js 18](https://nodejs.org/en/download/)
+- [Node.js](https://nodejs.org/en/download/)
 - Join the company's Vercel account
 
 ### Instructions
@@ -39,7 +39,7 @@ $ pnpm dev
 
 This will start a local server that will automatically rebuild the app and refresh the page when you
 make changes to the code. The app will be available at
-[http://localhost:3000](http://localhost:3000).
+[http://localhost:5173](http://localhost:5173).
 
 This is how you will run the app most of the time.
 
@@ -103,7 +103,7 @@ $ pnpm env:add
 $ pnpm env:rm
 ```
 
-Check the [Vercel documentation](https://vercel.com/docs/concepts/projects/environment-variables)
+Check the [Tanstack Start Documentation](https://tanstack.com/start/latest/docs/framework/react/overview)
 for more information.
 
 You should **never commit environment variables** to the repository. If you need to add a new
@@ -126,20 +126,20 @@ you can sign in using these credentials:
 
 ```javascript
 // Good
-const environmentID = '';
+const environmentID = "";
 
 // Bad
-const environmentId = '';
+const environmentId = "";
 ```
 
 - Naming (for both copy and code) should follow our [Product nomenclature](https://www.notion.so/inngest/Nomenclature-Taxonomy-aba427349a724183b90784f0b80d5a35).
 
 ```javascript
 // Good - terminology we use for external comms
-const environment = '';
+const environment = "";
 
 // Bad - deprecated terminology
-const workspace = '';
+const workspace = "";
 ```
 
 ### Language and Copy Conventions

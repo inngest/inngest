@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { formatDistanceToNow } from '@inngest/components/utils/date';
 
@@ -8,6 +8,7 @@ import { pathCreator } from '@/utils/urls';
 import { useEnvironment } from '../Environments/environment-context';
 import type { EntityLookup } from './Dashboard';
 import { sum } from './utils';
+import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type CompletedByFunctionType =
   FunctionStatusMetricsQuery['workspace']['completedByFunction'];
@@ -36,9 +37,13 @@ const sort = (metrics: CompletedByFunctionMetricsType) =>
 // Completion metrics for this function are spread across this:
 // [{id: x, data: {value}}, {id: x, data: {value}}]
 // flatten & sum all the values
-const getRate = (id: string, totalFailures: number, completed: CompletedByFunctionType) => {
+const getRate = (
+  id: string,
+  totalFailures: number,
+  completed: CompletedByFunctionType,
+) => {
   const totalCompleted = sum(
-    completed.metrics.filter((m) => m.id === id).flatMap(({ data }) => data)
+    completed.metrics.filter((m) => m.id === id).flatMap(({ data }) => data),
   );
 
   return totalFailures && totalCompleted ? totalFailures / totalCompleted : 0;
@@ -47,7 +52,7 @@ const getRate = (id: string, totalFailures: number, completed: CompletedByFuncti
 const mapRateList = (
   failed: CompletedByFunctionMetricsType,
   completed: CompletedByFunctionType,
-  functions: EntityLookup
+  functions: EntityLookup,
 ): Rate[] => {
   return failed.slice(0, 6).map((f) => {
     const failures = f.data.filter((d) => d.value > 0);
@@ -72,7 +77,8 @@ export const FailedRate = ({
 }) => {
   const env = useEnvironment();
   const failed = workspace && sort(filter(workspace.completedByFunction));
-  const rateList = failed && mapRateList(failed, workspace.completedByFunction, functions);
+  const rateList =
+    failed && mapRateList(failed, workspace.completedByFunction, functions);
 
   return (
     <div className="border-subtle my-5 mb-5 ml-4 mt-8 hidden h-full w-[25%] min-w-[220px] flex-col items-start justify-start border-l pl-4 md:flex">
@@ -88,9 +94,16 @@ export const FailedRate = ({
           <div className="mt-3 flex w-full flex-row items-center justify-between gap-x-3 text-xs font-light leading-none">
             <Link
               className="text-basis text-xs font-light leading-none hover:no-underline"
-              href={`${pathCreator.function({ envSlug: env.slug, functionSlug: r.slug })}/runs`}
+              to={
+                `${pathCreator.function({
+                  envSlug: env.slug,
+                  functionSlug: r.slug,
+                })}/runs` as FileRouteTypes['to']
+              }
             >
-              <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">{r.name}</div>
+              <div className="w-[136px] overflow-hidden text-ellipsis text-nowrap">
+                {r.name}
+              </div>
             </Link>
             <div className="flex flex-row justify-end gap-x-4">
               <div className="justify-self-end">{r.totalFailures}</div>
@@ -109,7 +122,8 @@ export const FailedRate = ({
                 r.lastOccurence && 'cursor-pointer'
               }`}
             >
-              {r.lastOccurence && formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
+              {r.lastOccurence &&
+                formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
             </div>
           </OptionalTooltip>
         </React.Fragment>

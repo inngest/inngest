@@ -1,8 +1,10 @@
-'use client';
-
 import { useMemo, useState } from 'react';
-import { Button } from '@inngest/components/Button/Button';
-import { Popover, PopoverContent, PopoverTrigger } from '@inngest/components/Popover';
+import { Button } from '@inngest/components/Button/NewButton';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@inngest/components/Popover';
 import {
   format as formatDate,
   isValid,
@@ -65,7 +67,13 @@ export function InsightsSQLEditorQueryEditHistoryButton({
         side="bottom"
       >
         <AuthorshipDate author={creator} date={createdAt} label="Created by" />
-        {hasEdits && <AuthorshipDate author={lastEditor} date={updatedAt} label="Edited by" />}
+        {hasEdits && (
+          <AuthorshipDate
+            author={lastEditor}
+            date={updatedAt}
+            label="Edited by"
+          />
+        )}
       </PopoverContent>
     </Popover>
   );

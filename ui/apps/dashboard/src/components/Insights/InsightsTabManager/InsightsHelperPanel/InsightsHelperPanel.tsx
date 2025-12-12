@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -20,7 +18,11 @@ type InsightsHelperPanelProps = {
   onClose: () => void;
 };
 
-export function InsightsHelperPanel({ active, agentThreadId, onClose }: InsightsHelperPanelProps) {
+export function InsightsHelperPanel({
+  active,
+  agentThreadId,
+  onClose,
+}: InsightsHelperPanelProps) {
   const content = useMemo(() => {
     switch (active) {
       case INSIGHTS_AI: {

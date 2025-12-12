@@ -1,7 +1,15 @@
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { RiLoopRightLine, RiMagicLine, RiSendPlaneLine } from '@remixicon/react';
+import {
+  RiLoopRightLine,
+  RiMagicLine,
+  RiSendPlaneLine,
+} from '@remixicon/react';
 
-import { OnboardingSteps, type OnboardingMenuContent, type OnboardingWidgetContent } from './types';
+import {
+  OnboardingSteps,
+  type OnboardingMenuContent,
+  type OnboardingWidgetContent,
+} from './types';
 
 export const onboardingWidgetContent: OnboardingWidgetContent = {
   step: {
@@ -32,7 +40,8 @@ export const onboardingWidgetContent: OnboardingWidgetContent = {
     },
   },
   tooltip: {
-    close: "Close this widget. Reopen from the 'Help & Feedback' menu, if needed.",
+    close:
+      "Close this widget. Reopen from the 'Help & Feedback' menu, if needed.",
   },
 };
 

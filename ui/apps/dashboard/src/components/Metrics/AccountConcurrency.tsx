@@ -1,15 +1,19 @@
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/NewButton';
 import { Chart, type LineSeriesOption } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
-import { Link } from '@inngest/components/Link/Link';
+import { Link } from '@inngest/components/Link/NewLink';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { MetricsResponse } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import tailwindConfig from '../../../tailwind.config';
-import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
+import { borderColor } from '@/utils/tailwind';
+import {
+  getLineChartOptions,
+  getXAxis,
+  lineColors,
+  seriesOptions,
+} from './utils';
 
 type Props = {
   data: MetricsResponse | undefined;
@@ -17,7 +21,11 @@ type Props = {
   isMarketplace: boolean;
 };
 
-export function AccountConcurrency({ data, limit, isMarketplace = false }: Props) {
+export function AccountConcurrency({
+  data,
+  limit,
+  isMarketplace = false,
+}: Props) {
   let option = {};
   if (data) {
     option = createChartOption({ limit, resp: data });
@@ -43,21 +51,25 @@ export function AccountConcurrency({ data, limit, isMarketplace = false }: Props
         {!isMarketplace && (
           <Button
             appearance="outlined"
-            href={pathCreator.billing({ highlight: 'concurrency', ref: 'app-concurrency-chart' })}
+            href={pathCreator.billing({
+              highlight: 'concurrency',
+              ref: 'app-concurrency-chart',
+            })}
             kind="secondary"
             label="Increase Concurrency"
           />
         )}
       </div>
       <div className="flex h-full flex-row items-center">
-        <Chart className="h-full w-full" group="metricsDashboard" option={option} />
+        <Chart
+          className="h-full w-full"
+          group="metricsDashboard"
+          option={option}
+        />
       </div>
     </div>
   );
 }
-const {
-  theme: { borderColor },
-} = resolveConfig(tailwindConfig);
 
 function createChartOption({
   limit,
@@ -73,7 +85,7 @@ function createChartOption({
       ...seriesOptions,
       data: resp.data.map(({ value }) => value),
       itemStyle: {
-        color: resolveColor(lineColors[1]?.[0]!, dark, lineColors[1]?.[1]),
+        color: resolveColor(lineColors[1][0], dark, lineColors[1][1]),
       },
       name: 'Concurrently running steps',
     },
@@ -97,7 +109,7 @@ function createChartOption({
         },
         lineStyle: {
           type: 'solid' as any,
-          color: resolveColor(lineColors[3]?.[0]!, dark, lineColors[3]?.[1]),
+          color: resolveColor(lineColors[3][0], dark, lineColors[3][1]),
         },
         symbol: 'none',
         tooltip: {

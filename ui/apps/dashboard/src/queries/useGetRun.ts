@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
-import type { GetRunPayload, GetRunResult } from '@inngest/components/SharedContext/useGetRun';
+import type {
+  GetRunPayload,
+  GetRunResult,
+} from '@inngest/components/SharedContext/useGetRun';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -98,7 +101,7 @@ export function useGetRun() {
         .query(
           query,
           { envID, runID, preview: preview ?? false },
-          { requestPolicy: 'network-only' }
+          { requestPolicy: 'network-only' },
         )
         .toPromise();
 
@@ -150,6 +153,6 @@ export function useGetRun() {
         },
       };
     },
-    [envID, client]
+    [envID, client],
   );
 }

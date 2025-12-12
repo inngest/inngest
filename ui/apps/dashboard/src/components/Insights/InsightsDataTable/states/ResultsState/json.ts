@@ -1,4 +1,6 @@
-export function getFormattedJSONObjectOrArrayString(value: string): null | string {
+export function getFormattedJSONObjectOrArrayString(
+  value: string,
+): null | string {
   if (!mayBeJSONArray(value) && !mayBeJSONObject(value)) return null;
 
   try {

@@ -35,7 +35,7 @@ export default defineConfig({
       ),
     },
     //
-    // TODO: these can go away when dashboard is converted and versions are in line
+    // TANSTACK TODO: these can go away when dashboard is converted and versions are in line
     dedupe: ['next-themes', '@tanstack/react-query', 'react', 'react-dom'],
   },
   ssr: {

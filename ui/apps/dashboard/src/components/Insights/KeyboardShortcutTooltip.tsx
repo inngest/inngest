@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 
 type KeyCombo = {
@@ -13,7 +11,9 @@ type KeyboardShortcutTooltipProps = {
   combo: KeyCombo;
 };
 
-export function KeyboardShortcutTooltip({ combo }: KeyboardShortcutTooltipProps) {
+export function KeyboardShortcutTooltip({
+  combo,
+}: KeyboardShortcutTooltipProps) {
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
