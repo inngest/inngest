@@ -2342,6 +2342,8 @@ func TestQueueRateLimit(t *testing.T) {
 			Period: 10, // Admit one every 10 seconds
 			Burst:  3,  // With bursts of 3
 		}
+		// NOTE: Since fixing GCRA, we will now admit the maximum of limit + burst requests
+		// This means we can admit up to 1 + 3 = 4 items at once
 
 		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 			return PartitionConstraintConfig{
@@ -2353,13 +2355,14 @@ func TestQueueRateLimit(t *testing.T) {
 				},
 			}
 		}
+		accountID := uuid.New()
 
 		items := []osqueue.QueueItem{}
 		for i := 0; i <= 20; i++ {
 			item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
 				FunctionID: idA,
 				Data: osqueue.Item{
-					Identifier: state.Identifier{WorkflowID: idA},
+					Identifier: state.Identifier{WorkflowID: idA, AccountID: accountID},
 					Throttle:   throttle,
 				},
 			}, clock.Now(), osqueue.EnqueueOpts{})
@@ -2376,7 +2379,7 @@ func TestQueueRateLimit(t *testing.T) {
 		idx := 0
 
 		t.Run("Leasing up to bursts succeeds", func(t *testing.T) {
-			for i := 0; i < 3; i++ {
+			for i := 0; i < 4; i++ {
 				lease, err := q.Lease(ctx, items[i], 2*time.Second, clock.Now(), nil)
 				r.NoError(err, "leasing throttled queue item with capacity failed")
 				r.NotNil(lease)
@@ -2384,7 +2387,7 @@ func TestQueueRateLimit(t *testing.T) {
 			}
 		})
 
-		t.Run("Leasing the 4th time fails", func(t *testing.T) {
+		t.Run("Leasing the 5th time fails", func(t *testing.T) {
 			lease, err := q.Lease(ctx, items[idx], 1*time.Second, clock.Now(), nil)
 			r.NotNil(err, "leasing throttled queue item without capacity didn't error")
 			r.ErrorContains(err, ErrQueueItemThrottled.Error())
