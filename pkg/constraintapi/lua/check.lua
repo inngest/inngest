@@ -185,6 +185,10 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	local emission = period_ms / math.max(limit, 1)
 	result["ei"] = emission
 
+	-- retry_at is always computed under the assumption that all
+	-- remaining capacity is consumed
+	result["retry_at"] = now_ms + emission
+
 	-- dvt determines how many requests can be admitted
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
@@ -230,6 +234,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		if increment <= dvt then
 			-- retry_after outlines when the next request would be accepted
 			result["retry_after"] = -diff
+			result["retry_at"] = now_ms - diff
 			-- ttl represents the current time until the full "limit" is allowed again
 			ttl = tat - now_ms
 			result["ttl"] = ttl
@@ -246,8 +251,6 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 
 			result["limited"] = true
 
-			result["retry_at"] = now_ms + (result["retry_after"] or 0)
-
 			return result
 		end
 	end
@@ -260,10 +263,6 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		redis.call("SET", key, new_tat, "EX", expiry)
 	end
 	result["ttl"] = ttl
-
-	-- retry_at is always computed under the assumption that all
-	-- remaining capacity is consumed
-	result["retry_at"] = now_ms + emission
 
 	local next = dvt - ttl
 	if next > -emission then

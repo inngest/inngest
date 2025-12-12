@@ -733,6 +733,95 @@ func TestNewGCRAScript(t *testing.T) {
 
 		}
 	})
+
+	t.Run("retryAt should be properly calculated", func(t *testing.T) {
+		t.Parallel()
+
+		clock := clockwork.NewFakeClock()
+
+		r, rc := initRedis(t)
+		defer rc.Close()
+
+		key := "test"
+
+		// 10 every 60 minutes, 1 every 6s
+		period := 1 * time.Minute
+		limit := 10
+		burst := 1
+
+		// with full capacity, should show refill after 6s assuming that all capacity is consumed
+		res := runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
+
+		// Read initial capacity
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 2,
+		})
+
+		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
+		require.Equal(t, (12 * time.Second).Milliseconds(), res.DVT)
+		require.Equal(t, (2 * 6 * time.Second).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-12*time.Second).UnixMilli(), res.AllowAt)
+		require.Equal(t, (0 * time.Second).Milliseconds(), res.Diff)
+
+		require.Equal(t, 2, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		// Accounts for burst
+		require.Equal(t, 2*6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
+
+		// Advance time just a little so retryAt should go down
+
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+		r.SetTime(clock.Now())
+
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+		require.Equal(t, clock.Now().Add(4*time.Second).UnixMilli(), res.AllowAt)
+		require.Equal(t, -4*time.Second, time.Duration(res.Diff)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(4*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
+
+		// skip forward 4 seconds, so first request is "fully consumed"
+		clock.Advance(4 * time.Second)
+		r.FastForward(4 * time.Second)
+		r.SetTime(clock.Now())
+
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 0,
+		})
+		require.Equal(t, 1, res.Remaining)
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.TAT), time.Second)
+		require.Equal(t, clock.Now().UnixMilli(), res.AllowAt)
+		require.Equal(t, 0*time.Second, time.Duration(res.Diff)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
+	})
 }
 
 func TestLuaGCRA(t *testing.T) {
@@ -986,7 +1075,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  9,
 					consumeCapacity: 9,
 					capacityAfter:   0,
-					retryAt:         6 * time.Minute,
+					retryAt:         3 * time.Minute,
 				},
 				{
 					delay:           60 * time.Minute,
