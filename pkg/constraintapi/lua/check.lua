@@ -266,17 +266,14 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatib
 	end
 	result["ttl"] = ttl
 
-	-- if we allowed the request, allow an immediate retry
-	result["retry_at"] = now_ms
+	-- retry_at is always computed under the assumption that all
+	-- remaining capacity is consumed
+	result["retry_at"] = now_ms + emission
 
 	local next = dvt - ttl
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
-
-		if remaining == 0 then
-			result["retry_at"] = now_ms + emission
-		end
 	end
 	result["reset_after"] = ttl
 	result["next"] = next
