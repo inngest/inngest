@@ -62,7 +62,7 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -105,7 +105,7 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -128,7 +128,7 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -157,11 +157,11 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 				KeyExpressionHash: fmt.Sprintf("complex-rate-limit-%d", i),
 			}
 			config.Throttle[i] = ThrottleConfig{
-				Scope:                     enums.ThrottleScopeFn,
-				Limit:                     1000000,
-				Burst:                     100000,
-				Period:                    3600,
-				ThrottleKeyExpressionHash: fmt.Sprintf("complex-throttle-%d", i),
+				Scope:             enums.ThrottleScopeFn,
+				Limit:             1000000,
+				Burst:             100000,
+				Period:            3600,
+				KeyExpressionHash: fmt.Sprintf("complex-throttle-%d", i),
 			}
 		}
 
@@ -192,7 +192,7 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -239,7 +239,7 @@ func TestInputValidation_ResourceLimits(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -290,7 +290,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -313,7 +313,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -380,7 +380,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -434,7 +434,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -456,7 +456,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -478,7 +478,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          []ConstraintItem{}, // Empty
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -520,7 +520,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -542,7 +542,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -564,7 +564,7 @@ func TestInputValidation_MalformedData(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -620,7 +620,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -675,7 +675,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -730,7 +730,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -782,7 +782,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -804,7 +804,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -838,7 +838,7 @@ func TestInputValidation_BoundaryConditions(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})

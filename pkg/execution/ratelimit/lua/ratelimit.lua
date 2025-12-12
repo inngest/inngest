@@ -84,11 +84,11 @@ end
 ---@param period_ns integer
 ---@param limit integer
 ---@param burst integer
----@return integer[] returns a 2-tuple of remaining capacity and retry at
+---@return integer[] returns a 3-tuple of remaining capacity, retry at, and current usage
 local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	-- Handle zero limit case - immediately rate limit
 	if limit == 0 then
-		return { 0, now_ns + period_ns }
+		return { 0, now_ns + period_ns, 0 }
 	end
 
 	-- Match throttled library calculations exactly
@@ -102,6 +102,13 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 
 	-- retrieve and normalize theoretical arrival time
 	local tat = retrieveAndNormalizeTat(key, now_ns, period_ns, delay_variation_tolerance)
+
+	-- Calculate current usage (consumed tokens) independently of burst capacity
+	local used_tokens = 0
+	if tat > now_ns then
+		local consumed_time = tat - now_ns
+		used_tokens = math.min(math.ceil(consumed_time / emission_interval), limit)
+	end
 
 	-- Calculate what the next TAT would be if we processed this request (quantity = 1)
 	local increment = 1 * emission_interval
@@ -120,17 +127,23 @@ local function gcraCapacity(key, now_ns, period_ns, limit, burst)
 	if diff < 0 then
 		-- We are rate limited - calculate retry time
 		-- RetryAfter = -diff (when diff is negative)
-		return { 0, allow_at }
+		return { 0, allow_at, used_tokens }
 	else
 		-- Not rate limited - calculate remaining capacity
-		-- next = delayVariationTolerance - ttl, where ttl = newTat.Sub(now)
-		local ttl = new_tat - now_ns
-		local next = delay_variation_tolerance - ttl
+		-- Use current TAT instead of new_tat since we haven't consumed the token yet
+		-- next = delayVariationTolerance - ttl, where ttl = currentTat.Sub(now)
+		local current_ttl = math.max(tat - now_ns, 0)
+		local next = delay_variation_tolerance - current_ttl
 		local remaining = 0
 		if next > -emission_interval then
 			remaining = math.floor(next / emission_interval)
 		end
-		return { remaining, 0 }
+
+		-- Calculate when the next unit will be available after consuming all remaining capacity
+		local new_tat_after_consumption = math.max(tat, now_ns) + remaining * emission_interval
+		local next_available_at_ns = new_tat_after_consumption - delay_variation_tolerance + emission_interval
+
+		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
 
@@ -186,7 +199,7 @@ end
 
 -- Check if capacity > 0
 local res = gcraCapacity(key, now_ns, period_ns, limit, burst)
-if res[2] == 0 then
+if res[1] > 0 then
 	-- Not rate limited, perform the update
 	gcraUpdate(key, now_ns, period_ns, limit, 1, burst)
 

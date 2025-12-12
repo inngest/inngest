@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -15,12 +16,11 @@ import (
 
 type backlogRefillConstraintCheckResult struct {
 	itemsToRefill        []string
-	itemCapacityLeases   map[string]ulid.ULID
+	itemCapacityLeases   []osqueue.CapacityLease
 	limitingConstraint   enums.QueueConstraint
 	skipConstraintChecks bool
 
-	fallbackIdempotencyKey string
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
 func convertLimitingConstraint(
@@ -80,6 +80,8 @@ func (q *queue) backlogRefillConstraintCheck(
 	constraints PartitionConstraintConfig,
 	items []*osqueue.QueueItem,
 	kg QueueKeyGenerator,
+	operationIdempotencyKey string,
+	now time.Time,
 ) (*backlogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
@@ -107,16 +109,10 @@ func (q *queue) backlogRefillConstraintCheck(
 		}, nil
 	}
 
-	now := q.clock.Now()
-
-	// NOTE: This idempotency key is simply used for retrying Acquire
-	// We do not use the same key for multiple processShadowPartitionBacklog attempts
-	idempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
-
 	res, err := q.capacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
 		AccountID:            *shadowPart.AccountID,
 		EnvID:                *shadowPart.EnvID,
-		IdempotencyKey:       idempotencyKey,
+		IdempotencyKey:       operationIdempotencyKey,
 		FunctionID:           *shadowPart.FunctionID,
 		CurrentTime:          now,
 		Duration:             QueueLeaseDuration,
@@ -128,7 +124,7 @@ func (q *queue) backlogRefillConstraintCheck(
 		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
-			Location:          constraintapi.LeaseLocationItemLease,
+			Location:          constraintapi.CallerLocationBacklogRefill,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
 		Migration: constraintapi.MigrationIdentifier{
@@ -141,10 +137,9 @@ func (q *queue) backlogRefillConstraintCheck(
 			return nil, fmt.Errorf("could not enforce constraints and acquire lease: %w", err)
 		}
 
-		// Attempt to fall back to BacklogRefill -- ignore GCRA with fallbackIdempotencyKey
+		// Attempt to fall back to BacklogRefill -- ignore GCRA with constraint check idempotency
 		return &backlogRefillConstraintCheckResult{
-			itemsToRefill:          itemIDs,
-			fallbackIdempotencyKey: idempotencyKey,
+			itemsToRefill: itemIDs,
 		}, nil
 	}
 
@@ -154,7 +149,6 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	if len(res.Leases) == 0 {
-		// TODO Handle no capacity
 		return &backlogRefillConstraintCheckResult{
 			itemsToRefill:      nil,
 			limitingConstraint: constraint,
@@ -163,11 +157,13 @@ func (q *queue) backlogRefillConstraintCheck(
 	}
 
 	itemsToRefill := make([]string, len(res.Leases))
-	itemCapacityLeases := make(map[string]ulid.ULID, len(res.Leases))
+	itemCapacityLeases := make([]osqueue.CapacityLease, len(res.Leases))
 	for i, l := range res.Leases {
 		// NOTE: This works because idempotency key == queue item ID
 		itemsToRefill[i] = l.IdempotencyKey
-		itemCapacityLeases[l.IdempotencyKey] = l.LeaseID
+		itemCapacityLeases[i] = osqueue.CapacityLease{
+			LeaseID: l.LeaseID,
+		}
 	}
 
 	return &backlogRefillConstraintCheckResult{
@@ -180,17 +176,39 @@ func (q *queue) backlogRefillConstraintCheck(
 }
 
 type itemLeaseConstraintCheckResult struct {
-	leaseID              *ulid.ULID
-	limitingConstraint   enums.QueueConstraint
+	// capacityLease optionally returns a capacity lease ID which
+	// must be passed to the processing function to be extended
+	// while processing the item.
+	capacityLease *osqueue.CapacityLease
+
+	// limitingConstraint returns the most limiting constraint in case
+	// no capacity was available.
+	limitingConstraint enums.QueueConstraint
+
+	// skipConstraintChecks determines whether subsequent operations
+	// should check and enforce constraints, and whether constraint state
+	// should be updated while processing a queue item.
+	//
+	// When enrolled to the Constraint API and holding a valid capacity lease,
+	// constraint checks _and_ updates may be skipped, as state is maintained within
+	// the Constraint API.
 	skipConstraintChecks bool
 
-	fallbackIdempotencyKey string
-	retryAfter             time.Time
+	retryAfter time.Time
 }
 
+// itemLeaseConstraintCheck determines whether the given queue item
+// can start processing with or without checking and updating constraint state.
+//
+// If enrolled to the Constraint API, constraint checks will be moved to the new API.
+// In case of failing API requests and enabled fallback, we will attempt to check
+// constraints in the queue during regular Lease operations (while handling idempotency
+// in case the Constraint API call succeeded internally).
+//
+// In the case of using the Constraint API, the item may also receive a capacity lease to be
+// extended for the duration of processing.
 func (q *queue) itemLeaseConstraintCheck(
 	ctx context.Context,
-	partition QueuePartition,
 	shadowPart *QueueShadowPartition,
 	backlog *QueueBacklog,
 	constraints PartitionConstraintConfig,
@@ -199,6 +217,14 @@ func (q *queue) itemLeaseConstraintCheck(
 	kg QueueKeyGenerator,
 ) (itemLeaseConstraintCheckResult, error) {
 	l := logger.StdlibLogger(ctx)
+
+	// Disable lease checks for system queues
+	// NOTE: This also disables constraint updates during processing, for consistency.
+	if shadowPart.SystemQueueName != nil {
+		return itemLeaseConstraintCheckResult{
+			skipConstraintChecks: true,
+		}, nil
+	}
 
 	if shadowPart.AccountID == nil ||
 		shadowPart.EnvID == nil ||
@@ -218,10 +244,12 @@ func (q *queue) itemLeaseConstraintCheck(
 	}
 
 	// If capacity lease is still valid for the forseeable future, use it
-	hasValidCapacityLease := item.CapacityLeaseID != nil && item.CapacityLeaseID.Timestamp().Before(now.Add(5*time.Second))
+	hasValidCapacityLease := item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
 	if hasValidCapacityLease {
 		return itemLeaseConstraintCheckResult{
-			leaseID:              item.CapacityLeaseID,
+			capacityLease: item.CapacityLease,
+			// Skip any constraint checks and subsequent updates,
+			// as constraint state is maintained in the Constraint API.
 			skipConstraintChecks: true,
 		}, nil
 	}
@@ -248,7 +276,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		MaximumLifetime: consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
 			Service:           constraintapi.ServiceExecutor,
-			Location:          constraintapi.LeaseLocationItemLease,
+			Location:          constraintapi.CallerLocationItemLease,
 			RunProcessingMode: constraintapi.RunProcessingModeBackground,
 		},
 		Migration: constraintapi.MigrationIdentifier{
@@ -264,9 +292,7 @@ func (q *queue) itemLeaseConstraintCheck(
 		}
 
 		// Fallback to Lease (with idempotency)
-		return itemLeaseConstraintCheckResult{
-			fallbackIdempotencyKey: idempotencyKey,
-		}, nil
+		return itemLeaseConstraintCheckResult{}, nil
 	}
 
 	constraint := enums.QueueConstraintNotLimited
@@ -284,7 +310,11 @@ func (q *queue) itemLeaseConstraintCheck(
 	capacityLeaseID := res.Leases[0].LeaseID
 
 	return itemLeaseConstraintCheckResult{
-		leaseID:              &capacityLeaseID,
+		capacityLease: &osqueue.CapacityLease{
+			LeaseID: capacityLeaseID,
+		},
+		// Skip any constraint checks and subsequent updates,
+		// as constraint state is maintained in the Constraint API.
 		skipConstraintChecks: true,
 	}, nil
 }
@@ -317,10 +347,10 @@ func constraintConfigFromConstraints(
 
 	if constraints.Throttle != nil {
 		config.Throttle = append(config.Throttle, constraintapi.ThrottleConfig{
-			Limit:                     constraints.Throttle.Limit,
-			Burst:                     constraints.Throttle.Burst,
-			Period:                    constraints.Throttle.Period,
-			ThrottleKeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
+			Limit:             constraints.Throttle.Limit,
+			Burst:             constraints.Throttle.Burst,
+			Period:            constraints.Throttle.Period,
+			KeyExpressionHash: constraints.Throttle.ThrottleKeyExpressionHash,
 		})
 	}
 
@@ -375,4 +405,25 @@ func constraintItemsFromBacklog(sp *QueueShadowPartition, backlog *QueueBacklog,
 	}
 
 	return constraints
+}
+
+func (q *queue) keyConstraintCheckIdempotency(accountID *uuid.UUID, itemID string) string {
+	kg := q.primaryQueueShard.RedisClient.KeyGenerator()
+
+	if accountID == nil || *accountID == uuid.Nil {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	if q.capacityManager == nil {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	if itemID == "" {
+		return fmt.Sprintf("%s:-", kg.QueuePrefix())
+	}
+
+	return q.capacityManager.KeyConstraintCheckIdempotency(constraintapi.MigrationIdentifier{
+		IsRateLimit: false,
+		QueueShard:  q.primaryQueueShard.Name,
+	}, *accountID, itemID)
 }

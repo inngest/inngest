@@ -3,14 +3,15 @@ package constraintapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
 type releaseScriptResponse struct {
-	Status int      `json:"s"`
-	Debug  []string `json:"d"`
+	Status int                 `json:"s"`
+	Debug  flexibleStringArray `json:"d"`
 
 	// Remaining specifies the number of remaining leases
 	// generated in the same Acquire operation
@@ -53,16 +54,25 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		enableDebugLogsVal = "1"
 	}
 
+	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
+
 	args, err := strSlice([]any{
-		keyPrefix,
+		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
-		int(OperationIdempotencyTTL.Seconds()),
+		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)
 	}
+
+	l.Trace(
+		"prepared release call",
+		"req", req,
+		"keys", keys,
+		"args", args,
+	)
 
 	rawRes, err := scripts["release"].Exec(ctx, client, keys, args).AsBytes()
 	if err != nil {
@@ -87,6 +97,18 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		return res, nil
 	case 3:
 		l.Trace("capacity released")
+
+		if len(r.lifecycles) > 0 {
+			for _, hook := range r.lifecycles {
+				err := hook.OnCapacityLeaseReleased(ctx, OnCapacityLeaseReleasedData{
+					AccountID: req.AccountID,
+					LeaseID:   req.LeaseID,
+				})
+				if err != nil {
+					return nil, errs.Wrap(0, false, "release lifecycle failed: %w", err)
+				}
+			}
+		}
 
 		// TODO: track success
 		return res, nil

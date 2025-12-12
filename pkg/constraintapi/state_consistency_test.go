@@ -30,9 +30,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 			Throttle: []ThrottleConfig{
 				{
-					Limit:                     10,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "consistency-test",
+					Limit:             10,
+					Period:            60,
+					KeyExpressionHash: "consistency-test",
 				},
 			},
 		}
@@ -56,8 +56,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		}
 		var err error
 
-		// Acquire multiple leases
-		acquireResp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		acquireReq := &CapacityAcquireRequest{
 			IdempotencyKey:       "consistency-acquire-1",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -71,10 +70,17 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		_, _, _, fingerprint, err := buildRequestState(acquireReq, "q:v1")
+		require.NoError(t, err)
+		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
+
+		// Acquire multiple leases
+		acquireResp, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, acquireResp.Leases, 3, "Should acquire 3 leases")
@@ -111,13 +117,16 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		finalState := te.CaptureRedisState()
 		te.CompareRedisState(afterAcquireState, finalState, "After Release")
 
-		_, err = te.Redis.Get(te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, "consistency-acquire-1"))
+		_, err = te.Redis.Get(te.CapacityManager.keyRequestState(te.KeyPrefix, te.AccountID, acquireResp.RequestID))
 		require.Error(t, err)
 
 		// Verify all capacity is restored - only idempotency keys should remain
 		expectedRemainingKeys := []string{
-			te.CapacityManager.keyOperationIdempotency(te.KeyPrefix, te.AccountID, "acq", "consistency-acquire-1"),
+			te.CapacityManager.keyOperationIdempotency(te.KeyPrefix, te.AccountID, "acq", acquireIdempotencyKey),
 			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "consistency-acquire-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-2"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "lease-3"),
 		}
 		for i := 1; i <= 3; i++ {
 			expectedRemainingKeys = append(expectedRemainingKeys,
@@ -160,8 +169,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		// Try to acquire more than available capacity
-		resp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		acquireReq := &CapacityAcquireRequest{
 			IdempotencyKey:       "partial-acquire",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -175,10 +183,13 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		// Try to acquire more than available capacity
+		resp, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, resp.Leases, 2, "Should only grant available capacity")
@@ -249,7 +260,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
 		})
@@ -312,9 +323,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		// Verify lease details contain extension information
 		cv.VerifyLeaseDetails(
 			*extendResp.LeaseID,
-			"extend-lease-1",
+			util.XXHash("extend-lease-1"),
 			"",
-			util.XXHash("extend-acquire"),
+			acquireResp.RequestID,
 		)
 
 		enableDebugLogs = true
@@ -357,8 +368,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		// Perform acquire operation
-		acquireResp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		acquireReq := &CapacityAcquireRequest{
 			IdempotencyKey:       "ttl-test",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -372,17 +382,24 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		_, _, _, fingerprint, err := buildRequestState(acquireReq, "q:v1")
+		require.NoError(t, err)
+		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
+
+		// Perform acquire operation
+		acquireResp, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, acquireResp.Leases, 1)
 
 		// Verify idempotency keys are properly set with TTL
 		iv := te.NewIdempotencyVerifier()
-		iv.VerifyOperationIdempotency("acq", "ttl-test", int(OperationIdempotencyTTL.Seconds()), true)
+		iv.VerifyOperationIdempotency("acq", acquireIdempotencyKey, int(OperationIdempotencyTTL.Seconds()), true)
 
 		// Perform release operation
 		_, err = te.CapacityManager.Release(context.Background(), &CapacityReleaseRequest{
@@ -401,14 +418,16 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 		te.AdvanceTimeAndRedis(OperationIdempotencyTTL + time.Second)
 
 		// Verify idempotency keys are cleaned up
-		iv.VerifyOperationIdempotency("acq", "ttl-test", 0, false)
+		iv.VerifyOperationIdempotency("acq", acquireIdempotencyKey, 0, false)
 		iv.VerifyOperationIdempotency("rel", "ttl-release", 0, false)
 
 		// Verify no other resource leaks exist after TTL cleanup
 		finalState := te.CaptureRedisState()
-		require.Equal(t, finalState.Keys,
+		require.Len(t, finalState.Keys, 2)
+		require.Subset(t, finalState.Keys,
 			[]string{
 				te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "ttl-test"),
+				te.CapacityManager.keyConstraintCheckIdempotency(te.KeyPrefix, te.AccountID, "ttl-lease-1"),
 			},
 			"No keys should remain after TTL cleanup")
 	})
@@ -425,9 +444,9 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 			Throttle: []ThrottleConfig{
 				{
-					Limit:                     5,
-					Period:                    60,
-					ThrottleKeyExpressionHash: "throttle-expr",
+					Limit:             5,
+					Period:            60,
+					KeyExpressionHash: "throttle-expr",
 				},
 			},
 		}
@@ -450,8 +469,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		// Acquire capacity affecting both constraints
-		acquireResp, err := te.CapacityManager.Acquire(context.Background(), &CapacityAcquireRequest{
+		acquireReq := &CapacityAcquireRequest{
 			IdempotencyKey:       "multi-acquire",
 			AccountID:            te.AccountID,
 			EnvID:                te.EnvID,
@@ -465,10 +483,17 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			Constraints:          constraints,
 			Source: LeaseSource{
 				Service:  ServiceExecutor,
-				Location: LeaseLocationItemLease,
+				Location: CallerLocationItemLease,
 			},
 			Migration: MigrationIdentifier{QueueShard: "test"},
-		})
+		}
+
+		_, _, _, fingerprint, err := buildRequestState(acquireReq, "q:v1")
+		require.NoError(t, err)
+		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
+
+		// Acquire capacity affecting both constraints
+		acquireResp, err := te.CapacityManager.Acquire(context.Background(), acquireReq)
 
 		require.NoError(t, err)
 		require.Len(t, acquireResp.Leases, 2)
@@ -493,10 +518,12 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 
 		// Verify only expected keys remain (rate limit state + idempotency keys)
 		expectedRemainingKeys := []string{
-			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "acq", "multi-acquire"),
+			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "acq", acquireIdempotencyKey),
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-1"),
 			te.CapacityManager.keyOperationIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "rel", "multi-release-2"),
 			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-acquire"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-lease-1"),
+			te.CapacityManager.keyConstraintCheckIdempotency(te.CapacityManager.queueStateKeyPrefix, te.AccountID, "multi-lease-2"),
 			"{q:v1}:throttle:multi-value", // throttle key
 		}
 

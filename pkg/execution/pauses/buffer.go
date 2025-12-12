@@ -94,3 +94,7 @@ func (r redisAdapter) BufferLen(ctx context.Context, i Index) (int64, error) {
 func (r redisAdapter) PausesSinceWithCreatedAt(ctx context.Context, index Index, since time.Time, limit int64) (state.PauseIterator, error) {
 	return r.rsm.PausesByEventSinceWithCreatedAt(ctx, index.WorkspaceID, index.EventName, since, limit)
 }
+
+func (r redisAdapter) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
+	return r.rsm.DeletePauseByID(ctx, pauseID, workspaceID)
+}

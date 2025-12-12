@@ -64,9 +64,26 @@ func (q *queue) DequeueByJobID(ctx context.Context, jobID string, opts ...QueueO
 	return q.Dequeue(ctx, shard, *item)
 }
 
+type dequeueOptions struct {
+	disableConstraintUpdates bool
+}
+
+func DequeueOptionDisableConstraintUpdates(disableUpdates bool) dequeueOptionFn {
+	return func(o *dequeueOptions) {
+		o.disableConstraintUpdates = disableUpdates
+	}
+}
+
+type dequeueOptionFn func(o *dequeueOptions)
+
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, options ...dequeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
+
+	o := &dequeueOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
 
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for Dequeue: %s", queueShard.Kind)
@@ -122,6 +139,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		// Singleton
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
+
+		kg.PartitionScavengerIndex(partition.PartitionID),
 	}
 
 	// Append indexes
@@ -140,6 +159,14 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		idempotency = *i.IdempotencyPeriod
 	}
 
+	// Enable concurrency state updates by default, disable under some circumstances
+	// - processing system queue items
+	// - holding a valid capacity lease
+	updateConstraintStateVal := "1"
+	if o.disableConstraintUpdates {
+		updateConstraintStateVal = "0"
+	}
+
 	args, err := StrSlice([]any{
 		i.ID,
 		partition.PartitionID,
@@ -148,6 +175,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
+
+		updateConstraintStateVal,
 	})
 	if err != nil {
 		return err
@@ -176,9 +205,26 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 }
 
+type requeueOptions struct {
+	disableConstraintUpdates bool
+}
+
+func RequeueOptionDisableConstraintUpdates(disableUpdates bool) requeueOptionFn {
+	return func(o *requeueOptions) {
+		o.disableConstraintUpdates = disableUpdates
+	}
+}
+
+type requeueOptionFn func(o *requeueOptions)
+
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time, options ...requeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
+
+	o := &requeueOptions{}
+	for _, opt := range options {
+		opt(o)
+	}
 
 	l := q.log.With("item", i)
 
@@ -284,12 +330,22 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.ShadowPartitionMeta(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
+
+		kg.PartitionScavengerIndex(shadowPartition.PartitionID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
+	}
+
+	// Enable concurrency state updates by default, disable under some circumstances
+	// - processing system queue items
+	// - holding a valid capacity lease
+	updateConstraintStateVal := "1"
+	if o.disableConstraintUpdates {
+		updateConstraintStateVal = "0"
 	}
 
 	args, err := StrSlice([]any{
@@ -308,6 +364,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
+
+		updateConstraintStateVal,
 	})
 	if err != nil {
 		return err

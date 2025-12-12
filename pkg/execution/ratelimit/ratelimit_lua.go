@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest"
@@ -42,9 +43,14 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 	periodNS := dur.Nanoseconds()
 	limit := c.Limit
 
+	idempotencyKey := o.idempotencyKey
+	if !strings.HasPrefix(idempotencyKey, l.prefix) {
+		idempotencyKey = l.prefix + idempotencyKey
+	}
+
 	keys := []string{
 		l.prefix + key,
-		l.prefix + o.idempotencyKey,
+		idempotencyKey,
 	}
 	args := []string{
 		fmt.Sprintf("%d", nowNS),

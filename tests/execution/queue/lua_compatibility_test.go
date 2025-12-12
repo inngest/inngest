@@ -2,11 +2,14 @@ package queue
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -14,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/tests/execution/queue/helper"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -58,7 +62,7 @@ func TestLuaCompatibility(t *testing.T) {
 			Name:       "Basic Garnet",
 			ServerType: "garnet",
 			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage("ghcr.io/microsoft/garnet:1.0.84"),
+				helper.WithImage("ghcr.io/microsoft/garnet:1.0.87"),
 				helper.WithConfiguration(&helper.GarnetConfiguration{
 					EnableLua: true,
 				}),
@@ -320,9 +324,62 @@ func TestLuaCompatibility(t *testing.T) {
 				refillItems, err := getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
 				require.NoError(t, err)
 
-				leaseID, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
+				res, err := q.BacklogRefill(ctx, &backlog, &sp, refillUntil, refillItems, constraints)
 				require.NoError(t, err)
-				require.NotNil(t, leaseID)
+				require.NotNil(t, res)
+				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refilled)
+
+				// Add second item with capacity lease
+				capacityLeaseID := ulid.MustNew(ulid.Timestamp(refillUntil.Add(5*time.Second)), rand.Reader)
+				item2 := queue.QueueItem{
+					FunctionID: functionID,
+					Data: queue.Item{
+						Kind: queue.KindStart,
+						Identifier: state.Identifier{
+							AccountID: accountID,
+							RunID:     runID,
+						},
+						Throttle: &queue.Throttle{
+							Limit:               5,
+							Burst:               0,
+							Period:              60,
+							Key:                 keyHash,
+							UnhashedThrottleKey: throttleKey,
+							KeyExpressionHash:   exprHash,
+						},
+					},
+				}
+
+				// Enqueue to backlog
+				qi2, err := q.EnqueueItem(ctx, shard, item2, now, queue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				refillItems, err = getItemIDsFromBacklog(ctx, mgr, &backlog, refillUntil, 10)
+				require.NoError(t, err)
+
+				// Refill with capacity lease awareness
+				res, err = q.BacklogRefill(
+					ctx,
+					&backlog,
+					&sp,
+					refillUntil,
+					refillItems,
+					constraints,
+					redis_state.WithBacklogRefillConstraintCheckIdempotencyKey("acquire-refill"),
+					redis_state.WithBacklogRefillDisableConstraintChecks(true),
+					redis_state.WithBacklogRefillItemCapacityLeases([]queue.CapacityLease{{
+						LeaseID: capacityLeaseID,
+					}}),
+				)
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				require.Equal(t, 1, res.Refill)
+				require.Equal(t, 1, res.Refilled)
+
+				refilled, err := q.ItemByID(ctx, qi2.ID)
+				require.NoError(t, err)
+				require.Equal(t, capacityLeaseID.String(), refilled.CapacityLease.LeaseID.String())
 			})
 
 			t.Run("current time is returned for rate limiting", func(t *testing.T) {
@@ -346,6 +403,131 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err)
 
 				t.Log(res[1], parsed)
+			})
+
+			t.Run("acquiring capacity works", func(t *testing.T) {
+				shard := setup(t)
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(false),
+					constraintapi.WithNumScavengerShards(4),
+					constraintapi.WithQueueShards(map[string]rueidis.Client{
+						shard.Name: shard.RedisClient.Client(),
+					}),
+					constraintapi.WithQueueStateKeyPrefix("q:v1"),
+					constraintapi.WithRateLimitClient(shard.RedisClient.Client()),
+					constraintapi.WithRateLimitKeyPrefix("rl"),
+				)
+				require.NoError(t, err)
+
+				config := constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						AccountConcurrency:  10,
+						FunctionConcurrency: 5,
+					},
+				}
+
+				accountID := uuid.New()
+				envID := uuid.New()
+				functionID := uuid.New()
+
+				constraints := []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeAccount,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:account:%s", accountID),
+						},
+					},
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Scope:             enums.ConcurrencyScopeFn,
+							Mode:              enums.ConcurrencyModeStep,
+							InProgressItemKey: fmt.Sprintf("{q:v1}:concurrency:p:%s", functionID),
+						},
+					},
+				}
+
+				checkResp, userErr, internalErr := cm.Check(ctx, &constraintapi.CapacityCheckRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					AccountID:     accountID,
+					EnvID:         envID,
+					FunctionID:    functionID,
+					Configuration: config,
+					Constraints:   constraints,
+				})
+				require.NoError(t, internalErr)
+				require.NoError(t, userErr)
+				require.NotNil(t, checkResp)
+				require.Equal(t, 5, checkResp.AvailableCapacity)
+				require.Len(t, checkResp.Usage, 2)
+				require.Equal(t, 10, checkResp.Usage[0].Limit)
+				require.Equal(t, 0, checkResp.Usage[0].Used)
+				require.Equal(t, 5, checkResp.Usage[1].Limit)
+				require.Equal(t, 0, checkResp.Usage[1].Used)
+
+				acquireResp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey:       "acquire-test",
+					AccountID:            accountID,
+					EnvID:                envID,
+					FunctionID:           functionID,
+					Configuration:        config,
+					Constraints:          constraints,
+					Amount:               1,
+					LeaseIdempotencyKeys: []string{"item1"},
+					LeaseRunIDs:          nil,
+					CurrentTime:          time.Now(),
+					Duration:             5 * time.Second,
+					MaximumLifetime:      time.Hour,
+					Source: constraintapi.LeaseSource{
+						Service:           constraintapi.ServiceAPI,
+						Location:          constraintapi.CallerLocationItemLease,
+						RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+					},
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, acquireResp)
+				require.Equal(t, 1, len(acquireResp.Leases))
+
+				extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey: "extend-test",
+					AccountID:      accountID,
+					Duration:       5 * time.Second,
+					LeaseID:        acquireResp.Leases[0].LeaseID,
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, extendResp)
+				require.NotNil(t, extendResp.LeaseID)
+
+				releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
+					Migration: constraintapi.MigrationIdentifier{
+						IsRateLimit: false,
+						QueueShard:  shard.Name,
+					},
+					IdempotencyKey: "release-test",
+					AccountID:      accountID,
+					LeaseID:        *extendResp.LeaseID,
+				})
+
+				require.NoError(t, err)
+				require.NotNil(t, releaseResp)
 			})
 		})
 	}

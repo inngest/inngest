@@ -94,33 +94,69 @@ export default function SendEventModal({
       return pushToast('Event payload could not be parsed as JSON.');
     }
 
-    if (!data.name) {
-      return pushToast('Event payload must contain a name.');
-    }
+    const events = Array.isArray(data) ? data : [data];
+    for (const event of events) {
+      if (!event.name) {
+        return pushToast('Each event payload must contain a name.');
+      }
 
-    if (typeof data.name !== 'string') {
-      return pushToast(
-        "Event payload name must be a string, ideally in the format 'scope/subject.verb'.",
-      );
-    }
+      if (typeof event.name !== 'string') {
+        return pushToast(
+          "Each event payload name must be a string, ideally in the format 'scope/subject.verb'.",
+        );
+      }
 
-    if (data.data && typeof data.data !== 'object') {
-      return pushToast('Event payload data must be an object if defined.');
-    }
+      if (event.data && typeof event.data !== 'object') {
+        return pushToast(
+          'Each event payload data must be an object if defined.',
+        );
+      }
 
-    if (data.user && typeof data.user !== 'object') {
-      return pushToast('Event payload user must be an object if defined.');
+      if (event.user && typeof event.user !== 'object') {
+        return pushToast(
+          'Each event payload user must be an object if defined.',
+        );
+      }
     }
 
     _sendEvent(data)
       .unwrap()
       .then(() => {
-        toast.success('The event was successfully added.');
+        const message = Array.isArray(data)
+          ? `${data.length} events were successfully added.`
+          : 'The event was successfully added.';
+        toast.success(message);
         onClose();
       });
   }, [_sendEvent, input]);
 
   const monaco = useMonaco();
+
+  const eventProperties = {
+    name: {
+      type: 'string',
+      description:
+        "A unique identifier for the event. The recommended format is scope/subject.verb, e.g. 'app/user.created' or 'stripe/payment.succeeded'.",
+    },
+    data: {
+      type: 'object',
+      additionalProperties: true,
+      description: 'Any data pertinent to the event.',
+    },
+    user: {
+      type: 'object',
+      additionalProperties: true,
+      description:
+        "Any user data associated with the event. All fields ending in '_id' will be used to attribute the event to a particular user.",
+    },
+    ts: {
+      type: 'number',
+      multipleOf: 1,
+      minimum: 0,
+      description:
+        'An integer representing the milliseconds since the unix epoch at which this event occured. If omitted, the current time will be used.',
+    },
+  };
 
   const sendEventRef = useRef(sendEvent);
   useEffect(() => {
@@ -153,33 +189,21 @@ export default function SendEventModal({
           uri: 'https://inngest.com/event-schema.json',
           fileMatch: ['*'],
           schema: {
-            type: 'object',
-            properties: {
-              name: {
-                type: 'string',
-                description:
-                  "A unique identifier for the event. The recommended format is scope/subject.verb, e.g. 'app/user.created' or 'stripe/payment.succeeded'.",
-              },
-              data: {
+            oneOf: [
+              {
                 type: 'object',
-                additionalProperties: true,
-                description: 'Any data pertinent to the event.',
+                properties: eventProperties,
+                required: ['name'],
               },
-              user: {
-                type: 'object',
-                additionalProperties: true,
-                description:
-                  "Any user data associated with the event. All fields ending in '_id' will be used to attribute the event to a particular user.",
+              {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: eventProperties,
+                  required: ['name'],
+                },
               },
-              ts: {
-                type: 'number',
-                multipleOf: 1,
-                minimum: 0,
-                description:
-                  'An integer representing the milliseconds since the unix epoch at which this event occured. If omitted, the current time will be used.',
-              },
-            },
-            required: ['name'],
+            ],
           },
         },
       ],

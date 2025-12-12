@@ -184,6 +184,7 @@ func (v v2) Delete(ctx context.Context, id state.ID) error {
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
+		WorkspaceID: id.Tenant.EnvID,
 	})
 }
 
