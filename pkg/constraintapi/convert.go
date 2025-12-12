@@ -702,7 +702,6 @@ func CapacityAcquireRequestToProto(req *CapacityAcquireRequest) *pb.CapacityAcqu
 		BlockingThreshold:               durationpb.New(req.BlockingThreshold),
 		Source:                          LeaseSourceToProto(req.Source),
 		Migration:                       MigrationIdentifierToProto(req.Migration),
-		EnableThrottleCompatibilityMode: req.EnableThrottleCompatibilityMode,
 	}
 }
 
@@ -776,7 +775,6 @@ func CapacityAcquireRequestFromProto(pbReq *pb.CapacityAcquireRequest) (*Capacit
 		BlockingThreshold:               blockingThreshold,
 		Source:                          LeaseSourceFromProto(pbReq.Source),
 		Migration:                       MigrationIdentifierFromProto(pbReq.Migration),
-		EnableThrottleCompatibilityMode: pbReq.EnableThrottleCompatibilityMode,
 	}, nil
 }
 

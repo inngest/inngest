@@ -96,9 +96,6 @@ if ARGV[18] ~= nil and ARGV[18] ~= "" and ARGV[18] ~= "null" then
   end
 end
 
-
-local enableThrottleFix = tonumber(ARGV[19]) == 1
-
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -174,7 +171,7 @@ end
 
 if checkConstraints == 1 then
   if (constraintCapacity == nil or constraintCapacity > 0) and checkThrottle then
-    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, enableThrottleFix)
+    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
     local remainingThrottleCapacity = gcraRes[1]
     local throttleRetryAt = gcraRes[2]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
@@ -347,7 +344,7 @@ end
 
 -- update gcra theoretical arrival time
 if checkThrottle then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled, enableThrottleFix)
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 
 --

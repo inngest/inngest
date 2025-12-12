@@ -249,10 +249,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 	scopedKeyPrefix := fmt.Sprintf("{%s}:%s", keyPrefix, accountScope(req.AccountID))
 
-	// NOTE: This flag is temporary and will be removed once we have fully rolled out the fixed gcra implementation
-	// across all accounts
-	enableThrottleCompatibilityModeVal := req.EnableThrottleCompatibilityMode
-
 	args, err := strSlice([]any{
 		// This will be marshaled
 		rueidis.BinaryString(requestState),
@@ -270,8 +266,6 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		int(r.constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
-
-		enableThrottleCompatibilityModeVal,
 	})
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid args: %w", err)

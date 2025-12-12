@@ -42,8 +42,6 @@ local operationIdempotencyTTL = tonumber(ARGV[9])--[[@as integer]]
 local constraintCheckIdempotencyTTL = tonumber(ARGV[10])--[[@as integer]]
 local enableDebugLogs = tonumber(ARGV[11]) == 1
 
-local enableThrottleCompatibilityMode = tonumber(ARGV[12]) == 1
-
 ---@type string[]
 local debugLogs = {}
 ---@param ... string
@@ -262,8 +260,7 @@ end
 ---@param limit integer
 ---@param burst integer
 ---@param quantity integer
----@param compatibility_mode boolean
-local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatibility_mode)
+local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	---@type { allowed: boolean, limit: integer?, retry_after: integer?, reset_after: integer?, remaining: integer? }
 	local result = {}
 
@@ -276,10 +273,6 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatib
 
 	-- dvt determines how many requests can be admitted
 	local dvt = emission * (burst + 1)
-	if compatibility_mode then
-		-- compatibility mode is used to ensure we perform the legacy gcra() implementation
-		dvt = period_ms * (burst + 1)
-	end
 	result["dvt"] = dvt
 
 	-- use existing tat or start at now_ms
@@ -455,7 +448,7 @@ for index, value in ipairs(constraints) do
 		-- allow consuming all capacity in one request (for generating multiple leases)
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes =
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0, enableThrottleCompatibilityMode)
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
@@ -535,7 +528,7 @@ for i = 1, granted, 1 do
 			-- update throttle: consume 1 unit
 			-- allow consuming all capacity in one request (for generating multiple leases)
 			local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1, enableThrottleCompatibilityMode)
+			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 1)
 		end
 	end
 

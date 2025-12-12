@@ -1,5 +1,5 @@
 -- applyGCRA runs GCRA
-local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity, compatibility_mode)
+local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity)
 	---@type { allowed: boolean, limit: integer?, retry_after: integer?, reset_after: integer?, remaining: integer? }
 	local result = {}
 
@@ -12,10 +12,6 @@ local function applyGCRA(key, now_ms, period_ms, limit, burst, quantity, compati
 
 	-- dvt determines how many requests can be admitted
 	local dvt = emission * (burst + 1)
-	if compatibility_mode then
-		-- compatibility mode is used to ensure we perform the legacy gcra() implementation
-		dvt = period_ms * (burst + 1)
-	end
 	result["dvt"] = dvt
 
 	-- use existing tat or start at now_ms
@@ -108,29 +104,26 @@ end
 -- performs gcra rate limiting for a given key.
 --
 -- Returns true on success, false if the key has been rate limited.
-local function gcra(key, now_ms, period_ms, limit, burst, enableThrottleFix)
-	local maxBurst = burst
-	if enableThrottleFix then
-		-- NOTE: we need to admit more than a single item every emission interval, as the queue
-		-- does not follow a uniform arrival rate and we would throttle the majority of queue items,
-		-- leading to significantly lower queue throughput
-		maxBurst = limit + burst - 1
-	end
+local function gcra(key, now_ms, period_ms, limit, burst)
+  -- NOTE: we need to admit more than a single item every emission interval, as the queue
+  -- does not follow a uniform arrival rate and we would throttle the majority of queue items,
+  -- leading to significantly lower queue throughput
+  local maxBurst = limit + burst - 1
 
-	local res = applyGCRA(key, now_ms, period_ms, limit, maxBurst, 1, not enableThrottleFix)
+	local res = applyGCRA(key, now_ms, period_ms, limit, maxBurst, 1)
 
 	local used_burst = res["tat"] > now_ms
 
 	return { res["allowed"], used_burst }
 end
 
-local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity, enableThrottleFix)
-	local allowRefillingAll = limit + burst
-	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll - 1, quantity, not enableThrottleFix)
+local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
+	local allowRefillingAll = limit + burst - 1
+	local res = applyGCRA(key, now_ms, period_ms, limit, allowRefillingAll, quantity)
 
 	return { res["remaining"], res["retry_at"] }
 end
 
-local function gcraCapacity(key, now_ms, period_ms, limit, burst, enableThrottleFix)
-	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0, enableThrottleFix)
+local function gcraCapacity(key, now_ms, period_ms, limit, burst)
+	return gcraUpdate(key, now_ms, period_ms, limit, burst, 0)
 end
