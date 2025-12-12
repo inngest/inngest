@@ -105,10 +105,10 @@ end
 --
 -- Returns true on success, false if the key has been rate limited.
 local function gcra(key, now_ms, period_ms, limit, burst)
-  -- NOTE: we need to admit more than a single item every emission interval, as the queue
-  -- does not follow a uniform arrival rate and we would throttle the majority of queue items,
-  -- leading to significantly lower queue throughput
-  local maxBurst = limit + burst - 1
+	-- NOTE: we need to admit more than a single item every emission interval, as the queue
+	-- does not follow a uniform arrival rate and we would throttle the majority of queue items,
+	-- leading to significantly lower queue throughput
+	local maxBurst = limit + burst - 1
 
 	local res = applyGCRA(key, now_ms, period_ms, limit, maxBurst, 1)
 

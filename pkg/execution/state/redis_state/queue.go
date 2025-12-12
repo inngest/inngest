@@ -2294,7 +2294,6 @@ func (q *queue) Lease(
 
 	checkThrottle := checkConstraints && o.constraints.Throttle != nil && item.Data.Throttle != nil
 
-
 	enableThrottleInstrumentation := checkThrottle &&
 		o.sp.AccountID != nil &&
 		o.sp.FunctionID != nil &&

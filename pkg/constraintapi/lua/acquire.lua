@@ -447,8 +447,7 @@ for index, value in ipairs(constraints) do
 		debug("evaluating throttle")
 		-- allow consuming all capacity in one request (for generating multiple leases)
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
-		local throttleRes =
-			throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"]
 		constraintRetryAfter = toInteger(throttleRes["retry_at"]) -- already in ms
 	end
