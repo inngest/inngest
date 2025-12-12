@@ -20,7 +20,7 @@ const createUser = createServerFn({ method: 'GET' }).handler(async () =>
 
 export const Route = createFileRoute('/(auth)/user-setup')({
   component: UserSetupComponent,
-  loader: async () => {
+  beforeLoad: async () => {
     await createUser();
   },
 });

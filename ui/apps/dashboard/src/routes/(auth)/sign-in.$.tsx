@@ -1,4 +1,8 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import {
+  createFileRoute,
+  useLocation,
+  useNavigate,
+} from '@tanstack/react-router';
 import { SignIn } from '@clerk/tanstack-react-start';
 import SplitView from '@/components/SignIn/SplitView';
 import { Alert } from '@inngest/components/Alert/NewAlert';
@@ -31,11 +35,15 @@ export const Route = createFileRoute('/(auth)/sign-in/$')({
 function RouteComponent() {
   const { error, redirect_url } = Route.useSearch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoaded, isSignedIn } = useAuth();
-  const redirectTo = redirect_url ?? '/';
+  const redirectTo = redirect_url ?? import.meta.env.VITE_HOME_PATH;
+  const signIn = location.pathname !== '/sign-in';
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
+    //
+    // Clerk redirects are not reliable. Do it ourselves.
+    if (!isLoaded || !isSignedIn || signIn) {
       return;
     }
 
@@ -48,13 +56,12 @@ function RouteComponent() {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        {isLoaded && isSignedIn ? (
+        {isLoaded && isSignedIn && signIn ? (
           <div className="flex items-center justify-center">
             <LoadingIcon />
           </div>
         ) : (
           <SignIn
-            forceRedirectUrl={redirectTo}
             appearance={{
               elements: {
                 footer: 'bg-none',

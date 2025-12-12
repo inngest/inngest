@@ -21,7 +21,7 @@ const setUpAccount = createServerFn({ method: 'GET' }).handler(() =>
 
 export const Route = createFileRoute('/(auth)/organization-setup')({
   component: OrganizationSetupComponent,
-  loader: async () => {
+  beforeLoad: async () => {
     await setUpAccount();
   },
 });
