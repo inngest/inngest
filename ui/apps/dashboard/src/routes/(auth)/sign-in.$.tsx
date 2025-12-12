@@ -1,10 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { SignIn } from '@clerk/tanstack-react-start';
 import SplitView from '@/components/SignIn/SplitView';
 import { Alert } from '@inngest/components/Alert/NewAlert';
 import SignInRedirectErrors, {
   hasErrorMessage,
 } from '@/components/SignIn/Errors';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useAuth } from '@clerk/tanstack-react-start';
+import { useEffect } from 'react';
 
 type SignInSearchParams = {
   redirect_url?: string;
@@ -15,25 +18,50 @@ export const Route = createFileRoute('/(auth)/sign-in/$')({
   component: RouteComponent,
   validateSearch: (search: Record<string, unknown>): SignInSearchParams => {
     return {
-      redirect_url: search?.redirect_url as string | undefined,
-      error: search?.error as string | undefined,
+      redirect_url:
+        typeof search?.redirect_url === 'string' &&
+        search.redirect_url.startsWith('/')
+          ? search.redirect_url
+          : undefined,
+      error: typeof search?.error === 'string' ? search.error : undefined,
     };
   },
 });
 
 function RouteComponent() {
-  const { error } = Route.useSearch();
+  const { error, redirect_url } = Route.useSearch();
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useAuth();
+  const redirectTo = redirect_url ?? '/';
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      return;
+    }
+
+    navigate({
+      to: redirectTo,
+      replace: true,
+    });
+  }, [isLoaded, isSignedIn, navigate, redirectTo]);
 
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        <SignIn
-          appearance={{
-            elements: {
-              footer: 'bg-none',
-            },
-          }}
-        />
+        {isLoaded && isSignedIn ? (
+          <div className="flex items-center justify-center">
+            <LoadingIcon />
+          </div>
+        ) : (
+          <SignIn
+            forceRedirectUrl={redirectTo}
+            appearance={{
+              elements: {
+                footer: 'bg-none',
+              },
+            }}
+          />
+        )}
         {typeof error === 'string' && (
           <Alert severity="error" className="mx-auto max-w-xs">
             <p className="text-balance">

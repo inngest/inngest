@@ -14,9 +14,10 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
+    "dev:vite": "vite dev",
     "dev:graphql-codegen": "graphql-codegen -w -r dotenv/config",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && if test \"$VERCEL_ENV\" = \"production\"; then pnpm graphql-codegen && vite build; else vite build; fi",
     "graphql-codegen": "graphql-codegen -r dotenv/config",
     "start": "vite start",
     "format": "prettier --write src",
@@ -28,7 +29,7 @@
     "env:rm": "npx vercel env rm"
   },
   "dependencies": {
-    "@clerk/tanstack-react-start": "^0.26.5",
+    "@clerk/tanstack-react-start": "^0.27.9",
     "@graphql-typed-document-node/core": "^3.2.0",
     "@headlessui/react": "^1.7.18",
     "@headlessui/tailwindcss": "^0.1.2",

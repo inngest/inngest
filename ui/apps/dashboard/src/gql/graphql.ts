@@ -2177,6 +2177,7 @@ export type SpanMetadata = {
   __typename?: 'SpanMetadata';
   kind: Scalars['SpanMetadataKind']['output'];
   scope: Scalars['SpanMetadataScope']['output'];
+  updatedAt: Scalars['Time']['output'];
   values: Scalars['SpanMetadataValues']['output'];
 };
 
