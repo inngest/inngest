@@ -119,6 +119,7 @@ func TestNewGCRAScript(t *testing.T) {
 			burst:    burst,
 			quantity: 0,
 		})
+		require.False(t, res.Limited)
 
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
