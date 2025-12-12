@@ -37,9 +37,9 @@ export default function SignInPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const redirectTo = resolveRedirect(searchParams?.get('redirect_url'));
+  const redirectTo = resolveRedirect(searchParams.get('redirect_url'));
 
-  const error = searchParams?.get('error');
+  const error = searchParams.get('error');
   const nestedRoute = pathname !== '/sign-in';
 
   useEffect(() => {
