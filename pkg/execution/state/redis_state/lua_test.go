@@ -25,7 +25,6 @@ func TestNewGCRAScript(t *testing.T) {
 		limit                   int
 		burst                   int
 		quantity                int
-		enableCompatibilityMode bool
 	}
 
 	type rateLimitResult struct {
@@ -76,10 +75,6 @@ func TestNewGCRAScript(t *testing.T) {
 	}
 
 	runScript := func(t *testing.T, rc rueidis.Client, opts gcraScriptOptions) rateLimitResult {
-		compatibilityMode := "0"
-		if opts.enableCompatibilityMode {
-			compatibilityMode = "1"
-		}
 		nowMS := opts.now.UnixMilli()
 		args, err := StrSlice([]any{
 			opts.key,
@@ -88,7 +83,6 @@ func TestNewGCRAScript(t *testing.T) {
 			opts.burst,
 			opts.period.Milliseconds(),
 			opts.quantity,
-			compatibilityMode,
 		})
 		require.NoError(t, err)
 
@@ -651,6 +645,7 @@ func TestNewGCRAScript(t *testing.T) {
 	})
 
 	t.Run("compatibility mode should have incorrectly large dvt", func(t *testing.T) {
+		t.Skip("compatibility mode was removed")
 		t.Parallel()
 
 		clock := clockwork.NewFakeClock()
@@ -674,7 +669,6 @@ func TestNewGCRAScript(t *testing.T) {
 				limit:                   limit,
 				burst:                   burst,
 				quantity:                0,
-				enableCompatibilityMode: true,
 			})
 			require.False(t, res.Limited)
 			require.Equal(t, 1, res.Limit)
@@ -888,14 +882,14 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:         0,
+					retryAt:         time.Minute * (60 / 10),
 				},
 				{
 					delay:           0,
 					capacityBefore:  10,
 					consumeCapacity: 5,
 					capacityAfter:   5,
-					retryAt:         0,
+					retryAt:         time.Minute * (60 / 10),
 				},
 				{
 					delay:           0,
@@ -909,7 +903,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:         0,
+					retryAt:         time.Minute * (60 / 10),
 				},
 			},
 		},
@@ -925,28 +919,28 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  100,
 					consumeCapacity: 0,
 					capacityAfter:   100,
-					retryAt:         0,
+					retryAt:         6*time.Minute,
 				},
 				{
 					delay:           0,
 					capacityBefore:  100,
 					consumeCapacity: 20,
 					capacityAfter:   80,
-					retryAt:         0,
+					retryAt:         6*time.Minute,
 				},
 				{
 					delay:           1 * time.Hour,
 					capacityBefore:  90, // assume 10 items got refilled since 1 hour passed
 					consumeCapacity: 90,
 					capacityAfter:   0,
-					retryAt:         6 * time.Minute,
+					retryAt:        6*time.Minute,
 				},
 				{
 					delay:           1 * time.Hour,
 					capacityBefore:  10, // assume 10 items got refilled again
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:         0,
+					retryAt:         6*time.Minute,
 				},
 			},
 		},
@@ -962,28 +956,28 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  12,
 					consumeCapacity: 0,
 					capacityAfter:   12,
-					retryAt:         0,
+					retryAt:         6*time.Minute,
 				},
 				{
 					delay:           0,
 					capacityBefore:  12,
 					consumeCapacity: 5,
 					capacityAfter:   7,
-					retryAt:         0,
+					retryAt:        6*time.Minute,
 				},
 				{
 					delay:           10 * time.Minute,
 					capacityBefore:  8, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   8,
-					retryAt:         0,
+					retryAt:          6*time.Minute,
 				},
 				{
 					delay:           5 * time.Minute,
 					capacityBefore:  9, // assume 1 item got refilled
 					consumeCapacity: 0,
 					capacityAfter:   9,
-					retryAt:         0,
+					retryAt:       6*time.Minute,
 				},
 				{
 					delay:           0,
@@ -997,7 +991,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  10,
 					consumeCapacity: 0,
 					capacityAfter:   10,
-					retryAt:         0,
+					retryAt:          6*time.Minute,
 				},
 			},
 		},
@@ -1011,7 +1005,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
-					retryAt:         0,
+					retryAt:       5*time.Second, 
 				},
 				{
 					delay:           time.Second,
@@ -1025,7 +1019,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 0,
 					capacityAfter:   1,
-					retryAt:         0,
+					retryAt:         5*time.Second, 
 				},
 			},
 		},
