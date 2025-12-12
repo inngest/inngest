@@ -45,6 +45,10 @@ func TestNewGCRAScript(t *testing.T) {
 		// It should be -1 unless the rate limit has been exceeded.
 		RetryAfterMS int64 `json:"retry_after"`
 
+		// RetryAt is the time the next request is permitted
+		// This assumes all capacity is consumed in the request.
+		RetryAtMS int64 `json:"retry_at"`
+
 		EmissionInterval int64 `json:"ei"`
 		DVT              int64 `json:"dvt"`
 
@@ -112,6 +116,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 1, res.Remaining)
 		require.Equal(t, time.Duration(0), time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("consume 1 should work", func(t *testing.T) {
@@ -143,6 +148,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, 6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("consume 1 with burst 1 should work", func(t *testing.T) {
@@ -175,6 +181,7 @@ func TestNewGCRAScript(t *testing.T) {
 		// Accounts for burst
 		require.Equal(t, 2*6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("being limited should work", func(t *testing.T) {
@@ -199,6 +206,7 @@ func TestNewGCRAScript(t *testing.T) {
 
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 
 		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
 
@@ -215,6 +223,7 @@ func TestNewGCRAScript(t *testing.T) {
 		// Accounts for burst
 		require.Equal(t, 6*time.Second, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, 6*time.Second, time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("1 request every 24h should work", func(t *testing.T) {
@@ -239,6 +248,7 @@ func TestNewGCRAScript(t *testing.T) {
 
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, clock.Now().Add(24*time.Hour).UnixMilli(), res.RetryAtMS)
 
 		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 1)
 
@@ -254,6 +264,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, 24*time.Hour, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, 24*time.Hour, time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(24*time.Hour).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("3000 requests every minute should work", func(t *testing.T) {
@@ -278,6 +289,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.DVT)
 		require.Equal(t, (20 * time.Millisecond).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().Add(20*time.Millisecond).UnixMilli(), res.RetryAtMS)
 		// allow initial request
 		require.Equal(t, clock.Now().Add(20*time.Millisecond).Add(-20*time.Millisecond).UnixMilli(), res.AllowAt)
 		require.Equal(t, time.Duration(0).Milliseconds(), res.Diff)
@@ -288,6 +300,7 @@ func TestNewGCRAScript(t *testing.T) {
 
 		require.Equal(t, 20*time.Millisecond, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, time.Duration(0), time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(20*time.Millisecond).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("3000 requests every minute with burst should work", func(t *testing.T) {
@@ -381,24 +394,46 @@ func TestNewGCRAScript(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 20, res.Remaining)
+		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
 		// use half the capacity at once
 		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 10, res.Remaining)
+		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
 		// use remaining half
 		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, clock.Now().Add(3*time.Second).UnixMilli(), res.RetryAtMS)
 
-		// no more
+		// no more capacity
+		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 0)
+		require.Equal(t, 20, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, 3*time.Second, time.Duration(res.EmissionInterval)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(time.Minute), time.UnixMilli(res.TAT), time.Second)
+		require.WithinDuration(t, clock.Now().Add(time.Minute+3*time.Second), time.UnixMilli(res.NewTAT), time.Second)
+
+		// it would take 3s until we can run another request
+		require.Equal(t, -3*time.Second, time.Duration(res.Diff)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(3*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
+
+		// using for multiple items is impossible now
 		res = runScript(t, rc, key, clock.Now(), period, limit, burst, 10)
 		require.True(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, 3*time.Second, time.Duration(res.EmissionInterval)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(time.Minute), time.UnixMilli(res.TAT), time.Second)
+		require.WithinDuration(t, clock.Now().Add(time.Minute+10*3*time.Second), time.UnixMilli(res.NewTAT), time.Second)
+
+		// it would take 30s until we could run all requests
+		require.Equal(t, -30*time.Second, time.Duration(res.Diff)*time.Millisecond)
+		require.WithinDuration(t, clock.Now().Add(30*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
 	})
 
 	t.Run("simulate gcraCapacity for key queues", func(t *testing.T) {

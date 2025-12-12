@@ -153,14 +153,11 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity, compatib
 		redis.call("SET", key, new_tat, "EX", expiry)
 	end
 	result["ttl"] = ttl
-	result["retry_at"] = now_ms
+	result["retry_at"] = now_ms + emission
 	local next = dvt - ttl
 	if next > -emission then
 		local remaining = math.floor(next / emission)
 		result["remaining"] = remaining
-		if remaining == 0 then
-			result["retry_at"] = now_ms + emission
-		end
 	end
 	result["reset_after"] = ttl
 	result["next"] = next
