@@ -113,7 +113,7 @@ local function gcra(key, now_ms, period_ms, limit, burst)
 
 	local used_burst = res["tat"] > now_ms
 
-	return { res["allowed"], used_burst }
+	return { not res["limited"], used_burst }
 end
 
 local function gcraUpdate(key, now_ms, period_ms, limit, burst, quantity)
