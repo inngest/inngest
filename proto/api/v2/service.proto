@@ -69,10 +69,10 @@ service V2 {
       }
     };
   }
-  
+
   // Internal method to ensure ErrorResponse schema generation (not exposed via HTTP)
   rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
-  
+
   rpc CreatePartnerAccount(CreateAccountRequest) returns (CreateAccountResponse) {
     option (google.api.http) = {
       post: "/partner/accounts",
@@ -912,6 +912,78 @@ service V2 {
       }
     };
   }
+
+  rpc BulkRerun(BulkRerunRequest) returns (BulkRerunResponse) {
+    option (google.api.http) = {
+      post: "/bulk/rerun"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Bulk rerun"
+      description: "Triggers up to 50 runs to be re-executed. Each run will be replayed with its original event data."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Bulk rerun results"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2BulkRerunResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1201,4 +1273,25 @@ message PatchEnvRequest {
 message PatchEnvsResponse {
   Env data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message BulkRerunRequest {
+  repeated string runIds = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "List of run IDs to rerun (max: 50)"
+      example: "[\"01HP1ZX8M3NG9VP6QN0XK7J4CY\", \"01HP1ZY9N4OH0WQ7RO1YL8K5DZ\"]"
+    }
+  ];
+}
+
+message BulkRerunResponse {
+  repeated RerunResult data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message RerunResult {
+  string originalRunId = 1;
+  optional string newRunId = 2;
+  bool success = 3;
+  optional string error = 4;
 }
