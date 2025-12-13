@@ -34,7 +34,6 @@ const requestMiddleware: RequestMiddleware = async (request) => {
 
   //
   // In serverless environments after login, tokens may be briefly stale.
-  // Check if token expires very soon and retry once after a short delay.
   if (sessionToken) {
     const decoded = decodeJWT(sessionToken);
     const now = Date.now();
@@ -47,19 +46,6 @@ const requestMiddleware: RequestMiddleware = async (request) => {
       isExpired: expiresIn !== null && expiresIn < 0,
       claims: decoded ? Object.keys(decoded) : [],
     });
-
-    //
-    // If token expires in < 5 seconds, it might be stale - wait and retry
-    if (expiresIn !== null && expiresIn < 5000) {
-      console.log('[graphqlAPI] Token expiring soon, retrying...');
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      sessionToken = await getToken();
-      const retryDecoded = decodeJWT(sessionToken || '');
-      const retryExpiresIn = retryDecoded?.exp
-        ? retryDecoded.exp * 1000 - Date.now()
-        : null;
-      console.log('[graphqlAPI] Retry token expiresIn:', retryExpiresIn);
-    }
   } else {
     console.log('[graphqlAPI] No session token, using cookies');
   }
