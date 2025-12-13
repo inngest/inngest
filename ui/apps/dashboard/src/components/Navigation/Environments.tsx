@@ -33,8 +33,14 @@ const useSwitchablePathname = (): string => {
   const location = useLocation();
   const pathname = location.pathname;
 
-  // Parse pathname into segments (TanStack Router doesn't have route groups like Next.js)
-  const segments = pathname.split('/').filter((segment) => segment.length > 0);
+  //
+  // Parse pathname into segments and strip env/envSlug prefix
+  // to match Next.js useSelectedLayoutSegments behavior
+  let segments = pathname.split('/').filter((segment) => segment.length > 0);
+
+  if (segments[0] === 'env' && segments.length > 1) {
+    segments = segments.slice(2);
+  }
 
   // Accounts are not environment specific
   if (pathname.match(/^\/settings\//)) {
