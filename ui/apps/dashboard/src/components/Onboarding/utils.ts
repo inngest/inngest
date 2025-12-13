@@ -17,5 +17,5 @@ export function getNextStepName(
 }
 
 export const ONBOARDING_VERCEL_NEXT_URL = encodeURIComponent(
-  `${process.env.NEXT_PUBLIC_APP_URL}/env/production/onboarding/deploy-app`,
+  `${import.meta.env.VITE_APP_URL}/env/production/onboarding/deploy-app`,
 );

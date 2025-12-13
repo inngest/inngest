@@ -17,7 +17,7 @@ import {
   useEvents,
 } from '@/components/Events/useEvents';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 export default function EventsPage({
   environmentSlug: envSlug,
@@ -30,7 +30,7 @@ export default function EventsPage({
   showHeader?: boolean;
   singleEventTypePage?: boolean;
 }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { isModalVisible, selectedEvent, openModal, closeModal } =
     useReplayModal();
 
@@ -70,7 +70,7 @@ export default function EventsPage({
             <Button
               appearance="outlined"
               label="Refresh"
-              onClick={() => navigate({ to: '.' })}
+              onClick={() => router.invalidate()}
               icon={<RiRefreshLine />}
               iconSide="left"
             />

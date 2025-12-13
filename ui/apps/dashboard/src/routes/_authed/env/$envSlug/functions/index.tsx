@@ -15,6 +15,7 @@ import {
   useNavigate,
   createFileRoute,
   ClientOnly,
+  useRouter,
 } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/')({
@@ -23,7 +24,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/functions/')({
 
 function FunctionPage() {
   const { envSlug } = Route.useParams();
-  const navigate = useNavigate();
+  const router = useRouter();
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
@@ -64,7 +65,7 @@ function FunctionPage() {
               <Button
                 appearance="outlined"
                 label="Refresh"
-                onClick={() => navigate({ to: '.' })}
+                onClick={() => router.invalidate()}
                 icon={<RiRefreshLine />}
                 iconSide="left"
               />

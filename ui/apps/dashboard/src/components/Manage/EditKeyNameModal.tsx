@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import useManagePageTerminology from './useManagePageTerminology';
 import { Context } from './Context';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 type EditKeyNameProps = {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export default function EditKeyModal({
   const [inputValue, setInputValue] = useState(keyName ?? '');
   const [isDisabled, setDisabled] = useState(true);
   const { save, fetching } = useContext(Context);
-  const navigate = useNavigate();
+  const router = useRouter();
   const currentContent = useManagePageTerminology();
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -44,7 +44,7 @@ export default function EditKeyModal({
           toast.error(`${currentContent?.name} has not been updated`);
         } else {
           toast.success(`${currentContent?.name} was successfully updated`);
-          navigate({ to: '.' });
+          router.invalidate();
         }
       });
     }

@@ -1,12 +1,12 @@
-import { useContext, useState } from 'react';
 import { Button } from '@inngest/components/Button/NewButton';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
+import { useContext, useState } from 'react';
 import { toast } from 'sonner';
 
 import CodeEditor from '@/components/Textarea/CodeEditor';
+import { useRouter } from '@tanstack/react-router';
 import { Context } from './Context';
 import { FilterEditor } from './FilterEditor';
-import { useNavigate } from '@tanstack/react-router';
 
 type FilterEventsProps = {
   keyID: string;
@@ -22,7 +22,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   const [newFilter, setNewFilter] = useState(filter);
   const [isDisabled, setDisabled] = useState(true);
   const { save } = useContext(Context);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   function validateSubmit(nextValue: {}) {
     if (JSON.stringify(nextValue) === JSON.stringify(filter)) {
@@ -55,7 +55,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
         toast.error('Event key filter has not been updated');
       } else {
         toast.success('Event key filter updated');
-        navigate({ to: '.' });
+        router.invalidate();
       }
     });
   }

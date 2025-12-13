@@ -15,7 +15,7 @@ export const analytics = new Proxy(
           {
             writeKey: import.meta.env.VITE_SEGMENT_WRITE_KEY!,
             cdnURL:
-              process.env.NODE_ENV === 'production'
+              import.meta.env.MODE === 'production'
                 ? 'https://analytics-cdn.inngest.com'
                 : undefined,
           },
@@ -23,7 +23,7 @@ export const analytics = new Proxy(
             integrations: {
               'Segment.io': {
                 apiHost:
-                  process.env.NODE_ENV === 'production'
+                  import.meta.env.MODE === 'production'
                     ? 'analytics.inngest.com/v1'
                     : undefined,
                 protocol: 'https',

@@ -168,7 +168,7 @@ function CheckoutForm({
         // TODO - Use PUBLIC_APP_URL from other branch changes
         return_url: new URL(
           '/account/billing',
-          process.env.NEXT_PUBLIC_APP_URL,
+          import.meta.env.VITE_APP_URL,
         ).toString(),
       },
       redirect: 'if_required',

@@ -2,6 +2,7 @@ import {
   ClientOnly,
   createFileRoute,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/event-types/')({
 
 export default function EventTypesComponent() {
   const { envSlug } = Route.useParams();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const internalPathCreator = useMemo(() => {
     return {
@@ -70,7 +71,7 @@ export default function EventTypesComponent() {
               <Button
                 appearance="outlined"
                 label="Refresh"
-                onClick={() => navigate({ to: '.' })}
+                onClick={() => router.invalidate()}
                 icon={<RiRefreshLine />}
                 iconSide="left"
               />

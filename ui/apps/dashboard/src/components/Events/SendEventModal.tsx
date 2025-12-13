@@ -14,7 +14,7 @@ import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 
 const eventSchema = z.object({
   name: z.string(),
@@ -133,15 +133,16 @@ export function SendEventModal({
     }
   });
 
+  const router = useRouter();
   const navigate = useNavigate();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();
   const hasEventKey = Boolean(eventKey);
   const protocol =
-    process.env.NODE_ENV === 'development' ? 'http://' : 'https://';
-  const sendEventURL = `${protocol}${
-    process.env.NEXT_PUBLIC_EVENT_API_HOST
-  }/e/${eventKey || '<EVENT_KEY>'}`;
+    import.meta.env.MODE === 'development' ? 'http://' : 'https://';
+  const sendEventURL = `${protocol}${import.meta.env.VITE_EVENT_API_HOST}/e/${
+    eventKey || '<EVENT_KEY>'
+  }`;
 
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
@@ -193,7 +194,7 @@ export function SendEventModal({
       toast.promise(sendEvent, {
         loading: 'Loading...',
         success: () => {
-          navigate({ to: '.' });
+          router.invalidate();
           onClose();
           window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
           return 'Event sent!';
@@ -214,7 +215,7 @@ export function SendEventModal({
       toast.promise(navigator.clipboard.writeText(code), {
         loading: 'Loading...',
         success: () => {
-          navigate({ to: '.' });
+          router.invalidate();
           onClose();
           return 'Copied to clipboard!';
         },

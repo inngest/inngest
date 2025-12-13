@@ -1,11 +1,11 @@
 import { RiRefreshLine } from '@remixicon/react';
-import { useNavigate } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import { Button } from '../Button/NewButton';
 
 export const RefreshButton = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   return (
     <Button
@@ -15,7 +15,7 @@ export const RefreshButton = () => {
       icon={<RiRefreshLine />}
       iconSide="left"
       onClick={() => {
-        navigate({ to: '.' });
+        router.invalidate();
         setTimeout(() => toast.success('Page successfully refreshed!'), 500);
       }}
     />
