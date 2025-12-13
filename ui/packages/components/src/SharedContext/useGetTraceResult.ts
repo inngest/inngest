@@ -34,6 +34,8 @@ export const useGetTraceResult = ({
 }: UseGetTraceResultOptions) => {
   const shared = useShared();
 
+  const isQueryEnabled = enabled && Boolean(traceID);
+
   const queryResult = useQuery({
     queryKey: ['trace-result', traceID, { preview }],
     queryFn: useCallback(async () => {
@@ -44,12 +46,12 @@ export const useGetTraceResult = ({
       return await shared.getTraceResult({ traceID, preview });
     }, [shared.getTraceResult, traceID, preview]),
     refetchInterval,
-    enabled: enabled && Boolean(traceID),
+    enabled: isQueryEnabled,
   });
 
   return {
     data: queryResult.data,
-    loading: queryResult.isPending,
+    loading: isQueryEnabled && queryResult.isPending,
     error: queryResult.error,
     refetch: queryResult.refetch,
   };
