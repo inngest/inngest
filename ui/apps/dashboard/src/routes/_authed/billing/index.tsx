@@ -10,7 +10,6 @@ import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
 import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -18,17 +17,14 @@ import {
 } from '@/queries/server/billing';
 import { pathCreator } from '@/utils/urls';
 
+const hasUsageMetrics = (obj: unknown): obj is { usage: number } => {
+  return typeof obj === 'object' && obj !== null && 'usage' in obj;
+};
+
 export const Route = createFileRoute('/_authed/billing/')({
   component: BillingComponent,
   ssr: true,
   loader: async () => {
-    const usageMetricsCacheEnabled = await getBooleanFlag(
-      'usage-metrics-db-cache',
-      {
-        defaultValue: false,
-      },
-    );
-
     const { addons, entitlements } = await getEntitlementUsage();
 
     const { plan: currentPlan, subscription: currentSubscription } =
@@ -45,16 +41,35 @@ export const Route = createFileRoute('/_authed/billing/')({
     let isCurrentHobbyPlan = false;
     let legacyNoRunsPlan = false;
 
+    //
+    // usageMetricsCacheEnabled is checked inside getEntitlementUsage()
+    // we can infer it's enabled if usage data is present
+    const usageMetricsCacheEnabled = hasUsageMetrics(entitlements.stepCount);
+
     if (usageMetricsCacheEnabled) {
       isCurrentHobbyPlan = isHobbyPlan(currentPlan);
       legacyNoRunsPlan = entitlements.runCount.limit === null;
 
-      const stepUsage = (entitlements.stepCount as any).usage || 0;
+      const stepUsage = hasUsageMetrics(entitlements.stepCount)
+        ? entitlements.stepCount.usage
+        : 0;
       const stepLimit = entitlements.stepCount.limit;
-      const runUsage = (entitlements.runCount as any).usage || 0;
+      const runUsage = hasUsageMetrics(entitlements.runCount)
+        ? entitlements.runCount.usage
+        : 0;
       const runLimit = entitlements.runCount.limit;
-      const executionUsage = (entitlements as any).executions?.usage || 0;
-      const executionLimit = (entitlements as any).executions?.limit;
+
+      const executionsData = (entitlements as Record<string, unknown>)
+        .executions;
+      const executionUsage = hasUsageMetrics(executionsData)
+        ? executionsData.usage
+        : 0;
+      const executionLimit =
+        typeof executionsData === 'object' &&
+        executionsData !== null &&
+        'limit' in executionsData
+          ? (executionsData.limit as number | null)
+          : null;
 
       runs = {
         title: 'Runs',
