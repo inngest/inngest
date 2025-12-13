@@ -38,17 +38,20 @@ export default function SignInPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const redirectTo = resolveRedirect(searchParams.get('redirect_url'));
-
   const error = searchParams.get('error');
+
+  //
+  // don't mess with clerk impersonation requests
+  const clerk = searchParams.get('__clerk_ticket');
   const nestedRoute = pathname !== '/sign-in';
 
   useEffect(() => {
-    //
-    // Clerk redirects are not reliable. Do it ourselves.
-    if (!isLoaded || !isSignedIn || nestedRoute) {
+    if (!isLoaded || !isSignedIn || nestedRoute || clerk) {
       return;
     }
 
+    //
+    // Clerk redirects are not reliable. Do it ourselves.
     router.replace(redirectTo);
   }, [isLoaded, isSignedIn, router, redirectTo, nestedRoute]);
 
