@@ -1,6 +1,5 @@
 import { useClerk } from '@clerk/tanstack-react-start';
 import { RiLogoutCircleLine } from '@remixicon/react';
-import { Link } from '@tanstack/react-router';
 
 export const SignOutButton = ({
   isMarketplace = false,
@@ -10,7 +9,7 @@ export const SignOutButton = ({
   const { signOut, session } = useClerk();
 
   const content = (
-    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+    <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start h-full w-full p-2">
       <RiLogoutCircleLine className="text-muted mr-2 h-4 w-4" />
       <div>Sign Out </div>
     </div>
@@ -20,13 +19,12 @@ export const SignOutButton = ({
     // Sign out via Clerk.
     return (
       <button
+        className="h-full w-full"
         onClick={async () => {
           await signOut({
             sessionId: session?.id,
+            redirectUrl: '/sign-in/choose',
           });
-          //
-          // Hard navigate to ensure all client state is cleared
-          window.location.href = '/sign-in/choose';
         }}
       >
         {content}
