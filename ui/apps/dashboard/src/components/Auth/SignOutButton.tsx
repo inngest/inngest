@@ -23,8 +23,10 @@ export const SignOutButton = ({
         onClick={async () => {
           await signOut({
             sessionId: session?.id,
-            redirectUrl: '/sign-in/choose',
           });
+          //
+          // Hard navigate to ensure all client state is cleared
+          window.location.href = '/sign-in/choose';
         }}
       >
         {content}

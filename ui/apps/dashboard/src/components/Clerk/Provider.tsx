@@ -19,6 +19,7 @@ const dangerGhostButton =
 export const InngestClerkProvider = ({ children }: React.PropsWithChildren) => {
   return (
     <ClerkProvider
+      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
       appearance={{
         layout: {
           logoPlacement: 'outside' as const,
