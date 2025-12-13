@@ -11,12 +11,7 @@ import {
   useFunctions,
 } from '@/components/Functions/useFunctions';
 import { pathCreator } from '@/utils/urls';
-import {
-  useNavigate,
-  createFileRoute,
-  ClientOnly,
-  useRouter,
-} from '@tanstack/react-router';
+import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/')({
   component: FunctionPage,

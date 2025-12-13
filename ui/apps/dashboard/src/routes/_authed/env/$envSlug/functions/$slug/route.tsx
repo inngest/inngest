@@ -138,23 +138,27 @@ function FunctionComponent() {
         tabs={[
           {
             children: 'Dashboard',
-            href: `/env/${envSlug}/functions/${slug}`,
+            href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}`,
             exactRouteMatch: true,
           },
           {
             children: 'Runs',
-            href: `/env/${envSlug}/functions/${slug}/runs`,
+            href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}/runs`,
           },
           {
             children: 'Replays',
-            href: `/env/${envSlug}/functions/${slug}/replays`,
+            href: `/env/${envSlug}/functions/${encodeURIComponent(
+              slug,
+            )}/replays`,
           },
           ...(isBulkCancellationEnabled.isReady &&
           isBulkCancellationEnabled.value
             ? [
                 {
                   children: 'Cancellations',
-                  href: `/env/${envSlug}/functions/${slug}/cancellations`,
+                  href: `/env/${envSlug}/functions/${encodeURIComponent(
+                    slug,
+                  )}/cancellations`,
                 },
               ]
             : []),
