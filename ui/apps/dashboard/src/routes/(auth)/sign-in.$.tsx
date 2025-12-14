@@ -24,6 +24,8 @@ export const Route = createFileRoute('/(auth)/sign-in/$')({
     return {
       redirect_url:
         typeof search?.redirect_url === 'string' &&
+        //
+        // we only support relative redirects
         search.redirect_url.startsWith('/')
           ? search.redirect_url
           : undefined,
@@ -38,15 +40,15 @@ function RouteComponent() {
   const location = useLocation();
   const { isLoaded, isSignedIn } = useAuth();
   const redirectTo = redirect_url ?? import.meta.env.VITE_HOME_PATH;
-  const signIn = location.pathname !== '/sign-in';
+  const isRedirect = !location.pathname.startsWith('/sign-in');
 
   useEffect(() => {
-    //
-    // Clerk redirects are not reliable. Do it ourselves.
-    if (!isLoaded || !isSignedIn || signIn) {
+    if (!isLoaded || !isSignedIn || !isRedirect) {
       return;
     }
 
+    //
+    // Clerk redirects are not reliable. Do it ourselves.
     navigate({
       to: redirectTo,
       replace: true,
@@ -56,7 +58,7 @@ function RouteComponent() {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        {isLoaded && isSignedIn && signIn ? (
+        {isLoaded && isSignedIn && isRedirect ? (
           <div className="flex items-center justify-center">
             <LoadingIcon />
           </div>
