@@ -24,6 +24,8 @@ var (
 
 	peekSizeBoundaries = []float64{10, 30, 50, 100, 250, 500, 1000, 3000, 5000}
 
+	cancellationReadSizeBoundaries = []float64{10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 25_000, 50_000, 75_000, 100_000}
+
 	PausesBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
@@ -377,6 +379,27 @@ func HistogramQueueScavengerPartitionScavengeDuration(ctx context.Context, dur t
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_partition_scavenge_duration",
 		Description: "Distribution of queue scavenger duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramCancellationReadSize(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_size",
+		Description: "Distribution of the number of items being read in single operations by the cancellation read writer",
+		Tags:        opts.Tags,
+		Boundaries:  cancellationReadSizeBoundaries,
+	})
+}
+
+func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_read_duration",
+		Description: "Distribution of cancellation read duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
