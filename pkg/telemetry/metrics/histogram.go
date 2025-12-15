@@ -15,6 +15,13 @@ var (
 		600_000, 1_800_000, // < 1h
 	}
 
+	cancellationReadDurationBoundaries = []float64{
+		5, 10, 50, 100, 200, 500, // < 1s
+		1000, 2000, 5000, 30_000, // < 1m
+		60_000, 120_000, 300_000, // < 10m
+		600_000, 1_800_000, // < 1h
+	}
+
 	processPartitionBoundaries = []float64{
 		5, 10, 25, 50, 100, 200, // < 1s
 		400, 600, 800, 1_000,
@@ -402,6 +409,6 @@ func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, o
 		Description: "Distribution of cancellation read duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
+		Boundaries:  cancellationReadDurationBoundaries,
 	})
 }
