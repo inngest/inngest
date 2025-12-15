@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -1360,6 +1361,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	// Start cancellation check
+	cancelled, err := e.checkCancellation(ctx, md, events)
+	if err != nil {
+		return nil, fmt.Errorf("could not check cancellation: %w", err)
+	}
+
 	//
 	// record function start time using the same method as step started,
 	// ensures ui timeline alignment
@@ -1379,7 +1386,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	if v.stopWithoutRetry {
+	if cancelled || v.stopWithoutRetry {
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
 		err := e.smv2.Delete(ctx, md.ID)
@@ -1763,6 +1770,69 @@ func correlationID(event event.Event) *string {
 		return &correlationID
 	}
 	return nil
+}
+
+func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
+	if e.cancellationChecker == nil {
+		return false, nil
+	}
+
+	l := logger.StdlibLogger(ctx)
+	evt := event.Event{}
+	if err := json.Unmarshal(evts[0], &evt); err != nil {
+		return false, fmt.Errorf("error decoding input event in cancellation checker: %w", err)
+	}
+
+	deadline := 100 * time.Millisecond
+
+	done := make(chan bool)
+
+	service.Go(func() {
+		cancel, err := e.cancellationChecker.IsCancelled(
+			ctx,
+			md.ID.Tenant.EnvID,
+			md.ID.FunctionID,
+			md.ID.RunID,
+			evt.Map(),
+		)
+		if err != nil {
+			if errors.Is(err, &expressions.CompileError{}) {
+				logger.StdlibLogger(ctx).Warn(
+					"invalid cancellation expression",
+					"error", err.Error(),
+					"run_id", md.ID.RunID,
+					"function_id", md.ID.FunctionID,
+					"workspace_id", md.ID.Tenant.EnvID,
+				)
+			} else {
+				logger.StdlibLogger(ctx).Error(
+					"error checking cancellation",
+					"error", err.Error(),
+					"run_id", md.ID.RunID,
+					"function_id", md.ID.FunctionID,
+					"workspace_id", md.ID.Tenant.EnvID,
+				)
+			}
+		}
+		if cancel != nil {
+			err = e.Cancel(ctx, md.ID, execution.CancelRequest{
+				CancellationID: &cancel.ID,
+			})
+			if err != nil {
+				l.ReportError(err, "failed to cancel run after checking cancellation")
+			}
+			done <- true
+		}
+
+		done <- false
+	})
+
+	select {
+	case cancelled := <-done:
+		return cancelled, nil
+	case <-e.clock.After(deadline):
+		return false, nil
+	}
 }
 
 // run executes the step with the given step ID.
