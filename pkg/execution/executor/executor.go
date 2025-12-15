@@ -123,6 +123,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
 		driverv1: map[string]driver.DriverV1{},
 		driverv2: map[string]driver.DriverV2{},
+		clock:    clockwork.NewRealClock(),
 	}
 
 	for _, o := range opts {
@@ -1789,6 +1790,8 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 		return false, nil
 	}
 
+	start := time.Now()
+
 	l := logger.StdlibLogger(ctx).With(
 		"run_id", md.ID.RunID,
 		"function_id", md.ID.FunctionID,
@@ -1808,6 +1811,12 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 
 	// Ensure this completes before we shut down the service
 	service.Go(func() {
+		defer func() {
+			metrics.HistogramCancellationCheckDuration(ctx, time.Since(start), metrics.HistogramOpt{
+				PkgName: pkgName,
+			})
+		}()
+
 		cancel, err := e.cancellationChecker.IsCancelled(
 			ctx,
 			md.ID.Tenant.EnvID,
@@ -1844,6 +1853,9 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 		// Or continue processing after hitting deadline
 	case <-e.clock.After(deadline):
 		l.Debug("continuing cancellation check in background")
+		metrics.IncrAsyncCancellationCheckCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 		return false, nil
 	}
 }
