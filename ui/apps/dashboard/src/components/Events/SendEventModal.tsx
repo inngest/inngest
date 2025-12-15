@@ -1,25 +1,17 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
-import { Button } from '@inngest/components/Button';
-import { Modal } from '@inngest/components/Modal/Modal';
-import TabCards from '@inngest/components/TabCards/TabCards';
+import { useCallback, useMemo } from 'react';
+import {
+  SendEventModal as BaseSendEventModal,
+  type SendEventConfig,
+  type SharedSendEventModalProps,
+} from '@inngest/components/SendEvent/SendEventModal';
+import { type EventPayload } from '@inngest/components/SendEvent/utils';
 import ky from 'ky';
-import { toast } from 'sonner';
-
 import { useQuery } from 'urql';
-import { z } from 'zod/v3';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import CodeEditor from '@/components/Textarea/CodeEditor';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
-import { useNavigate, useRouter } from '@tanstack/react-router';
-
-const eventSchema = z.object({
-  name: z.string(),
-  data: z.record(z.unknown()),
-});
+import { useRouter } from '@tanstack/react-router';
 
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {
@@ -32,112 +24,22 @@ const GetEventKeysDocument = graphql(/* GraphQL */ `
   }
 `);
 
-type SendEventModalProps = {
+type CloudSendEventModalProps = Omit<SharedSendEventModalProps, 'config'> & {
   eventName?: string;
-  isOpen: boolean;
-  onClose: () => void;
   initialData?: string;
 };
 
-type TabType = {
-  payload: { name: string; data: {} } | { name: string; data: {} }[];
-  eventKey?: string;
-  isBranchChild: boolean;
-  envName: string;
-  sendEventURL: string;
-  sendEventAction: (event: React.FormEvent<HTMLFormElement>) => void;
-  copyToClipboardAction: (event: React.FormEvent<HTMLFormElement>) => void;
-};
-
-const buildTabs = ({
-  payload,
-  eventKey,
-  envName,
-  sendEventURL,
-  isBranchChild,
-  sendEventAction,
-  copyToClipboardAction,
-}: TabType) => {
-  return [
-    {
-      tabLabel: 'JSON Editor',
-      tabTitle: 'Send Custom JSON',
-      submitButtonLabel: 'Send event',
-      submitButtonEnabled: Boolean(eventKey),
-      submitAction: sendEventAction,
-      codeLanguage: 'json',
-      initialCode: JSON.stringify(payload, null, 2),
-    },
-    {
-      tabLabel: 'SDK',
-      tabTitle: 'Send with the SDK',
-      submitButtonLabel: 'Copy Code',
-      submitButtonEnabled: true,
-      submitAction: copyToClipboardAction,
-      codeLanguage: 'javascript',
-      initialCode: `import { Inngest } from 'inngest';
-
-const inngest = new Inngest({
-  name: 'Your App Name',
-  eventKey: '${eventKey || '<EVENT_KEY>'}',${
-        isBranchChild ? `\n  env: '${envName}',` : ''
-      }
-});
-
-await inngest.send(${JSON.stringify(payload, null, 2)});`,
-    },
-    {
-      tabLabel: 'cURL',
-      tabTitle: 'Send with cURL',
-      submitButtonLabel: 'Copy Code',
-      submitButtonEnabled: true,
-      submitAction: copyToClipboardAction,
-      codeLanguage: 'bash',
-      initialCode: `curl ${sendEventURL} \\${
-        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
-      }
-  --data '${JSON.stringify(payload)}'`,
-    },
-  ];
-};
-
 export function SendEventModal({
-  eventName = 'Your Event Name',
+  data,
   isOpen,
   onClose,
+  eventName = 'Your Event Name',
   initialData,
-}: SendEventModalProps) {
-  const [payload, setPayload] = useState<
-    | { name: string; data: Record<string, unknown> }
-    | { name: string; data: Record<string, unknown> }[]
-  >(() => {
-    try {
-      if (initialData) {
-        const parsedData = JSON.parse(initialData);
-        if (Array.isArray(parsedData)) {
-          return parsedData.map((item) => ({
-            name: item.name || eventName,
-            data: item.data || {},
-          }));
-        } else {
-          return {
-            name: eventName,
-            data: parsedData.data || {},
-          };
-        }
-      }
-      return { name: eventName, data: {} };
-    } catch (error) {
-      console.error('Failed to parse initialData:', error);
-      return { name: eventName, data: {} };
-    }
-  });
-
+}: CloudSendEventModalProps) {
   const router = useRouter();
-  const navigate = useNavigate();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();
-  const hasEventKey = Boolean(eventKey);
+
   const protocol =
     import.meta.env.MODE === 'development' ? 'http://' : 'https://';
   const sendEventURL = `${protocol}${import.meta.env.VITE_EVENT_API_HOST}/e/${
@@ -147,38 +49,10 @@ export function SendEventModal({
   const isBranchChild = environment.type === EnvironmentType.BranchChild;
   const envName = environment.name;
 
-  // serialize data to state on change so we can persist it between editor tab changes
-  const serializeData = (code: string) => {
-    let payload;
-    const parsedObject = eventSchema.safeParse(JSON.parse(code));
-    if (parsedObject.success) {
-      payload = parsedObject.data;
-    } else {
-      const parsedArray = z.array(eventSchema).safeParse(JSON.parse(code));
-      if (parsedArray.success) {
-        payload = parsedArray.data;
-      } else {
-        console.log("can't parse code editor payload, skipping serialization");
-        return;
-      }
-    }
-
-    setPayload(payload);
-  };
-
-  const sendEventAction = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const formData = new FormData(form);
-      const jsonString = formData.get('code') as string;
-
-      let jsonEvent: any;
-      try {
-        jsonEvent = JSON.parse(jsonString);
-      } catch (error) {
-        toast.error('Could not parse JSON. Please check your syntax.');
-        return;
+  const sendEvent = useCallback(
+    async (payload: EventPayload | EventPayload[]) => {
+      if (!eventKey) {
+        throw new Error('No event key available. Please check your environment configuration.');
       }
 
       const headers: { ['x-inngest-env']?: string } = {};
@@ -186,157 +60,86 @@ export function SendEventModal({
         headers['x-inngest-env'] = envName;
       }
 
-      const sendEvent = ky.post(sendEventURL, {
-        json: jsonEvent,
+      await ky.post(sendEventURL, {
+        json: payload,
         headers,
       });
 
-      toast.promise(sendEvent, {
-        loading: 'Loading...',
-        success: () => {
-          router.invalidate();
-          onClose();
-          window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
-          return 'Event sent!';
-        },
-        error: 'Could not send event. Please try again later.',
-      });
+      router.invalidate();
+      window.location.reload(); // We need to reload page to display new events, because we can't update the URQL cache without using mutations
     },
-    [envName, isBranchChild, onClose, navigate, sendEventURL],
+    [sendEventURL, isBranchChild, envName, router, eventKey],
   );
 
-  const copyToClipboardAction = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const formData = new FormData(form);
-      const code = formData.get('code') as string;
+  const generateCloudSDKCode = useCallback(
+    (payload: EventPayload | EventPayload[]) => {
+      return `import { Inngest } from 'inngest';
 
-      toast.promise(navigator.clipboard.writeText(code), {
-        loading: 'Loading...',
-        success: () => {
-          router.invalidate();
-          onClose();
-          return 'Copied to clipboard!';
-        },
-        error: 'Could not copy to clipboard.',
-      });
+const inngest = new Inngest({
+  name: 'Your App Name',
+  eventKey: '${eventKey || '<EVENT_KEY>'}',${isBranchChild ? `\n  env: '${envName}',` : ''}
+});
+
+await inngest.send(${JSON.stringify(payload, null, 2)});`;
     },
-    [onClose, navigate],
+    [eventKey, isBranchChild, envName],
   );
 
-  let tabs = useMemo(() => {
-    return buildTabs({
-      envName,
-      payload,
-      eventKey,
-      sendEventURL,
-      isBranchChild,
-      copyToClipboardAction,
-      sendEventAction,
-    });
-  }, [
-    copyToClipboardAction,
-    envName,
-    eventKey,
-    isBranchChild,
-    payload,
-    sendEventAction,
-    sendEventURL,
-  ]);
-
-  return (
-    <Modal className="max-w-6xl" isOpen={isOpen} onClose={onClose}>
-      <Modal.Body>
-        <TabCards
-          defaultValue="JSON Editor"
-          onChange={() => {
-            tabs = buildTabs({
-              envName,
-              payload,
-              eventKey,
-              sendEventURL,
-              isBranchChild,
-              copyToClipboardAction,
-              sendEventAction,
-            });
-          }}
-        >
-          <div className="items-top flex justify-between">
-            <h2 className="text-basis text-xl">Send Event</h2>
-            <TabCards.ButtonList>
-              {tabs.map(({ tabLabel }) => (
-                <TabCards.Button key={tabLabel} value={tabLabel}>
-                  {tabLabel}
-                </TabCards.Button>
-              ))}
-            </TabCards.ButtonList>
-          </div>
-          {!hasEventKey && (
-            <Alert severity="warning" className="mb-2 text-sm">
-              There are no Event Keys for this environment. Please create an
-              Event Key in{' '}
-              <Alert.Link
-                to={pathCreator.keys({ envSlug: environment.slug })}
-                severity="warning"
-              >
-                the Manage tab
-              </Alert.Link>{' '}
-              first.
-            </Alert>
-          )}
-          <>
-            {tabs.map(
-              ({
-                tabLabel,
-                tabTitle,
-                submitButtonLabel,
-                submitButtonEnabled,
-                submitAction,
-                codeLanguage,
-                initialCode,
-              }) => (
-                <TabCards.Content
-                  key={tabLabel}
-                  value={tabLabel}
-                  className="p-0"
-                >
-                  <form onSubmit={submitAction}>
-                    <header className="flex items-center justify-between rounded-t-md p-2">
-                      <h3 className="px-2">{tabTitle}</h3>
-                      <Button
-                        type="submit"
-                        disabled={!submitButtonEnabled}
-                        label={submitButtonLabel}
-                        kind="primary"
-                      />
-                    </header>
-                    <div className="bg-codeEditor w-full overflow-auto rounded-b-md p-4">
-                      <CodeEditor
-                        language={codeLanguage}
-                        initialCode={initialCode}
-                        name="code"
-                        className="h-80 w-[640px]"
-                        onCodeChange={serializeData}
-                      />
-                    </div>
-                  </form>
-                </TabCards.Content>
-              ),
-            )}
-          </>
-        </TabCards>
-      </Modal.Body>
-      <Modal.Footer className="flex justify-end gap-2">
-        <Button
-          kind="secondary"
-          label="Close modal"
-          appearance="outlined"
-          onClick={onClose}
-        />
-      </Modal.Footer>
-    </Modal>
+  const generateCloudCurlCode = useCallback(
+    (payload: EventPayload | EventPayload[]) => {
+      return `curl ${sendEventURL} \\${isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''}
+  --data '${JSON.stringify(payload)}'`;
+    },
+    [sendEventURL, isBranchChild, envName],
   );
+
+  const processCloudData = useCallback(() => {
+    try {
+      if (initialData) {
+        const parsedData = JSON.parse(initialData);
+        if (Array.isArray(parsedData)) {
+          return JSON.stringify(
+            parsedData.map((item) => ({
+              name: item.name || eventName,
+              data: item.data || {},
+            })),
+            null,
+            2,
+          );
+        } else {
+          return JSON.stringify(
+            {
+              name: eventName,
+              data: parsedData.data || {},
+            },
+            null,
+            2,
+          );
+        }
+      }
+      return JSON.stringify({ name: eventName, data: {} }, null, 2);
+    } catch (error) {
+      console.error('Failed to parse initialData:', error);
+      return JSON.stringify({ name: eventName, data: {} }, null, 2);
+    }
+  }, [eventName, initialData]);
+
+  const config: SendEventConfig = useMemo(
+    () => ({
+      sendEvent,
+      generateSDKCode: generateCloudSDKCode,
+      generateCurlCode: generateCloudCurlCode,
+      ui: {
+        modalTitle: 'Send Event',
+        sendButtonLabel: 'Send event',
+        isLoading: false,
+      },
+      processInitialData: processCloudData,
+    }),
+    [sendEvent, generateCloudSDKCode, generateCloudCurlCode, processCloudData],
+  );
+
+  return <BaseSendEventModal data={data} isOpen={isOpen} onClose={onClose} config={config} />;
 }
 
 function usePreferDefaultEventKey(): string | undefined {
