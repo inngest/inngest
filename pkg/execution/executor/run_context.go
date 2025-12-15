@@ -1,7 +1,9 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -9,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
@@ -32,6 +35,11 @@ type runInstance struct {
 	// This is necessary to properly tie the parent span to queue items for eg.
 	// step.sleep, which require a completion span in some other future thread.
 	parentSpan *meta.SpanReference
+
+	// start is the time in which we started the job.  This is, realistically,
+	// the same time as redis_state.GetItemStart(ctx) but is explicit instead
+	// of implicit.
+	start time.Time
 }
 
 // RunContext interface implementation for runInstance
@@ -112,4 +120,10 @@ func (r *runInstance) ExecutionSpan() *meta.SpanReference {
 
 func (r *runInstance) ParentSpan() *meta.SpanReference {
 	return r.parentSpan
+}
+
+func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, tags map[string]any) {
+	metrics.HistogramExecutorLatency(ctx, time.Since(r.start), kind, metrics.HistogramOpt{
+		Tags: tags,
+	})
 }
