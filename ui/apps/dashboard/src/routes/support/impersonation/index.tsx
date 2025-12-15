@@ -4,28 +4,25 @@ import {
   createFileRoute,
   redirect,
   useLoaderData,
-  useSearch,
 } from '@tanstack/react-router';
 
-type ImpersonationLoaderData = {
-  actorToken?: string;
-};
 export const Route = createFileRoute('/support/impersonation/')({
   component: ImpersonationComponent,
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      userId: search.userId as string,
+      user_id: search.user_id as string | undefined,
     };
   },
-  loader: async ({ params: { userId } }: { params: { userId: string } }) => {
+  loaderDeps: ({ search: { user_id } }) => ({ user_id }),
+  loader: async ({ deps: { user_id } }) => {
     const user = await auth();
 
-    if (!user.userId || !userId) {
+    if (!user.userId || !user_id) {
       console.log('Missing user or userId');
       redirect({ to: '/', throw: true });
     }
 
-    const INNGEST_ORG_ID = import.meta.env.CLERK_INNGEST_ORG_ID;
+    const INNGEST_ORG_ID = process.env.CLERK_INNGEST_ORG_ID;
 
     if (!INNGEST_ORG_ID) {
       console.log('Missing CLERK_INNGEST_ORG_ID env variable');
@@ -39,7 +36,7 @@ export const Route = createFileRoute('/support/impersonation/')({
     const actorId = user.userId;
 
     const body = JSON.stringify({
-      user_id: userId,
+      user_id,
       actor: {
         sub: actorId,
       },

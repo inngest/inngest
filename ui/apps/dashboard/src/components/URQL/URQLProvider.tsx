@@ -61,9 +61,9 @@ export function URQLProvider({ children }: { children: React.ReactNode }) {
               Sentry.captureException(error);
               signOut(() => {
                 navigate({
-                  to: `${
-                    import.meta.env.CLERK_SIGN_IN_URL || '/sign-in'
-                  }?error=${SignInRedirectErrors.Unauthenticated}`,
+                  to: `${process.env.CLERK_SIGN_IN_URL || '/sign-in'}?error=${
+                    SignInRedirectErrors.Unauthenticated
+                  }`,
                 });
               });
             }

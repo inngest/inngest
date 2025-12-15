@@ -20,35 +20,8 @@ const requestMiddleware: RequestMiddleware = async (request) => {
   const { auth } = await import('@clerk/tanstack-react-start/server');
   const { getCookies } = await import('@tanstack/react-start/server');
 
-  const { getToken, sessionId, userId } = await auth();
+  const { getToken } = await auth();
   let sessionToken = await getToken();
-
-  //
-  // Debug logging for auth issues
-  console.log('[graphqlAPI] Auth state:', {
-    hasToken: !!sessionToken,
-    sessionId,
-    userId,
-    tokenLength: sessionToken?.length,
-  });
-
-  //
-  // In serverless environments after login, tokens may be briefly stale.
-  if (sessionToken) {
-    const decoded = decodeJWT(sessionToken);
-    const now = Date.now();
-    const expiresIn = decoded?.exp ? decoded.exp * 1000 - now : null;
-    const issuedAt = decoded?.iat ? decoded.iat * 1000 : null;
-
-    console.log('[graphqlAPI] Token details:', {
-      expiresIn: expiresIn ? `${Math.round(expiresIn / 1000)}s` : 'unknown',
-      issuedAt: issuedAt ? new Date(issuedAt).toISOString() : 'unknown',
-      isExpired: expiresIn !== null && expiresIn < 0,
-      claims: decoded ? Object.keys(decoded) : [],
-    });
-  } else {
-    console.log('[graphqlAPI] No session token, using cookies');
-  }
 
   let headers = request.headers;
   if (sessionToken) {
