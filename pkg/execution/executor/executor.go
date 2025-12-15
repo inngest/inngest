@@ -1791,7 +1791,9 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 	// Wait for result to be available within deadline and return, or continue processing asynchronously
 	deadline := 100 * time.Millisecond
 
-	done := make(chan bool)
+	// Create buffered channel to allow sending even without receiver
+	// but block receive until message is ready
+	done := make(chan bool, 1)
 
 	// Ensure this completes before we shut down the service
 	service.Go(func() {
@@ -1816,6 +1818,7 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 			if err != nil {
 				l.ReportError(err, "failed to cancel run after checking cancellation")
 			}
+
 			done <- true
 			return
 		}
@@ -1826,8 +1829,6 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 	select {
 	// Wait for result to be available
 	case cancelled := <-done:
-		// No more value will be produced
-		close(done)
 		return cancelled, nil
 		// Or continue processing after hitting deadline
 	case <-e.clock.After(deadline):
