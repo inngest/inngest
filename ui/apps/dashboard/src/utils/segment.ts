@@ -13,6 +13,12 @@ export const analytics = new Proxy(
       if (!analyticsInstance) {
         const writeKey = import.meta.env.VITE_SEGMENT_WRITE_KEY;
 
+        if (!writeKey) {
+          console.warn(
+            'VITE_SEGMENT_WRITE_KEY is not defined - analytics will not work',
+          );
+        }
+
         //
         // Only use custom CDN in production with valid writeKey
         const useCustomCdn = import.meta.env.PROD && writeKey;
