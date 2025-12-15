@@ -38,8 +38,8 @@ const useSwitchablePathname = (): string => {
   // to match Next.js useSelectedLayoutSegments behavior
   let segments = pathname.split('/').filter((segment) => segment.length > 0);
 
-  if (segments[0] === 'env' && segments.length > 1) {
-    segments = segments.slice(2);
+  if (segments[0] === 'env') {
+    segments = segments.length > 1 ? segments.slice(2) : [];
   }
 
   // Accounts are not environment specific
