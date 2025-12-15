@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -1360,6 +1361,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	// Start cancellation check
+	cancelled, err := e.checkCancellation(ctx, md, events)
+	if err != nil {
+		return nil, fmt.Errorf("could not check cancellation: %w", err)
+	}
+
 	//
 	// record function start time using the same method as step started,
 	// ensures ui timeline alignment
@@ -1379,7 +1386,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	if v.stopWithoutRetry {
+	if cancelled || v.stopWithoutRetry {
 		// Validation prevented execution and doesn't want the executor to retry, so
 		// don't return an error - assume the function finishes and delete state.
 		err := e.smv2.Delete(ctx, md.ID)
@@ -1763,6 +1770,71 @@ func correlationID(event event.Event) *string {
 		return &correlationID
 	}
 	return nil
+}
+
+func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
+	// If no cancellation checker was provided, assume run should not be cancelled
+	if e.cancellationChecker == nil {
+		return false, nil
+	}
+
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", md.ID.RunID,
+		"function_id", md.ID.FunctionID,
+		"workspace_id", md.ID.Tenant.EnvID,
+	)
+	evt := event.Event{}
+	if err := json.Unmarshal(evts[0], &evt); err != nil {
+		return false, fmt.Errorf("error decoding input event in cancellation checker: %w", err)
+	}
+
+	// Wait for result to be available within deadline and return, or continue processing asynchronously
+	deadline := 100 * time.Millisecond
+
+	// Create buffered channel to allow sending even without receiver
+	// but block receive until message is ready
+	done := make(chan bool, 1)
+
+	// Ensure this completes before we shut down the service
+	service.Go(func() {
+		cancel, err := e.cancellationChecker.IsCancelled(
+			ctx,
+			md.ID.Tenant.EnvID,
+			md.ID.FunctionID,
+			md.ID.RunID,
+			evt.Map(),
+		)
+		if err != nil {
+			if errors.Is(err, &expressions.CompileError{}) {
+				l.Warn("invalid cancellation expression", "error", err.Error())
+			} else {
+				l.Error("error checking cancellation", "error", err.Error())
+			}
+		}
+		if cancel != nil {
+			err = e.Cancel(ctx, md.ID, execution.CancelRequest{
+				CancellationID: &cancel.ID,
+			})
+			if err != nil {
+				l.ReportError(err, "failed to cancel run after checking cancellation")
+			}
+
+			done <- true
+			return
+		}
+
+		done <- false
+	})
+
+	select {
+	// Wait for result to be available
+	case cancelled := <-done:
+		return cancelled, nil
+		// Or continue processing after hitting deadline
+	case <-e.clock.After(deadline):
+		l.Debug("continuing cancellation check in background")
+		return false, nil
+	}
 }
 
 // run executes the step with the given step ID.
