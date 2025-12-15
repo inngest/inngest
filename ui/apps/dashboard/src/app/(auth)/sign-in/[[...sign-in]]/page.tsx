@@ -62,7 +62,7 @@ export default function SignInPage() {
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        {isLoaded && isSignedIn && !nestedRoute ? (
+        {isLoaded && isSignedIn && !nestedRoute && !clerk ? (
           <div className="flex items-center justify-center">
             <LoadingIcon />
           </div>
