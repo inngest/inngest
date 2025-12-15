@@ -413,6 +413,22 @@ func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, o
 	})
 }
 
+func HistogramExecutorLatency(ctx context.Context, dur time.Duration, typ string, opts HistogramOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["type"] = typ
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "execution_latency",
+		Description: "Distribution of latency within the executor",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  PausesBoundaries,
+	})
+}
+
 func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,
