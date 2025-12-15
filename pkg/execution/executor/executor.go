@@ -1476,6 +1476,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		stackIndex: stackIndex,
 		httpClient: e.httpClient,
 		parentSpan: parentRef,
+		c:          e.clock,
 		start:      start,
 	}
 
@@ -1499,13 +1500,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		// Track how long it took us from the queue item job starting -> calling run.
-		instance.trackLatencyHistogram(ctx, "queue_to_run", nil)
-
+		instance.trackLatencyHistogram(ctx, "queue_to_run_start", nil)
 		resp, err := e.run(ctx, &instance)
+		instance.trackLatencyHistogram(ctx, "run_start_to_request_end", nil)
 
 		defer func() {
-			// track how long it takes to finish the entire run.
-			instance.trackLatencyHistogram(ctx, "queue_to_done", map[string]any{
+			// track how long it takes to finish accounting after running.
+			instance.trackLatencyHistogram(ctx, "request_end_to_finalize", map[string]any{
 				"error": err == nil,
 			})
 		}()

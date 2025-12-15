@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/jonboulle/clockwork"
 )
 
 type runInstance struct {
@@ -36,10 +37,16 @@ type runInstance struct {
 	// step.sleep, which require a completion span in some other future thread.
 	parentSpan *meta.SpanReference
 
+	// c represents the clock
+	c clockwork.Clock
+
 	// start is the time in which we started the job.  This is, realistically,
 	// the same time as redis_state.GetItemStart(ctx) but is explicit instead
 	// of implicit.
 	start time.Time
+	// _latency tracks the time that each latency call was tracked, allowing us
+	// to substract time correctly.
+	_next time.Time
 }
 
 // RunContext interface implementation for runInstance
@@ -123,7 +130,13 @@ func (r *runInstance) ParentSpan() *meta.SpanReference {
 }
 
 func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, tags map[string]any) {
-	metrics.HistogramExecutorLatency(ctx, time.Since(r.start), kind, metrics.HistogramOpt{
+	if r._next.IsZero() {
+		r._next = r.start
+	}
+
+	metrics.HistogramExecutorLatency(ctx, time.Since(r._next), kind, metrics.HistogramOpt{
 		Tags: tags,
 	})
+
+	r._next = r.c.Now()
 }
