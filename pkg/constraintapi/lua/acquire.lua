@@ -261,7 +261,7 @@ end
 ---@param burst integer
 ---@param quantity integer
 local function throttle(key, now_ms, period_ms, limit, burst, quantity)
-	---@type { allowed: boolean, limit: integer?, retry_after: integer?, reset_after: integer?, remaining: integer? }
+	---@type { limit: integer, ei: number, retry_at: number, dvt: number, tat: number, inc: number, ntat: number, aat: number, diff: number, retry_after: integer?, ttl: number?, next: number?, remaining: integer?, reset_after: integer?, limited: boolean? }
 	local result = {}
 
 	-- limit defines the maximum number of requests that can be admitted at once (irrespective of current usage)
@@ -288,7 +288,8 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	end
 
 	result["tat"] = tat
-
+	-- When called with quantity 0, we simulate a call with quantity=1 to
+	-- calculate retry after, remaining, etc. values
 	local origQuantity = quantity
 	if quantity == 0 then
 		quantity = 1
@@ -330,11 +331,8 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 			-- if we did want to update, we got limited
 			local next = dvt - ttl
 			result["next"] = next
-			if next > -emission then
-				result["remaining"] = math.floor(next / emission)
-			end
+			result["remaining"] = 0
 			result["reset_after"] = ttl
-
 			result["limited"] = true
 
 			return result

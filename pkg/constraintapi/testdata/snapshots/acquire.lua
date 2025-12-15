@@ -186,9 +186,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		if origQuantity > 0 then
 			local next = dvt - ttl
 			result["next"] = next
-			if next > -emission then
-				result["remaining"] = math.floor(next / emission)
-			end
+			result["remaining"] = 0
 			result["reset_after"] = ttl
 			result["limited"] = true
 			return result
