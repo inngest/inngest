@@ -150,7 +150,7 @@ func TestNewGCRAScript(t *testing.T) {
 		limit := 10
 		burst := 0
 
-		// Read initial capacity
+		// First request should be admitted
 		res := runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -160,6 +160,7 @@ func TestNewGCRAScript(t *testing.T) {
 			quantity: 1,
 		})
 
+		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixMilli())
@@ -199,6 +200,7 @@ func TestNewGCRAScript(t *testing.T) {
 			quantity: 2,
 		})
 
+		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Milliseconds(), res.EmissionInterval)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixMilli())
@@ -229,7 +231,7 @@ func TestNewGCRAScript(t *testing.T) {
 		limit := 10
 		burst := 0
 
-		// Read initial capacity
+		// First request should be allowed
 		res := runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -242,10 +244,12 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(1*6*time.Second).UnixMilli())
 
+		require.False(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, clock.Now().Add(6*time.Second).UnixMilli(), res.RetryAtMS)
 
+		// Second request should be limited
 		res = runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -263,6 +267,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, clock.Now().Add(2*6*time.Second).Add(-6*time.Second).UnixMilli(), res.AllowAt)
 		require.Equal(t, -(6 * time.Second).Milliseconds(), res.Diff)
 
+		require.True(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 		// Accounts for burst
@@ -276,7 +281,7 @@ func TestNewGCRAScript(t *testing.T) {
 
 		clock := clockwork.NewFakeClock()
 
-		_, rc := initRedis(t)
+		r, rc := initRedis(t)
 		defer rc.Close()
 
 		key := "test"
@@ -285,7 +290,7 @@ func TestNewGCRAScript(t *testing.T) {
 		limit := 1
 		burst := 0
 
-		// Read initial capacity
+		// First request should work
 		res := runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -295,6 +300,7 @@ func TestNewGCRAScript(t *testing.T) {
 			quantity: 1,
 		})
 
+		require.False(t, res.Limited)
 		require.Equal(t, res.TAT, clock.Now().UnixMilli())
 		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixMilli())
 
@@ -302,6 +308,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, clock.Now().Add(24*time.Hour).UnixMilli(), res.RetryAtMS)
 
+		// Second request should be limited
 		res = runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -319,11 +326,42 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, clock.Now().Add(24*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixMilli(), res.AllowAt)
 		require.Equal(t, -(24 * time.Hour).Milliseconds(), res.Diff)
 
+		require.True(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 		require.Equal(t, 24*time.Hour, time.Duration(res.ResetAfterMS)*time.Millisecond)
 		require.Equal(t, 24*time.Hour, time.Duration(res.RetryAfterMS)*time.Millisecond)
 		require.Equal(t, clock.Now().Add(24*time.Hour).UnixMilli(), res.RetryAtMS)
+
+		// Waiting should reduce ttl but still reject
+
+		clock.Advance(4 * time.Hour)
+		r.FastForward(4 * time.Hour)
+		r.SetTime(clock.Now())
+
+		res = runScript(t, rc, gcraScriptOptions{
+			key:      key,
+			now:      clock.Now(),
+			period:   period,
+			limit:    limit,
+			burst:    burst,
+			quantity: 1,
+		})
+
+		require.Equal(t, (24 * time.Hour).Milliseconds(), res.EmissionInterval)
+		require.Equal(t, res.TAT, clock.Now().Add(20*time.Hour).UnixMilli())
+		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Hour+24*time.Hour).UnixMilli())
+		require.Equal(t, (24 * time.Hour * 1).Milliseconds(), res.DVT)
+		require.Equal(t, (1 * 24 * time.Hour).Milliseconds(), res.Increment)
+		require.Equal(t, clock.Now().Add(20*time.Hour).Add(1*24*time.Hour).Add(-24*time.Hour).UnixMilli(), res.AllowAt)
+		require.Equal(t, -(20 * time.Hour).Milliseconds(), res.Diff)
+
+		require.True(t, res.Limited)
+		require.Equal(t, 1, res.Limit)
+		require.Equal(t, 0, res.Remaining)
+		require.Equal(t, 20*time.Hour, time.Duration(res.ResetAfterMS)*time.Millisecond)
+		require.Equal(t, 20*time.Hour, time.Duration(res.RetryAfterMS)*time.Millisecond)
+		require.Equal(t, clock.Now().Add(20*time.Hour).UnixMilli(), res.RetryAtMS)
 	})
 
 	t.Run("3000 requests every minute should work", func(t *testing.T) {
@@ -340,7 +378,7 @@ func TestNewGCRAScript(t *testing.T) {
 		limit := 3000
 		burst := 0
 
-		// Read initial capacity
+		// First request should be allowed
 		res := runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -361,6 +399,7 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, time.Duration(0).Milliseconds(), res.Diff)
 
 		// Since we don't have a burst, only one request will be allowed every 20ms
+		require.False(t, res.Limited)
 		require.Equal(t, 1, res.Limit)
 		require.Equal(t, 0, res.Remaining)
 
@@ -383,7 +422,7 @@ func TestNewGCRAScript(t *testing.T) {
 		limit := 3000
 		burst := 1
 
-		// Read initial capacity
+		// First request should be allowed
 		res := runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
@@ -645,96 +684,6 @@ func TestNewGCRAScript(t *testing.T) {
 		require.Equal(t, time.Hour.Milliseconds(), res.ResetAfterMS)
 	})
 
-	t.Run("compatibility mode should have incorrectly large dvt", func(t *testing.T) {
-		t.Skip("compatibility mode was removed")
-		t.Parallel()
-
-		clock := clockwork.NewFakeClock()
-
-		_, rc := initRedis(t)
-		defer rc.Close()
-
-		key := "test"
-
-		period := time.Minute
-		limit := 3000
-		// simulate legacy gcra() beheavior
-		burst := 0
-
-		// Incorrect reading - legacy behavior
-		{
-			res := runScript(t, rc, gcraScriptOptions{
-				key:      key,
-				now:      clock.Now(),
-				period:   period,
-				limit:    limit,
-				burst:    burst,
-				quantity: 0,
-			})
-			require.False(t, res.Limited)
-			require.Equal(t, 1, res.Limit)
-			// NOTE: This is wrongly calculated as the dvt is much higher
-			// While it does lead to allowing the correct number of requests per minute,
-			// we need to adjust the default burst to ensure throughput does not drop
-			// if the arrival rate is not perfectly spaced out (which is the case for the queue)
-			require.Equal(t, 3000, res.Remaining)
-
-			correctDVT := int(res.EmissionInterval) * (burst + 1)
-			require.NotEqual(t, int64(correctDVT), res.DVT)
-			incorrectDVT := int(period.Milliseconds()) * (burst + 1)
-			require.Equal(t, int64(incorrectDVT), res.DVT)
-
-			// allow_at is significantly larger than expected. It should be 20ms
-			require.WithinDuration(t, clock.Now().Add(-time.Minute), time.UnixMilli(res.AllowAt), time.Second)
-		}
-
-		// Correct reading without adjusting for rate smoothing
-		{
-			res := runScript(t, rc, gcraScriptOptions{
-				key:      key,
-				now:      clock.Now(),
-				period:   period,
-				limit:    limit,
-				burst:    burst,
-				quantity: 0,
-			})
-			require.False(t, res.Limited)
-			require.Equal(t, 1, res.Limit)
-			// NOTE: Without admitting a higher burst, we will smooth the rate to allow just one request
-			require.Equal(t, 1, res.Remaining)
-
-			correctDVT := int(res.EmissionInterval) * (burst + 1)
-			require.Equal(t, int64(correctDVT), res.DVT)
-
-			// Expect allow_at to be 20ms in the past (one emission interval since burst is minimum of 1)
-			require.WithinDuration(t, clock.Now().Add(-20*time.Millisecond), time.UnixMilli(res.AllowAt), time.Second)
-		}
-
-		// Correct reading adjusted for non-uniform arrival rate
-		{
-			maxBurst := limit + burst - 1
-			res := runScript(t, rc, gcraScriptOptions{
-				key:      key,
-				now:      clock.Now(),
-				period:   period,
-				limit:    limit,
-				burst:    maxBurst,
-				quantity: 0,
-			})
-			require.False(t, res.Limited)
-			require.Equal(t, 3000, res.Limit)
-			// NOTE: This is now adjusted to allow as many requests as possible within the period and limit constraints
-			require.Equal(t, 3000, res.Remaining)
-
-			correctDVT := int(res.EmissionInterval) * (maxBurst + 1)
-			require.Equal(t, int64(correctDVT), res.DVT)
-
-			// allow_at is now 1 minute in the past since we can admit 3000 requests * 20ms = 60s at once = period
-			require.WithinDuration(t, clock.Now().Add(-time.Minute), time.UnixMilli(res.AllowAt), time.Second)
-
-		}
-	})
-
 	t.Run("retryAt should be properly calculated", func(t *testing.T) {
 		t.Parallel()
 
@@ -761,7 +710,7 @@ func TestNewGCRAScript(t *testing.T) {
 		})
 		require.WithinDuration(t, clock.Now().Add(6*time.Second), time.UnixMilli(res.RetryAtMS), time.Second)
 
-		// Read initial capacity
+		// First request should work
 		res = runScript(t, rc, gcraScriptOptions{
 			key:      key,
 			now:      clock.Now(),
