@@ -412,3 +412,14 @@ func HistogramCancellationReadDuration(ctx context.Context, dur time.Duration, o
 		Boundaries:  cancellationReadDurationBoundaries,
 	})
 }
+
+func HistogramCancellationCheckDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_check_duration",
+		Description: "Distribution of cancellation check duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  cancellationReadDurationBoundaries,
+	})
+}
