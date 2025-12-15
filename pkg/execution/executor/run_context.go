@@ -135,7 +135,8 @@ func (r *runInstance) trackLatencyHistogram(ctx context.Context, kind string, ta
 	}
 
 	metrics.HistogramExecutorLatency(ctx, time.Since(r._next), kind, metrics.HistogramOpt{
-		Tags: tags,
+		PkgName: "executor",
+		Tags:    tags,
 	})
 
 	r._next = r.c.Now()
