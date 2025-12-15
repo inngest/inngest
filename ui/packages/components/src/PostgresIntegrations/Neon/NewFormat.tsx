@@ -97,7 +97,7 @@ export default function NeonFormat({
       {isVerified ? (
         <Button
           label="Next"
-          href={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
+          to={`/settings/integrations/${integration}/${IntegrationSteps.ConnectDb}`}
         />
       ) : (
         <Button
