@@ -44,7 +44,7 @@ type runInstance struct {
 	// the same time as redis_state.GetItemStart(ctx) but is explicit instead
 	// of implicit.
 	start time.Time
-	// _latency tracks the time that each latency call was tracked, allowing us
+	// _next tracks the time that each latency call was tracked, allowing us
 	// to substract time correctly.
 	_next time.Time
 }
