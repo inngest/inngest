@@ -643,6 +643,8 @@ func TestConstraintEnforcement(t *testing.T) {
 			afterAcquire: func(t *testing.T, deps *deps, resp *CapacityAcquireResponse) {
 				t.Log(resp.Debug())
 
+				require.Len(t, resp.Leases, 1)
+
 				require.Len(t, resp.LimitingConstraints, 1)
 				require.Equal(t, ConstraintKindThrottle, resp.LimitingConstraints[0].Kind)
 				require.False(t, resp.RetryAfter.IsZero())
@@ -651,6 +653,7 @@ func TestConstraintEnforcement(t *testing.T) {
 			},
 			afterPostAcquireCheck: func(t *testing.T, deps *deps, resp *CapacityCheckResponse) {
 				require.Equal(t, 1, resp.Usage[0].Used)
+				require.Equal(t, 1, resp.Usage[0].Limit)
 			},
 		},
 

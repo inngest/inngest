@@ -95,21 +95,68 @@ local function rateLimitCapacity(key, now_ns, period_ns, limit, burst)
 		return { remaining, toInteger(next_available_at_ns), used_tokens }
 	end
 end
-local function throttleCapacity(key, now_ms, period_ms, limit, burst)
+local function throttle(key, now_ms, period_ms, limit, burst, quantity)
+	local result = {}
+	result["limit"] = burst + 1
 	local emission = period_ms / math.max(limit, 1)
-	local total_capacity_time = emission * (limit + burst)
-	local tat = call("GET", key)
+	result["ei"] = emission
+	result["retry_at"] = now_ms + emission
+	local dvt = emission * (burst + 1)
+	result["dvt"] = dvt
+	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
 		tat = tonumber(tat)
 	end
-	local time_capacity_remain = now_ms + total_capacity_time - tat
-	local capacity = math.floor(time_capacity_remain / emission)
-	local final_capacity = math.min(capacity, limit + burst)
-	local new_tat_after_consumption = math.max(tat, now_ms) + final_capacity * emission
-	local next_available_at_ms = math.ceil(new_tat_after_consumption - total_capacity_time + emission)
-	return { final_capacity, next_available_at_ms }
+	result["tat"] = tat
+	local origQuantity = quantity
+	if quantity == 0 then
+		quantity = 1
+	end
+	local increment = quantity * emission
+	result["inc"] = increment
+	local new_tat = tat + increment
+	if now_ms > tat then
+		new_tat = now_ms + increment
+	end
+	result["ntat"] = new_tat
+	local allow_at = new_tat - dvt
+	result["aat"] = allow_at
+	local diff = now_ms - allow_at
+	result["diff"] = diff
+	local ttl = 0
+	if diff < 0 then
+		if increment <= dvt then
+			result["retry_after"] = -diff
+			result["retry_at"] = now_ms - diff
+			ttl = tat - now_ms
+			result["ttl"] = ttl
+		end
+		if origQuantity > 0 then
+			local next = dvt - ttl
+			result["next"] = next
+			result["remaining"] = 0
+			result["reset_after"] = ttl
+			result["limited"] = true
+			return result
+		end
+	end
+	ttl = tat - now_ms
+	if origQuantity > 0 then
+		ttl = new_tat - now_ms
+		local expiry = string.format("%d", math.max(ttl / 1000, 1))
+		redis.call("SET", key, new_tat, "EX", expiry)
+	end
+	result["ttl"] = ttl
+	local next = dvt - ttl
+	if next > -emission then
+		local remaining = math.floor(next / emission)
+		result["remaining"] = remaining
+	end
+	result["reset_after"] = ttl
+	result["next"] = next
+	return result
 end
 local configVersion = requestDetails.cv
 local constraints = requestDetails.s
@@ -160,9 +207,10 @@ for index, value in ipairs(constraints) do
 		table.insert(constraintUsage, usage)
 	elseif value.k == 3 then
 		debug("evaluating throttle")
-		local throttleRes = throttleCapacity(value.t.k, nowMS, value.t.p, value.t.l, value.t.b)
-		constraintCapacity = throttleRes[1]
-		constraintRetryAfter = toInteger(throttleRes[2]) 
+		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
+		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
+		constraintCapacity = throttleRes["remaining"]
+		constraintRetryAfter = toInteger(throttleRes["retry_at"]) 
 		local usage = {}
 		usage["l"] = value.t.l
 		usage["u"] = math.max(math.min(value.t.l - constraintCapacity, value.t.l or 0), 0)
