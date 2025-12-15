@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
@@ -347,7 +348,7 @@ func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 			args = append(args, k, v)
 		}
 
-		args = append(args, "err", err)
+		args = append(args, "err", err, "stack", debug.Stack())
 
 		l.Error(msg, args...)
 	}
