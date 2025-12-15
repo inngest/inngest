@@ -123,6 +123,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
 		driverv1: map[string]driver.DriverV1{},
 		driverv2: map[string]driver.DriverV2{},
+		clock:    clockwork.NewRealClock(),
 	}
 
 	for _, o := range opts {
