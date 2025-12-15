@@ -1773,20 +1773,27 @@ func correlationID(event event.Event) *string {
 }
 
 func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
+	// If no cancellation checker was provided, assume run should not be cancelled
 	if e.cancellationChecker == nil {
 		return false, nil
 	}
 
-	l := logger.StdlibLogger(ctx)
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", md.ID.RunID,
+		"function_id", md.ID.FunctionID,
+		"workspace_id", md.ID.Tenant.EnvID,
+	)
 	evt := event.Event{}
 	if err := json.Unmarshal(evts[0], &evt); err != nil {
 		return false, fmt.Errorf("error decoding input event in cancellation checker: %w", err)
 	}
 
+	// Wait for result to be available within deadline and return, or continue processing asynchronously
 	deadline := 100 * time.Millisecond
 
 	done := make(chan bool)
 
+	// Ensure this completes before we shut down the service
 	service.Go(func() {
 		cancel, err := e.cancellationChecker.IsCancelled(
 			ctx,
@@ -1797,21 +1804,9 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 		)
 		if err != nil {
 			if errors.Is(err, &expressions.CompileError{}) {
-				logger.StdlibLogger(ctx).Warn(
-					"invalid cancellation expression",
-					"error", err.Error(),
-					"run_id", md.ID.RunID,
-					"function_id", md.ID.FunctionID,
-					"workspace_id", md.ID.Tenant.EnvID,
-				)
+				l.Warn("invalid cancellation expression", "error", err.Error())
 			} else {
-				logger.StdlibLogger(ctx).Error(
-					"error checking cancellation",
-					"error", err.Error(),
-					"run_id", md.ID.RunID,
-					"function_id", md.ID.FunctionID,
-					"workspace_id", md.ID.Tenant.EnvID,
-				)
+				l.Error("error checking cancellation", "error", err.Error())
 			}
 		}
 		if cancel != nil {
@@ -1822,15 +1817,21 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 				l.ReportError(err, "failed to cancel run after checking cancellation")
 			}
 			done <- true
+			return
 		}
 
 		done <- false
 	})
 
 	select {
+	// Wait for result to be available
 	case cancelled := <-done:
+		// No more value will be produced
+		close(done)
 		return cancelled, nil
+		// Or continue processing after hitting deadline
 	case <-e.clock.After(deadline):
+		l.Debug("continuing cancellation check in background")
 		return false, nil
 	}
 }
