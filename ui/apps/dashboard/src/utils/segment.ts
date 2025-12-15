@@ -11,21 +11,23 @@ export const analytics = new Proxy(
       }
 
       if (!analyticsInstance) {
+        const writeKey = import.meta.env.VITE_SEGMENT_WRITE_KEY;
+
+        //
+        // Only use custom CDN in production with valid writeKey
+        const useCustomCdn = import.meta.env.PROD && writeKey;
+
         analyticsInstance = AnalyticsBrowser.load(
           {
-            writeKey: import.meta.env.VITE_SEGMENT_WRITE_KEY!,
-            cdnURL:
-              import.meta.env.MODE === 'production'
-                ? 'https://analytics-cdn.inngest.com'
-                : undefined,
+            writeKey: writeKey!,
+            cdnURL: useCustomCdn
+              ? 'https://analytics-cdn.inngest.com'
+              : undefined,
           },
           {
             integrations: {
               'Segment.io': {
-                apiHost:
-                  import.meta.env.MODE === 'production'
-                    ? 'analytics.inngest.com/v1'
-                    : undefined,
+                apiHost: useCustomCdn ? 'analytics.inngest.com/v1' : undefined,
                 protocol: 'https',
               },
             },
