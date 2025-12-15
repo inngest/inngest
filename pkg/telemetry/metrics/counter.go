@@ -770,3 +770,12 @@ func IncrQueueThrottleStatus(ctx context.Context, count int64, opts CounterOpt) 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrAsyncCancellationCheckCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "async_cancellation_check",
+		Description: "Total number of async cancellation checks",
+		Tags:        opts.Tags,
+	})
+}
