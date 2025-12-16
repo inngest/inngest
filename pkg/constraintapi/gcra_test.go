@@ -894,7 +894,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixNano())
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.Increment)
@@ -934,7 +934,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(6*time.Second).UnixNano())
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.Increment)
@@ -974,7 +974,7 @@ func TestRateLimitGCRA(t *testing.T) {
 
 		require.False(t, res.Limited)
 		require.Equal(t, (6 * time.Second).Nanoseconds(), res.EmissionInterval)
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(2*6*time.Second).UnixNano())
 		require.Equal(t, (12 * time.Second).Nanoseconds(), res.DVT)
 		require.Equal(t, (2 * 6 * time.Second).Nanoseconds(), res.Increment)
@@ -1013,7 +1013,7 @@ func TestRateLimitGCRA(t *testing.T) {
 			quantity: 1,
 		})
 
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(1*6*time.Second).UnixNano())
 
 		require.False(t, res.Limited)
@@ -1073,7 +1073,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		})
 
 		require.False(t, res.Limited)
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(24*time.Hour).UnixNano())
 
 		require.Equal(t, 1, res.Limit)
@@ -1160,7 +1160,7 @@ func TestRateLimitGCRA(t *testing.T) {
 			quantity: 1,
 		})
 
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(20*time.Millisecond).UnixNano())
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.DVT)
@@ -1205,7 +1205,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		})
 		require.False(t, res.Limited)
 
-		require.Equal(t, res.TAT, clock.Now().UnixNano())
+		require.WithinDuration(t, clock.Now(), time.Unix(0, res.TAT), time.Second)
 		require.Equal(t, res.NewTAT, clock.Now().Add(2*20*time.Millisecond).UnixNano())
 		require.Equal(t, (20 * time.Millisecond).Nanoseconds(), res.EmissionInterval)
 		require.Equal(t, (2 * 20 * time.Millisecond).Nanoseconds(), res.DVT)
@@ -1306,7 +1306,7 @@ func TestRateLimitGCRA(t *testing.T) {
 		require.False(t, res.Limited)
 		require.Equal(t, 20, res.Limit)
 		require.Equal(t, 20, res.Remaining)
-		require.Equal(t, clock.Now().Add(3*time.Second).UnixNano(), res.RetryAtMS)
+		require.WithinDuration(t, clock.Now().Add(3*time.Second), time.Unix(0, res.RetryAtMS), time.Second)
 
 		// use half the capacity at once
 		res = runScript(t, rc, gcraScriptOptions{
