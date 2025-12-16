@@ -69,7 +69,7 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	result["retry_at"] = now_ns + emission
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
-	local tat = call("GET", key)
+	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ns
 	else
@@ -114,7 +114,7 @@ local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 		used_tokens = math.min(math.ceil(ttl / emission), limit)
 		result["u"] = used_tokens
 		local expiry = string.format("%d", math.max(ttl / 1000000000, 1))
-		call("SET", key, new_tat, "EX", expiry)
+		redis.call("SET", key, new_tat, "EX", expiry)
 	end
 	local next = dvt - ttl
 	result["next"] = next
@@ -132,7 +132,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	result["retry_at"] = now_ms + emission
 	local dvt = emission * (burst + 1)
 	result["dvt"] = dvt
-	local tat = call("GET", key)
+	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
 	else
@@ -177,7 +177,7 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 		used_tokens = math.min(math.ceil(ttl / emission), limit)
 		result["u"] = used_tokens
 		local expiry = string.format("%d", math.max(ttl / 1000, 1))
-		call("SET", key, new_tat, "EX", expiry)
+		redis.call("SET", key, new_tat, "EX", expiry)
 	end
 	local next = dvt - ttl
 	result["next"] = next
