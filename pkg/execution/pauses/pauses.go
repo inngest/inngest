@@ -139,6 +139,10 @@ type Manager interface {
 	// Used for debugging block deletion tracking. Returns IDs, total count, and error.
 	GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error)
 
+	// CleanBlock deletes all pauses in a block and triggers compaction
+	// Used mainly as manual intervention for now.
+	CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error
+
 	// DeletePauseByID deletes a pause by its ID, handling both buffer and block storage
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 }
@@ -224,6 +228,9 @@ type BlockFlusher interface {
 
 	// DeleteByID deletes a pause from a block by its ID.
 	DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
+
+	// CleanBlock deletes all pauses in a block and triggers compaction.
+	CleanBlock(ctx context.Context, index Index, blockID ulid.ULID) error
 }
 
 // BlockReader reads blocks for a given index.
