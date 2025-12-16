@@ -134,7 +134,7 @@ func (r *resolver) Dialer() Dialer {
 
 		// First, dial the IPv4 addresses.
 		for _, idx := range r.randPerm(len(four)) {
-			ip := ips[idx]
+			ip := four[idx]
 			conn, err := r.dialer(ctx, network, net.JoinHostPort(ip.String(), port))
 			if err == nil {
 				return conn, nil
@@ -145,7 +145,7 @@ func (r *resolver) Dialer() Dialer {
 		}
 
 		for _, idx := range r.randPerm(len(six)) {
-			ip := ips[idx]
+			ip := six[idx]
 			conn, err := r.dialer(ctx, network, net.JoinHostPort(ip.String(), port))
 			if err == nil {
 				return conn, nil
