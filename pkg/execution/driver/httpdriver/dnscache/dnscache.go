@@ -34,8 +34,10 @@ type DNSResolver interface {
 	Dialer() Dialer
 }
 
-type ResolverOpts func(r *resolver)
-type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+type (
+	ResolverOpts func(r *resolver)
+	Dialer       func(ctx context.Context, network, addr string) (net.Conn, error)
+)
 
 func New(opts ...ResolverOpts) *resolver {
 	r := resolver{
@@ -120,8 +122,18 @@ func (r *resolver) Dialer() Dialer {
 			return nil, err
 		}
 
+		// XXX: When IPv6 and IPv4 are both specified, prefer IPv4.  This allows us to
+		// prefer egress without NAT64 hops, which on some clouds is required.
+		//
+		// We cna also implement our own "happy eyes" dial mechanism which allows us
+		// to dial both and eject after 300ms.
+
+		six, four := sixfour(ips)
+
 		var retErr error
-		for _, idx := range r.randPerm(len(ips)) {
+
+		// First, dial the IPv4 addresses.
+		for _, idx := range r.randPerm(len(four)) {
 			ip := ips[idx]
 			conn, err := r.dialer(ctx, network, net.JoinHostPort(ip.String(), port))
 			if err == nil {
@@ -131,6 +143,18 @@ func (r *resolver) Dialer() Dialer {
 				retErr = err
 			}
 		}
+
+		for _, idx := range r.randPerm(len(six)) {
+			ip := ips[idx]
+			conn, err := r.dialer(ctx, network, net.JoinHostPort(ip.String(), port))
+			if err == nil {
+				return conn, nil
+			}
+			if retErr == nil {
+				retErr = err
+			}
+		}
+
 		return nil, retErr
 	}
 }
@@ -165,6 +189,18 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 	}
 
 	return item.Value(), nil
+}
+
+// sixfour returns the ips split by ipv6 and ipv4
+func sixfour(ips []net.IP) (six []net.IP, four []net.IP) {
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			four = append(four, ip)
+		} else {
+			six = append(six, ip)
+		}
+	}
+	return six, four
 }
 
 func (r *resolver) randPerm(n int) []int {
