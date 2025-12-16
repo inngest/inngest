@@ -1,9 +1,7 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { OrganizationList } from '@clerk/tanstack-react-start';
-import SplitView from '@/components/SignIn/SplitView';
-import { useAuth } from '@clerk/tanstack-react-start';
-import { useEffect, useRef } from 'react';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
+import SplitView from '@/components/SignIn/SplitView';
+import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
+import { createFileRoute } from '@tanstack/react-router';
 
 type OrganizationListSearchParams = {
   redirect_url?: string;
@@ -26,58 +24,15 @@ export const Route = createFileRoute('/(auth)/organization-list/$')({
 
 function RouteComponent() {
   const { redirect_url } = Route.useSearch();
-  const navigate = useNavigate();
-  const { isLoaded, orgId, getToken } = useAuth();
-  const initialOrgIdRef = useRef<string | null | undefined>(undefined);
-
+  const { isLoaded, orgId } = useAuth();
+  const isRedirect = !location.pathname.startsWith('/organization-list');
   const redirectURL =
     redirect_url || import.meta.env.VITE_PUBLIC_HOME_PATH || '/';
-
-  useEffect(() => {
-    if (!isLoaded) {
-      return;
-    }
-    if (initialOrgIdRef.current !== undefined) {
-      return;
-    }
-
-    initialOrgIdRef.current = orgId ?? null;
-  }, [isLoaded, orgId]);
-
-  const shouldRedirect =
-    isLoaded &&
-    !!orgId &&
-    initialOrgIdRef.current !== undefined &&
-    orgId !== initialOrgIdRef.current;
-
-  useEffect(() => {
-    if (!shouldRedirect) {
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      await getToken({ skipCache: true });
-      if (cancelled) {
-        return;
-      }
-
-      navigate({
-        to: redirectURL,
-        replace: true,
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [getToken, navigate, redirectURL, shouldRedirect]);
 
   return (
     <SplitView>
       <div className="mx-auto my-auto text-center">
-        {shouldRedirect ? (
+        {isLoaded && orgId && isRedirect ? (
           <div className="flex items-center justify-center">
             <LoadingIcon />
           </div>
