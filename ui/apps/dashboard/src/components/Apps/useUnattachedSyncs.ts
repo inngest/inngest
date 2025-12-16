@@ -13,11 +13,17 @@ const query = graphql(`
   }
 `);
 
-export function useLatestUnattachedSync({ envID }: { envID: string }) {
+export function useLatestUnattachedSync({
+  envID,
+  userId,
+}: {
+  envID: string;
+  userId: string | null | undefined;
+}) {
   const client = useClient();
 
   return useQuery({
-    queryKey: ['latestUnattachedSync', envID],
+    queryKey: ['latestUnattachedSync', envID, userId],
     queryFn: async () => {
       const result = await client.query(query, { envID }).toPromise();
 

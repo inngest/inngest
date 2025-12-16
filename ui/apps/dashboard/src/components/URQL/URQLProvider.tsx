@@ -27,9 +27,13 @@ export default function URQLProviderWrapper({
 }: {
   children: React.ReactNode;
 }) {
-  const { isSignedIn, orgId } = useAuth();
+  const { isSignedIn, orgId, userId } = useAuth();
 
-  return <URQLProvider key={`${isSignedIn}-${orgId}`}>{children}</URQLProvider>;
+  return (
+    <URQLProvider key={`${isSignedIn}-${orgId}-${userId}`}>
+      {children}
+    </URQLProvider>
+  );
 }
 
 export function URQLProvider({ children }: { children: React.ReactNode }) {

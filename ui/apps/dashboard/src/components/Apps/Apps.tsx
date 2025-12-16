@@ -10,6 +10,7 @@ import { UnattachedSyncsCard } from '@/components/Apps/UnattachedSyncsCard';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useApps } from './useApps';
 import { useLatestUnattachedSync } from './useUnattachedSyncs';
+import { useAuth } from '@clerk/tanstack-react-start';
 
 type Props = {
   isArchived?: boolean;
@@ -17,13 +18,17 @@ type Props = {
 
 export function Apps({ isArchived = false }: Props) {
   const env = useEnvironment();
-  const unattachedSyncRes = useLatestUnattachedSync({ envID: env.id });
+  const { userId } = useAuth();
+  const unattachedSyncRes = useLatestUnattachedSync({
+    envID: env.id,
+    userId,
+  });
   if (unattachedSyncRes.error) {
     // Swallow error because we don't want to crash the page.
     console.error(unattachedSyncRes.error);
   }
 
-  const appsRes = useApps({ envID: env.id, isArchived });
+  const appsRes = useApps({ envID: env.id, isArchived, userId });
   if (appsRes.error) {
     throw appsRes.error;
   }

@@ -66,14 +66,16 @@ const query = graphql(`
 export function useApps({
   envID,
   isArchived,
+  userId,
 }: {
   envID: string;
   isArchived: boolean;
+  userId: string | null | undefined;
 }) {
   const client = useClient();
 
   return useQuery({
-    queryKey: ['apps', envID, isArchived],
+    queryKey: ['apps', envID, isArchived, userId],
     queryFn: async () => {
       const result = await client
         .query(
